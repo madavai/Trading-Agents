@@ -63,12 +63,14 @@ export async function probe(source: Source, userAgent: string, fetchImpl: Fetch 
   }
 }
 
-/** The user agent each source sees: the project's name and address, and the person's email for the SEC when given. */
-export function userAgent(contact: string, email: string): string {
-  return email.trim() ? `${contact} ${email.trim()}` : contact;
+/** The user agent a source sees: the project's name and address. The person's email goes to the SEC alone, which asks
+ *  every caller for one; no other source ever sees it. */
+export function userAgentFor(url: string, contact: string, email: string): string {
+  const host = new URL(url).hostname;
+  const sec = host === 'sec.gov' || host.endsWith('.sec.gov');
+  return sec && email.trim() ? `${contact} ${email.trim()}` : contact;
 }
 
 export async function probeAll(contact: string, secEmail: string, fetchImpl: Fetch = fetch, timeoutMs = 8000): Promise<ProbeResult[]> {
-  const ua = userAgent(contact, secEmail);
-  return Promise.all(SOURCES.map((s) => probe(s, ua, fetchImpl, timeoutMs)));
+  return Promise.all(SOURCES.map((s) => probe(s, userAgentFor(s.url, contact, secEmail), fetchImpl, timeoutMs)));
 }

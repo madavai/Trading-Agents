@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { probe, probeAll, SOURCES, userAgent } from '../src/check/probes.js';
+import { probe, probeAll, SOURCES, userAgentFor } from '../src/check/probes.js';
 import { dataLine, deskCheck, nodeLine, robinhoodLine } from '../src/check/desk-check.js';
 
 const answer = (status: number, body: string): typeof fetch => async () => new Response(body, { status });
@@ -34,13 +34,16 @@ test('silence and network failures read as unreachable, never as no data', async
   assert.match((await probe(source, 'ua', down)).detail, /unreachable \(fetch failed\)/);
 });
 
-test('every source is asked, with the contact as the user agent', async () => {
-  const seen: string[] = [];
-  const f: typeof fetch = async (_url, init) => { seen.push(String((init?.headers as Record<string, string>)['User-Agent'])); return new Response('{"chart":1,"news":1,"messages":1,"ticker":1} <feed observation_date', { status: 200 }); };
+test('every source is asked with the contact as the user agent, and only the SEC sees the email', async () => {
+  const seen = new Map<string, string>();
+  const f: typeof fetch = async (url, init) => { seen.set(new URL(String(url)).hostname, String((init?.headers as Record<string, string>)['User-Agent'])); return new Response('{"chart":1,"news":1,"messages":1,"ticker":1} <feed observation_date', { status: 200 }); };
   const all = await probeAll('trading-agents (+x)', 'me@example.com', f);
   assert.equal(all.length, SOURCES.length);
-  assert.ok(seen.every((u) => u === 'trading-agents (+x) me@example.com'));
-  assert.equal(userAgent('c', '  '), 'c');
+  for (const [host, ua] of seen) assert.equal(ua, host === 'www.sec.gov' ? 'trading-agents (+x) me@example.com' : 'trading-agents (+x)', host);
+  assert.ok(seen.has('www.sec.gov'));
+  assert.equal(userAgentFor('https://data.sec.gov/x', 'c', 'me@example.com'), 'c me@example.com');
+  assert.equal(userAgentFor('https://notsec.gov/x', 'c', 'me@example.com'), 'c');
+  assert.equal(userAgentFor('https://www.sec.gov/x', 'c', '  '), 'c');
 });
 
 test('the machine lines say what is missing in plain words', () => {

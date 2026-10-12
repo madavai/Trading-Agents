@@ -23530,10 +23530,10 @@ async function head(res) {
   });
   return new TextDecoder().decode(Buffer.concat(chunks));
 }
-async function probe(source, userAgent2, fetchImpl = fetch, timeoutMs = 8e3) {
+async function probe(source, userAgent, fetchImpl = fetch, timeoutMs = 8e3) {
   const started = Date.now();
   try {
-    const res = await fetchImpl(source.url, { headers: { "User-Agent": userAgent2, Accept: "*/*" }, signal: AbortSignal.timeout(timeoutMs) });
+    const res = await fetchImpl(source.url, { headers: { "User-Agent": userAgent, Accept: "*/*" }, signal: AbortSignal.timeout(timeoutMs) });
     const ms = Date.now() - started;
     if (!res.ok) {
       await res.body?.cancel().catch(() => {
@@ -23549,12 +23549,13 @@ async function probe(source, userAgent2, fetchImpl = fetch, timeoutMs = 8e3) {
     return { name: source.name, ok: false, detail: `unreachable (${err.message})` };
   }
 }
-function userAgent(contact, email2) {
-  return email2.trim() ? `${contact} ${email2.trim()}` : contact;
+function userAgentFor(url, contact, email2) {
+  const host = new URL(url).hostname;
+  const sec = host === "sec.gov" || host.endsWith(".sec.gov");
+  return sec && email2.trim() ? `${contact} ${email2.trim()}` : contact;
 }
 async function probeAll(contact, secEmail, fetchImpl = fetch, timeoutMs = 8e3) {
-  const ua = userAgent(contact, secEmail);
-  return Promise.all(SOURCES.map((s) => probe(s, ua, fetchImpl, timeoutMs)));
+  return Promise.all(SOURCES.map((s) => probe(s, userAgentFor(s.url, contact, secEmail), fetchImpl, timeoutMs)));
 }
 
 // src/version.ts
