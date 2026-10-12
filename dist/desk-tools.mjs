@@ -4015,12 +4015,12 @@ var require_fast_uri = __commonJS({
     }
     function hasMalformedPercentEncoding(component) {
       if (component === void 0) return false;
-      let percent = component.indexOf("%");
-      while (percent !== -1) {
-        if (percent + 2 >= component.length || !/^[\da-f]{2}$/iu.test(component.slice(percent + 1, percent + 3))) {
+      let percent2 = component.indexOf("%");
+      while (percent2 !== -1) {
+        if (percent2 + 2 >= component.length || !/^[\da-f]{2}$/iu.test(component.slice(percent2 + 1, percent2 + 3))) {
           return true;
         }
-        percent = component.indexOf("%", percent + 3);
+        percent2 = component.indexOf("%", percent2 + 3);
       }
       return false;
     }
@@ -12271,9 +12271,9 @@ var NONE = 0;
 var ASSUMED = 1;
 var PROVEN = 2;
 function isRecursive(inst, stack, resolve) {
-  const cached2 = recursive.get(inst);
-  if (cached2 !== void 0)
-    return cached2 ? PROVEN : NONE;
+  const cached3 = recursive.get(inst);
+  if (cached3 !== void 0)
+    return cached3 ? PROVEN : NONE;
   if (stack.has(inst))
     return PROVEN;
   stack.add(inst);
@@ -26705,21 +26705,21 @@ function visit(schema, fnOrHandlers) {
     const h = fnOrHandlers[node2._zod.def.type];
     return h ? h(node2, rewritten) : node2;
   };
-  const cache2 = /* @__PURE__ */ new Map();
+  const cache3 = /* @__PURE__ */ new Map();
   function run(s) {
-    const cached2 = cache2.get(s);
-    if (cached2 === RESOLVING) {
+    const cached3 = cache3.get(s);
+    if (cached3 === RESOLVING) {
       return new $ZodLazy({
         type: "lazy",
-        getter: () => cache2.get(s)
+        getter: () => cache3.get(s)
       });
     }
-    if (cached2 !== void 0)
-      return cached2;
-    cache2.set(s, RESOLVING);
+    if (cached3 !== void 0)
+      return cached3;
+    cache3.set(s, RESOLVING);
     const inner = mapInner(s);
     const mapped = fn(inner, inner !== s);
-    cache2.set(s, mapped);
+    cache3.set(s, mapped);
     return mapped;
   }
   function mapInner(s) {
@@ -34597,7 +34597,7 @@ var Protocol = class {
           }
         };
       }
-      const cancel = (reason) => {
+      const cancel = (reason2) => {
         this._responseHandlers.delete(messageId);
         this._progressHandlers.delete(messageId);
         this._cleanupTimeout(messageId);
@@ -34606,10 +34606,10 @@ var Protocol = class {
           method: "notifications/cancelled",
           params: {
             requestId: messageId,
-            reason: String(reason)
+            reason: String(reason2)
           }
         }, { relatedRequestId, resumptionToken, onresumptiontoken }).catch((error63) => this._onerror(new Error(`Failed to send cancellation: ${error63}`)));
-        const error62 = reason instanceof McpError ? reason : new McpError(ErrorCode.RequestTimeout, String(reason));
+        const error62 = reason2 instanceof McpError ? reason2 : new McpError(ErrorCode.RequestTimeout, String(reason2));
         reject(error62);
       };
       this._responseHandlers.set(messageId, (response) => {
@@ -36768,6 +36768,17 @@ async function getText(url2, opts = {}) {
     return text2;
   }
 }
+async function getCookies(url2) {
+  let res;
+  try {
+    res = await fetchImpl(url2, { headers: { "User-Agent": userAgentFor(url2, contact, secEmail) }, redirect: "manual", signal: AbortSignal.timeout(15e3) });
+  } catch (e) {
+    throw new Unavailable(`${new URL(url2).host} did not answer (${e.message})`);
+  }
+  await res.body?.cancel().catch(() => {
+  });
+  return res.headers.getSetCookie().map((c) => c.split(";")[0]).join("; ");
+}
 async function getJson(url2, opts = {}) {
   const text2 = await getText(url2, opts);
   try {
@@ -37158,7 +37169,7 @@ async function verifiedSnapshot(raw, analysis2, lookBack = 30) {
 }
 
 // src/data/news.ts
-var stamp = (epoch2) => new Date(epoch2 * 1e3).toISOString().slice(0, 16).replace("T", " ");
+var stamp = (epoch3) => new Date(epoch3 * 1e3).toISOString().slice(0, 16).replace("T", " ");
 async function search(q, count) {
   const qs = `q=${encodeURIComponent(q)}&newsCount=${count}&quotesCount=0&enableFuzzyQuery=false`;
   let last;
@@ -37348,6 +37359,284 @@ No open markets matched "${topic}". Polymarket covers mostly economic, political
   }).join("\n");
 }
 
+// src/data/sec.ts
+var STATEMENTS = {
+  balance_sheet: { title: "Balance sheet", lines: [
+    ["Total Assets", ["Assets"]],
+    ["Current Assets", ["AssetsCurrent"]],
+    ["Cash and Equivalents", ["CashAndCashEquivalentsAtCarryingValue"]],
+    ["Total Liabilities", ["Liabilities"]],
+    ["Current Liabilities", ["LiabilitiesCurrent"]],
+    ["Stockholders Equity", ["StockholdersEquity", "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"]]
+  ] },
+  income_statement: { title: "Income statement", lines: [
+    ["Revenue", ["RevenueFromContractWithCustomerExcludingAssessedTax", "Revenues", "SalesRevenueNet"]],
+    ["Cost of Revenue", ["CostOfRevenue", "CostOfGoodsAndServicesSold"]],
+    ["Gross Profit", ["GrossProfit"]],
+    ["Operating Income", ["OperatingIncomeLoss"]],
+    ["Net Income", ["NetIncomeLoss"]],
+    ["Diluted EPS", ["EarningsPerShareDiluted"]]
+  ] },
+  cashflow: { title: "Cash flow statement", lines: [
+    ["Operating Cash Flow", ["NetCashProvidedByUsedInOperatingActivities", "NetCashProvidedByUsedInOperatingActivitiesContinuingOperations"]],
+    ["Investing Cash Flow", ["NetCashProvidedByUsedInInvestingActivities"]],
+    ["Financing Cash Flow", ["NetCashProvidedByUsedInFinancingActivities"]],
+    ["Capital Expenditure", ["PaymentsToAcquirePropertyPlantAndEquipment", "PaymentsToAcquireProductiveAssets"]]
+  ] }
+};
+var QUARTER = [60, 115];
+var YEAR = [300, 400];
+var YEAR_TO_DATE = [[150, 200, 6], [240, 290, 9]];
+var ANNUAL_FORMS = ["10-K", "20-F", "40-F"];
+var SHOWN = { quarterly: 8, annual: 5 };
+function spanIndex(f, spans) {
+  if (!f.start) return 0;
+  const days = daysBetween(f.start, f.end);
+  const i = spans.findIndex(([lo, hi]) => days >= lo && days <= hi);
+  return i < 0 ? null : i;
+}
+function lineAsOf(facts, tags, asOf, spans, forms) {
+  const values = /* @__PURE__ */ new Map();
+  let unit = "USD";
+  for (const tag of tags) {
+    for (const [u, list2] of Object.entries(facts[tag]?.units ?? {})) {
+      const latest = /* @__PURE__ */ new Map(), covered = /* @__PURE__ */ new Set();
+      for (const f of list2) {
+        const i = spanIndex(f, spans), key = `${f.end}|${i}`;
+        if (i === null || f.filed > asOf || values.has(key)) continue;
+        if (!forms.length || forms.some((p) => (f.form ?? "").startsWith(p))) covered.add(key);
+        const seen = latest.get(key);
+        if (!seen || f.filed >= seen.filed) latest.set(key, f);
+      }
+      let any2 = false;
+      for (const [key, f] of latest) if (covered.has(key)) {
+        values.set(key, f.val);
+        any2 = true;
+      }
+      if (any2) unit = u;
+    }
+  }
+  return { values, unit };
+}
+function filedStatement(usGaap, kind, freq, asOf) {
+  const quarterly = freq === "quarterly";
+  const spans = quarterly ? [QUARTER, ...YEAR_TO_DATE.map(([lo, hi]) => [lo, hi])] : [YEAR];
+  const names = quarterly ? ["", ...YEAR_TO_DATE.map(([, , m]) => ` (${m} months to date)`)] : [""];
+  const lines = STATEMENTS[kind].lines.map(([label, tags]) => ({ label, ...lineAsOf(usGaap, tags, asOf, spans, quarterly ? [] : ANNUAL_FORMS) }));
+  const chosen = lines.map((l) => {
+    const m = /* @__PURE__ */ new Map();
+    for (const key of l.values.keys()) {
+      const [end, i] = key.split("|");
+      m.set(end, Math.min(Number(i), m.get(end) ?? Number(i)));
+    }
+    return m;
+  });
+  const ends = [...new Set(chosen.flatMap((m) => [...m.keys()]))].sort().reverse().slice(0, SHOWN[freq]);
+  const periods = ends.flatMap((end) => [...new Set(chosen.map((m) => m.get(end)).filter((i) => i !== void 0))].sort().map((i) => ({ end, i })));
+  if (!periods.length) throw new NoData(`no ${freq} ${STATEMENTS[kind].title.toLowerCase()} was filed with the SEC by ${asOf}`);
+  return {
+    columns: periods.map((p) => p.end + names[p.i]),
+    rows: lines.map((l, n) => ({ label: l.label, unit: l.unit, cells: periods.map((p) => chosen[n].get(p.end) === p.i ? l.values.get(`${p.end}|${p.i}`) ?? null : null) }))
+  };
+}
+var DAY_MS = 864e5;
+var cache2 = /* @__PURE__ */ new Map();
+function cached2(url2, timeoutMs) {
+  const hit = cache2.get(url2);
+  if (hit && Date.now() - hit.at < DAY_MS) return hit.value;
+  const value = getJson(url2, { timeoutMs });
+  cache2.set(url2, { at: Date.now(), value });
+  value.catch(() => cache2.delete(url2));
+  return value;
+}
+async function cikFor(symbol3) {
+  const table = await cached2("https://www.sec.gov/files/company_tickers.json", 3e4);
+  const hit = Object.values(table).find((e) => e.ticker?.toUpperCase() === symbol3.toUpperCase());
+  return hit ? String(hit.cik_str).padStart(10, "0") : null;
+}
+async function secStatement(symbol3, kind, freq, asOf) {
+  const cik = await cikFor(symbol3);
+  if (!cik) throw new NoData(`${symbol3} is not in the SEC's list of US filers`);
+  const facts = await cached2(`https://data.sec.gov/api/xbrl/companyfacts/CIK${cik}.json`, 45e3);
+  const usGaap = facts.facts?.["us-gaap"];
+  if (!usGaap) throw new NoData(`${symbol3} files with the SEC but not in US GAAP terms`);
+  return filedStatement(usGaap, kind, freq, asOf);
+}
+
+// src/data/company.ts
+function companySymbol(raw) {
+  const sym = normalizeSymbol(raw);
+  if (cryptoBase(raw) || /[\^=]/.test(sym)) throw new NoData(`${sym} is not a company: a crypto asset, index, future or currency pair has no company accounts`);
+  return sym;
+}
+var session = null;
+function yahooSession() {
+  session ??= (async () => {
+    const cookie = await getCookies("https://fc.yahoo.com");
+    if (!cookie) throw new Unavailable("Yahoo Finance gave no session cookie");
+    const crumb = (await getText(`${HOSTS[1]}/v1/test/getcrumb`, { headers: { Cookie: cookie } })).trim();
+    if (!crumb || crumb.length > 64 || /[\s<]/.test(crumb)) throw new Unavailable("Yahoo Finance gave no session key");
+    return { cookie, crumb };
+  })();
+  session.catch(() => {
+    session = null;
+  });
+  return session;
+}
+async function yahooJson(path4) {
+  for (let attempt = 0; ; attempt++) {
+    const s = await yahooSession();
+    try {
+      return await getJson(`${HOSTS[1]}${path4}&crumb=${encodeURIComponent(s.crumb)}`, { headers: { Cookie: s.cookie } });
+    } catch (e) {
+      if (attempt === 0 && /HTTP 401/.test(e.message)) {
+        session = null;
+        continue;
+      }
+      throw e;
+    }
+  }
+}
+async function summary(sym, modules) {
+  const j = await yahooJson(`/v10/finance/quoteSummary/${encodeURIComponent(sym)}?modules=${modules}`);
+  const r = j.quoteSummary?.result?.[0];
+  if (!r) throw new NoData(`Yahoo Finance has no company data for ${sym}${j.quoteSummary?.error?.description ? ` (${j.quoteSummary.error.description})` : ""}`);
+  return r;
+}
+var MAIN_UNIT = { GBp: "GBP", GBX: "GBP", ZAc: "ZAR", ILA: "ILS" };
+var has = (v) => typeof v?.raw === "number" && Number.isFinite(v.raw);
+var money = (v, currency) => has(v) ? `${v.raw.toLocaleString("en-US", { maximumFractionDigits: 2 })}${currency ? ` ${currency}` : ""}` : null;
+var plain2 = (v) => has(v) ? String(Number(v.raw.toFixed(4))) : null;
+var percent = (v) => has(v) ? `${(v.raw * 100).toFixed(2)}%` : null;
+async function companyOverview(raw, analysis2) {
+  const day = analysisDate(analysis2), sym = companySymbol(raw);
+  if (isHistorical(day)) return `Company profile and ratios for ${sym} are withheld for ${day}: Yahoo Finance serves them only as they stand today. Market value, multiples, the 52-week range and the past year's income move with today's price, and even the name, sector and industry are today's; they would put later knowledge into an analysis of ${day}. Use get_financial_statement, which serves a US filer's accounts as filed by then.`;
+  const r = await summary(sym, "price,summaryProfile,summaryDetail,defaultKeyStatistics,financialData");
+  const p = r.price ?? {}, d = r.summaryDetail ?? {}, k = r.defaultKeyStatistics ?? {}, f = r.financialData ?? {};
+  const quote = p.currency, main = quote ? MAIN_UNIT[quote] ?? quote : void 0, reported = f.financialCurrency;
+  const de = has(f.debtToEquity) ? `${Number(f.debtToEquity.raw.toFixed(2))}% (${(f.debtToEquity.raw / 100).toFixed(2)}x)` : null;
+  const fields = [
+    ["Name", p.longName ?? p.shortName],
+    ["Sector", r.summaryProfile?.sector],
+    ["Industry", r.summaryProfile?.industry],
+    ["Market Cap", money(p.marketCap ?? d.marketCap, main)],
+    ["PE Ratio (TTM)", plain2(d.trailingPE)],
+    ["Forward PE", plain2(d.forwardPE ?? k.forwardPE)],
+    ["PEG Ratio", plain2(k.pegRatio)],
+    ["Price to Book", plain2(k.priceToBook)],
+    ["EPS (TTM)", money(k.trailingEps, main)],
+    ["Forward EPS", money(k.forwardEps, main)],
+    ["Dividend Yield", percent(d.dividendYield)],
+    ["Beta", plain2(d.beta ?? k.beta)],
+    ["52 Week High", money(d.fiftyTwoWeekHigh, quote)],
+    ["52 Week Low", money(d.fiftyTwoWeekLow, quote)],
+    ["50 Day Average", money(d.fiftyDayAverage, quote)],
+    ["200 Day Average", money(d.twoHundredDayAverage, quote)],
+    ["Revenue (TTM)", money(f.totalRevenue, reported)],
+    ["Gross Profit (TTM)", money(f.grossProfits, reported)],
+    ["EBITDA", money(f.ebitda, reported)],
+    ["Net Income (TTM)", money(k.netIncomeToCommon, reported)],
+    ["Free Cash Flow", money(f.freeCashflow, reported)],
+    ["Profit Margin", percent(f.profitMargins ?? k.profitMargins)],
+    ["Operating Margin", percent(f.operatingMargins)],
+    ["Return on Equity", percent(f.returnOnEquity)],
+    ["Return on Assets", percent(f.returnOnAssets)],
+    ["Debt to Equity", de],
+    ["Current Ratio", plain2(f.currentRatio)],
+    ["Book Value per Share", money(k.bookValue, main)]
+  ];
+  const lines = fields.filter(([, v]) => v !== null && v !== void 0 && v !== "").map(([l, v]) => `${l}: ${v}`);
+  if (!lines.length) throw new NoData(`Yahoo Finance has no profile or ratios for ${sym}`);
+  return [`Company profile and ratios for ${sym}, from Yahoo Finance as they stand today (${day}). TTM is the last twelve months; a field Yahoo does not give is left out.`, "", ...lines].join("\n");
+}
+async function insiderTransactions(raw, analysis2, limit = 30) {
+  const day = analysisDate(analysis2), sym = companySymbol(raw);
+  if (isHistorical(day)) return `Insider transactions for ${sym} are withheld for ${day}: Yahoo Finance dates a trade by when it happened, not by when its filing made it public (up to two business days later), so it cannot show which trades were known on ${day}.`;
+  const r = await summary(sym, "insiderTransactions");
+  const list2 = (r.insiderTransactions?.transactions ?? []).filter((t) => has(t.startDate)).sort((a, b) => b.startDate.raw - a.startDate.raw).slice(0, limit);
+  if (!list2.length) return `No insider transactions reported for ${sym} by Yahoo Finance. Many listings have none.`;
+  const n = (v) => has(v) ? v.raw.toLocaleString("en-US") : null;
+  return [
+    `Insider transactions for ${sym} from Yahoo Finance (the latest ${list2.length}, newest first). Each is dated by the trade; its filing follows within two business days.`,
+    "",
+    ...list2.map((t) => `- ${new Date(t.startDate.raw * 1e3).toISOString().slice(0, 10)} \xB7 ${t.filerName ?? "unnamed"}${t.filerRelation ? ` (${t.filerRelation})` : ""}: ${t.transactionText || "no description"}${n(t.shares) ? ` \xB7 ${n(t.shares)} shares` : ""}${n(t.value) ? ` \xB7 value ${n(t.value)}` : ""}${t.ownership === "I" ? " \xB7 held indirectly" : ""}`)
+  ].join("\n");
+}
+var YAHOO_LINES = {
+  balance_sheet: ["TotalAssets", "CurrentAssets", "CashAndCashEquivalents", "TotalLiabilitiesNetMinorityInterest", "CurrentLiabilities", "StockholdersEquity"],
+  income_statement: ["TotalRevenue", "CostOfRevenue", "GrossProfit", "OperatingIncome", "NetIncome", "DilutedEPS"],
+  cashflow: ["OperatingCashFlow", "InvestingCashFlow", "FinancingCashFlow", "CapitalExpenditure"]
+};
+function yahooTable(j, kind, freq) {
+  const series = /* @__PURE__ */ new Map();
+  for (const r of j.timeseries?.result ?? []) {
+    const t = r.meta?.type?.[0];
+    if (t && Array.isArray(r[t])) series.set(t, r[t].filter((p) => !!p));
+  }
+  const lines = YAHOO_LINES[kind].map((name, i) => {
+    const values = /* @__PURE__ */ new Map();
+    let unit = "";
+    for (const p of series.get(freq + name) ?? []) if (p.asOfDate && has(p.reportedValue)) {
+      values.set(p.asOfDate, p.reportedValue.raw);
+      unit = p.currencyCode ?? unit;
+    }
+    return { label: STATEMENTS[kind].lines[i][0], unit: name === "DilutedEPS" ? `${unit}/shares` : unit, values };
+  });
+  const ends = [...new Set(lines.flatMap((l) => [...l.values.keys()]))].sort().reverse().slice(0, SHOWN[freq]);
+  if (!ends.length) throw new NoData(`Yahoo Finance has no ${freq} ${STATEMENTS[kind].title.toLowerCase()}`);
+  return { columns: ends, rows: lines.map((l) => ({ label: l.label, unit: l.unit, cells: ends.map((e) => l.values.get(e) ?? null) })) };
+}
+var epoch2 = (date5) => Math.floor(Date.parse(`${date5}T00:00:00Z`) / 1e3);
+async function yahooStatement(sym, kind, freq, day) {
+  const types = YAHOO_LINES[kind].map((n) => freq + n).join(",");
+  const j = await yahooJson(`/ws/fundamentals-timeseries/v1/finance/timeseries/${encodeURIComponent(sym)}?symbol=${encodeURIComponent(sym)}&type=${types}&period1=${epoch2(addDays(day, -6 * 366))}&period2=${epoch2(addDays(day, 1))}`);
+  return yahooTable(j, kind, freq);
+}
+function renderTable(t, head2, note) {
+  const rows = t.rows.filter((r) => r.cells.some((c) => c !== null)), missing = t.rows.filter((r) => !rows.includes(r)).map((r) => r.label);
+  const perShare = (u) => u.includes("/");
+  const main = rows.find((r) => !perShare(r.unit))?.unit ?? "";
+  const name = (r) => perShare(r.unit) ? `${r.label} (${r.unit.split("/")[0] || "currency"} per share)` : r.unit !== main ? `${r.label} (millions of ${r.unit || "an unstated currency"})` : r.label;
+  const cell = (v, u) => v === null ? "\u2013" : perShare(u) ? v.toFixed(2) : (v / 1e6).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const out = [
+    head2,
+    `Money in millions of ${main || "an unstated currency"} unless the row says otherwise; "\u2013" means no figure for that period. ${note}`,
+    "",
+    `Line | ${t.columns.join(" | ")}`,
+    `---|${t.columns.map(() => "---:").join("|")}`,
+    ...rows.map((r) => `${name(r)} | ${r.cells.map((c) => cell(c, r.unit)).join(" | ")}`)
+  ];
+  if (missing.length) out.push("", `Not reported by this source: ${missing.join(", ")}.`);
+  return out.join("\n");
+}
+var SEC_EMAIL = "the SEC asks every caller for a contact email: put yours in desk-settings.json, sources.secContactEmail";
+var reason = (e) => {
+  const m = e.message;
+  return /sec\.gov refused \(HTTP 403\)/.test(m) ? `${m}: ${SEC_EMAIL}` : m;
+};
+async function financialStatement(raw, kind, freq, analysis2) {
+  const day = analysisDate(analysis2), sym = companySymbol(raw), title = STATEMENTS[kind].title;
+  let secFailure;
+  try {
+    const t = await secStatement(sym, kind, freq, day);
+    const q4 = kind !== "balance_sheet" && freq === "quarterly" ? " A fourth quarter is never derived: it is filed only inside the annual figure." : "";
+    return renderTable(t, `${title} for ${sym} (${freq}), as filed with the SEC on or before ${day}`, `Each figure is the latest filing of it by that day; a restatement counts only from the day it was filed.${q4}`);
+  } catch (e) {
+    secFailure = e;
+  }
+  if (isHistorical(day)) {
+    if (!(secFailure instanceof NoData)) throw new Unavailable(`the SEC, the only source of accounts as filed by ${day}, could not answer (${reason(secFailure)})`);
+    return `${title} for ${sym} is withheld for ${day}: ${reason(secFailure)}, and the other source, Yahoo Finance, dates a statement by the period it covers, not by when it was filed, so it cannot show which figures were public on ${day}.`;
+  }
+  try {
+    const t = await yahooStatement(sym, kind, freq, day);
+    return renderTable(t, `${title} for ${sym} (${freq}), from Yahoo Finance as it stands today`, `Not from the SEC (${reason(secFailure)}). Yahoo gives money spent, such as capital expenditure, as a negative figure.`);
+  } catch (e) {
+    const both = `SEC: ${reason(secFailure)}; Yahoo Finance: ${e.message}`;
+    throw secFailure instanceof NoData && e instanceof NoData ? new NoData(both) : new Unavailable(both);
+  }
+}
+
 // src/tools/server.ts
 var text = (t) => ({ content: [{ type: "text", text: t }] });
 async function answer(what, run) {
@@ -37427,6 +37716,29 @@ function deskServer(root = process.cwd(), fetchImpl2) {
     inputSchema: { topic: external_exports.string().min(2).max(80), analysis_date: analysis, limit: external_exports.number().int().min(1).max(10).optional() },
     annotations: READ
   }, async (a) => answer("prediction markets on " + a.topic, () => predictionMarkets(a.topic, a.analysis_date, a.limit ?? 6)));
+  server.registerTool("get_company_overview", {
+    title: "Company profile and ratios",
+    description: "The company's name, sector and industry, market value, valuation multiples (P/E, forward P/E, PEG, price to book), margins, returns, debt to equity, dividend yield, beta and the 52-week range, from Yahoo Finance as they stand today. Withheld for a past analysis date.",
+    inputSchema: { symbol: symbol2, analysis_date: analysis },
+    annotations: READ
+  }, async (a) => answer("profile of " + a.symbol, () => companyOverview(a.symbol, a.analysis_date)));
+  server.registerTool("get_financial_statement", {
+    title: "Financial statement",
+    description: "A balance sheet, income statement or cash flow statement, quarterly or annual, latest periods first. For a US filer it is the SEC filing as it stood on the analysis date; otherwise Yahoo Finance's, for today only.",
+    inputSchema: {
+      symbol: symbol2,
+      analysis_date: analysis,
+      statement: external_exports.enum(["balance_sheet", "income_statement", "cashflow"]),
+      frequency: external_exports.enum(["quarterly", "annual"]).optional().describe("quarterly when left out")
+    },
+    annotations: READ
+  }, async (a) => answer(`${a.statement.replace("_", " ")} of ${a.symbol}`, () => financialStatement(a.symbol, a.statement, a.frequency ?? "quarterly", a.analysis_date)));
+  server.registerTool("get_insider_transactions", {
+    title: "Insider transactions",
+    description: "Recent buying and selling by the company's directors and officers, from Yahoo Finance: who, their role, what, how many shares and the value. Withheld for a past analysis date.",
+    inputSchema: { symbol: symbol2, analysis_date: analysis },
+    annotations: READ
+  }, async (a) => answer("insider transactions of " + a.symbol, () => insiderTransactions(a.symbol, a.analysis_date)));
   return server;
 }
 

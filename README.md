@@ -7,10 +7,10 @@ connection with one review and one confirm. The agents never trade. You do.
 Adapted from [TradingAgents](https://github.com/TauricResearch/TradingAgents) by Tauric Research (see `NOTICE`); not
 affiliated with them. **Nothing here is investment advice.**
 
-> **Status: milestone 1b.** The desk check, a read-only Robinhood connection test, and the data tools: prices,
+> **Status: milestone 1c.** The desk check, a read-only Robinhood connection test, and the data tools: prices,
 > 13 indicators, the checked price table, instrument identity, company and world news, StockTwits and Reddit posts,
-> economic figures (FRED) and prediction-market odds. Company accounts, the analysis team, the dashboard and trading
-> come in the next milestones.
+> economic figures (FRED), prediction-market odds, and company accounts (SEC filings as filed, Yahoo Finance's profile,
+> ratios and insider trades). The analysis team, the dashboard and trading come in the next milestones.
 
 ## Start in three steps
 1. In Madav, clone this repository and open its folder.
@@ -19,6 +19,10 @@ affiliated with them. **Nothing here is investment advice.**
    (read-only).
 
 You need Node 22 or later (Madav needs it too). No keys, no installs, no settings.
+
+One optional setting: the SEC asks everyone who reads its filings for a contact email. Put yours in
+`desk-settings.json` (`sources.secContactEmail`) and the desk reads US companies' accounts as filed, for any date; only
+the SEC ever sees it. Without it, accounts come from Yahoo Finance, for today's analysis only.
 
 ## How it works
 1. **Agents analyse.** Four analysts (price and indicators, mood, news, company accounts), a bull and a bear, a research
