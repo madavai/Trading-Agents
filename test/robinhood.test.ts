@@ -67,9 +67,9 @@ test('a read is summarised by counts, never repeated', () => {
   assert.equal(summarise(text('plain words')), '11 characters of text');
 });
 
-test('order tools are named as such, reads and reviews are not', () => {
+test('trading tools are named as such, reads are not', () => {
   assert.equal(isOrderTool('place_equity_order'), true);
   assert.equal(isOrderTool('cancel_order'), true);
-  assert.equal(isOrderTool('review_equity_order'), false);
+  assert.equal(isOrderTool('review_equity_order'), true);   // a review names an order: agents never call it either
   assert.equal(isOrderTool('get_equity_positions'), false);
 });

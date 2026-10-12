@@ -10,4 +10,4 @@ description: Check that this computer is ready for the Trading Agents desk - Nod
 3. Ask whether to test the Robinhood connection now. Say what it does: it opens Robinhood's own sign-in page, it only reads, and it never places an order. Only on a yes, run `node dist/robinhood.mjs connect` in this folder and wait while they sign in (up to five minutes).
 4. Report what came back: whether Robinhood accepted the sign-in, how many tools its connection offers (read and review tools, and order tools that agents can never call), and whether the positions answered. If it did not work, give its words and say the desk will switch to plan B; nothing was ordered.
 
-Never open, read, print or copy anything in the person's `~/.trading-agents` folder. Never call a tool that places, changes or cancels an order. Never run the connection without the person's yes.
+Never open, search, read, print or copy anything in the person's `~/.trading-agents` folder. Never use a broker connection or Robinhood's site yourself, and never call a tool that trades or moves money: the connection test is the program's own, run only on the person's yes.

@@ -27,10 +27,13 @@ You need Node 22 or later (Madav needs it too). No keys, no installs, no setting
    exact order you confirmed, within your caps. Trading ships switched off.
 
 ## Safety
-- No agent has an order tool; a guard refuses any it finds.
-- Robinhood only lets agents trade in its separate Agentic account, which you fund yourself.
-- Your Robinhood sign-in stays in `~/.trading-agents` on your computer, never in this repository and never shown to an
-  agent.
+- No agent uses a broker connection. A guard refuses every broker tool, every tool that speaks of trading or moving
+  money, and Robinhood's site, whatever an agent was told.
+- Robinhood only lets agents trade in its separate Agentic account, which you fund yourself. Keep Robinhood's own
+  "trade approvals" on until you trust the desk: then every order also waits for your OK on your phone.
+- Your Robinhood sign-in stays in `~/.trading-agents` on your computer, never in this repository. Agents are refused
+  that folder; the real protection is that they get no free shell or file access outside this folder without your
+  approval, so **never run this folder with permission checks bypassed**.
 - A source that cannot be reached is reported as unavailable, never as "no news". No number is invented.
 
 ## Design

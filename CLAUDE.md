@@ -10,9 +10,13 @@ TradingAgents by Tauric Research (see NOTICE). It is early: milestone 0.
 - Coming in later milestones: `/analyse`, `/terminal`, `/schedule`, `/settle`.
 
 ## Rules for every agent in this folder
-- Never place, change or cancel an order. Orders come only from the person's Confirm in the dashboard. A guard
-  (`.claude/hooks/guard.mjs`) refuses every order tool on every broker connection.
-- Never open, read, print or copy anything in the person's `~/.trading-agents` folder: it holds their Robinhood sign-in.
+- Never place, change or cancel an order, and never use a broker connection or Robinhood's site. Orders come only from
+  the person's Confirm in the dashboard. A guard (`.claude/hooks/guard.mjs`) refuses every broker tool and every tool
+  that speaks of trading or moving money.
+- Never open, search, read, print or copy anything in the person's `~/.trading-agents` folder: it holds their Robinhood
+  sign-in.
+- Ask before any shell command or file access outside this folder; never suggest running this folder with permission
+  checks bypassed.
 - Never invent a number. Every exact price comes from a desk tool. A source that could not be reached is "unavailable",
   never "nothing happened".
 - Nothing here is investment advice; say so when a person treats a call as a certainty.

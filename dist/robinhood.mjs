@@ -19008,7 +19008,9 @@ var VERSION = true ? "0.0.1" : "dev";
 var ROBINHOOD_MCP = "https://agent.robinhood.com/mcp/trading";
 var CALLBACK_PORT = 47613;
 var redirectFor = (port) => `http://127.0.0.1:${port}/callback`;
-var isOrderTool = (name) => /(place|submit|cancel|replace|modify|amend|send|execute)[\w-]*order|order[\w-]*(place|submit|cancel|replace|modify|amend|send|execute)/i.test(name);
+var TRADE_WORDS = /order|trade|buy|sell|liquidat|close.?position|transfer|withdraw|deposit|payment/i;
+var isOrderTool = (name) => TRADE_WORDS.test(name);
+var isPositionsRead = (name) => /^(get|list)_/i.test(name) && /position/i.test(name) && !isOrderTool(name);
 function openBrowser(url2) {
   const href = url2.toString();
   const [cmd, args] = process.platform === "win32" ? ["rundll32", ["url.dll,FileProtocolHandler", href]] : process.platform === "darwin" ? ["open", [href]] : ["xdg-open", [href]];
@@ -19109,7 +19111,7 @@ ${url2}`);
   try {
     const { tools } = await c.listTools();
     const out = { tools: tools.map(line) };
-    const positions = tools.find((x) => /position/i.test(x.name) && !isOrderTool(x.name) && !x.inputSchema.required?.length);
+    const positions = tools.find((x) => isPositionsRead(x.name) && !x.inputSchema.required?.length);
     if (positions) out.positions = `${positions.name} answered: ${summarise(await c.callTool({ name: positions.name, arguments: {} }))}`;
     return out;
   } finally {
@@ -19140,10 +19142,10 @@ async function main(command) {
     const order = c.tools.filter((t) => t.order), read = c.tools.filter((t) => !t.order);
     say(`Connected to Robinhood. Its connection offers ${c.tools.length} tools.`);
     say(`
-Read and review tools (${read.length}):`);
+Read tools (${read.length}):`);
     for (const t of read) say(`- ${t.name}${t.readOnly ? " (read-only)" : ""}: ${t.description}`);
     say(`
-Order tools (${order.length}) - agents can never call these; only your Confirm in the dashboard will:`);
+Tools that order, review orders or move money (${order.length}) - agents can never call these; only your Confirm in the dashboard will place an order:`);
     for (const t of order) say(`- ${t.name}: ${t.description}`);
     say(`
 ${c.positions ?? "No positions tool without inputs was found, so nothing was read."}`);

@@ -26,9 +26,9 @@ async function main(command: string | undefined): Promise<number> {
     const c = await connect(file, { say });
     const order = c.tools.filter((t) => t.order), read = c.tools.filter((t) => !t.order);
     say(`Connected to Robinhood. Its connection offers ${c.tools.length} tools.`);
-    say(`\nRead and review tools (${read.length}):`);
+    say(`\nRead tools (${read.length}):`);
     for (const t of read) say(`- ${t.name}${t.readOnly ? ' (read-only)' : ''}: ${t.description}`);
-    say(`\nOrder tools (${order.length}) - agents can never call these; only your Confirm in the dashboard will:`);
+    say(`\nTools that order, review orders or move money (${order.length}) - agents can never call these; only your Confirm in the dashboard will place an order:`);
     for (const t of order) say(`- ${t.name}: ${t.description}`);
     say(`\n${c.positions ?? 'No positions tool without inputs was found, so nothing was read.'}`);
     say('Nothing was ordered, changed or cancelled.');

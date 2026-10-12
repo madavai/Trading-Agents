@@ -1,7 +1,7 @@
 // A read-only connection to Robinhood's agent doorway (its Trading MCP server): sign in through Robinhood's own page if
 // needed, list what the connection offers, and ask one read-only tool for the positions. Milestone 0 uses it to learn,
-// on the person's computer, whether Robinhood accepts this program's sign-in; the dashboard reuses it later. It never
-// calls a tool that places, changes or cancels an order: isOrderTool refuses those by name.
+// on the person's computer, whether Robinhood accepts this program's sign-in; the dashboard reuses it later. The only
+// tool it ever calls is a get or list of positions (isPositionsRead); nothing that trades.
 import http from 'node:http';
 import { spawn } from 'node:child_process';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -15,9 +15,13 @@ export const ROBINHOOD_MCP = 'https://agent.robinhood.com/mcp/trading';
 export const CALLBACK_PORT = 47613;
 export const redirectFor = (port: number): string => `http://127.0.0.1:${port}/callback`;
 
-/** A tool that places, changes or cancels an order, on any broker. The same rule as .claude/hooks/guard.mjs. */
-export const isOrderTool = (name: string): boolean =>
-  /(place|submit|cancel|replace|modify|amend|send|execute)[\w-]*order|order[\w-]*(place|submit|cancel|replace|modify|amend|send|execute)/i.test(name);
+/** A tool whose name speaks of trading or moving money - orders (reviews included), trades, buying, selling,
+ *  transfers. The same rule as TRADE_WORDS in .claude/hooks/guard.mjs. This program never calls one. */
+export const TRADE_WORDS = /order|trade|buy|sell|liquidat|close.?position|transfer|withdraw|deposit|payment/i;
+export const isOrderTool = (name: string): boolean => TRADE_WORDS.test(name);
+
+/** The one tool the connection test may call: a get or list of positions, nothing that trades. */
+export const isPositionsRead = (name: string): boolean => /^(get|list)_/i.test(name) && /position/i.test(name) && !isOrderTool(name);
 
 /** Opens the person's browser on a page, without a shell reading the address. */
 export function openBrowser(url: URL): void {
@@ -95,7 +99,7 @@ export async function connect(file: string, opts: { port?: number; open?: (url: 
   try {
     const { tools } = await c.listTools();
     const out: Connection = { tools: tools.map(line) };
-    const positions = tools.find((x) => /position/i.test(x.name) && !isOrderTool(x.name) && !(x.inputSchema.required?.length));
+    const positions = tools.find((x) => isPositionsRead(x.name) && !(x.inputSchema.required?.length));
     if (positions) out.positions = `${positions.name} answered: ${summarise(await c.callTool({ name: positions.name, arguments: {} }))}`;
     return out;
   } finally {
