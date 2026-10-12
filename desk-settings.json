@@ -1,0 +1,50 @@
+{
+  "about": "The desk's settings, read by the desk tool server and the dashboard. Edit freely; the dashboard's Settings page will change the trading part for you.",
+  "analysis": {
+    "outputLanguage": "English",
+    "debateRounds": 1,
+    "riskRounds": 1,
+    "analysts": ["market", "sentiment", "news", "fundamentals"],
+    "maxStepsPerAnalyst": 20,
+    "newsLookbackDays": 7,
+    "companyNewsLimit": 20,
+    "worldNewsLimit": 10,
+    "worldNewsSearches": [
+      "Federal Reserve interest rates inflation",
+      "S&P 500 earnings GDP economic outlook",
+      "geopolitical risk trade war sanctions",
+      "ECB Bank of England BOJ central bank policy",
+      "oil commodities supply chain energy"
+    ],
+    "stocktwitsLimit": 30,
+    "subreddits": ["wallstreetbets", "stocks", "investing"],
+    "cryptoSubreddits": ["CryptoCurrency", "CryptoMarkets"]
+  },
+  "scoring": {
+    "holdingPeriodDays": 5,
+    "benchmarks": {
+      "": "SPY",
+      ".NS": "^NSEI", ".BO": "^BSESN", ".T": "^N225", ".TW": "^TWII", ".KS": "^KS11", ".HK": "^HSI",
+      ".SI": "^STI", ".L": "^FTSE", ".DE": "^GDAXI", ".PA": "^FCHI", ".AS": "^AEX", ".SW": "^SSMI",
+      ".MI": "FTSEMIB.MI", ".TO": "^GSPTSE", ".AX": "^AXJO", ".SS": "000001.SS", ".SZ": "399001.SZ", ".SA": "^BVSP"
+    }
+  },
+  "trading": {
+    "enabled": false,
+    "fullPositionPercent": 10,
+    "ratingToOrder": {
+      "Buy": "buy a full position",
+      "Overweight": "buy half a position",
+      "Hold": "no order",
+      "Underweight": "sell half of what is held",
+      "Sell": "sell everything held",
+      "Needs review": "no order"
+    },
+    "caps": { "perOrderUsd": 500, "perStockPercent": 10, "ordersPerDay": 3 },
+    "orderDefaults": { "type": "limit", "timeInForce": "day", "addStopLossAfterFill": false }
+  },
+  "sources": {
+    "contact": "trading-agents (+https://github.com/madavai/trading-agents)",
+    "secContactEmail": ""
+  }
+}
