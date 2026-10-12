@@ -36632,10 +36632,10 @@ async function head(res) {
   });
   return new TextDecoder().decode(Buffer.concat(chunks));
 }
-async function probe(source, userAgent3, fetchImpl2 = fetch, timeoutMs = 8e3) {
+async function probe(source, userAgent, fetchImpl2 = fetch, timeoutMs = 8e3) {
   const started = Date.now();
   try {
-    const res = await fetchImpl2(source.url, { headers: { "User-Agent": userAgent3, Accept: "*/*" }, signal: AbortSignal.timeout(timeoutMs) });
+    const res = await fetchImpl2(source.url, { headers: { "User-Agent": userAgent, Accept: "*/*" }, signal: AbortSignal.timeout(timeoutMs) });
     const ms = Date.now() - started;
     if (!res.ok) {
       await res.body?.cancel().catch(() => {
@@ -36651,12 +36651,13 @@ async function probe(source, userAgent3, fetchImpl2 = fetch, timeoutMs = 8e3) {
     return { name: source.name, ok: false, detail: `unreachable (${err.message})` };
   }
 }
-function userAgent(contact, email3) {
-  return email3.trim() ? `${contact} ${email3.trim()}` : contact;
+function userAgentFor(url2, contact2, email3) {
+  const host = new URL(url2).hostname;
+  const sec = host === "sec.gov" || host.endsWith(".sec.gov");
+  return sec && email3.trim() ? `${contact2} ${email3.trim()}` : contact2;
 }
-async function probeAll(contact, secEmail, fetchImpl2 = fetch, timeoutMs = 8e3) {
-  const ua = userAgent(contact, secEmail);
-  return Promise.all(SOURCES.map((s) => probe(s, ua, fetchImpl2, timeoutMs)));
+async function probeAll(contact2, secEmail2, fetchImpl2 = fetch, timeoutMs = 8e3) {
+  return Promise.all(SOURCES.map((s) => probe(s, userAgentFor(s.url, contact2, secEmail2), fetchImpl2, timeoutMs)));
 }
 
 // src/version.ts
@@ -36711,10 +36712,12 @@ var NoData = class extends Error {
   name = "NoData";
 };
 var fetchImpl = (...a) => fetch(...a);
-var userAgent2 = "trading-agents (+https://github.com/madavai/trading-agents)";
+var contact = "trading-agents (+https://github.com/madavai/trading-agents)";
+var secEmail = "";
 function configure(opts) {
   if (opts.fetch) fetchImpl = opts.fetch;
-  if (opts.userAgent) userAgent2 = opts.userAgent;
+  if (opts.contact) contact = opts.contact;
+  if (opts.secEmail !== void 0) secEmail = opts.secEmail;
 }
 var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function getText(url2, opts = {}) {
@@ -36722,7 +36725,7 @@ async function getText(url2, opts = {}) {
   for (let attempt = 0; ; attempt++) {
     let res;
     try {
-      res = await fetchImpl(url2, { headers: { "User-Agent": userAgent2, Accept: "*/*", ...opts.headers }, signal: AbortSignal.timeout(opts.timeoutMs ?? 15e3) });
+      res = await fetchImpl(url2, { headers: { "User-Agent": userAgentFor(url2, contact, secEmail), Accept: "*/*", ...opts.headers }, signal: AbortSignal.timeout(opts.timeoutMs ?? 15e3) });
     } catch (e) {
       const err = e;
       if (attempt === 0 && err.name !== "TimeoutError") {
@@ -37150,7 +37153,7 @@ var READ = { readOnlyHint: true, openWorldHint: true };
 function deskServer(root = process.cwd(), fetchImpl2) {
   try {
     const s = readSettings(root).sources;
-    configure({ userAgent: userAgent(s.contact, s.secContactEmail) });
+    configure({ contact: s.contact, secEmail: s.secContactEmail });
   } catch {
   }
   if (fetchImpl2) configure({ fetch: fetchImpl2 });

@@ -5,14 +5,18 @@
 export class Unavailable extends Error { override name = 'Unavailable'; }
 export class NoData extends Error { override name = 'NoData'; }
 
+import { userAgentFor } from '../check/probes.js';
+
 type Fetch = typeof fetch;
 let fetchImpl: Fetch = (...a) => fetch(...a);
-let userAgent = 'trading-agents (+https://github.com/madavai/trading-agents)';
+let contact = 'trading-agents (+https://github.com/madavai/trading-agents)';
+let secEmail = '';
 
-/** For the tests and the server: the fetch to use, and the user agent every source sees. */
-export function configure(opts: { fetch?: Fetch; userAgent?: string }): void {
+/** For the tests and the server: the fetch to use, the user agent every source sees, and the email only the SEC sees. */
+export function configure(opts: { fetch?: Fetch; contact?: string; secEmail?: string }): void {
   if (opts.fetch) fetchImpl = opts.fetch;
-  if (opts.userAgent) userAgent = opts.userAgent;
+  if (opts.contact) contact = opts.contact;
+  if (opts.secEmail !== undefined) secEmail = opts.secEmail;
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -22,7 +26,7 @@ export async function getText(url: string, opts: { timeoutMs?: number; headers?:
   for (let attempt = 0; ; attempt++) {
     let res: Response;
     try {
-      res = await fetchImpl(url, { headers: { 'User-Agent': userAgent, Accept: '*/*', ...opts.headers }, signal: AbortSignal.timeout(opts.timeoutMs ?? 15_000) });
+      res = await fetchImpl(url, { headers: { 'User-Agent': userAgentFor(url, contact, secEmail), Accept: '*/*', ...opts.headers }, signal: AbortSignal.timeout(opts.timeoutMs ?? 15_000) });
     } catch (e) {
       const err = e as Error;
       if (attempt === 0 && err.name !== 'TimeoutError') { await sleep(800); continue; }

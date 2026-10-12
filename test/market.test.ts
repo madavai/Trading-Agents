@@ -35,6 +35,14 @@ test('a busy source is asked once more; a missing one is no data; a down one is 
   await assert.rejects(getText('https://example.com/c'), Unavailable);
 });
 
+test('the data tools send the SEC contact email to the SEC alone', async () => {
+  const seen = new Map<string, string>();
+  configure({ contact: 'ta (+x)', secEmail: 'me@example.com', fetch: async (url, init) => { seen.set(new URL(String(url)).hostname, String((init?.headers as Record<string, string>)['User-Agent'])); return new Response('ok'); } });
+  for (const u of ['https://query1.finance.yahoo.com/a', 'https://www.reddit.com/b', 'https://data.sec.gov/c']) await getText(u);
+  assert.deepEqual(Object.fromEntries(seen), { 'query1.finance.yahoo.com': 'ta (+x)', 'www.reddit.com': 'ta (+x)', 'data.sec.gov': 'ta (+x) me@example.com' });
+  configure({ secEmail: '' });
+});
+
 test('the checked price table never uses a row after the analysis date', async () => {
   configure({ fetch: chartFetch(() => series('2026-10-09', 300)) });
   const t = await verifiedSnapshot('nvda', '2026-10-01');

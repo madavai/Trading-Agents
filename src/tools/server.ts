@@ -4,7 +4,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { deskCheck, readSettings } from '../check/desk-check.js';
-import { userAgent } from '../check/probes.js';
 import { configure, failureText } from '../data/http.js';
 import { INDICATOR_NAMES } from '../data/indicators.js';
 import { indicatorWindow, instrument, priceHistory, verifiedSnapshot } from '../data/market.js';
@@ -26,7 +25,7 @@ const analysis = z.string().describe('The analysis date, YYYY-MM-DD. Nothing dat
 const READ = { readOnlyHint: true, openWorldHint: true } as const;
 
 export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetch): McpServer {
-  try { const s = readSettings(root).sources; configure({ userAgent: userAgent(s.contact, s.secContactEmail) }); } catch { /* keep the default user agent */ }
+  try { const s = readSettings(root).sources; configure({ contact: s.contact, secEmail: s.secContactEmail }); } catch { /* keep the default user agent */ }
   if (fetchImpl) configure({ fetch: fetchImpl });
   const server = new McpServer({ name: 'trading-desk', version: VERSION });
 
