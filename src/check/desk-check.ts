@@ -6,6 +6,7 @@ import { deskDataDir, robinhoodFile } from '../paths.js';
 import { probeAll, type ProbeResult } from './probes.js';
 import { VERSION } from '../version.js';
 import { readSettings } from '../settings.js';
+import { readContactEmail } from '../contact.js';
 
 export interface Line { ok: boolean; text: string }
 
@@ -33,6 +34,12 @@ export function robinhoodLine(file = robinhoodFile()): Line {
   return { ok: true, text: `Robinhood: a sign-in is saved (last refreshed ${when.toISOString().slice(0, 16).replace('T', ' ')} UTC)` };
 }
 
+export function contactLine(email: string): Line {
+  return email
+    ? { ok: true, text: `Contact email for the SEC: ${email} (sent to sec.gov alone, kept in desk-data)` }
+    : { ok: false, text: 'Contact email for the SEC: not given yet. The desk needs it before the first analysis: the SEC asks everyone who reads its filings for one. Ask the person for their own email and save it with set_contact_email' };
+}
+
 export function render(lines: Line[], sources: ProbeResult[]): string {
   const mark = (ok: boolean) => (ok ? 'OK ' : 'NO ');
   const out = [`Trading Agents desk check (version ${VERSION})`, '', 'This computer:'];
@@ -45,7 +52,7 @@ export function render(lines: Line[], sources: ProbeResult[]): string {
 }
 
 export async function deskCheck(root: string = process.cwd(), fetchImpl: typeof fetch = fetch): Promise<string> {
-  const settings = readSettings(root);
-  const sources = await probeAll(settings.sources.contact, settings.sources.secContactEmail, fetchImpl);
-  return render([nodeLine(), dataLine(root), robinhoodLine()], sources);
+  const settings = readSettings(root), email = readContactEmail(root);
+  const sources = await probeAll(settings.sources.contact, email, fetchImpl);
+  return render([nodeLine(), dataLine(root), contactLine(email), robinhoodLine()], sources);
 }

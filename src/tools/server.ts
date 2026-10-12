@@ -5,6 +5,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { deskCheck } from '../check/desk-check.js';
 import { readSettings } from '../settings.js';
+import { readContactEmail, saveContactEmail } from '../contact.js';
 import { configure, failureText } from '../data/http.js';
 import { INDICATOR_NAMES } from '../data/indicators.js';
 import { indicatorWindow, instrument, priceHistory, verifiedSnapshot } from '../data/market.js';
@@ -32,7 +33,7 @@ const READ = { readOnlyHint: true, openWorldHint: true } as const;
 
 export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetch): McpServer {
   const settings = readSettings(root), a0 = settings.analysis;
-  configure({ contact: settings.sources.contact, secEmail: settings.sources.secContactEmail });
+  configure({ contact: settings.sources.contact, secEmail: readContactEmail(root) });
   if (fetchImpl) configure({ fetch: fetchImpl });
   const server = new McpServer({ name: 'trading-desk', version: VERSION });
 
@@ -41,6 +42,21 @@ export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetc
     description: 'Check that this computer is ready for the Trading Agents desk: Node, the desk data folder, whether a Robinhood sign-in is saved, and whether each free data source answers. Read-only; it sends no order and reads no secret.',
     annotations: READ,
   }, async () => text(await deskCheck(root, fetchImpl)));
+
+  server.registerTool('set_contact_email', {
+    title: 'Save the contact email',
+    description: 'Save the person\'s own email as the contact the SEC asks of everyone who reads its filings. Ask the person for it in plain words and pass exactly what they give; never invent, guess or reuse an address. It is kept in this folder\'s desk-data (never committed) and sent to sec.gov alone.',
+    inputSchema: { email: z.string().min(3).max(254).describe('The email address the person gave') },
+    annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false },
+  }, async (a) => {
+    try {
+      const email = saveContactEmail(root, a.email);
+      configure({ secEmail: email });
+      return text(`Saved. The SEC will see ${email} as the contact for this desk's requests; no other source sees it.`);
+    } catch (e) {
+      return text(`INPUT_ERROR: ${(e as Error).message}. Ask the person for their own email address and call again.`);
+    }
+  });
 
   server.registerTool('get_instrument', {
     title: 'Instrument identity',

@@ -3263,8 +3263,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path4) {
-      let input2 = path4;
+    function removeDotSegments(path5) {
+      let input2 = path5;
       const output2 = [];
       let nextSlash = -1;
       let len = 0;
@@ -3673,8 +3673,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path4 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path4 && path4 !== "/" ? path4 : void 0;
+        const path5 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path5 && path5 !== "/" ? path5 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -7187,12 +7187,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list2, fs3, exportName) {
+    function addFormats(ajv, list2, fs4, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list2)
-        ajv.addFormat(f, fs3[f]);
+        ajv.addFormat(f, fs4[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -8020,10 +8020,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path4) {
-  if (!path4)
+function getElementAtPath(obj, path5) {
+  if (!path5)
     return obj;
-  return path4.reduce((acc, key) => acc?.[key], obj);
+  return path5.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -8363,11 +8363,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path4, issues) {
+function prefixIssues(path5, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path4);
+    iss.path.unshift(path5);
     return iss;
   });
 }
@@ -8829,16 +8829,16 @@ function flattenError(error62, mapper = (issue2) => issue2.message) {
 }
 function formatError(error62, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error63, path4 = []) => {
+  const processError = (error63, path5 = []) => {
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path4, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path5, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path4, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path5, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path4, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path5, ...issue2.path]);
       } else {
-        const fullpath = [...path4, ...issue2.path];
+        const fullpath = [...path5, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -8877,17 +8877,17 @@ function formatError(error62, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error62, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error63, path4 = []) => {
+  const processError = (error63, path5 = []) => {
     var _a3;
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path4, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path5, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path4, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path5, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path4, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path5, ...issue2.path]);
       } else {
-        const fullpath = [...path4, ...issue2.path];
+        const fullpath = [...path5, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -8926,8 +8926,8 @@ function treeifyError(error62, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path4 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path4) {
+  const path5 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path5) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -26065,13 +26065,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path4 = ref.slice(1).split("/").filter(Boolean);
-  if (path4.length === 0) {
+  const path5 = ref.slice(1).split("/").filter(Boolean);
+  if (path5.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path4[0] === defsKey) {
-    const key = path4[1] === void 0 ? void 0 : decodeJSONPointerSegment(path4[1]);
+  if (path5[0] === defsKey) {
+    const key = path5[1] === void 0 ? void 0 : decodeJSONPointerSegment(path5[1]);
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -28929,8 +28929,8 @@ function getErrorMap2() {
 
 // node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path4, errorMaps, issueData } = params;
-  const fullPath = [...path4, ...issueData.path || []];
+  const { data, path: path5, errorMaps, issueData } = params;
+  const fullPath = [...path5, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -29045,11 +29045,11 @@ var errorUtil;
 
 // node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path4, key) {
+  constructor(parent, value, path5, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path4;
+    this._path = path5;
     this._key = key;
   }
   get path() {
@@ -32600,11 +32600,11 @@ function normalizeObjectSchema(schema) {
   }
   return void 0;
 }
-function getDotPath(path4) {
-  if (path4.length === 0) {
+function getDotPath(path5) {
+  if (path5.length === 0) {
     return "object root";
   }
-  return path4.reduce((acc, seg, index) => {
+  return path5.reduce((acc, seg, index) => {
     if (index === 0) {
       return String(seg);
     }
@@ -36591,8 +36591,8 @@ var EMPTY_COMPLETION_RESULT = {
 };
 
 // src/check/desk-check.ts
-import fs2 from "node:fs";
-import path3 from "node:path";
+import fs3 from "node:fs";
+import path4 from "node:path";
 
 // src/paths.ts
 import os from "node:os";
@@ -36600,6 +36600,34 @@ import path from "node:path";
 var homeDir = () => process.env.TRADING_AGENTS_HOME || path.join(os.homedir(), ".trading-agents");
 var deskDataDir = (root = process.cwd()) => path.join(root, "desk-data");
 var robinhoodFile = () => path.join(homeDir(), "robinhood.json");
+
+// src/contact.ts
+import fs from "node:fs";
+import path2 from "node:path";
+var file2 = (root) => path2.join(deskDataDir(root), "contact.json");
+var EMAIL = /^[^\s@<>()",;:]+@[^\s@<>()",;:]+\.[a-z]{2,}$/i;
+var RESERVED = /@(?:[^@]*\.)?(?:example\.(?:com|net|org)|example|test|invalid|localhost)$/i;
+function checkEmail(raw) {
+  const email3 = String(raw ?? "").trim();
+  if (!EMAIL.test(email3)) throw new Error(`"${raw}" is not an email address`);
+  if (RESERVED.test(email3)) throw new Error(`${email3} is a made-up example address: the SEC needs one that reaches the person`);
+  return email3;
+}
+function readContactEmail(root) {
+  try {
+    const saved = JSON.parse(fs.readFileSync(file2(root), "utf8"));
+    return typeof saved.email === "string" ? checkEmail(saved.email) : "";
+  } catch {
+    return "";
+  }
+}
+function saveContactEmail(root, raw) {
+  const email3 = checkEmail(raw);
+  fs.mkdirSync(deskDataDir(root), { recursive: true });
+  fs.writeFileSync(file2(root), JSON.stringify({ email: email3 }, null, 2) + "\n");
+  return email3;
+}
+var ASK_FOR_EMAIL = "the SEC asks everyone who reads its filings for a contact email, and none is saved yet: ask the person for their own email (never invent one) and save it with set_contact_email";
 
 // src/check/probes.ts
 var SOURCES = [
@@ -36613,7 +36641,7 @@ var SOURCES = [
     name: "SEC EDGAR",
     url: "https://www.sec.gov/files/company_tickers.json",
     looksRight: (b) => b.includes('"ticker"'),
-    onRefused: "the SEC asks every caller for a contact email: put yours in desk-settings.json, sources.secContactEmail"
+    onRefused: ASK_FOR_EMAIL
   }
 ];
 var MAX_BYTES = 64 * 1024;
@@ -36664,8 +36692,8 @@ async function probeAll(contact2, secEmail2, fetchImpl2 = fetch, timeoutMs = 8e3
 var VERSION = true ? "0.0.1" : "dev";
 
 // src/settings.ts
-import fs from "node:fs";
-import path2 from "node:path";
+import fs2 from "node:fs";
+import path3 from "node:path";
 var DEFAULTS = {
   analysis: {
     newsLookbackDays: 7,
@@ -36676,12 +36704,12 @@ var DEFAULTS = {
     subreddits: ["wallstreetbets", "stocks", "investing"],
     cryptoSubreddits: ["CryptoCurrency", "CryptoMarkets"]
   },
-  sources: { contact: "trading-agents (+https://github.com/madavai/trading-agents)", secContactEmail: "" }
+  sources: { contact: "trading-agents (+https://github.com/madavai/trading-agents)" }
 };
 function readSettings(root) {
   let raw = {};
   try {
-    raw = JSON.parse(fs.readFileSync(path2.join(root, "desk-settings.json"), "utf8"));
+    raw = JSON.parse(fs2.readFileSync(path3.join(root, "desk-settings.json"), "utf8"));
   } catch {
   }
   return { analysis: { ...DEFAULTS.analysis, ...raw.analysis }, sources: { ...DEFAULTS.sources, ...raw.sources } };
@@ -36695,19 +36723,22 @@ function nodeLine(version2 = process.versions.node) {
 function dataLine(root) {
   const dir = deskDataDir(root);
   try {
-    fs2.mkdirSync(dir, { recursive: true });
-    const probe2 = path3.join(dir, ".write-check");
-    fs2.writeFileSync(probe2, "ok");
-    fs2.rmSync(probe2);
+    fs3.mkdirSync(dir, { recursive: true });
+    const probe2 = path4.join(dir, ".write-check");
+    fs3.writeFileSync(probe2, "ok");
+    fs3.rmSync(probe2);
     return { ok: true, text: `Desk data folder ${dir} (writable)` };
   } catch (e) {
     return { ok: false, text: `Desk data folder ${dir} cannot be written: ${e.message}` };
   }
 }
-function robinhoodLine(file2 = robinhoodFile()) {
-  if (!fs2.existsSync(file2)) return { ok: true, text: "Robinhood: not connected yet (only needed for trading; analysis works without it)" };
-  const when = fs2.statSync(file2).mtime;
+function robinhoodLine(file3 = robinhoodFile()) {
+  if (!fs3.existsSync(file3)) return { ok: true, text: "Robinhood: not connected yet (only needed for trading; analysis works without it)" };
+  const when = fs3.statSync(file3).mtime;
   return { ok: true, text: `Robinhood: a sign-in is saved (last refreshed ${when.toISOString().slice(0, 16).replace("T", " ")} UTC)` };
+}
+function contactLine(email3) {
+  return email3 ? { ok: true, text: `Contact email for the SEC: ${email3} (sent to sec.gov alone, kept in desk-data)` } : { ok: false, text: "Contact email for the SEC: not given yet. The desk needs it before the first analysis: the SEC asks everyone who reads its filings for one. Ask the person for their own email and save it with set_contact_email" };
 }
 function render(lines, sources) {
   const mark = (ok) => ok ? "OK " : "NO ";
@@ -36720,9 +36751,9 @@ function render(lines, sources) {
   return out.join("\n");
 }
 async function deskCheck(root = process.cwd(), fetchImpl2 = fetch) {
-  const settings = readSettings(root);
-  const sources = await probeAll(settings.sources.contact, settings.sources.secContactEmail, fetchImpl2);
-  return render([nodeLine(), dataLine(root), robinhoodLine()], sources);
+  const settings = readSettings(root), email3 = readContactEmail(root);
+  const sources = await probeAll(settings.sources.contact, email3, fetchImpl2);
+  return render([nodeLine(), dataLine(root), contactLine(email3), robinhoodLine()], sources);
 }
 
 // src/data/http.ts
@@ -37483,11 +37514,11 @@ function yahooSession() {
   });
   return session;
 }
-async function yahooJson(path4) {
+async function yahooJson(path5) {
   for (let attempt = 0; ; attempt++) {
     const s = await yahooSession();
     try {
-      return await getJson(`${HOSTS[1]}${path4}&crumb=${encodeURIComponent(s.crumb)}`, { headers: { Cookie: s.cookie } });
+      return await getJson(`${HOSTS[1]}${path5}&crumb=${encodeURIComponent(s.crumb)}`, { headers: { Cookie: s.cookie } });
     } catch (e) {
       if (attempt === 0 && /HTTP 401/.test(e.message)) {
         session = null;
@@ -37609,10 +37640,9 @@ function renderTable(t, head2, note) {
   if (missing.length) out.push("", `Not reported by this source: ${missing.join(", ")}.`);
   return out.join("\n");
 }
-var SEC_EMAIL = "the SEC asks every caller for a contact email: put yours in desk-settings.json, sources.secContactEmail";
 var reason = (e) => {
   const m = e.message;
-  return /sec\.gov refused \(HTTP 403\)/.test(m) ? `${m}: ${SEC_EMAIL}` : m;
+  return /sec\.gov refused \(HTTP 403\)/.test(m) ? `${m}: ${ASK_FOR_EMAIL}` : m;
 };
 async function financialStatement(raw, kind, freq, analysis2) {
   const day = analysisDate(analysis2), sym = companySymbol(raw), title = STATEMENTS[kind].title;
@@ -37653,7 +37683,7 @@ var analysis = external_exports.string().describe("The analysis date, YYYY-MM-DD
 var READ = { readOnlyHint: true, openWorldHint: true };
 function deskServer(root = process.cwd(), fetchImpl2) {
   const settings = readSettings(root), a0 = settings.analysis;
-  configure({ contact: settings.sources.contact, secEmail: settings.sources.secContactEmail });
+  configure({ contact: settings.sources.contact, secEmail: readContactEmail(root) });
   if (fetchImpl2) configure({ fetch: fetchImpl2 });
   const server = new McpServer({ name: "trading-desk", version: VERSION });
   server.registerTool("desk_check", {
@@ -37661,6 +37691,20 @@ function deskServer(root = process.cwd(), fetchImpl2) {
     description: "Check that this computer is ready for the Trading Agents desk: Node, the desk data folder, whether a Robinhood sign-in is saved, and whether each free data source answers. Read-only; it sends no order and reads no secret.",
     annotations: READ
   }, async () => text(await deskCheck(root, fetchImpl2)));
+  server.registerTool("set_contact_email", {
+    title: "Save the contact email",
+    description: "Save the person's own email as the contact the SEC asks of everyone who reads its filings. Ask the person for it in plain words and pass exactly what they give; never invent, guess or reuse an address. It is kept in this folder's desk-data (never committed) and sent to sec.gov alone.",
+    inputSchema: { email: external_exports.string().min(3).max(254).describe("The email address the person gave") },
+    annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false }
+  }, async (a) => {
+    try {
+      const email3 = saveContactEmail(root, a.email);
+      configure({ secEmail: email3 });
+      return text(`Saved. The SEC will see ${email3} as the contact for this desk's requests; no other source sees it.`);
+    } catch (e) {
+      return text(`INPUT_ERROR: ${e.message}. Ask the person for their own email address and call again.`);
+    }
+  });
   server.registerTool("get_instrument", {
     title: "Instrument identity",
     description: "Who the instrument is: the exact ticker (broker spellings like XAUUSD or BTCUSD mapped to the one the data uses), its kind (stock, fund, crypto, index), name, exchange, currency and its latest trading day on or before the analysis date. Call it first; refer to the instrument by this ticker in every report.",

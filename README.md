@@ -1,8 +1,9 @@
 # Trading Agents
 
-A trading desk of AI agents for [Madav](https://github.com/madavai). A team of agents analyses a stock the way a trading
-firm would; you see their call on a dashboard; and if you decide to act, you place the order through Robinhood's agent
-connection with one review and one confirm. The agents never trade. You do.
+A trading desk of AI agents for [Madav](https://github.com/madavai), being built in the open. When it is finished, a
+team of agents analyses a stock the way a trading firm would; you see their call on a dashboard; and if you decide to
+act, you place the order through Robinhood's agent connection with one review and one confirm. The agents never trade.
+You do. What works today is listed under Status; everything else is marked as coming.
 
 Adapted from [TradingAgents](https://github.com/TauricResearch/TradingAgents) by Tauric Research (see `NOTICE`); not
 affiliated with them. **Nothing here is investment advice.**
@@ -15,22 +16,30 @@ affiliated with them. **Nothing here is investment advice.**
 ## Start in three steps
 1. In Madav, clone this repository and open its folder.
 2. If Madav asks whether to use this folder's tools, say yes.
-3. Type `/desk-check`. It checks your computer and the free data sources, and can test your Robinhood sign-in
-   (read-only).
+3. Type `/desk-check`. It checks your computer and the free data sources, asks for your email (once), and can test
+   your Robinhood sign-in (read-only).
 
-You need Node 22 or later (Madav needs it too). No keys, no installs, no settings.
+You need Node 22 or later (Madav needs it too). No keys and no installs; only your email, once.
 
-One optional setting: the SEC asks everyone who reads its filings for a contact email. Put yours in
-`desk-settings.json` (`sources.secContactEmail`) and the desk reads US companies' accounts as filed, for any date; only
-the SEC ever sees it. Without it, accounts come from Yahoo Finance, for today's analysis only.
+**Why your email:** the SEC asks everyone who reads its filings for a contact address, so the desk needs yours before
+its first analysis. It is kept in this folder's `desk-data` (which git never commits) and sent to the SEC alone; no
+other source sees it.
 
-## How it works
-1. **Agents analyse.** Four analysts (price and indicators, mood, news, company accounts), a bull and a bear, a research
-   manager, a trader, three risk voices and a portfolio manager work in turn, from free public data, and propose a
-   rating and an order.
-2. **You decide.** The dashboard shows your markets, your watchlist, charts, the desk's call and its record.
-3. **You trade.** Decide, Review (Robinhood's own dry run), Place, Confirm. Only that confirm sends an order, only the
-   exact order you confirmed, within your caps. Trading ships switched off.
+## How it will work
+1. **Agents analyse** (coming next). Four analysts (price and indicators, mood, news, company accounts), a bull and a
+   bear, a research manager, a trader, three risk voices and a portfolio manager work in turn, from free public data,
+   and propose a rating and an order.
+2. **You decide** (coming later). The dashboard shows your markets, your watchlist, charts, the desk's call and its
+   record.
+3. **You trade** (coming later, and only after a real order has been proven end to end). Decide, Review (Robinhood's own
+   dry run), Place, Confirm. Only that confirm sends an order, only the exact order you confirmed, within your caps.
+   Trading ships switched off.
+
+## Where the data comes from
+Free public sources, with no keys: Yahoo Finance (prices, news, company profile), StockTwits, Reddit, FRED (economic
+figures), Polymarket (odds) and SEC EDGAR (company filings). Yahoo Finance has no official free service: the desk reads
+the same public pages its website uses, for personal use, and Yahoo can block or change them without notice. Any source
+that does not answer is reported as unavailable, never as "nothing happened".
 
 ## Safety
 - No agent uses a broker connection. A guard refuses every broker tool, every tool that speaks of trading or moving
@@ -47,4 +56,5 @@ the SEC ever sees it. Without it, accounts come from Yahoo Finance, for today's 
 prices in it are made up).
 
 ## Licence
-MIT (see `LICENSE`), with the credits and font licences in `NOTICE`.
+MIT (see `LICENSE`). Files adapted from TradingAgents say so at their top and stay under the Apache License 2.0
+(`LICENSE-APACHE`). Credits and font licences are in `NOTICE`.

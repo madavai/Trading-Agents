@@ -44,7 +44,6 @@
     "orderDefaults": { "type": "limit", "timeInForce": "day", "addStopLossAfterFill": false }
   },
   "sources": {
-    "contact": "trading-agents (+https://github.com/madavai/trading-agents)",
-    "secContactEmail": ""
+    "contact": "trading-agents (+https://github.com/madavai/trading-agents)"
   }
 }

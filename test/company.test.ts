@@ -91,13 +91,13 @@ test('when the SEC refuses, today falls back to Yahoo and a past day is told why
   configure({ fetch: route([[/sec\.gov/, () => new Response('Forbidden', { status: 403 })], ...YAHOO_SESSION, [/fundamentals-timeseries/, () => json(TS)]], seen) });
   const now = await financialStatement('ACME', 'income_statement', 'quarterly', '2026-10-12');
   assert.match(now, /from Yahoo Finance as it stands today/);
-  assert.match(now, /put yours in desk-settings\.json, sources\.secContactEmail/);
+  assert.match(now, /ask the person for their own email \(never invent one\) and save it with set_contact_email/);
   assert.match(now, /Revenue \| 210\.0 \| 200\.0/);
   assert.match(now, /Diluted EPS \(USD per share\) \| 0\.50 \| –/);
   const ts = seen.find((s) => /fundamentals-timeseries/.test(s.url))!;
   assert.match(ts.url, /crumb=crumb1/);
   assert.equal(ts.headers.Cookie, 'A3=abc');
-  await assert.rejects(financialStatement('ACME', 'income_statement', 'quarterly', '2026-09-01'), /the SEC, the only source of accounts as filed by 2026-09-01, could not answer .*secContactEmail/);
+  await assert.rejects(financialStatement('ACME', 'income_statement', 'quarterly', '2026-09-01'), /the SEC, the only source of accounts as filed by 2026-09-01, could not answer .*set_contact_email/);
 });
 
 test('a company the SEC does not list is withheld for a past day and served by Yahoo today', async () => {

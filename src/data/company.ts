@@ -8,6 +8,7 @@ import { getCookies, getJson, getText, NoData, Unavailable } from './http.js';
 import { cryptoBase, normalizeSymbol } from './symbols.js';
 import { HOSTS } from './yahoo.js';
 import { secStatement, SHOWN, STATEMENTS, type Frequency, type Statement, type Table } from './sec.js';
+import { ASK_FOR_EMAIL } from '../contact.js';
 
 /** The symbol of a company; a crypto asset, an index, a future or a currency pair has no company accounts. */
 function companySymbol(raw: string): string {
@@ -160,8 +161,7 @@ export function renderTable(t: Table, head: string, note: string): string {
   return out.join('\n');
 }
 
-const SEC_EMAIL = 'the SEC asks every caller for a contact email: put yours in desk-settings.json, sources.secContactEmail';
-const reason = (e: unknown) => { const m = (e as Error).message; return /sec\.gov refused \(HTTP 403\)/.test(m) ? `${m}: ${SEC_EMAIL}` : m; };
+const reason = (e: unknown) => { const m = (e as Error).message; return /sec\.gov refused \(HTTP 403\)/.test(m) ? `${m}: ${ASK_FOR_EMAIL}` : m; };
 
 /** A financial statement: as filed with the SEC by the analysis date for a US filer; else, for today only, Yahoo's. */
 export async function financialStatement(raw: string, kind: Statement, freq: Frequency, analysis: string): Promise<string> {
