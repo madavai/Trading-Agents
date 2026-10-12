@@ -45,6 +45,18 @@ export async function getText(url: string, opts: { timeoutMs?: number; headers?:
   }
 }
 
+/** The cookies a host sets, whatever its answer: Yahoo hands its session cookie on a page that answers 404. */
+export async function getCookies(url: string): Promise<string> {
+  let res: Response;
+  try {
+    res = await fetchImpl(url, { headers: { 'User-Agent': userAgentFor(url, contact, secEmail) }, redirect: 'manual', signal: AbortSignal.timeout(15_000) });
+  } catch (e) {
+    throw new Unavailable(`${new URL(url).host} did not answer (${(e as Error).message})`);
+  }
+  await res.body?.cancel().catch(() => {});
+  return res.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
+}
+
 export async function getJson<T>(url: string, opts: { timeoutMs?: number; headers?: Record<string, string> } = {}): Promise<T> {
   const text = await getText(url, opts);
   try { return JSON.parse(text) as T; } catch { throw new Unavailable(`${new URL(url).host} answered with something that is not data`); }

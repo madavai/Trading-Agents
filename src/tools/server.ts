@@ -12,6 +12,7 @@ import { companyNews, worldNews } from '../data/news.js';
 import { socialPosts } from '../data/social.js';
 import { economicSeries, SERIES } from '../data/macro.js';
 import { predictionMarkets } from '../data/odds.js';
+import { companyOverview, financialStatement, insiderTransactions } from '../data/company.js';
 import { VERSION } from '../version.js';
 
 const text = (t: string) => ({ content: [{ type: 'text' as const, text: t }] });
@@ -105,6 +106,31 @@ export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetc
     inputSchema: { topic: z.string().min(2).max(80), analysis_date: analysis, limit: z.number().int().min(1).max(10).optional() },
     annotations: READ,
   }, async (a) => answer('prediction markets on ' + a.topic, () => predictionMarkets(a.topic, a.analysis_date, a.limit ?? 6)));
+
+  server.registerTool('get_company_overview', {
+    title: 'Company profile and ratios',
+    description: 'The company\'s name, sector and industry, market value, valuation multiples (P/E, forward P/E, PEG, price to book), margins, returns, debt to equity, dividend yield, beta and the 52-week range, from Yahoo Finance as they stand today. Withheld for a past analysis date.',
+    inputSchema: { symbol, analysis_date: analysis },
+    annotations: READ,
+  }, async (a) => answer('profile of ' + a.symbol, () => companyOverview(a.symbol, a.analysis_date)));
+
+  server.registerTool('get_financial_statement', {
+    title: 'Financial statement',
+    description: 'A balance sheet, income statement or cash flow statement, quarterly or annual, latest periods first. For a US filer it is the SEC filing as it stood on the analysis date; otherwise Yahoo Finance\'s, for today only.',
+    inputSchema: {
+      symbol, analysis_date: analysis,
+      statement: z.enum(['balance_sheet', 'income_statement', 'cashflow']),
+      frequency: z.enum(['quarterly', 'annual']).optional().describe('quarterly when left out'),
+    },
+    annotations: READ,
+  }, async (a) => answer(`${a.statement.replace('_', ' ')} of ${a.symbol}`, () => financialStatement(a.symbol, a.statement, a.frequency ?? 'quarterly', a.analysis_date)));
+
+  server.registerTool('get_insider_transactions', {
+    title: 'Insider transactions',
+    description: 'Recent buying and selling by the company\'s directors and officers, from Yahoo Finance: who, their role, what, how many shares and the value. Withheld for a past analysis date.',
+    inputSchema: { symbol, analysis_date: analysis },
+    annotations: READ,
+  }, async (a) => answer('insider transactions of ' + a.symbol, () => insiderTransactions(a.symbol, a.analysis_date)));
 
   return server;
 }
