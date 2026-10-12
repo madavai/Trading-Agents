@@ -5,12 +5,7 @@ import path from 'node:path';
 import { deskDataDir, robinhoodFile } from '../paths.js';
 import { probeAll, type ProbeResult } from './probes.js';
 import { VERSION } from '../version.js';
-
-export interface Settings { sources: { contact: string; secContactEmail: string } }
-
-export function readSettings(root: string): Settings {
-  return JSON.parse(fs.readFileSync(path.join(root, 'desk-settings.json'), 'utf8')) as Settings;
-}
+import { readSettings } from '../settings.js';
 
 export interface Line { ok: boolean; text: string }
 

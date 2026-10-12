@@ -7,9 +7,10 @@ connection with one review and one confirm. The agents never trade. You do.
 Adapted from [TradingAgents](https://github.com/TauricResearch/TradingAgents) by Tauric Research (see `NOTICE`); not
 affiliated with them. **Nothing here is investment advice.**
 
-> **Status: milestone 1a.** The desk check, a read-only Robinhood connection test, and the market data tools (prices,
-> 13 indicators, the checked price table, instrument identity). News, posts and company accounts, the analysis team, the
-> dashboard and trading come in the next milestones.
+> **Status: milestone 1b.** The desk check, a read-only Robinhood connection test, and the data tools: prices,
+> 13 indicators, the checked price table, instrument identity, company and world news, StockTwits and Reddit posts,
+> economic figures (FRED) and prediction-market odds. Company accounts, the analysis team, the dashboard and trading
+> come in the next milestones.
 
 ## Start in three steps
 1. In Madav, clone this repository and open its folder.
