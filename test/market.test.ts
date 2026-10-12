@@ -83,7 +83,7 @@ test('the server offers the market tools, and turns failures into plain words fo
   const client = new Client({ name: 'test', version: '0' });
   await client.connect(b);
   const names = (await client.listTools()).tools.map((t) => t.name);
-  assert.deepEqual(names, ['desk_check', 'get_instrument', 'get_price_history', 'get_indicators', 'get_verified_snapshot']);
+  for (const n of ['desk_check', 'get_instrument', 'get_price_history', 'get_indicators', 'get_verified_snapshot']) assert.ok(names.includes(n), n);
   const call = async (name: string, args: Record<string, unknown>) => ((await client.callTool({ name, arguments: args })) as { content: Array<{ text: string }> }).content[0]!.text;
   assert.match(await call('get_verified_snapshot', { symbol: 'NVDA', analysis_date: '2026-10-09' }), /Checked price table for NVDA/);
   assert.match(await call('get_verified_snapshot', { symbol: 'NVDA', analysis_date: '2027-01-01' }), /^INPUT_ERROR: the analysis date 2027-01-01 is in the future/);

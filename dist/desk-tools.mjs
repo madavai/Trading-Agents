@@ -3263,8 +3263,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path3) {
-      let input2 = path3;
+    function removeDotSegments(path4) {
+      let input2 = path4;
       const output2 = [];
       let nextSlash = -1;
       let len = 0;
@@ -3673,8 +3673,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path3 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path3 && path3 !== "/" ? path3 : void 0;
+        const path4 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path4 && path4 !== "/" ? path4 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -7174,8 +7174,8 @@ var require_dist = __commonJS({
         return ajv;
       }
       const [formats, exportName] = opts.mode === "fast" ? [formats_1.fastFormats, fastName] : [formats_1.fullFormats, fullName];
-      const list = opts.formats || formats_1.formatNames;
-      addFormats(ajv, list, formats, exportName);
+      const list2 = opts.formats || formats_1.formatNames;
+      addFormats(ajv, list2, formats, exportName);
       if (opts.keywords)
         (0, limit_1.default)(ajv);
       return ajv;
@@ -7187,12 +7187,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list, fs2, exportName) {
+    function addFormats(ajv, list2, fs3, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
-      for (const f of list)
-        ajv.addFormat(f, fs2[f]);
+      for (const f of list2)
+        ajv.addFormat(f, fs3[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -8020,10 +8020,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path3) {
-  if (!path3)
+function getElementAtPath(obj, path4) {
+  if (!path4)
     return obj;
-  return path3.reduce((acc, key) => acc?.[key], obj);
+  return path4.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -8363,11 +8363,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path3, issues) {
+function prefixIssues(path4, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path3);
+    iss.path.unshift(path4);
     return iss;
   });
 }
@@ -8829,16 +8829,16 @@ function flattenError(error62, mapper = (issue2) => issue2.message) {
 }
 function formatError(error62, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error63, path3 = []) => {
+  const processError = (error63, path4 = []) => {
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path3, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path4, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path3, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path4, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path3, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path4, ...issue2.path]);
       } else {
-        const fullpath = [...path3, ...issue2.path];
+        const fullpath = [...path4, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -8877,17 +8877,17 @@ function formatError(error62, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error62, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error63, path3 = []) => {
+  const processError = (error63, path4 = []) => {
     var _a3;
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path3, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path4, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path3, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path4, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path3, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path4, ...issue2.path]);
       } else {
-        const fullpath = [...path3, ...issue2.path];
+        const fullpath = [...path4, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -8926,8 +8926,8 @@ function treeifyError(error62, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path3 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path3) {
+  const path4 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path4) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -23408,8 +23408,8 @@ var contributors = {
 function aggregateChecks(schema) {
   const agg = {};
   const def = schema._zod.def;
-  const list = schema._zod.traits.has("$ZodCheck") ? [schema, ...def.checks ?? []] : def.checks ?? [];
-  for (const ch of list)
+  const list2 = schema._zod.traits.has("$ZodCheck") ? [schema, ...def.checks ?? []] : def.checks ?? [];
+  for (const ch of list2)
     contributors[ch._zod.def.check]?.(agg, ch._zod.def);
   const bag = schema._zod.bag;
   if (bag.minimum !== void 0)
@@ -26065,13 +26065,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path3 = ref.slice(1).split("/").filter(Boolean);
-  if (path3.length === 0) {
+  const path4 = ref.slice(1).split("/").filter(Boolean);
+  if (path4.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path3[0] === defsKey) {
-    const key = path3[1] === void 0 ? void 0 : decodeJSONPointerSegment(path3[1]);
+  if (path4[0] === defsKey) {
+    const key = path4[1] === void 0 ? void 0 : decodeJSONPointerSegment(path4[1]);
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -28929,8 +28929,8 @@ function getErrorMap2() {
 
 // node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path3, errorMaps, issueData } = params;
-  const fullPath = [...path3, ...issueData.path || []];
+  const { data, path: path4, errorMaps, issueData } = params;
+  const fullPath = [...path4, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -29045,11 +29045,11 @@ var errorUtil;
 
 // node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path3, key) {
+  constructor(parent, value, path4, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path3;
+    this._path = path4;
     this._key = key;
   }
   get path() {
@@ -32600,11 +32600,11 @@ function normalizeObjectSchema(schema) {
   }
   return void 0;
 }
-function getDotPath(path3) {
-  if (path3.length === 0) {
+function getDotPath(path4) {
+  if (path4.length === 0) {
     return "object root";
   }
-  return path3.reduce((acc, seg, index) => {
+  return path4.reduce((acc, seg, index) => {
     if (index === 0) {
       return String(seg);
     }
@@ -36591,8 +36591,8 @@ var EMPTY_COMPLETION_RESULT = {
 };
 
 // src/check/desk-check.ts
-import fs from "node:fs";
-import path2 from "node:path";
+import fs2 from "node:fs";
+import path3 from "node:path";
 
 // src/paths.ts
 import os from "node:os";
@@ -36662,10 +36662,31 @@ async function probeAll(contact, secEmail, fetchImpl2 = fetch, timeoutMs = 8e3) 
 // src/version.ts
 var VERSION = true ? "0.0.1" : "dev";
 
-// src/check/desk-check.ts
+// src/settings.ts
+import fs from "node:fs";
+import path2 from "node:path";
+var DEFAULTS = {
+  analysis: {
+    newsLookbackDays: 7,
+    companyNewsLimit: 20,
+    worldNewsLimit: 10,
+    worldNewsSearches: ["Federal Reserve interest rates inflation", "S&P 500 earnings GDP economic outlook", "geopolitical risk trade war sanctions", "ECB Bank of England BOJ central bank policy", "oil commodities supply chain energy"],
+    stocktwitsLimit: 30,
+    subreddits: ["wallstreetbets", "stocks", "investing"],
+    cryptoSubreddits: ["CryptoCurrency", "CryptoMarkets"]
+  },
+  sources: { contact: "trading-agents (+https://github.com/madavai/trading-agents)", secContactEmail: "" }
+};
 function readSettings(root) {
-  return JSON.parse(fs.readFileSync(path2.join(root, "desk-settings.json"), "utf8"));
+  let raw = {};
+  try {
+    raw = JSON.parse(fs.readFileSync(path2.join(root, "desk-settings.json"), "utf8"));
+  } catch {
+  }
+  return { analysis: { ...DEFAULTS.analysis, ...raw.analysis }, sources: { ...DEFAULTS.sources, ...raw.sources } };
 }
+
+// src/check/desk-check.ts
 function nodeLine(version2 = process.versions.node) {
   const major = Number(version2.split(".")[0]);
   return major >= 22 ? { ok: true, text: `Node ${version2}` } : { ok: false, text: `Node ${version2} is too old: install Node 22 or later from nodejs.org` };
@@ -36673,18 +36694,18 @@ function nodeLine(version2 = process.versions.node) {
 function dataLine(root) {
   const dir = deskDataDir(root);
   try {
-    fs.mkdirSync(dir, { recursive: true });
-    const probe2 = path2.join(dir, ".write-check");
-    fs.writeFileSync(probe2, "ok");
-    fs.rmSync(probe2);
+    fs2.mkdirSync(dir, { recursive: true });
+    const probe2 = path3.join(dir, ".write-check");
+    fs2.writeFileSync(probe2, "ok");
+    fs2.rmSync(probe2);
     return { ok: true, text: `Desk data folder ${dir} (writable)` };
   } catch (e) {
     return { ok: false, text: `Desk data folder ${dir} cannot be written: ${e.message}` };
   }
 }
 function robinhoodLine(file2 = robinhoodFile()) {
-  if (!fs.existsSync(file2)) return { ok: true, text: "Robinhood: not connected yet (only needed for trading; analysis works without it)" };
-  const when = fs.statSync(file2).mtime;
+  if (!fs2.existsSync(file2)) return { ok: true, text: "Robinhood: not connected yet (only needed for trading; analysis works without it)" };
+  const when = fs2.statSync(file2).mtime;
   return { ok: true, text: `Robinhood: a sign-in is saved (last refreshed ${when.toISOString().slice(0, 16).replace("T", " ")} UTC)` };
 }
 function render(lines, sources) {
@@ -37043,8 +37064,8 @@ async function daily(raw, from, to) {
 async function history(raw, analysis2, calendarDays = 420) {
   const s = await daily(raw, addDays(analysis2, -calendarDays), analysis2);
   if (!s.bars.length) throw new NoData(`Yahoo Finance has no prices for ${normalizeSymbol(raw)} on or before ${analysis2}`);
-  const lastDate = s.bars[s.bars.length - 1].date, gap = daysBetween(lastDate, analysis2);
-  if (gap > 7) throw new NoData(`the latest price for ${normalizeSymbol(raw)} is from ${lastDate}, ${gap} days before ${analysis2}: the symbol may be delisted or not traded`);
+  const lastDate = s.bars[s.bars.length - 1].date, gap2 = daysBetween(lastDate, analysis2);
+  if (gap2 > 7) throw new NoData(`the latest price for ${normalizeSymbol(raw)} is from ${lastDate}, ${gap2} days before ${analysis2}: the symbol may be delisted or not traded`);
   return s;
 }
 
@@ -37133,6 +37154,197 @@ async function verifiedSnapshot(raw, analysis2, lookBack = 30) {
   return lines.join("\n");
 }
 
+// src/data/news.ts
+var stamp = (epoch2) => new Date(epoch2 * 1e3).toISOString().slice(0, 16).replace("T", " ");
+async function search(q, count) {
+  const qs = `q=${encodeURIComponent(q)}&newsCount=${count}&quotesCount=0&enableFuzzyQuery=false`;
+  let last;
+  for (const host of HOSTS) {
+    try {
+      const j = await getJson(`${host}/v1/finance/search?${qs}`);
+      return (j.news ?? []).filter((n) => n.title && n.providerPublishTime).map((n) => ({ title: n.title, publisher: n.publisher ?? "unknown", link: n.link ?? "", time: stamp(n.providerPublishTime), tickers: (n.relatedTickers ?? []).map((t) => t.toUpperCase()) }));
+    } catch (e) {
+      last = e;
+    }
+  }
+  throw last;
+}
+var inWindow = (a, from, to) => a.time.slice(0, 10) >= from && a.time.slice(0, 10) <= to;
+var render2 = (list2) => list2.map((a) => `- ${a.time} UTC \xB7 ${a.publisher}: ${a.title}${a.link ? `
+  ${a.link}` : ""}`).join("\n");
+function gap(found, from, to, subject) {
+  const oldest = found.map((a) => a.time.slice(0, 10)).sort()[0];
+  if (oldest && oldest > to) return `Unavailable for ${from} to ${to}: Yahoo Finance's search serves only recent articles (the oldest it returned is from ${oldest}), so this is not an absence of ${subject}.`;
+  return `No ${subject} between ${from} and ${to} in Yahoo Finance's search results. Search returns a sample, so this is not proof that nothing happened.`;
+}
+async function companyNews(raw, analysis2, lookBackDays, limit) {
+  const day = analysisDate(analysis2), sym = normalizeSymbol(raw), from = addDays(day, -lookBackDays);
+  const all = await search(sym, Math.max(limit * 2, 20));
+  const untagged = all.length > 0 && all.every((a) => a.tickers.length === 0);
+  const found = untagged ? all : all.filter((a) => a.tickers.includes(sym));
+  if (!found.length) throw new Unavailable(`Yahoo Finance's search has no articles tagged ${sym} (it tags few listings outside the US)`);
+  const list2 = found.filter((a) => inWindow(a, from, day)).sort((a, b) => b.time.localeCompare(a.time)).slice(0, limit);
+  if (!list2.length) return gap(found, from, day, `news about ${sym}`);
+  const how = untagged ? `matched by Yahoo's search for "${sym}", not tagged: check each is about this company` : `tagged ${sym}`;
+  return [`News about ${sym}, ${from} to ${day} (${list2.length} article${list2.length === 1 ? "" : "s"} ${how}; headlines only)`, "", render2(list2)].join("\n");
+}
+async function worldNews(analysis2, lookBackDays, limit, queries) {
+  const day = analysisDate(analysis2), from = addDays(day, -lookBackDays);
+  const results = await Promise.allSettled(queries.map((q) => search(q, 10)));
+  const failed = results.filter((r) => r.status === "rejected").length;
+  if (failed === queries.length) throw results[0].reason;
+  const seen = /* @__PURE__ */ new Set(), all = [];
+  for (const r of results) if (r.status === "fulfilled") for (const a of r.value) {
+    const k = a.link || a.title;
+    if (!seen.has(k)) {
+      seen.add(k);
+      all.push(a);
+    }
+  }
+  const list2 = all.filter((a) => inWindow(a, from, day)).sort((a, b) => b.time.localeCompare(a.time)).slice(0, limit);
+  const note = failed ? `
+(${failed} of ${queries.length} searches could not be run: Yahoo Finance did not answer them.)` : "";
+  if (!list2.length) return gap(all, from, day, "world and economic news") + note;
+  const past = isHistorical(day) ? " Search favours recent articles, so a past window may be thin." : "";
+  return [`World and economic news, ${from} to ${day}, from ${queries.length} searches: ${queries.join("; ")}.${past}`, "", render2(list2)].join("\n") + note;
+}
+
+// src/data/social.ts
+var clip = (s, n) => s.length > n ? `${s.slice(0, n - 1)}\u2026` : s;
+var decode3 = (s) => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;|&#x27;/g, "'").replace(/&amp;/g, "&");
+var plain = (html) => decode3(decode3(html).replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+async function stocktwits(raw, from, to, limit) {
+  const base = cryptoBase(raw), sym = base ? `${base}.X` : normalizeSymbol(raw);
+  const j = await getJson(`https://api.stocktwits.com/api/2/streams/symbol/${encodeURIComponent(sym)}.json`);
+  return (j.messages ?? []).filter((m) => m.body && m.created_at).map((m) => ({ time: m.created_at.slice(0, 16).replace("T", " "), text: clip(m.body.replace(/\s+/g, " ").trim(), 280), tag: m.entities?.sentiment?.basic ?? void 0 })).filter((p) => p.time.slice(0, 10) >= from && p.time.slice(0, 10) <= to).slice(0, limit);
+}
+function parseAtom(xml) {
+  return xml.split(/<entry[\s>]/).slice(1).map((chunk) => {
+    const e = chunk.split("</entry>")[0] ?? "";
+    const pick2 = (re) => re.exec(e)?.[1] ?? "";
+    return { time: (pick2(/<published>([^<]+)<\/published>/) || pick2(/<updated>([^<]+)<\/updated>/)).slice(0, 16).replace("T", " "), title: plain(pick2(/<title[^>]*>([\s\S]*?)<\/title>/)), text: clip(plain(pick2(/<content[^>]*>([\s\S]*?)<\/content>/)), 300), where: pick2(/<category[^>]*term="([^"]+)"/) };
+  }).filter((p) => p.time && p.title);
+}
+async function reddit(raw, from, to, subs) {
+  const base = cryptoBase(raw), q = base ?? normalizeSymbol(raw).replace(/\..*$/, "");
+  const url2 = `https://www.reddit.com/r/${subs.map(encodeURIComponent).join("+")}/search.rss?q=${encodeURIComponent(q)}&restrict_sr=on&sort=new&t=week&limit=100`;
+  return parseAtom(await getText(url2, { headers: { Accept: "application/atom+xml" } })).filter((p) => p.time.slice(0, 10) >= from && p.time.slice(0, 10) <= to);
+}
+function subredditsFor(raw, stock, crypto) {
+  const base = cryptoBase(raw);
+  if (!base) return stock;
+  const own2 = { BTC: "Bitcoin", ETH: "ethereum", SOL: "solana" };
+  return own2[base] ? [own2[base], ...crypto] : crypto;
+}
+async function socialPosts(raw, analysis2, opts) {
+  const day = analysisDate(analysis2), from = addDays(day, -opts.lookBackDays), sym = normalizeSymbol(raw);
+  const subs = subredditsFor(raw, opts.subreddits, opts.cryptoSubreddits);
+  const [tw, rd] = await Promise.allSettled([stocktwits(raw, from, day, opts.stocktwitsLimit), reddit(raw, from, day, subs)]);
+  const out = [`Posts about ${sym}, ${from} to ${day}. Both sources serve only recent posts, so a past window can be empty for that reason alone.`, ""];
+  out.push("### StockTwits (retail traders; each author may tag a message Bullish or Bearish)");
+  if (tw.status === "rejected") out.push(`StockTwits unavailable: ${tw.reason.message}. This is not a quiet crowd.`);
+  else if (!tw.value.length) out.push(`No StockTwits messages about ${sym} in this window that the stream still serves.`);
+  else {
+    const bull = tw.value.filter((p) => p.tag === "Bullish").length, bear = tw.value.filter((p) => p.tag === "Bearish").length, tagged = bull + bear;
+    out.push(`${tw.value.length} messages: ${bull} Bullish, ${bear} Bearish, ${tw.value.length - tagged} untagged${tagged ? ` (${Math.round(bull / tagged * 100)}/${Math.round(bear / tagged * 100)} among the tagged)` : ""}.`);
+    out.push(...tw.value.map((p) => `- ${p.time} UTC${p.tag ? ` [${p.tag}]` : ""}: ${p.text}`));
+  }
+  out.push("", `### Reddit (${subs.map((s) => `r/${s}`).join(", ")}; no vote or comment counts in the feed)`);
+  if (rd.status === "rejected") out.push(`Reddit unavailable: ${rd.reason.message}. This is not a quiet crowd.`);
+  else if (!rd.value.length) out.push(`No Reddit posts about ${sym} in these communities in this window that the feed still serves.`);
+  else out.push(`${rd.value.length} posts.`, ...rd.value.slice(0, 25).map((p) => `- ${p.time} UTC \xB7 r/${p.where || "?"}: ${p.title}${p.text ? ` - ${p.text}` : ""}`));
+  return out.join("\n");
+}
+
+// src/data/macro.ts
+var SERIES = {
+  fed_funds_rate: ["FEDFUNDS", "Federal funds effective rate (percent)"],
+  "2y_treasury": ["DGS2", "2-year Treasury yield (percent)"],
+  "10y_treasury": ["DGS10", "10-year Treasury yield (percent)"],
+  "30y_treasury": ["DGS30", "30-year Treasury yield (percent)"],
+  yield_curve: ["T10Y2Y", "10-year minus 2-year Treasury spread (percentage points)"],
+  cpi: ["CPIAUCSL", "Consumer price index, all items (index)"],
+  core_cpi: ["CPILFESL", "Consumer price index, less food and energy (index)"],
+  pce: ["PCEPI", "PCE price index (index)"],
+  core_pce: ["PCEPILFE", "PCE price index, less food and energy (index)"],
+  inflation_expectations: ["T10YIE", "10-year breakeven inflation (percent)"],
+  real_gdp: ["GDPC1", "Real GDP (billions of chained dollars, annual rate)"],
+  gdp: ["GDP", "GDP (billions of dollars, annual rate)"],
+  industrial_production: ["INDPRO", "Industrial production (index)"],
+  unemployment: ["UNRATE", "Unemployment rate (percent)"],
+  payrolls: ["PAYEMS", "Nonfarm payrolls (thousands of persons)"],
+  initial_claims: ["ICSA", "Initial jobless claims (number)"],
+  m2: ["M2SL", "M2 money supply (billions of dollars)"],
+  vix: ["VIXCLS", "VIX volatility index"],
+  dollar_index: ["DTWEXBGS", "Broad US dollar index"],
+  consumer_sentiment: ["UMCSENT", "University of Michigan consumer sentiment (index)"],
+  housing_starts: ["HOUST", "Housing starts (thousands of units, annual rate)"],
+  retail_sales: ["RSAFS", "Retail sales (millions of dollars)"],
+  ecb_deposit_rate: ["ECBDFR", "ECB deposit facility rate (percent)"],
+  euro_hicp: ["CP0000EZ19M086NEST", "Euro area harmonised consumer prices (index)"],
+  germany_10y: ["IRLTLT01DEM156N", "Germany 10-year government bond yield (percent)"],
+  eur_usd: ["DEXUSEU", "US dollars per euro"]
+};
+function parseCsv(csv) {
+  return csv.trim().split(/\r?\n/).slice(1).map((line) => line.split(",")).filter((c) => c.length >= 2 && c[1] !== "." && c[1] !== "").map(([d, v]) => ({ date: d.trim(), value: Number(v) })).filter((o) => /^\d{4}-\d{2}-\d{2}$/.test(o.date) && Number.isFinite(o.value));
+}
+function releaseLag(obs) {
+  const gaps = obs.slice(1).map((o, i) => (Date.parse(o.date) - Date.parse(obs[i].date)) / 864e5).sort((a, b) => a - b);
+  const median = gaps[Math.floor(gaps.length / 2)] ?? 1;
+  return median <= 3 ? 1 : median <= 10 ? 6 : median <= 45 ? 45 : 120;
+}
+async function economicSeries(indicator, analysis2, lookBackDays = 365) {
+  const day = analysisDate(analysis2), key = indicator.trim().toLowerCase(), known = SERIES[key];
+  const id = known?.[0] ?? indicator.trim().toUpperCase();
+  if (!/^[A-Z0-9_]{1,40}$/.test(id)) throw new Error(`"${indicator}" is not a series name or a FRED series id`);
+  const from = addDays(day, -Math.max(30, Math.min(3650, lookBackDays)) - 130);
+  let obs = parseCsv(await getText(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${id}&cosd=${from}&coed=${day}`)).filter((o) => o.date <= day);
+  const past = isHistorical(day), lag = releaseLag(obs);
+  if (past) obs = obs.filter((o) => addDays(o.date, lag) <= day);
+  obs = obs.filter((o) => o.date >= addDays(day, -Math.max(30, Math.min(3650, lookBackDays))));
+  if (!obs.length) throw new NoData(`FRED has no ${id} values published by ${day} in this window`);
+  const first = obs[0], last = obs[obs.length - 1], change = last.value - first.value, pct = first.value ? change / Math.abs(first.value) * 100 : 0;
+  const fmt = (v) => Math.abs(v) >= 1e3 ? v.toLocaleString("en-US", { maximumFractionDigits: 1 }) : v.toFixed(2);
+  const lines = [
+    `## ${known?.[1] ?? id} - FRED series ${id}`,
+    "",
+    `- Latest value known by ${day}: ${fmt(last.value)} (for ${last.date})`,
+    `- Change since ${first.date}: ${change >= 0 ? "+" : ""}${fmt(change)} (${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%)`,
+    past ? `- A past analysis date: values are kept only if published by ${day} (a ${lag}-day release lag for this series), and are today's revised figures; first releases may have differed slightly.` : "- Values as published today, revisions included.",
+    "",
+    "Date | Value",
+    "---|---:",
+    ...obs.slice(-40).map((o) => `${o.date} | ${fmt(o.value)}`)
+  ];
+  if (!known) lines.push("", `Names this desk knows: ${Object.keys(SERIES).join(", ")}.`);
+  return lines.join("\n");
+}
+
+// src/data/odds.ts
+var list = (s) => {
+  try {
+    const v = JSON.parse(s ?? "[]");
+    return Array.isArray(v) ? v.map(String) : [];
+  } catch {
+    return [];
+  }
+};
+async function predictionMarkets(topic, analysis2, limit = 6, now = /* @__PURE__ */ new Date()) {
+  const day = analysisDate(analysis2);
+  if (isHistorical(day)) return `Prediction-market odds are withheld for ${day}: Polymarket serves only today's odds on open markets, and those would put later knowledge into an analysis of ${day}.`;
+  const j = await getJson(`https://gamma-api.polymarket.com/public-search?q=${encodeURIComponent(topic)}&limit_per_type=20`);
+  const open2 = (j.events ?? []).flatMap((e) => e.markets ?? []).filter((m) => m.question && !m.closed && m.active !== false && list(m.outcomePrices).length && list(m.outcomes).length && (!m.endDate || Date.parse(m.endDate) > now.getTime())).sort((a, b) => (b.volumeNum ?? 0) - (a.volumeNum ?? 0)).slice(0, Math.max(1, Math.min(10, limit)));
+  const head2 = `## Polymarket: "${topic}"
+Live odds: the crowd's priced chance of each event (more traded volume, more reliable). A price is not a forecast to take as certain.
+`;
+  if (!open2.length) return `${head2}
+No open markets matched "${topic}". Polymarket covers mostly economic, political, geopolitical and crypto events; a single company may have none.`;
+  return head2 + "\n" + open2.map((m) => {
+    const p = Number(list(m.outcomePrices)[0]), wk = m.oneWeekPriceChange;
+    return `- ${m.question}: ${list(m.outcomes)[0]} ${(p * 100).toFixed(0)}% \xB7 volume $${Math.round(m.volumeNum ?? 0).toLocaleString("en-US")}${m.endDate ? ` \xB7 resolves ${m.endDate.slice(0, 10)}` : ""}${typeof wk === "number" ? ` \xB7 ${wk >= 0 ? "+" : ""}${(wk * 100).toFixed(1)} points this week` : ""}`;
+  }).join("\n");
+}
+
 // src/tools/server.ts
 var text = (t) => ({ content: [{ type: "text", text: t }] });
 async function answer(what, run) {
@@ -37140,7 +37352,7 @@ async function answer(what, run) {
     return text(await run());
   } catch (e) {
     const err = e;
-    if (/YYYY-MM-DD|in the future|not a ticker/.test(err.message)) return text(`INPUT_ERROR: ${err.message}. Correct it and call again.`);
+    if (/YYYY-MM-DD|in the future|not a ticker|not a series name/.test(err.message)) return text(`INPUT_ERROR: ${err.message}. Correct it and call again.`);
     return text(failureText(e, what));
   }
 }
@@ -37148,11 +37360,8 @@ var symbol2 = external_exports.string().min(1).max(20).describe("The ticker as t
 var analysis = external_exports.string().describe("The analysis date, YYYY-MM-DD. Nothing dated after it is ever returned.");
 var READ = { readOnlyHint: true, openWorldHint: true };
 function deskServer(root = process.cwd(), fetchImpl2) {
-  try {
-    const s = readSettings(root).sources;
-    configure({ userAgent: userAgent(s.contact, s.secContactEmail) });
-  } catch {
-  }
+  const settings = readSettings(root), a0 = settings.analysis;
+  configure({ userAgent: userAgent(settings.sources.contact, settings.sources.secContactEmail) });
   if (fetchImpl2) configure({ fetch: fetchImpl2 });
   const server = new McpServer({ name: "trading-desk", version: VERSION });
   server.registerTool("desk_check", {
@@ -37184,6 +37393,37 @@ function deskServer(root = process.cwd(), fetchImpl2) {
     inputSchema: { symbol: symbol2, analysis_date: analysis, look_back_days: external_exports.number().int().min(1).max(30).optional().describe("How many recent closes to list; 30 when left out") },
     annotations: READ
   }, async (a) => answer(`checked price table of ${a.symbol}`, () => verifiedSnapshot(a.symbol, a.analysis_date, a.look_back_days ?? 30)));
+  const days = external_exports.number().int().min(1).max(30).optional().describe("Calendar days before the analysis date; " + a0.newsLookbackDays + " when left out");
+  server.registerTool("get_company_news", {
+    title: "Company news",
+    description: "Headlines about the instrument from Yahoo Finance, with publisher and time, over the days before the analysis date. Search returns a recent sample: an empty or unreachable window is said to be so, never no news.",
+    inputSchema: { symbol: symbol2, analysis_date: analysis, look_back_days: days },
+    annotations: READ
+  }, async (a) => answer("news about " + a.symbol, () => companyNews(a.symbol, a.analysis_date, a.look_back_days ?? a0.newsLookbackDays, a0.companyNewsLimit)));
+  server.registerTool("get_world_news", {
+    title: "World and economic news",
+    description: "Headlines on central banks, the economy, geopolitics and commodities from the desk's standing searches, over the days before the analysis date.",
+    inputSchema: { analysis_date: analysis, look_back_days: days },
+    annotations: READ
+  }, async (a) => answer("world news", () => worldNews(a.analysis_date, a.look_back_days ?? a0.newsLookbackDays, a0.worldNewsLimit, a0.worldNewsSearches)));
+  server.registerTool("get_social_posts", {
+    title: "StockTwits and Reddit posts",
+    description: "What people posted about the instrument over the week before the analysis date: StockTwits messages with their authors' Bullish or Bearish tags and counts, and Reddit posts from the investing communities (crypto ones for a crypto pair). Each source that fails is named as unavailable, never as quiet.",
+    inputSchema: { symbol: symbol2, analysis_date: analysis },
+    annotations: READ
+  }, async (a) => answer("posts about " + a.symbol, () => socialPosts(a.symbol, a.analysis_date, { lookBackDays: a0.newsLookbackDays, stocktwitsLimit: a0.stocktwitsLimit, subreddits: a0.subreddits, cryptoSubreddits: a0.cryptoSubreddits })));
+  server.registerTool("get_economic_series", {
+    title: "Economic figures (FRED)",
+    description: "An economic series from FRED as known by the analysis date: the latest value, the change over the window and recent values. Names: " + Object.keys(SERIES).join(", ") + "; or any FRED series id.",
+    inputSchema: { indicator: external_exports.string().describe("A name such as cpi, 10y_treasury, unemployment, or a FRED series id"), analysis_date: analysis, look_back_days: external_exports.number().int().min(30).max(3650).optional().describe("365 when left out") },
+    annotations: READ
+  }, async (a) => answer("economic series " + a.indicator, () => economicSeries(a.indicator, a.analysis_date, a.look_back_days ?? 365)));
+  server.registerTool("get_prediction_markets", {
+    title: "Prediction-market odds",
+    description: 'Live Polymarket odds for forward-looking events matching a topic (e.g. "Fed rate cut", "recession 2026"), with volume and resolution date. Withheld for a past analysis date.',
+    inputSchema: { topic: external_exports.string().min(2).max(80), analysis_date: analysis, limit: external_exports.number().int().min(1).max(10).optional() },
+    annotations: READ
+  }, async (a) => answer("prediction markets on " + a.topic, () => predictionMarkets(a.topic, a.analysis_date, a.limit ?? 6)));
   return server;
 }
 
