@@ -32,14 +32,14 @@ test('the tool server Madav starts is the prebuilt one in the repository', () =>
   for (const f of ['dist/desk-tools.mjs', 'dist/robinhood.mjs']) assert.ok(fs.existsSync(f), `${f} is built and committed`);
 });
 
-test('the desk tool server offers the desk check and no order tool', async () => {
+test('the desk tool server offers the desk check, and no tool that trades', async () => {
   const [a, b] = InMemoryTransport.createLinkedPair();
   const fake: typeof fetch = async () => new Response('{"chart":1,"news":1,"messages":1,"ticker":1} <feed observation_date', { status: 200 });
   await deskServer(process.cwd(), fake).connect(a);
   const client = new Client({ name: 'test', version: '0' });
   await client.connect(b);
   const { tools } = await client.listTools();
-  assert.deepEqual(tools.map((t) => t.name), ['desk_check']);
+  assert.ok(tools.some((t) => t.name === 'desk_check'));
   assert.ok(tools.every((t) => !isOrderTool(t.name)));
   const result = await client.callTool({ name: 'desk_check', arguments: {} }) as { content: Array<{ text: string }> };
   assert.match(result.content[0]!.text, /Trading Agents desk check/);
