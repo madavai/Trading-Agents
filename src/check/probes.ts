@@ -1,5 +1,6 @@
 // The free data sources the desk reads, each asked once with a small request, so a person sees which ones this computer
 // can reach before the desk relies on them. A source that cannot be reached is reported as such, never as "no data".
+import { ASK_FOR_EMAIL } from '../contact.js';
 
 export interface Source {
   name: string;
@@ -18,7 +19,7 @@ export const SOURCES: Source[] = [
   { name: 'FRED economic data', url: 'https://fred.stlouisfed.org/graph/fredgraph.csv?id=DGS10', looksRight: (b) => /observation_date|DATE/.test(b) },
   { name: 'Polymarket', url: 'https://gamma-api.polymarket.com/public-search?q=fed&limit_per_type=1', looksRight: (b) => b.trimStart().startsWith('{') },
   { name: 'SEC EDGAR', url: 'https://www.sec.gov/files/company_tickers.json', looksRight: (b) => b.includes('"ticker"'),
-    onRefused: 'the SEC asks every caller for a contact email: put yours in desk-settings.json, sources.secContactEmail' },
+    onRefused: ASK_FOR_EMAIL },
 ];
 
 export interface ProbeResult { name: string; ok: boolean; detail: string }

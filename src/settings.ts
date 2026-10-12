@@ -13,7 +13,7 @@ export interface Settings {
     subreddits: string[];
     cryptoSubreddits: string[];
   };
-  sources: { contact: string; secContactEmail: string };
+  sources: { contact: string };
 }
 
 export const DEFAULTS: Settings = {
@@ -26,7 +26,7 @@ export const DEFAULTS: Settings = {
     subreddits: ['wallstreetbets', 'stocks', 'investing'],
     cryptoSubreddits: ['CryptoCurrency', 'CryptoMarkets'],
   },
-  sources: { contact: 'trading-agents (+https://github.com/madavai/trading-agents)', secContactEmail: '' },
+  sources: { contact: 'trading-agents (+https://github.com/madavai/trading-agents)' },
 };
 
 export function readSettings(root: string): Settings {

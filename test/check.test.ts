@@ -18,7 +18,7 @@ test('a source that answers with its data is ready', async () => {
 test('a refusal is reported as a refusal, with what to do for the SEC', async () => {
   const r = await probe(source, 'ua', answer(403, 'Forbidden'));
   assert.equal(r.ok, false);
-  assert.match(r.detail, /refused \(HTTP 403\): the SEC asks every caller for a contact email/);
+  assert.match(r.detail, /refused \(HTTP 403\): the SEC asks everyone who reads its filings for a contact email.*set_contact_email/);
 });
 
 test('an answer without the expected data is not counted as ready', async () => {

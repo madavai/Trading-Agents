@@ -20,6 +20,8 @@ team, the dashboard and trading come next.
   checks bypassed.
 - Never invent a number. Every exact price, level and indicator comes from a desk tool (the checked price table
   first). A source that could not be reached is "unavailable", never "nothing happened".
+- The desk needs the person's own email before its first analysis (the SEC asks every reader of its filings for one):
+  ask them for it and save it with `set_contact_email`. Never invent, guess or reuse an address.
 - Nothing here is investment advice; say so when a person treats a call as a certainty.
 
 ## For developers
