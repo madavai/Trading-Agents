@@ -14,6 +14,7 @@ import { socialPosts } from '../data/social.js';
 import { economicSeries, SERIES } from '../data/macro.js';
 import { predictionMarkets } from '../data/odds.js';
 import { companyOverview, financialStatement, insiderTransactions } from '../data/company.js';
+import { registerDeskTools } from './desk.js';
 import { VERSION } from '../version.js';
 
 const text = (t: string) => ({ content: [{ type: 'text' as const, text: t }] });
@@ -148,5 +149,6 @@ export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetc
     annotations: READ,
   }, async (a) => answer('insider transactions of ' + a.symbol, () => insiderTransactions(a.symbol, a.analysis_date)));
 
+  registerDeskTools(server, root);
   return server;
 }

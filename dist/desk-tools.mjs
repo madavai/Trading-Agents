@@ -247,13 +247,13 @@ var require_scope = __commonJS({
       }
     };
     exports.ValueScopeName = ValueScopeName;
-    var line = (0, code_1._)`\n`;
+    var line2 = (0, code_1._)`\n`;
     var ValueScope = class extends Scope {
       constructor(opts) {
         super(opts);
         this._values = {};
         this._scope = opts.scope;
-        this.opts = { ...opts, _n: opts.lines ? line : code_1.nil };
+        this.opts = { ...opts, _n: opts.lines ? line2 : code_1.nil };
       }
       get() {
         return this._scope;
@@ -510,17 +510,17 @@ var require_codegen = __commonJS({
         this.nodes = nodes;
       }
       render(opts) {
-        return this.nodes.reduce((code, n) => code + n.render(opts), "");
+        return this.nodes.reduce((code, n2) => code + n2.render(opts), "");
       }
       optimizeNodes() {
         const { nodes } = this;
         let i = nodes.length;
         while (i--) {
-          const n = nodes[i].optimizeNodes();
-          if (Array.isArray(n))
-            nodes.splice(i, 1, ...n);
-          else if (n)
-            nodes[i] = n;
+          const n2 = nodes[i].optimizeNodes();
+          if (Array.isArray(n2))
+            nodes.splice(i, 1, ...n2);
+          else if (n2)
+            nodes[i] = n2;
           else
             nodes.splice(i, 1);
         }
@@ -530,16 +530,16 @@ var require_codegen = __commonJS({
         const { nodes } = this;
         let i = nodes.length;
         while (i--) {
-          const n = nodes[i];
-          if (n.optimizeNames(names, constants))
+          const n2 = nodes[i];
+          if (n2.optimizeNames(names, constants))
             continue;
-          subtractNames(names, n.names);
+          subtractNames(names, n2.names);
           nodes.splice(i, 1);
         }
         return nodes.length > 0 ? this : void 0;
       }
       get names() {
-        return this.nodes.reduce((names, n) => addNames(names, n.names), {});
+        return this.nodes.reduce((names, n2) => addNames(names, n2.names), {});
       }
     };
     var BlockNode = class extends ParentNode {
@@ -950,8 +950,8 @@ var require_codegen = __commonJS({
       endFunc() {
         return this._endBlockNode(Func);
       }
-      optimize(n = 1) {
-        while (n-- > 0) {
+      optimize(n2 = 1) {
+        while (n2-- > 0) {
           this._root.optimizeNodes();
           this._root.optimizeNames(this._root.names, this._constants);
         }
@@ -965,19 +965,19 @@ var require_codegen = __commonJS({
         this._nodes.push(node2);
       }
       _endBlockNode(N1, N2) {
-        const n = this._currNode;
-        if (n instanceof N1 || N2 && n instanceof N2) {
+        const n2 = this._currNode;
+        if (n2 instanceof N1 || N2 && n2 instanceof N2) {
           this._nodes.pop();
           return this;
         }
         throw new Error(`CodeGen: not in block "${N2 ? `${N1.kind}/${N2.kind}` : N1.kind}"`);
       }
       _elseNode(node2) {
-        const n = this._currNode;
-        if (!(n instanceof If)) {
+        const n2 = this._currNode;
+        if (!(n2 instanceof If)) {
           throw new Error('CodeGen: "else" without "if"');
         }
-        this._currNode = n.else = node2;
+        this._currNode = n2.else = node2;
         return this;
       }
       get _root() {
@@ -994,8 +994,8 @@ var require_codegen = __commonJS({
     };
     exports.CodeGen = CodeGen;
     function addNames(names, from) {
-      for (const n in from)
-        names[n] = (names[n] || 0) + (from[n] || 0);
+      for (const n2 in from)
+        names[n2] = (names[n2] || 0) + (from[n2] || 0);
       return names;
     }
     function addExprNames(names, from) {
@@ -1015,11 +1015,11 @@ var require_codegen = __commonJS({
           items.push(c);
         return items;
       }, []));
-      function replaceName(n) {
-        const c = constants[n.str];
-        if (c === void 0 || names[n.str] !== 1)
-          return n;
-        delete names[n.str];
+      function replaceName(n2) {
+        const c = constants[n2.str];
+        if (c === void 0 || names[n2.str] !== 1)
+          return n2;
+        delete names[n2.str];
         return c;
       }
       function canOptimize(e) {
@@ -1027,8 +1027,8 @@ var require_codegen = __commonJS({
       }
     }
     function subtractNames(names, from) {
-      for (const n in from)
-        names[n] = (names[n] || 0) - (from[n] || 0);
+      for (const n2 in from)
+        names[n2] = (names[n2] || 0) - (from[n2] || 0);
     }
     function not(x) {
       return typeof x == "boolean" || typeof x == "number" || x === null ? !x : (0, code_1._)`!${par(x)}`;
@@ -3263,8 +3263,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path5) {
-      let input2 = path5;
+    function removeDotSegments(path8) {
+      let input2 = path8;
       const output2 = [];
       let nextSlash = -1;
       let len = 0;
@@ -3673,8 +3673,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path5 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path5 && path5 !== "/" ? path5 : void 0;
+        const path8 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path8 && path8 !== "/" ? path8 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -3838,7 +3838,7 @@ var require_fast_uri = __commonJS({
         normalizeString(uri, options);
       } else if (typeof uri === "object") {
         uri = /** @type {T} */
-        parse3(serialize(uri, options), options);
+        parse4(serialize(uri, options), options);
       }
       return uri;
     }
@@ -3878,8 +3878,8 @@ var require_fast_uri = __commonJS({
     function resolveComponent(base, relative, options, skipNormalization) {
       const target = {};
       if (!skipNormalization) {
-        base = parse3(serialize(base, options), options);
-        relative = parse3(serialize(relative, options), options);
+        base = parse4(serialize(base, options), options);
+        relative = parse4(serialize(relative, options), options);
       }
       options = options || {};
       if (!options.tolerant && relative.scheme) {
@@ -4178,7 +4178,7 @@ var require_fast_uri = __commonJS({
       }
       return { parsed, malformedAuthorityOrPort, malformedPercentEncoding, malformedSchemeSpecific, malformedHost, malformedScheme };
     }
-    function parse3(uri, opts) {
+    function parse4(uri, opts) {
       return parseWithStatus(uri, opts).parsed;
     }
     function normalizeString(uri, opts) {
@@ -4215,7 +4215,7 @@ var require_fast_uri = __commonJS({
       resolveComponent,
       equal,
       serialize,
-      parse: parse3
+      parse: parse4
     };
     module.exports = fastUri;
     module.exports.default = fastUri;
@@ -4626,7 +4626,7 @@ var require_core = __commonJS({
       errorsText(errors = this.errors, { separator = ", ", dataVar = "data" } = {}) {
         if (!errors || errors.length === 0)
           return "No errors";
-        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text2, msg) => text2 + separator + msg);
+        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text3, msg) => text3 + separator + msg);
       }
       $dataMetaSchema(metaSchema, keywordsJsonPointers) {
         const rules = this.RULES.all;
@@ -6966,8 +6966,8 @@ var require_formats = __commonJS({
         return false;
       const year = +matches[1];
       const month = +matches[2];
-      const day = +matches[3];
-      return month >= 1 && month <= 12 && day >= 1 && day <= (month === 2 && isLeapYear(year) ? 29 : DAYS[month]);
+      const day2 = +matches[3];
+      return month >= 1 && month <= 12 && day2 >= 1 && day2 <= (month === 2 && isLeapYear(year) ? 29 : DAYS[month]);
     }
     function compareDate(d1, d2) {
       if (!(d1 && d2))
@@ -7187,12 +7187,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list2, fs4, exportName) {
+    function addFormats(ajv, list2, fs8, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list2)
-        ajv.addFormat(f, fs4[f]);
+        ajv.addFormat(f, fs8[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -8020,10 +8020,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path5) {
-  if (!path5)
+function getElementAtPath(obj, path8) {
+  if (!path8)
     return obj;
-  return path5.reduce((acc, key) => acc?.[key], obj);
+  return path8.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -8363,11 +8363,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path5, issues) {
+function prefixIssues(path8, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path5);
+    iss.path.unshift(path8);
     return iss;
   });
 }
@@ -8829,16 +8829,16 @@ function flattenError(error62, mapper = (issue2) => issue2.message) {
 }
 function formatError(error62, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error63, path5 = []) => {
+  const processError = (error63, path8 = []) => {
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path5, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path8, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path5, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path8, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path5, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path8, ...issue2.path]);
       } else {
-        const fullpath = [...path5, ...issue2.path];
+        const fullpath = [...path8, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -8877,17 +8877,17 @@ function formatError(error62, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error62, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error63, path5 = []) => {
+  const processError = (error63, path8 = []) => {
     var _a3;
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path5, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path8, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path5, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path8, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path5, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path8, ...issue2.path]);
       } else {
-        const fullpath = [...path5, ...issue2.path];
+        const fullpath = [...path8, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -8926,8 +8926,8 @@ function treeifyError(error62, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path5 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path5) {
+  const path8 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path8) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -9061,18 +9061,18 @@ var validateAsync = async (schema, value, _ctx) => {
   return result.issues.length === 0;
 };
 var _encode = (_Err) => {
-  const parse3 = _parse(_Err);
+  const parse4 = _parse(_Err);
   const fn = (schema, value, _ctx, _params) => {
     const ctx = _ctx ? { ..._ctx, direction: "backward" } : { direction: "backward" };
-    return parse3(schema, value, ctx, finalizeParams(fn, _params));
+    return parse4(schema, value, ctx, finalizeParams(fn, _params));
   };
   return fn;
 };
 var encode = /* @__PURE__ */ _encode($ZodRealError);
 var _decode = (_Err) => {
-  const parse3 = _parse(_Err);
+  const parse4 = _parse(_Err);
   const fn = (schema, value, _ctx, _params) => {
-    return parse3(schema, value, _ctx, finalizeParams(fn, _params));
+    return parse4(schema, value, _ctx, finalizeParams(fn, _params));
   };
   return fn;
 };
@@ -9788,8 +9788,8 @@ var Doc = class {
     const lines = content.split("\n").filter((x) => x);
     const minIndent = Math.min(...lines.map((x) => x.length - x.trimStart().length));
     const dedented = lines.map((x) => x.slice(minIndent)).map((x) => " ".repeat(this.indent * 2) + x);
-    for (const line of dedented) {
-      this.content.push(line);
+    for (const line2 of dedented) {
+      this.content.push(line2);
     }
   }
   compile() {
@@ -10566,13 +10566,13 @@ function capSize(inst, size) {
   const caps = sizeCaps(inst._zod.def.checks);
   if (!caps.length)
     return;
-  const cap = Math.min(...caps.map((c) => c[0]));
-  const parse3 = inst._zod.parse;
+  const cap2 = Math.min(...caps.map((c) => c[0]));
+  const parse4 = inst._zod.parse;
   inst._zod.parse = (payload, ctx) => {
-    const n = size(payload.value);
-    if (n > cap && !ctx?.skipChecks && ctx?.direction !== "backward") {
+    const n2 = size(payload.value);
+    if (n2 > cap2 && !ctx?.skipChecks && ctx?.direction !== "backward") {
       for (const [max, ch] of sizeCaps(inst._zod.def.checks)) {
-        if (n > max && ch._zod.def.when(payload)) {
+        if (n2 > max && ch._zod.def.when(payload)) {
           const start = payload.issues.length;
           ch._zod.check(payload);
           payload.issues[start].continue = false;
@@ -10581,7 +10581,7 @@ function capSize(inst, size) {
         }
       }
     }
-    return parse3(payload, ctx);
+    return parse4(payload, ctx);
   };
 }
 var arraySize = (input2) => Array.isArray(input2) ? input2.length : -1;
@@ -16553,8 +16553,8 @@ function ko_default() {
 }
 
 // node_modules/zod/v4/locales/lt.js
-var capitalizeFirstCharacter = (text2) => {
-  return text2.charAt(0).toUpperCase() + text2.slice(1);
+var capitalizeFirstCharacter = (text3) => {
+  return text3.charAt(0).toUpperCase() + text3.slice(1);
 };
 function getUnitTypeFromNumber(number4) {
   const abs = Math.abs(number4);
@@ -23099,7 +23099,7 @@ function foldIntersection(json2) {
   for (const key of FOLDABLE_KEYS)
     if (key in json2)
       return;
-  const unions = allOf.filter((m) => UNION_KEYS.some((k) => Array.isArray(m[k])));
+  const unions = allOf.filter((m2) => UNION_KEYS.some((k) => Array.isArray(m2[k])));
   let folded = null;
   if (!unions.length) {
     folded = foldObjects(allOf);
@@ -23108,7 +23108,7 @@ function foldIntersection(json2) {
     const keyword = UNION_KEYS.find((k) => Array.isArray(union2[k]));
     if (Object.keys(union2).length !== 1)
       return;
-    const rest = allOf.filter((m) => m !== union2);
+    const rest = allOf.filter((m2) => m2 !== union2);
     const branches = union2[keyword].map((branch) => foldObjects([...rest, branch]));
     if (branches.some((b) => !b))
       return;
@@ -23367,7 +23367,7 @@ var addPattern = (agg, pattern) => {
   agg.patterns.add(pattern);
 };
 var intersectMime = (agg, mime) => {
-  agg.mime = agg.mime ? agg.mime.filter((m) => mime.includes(m)) : [...mime];
+  agg.mime = agg.mime ? agg.mime.filter((m2) => mime.includes(m2)) : [...mime];
 };
 var setFormat = (agg, format) => {
   agg.format = format;
@@ -23517,7 +23517,7 @@ var numberProcessor = (schema, ctx, _json, params) => {
     if (first !== void 0)
       json2.multipleOf = first;
     if (rest.length)
-      json2.allOf = [...json2.allOf ?? [], ...rest.map((m) => ({ multipleOf: m }))];
+      json2.allOf = [...json2.allOf ?? [], ...rest.map((m2) => ({ multipleOf: m2 }))];
   }
 };
 var booleanProcessor = (_schema, _ctx, json2, _params) => {
@@ -23635,7 +23635,7 @@ var fileProcessor = (schema, _ctx, json2, _params) => {
   else if (mime.length === 1)
     _json.contentMediaType = mime[0];
   else
-    _json.anyOf = mime.map((m) => ({ contentMediaType: m }));
+    _json.anyOf = mime.map((m2) => ({ contentMediaType: m2 }));
 };
 var successProcessor = (_schema, _ctx, json2, _params) => {
   json2.type = "boolean";
@@ -25238,17 +25238,17 @@ var ZodArray = /* @__PURE__ */ $constructor("ZodArray", (inst, def) => {
   inst._zod.processJSONSchema = (ctx, json2, params) => arrayProcessor(inst, ctx, json2, params);
   inst.element = def.element;
 }, {
-  min(n, params) {
-    return this.check(_minLength(n, params));
+  min(n2, params) {
+    return this.check(_minLength(n2, params));
   },
   nonempty(params) {
     return this.check(_minLength(1, params));
   },
-  max(n, params) {
-    return this.check(_maxLength(n, params));
+  max(n2, params) {
+    return this.check(_maxLength(n2, params));
   },
-  length(n, params) {
-    return this.check(_length(n, params));
+  length(n2, params) {
+    return this.check(_length(n2, params));
   },
   unwrap() {
     return this.element;
@@ -26065,13 +26065,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path5 = ref.slice(1).split("/").filter(Boolean);
-  if (path5.length === 0) {
+  const path8 = ref.slice(1).split("/").filter(Boolean);
+  if (path8.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path5[0] === defsKey) {
-    const key = path5[1] === void 0 ? void 0 : decodeJSONPointerSegment(path5[1]);
+  if (path8[0] === defsKey) {
+    const key = path8[1] === void 0 ? void 0 : decodeJSONPointerSegment(path8[1]);
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -26205,8 +26205,8 @@ function containsRef(value) {
     return Object.values(sub).some(containsRef);
   });
 }
-function plural(n) {
-  return n === 1 ? "element" : "elements";
+function plural(n2) {
+  return n2 === 1 ? "element" : "elements";
 }
 function checkArrayGuards(arraySchema, guards) {
   const guard = z.transform((value) => value).check((payload) => {
@@ -28473,16 +28473,16 @@ var ReadBuffer = class {
     if (index === -1) {
       return null;
     }
-    const line = this._buffer.toString("utf8", 0, index).replace(/\r$/, "");
+    const line2 = this._buffer.toString("utf8", 0, index).replace(/\r$/, "");
     this._buffer = this._buffer.subarray(index + 1);
-    return deserializeMessage(line);
+    return deserializeMessage(line2);
   }
   clear() {
     this._buffer = void 0;
   }
 };
-function deserializeMessage(line) {
-  return JSONRPCMessageSchema.parse(JSON.parse(line));
+function deserializeMessage(line2) {
+  return JSONRPCMessageSchema.parse(JSON.parse(line2));
 }
 function serializeMessage(message) {
   return JSON.stringify(message) + "\n";
@@ -28929,8 +28929,8 @@ function getErrorMap2() {
 
 // node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path5, errorMaps, issueData } = params;
-  const fullPath = [...path5, ...issueData.path || []];
+  const { data, path: path8, errorMaps, issueData } = params;
+  const fullPath = [...path8, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -28943,7 +28943,7 @@ var makeIssue = (params) => {
     };
   }
   let errorMessage = "";
-  const maps = errorMaps.filter((m) => !!m).slice().reverse();
+  const maps = errorMaps.filter((m2) => !!m2).slice().reverse();
   for (const map2 of maps) {
     errorMessage = map2(fullIssue, { data, defaultError: errorMessage }).message;
   }
@@ -29045,11 +29045,11 @@ var errorUtil;
 
 // node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path5, key) {
+  constructor(parent, value, path8, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path5;
+    this._path = path8;
     this._key = key;
   }
   get path() {
@@ -32600,11 +32600,11 @@ function normalizeObjectSchema(schema) {
   }
   return void 0;
 }
-function getDotPath(path5) {
-  if (path5.length === 0) {
+function getDotPath(path8) {
+  if (path8.length === 0) {
     return "object root";
   }
-  return path5.reduce((acc, seg, index) => {
+  return path8.reduce((acc, seg, index) => {
     if (index === 0) {
       return String(seg);
     }
@@ -36694,8 +36694,14 @@ var VERSION = true ? "0.0.1" : "dev";
 // src/settings.ts
 import fs2 from "node:fs";
 import path3 from "node:path";
+var ANALYSTS = ["market", "sentiment", "news", "fundamentals"];
 var DEFAULTS = {
   analysis: {
+    outputLanguage: "English",
+    debateRounds: 1,
+    riskRounds: 1,
+    analysts: [...ANALYSTS],
+    managerModel: "",
     newsLookbackDays: 7,
     companyNewsLimit: 20,
     worldNewsLimit: 10,
@@ -36704,15 +36710,45 @@ var DEFAULTS = {
     subreddits: ["wallstreetbets", "stocks", "investing"],
     cryptoSubreddits: ["CryptoCurrency", "CryptoMarkets"]
   },
+  scoring: {
+    holdingPeriodDays: 5,
+    benchmark: "",
+    benchmarks: { "": "SPY", ".NS": "^NSEI", ".BO": "^BSESN", ".T": "^N225", ".TW": "^TWII", ".TWO": "^TWII", ".KS": "^KS11", ".KQ": "^KQ11", ".HK": "^HSI", ".SI": "^STI", ".L": "^FTSE", ".DE": "^GDAXI", ".PA": "^FCHI", ".AS": "^AEX", ".SW": "^SSMI", ".MI": "FTSEMIB.MI", ".TO": "^GSPTSE", ".AX": "^AXJO", ".SS": "000001.SS", ".SZ": "399001.SZ", ".SA": "^BVSP" }
+  },
+  journal: { maxResolvedEntries: null },
   sources: { contact: "trading-agents (+https://github.com/madavai/trading-agents)" }
 };
+var int2 = (v, lo, hi, fallback) => Number.isInteger(v) && v >= lo && v <= hi ? v : fallback;
+function languageName(v, fallback = "English") {
+  const s = typeof v === "string" ? v.trim() : "";
+  return new RegExp("^\\p{L}[\\p{L} ()\\-]{0,38}$", "u").test(s) ? s : fallback;
+}
 function readSettings(root) {
   let raw = {};
   try {
     raw = JSON.parse(fs2.readFileSync(path3.join(root, "desk-settings.json"), "utf8"));
   } catch {
   }
-  return { analysis: { ...DEFAULTS.analysis, ...raw.analysis }, sources: { ...DEFAULTS.sources, ...raw.sources } };
+  const a = { ...DEFAULTS.analysis, ...raw.analysis }, s = { ...DEFAULTS.scoring, ...raw.scoring }, j = { ...DEFAULTS.journal, ...raw.journal };
+  const analysts = Array.isArray(a.analysts) ? ANALYSTS.filter((x) => a.analysts.includes(x)) : [];
+  const benchmarks = s.benchmarks && typeof s.benchmarks === "object" ? Object.fromEntries(Object.entries(s.benchmarks).filter(([k, v]) => typeof v === "string" && v.trim() && k.length <= 8)) : {};
+  return {
+    analysis: {
+      ...a,
+      outputLanguage: languageName(a.outputLanguage),
+      debateRounds: int2(a.debateRounds, 1, 5, 1),
+      riskRounds: int2(a.riskRounds, 1, 5, 1),
+      analysts: analysts.length ? analysts : [...ANALYSTS],
+      managerModel: typeof a.managerModel === "string" && /^[\w.\-[\]]{0,60}$/.test(a.managerModel.trim()) ? a.managerModel.trim() : ""
+    },
+    scoring: {
+      holdingPeriodDays: int2(s.holdingPeriodDays, 1, 60, 5),
+      benchmark: typeof s.benchmark === "string" ? s.benchmark.trim() : "",
+      benchmarks: { ...DEFAULTS.scoring.benchmarks, ...benchmarks }
+    },
+    journal: { maxResolvedEntries: Number.isInteger(j.maxResolvedEntries) && j.maxResolvedEntries > 0 ? j.maxResolvedEntries : null },
+    sources: { ...DEFAULTS.sources, ...raw.sources }
+  };
 }
 
 // src/check/desk-check.ts
@@ -36732,9 +36768,9 @@ function dataLine(root) {
     return { ok: false, text: `Desk data folder ${dir} cannot be written: ${e.message}` };
   }
 }
-function robinhoodLine(file3 = robinhoodFile()) {
-  if (!fs3.existsSync(file3)) return { ok: true, text: "Robinhood: not connected yet (only needed for trading; analysis works without it)" };
-  const when = fs3.statSync(file3).mtime;
+function robinhoodLine(file4 = robinhoodFile()) {
+  if (!fs3.existsSync(file4)) return { ok: true, text: "Robinhood: not connected yet (only needed for trading; analysis works without it)" };
+  const when = fs3.statSync(file4).mtime;
   return { ok: true, text: `Robinhood: a sign-in is saved (last refreshed ${when.toISOString().slice(0, 16).replace("T", " ")} UTC)` };
 }
 function contactLine(email3) {
@@ -36793,10 +36829,10 @@ async function getText(url2, opts = {}) {
       await sleep(wait);
       continue;
     }
-    const text2 = await res.text();
+    const text3 = await res.text();
     if (res.status === 404) throw new NoData(`${host} has nothing at that address (HTTP 404)`);
     if (!res.ok) throw new Unavailable(`${host} refused (HTTP ${res.status})`);
-    return text2;
+    return text3;
   }
 }
 async function getCookies(url2) {
@@ -36811,9 +36847,9 @@ async function getCookies(url2) {
   return res.headers.getSetCookie().map((c) => c.split(";")[0]).join("; ");
 }
 async function getJson(url2, opts = {}) {
-  const text2 = await getText(url2, opts);
+  const text3 = await getText(url2, opts);
   try {
-    return JSON.parse(text2);
+    return JSON.parse(text3);
   } catch {
     throw new Unavailable(`${new URL(url2).host} answered with something that is not data`);
   }
@@ -36825,42 +36861,42 @@ function failureText(e, what) {
 }
 
 // src/data/indicators.ts
-function sma(xs, n) {
+function sma(xs, n2) {
   const out = [];
   let sum = 0;
   xs.forEach((x, i) => {
     sum += x;
-    if (i >= n) sum -= xs[i - n];
-    out.push(i >= n - 1 ? sum / n : null);
+    if (i >= n2) sum -= xs[i - n2];
+    out.push(i >= n2 - 1 ? sum / n2 : null);
   });
   return out;
 }
-function ema(xs, n) {
-  const k = 1 - 2 / (n + 1);
+function ema(xs, n2) {
+  const k = 1 - 2 / (n2 + 1);
   let numer = 0, denom = 0, seen = 0;
   return xs.map((x) => {
     if (x === null) return null;
     numer = x + k * numer;
     denom = 1 + k * denom;
     seen++;
-    return seen >= n ? numer / denom : null;
+    return seen >= n2 ? numer / denom : null;
   });
 }
-function wilder(xs, n, startAt) {
+function wilder(xs, n2, startAt) {
   const out = xs.map(() => null);
   let prev = 0;
   for (let i = startAt; i < xs.length; i++) {
     const k = i - startAt;
-    if (k < n - 1) continue;
-    prev = k === n - 1 ? xs.slice(startAt, i + 1).reduce((a, b) => a + b, 0) / n : (prev * (n - 1) + xs[i]) / n;
+    if (k < n2 - 1) continue;
+    prev = k === n2 - 1 ? xs.slice(startAt, i + 1).reduce((a, b) => a + b, 0) / n2 : (prev * (n2 - 1) + xs[i]) / n2;
     out[i] = prev;
   }
   return out;
 }
-function rsi(closes, n = 14) {
+function rsi(closes, n2 = 14) {
   const gains = closes.map((c, i) => i ? Math.max(0, c - closes[i - 1]) : 0);
   const losses = closes.map((c, i) => i ? Math.max(0, closes[i - 1] - c) : 0);
-  const g = wilder(gains, n, 1), l = wilder(losses, n, 1);
+  const g = wilder(gains, n2, 1), l = wilder(losses, n2, 1);
   return g.map((gv, i) => {
     const lv = l[i];
     if (gv === null || lv === null || lv === void 0) return null;
@@ -36869,42 +36905,42 @@ function rsi(closes, n = 14) {
 }
 function macd(closes) {
   const fast = ema(closes, 12), slow = ema(closes, 26);
-  const line = fast.map((f, i) => f === null || slow[i] === null ? null : f - slow[i]);
-  const signal = ema(line, 9);
-  return { macd: line, signal, hist: line.map((m, i) => m === null || signal[i] === null ? null : m - signal[i]) };
+  const line2 = fast.map((f, i) => f === null || slow[i] === null ? null : f - slow[i]);
+  const signal = ema(line2, 9);
+  return { macd: line2, signal, hist: line2.map((m2, i) => m2 === null || signal[i] === null ? null : m2 - signal[i]) };
 }
-function bollinger(closes, n = 20, k = 2) {
-  const mid = sma(closes, n), upper = [], lower = [];
+function bollinger(closes, n2 = 20, k = 2) {
+  const mid = sma(closes, n2), upper = [], lower = [];
   closes.forEach((_, i) => {
-    const m = mid[i];
-    if (m === null || m === void 0) {
+    const m2 = mid[i];
+    if (m2 === null || m2 === void 0) {
       upper.push(null);
       lower.push(null);
       return;
     }
-    const w = closes.slice(i - n + 1, i + 1), sd = Math.sqrt(w.reduce((a, x) => a + (x - m) ** 2, 0) / (n - 1));
-    upper.push(m + k * sd);
-    lower.push(m - k * sd);
+    const w = closes.slice(i - n2 + 1, i + 1), sd = Math.sqrt(w.reduce((a, x) => a + (x - m2) ** 2, 0) / (n2 - 1));
+    upper.push(m2 + k * sd);
+    lower.push(m2 - k * sd);
   });
   return { mid, upper, lower };
 }
-function atr(bars, n = 14) {
+function atr(bars, n2 = 14) {
   const tr = bars.map((b, i) => i ? Math.max(b.high - b.low, Math.abs(b.high - bars[i - 1].close), Math.abs(b.low - bars[i - 1].close)) : b.high - b.low);
-  return wilder(tr, n, 0);
+  return wilder(tr, n2, 0);
 }
-function vwma(bars, n = 14) {
+function vwma(bars, n2 = 14) {
   return bars.map((_, i) => {
-    if (i < n - 1) return null;
-    const w = bars.slice(i - n + 1, i + 1), vol2 = w.reduce((a, b) => a + b.volume, 0);
+    if (i < n2 - 1) return null;
+    const w = bars.slice(i - n2 + 1, i + 1), vol2 = w.reduce((a, b) => a + b.volume, 0);
     return vol2 > 0 ? w.reduce((a, b) => a + b.close * b.volume, 0) / vol2 : null;
   });
 }
-function mfi(bars, n = 14) {
+function mfi(bars, n2 = 14) {
   const tp = bars.map((b) => (b.high + b.low + b.close) / 3);
   return bars.map((_, i) => {
-    if (i < n) return null;
+    if (i < n2) return null;
     let pos = 0, neg = 0;
-    for (let j = i - n + 1; j <= i; j++) {
+    for (let j = i - n2 + 1; j <= i; j++) {
       const flow = tp[j] * bars[j].volume;
       if (tp[j] > tp[j - 1]) pos += flow;
       else if (tp[j] < tp[j - 1]) neg += flow;
@@ -37058,17 +37094,22 @@ function normalizeSymbol(raw) {
   if (sh) return `${sh[1]}.SS`;
   return s;
 }
+function safeSymbol(raw) {
+  const s = normalizeSymbol(raw);
+  if (!/^[A-Z0-9.\-=^]{1,20}$/.test(s)) throw new Error(`"${raw}" is not a ticker symbol this desk can look up`);
+  return s;
+}
 
 // src/data/yahoo.ts
 var HOSTS = ["https://query1.finance.yahoo.com", "https://query2.finance.yahoo.com"];
 var cache = /* @__PURE__ */ new Map();
 var epoch = (date5) => Math.floor(Date.parse(`${date5}T00:00:00Z`) / 1e3);
 var num = (v) => typeof v === "number" && Number.isFinite(v) ? v : null;
-function parseChart(json2, symbol3) {
+function parseChart(json2, symbol4) {
   const r = json2.chart?.result?.[0];
-  if (!r) throw new NoData(`Yahoo Finance has no prices for ${symbol3}${json2.chart?.error?.description ? ` (${json2.chart.error.description})` : ""}`);
-  const m = r.meta ?? {}, q = r.indicators?.quote?.[0] ?? {}, adj = r.indicators?.adjclose?.[0]?.adjclose;
-  const offset = m.gmtoffset ?? 0;
+  if (!r) throw new NoData(`Yahoo Finance has no prices for ${symbol4}${json2.chart?.error?.description ? ` (${json2.chart.error.description})` : ""}`);
+  const m2 = r.meta ?? {}, q = r.indicators?.quote?.[0] ?? {}, adj = r.indicators?.adjclose?.[0]?.adjclose;
+  const offset = m2.gmtoffset ?? 0;
   const bars = [];
   (r.timestamp ?? []).forEach((ts, i) => {
     const open2 = num(q.open?.[i]), high = num(q.high?.[i]), low = num(q.low?.[i]), close = num(q.close?.[i]);
@@ -37079,16 +37120,16 @@ function parseChart(json2, symbol3) {
   const seen = /* @__PURE__ */ new Set();
   const unique = bars.filter((b) => seen.has(b.date) ? false : (seen.add(b.date), true));
   return {
-    meta: { symbol: m.symbol ?? symbol3, currency: m.currency, exchange: m.fullExchangeName ?? m.exchangeName, type: m.instrumentType, name: m.longName ?? m.shortName, price: m.regularMarketPrice, timezone: m.exchangeTimezoneName },
+    meta: { symbol: m2.symbol ?? symbol4, currency: m2.currency, exchange: m2.fullExchangeName ?? m2.exchangeName, type: m2.instrumentType, name: m2.longName ?? m2.shortName, price: m2.regularMarketPrice, timezone: m2.exchangeTimezoneName },
     bars: unique
   };
 }
-async function fetchDaily(symbol3, from, to) {
+async function fetchDaily(symbol4, from, to) {
   const qs = `period1=${epoch(from)}&period2=${epoch(addDays(to, 1))}&interval=1d&events=div%2Csplit&includeAdjustedClose=true`;
   let last;
   for (const host of HOSTS) {
     try {
-      return parseChart(await getJson(`${host}/v8/finance/chart/${encodeURIComponent(symbol3)}?${qs}`), symbol3);
+      return parseChart(await getJson(`${host}/v8/finance/chart/${encodeURIComponent(symbol4)}?${qs}`), symbol4);
     } catch (e) {
       if (e instanceof NoData) throw e;
       last = e;
@@ -37097,9 +37138,9 @@ async function fetchDaily(symbol3, from, to) {
   throw last;
 }
 async function daily(raw, from, to) {
-  const symbol3 = normalizeSymbol(raw), key = `${symbol3}|${from}|${to}`;
+  const symbol4 = normalizeSymbol(raw), key = `${symbol4}|${from}|${to}`;
   if (!cache.has(key)) {
-    const p = fetchDaily(symbol3, from, to);
+    const p = fetchDaily(symbol4, from, to);
     cache.set(key, p);
     p.catch(() => cache.delete(key));
   }
@@ -37123,20 +37164,20 @@ var resolved = (raw) => {
   return s === raw.trim().toUpperCase() ? s : `${s} (from ${raw.trim()})`;
 };
 async function instrument(raw, analysis2) {
-  const day = analysisDate(analysis2), s = await history(raw, day, 30), last = s.bars[s.bars.length - 1];
-  const kind = typeWord(s.meta.type, raw), old = isHistorical(day);
+  const day2 = analysisDate(analysis2), s = await history(raw, day2, 30), last = s.bars[s.bars.length - 1];
+  const kind = typeWord(s.meta.type, raw), old = isHistorical(day2);
   const lines = [`Instrument: ${resolved(raw)}`, `Kind: ${kind}`];
-  if (s.meta.name) lines.push(old ? `Name: ${s.meta.name} (its current name, given only to identify it; on ${day} it may have been named differently)` : `Name: ${s.meta.name}`);
+  if (s.meta.name) lines.push(old ? `Name: ${s.meta.name} (its current name, given only to identify it; on ${day2} it may have been named differently)` : `Name: ${s.meta.name}`);
   if (!old && s.meta.exchange) lines.push(`Exchange: ${s.meta.exchange}`);
   if (s.meta.currency) lines.push(`Quote currency: ${s.meta.currency}`);
-  lines.push(`Analysis date: ${day}${old ? " (a past day: use only what was known by then)" : ""}`);
+  lines.push(`Analysis date: ${day2}${old ? " (a past day: use only what was known by then)" : ""}`);
   lines.push(`Latest trading day on or before it: ${last.date}, close ${f2(last.close)}`);
   lines.push("", `Refer to it by this exact ticker in every report, keeping any exchange suffix. Do not substitute a different company or ticker unless a tool result disproves this identity.${kind === "crypto asset" ? " It is a crypto asset, not a company: do not assume company fundamentals exist." : ""}`);
   return lines.join("\n");
 }
 var MAX_ROWS = 260;
 async function priceHistory(raw, analysis2, start, end) {
-  const day = analysisDate(analysis2), [s, e] = window(start, end, day);
+  const day2 = analysisDate(analysis2), [s, e] = window(start, end, day2);
   const series = await daily(raw, s, e);
   if (!series.bars.length) return `No trading rows for ${resolved(raw)} from ${s} to ${e}.`;
   const rows = series.bars.slice(-MAX_ROWS);
@@ -37148,26 +37189,26 @@ function indicatorList(input2) {
   return { ok: [...new Set(parts.filter(isIndicator))], unknown: parts.filter((p) => !isIndicator(p)) };
 }
 async function indicatorWindow(raw, analysis2, names, lookBackDays = 30) {
-  const day = analysisDate(analysis2), { ok, unknown: unknown2 } = indicatorList(names);
+  const day2 = analysisDate(analysis2), { ok, unknown: unknown2 } = indicatorList(names);
   if (!ok.length) return `None of "${[names].flat().join(", ")}" is an indicator this desk computes. Use: ${INDICATOR_NAMES.join(", ")}.`;
-  const days = Math.max(5, Math.min(120, Math.round(lookBackDays))), from = addDays(day, -days);
-  const s = await history(raw, day), out = [];
+  const days = Math.max(5, Math.min(120, Math.round(lookBackDays))), from = addDays(day2, -days);
+  const s = await history(raw, day2), out = [];
   for (const name of ok) {
     const values = compute(name, s.bars);
     const rows = s.bars.map((b, i) => [b, values[i]]).filter(([b]) => b.date >= from);
-    out.push(`## ${name} for ${resolved(raw)}, ${from} to ${day} (trading days only)`, ...rows.map(([b, v]) => `${b.date}: ${f2(v)}`), "", INDICATORS[name], "");
+    out.push(`## ${name} for ${resolved(raw)}, ${from} to ${day2} (trading days only)`, ...rows.map(([b, v]) => `${b.date}: ${f2(v)}`), "", INDICATORS[name], "");
   }
   if (unknown2.length) out.push(`Not computed (unknown names): ${unknown2.join(", ")}. Use: ${INDICATOR_NAMES.join(", ")}.`);
   return out.join("\n").trim();
 }
 var SNAPSHOT_INDICATORS = ["close_10_ema", "close_50_sma", "close_200_sma", "rsi", "boll", "boll_ub", "boll_lb", "macd", "macds", "macdh", "atr"];
 async function verifiedSnapshot(raw, analysis2, lookBack = 30) {
-  const day = analysisDate(analysis2), s = await history(raw, day), bars = s.bars, last = bars[bars.length - 1];
+  const day2 = analysisDate(analysis2), s = await history(raw, day2), bars = s.bars, last = bars[bars.length - 1];
   const recent = bars.slice(-Math.max(1, Math.min(30, Math.round(lookBack))));
   const lines = [
     `## Checked price table for ${resolved(raw)}`,
     "",
-    `- Analysis date: ${day}`,
+    `- Analysis date: ${day2}`,
     `- Latest trading row used: ${last.date}`,
     "- Rows after the analysis date are excluded.",
     `- Prices adjusted for splits and dividends${s.meta.currency ? `, in ${s.meta.currency}` : ""}.`,
@@ -37186,7 +37227,7 @@ async function verifiedSnapshot(raw, analysis2, lookBack = 30) {
     "",
     "| Indicator | Value |",
     "|---|---:|",
-    ...SNAPSHOT_INDICATORS.map((n) => `| ${n} | ${f2(compute(n, bars).at(-1))} |`),
+    ...SNAPSHOT_INDICATORS.map((n2) => `| ${n2} | ${f2(compute(n2, bars).at(-1))} |`),
     "",
     `### The last ${recent.length} closes`,
     "",
@@ -37207,7 +37248,7 @@ async function search(q, count) {
   for (const host of HOSTS) {
     try {
       const j = await getJson(`${host}/v1/finance/search?${qs}`);
-      return (j.news ?? []).filter((n) => n.title && n.providerPublishTime).map((n) => ({ title: n.title, publisher: n.publisher ?? "unknown", link: n.link ?? "", time: stamp(n.providerPublishTime), tickers: (n.relatedTickers ?? []).map((t) => t.toUpperCase()) }));
+      return (j.news ?? []).filter((n2) => n2.title && n2.providerPublishTime).map((n2) => ({ title: n2.title, publisher: n2.publisher ?? "unknown", link: n2.link ?? "", time: stamp(n2.providerPublishTime), tickers: (n2.relatedTickers ?? []).map((t) => t.toUpperCase()) }));
     } catch (e) {
       last = e;
     }
@@ -37223,18 +37264,18 @@ function gap(found, from, to, subject) {
   return `No ${subject} between ${from} and ${to} in Yahoo Finance's search results. Search returns a sample, so this is not proof that nothing happened.`;
 }
 async function companyNews(raw, analysis2, lookBackDays, limit) {
-  const day = analysisDate(analysis2), sym = normalizeSymbol(raw), from = addDays(day, -lookBackDays);
+  const day2 = analysisDate(analysis2), sym = normalizeSymbol(raw), from = addDays(day2, -lookBackDays);
   const all = await search(sym, Math.max(limit * 2, 20));
   const untagged = all.length > 0 && all.every((a) => a.tickers.length === 0);
   const found = untagged ? all : all.filter((a) => a.tickers.includes(sym));
   if (!found.length) throw new Unavailable(`Yahoo Finance's search has no articles tagged ${sym} (it tags few listings outside the US)`);
-  const list2 = found.filter((a) => inWindow(a, from, day)).sort((a, b) => b.time.localeCompare(a.time)).slice(0, limit);
-  if (!list2.length) return gap(found, from, day, `news about ${sym}`);
+  const list2 = found.filter((a) => inWindow(a, from, day2)).sort((a, b) => b.time.localeCompare(a.time)).slice(0, limit);
+  if (!list2.length) return gap(found, from, day2, `news about ${sym}`);
   const how = untagged ? `matched by Yahoo's search for "${sym}", not tagged: check each is about this company` : `tagged ${sym}`;
-  return [`News about ${sym}, ${from} to ${day} (${list2.length} article${list2.length === 1 ? "" : "s"} ${how}; headlines only)`, "", render2(list2)].join("\n");
+  return [`News about ${sym}, ${from} to ${day2} (${list2.length} article${list2.length === 1 ? "" : "s"} ${how}; headlines only)`, "", render2(list2)].join("\n");
 }
 async function worldNews(analysis2, lookBackDays, limit, queries) {
-  const day = analysisDate(analysis2), from = addDays(day, -lookBackDays);
+  const day2 = analysisDate(analysis2), from = addDays(day2, -lookBackDays);
   const results = await Promise.allSettled(queries.map((q) => search(q, 10)));
   const failed = results.filter((r) => r.status === "rejected").length;
   if (failed === queries.length) throw results[0].reason;
@@ -37246,22 +37287,22 @@ async function worldNews(analysis2, lookBackDays, limit, queries) {
       all.push(a);
     }
   }
-  const list2 = all.filter((a) => inWindow(a, from, day)).sort((a, b) => b.time.localeCompare(a.time)).slice(0, limit);
+  const list2 = all.filter((a) => inWindow(a, from, day2)).sort((a, b) => b.time.localeCompare(a.time)).slice(0, limit);
   const note = failed ? `
 (${failed} of ${queries.length} searches could not be run: Yahoo Finance did not answer them.)` : "";
-  if (!list2.length) return gap(all, from, day, "world and economic news") + note;
-  const past = isHistorical(day) ? " Search favours recent articles, so a past window may be thin." : "";
-  return [`World and economic news, ${from} to ${day}, from ${queries.length} searches: ${queries.join("; ")}.${past}`, "", render2(list2)].join("\n") + note;
+  if (!list2.length) return gap(all, from, day2, "world and economic news") + note;
+  const past = isHistorical(day2) ? " Search favours recent articles, so a past window may be thin." : "";
+  return [`World and economic news, ${from} to ${day2}, from ${queries.length} searches: ${queries.join("; ")}.${past}`, "", render2(list2)].join("\n") + note;
 }
 
 // src/data/social.ts
-var clip = (s, n) => s.length > n ? `${s.slice(0, n - 1)}\u2026` : s;
+var clip = (s, n2) => s.length > n2 ? `${s.slice(0, n2 - 1)}\u2026` : s;
 var decode3 = (s) => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;|&#x27;/g, "'").replace(/&amp;/g, "&");
 var plain = (html) => decode3(decode3(html).replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
 async function stocktwits(raw, from, to, limit) {
   const base = cryptoBase(raw), sym = base ? `${base}.X` : normalizeSymbol(raw);
   const j = await getJson(`https://api.stocktwits.com/api/2/streams/symbol/${encodeURIComponent(sym)}.json`);
-  return (j.messages ?? []).filter((m) => m.body && m.created_at).map((m) => ({ time: m.created_at.slice(0, 16).replace("T", " "), text: clip(m.body.replace(/\s+/g, " ").trim(), 280), tag: m.entities?.sentiment?.basic ?? void 0 })).filter((p) => p.time.slice(0, 10) >= from && p.time.slice(0, 10) <= to).slice(0, limit);
+  return (j.messages ?? []).filter((m2) => m2.body && m2.created_at).map((m2) => ({ time: m2.created_at.slice(0, 16).replace("T", " "), text: clip(m2.body.replace(/\s+/g, " ").trim(), 280), tag: m2.entities?.sentiment?.basic ?? void 0 })).filter((p) => p.time.slice(0, 10) >= from && p.time.slice(0, 10) <= to).slice(0, limit);
 }
 function parseAtom(xml) {
   return xml.split(/<entry[\s>]/).slice(1).map((chunk) => {
@@ -37282,10 +37323,10 @@ function subredditsFor(raw, stock, crypto) {
   return own2[base] ? [own2[base], ...crypto] : crypto;
 }
 async function socialPosts(raw, analysis2, opts) {
-  const day = analysisDate(analysis2), from = addDays(day, -opts.lookBackDays), sym = normalizeSymbol(raw);
+  const day2 = analysisDate(analysis2), from = addDays(day2, -opts.lookBackDays), sym = normalizeSymbol(raw);
   const subs = subredditsFor(raw, opts.subreddits, opts.cryptoSubreddits);
-  const [tw, rd] = await Promise.allSettled([stocktwits(raw, from, day, opts.stocktwitsLimit), reddit(raw, from, day, subs)]);
-  const out = [`Posts about ${sym}, ${from} to ${day}. Both sources serve only recent posts, so a past window can be empty for that reason alone.`, ""];
+  const [tw, rd] = await Promise.allSettled([stocktwits(raw, from, day2, opts.stocktwitsLimit), reddit(raw, from, day2, subs)]);
+  const out = [`Posts about ${sym}, ${from} to ${day2}. Both sources serve only recent posts, so a past window can be empty for that reason alone.`, ""];
   out.push("### StockTwits (retail traders; each author may tag a message Bullish or Bearish)");
   if (tw.status === "rejected") out.push(`StockTwits unavailable: ${tw.reason.message}. This is not a quiet crowd.`);
   else if (!tw.value.length) out.push(`No StockTwits messages about ${sym} in this window that the stream still serves.`);
@@ -37331,7 +37372,7 @@ var SERIES = {
   eur_usd: ["DEXUSEU", "US dollars per euro"]
 };
 function parseCsv(csv) {
-  return csv.trim().split(/\r?\n/).slice(1).map((line) => line.split(",")).filter((c) => c.length >= 2 && c[1] !== "." && c[1] !== "").map(([d, v]) => ({ date: d.trim(), value: Number(v) })).filter((o) => /^\d{4}-\d{2}-\d{2}$/.test(o.date) && Number.isFinite(o.value));
+  return csv.trim().split(/\r?\n/).slice(1).map((line2) => line2.split(",")).filter((c) => c.length >= 2 && c[1] !== "." && c[1] !== "").map(([d, v]) => ({ date: d.trim(), value: Number(v) })).filter((o) => /^\d{4}-\d{2}-\d{2}$/.test(o.date) && Number.isFinite(o.value));
 }
 function releaseLag(obs) {
   const gaps = obs.slice(1).map((o, i) => (Date.parse(o.date) - Date.parse(obs[i].date)) / 864e5).sort((a, b) => a - b);
@@ -37339,23 +37380,23 @@ function releaseLag(obs) {
   return median <= 3 ? 1 : median <= 10 ? 6 : median <= 45 ? 45 : 120;
 }
 async function economicSeries(indicator, analysis2, lookBackDays = 365) {
-  const day = analysisDate(analysis2), key = indicator.trim().toLowerCase(), known = SERIES[key];
+  const day2 = analysisDate(analysis2), key = indicator.trim().toLowerCase(), known = SERIES[key];
   const id = known?.[0] ?? indicator.trim().toUpperCase();
   if (!/^[A-Z0-9_]{1,40}$/.test(id)) throw new Error(`"${indicator}" is not a series name or a FRED series id`);
-  const from = addDays(day, -Math.max(30, Math.min(3650, lookBackDays)) - 130);
-  let obs = parseCsv(await getText(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${id}&cosd=${from}&coed=${day}`)).filter((o) => o.date <= day);
-  const past = isHistorical(day), lag = releaseLag(obs);
-  if (past) obs = obs.filter((o) => addDays(o.date, lag) <= day);
-  obs = obs.filter((o) => o.date >= addDays(day, -Math.max(30, Math.min(3650, lookBackDays))));
-  if (!obs.length) throw new NoData(`FRED has no ${id} values published by ${day} in this window`);
-  const first = obs[0], last = obs[obs.length - 1], change = last.value - first.value, pct = first.value ? change / Math.abs(first.value) * 100 : 0;
+  const from = addDays(day2, -Math.max(30, Math.min(3650, lookBackDays)) - 130);
+  let obs = parseCsv(await getText(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${id}&cosd=${from}&coed=${day2}`)).filter((o) => o.date <= day2);
+  const past = isHistorical(day2), lag = releaseLag(obs);
+  if (past) obs = obs.filter((o) => addDays(o.date, lag) <= day2);
+  obs = obs.filter((o) => o.date >= addDays(day2, -Math.max(30, Math.min(3650, lookBackDays))));
+  if (!obs.length) throw new NoData(`FRED has no ${id} values published by ${day2} in this window`);
+  const first = obs[0], last = obs[obs.length - 1], change2 = last.value - first.value, pct3 = first.value ? change2 / Math.abs(first.value) * 100 : 0;
   const fmt = (v) => Math.abs(v) >= 1e3 ? v.toLocaleString("en-US", { maximumFractionDigits: 1 }) : v.toFixed(2);
   const lines = [
     `## ${known?.[1] ?? id} - FRED series ${id}`,
     "",
-    `- Latest value known by ${day}: ${fmt(last.value)} (for ${last.date})`,
-    `- Change since ${first.date}: ${change >= 0 ? "+" : ""}${fmt(change)} (${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%)`,
-    past ? `- A past analysis date: values are kept only if published by ${day} (a ${lag}-day release lag for this series), and are today's revised figures; first releases may have differed slightly.` : "- Values as published today, revisions included.",
+    `- Latest value known by ${day2}: ${fmt(last.value)} (for ${last.date})`,
+    `- Change since ${first.date}: ${change2 >= 0 ? "+" : ""}${fmt(change2)} (${pct3 >= 0 ? "+" : ""}${pct3.toFixed(1)}%)`,
+    past ? `- A past analysis date: values are kept only if published by ${day2} (a ${lag}-day release lag for this series), and are today's revised figures; first releases may have differed slightly.` : "- Values as published today, revisions included.",
     "",
     "Date | Value",
     "---|---:",
@@ -37375,18 +37416,18 @@ var list = (s) => {
   }
 };
 async function predictionMarkets(topic, analysis2, limit = 6, now = /* @__PURE__ */ new Date()) {
-  const day = analysisDate(analysis2);
-  if (isHistorical(day)) return `Prediction-market odds are withheld for ${day}: Polymarket serves only today's odds on open markets, and those would put later knowledge into an analysis of ${day}.`;
+  const day2 = analysisDate(analysis2);
+  if (isHistorical(day2)) return `Prediction-market odds are withheld for ${day2}: Polymarket serves only today's odds on open markets, and those would put later knowledge into an analysis of ${day2}.`;
   const j = await getJson(`https://gamma-api.polymarket.com/public-search?q=${encodeURIComponent(topic)}&limit_per_type=20`);
-  const open2 = (j.events ?? []).flatMap((e) => e.markets ?? []).filter((m) => m.question && !m.closed && m.active !== false && list(m.outcomePrices).length && list(m.outcomes).length && (!m.endDate || Date.parse(m.endDate) > now.getTime())).sort((a, b) => (b.volumeNum ?? 0) - (a.volumeNum ?? 0)).slice(0, Math.max(1, Math.min(10, limit)));
+  const open2 = (j.events ?? []).flatMap((e) => e.markets ?? []).filter((m2) => m2.question && !m2.closed && m2.active !== false && list(m2.outcomePrices).length && list(m2.outcomes).length && (!m2.endDate || Date.parse(m2.endDate) > now.getTime())).sort((a, b) => (b.volumeNum ?? 0) - (a.volumeNum ?? 0)).slice(0, Math.max(1, Math.min(10, limit)));
   const head2 = `## Polymarket: "${topic}"
 Live odds: the crowd's priced chance of each event (more traded volume, more reliable). A price is not a forecast to take as certain.
 `;
   if (!open2.length) return `${head2}
 No open markets matched "${topic}". Polymarket covers mostly economic, political, geopolitical and crypto events; a single company may have none.`;
-  return head2 + "\n" + open2.map((m) => {
-    const p = Number(list(m.outcomePrices)[0]), wk = m.oneWeekPriceChange;
-    return `- ${m.question}: ${list(m.outcomes)[0]} ${(p * 100).toFixed(0)}% \xB7 volume $${Math.round(m.volumeNum ?? 0).toLocaleString("en-US")}${m.endDate ? ` \xB7 resolves ${m.endDate.slice(0, 10)}` : ""}${typeof wk === "number" ? ` \xB7 ${wk >= 0 ? "+" : ""}${(wk * 100).toFixed(1)} points this week` : ""}`;
+  return head2 + "\n" + open2.map((m2) => {
+    const p = Number(list(m2.outcomePrices)[0]), wk = m2.oneWeekPriceChange;
+    return `- ${m2.question}: ${list(m2.outcomes)[0]} ${(p * 100).toFixed(0)}% \xB7 volume $${Math.round(m2.volumeNum ?? 0).toLocaleString("en-US")}${m2.endDate ? ` \xB7 resolves ${m2.endDate.slice(0, 10)}` : ""}${typeof wk === "number" ? ` \xB7 ${wk >= 0 ? "+" : ""}${(wk * 100).toFixed(1)} points this week` : ""}`;
   }).join("\n");
 }
 
@@ -37452,22 +37493,22 @@ function lineAsOf(facts, tags, asOf, spans, forms) {
 function filedStatement(usGaap, kind, freq, asOf) {
   const quarterly = freq === "quarterly";
   const spans = quarterly ? [QUARTER, ...YEAR_TO_DATE.map(([lo, hi]) => [lo, hi])] : [YEAR];
-  const names = quarterly ? ["", ...YEAR_TO_DATE.map(([, , m]) => ` (${m} months to date)`)] : [""];
+  const names = quarterly ? ["", ...YEAR_TO_DATE.map(([, , m2]) => ` (${m2} months to date)`)] : [""];
   const lines = STATEMENTS[kind].lines.map(([label, tags]) => ({ label, ...lineAsOf(usGaap, tags, asOf, spans, quarterly ? [] : ANNUAL_FORMS) }));
   const chosen = lines.map((l) => {
-    const m = /* @__PURE__ */ new Map();
+    const m2 = /* @__PURE__ */ new Map();
     for (const key of l.values.keys()) {
       const [end, i] = key.split("|");
-      m.set(end, Math.min(Number(i), m.get(end) ?? Number(i)));
+      m2.set(end, Math.min(Number(i), m2.get(end) ?? Number(i)));
     }
-    return m;
+    return m2;
   });
-  const ends = [...new Set(chosen.flatMap((m) => [...m.keys()]))].sort().reverse().slice(0, SHOWN[freq]);
-  const periods = ends.flatMap((end) => [...new Set(chosen.map((m) => m.get(end)).filter((i) => i !== void 0))].sort().map((i) => ({ end, i })));
+  const ends = [...new Set(chosen.flatMap((m2) => [...m2.keys()]))].sort().reverse().slice(0, SHOWN[freq]);
+  const periods = ends.flatMap((end) => [...new Set(chosen.map((m2) => m2.get(end)).filter((i) => i !== void 0))].sort().map((i) => ({ end, i })));
   if (!periods.length) throw new NoData(`no ${freq} ${STATEMENTS[kind].title.toLowerCase()} was filed with the SEC by ${asOf}`);
   return {
     columns: periods.map((p) => p.end + names[p.i]),
-    rows: lines.map((l, n) => ({ label: l.label, unit: l.unit, cells: periods.map((p) => chosen[n].get(p.end) === p.i ? l.values.get(`${p.end}|${p.i}`) ?? null : null) }))
+    rows: lines.map((l, n2) => ({ label: l.label, unit: l.unit, cells: periods.map((p) => chosen[n2].get(p.end) === p.i ? l.values.get(`${p.end}|${p.i}`) ?? null : null) }))
   };
 }
 var DAY_MS = 864e5;
@@ -37480,17 +37521,17 @@ function cached2(url2, timeoutMs) {
   value.catch(() => cache2.delete(url2));
   return value;
 }
-async function cikFor(symbol3) {
+async function cikFor(symbol4) {
   const table = await cached2("https://www.sec.gov/files/company_tickers.json", 3e4);
-  const hit = Object.values(table).find((e) => e.ticker?.toUpperCase() === symbol3.toUpperCase());
+  const hit = Object.values(table).find((e) => e.ticker?.toUpperCase() === symbol4.toUpperCase());
   return hit ? String(hit.cik_str).padStart(10, "0") : null;
 }
-async function secStatement(symbol3, kind, freq, asOf) {
-  const cik = await cikFor(symbol3);
-  if (!cik) throw new NoData(`${symbol3} is not in the SEC's list of US filers`);
+async function secStatement(symbol4, kind, freq, asOf) {
+  const cik = await cikFor(symbol4);
+  if (!cik) throw new NoData(`${symbol4} is not in the SEC's list of US filers`);
   const facts = await cached2(`https://data.sec.gov/api/xbrl/companyfacts/CIK${cik}.json`, 45e3);
   const usGaap = facts.facts?.["us-gaap"];
-  if (!usGaap) throw new NoData(`${symbol3} files with the SEC but not in US GAAP terms`);
+  if (!usGaap) throw new NoData(`${symbol4} files with the SEC but not in US GAAP terms`);
   return filedStatement(usGaap, kind, freq, asOf);
 }
 
@@ -37514,11 +37555,11 @@ function yahooSession() {
   });
   return session;
 }
-async function yahooJson(path5) {
+async function yahooJson(path8) {
   for (let attempt = 0; ; attempt++) {
     const s = await yahooSession();
     try {
-      return await getJson(`${HOSTS[1]}${path5}&crumb=${encodeURIComponent(s.crumb)}`, { headers: { Cookie: s.cookie } });
+      return await getJson(`${HOSTS[1]}${path8}&crumb=${encodeURIComponent(s.crumb)}`, { headers: { Cookie: s.cookie } });
     } catch (e) {
       if (attempt === 0 && /HTTP 401/.test(e.message)) {
         session = null;
@@ -37540,8 +37581,8 @@ var money = (v, currency) => has(v) ? `${v.raw.toLocaleString("en-US", { maximum
 var plain2 = (v) => has(v) ? String(Number(v.raw.toFixed(4))) : null;
 var percent = (v) => has(v) ? `${(v.raw * 100).toFixed(2)}%` : null;
 async function companyOverview(raw, analysis2) {
-  const day = analysisDate(analysis2), sym = companySymbol(raw);
-  if (isHistorical(day)) return `Company profile and ratios for ${sym} are withheld for ${day}: Yahoo Finance serves them only as they stand today. Market value, multiples, the 52-week range and the past year's income move with today's price, and even the name, sector and industry are today's; they would put later knowledge into an analysis of ${day}. Use get_financial_statement, which serves a US filer's accounts as filed by then.`;
+  const day2 = analysisDate(analysis2), sym = companySymbol(raw);
+  if (isHistorical(day2)) return `Company profile and ratios for ${sym} are withheld for ${day2}: Yahoo Finance serves them only as they stand today. Market value, multiples, the 52-week range and the past year's income move with today's price, and even the name, sector and industry are today's; they would put later knowledge into an analysis of ${day2}. Use get_financial_statement, which serves a US filer's accounts as filed by then.`;
   const r = await summary(sym, "price,summaryProfile,summaryDetail,defaultKeyStatistics,financialData");
   const p = r.price ?? {}, d = r.summaryDetail ?? {}, k = r.defaultKeyStatistics ?? {}, f = r.financialData ?? {};
   const quote = p.currency, main = quote ? MAIN_UNIT[quote] ?? quote : void 0, reported = f.financialCurrency;
@@ -37578,19 +37619,19 @@ async function companyOverview(raw, analysis2) {
   ];
   const lines = fields.filter(([, v]) => v !== null && v !== void 0 && v !== "").map(([l, v]) => `${l}: ${v}`);
   if (!lines.length) throw new NoData(`Yahoo Finance has no profile or ratios for ${sym}`);
-  return [`Company profile and ratios for ${sym}, from Yahoo Finance as they stand today (${day}). TTM is the last twelve months; a field Yahoo does not give is left out.`, "", ...lines].join("\n");
+  return [`Company profile and ratios for ${sym}, from Yahoo Finance as they stand today (${day2}). TTM is the last twelve months; a field Yahoo does not give is left out.`, "", ...lines].join("\n");
 }
 async function insiderTransactions(raw, analysis2, limit = 30) {
-  const day = analysisDate(analysis2), sym = companySymbol(raw);
-  if (isHistorical(day)) return `Insider transactions for ${sym} are withheld for ${day}: Yahoo Finance dates a trade by when it happened, not by when its filing made it public (up to two business days later), so it cannot show which trades were known on ${day}.`;
+  const day2 = analysisDate(analysis2), sym = companySymbol(raw);
+  if (isHistorical(day2)) return `Insider transactions for ${sym} are withheld for ${day2}: Yahoo Finance dates a trade by when it happened, not by when its filing made it public (up to two business days later), so it cannot show which trades were known on ${day2}.`;
   const r = await summary(sym, "insiderTransactions");
   const list2 = (r.insiderTransactions?.transactions ?? []).filter((t) => has(t.startDate)).sort((a, b) => b.startDate.raw - a.startDate.raw).slice(0, limit);
   if (!list2.length) return `No insider transactions reported for ${sym} by Yahoo Finance. Many listings have none.`;
-  const n = (v) => has(v) ? v.raw.toLocaleString("en-US") : null;
+  const n2 = (v) => has(v) ? v.raw.toLocaleString("en-US") : null;
   return [
     `Insider transactions for ${sym} from Yahoo Finance (the latest ${list2.length}, newest first). Each is dated by the trade; its filing follows within two business days.`,
     "",
-    ...list2.map((t) => `- ${new Date(t.startDate.raw * 1e3).toISOString().slice(0, 10)} \xB7 ${t.filerName ?? "unnamed"}${t.filerRelation ? ` (${t.filerRelation})` : ""}: ${t.transactionText || "no description"}${n(t.shares) ? ` \xB7 ${n(t.shares)} shares` : ""}${n(t.value) ? ` \xB7 value ${n(t.value)}` : ""}${t.ownership === "I" ? " \xB7 held indirectly" : ""}`)
+    ...list2.map((t) => `- ${new Date(t.startDate.raw * 1e3).toISOString().slice(0, 10)} \xB7 ${t.filerName ?? "unnamed"}${t.filerRelation ? ` (${t.filerRelation})` : ""}: ${t.transactionText || "no description"}${n2(t.shares) ? ` \xB7 ${n2(t.shares)} shares` : ""}${n2(t.value) ? ` \xB7 value ${n2(t.value)}` : ""}${t.ownership === "I" ? " \xB7 held indirectly" : ""}`)
   ].join("\n");
 }
 var YAHOO_LINES = {
@@ -37618,9 +37659,9 @@ function yahooTable(j, kind, freq) {
   return { columns: ends, rows: lines.map((l) => ({ label: l.label, unit: l.unit, cells: ends.map((e) => l.values.get(e) ?? null) })) };
 }
 var epoch2 = (date5) => Math.floor(Date.parse(`${date5}T00:00:00Z`) / 1e3);
-async function yahooStatement(sym, kind, freq, day) {
-  const types = YAHOO_LINES[kind].map((n) => freq + n).join(",");
-  const j = await yahooJson(`/ws/fundamentals-timeseries/v1/finance/timeseries/${encodeURIComponent(sym)}?symbol=${encodeURIComponent(sym)}&type=${types}&period1=${epoch2(addDays(day, -6 * 366))}&period2=${epoch2(addDays(day, 1))}`);
+async function yahooStatement(sym, kind, freq, day2) {
+  const types = YAHOO_LINES[kind].map((n2) => freq + n2).join(",");
+  const j = await yahooJson(`/ws/fundamentals-timeseries/v1/finance/timeseries/${encodeURIComponent(sym)}?symbol=${encodeURIComponent(sym)}&type=${types}&period1=${epoch2(addDays(day2, -6 * 366))}&period2=${epoch2(addDays(day2, 1))}`);
   return yahooTable(j, kind, freq);
 }
 function renderTable(t, head2, note) {
@@ -37641,25 +37682,25 @@ function renderTable(t, head2, note) {
   return out.join("\n");
 }
 var reason = (e) => {
-  const m = e.message;
-  return /sec\.gov refused \(HTTP 403\)/.test(m) ? `${m}: ${ASK_FOR_EMAIL}` : m;
+  const m2 = e.message;
+  return /sec\.gov refused \(HTTP 403\)/.test(m2) ? `${m2}: ${ASK_FOR_EMAIL}` : m2;
 };
 async function financialStatement(raw, kind, freq, analysis2) {
-  const day = analysisDate(analysis2), sym = companySymbol(raw), title = STATEMENTS[kind].title;
+  const day2 = analysisDate(analysis2), sym = companySymbol(raw), title = STATEMENTS[kind].title;
   let secFailure;
   try {
-    const t = await secStatement(sym, kind, freq, day);
+    const t = await secStatement(sym, kind, freq, day2);
     const q4 = kind !== "balance_sheet" && freq === "quarterly" ? " A fourth quarter is never derived: it is filed only inside the annual figure." : "";
-    return renderTable(t, `${title} for ${sym} (${freq}), as filed with the SEC on or before ${day}`, `Each figure is the latest filing of it by that day; a restatement counts only from the day it was filed.${q4}`);
+    return renderTable(t, `${title} for ${sym} (${freq}), as filed with the SEC on or before ${day2}`, `Each figure is the latest filing of it by that day; a restatement counts only from the day it was filed.${q4}`);
   } catch (e) {
     secFailure = e;
   }
-  if (isHistorical(day)) {
-    if (!(secFailure instanceof NoData)) throw new Unavailable(`the SEC, the only source of accounts as filed by ${day}, could not answer (${reason(secFailure)})`);
-    return `${title} for ${sym} is withheld for ${day}: ${reason(secFailure)}, and the other source, Yahoo Finance, dates a statement by the period it covers, not by when it was filed, so it cannot show which figures were public on ${day}.`;
+  if (isHistorical(day2)) {
+    if (!(secFailure instanceof NoData)) throw new Unavailable(`the SEC, the only source of accounts as filed by ${day2}, could not answer (${reason(secFailure)})`);
+    return `${title} for ${sym} is withheld for ${day2}: ${reason(secFailure)}, and the other source, Yahoo Finance, dates a statement by the period it covers, not by when it was filed, so it cannot show which figures were public on ${day2}.`;
   }
   try {
-    const t = await yahooStatement(sym, kind, freq, day);
+    const t = await yahooStatement(sym, kind, freq, day2);
     return renderTable(t, `${title} for ${sym} (${freq}), from Yahoo Finance as it stands today`, `Not from the SEC (${reason(secFailure)}). Yahoo gives money spent, such as capital expenditure, as a negative figure.`);
   } catch (e) {
     const both = `SEC: ${reason(secFailure)}; Yahoo Finance: ${e.message}`;
@@ -37667,18 +37708,617 @@ async function financialStatement(raw, kind, freq, analysis2) {
   }
 }
 
-// src/tools/server.ts
+// src/desk/holdings.ts
+import fs5 from "node:fs";
+import path5 from "node:path";
+
+// src/desk/lock.ts
+import fs4 from "node:fs";
+var STALE_MS = 6e4;
+var nap = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+function withLock(file4, run, waitMs = 15e3) {
+  const lock = `${file4}.lock`, until = Date.now() + waitMs;
+  for (; ; ) {
+    try {
+      fs4.mkdirSync(lock);
+      break;
+    } catch (e) {
+      if (e.code !== "EEXIST") throw e;
+      try {
+        if (Date.now() - fs4.statSync(lock).mtimeMs > STALE_MS) {
+          fs4.rmdirSync(lock);
+          continue;
+        }
+      } catch {
+        continue;
+      }
+      if (Date.now() > until) throw new Error(`${file4} is in use by another run; try again in a moment`);
+      nap(40);
+    }
+  }
+  try {
+    return run();
+  } finally {
+    try {
+      fs4.rmdirSync(lock);
+    } catch {
+    }
+  }
+}
+function writeWhole(file4, text3) {
+  const temp = `${file4}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
+  try {
+    fs4.writeFileSync(temp, text3);
+    fs4.renameSync(temp, file4);
+  } catch (e) {
+    try {
+      fs4.rmSync(temp, { force: true });
+    } catch {
+    }
+    throw e;
+  }
+}
+
+// src/desk/holdings.ts
+var file3 = (dir) => path5.join(dir, "holdings.json");
+var num2 = (v, what) => {
+  if (typeof v !== "number" || !Number.isFinite(v)) throw new Error(`${what} must be a number`);
+  return v;
+};
+function saveHoldings(dir, input2, today2, source = "person") {
+  if (input2.positions.length > 500) throw new Error("more than 500 positions");
+  const seen = /* @__PURE__ */ new Set();
+  const positions = input2.positions.map((p) => {
+    const ticker = safeSymbol(p.ticker);
+    if (seen.has(ticker)) throw new Error(`${ticker} is listed twice: give one total quantity`);
+    seen.add(ticker);
+    const quantity = num2(p.quantity, `the quantity of ${ticker}`);
+    if (quantity === 0) throw new Error(`${ticker} has a quantity of 0: leave it out`);
+    const averagePrice = p.averagePrice === void 0 ? void 0 : num2(p.averagePrice, `the average price of ${ticker}`);
+    if (averagePrice !== void 0 && averagePrice <= 0) throw new Error(`the average price of ${ticker} must be above 0`);
+    return { ticker, quantity, ...averagePrice === void 0 ? {} : { averagePrice } };
+  });
+  const cash = input2.cash === void 0 ? void 0 : num2(input2.cash, "cash");
+  if (cash !== void 0 && cash < 0) throw new Error("cash cannot be negative");
+  const currency = input2.currency?.trim().toUpperCase();
+  if (currency !== void 0 && !/^[A-Z]{3}$/.test(currency)) throw new Error(`"${input2.currency}" is not a three-letter currency such as USD`);
+  const h = { ...cash === void 0 ? {} : { cash }, ...currency ? { currency } : {}, positions, source, savedOn: today2 };
+  fs5.mkdirSync(dir, { recursive: true });
+  writeWhole(file3(dir), JSON.stringify(h, null, 2) + "\n");
+  return h;
+}
+function readHoldings(dir) {
+  try {
+    const h = JSON.parse(fs5.readFileSync(file3(dir), "utf8"));
+    return Array.isArray(h.positions) ? h : null;
+  } catch {
+    return null;
+  }
+}
+function forgetHoldings(dir) {
+  try {
+    fs5.rmSync(file3(dir));
+    return true;
+  } catch {
+    return false;
+  }
+}
+var n = (v) => v.toLocaleString("en-US", { maximumSignificantDigits: 4 });
+var m = (v) => v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function renderHoldings(h, ticker) {
+  if (!h) return "Portfolio context: not provided. You do not know the person's current holdings or cash, so do not assume a flat book; give direction and sizing guidance in terms they can apply to their own position.";
+  const held = h.positions.find((p) => p.ticker === ticker);
+  const lines = [held ? `- Current position in ${ticker}: ${n(held.quantity)} units${held.averagePrice ? `, average price ${m(held.averagePrice)}` : ""}` : `- No current position in ${ticker}`];
+  if (h.cash !== void 0) lines.push(`- Cash available: ${m(h.cash)}${h.currency ? ` ${h.currency}` : ""}`);
+  const others = h.positions.filter((p) => p !== held);
+  if (others.length) lines.push(`- Other positions: ${others.map((p) => `${p.ticker} ${n(p.quantity)}`).join(", ")}`);
+  return `Portfolio as ${h.source === "robinhood" ? "read from Robinhood" : "given by the person"} on ${h.savedOn} (it may have changed since):
+${lines.join("\n")}`;
+}
+
+// src/desk/journal.ts
+import fs6 from "node:fs";
+import path6 from "node:path";
+
+// src/desk/rating.ts
+var RATINGS = ["Buy", "Overweight", "Hold", "Underweight", "Sell"];
+var REVIEW = "Needs review";
+var SET = new Set(RATINGS.map((r) => r.toLowerCase()));
+var cap = (s) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+var LABEL = /(?<![a-z])rating\b[^:\-\u2010-\u2015]*[:\-\u2010-\u2015][\s*]*(\w+)/gi;
+var OWN = "(?:(?:final|our|overall|my|recommended|updated|revised|new|current)\\s+)*";
+var LINE = new RegExp(`^\\s*(?<item>(?:[-+*\\u2022]|\\d+[.)])\\s+)?[\\s*_#]*${OWN}rating[^\\w:\\-\\u2010-\\u2015]*[:\\-\\u2010-\\u2015][\\s*]*(?<value>\\w+)`, "i");
+var SCALE = /rating\s*(scale|options|legend)/i;
+function extractRating(text3) {
+  if (!text3) return null;
+  const lines = text3.normalize("NFKC").split(/\r?\n/).filter((l) => l.trim() && !SCALE.test(l));
+  const first = lines.find((l) => !l.trimStart().startsWith("#") || LINE.test(l)) ?? "";
+  const m2 = LINE.exec(first);
+  const opening = m2 && SET.has(m2.groups.value.toLowerCase()) ? m2 : null;
+  if (opening && !opening.groups.item) return cap(opening.groups.value);
+  const own2 = opening ? [cap(opening.groups.value)] : [], labels = [];
+  for (const line2 of lines) {
+    const lm = LINE.exec(line2);
+    if (lm && !lm.groups.item && SET.has(lm.groups.value.toLowerCase())) own2.push(cap(lm.groups.value));
+    for (const x of line2.matchAll(LABEL)) if (SET.has(x[1].toLowerCase())) labels.push(cap(x[1]));
+  }
+  const found = own2.length ? own2 : labels;
+  return found.length && new Set(found).size === 1 ? found[0] : null;
+}
+var parseRating = (text3) => extractRating(text3) ?? REVIEW;
+
+// src/desk/journal.ts
+var SEPARATOR = "\n\n<!-- ENTRY_END -->\n\n";
+var pct = (v) => `${v >= 0 ? "+" : "-"}${(Math.abs(v) * 100).toFixed(1)}%`;
+var keep = (text3) => text3.replace(/<!--\s*ENTRY_END\s*-->/gi, "").replace(/^([ \t]*)(DECISION|REFLECTION):/gim, "$1$2 -").trim();
+function parse3(block) {
+  const lines = block.trim().split(/\r?\n/);
+  const tag = lines[0]?.trim() ?? "";
+  if (!tag.startsWith("[") || !tag.endsWith("]")) return null;
+  const f = tag.slice(1, -1).split("|").map((s) => s.trim());
+  if (f.length < 4) return null;
+  const body = lines.slice(1).join("\n").trim();
+  const decision = /DECISION:\n([\s\S]*?)(?=\nREFLECTION:|$)/.exec(body)?.[1]?.trim() ?? "";
+  const reflection = /REFLECTION:\n([\s\S]*)$/.exec(body)?.[1]?.trim() ?? "";
+  const resolved2 = f.slice(6).find((x) => x.startsWith("resolved:"))?.slice("resolved:".length).trim() ?? null;
+  return { date: f[0], ticker: f[1], rating: f[2], pending: f[3] === "pending", raw: f[3] === "pending" ? null : f[3], alpha: f[4] ?? null, holding: f[5] ?? null, resolved: resolved2, decision, reflection };
+}
+var Journal = class {
+  /** @param maxResolved keep at most this many settled entries (the oldest go first); pending ones are never dropped */
+  constructor(file4, maxResolved = null) {
+    this.file = file4;
+    this.maxResolved = maxResolved;
+  }
+  file;
+  maxResolved;
+  read() {
+    try {
+      return fs6.readFileSync(this.file, "utf8");
+    } catch {
+      return "";
+    }
+  }
+  write(text3) {
+    fs6.mkdirSync(path6.dirname(this.file), { recursive: true });
+    writeWhole(this.file, text3);
+  }
+  blocks() {
+    return this.read().split(SEPARATOR).filter((b) => b.trim());
+  }
+  load() {
+    return this.blocks().map(parse3).filter((e) => e !== null);
+  }
+  pending() {
+    return this.load().filter((e) => e.pending);
+  }
+  /** Adds a pending entry. One entry per stock and day, settled or not: a re-run must not count the same call twice. */
+  storeDecision(ticker, date5, decision, rating) {
+    fs6.mkdirSync(path6.dirname(this.file), { recursive: true });
+    return withLock(this.file, () => {
+      if (this.load().some((e) => e.date === date5 && e.ticker === ticker)) return "exists";
+      const r = rating && RATINGS.includes(rating) ? rating : parseRating(decision);
+      const old = this.read();
+      this.write(`${old}${old && !old.endsWith(SEPARATOR) ? SEPARATOR : ""}[${date5} | ${ticker} | ${r} | pending]
+
+DECISION:
+${keep(decision)}${SEPARATOR}`);
+      return "stored";
+    });
+  }
+  /** Settles a pending entry with its measured outcome and the lesson. False when it was no longer pending. */
+  recordOutcome(ticker, date5, raw, alpha, holdingDays, reflection, resolution) {
+    return withLock(this.file, () => {
+      let done = false;
+      const out = this.blocks().map((block) => {
+        const e = parse3(block);
+        if (done || !e || !e.pending || e.date !== date5 || e.ticker !== ticker) return block;
+        done = true;
+        return `[${date5} | ${ticker} | ${e.rating} | ${pct(raw)} | ${pct(alpha)} | ${holdingDays}d | resolved:${resolution}]
+
+DECISION:
+${e.decision}
+
+REFLECTION:
+${keep(reflection)}`;
+      });
+      if (!done) return false;
+      this.write(this.rotate(out).join(SEPARATOR) + SEPARATOR);
+      return true;
+    });
+  }
+  rotate(blocks) {
+    if (!this.maxResolved || this.maxResolved <= 0) return blocks;
+    const settled = blocks.filter((b) => {
+      const e = parse3(b);
+      return e && !e.pending;
+    }).length;
+    let drop = settled - this.maxResolved;
+    return drop <= 0 ? blocks : blocks.filter((b) => {
+      const e = parse3(b);
+      if (e && !e.pending && drop > 0) {
+        drop--;
+        return false;
+      }
+      return true;
+    });
+  }
+  /** The lessons for an analysis: the latest settled calls on this stock in full, and the latest on others as lessons only.
+   *  With `asOf`, only calls whose outcome was already known on that day - a past-dated run must not learn from its future. */
+  pastContext(ticker, o = {}) {
+    const { sameLimit = 5, otherLimit = 3 } = o;
+    let settled = this.load().filter((e) => !e.pending);
+    if (o.asOf) settled = settled.filter((e) => e.resolved && e.resolved <= o.asOf);
+    const same = [], other = [];
+    for (const e of settled.reverse()) {
+      if (e.ticker === ticker ? same.length < sameLimit : other.length < otherLimit) (e.ticker === ticker ? same : other).push(e);
+      if (same.length >= sameLimit && other.length >= otherLimit) break;
+    }
+    if (!same.length && !other.length) return "";
+    const full = (e) => [`[${e.date} | ${e.ticker} | ${e.rating} | ${e.raw ?? "n/a"} | ${e.alpha ?? "n/a"} | ${e.holding ?? "n/a"}]`, `DECISION:
+${e.decision}`, ...e.reflection ? [`REFLECTION:
+${e.reflection}`] : []].join("\n\n");
+    const short = (e) => `[${e.date} | ${e.ticker} | ${e.rating} | ${e.raw ?? "n/a"}]
+${e.reflection || e.decision.slice(0, 300) + (e.decision.length > 300 ? "..." : "")}`;
+    const parts = [];
+    if (same.length) parts.push(`Past analyses of ${ticker} (most recent first):`, ...same.map(full));
+    if (other.length) parts.push("Recent cross-ticker lessons:", ...other.map(short));
+    return parts.join("\n\n");
+  }
+};
+
+// src/desk/runs.ts
+import fs7 from "node:fs";
+import path7 from "node:path";
+var SECTIONS = ["market", "sentiment", "news", "fundamentals", "bull", "bear", "research_plan", "trader", "aggressive", "conservative", "neutral", "decision"];
+var DEBATES = { investment_debate: ["bull", "bear"], risk_debate: ["aggressive", "conservative", "neutral"] };
+var TURNS = new Set(Object.values(DEBATES).flat());
+var MAX_CHARS = 6e4;
+var LABELS = { market: "Market Analyst", sentiment: "Sentiment Analyst", news: "News Analyst", fundamentals: "Fundamentals Analyst", bull: "Bull Researcher", bear: "Bear Researcher", research_plan: "Research Manager", trader: "Trader", aggressive: "Aggressive Analyst", conservative: "Conservative Analyst", neutral: "Neutral Analyst", decision: "Portfolio Manager" };
+var PARTS = [
+  ["I. Analyst Team Reports", ["market", "sentiment", "news", "fundamentals"]],
+  ["II. Research Team Decision", ["bull", "bear", "research_plan"]],
+  ["III. Trading Team Plan", ["trader"]],
+  ["IV. Risk Management Team Decision", ["aggressive", "conservative", "neutral"]],
+  ["V. Portfolio Manager Decision", ["decision"]]
+];
+var folder = (dir, ticker, date5) => path7.join(dir, "runs", `${safeSymbol(ticker).replace(/\^/g, "IDX_").replace(/=/g, "_EQ_")}_${date5}`);
+var runFile = (dir, ticker, date5) => path7.join(folder(dir, ticker, date5), "run.json");
+function load(dir, ticker, date5) {
+  try {
+    return JSON.parse(fs7.readFileSync(runFile(dir, ticker, date5), "utf8"));
+  } catch {
+    return { ticker: safeSymbol(ticker), date: date5, startedAt: (/* @__PURE__ */ new Date()).toISOString(), log: [] };
+  }
+}
+function change(dir, ticker, date5, edit) {
+  const file4 = runFile(dir, ticker, date5);
+  fs7.mkdirSync(path7.dirname(file4), { recursive: true });
+  return withLock(file4, () => {
+    const r = load(dir, ticker, date5);
+    edit(r);
+    writeWhole(file4, JSON.stringify(r));
+    return r;
+  });
+}
+var isSection = (s) => SECTIONS.includes(s);
+function startRun(dir, ticker, date5, plan) {
+  change(dir, ticker, date5, (r) => {
+    r.plan = plan;
+  });
+}
+function saveSection(dir, ticker, date5, section, text3) {
+  const t = text3.trim();
+  if (!t) throw new Error("there is nothing to save: the text is empty");
+  if (t.length > MAX_CHARS) throw new Error(`the text is ${t.length} characters; the most one section holds is ${MAX_CHARS}`);
+  let turns = 0;
+  change(dir, ticker, date5, (r) => {
+    if (!TURNS.has(section)) r.log = r.log.filter((e) => e.section !== section);
+    r.log.push({ section, text: t });
+    turns = r.log.filter((e) => e.section === section).length;
+  });
+  return turns;
+}
+function progress(dir, ticker, date5) {
+  const out = {};
+  for (const e of load(dir, ticker, date5).log) out[e.section] = (out[e.section] ?? 0) + 1;
+  return out;
+}
+var savedPlan = (dir, ticker, date5) => load(dir, ticker, date5).plan;
+function readSections(dir, ticker, date5, names) {
+  const log = load(dir, ticker, date5).log;
+  return names.map((name) => {
+    const group = DEBATES[name];
+    const entries = group ? log.filter((e) => group.includes(e.section)) : log.filter((e) => e.section === name);
+    const label = group ? name.replace("_", " ") : isSection(name) ? LABELS[name] : name;
+    if (!entries.length) return `(No ${label} yet: it is not available, not an empty finding.)`;
+    return `## ${label}
+${entries.map((e) => (group ? `[${LABELS[e.section]}]
+` : "") + e.text).join("\n\n")}`;
+  }).join("\n\n");
+}
+function writeReport(dir, ticker, date5, header) {
+  const log = load(dir, ticker, date5).log, root = folder(dir, ticker, date5);
+  const body = PARTS.flatMap(([heading, secs]) => {
+    const written = secs.map((s) => ({ s, texts: log.filter((e) => e.section === s).map((e) => e.text) })).filter((x) => x.texts.length);
+    if (!written.length) return [];
+    return [`## ${heading}
+
+${written.map(({ s, texts }) => `### ${LABELS[s]}
+${texts.join("\n\n")}`).join("\n\n")}`];
+  });
+  const title = [`# Trading Analysis Report: ${safeSymbol(ticker)}`, "", `- Analysis date: ${date5}`, ...header.map((h) => `- ${h}`), ""].join("\n");
+  const out = path7.join(root, "complete_report.md");
+  writeWhole(out, `${title}
+${body.join("\n\n")}
+`);
+  return out;
+}
+function deleteRun(dir, ticker, date5) {
+  fs7.rmSync(folder(dir, ticker, date5), { recursive: true, force: true });
+}
+
+// src/desk/scoring.ts
+function resolveBenchmark(ticker, s) {
+  if (s.benchmark.trim()) return normalizeSymbol(s.benchmark);
+  const sym = normalizeSymbol(ticker);
+  const suffix = Object.keys(s.benchmarks).filter(Boolean).sort((a, b) => b.length - a.length).find((x) => sym.endsWith(x.toUpperCase()));
+  return suffix ? s.benchmarks[suffix] : s.benchmarks[""] ?? "SPY";
+}
+var closeOn = (bars, date5) => [...bars].reverse().find((b) => b.date <= date5).close;
+async function measure(ticker, tradeDate, benchmark, holdingDays) {
+  const end = addDays(tradeDate, Math.round(holdingDays * 7 / 5) + 7);
+  const stock = (await daily(ticker, tradeDate, end)).bars;
+  if (stock.length <= holdingDays) return null;
+  const entry = stock[0].date, exit = stock[holdingDays].date;
+  if (exit >= today()) return null;
+  const bench = (await daily(benchmark, addDays(tradeDate, -7), end)).bars;
+  if (!bench.length || bench[0].date > entry || bench[bench.length - 1].date < exit) return null;
+  const raw = stock[holdingDays].close / stock[0].close - 1;
+  const benchmarkReturn = closeOn(bench, exit) / closeOn(bench, entry) - 1;
+  return { raw, alpha: raw - benchmarkReturn, benchmarkReturn, holdingDays, entry, exit, benchmark };
+}
+
+// src/desk/plan.ts
+var NeedsEmail = class extends Error {
+  name = "NeedsEmail";
+};
+var ANALYST_SECTION = { market: "market", sentiment: "sentiment", news: "news", fundamentals: "fundamentals" };
+var journalFile = (root) => `${deskDataDir(root)}/journal.md`;
+var journalOf = (root) => new Journal(journalFile(root), readSettings(root).journal.maxResolvedEntries);
+function kindOf(raw, symbol4) {
+  if (cryptoBase(raw)) return "crypto";
+  return /[\^=]/.test(symbol4) ? "other" : "stock";
+}
+function stepsFor(analysts, debateRounds, riskRounds) {
+  const steps = analysts.map((a) => ({ section: ANALYST_SECTION[a], turn: 1 }));
+  for (let t = 1; t <= debateRounds; t++) steps.push({ section: "bull", turn: t }, { section: "bear", turn: t });
+  steps.push({ section: "research_plan", turn: 1 }, { section: "trader", turn: 1 });
+  for (let t = 1; t <= riskRounds; t++) steps.push({ section: "aggressive", turn: t }, { section: "conservative", turn: t }, { section: "neutral", turn: t });
+  steps.push({ section: "decision", turn: 1 });
+  return steps;
+}
+function buildPlan(root, req) {
+  if (!readContactEmail(root)) throw new NeedsEmail(ASK_FOR_EMAIL);
+  const s = readSettings(root), dir = deskDataDir(root);
+  const symbol4 = safeSymbol(req.symbol), day2 = analysisDate(req.analysisDate), notes = [];
+  const kind = kindOf(req.symbol, symbol4);
+  if (req.restart) deleteRun(dir, symbol4, day2);
+  const done = progress(dir, symbol4, day2), saved = savedPlan(dir, symbol4, day2);
+  const resumed = Object.keys(done).length > 0 && !!saved?.analysts;
+  let analysts, debateRounds, riskRounds, language;
+  if (resumed) {
+    ({ analysts, debateRounds, riskRounds, language } = saved);
+    notes.push(`Resuming the run started earlier for ${symbol4} on ${day2}, with its original plan (${analysts.join(", ")}; ${debateRounds} debate and ${riskRounds} risk round(s); ${language}). To start over, plan again with restart.`);
+  } else {
+    if (req.analysts) {
+      const unknown2 = req.analysts.filter((a) => !ANALYSTS.includes(a));
+      if (unknown2.length) throw new Error(`unknown analyst ${unknown2.join(", ")}; choose from ${ANALYSTS.join(", ")}`);
+      analysts = ANALYSTS.filter((a) => req.analysts.includes(a));
+      if (!analysts.length) throw new Error(`name at least one analyst from ${ANALYSTS.join(", ")}`);
+      if (kind !== "stock" && analysts.includes("fundamentals")) throw new Error(`the fundamentals analyst is not available for ${symbol4}: a ${kind === "crypto" ? "crypto asset" : "index, future or currency pair"} has no company accounts`);
+    } else {
+      analysts = s.analysis.analysts.filter((a) => kind === "stock" || a !== "fundamentals");
+      if (kind !== "stock" && s.analysis.analysts.includes("fundamentals")) notes.push(`${symbol4} is ${kind === "crypto" ? "a crypto asset" : "not a company"}, so there is no fundamentals analyst: it has no company accounts.`);
+      if (!analysts.length) throw new Error(`none of the settings' analysts is available for ${symbol4}`);
+    }
+    for (const [name, v] of [["debate rounds", req.debateRounds], ["risk rounds", req.riskRounds]]) if (v !== void 0 && !(Number.isInteger(v) && v >= 1 && v <= 5)) throw new Error(`${name} must be a whole number from 1 to 5`);
+    debateRounds = req.debateRounds ?? s.analysis.debateRounds;
+    riskRounds = req.riskRounds ?? s.analysis.riskRounds;
+    if (req.language !== void 0 && languageName(req.language, "") === "") throw new Error(`"${req.language}" is not a language name`);
+    language = req.language !== void 0 ? languageName(req.language) : s.analysis.outputLanguage;
+  }
+  const benchmark = resolveBenchmark(symbol4, s.scoring);
+  const plan = { symbol: symbol4, analysisDate: day2, kind, analysts, debateRounds, riskRounds, language, managerModel: s.analysis.managerModel, benchmark, holdingDays: s.scoring.holdingPeriodDays, steps: [], notes };
+  plan.steps = stepsFor(analysts, debateRounds, riskRounds).map((st) => ({ ...st, done: (done[st.section] ?? 0) >= st.turn }));
+  if (!resumed) startRun(dir, symbol4, day2, plan);
+  const lessons = journalOf(root).pastContext(symbol4, isHistorical(day2) ? { asOf: day2 } : {});
+  return { plan, holdings: renderHoldings(readHoldings(dir), symbol4), lessons, resumed };
+}
+function renderPlan({ plan: p, holdings, lessons, resumed }) {
+  const next = p.steps.find((x) => !x.done);
+  const step = (x) => `${x.section}${x.turn > 1 || p.steps.filter((y) => y.section === x.section).length > 1 ? ` (turn ${x.turn})` : ""}`;
+  return [
+    `Analysis plan for ${p.symbol} on ${p.analysisDate}${isHistorical(p.analysisDate) ? " (a past day: use only what was known by then)" : ""}`,
+    `Instrument: ${p.kind === "stock" ? "a stock or fund" : p.kind === "crypto" ? "a crypto asset, not a company" : "an index, future or currency pair, not a company"}`,
+    `Analysts: ${p.analysts.join(", ")}`,
+    `Debate rounds: ${p.debateRounds} (bull and bear each speak ${p.debateRounds} time(s)); risk rounds: ${p.riskRounds} (each of the three risk voices speaks ${p.riskRounds} time(s))`,
+    `Report language: ${p.language}${p.language.toLowerCase() === "english" ? "" : " (the labelled lines **Rating**, **Action**, **Recommendation** keep their English words)"}`,
+    `Manager model: ${p.managerModel || "the same as everyone else"}`,
+    `Judged after ${p.holdingDays} trading days against ${p.benchmark}`,
+    ...p.notes.length ? ["", ...p.notes.map((n2) => `Note: ${n2}`)] : [],
+    "",
+    `Steps${resumed ? " (resuming)" : ""}: ${p.steps.map((x) => `${x.done ? "[done] " : ""}${step(x)}`).join(" -> ")}`,
+    next ? `Next step: ${step(next)}` : "Every step is done: write the report and record the decision.",
+    "",
+    holdings,
+    "",
+    lessons ? `Lessons from past calls:
+${lessons}` : "Lessons from past calls: none yet (no earlier call has been settled)."
+  ].join("\n");
+}
+
+// src/desk/settle.ts
+var pct2 = (v) => `${v >= 0 ? "+" : "-"}${(Math.abs(v) * 100).toFixed(1)}%`;
+var line = (o, e) => `${e.ticker} ${pct2(o.raw)} from ${o.entry} to ${o.exit} (${o.holdingDays} trading days); ${o.benchmark} ${pct2(o.benchmarkReturn)}; alpha ${pct2(o.alpha)}`;
+var MAX_REFLECTION = 1200;
+async function dueSettlements(journal, scoring, ticker) {
+  const pending = journal.pending().filter((e) => !ticker || e.ticker === ticker);
+  if (!pending.length) return ticker ? `No pending calls on ${ticker}.` : "No pending calls: every call in the journal is settled.";
+  const out = [];
+  let ready = 0;
+  for (const e of pending) {
+    const head2 = `[${e.date} | ${e.ticker} | ${e.rating}]`;
+    try {
+      const o = await measure(e.ticker, e.date, resolveBenchmark(e.ticker, scoring), scoring.holdingPeriodDays);
+      if (!o) {
+        out.push(`${head2} NOT YET: the ${scoring.holdingPeriodDays}-trading-day window after ${e.date} has not finished. Leave it pending.`);
+        continue;
+      }
+      ready++;
+      out.push(`${head2} READY: ${line(o, e)}
+DECISION:
+${e.decision}`);
+    } catch (err) {
+      out.push(`${head2} ${failureText(err, `prices to settle ${e.ticker} on ${e.date}`)} Leave it pending.`);
+    }
+  }
+  return [`${pending.length} pending call(s), ${ready} ready to settle. Settle a ready one with record_outcome, using only the figures shown here.`, "", ...out].join("\n\n");
+}
+async function settleOne(journal, scoring, ticker, date5, reflection) {
+  const text3 = reflection.trim();
+  if (!text3) throw new Error("the lesson is empty: write 2 to 4 plain sentences");
+  if (text3.length > MAX_REFLECTION) throw new Error(`the lesson is ${text3.length} characters; keep it under ${MAX_REFLECTION}`);
+  const e = journal.pending().find((x) => x.ticker === ticker && x.date === date5);
+  if (!e) throw new Error(`there is no pending call on ${ticker} for ${date5}`);
+  const o = await measure(ticker, date5, resolveBenchmark(ticker, scoring), scoring.holdingPeriodDays);
+  if (!o) return `NOT_YET: the ${scoring.holdingPeriodDays}-trading-day window after ${date5} has not finished, so ${ticker} stays pending.`;
+  return journal.recordOutcome(ticker, date5, o.raw, o.alpha, o.holdingDays, text3, o.exit) ? `Settled: ${line(o, e)}. The lesson is kept and will be read by later analyses from ${o.exit} on.` : `${ticker} on ${date5} was settled by another run already.`;
+}
+
+// src/tools/desk.ts
 var text = (t) => ({ content: [{ type: "text", text: t }] });
-async function answer(what, run) {
+var symbol2 = external_exports.string().min(1).max(20).describe("The ticker as the plan gives it");
+var day = external_exports.string().describe("The analysis date, YYYY-MM-DD");
+var DEBATES2 = ["investment_debate", "risk_debate"];
+async function act(run) {
   try {
     return text(await run());
   } catch (e) {
-    const err = e;
-    if (/YYYY-MM-DD|in the future|not a ticker|not a series name/.test(err.message)) return text(`INPUT_ERROR: ${err.message}. Correct it and call again.`);
-    return text(failureText(e, what));
+    if (e instanceof NeedsEmail) return text(`NEEDS_EMAIL: ${e.message}`);
+    if (e instanceof Unavailable || e instanceof NoData) return text(failureText(e, "this desk record"));
+    return text(`INPUT_ERROR: ${e.message}. Correct it and call again.`);
   }
 }
-var symbol2 = external_exports.string().min(1).max(20).describe("The ticker as the instrument context gives it, e.g. NVDA, 7203.T, BTC-USD");
+function registerDeskTools(server, root) {
+  const dir = deskDataDir(root);
+  const write = { readOnlyHint: false, openWorldHint: false };
+  server.registerTool("plan_analysis", {
+    title: "Plan an analysis",
+    description: "Draw up the plan for analysing a stock on a date, before any agent speaks: the instrument, the analysts that run, the debate rounds, the report language, the index the call will be judged against, what the person holds, the lessons from past calls, and - for a run that stopped half way - the next step. Refused with NEEDS_EMAIL until the person has given their email. Call it first, and follow it.",
+    inputSchema: {
+      symbol: symbol2,
+      analysis_date: day,
+      analysts: external_exports.array(external_exports.enum(["market", "sentiment", "news", "fundamentals"])).optional().describe("Only these analysts; the settings' when left out"),
+      debate_rounds: external_exports.number().int().min(1).max(5).optional().describe("Rounds of bull and bear; the settings' when left out"),
+      risk_rounds: external_exports.number().int().min(1).max(5).optional().describe("Rounds of the three risk voices; the settings' when left out"),
+      language: external_exports.string().max(40).optional().describe("Report language, e.g. Spanish; the settings' when left out"),
+      restart: external_exports.boolean().optional().describe("Throw away an earlier unfinished run of this stock and day and start over")
+    },
+    annotations: write
+  }, async (a) => act(() => renderPlan(buildPlan(root, { symbol: a.symbol, analysisDate: a.analysis_date, analysts: a.analysts, debateRounds: a.debate_rounds, riskRounds: a.risk_rounds, language: a.language, restart: a.restart }))));
+  server.registerTool("save_run_section", {
+    title: "Save a run section",
+    description: `Save what you wrote for your step of an analysis, so the next agent reads it from the desk and a stopped run can resume. section is one of ${SECTIONS.join(", ")}. A debate turn (bull, bear, aggressive, conservative, neutral) is added; any other section replaces the earlier text.`,
+    inputSchema: { symbol: symbol2, analysis_date: day, section: external_exports.enum(SECTIONS), text: external_exports.string().min(1).max(6e4) },
+    annotations: write
+  }, async (a) => act(() => {
+    const d = analysisDate(a.analysis_date), turns = saveSection(dir, a.symbol, d, a.section, a.text);
+    return `Saved ${a.section} for ${safeSymbol(a.symbol)} on ${d} (${turns > 1 ? `turn ${turns}` : "one text"}).`;
+  }));
+  server.registerTool("read_run", {
+    title: "Read a run",
+    description: `Read what the team has written so far for a stock and day. Without sections it lists which sections exist and how many turns each holds. With sections it returns their text; ${DEBATES2.join(" and ")} give a whole debate in the order spoken. A section not written yet is said to be missing, never blank.`,
+    inputSchema: { symbol: symbol2, analysis_date: day, sections: external_exports.array(external_exports.enum([...SECTIONS, ...DEBATES2])).optional() },
+    annotations: { readOnlyHint: true, openWorldHint: false }
+  }, async (a) => act(() => {
+    const d = analysisDate(a.analysis_date);
+    if (a.sections?.length) return readSections(dir, a.symbol, d, a.sections);
+    const p = progress(dir, a.symbol, d);
+    return Object.keys(p).length ? `Written so far for ${safeSymbol(a.symbol)} on ${d}: ${Object.entries(p).map(([k, n2]) => `${k} (${n2})`).join(", ")}` : `Nothing written yet for ${safeSymbol(a.symbol)} on ${d}.`;
+  }));
+  server.registerTool("write_report", {
+    title: "Write the report",
+    description: "Assemble the finished report of an analysis from everything the team saved - the analysts, the debates, the manager, the trader, the risk voices, the decision - into one markdown page in the run's folder. Returns where it is. Call it after the portfolio manager's decision is saved.",
+    inputSchema: { symbol: symbol2, analysis_date: day },
+    annotations: write
+  }, async (a) => act(() => {
+    const d = analysisDate(a.analysis_date), sym = safeSymbol(a.symbol), plan = savedPlan(dir, sym, d);
+    if (!progress(dir, sym, d)["decision"]) throw new Error(`the portfolio manager's decision is not saved yet for ${sym} on ${d}`);
+    const rating = parseRating(readSections(dir, sym, d, ["decision"]));
+    const header = [`Rating: ${rating}`, `Generated: ${(/* @__PURE__ */ new Date()).toISOString().slice(0, 16).replace("T", " ")} UTC`];
+    if (plan?.analysts) header.push(`Analysts: ${plan.analysts.join(", ")}; research debate rounds ${plan.debateRounds}, risk debate rounds ${plan.riskRounds}; language ${plan.language}`, `Judged after ${plan.holdingDays} trading days against ${plan.benchmark}`);
+    const file4 = writeReport(dir, sym, d, header);
+    return `Report written: ${file4}
+Rating: ${rating}`;
+  }));
+  server.registerTool("record_decision", {
+    title: "Record the decision",
+    description: "Put the portfolio manager's saved decision in the journal as a pending call, to be scored later against its market index. The text is the one saved in the run, so the journal always matches the report. One call per stock and day: a repeat is ignored. Pass the rating the decision states; without one it is read from the text, and a decision with no readable rating is recorded as Needs review.",
+    inputSchema: { symbol: symbol2, analysis_date: day, rating: external_exports.enum(RATINGS).optional() },
+    annotations: write
+  }, async (a) => act(() => {
+    const d = analysisDate(a.analysis_date), sym = safeSymbol(a.symbol);
+    const decision = readSections(dir, sym, d, ["decision"]);
+    if (!progress(dir, sym, d)["decision"]) throw new Error(`the portfolio manager's decision is not saved yet for ${sym} on ${d}`);
+    const body = decision.replace(/^## [^\n]*\n/, "");
+    const r = journalOf(root).storeDecision(sym, d, body, a.rating ?? void 0);
+    const rating = a.rating ?? parseRating(body);
+    return r === "stored" ? `Recorded: ${sym} on ${d}, ${rating}, pending. It is scored after ${readSettings(root).scoring.holdingPeriodDays} trading days.` : `${sym} on ${d} is already in the journal; nothing changed.`;
+  }));
+  server.registerTool("list_settlements", {
+    title: "Pending calls",
+    description: "List the calls in the journal that are not settled yet. For each whose holding window has finished trading, it shows the measured outcome (return, the index's return, alpha) and the decision, so you can write the lesson; the others are marked NOT YET. The figures come from price rows only.",
+    inputSchema: { symbol: symbol2.optional() },
+    annotations: { readOnlyHint: true, openWorldHint: true }
+  }, async (a) => act(() => dueSettlements(journalOf(root), readSettings(root).scoring, a.symbol ? safeSymbol(a.symbol) : void 0)));
+  server.registerTool("record_outcome", {
+    title: "Settle a call",
+    description: "Settle one pending call whose window has finished: the desk measures the outcome again itself and keeps it with your lesson. Give only the lesson - 2 to 4 plain sentences naming what the alpha shows, what part of the thesis it supports or undercuts, and one thing to do next time. Never pass or invent a number.",
+    inputSchema: { symbol: symbol2, trade_date: day, lesson: external_exports.string().min(1).max(1200) },
+    annotations: { readOnlyHint: false, openWorldHint: true }
+  }, async (a) => act(() => settleOne(journalOf(root), readSettings(root).scoring, safeSymbol(a.symbol), a.trade_date, a.lesson)));
+  server.registerTool("set_holdings", {
+    title: "Save what the person holds",
+    description: "Save the positions and free cash the person tells you they hold, so the trader and risk voices size against their real book. Pass exactly what they said; never guess. An empty list of positions means they hold nothing (a flat book) - different from not having said, which is the default.",
+    inputSchema: {
+      positions: external_exports.array(external_exports.object({ ticker: external_exports.string().min(1).max(20), quantity: external_exports.number(), average_price: external_exports.number().optional() })).max(500),
+      cash: external_exports.number().optional(),
+      currency: external_exports.string().length(3).optional().describe("e.g. USD")
+    },
+    annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false }
+  }, async (a) => act(() => {
+    const h = saveHoldings(dir, { cash: a.cash, currency: a.currency, positions: a.positions.map((p) => ({ ticker: p.ticker, quantity: p.quantity, averagePrice: p.average_price })) }, (/* @__PURE__ */ new Date()).toISOString().slice(0, 10));
+    return h.positions.length ? `Saved ${h.positions.length} position(s)${h.cash !== void 0 ? ` and cash ${h.cash}` : ""}.` : `Saved: the person holds nothing${h.cash !== void 0 ? `, with cash ${h.cash}` : ""}.`;
+  }));
+  server.registerTool("clear_holdings", {
+    title: "Forget what the person holds",
+    description: "Forget the saved holdings, so the desk goes back to not knowing what the person holds. Use when they ask to; it is not the same as holding nothing.",
+    annotations: { readOnlyHint: false, idempotentHint: true, destructiveHint: true, openWorldHint: false }
+  }, async () => act(() => forgetHoldings(dir) ? "Forgotten: the desk no longer knows what the person holds." : "Nothing was saved."));
+}
+
+// src/tools/server.ts
+var text2 = (t) => ({ content: [{ type: "text", text: t }] });
+async function answer(what, run) {
+  try {
+    return text2(await run());
+  } catch (e) {
+    const err = e;
+    if (/YYYY-MM-DD|in the future|not a ticker|not a series name/.test(err.message)) return text2(`INPUT_ERROR: ${err.message}. Correct it and call again.`);
+    return text2(failureText(e, what));
+  }
+}
+var symbol3 = external_exports.string().min(1).max(20).describe("The ticker as the instrument context gives it, e.g. NVDA, 7203.T, BTC-USD");
 var analysis = external_exports.string().describe("The analysis date, YYYY-MM-DD. Nothing dated after it is ever returned.");
 var READ = { readOnlyHint: true, openWorldHint: true };
 function deskServer(root = process.cwd(), fetchImpl2) {
@@ -37690,7 +38330,7 @@ function deskServer(root = process.cwd(), fetchImpl2) {
     title: "Desk check",
     description: "Check that this computer is ready for the Trading Agents desk: Node, the desk data folder, whether a Robinhood sign-in is saved, and whether each free data source answers. Read-only; it sends no order and reads no secret.",
     annotations: READ
-  }, async () => text(await deskCheck(root, fetchImpl2)));
+  }, async () => text2(await deskCheck(root, fetchImpl2)));
   server.registerTool("set_contact_email", {
     title: "Save the contact email",
     description: "Save the person's own email as the contact the SEC asks of everyone who reads its filings. Ask the person for it in plain words and pass exactly what they give; never invent, guess or reuse an address. It is kept in this folder's desk-data (never committed) and sent to sec.gov alone.",
@@ -37700,40 +38340,40 @@ function deskServer(root = process.cwd(), fetchImpl2) {
     try {
       const email3 = saveContactEmail(root, a.email);
       configure({ secEmail: email3 });
-      return text(`Saved. The SEC will see ${email3} as the contact for this desk's requests; no other source sees it.`);
+      return text2(`Saved. The SEC will see ${email3} as the contact for this desk's requests; no other source sees it.`);
     } catch (e) {
-      return text(`INPUT_ERROR: ${e.message}. Ask the person for their own email address and call again.`);
+      return text2(`INPUT_ERROR: ${e.message}. Ask the person for their own email address and call again.`);
     }
   });
   server.registerTool("get_instrument", {
     title: "Instrument identity",
     description: "Who the instrument is: the exact ticker (broker spellings like XAUUSD or BTCUSD mapped to the one the data uses), its kind (stock, fund, crypto, index), name, exchange, currency and its latest trading day on or before the analysis date. Call it first; refer to the instrument by this ticker in every report.",
-    inputSchema: { symbol: symbol2, analysis_date: analysis },
+    inputSchema: { symbol: symbol3, analysis_date: analysis },
     annotations: READ
   }, async (a) => answer(`identity of ${a.symbol}`, () => instrument(a.symbol, a.analysis_date)));
   server.registerTool("get_price_history", {
     title: "Daily prices",
     description: "Daily open, high, low, close and volume between two dates, adjusted for splits and dividends, held to the analysis date.",
-    inputSchema: { symbol: symbol2, analysis_date: analysis, start_date: external_exports.string().describe("YYYY-MM-DD"), end_date: external_exports.string().describe("YYYY-MM-DD; later than the analysis date is cut to it") },
+    inputSchema: { symbol: symbol3, analysis_date: analysis, start_date: external_exports.string().describe("YYYY-MM-DD"), end_date: external_exports.string().describe("YYYY-MM-DD; later than the analysis date is cut to it") },
     annotations: READ
   }, async (a) => answer(`prices of ${a.symbol}`, () => priceHistory(a.symbol, a.analysis_date, a.start_date, a.end_date)));
   server.registerTool("get_indicators", {
     title: "Technical indicators",
     description: `Values of one or more technical indicators, one per trading day over a look-back window ending on the analysis date, each with what it is for. Choose up to 8 that complement each other. Names: ${INDICATOR_NAMES.join(", ")}.`,
-    inputSchema: { symbol: symbol2, analysis_date: analysis, indicators: external_exports.string().describe('One name or several, comma separated, e.g. "rsi, macd, close_50_sma"'), look_back_days: external_exports.number().int().min(5).max(120).optional().describe("Calendar days to show; 30 when left out") },
+    inputSchema: { symbol: symbol3, analysis_date: analysis, indicators: external_exports.string().describe('One name or several, comma separated, e.g. "rsi, macd, close_50_sma"'), look_back_days: external_exports.number().int().min(5).max(120).optional().describe("Calendar days to show; 30 when left out") },
     annotations: READ
   }, async (a) => answer(`indicators of ${a.symbol}`, () => indicatorWindow(a.symbol, a.analysis_date, a.indicators, a.look_back_days ?? 30)));
   server.registerTool("get_verified_snapshot", {
     title: "Checked price table",
     description: "The checked price table: the latest trading row on or before the analysis date, the main indicators on it, and the last closes. Call it before writing any report, and take every exact price, level and indicator value from it.",
-    inputSchema: { symbol: symbol2, analysis_date: analysis, look_back_days: external_exports.number().int().min(1).max(30).optional().describe("How many recent closes to list; 30 when left out") },
+    inputSchema: { symbol: symbol3, analysis_date: analysis, look_back_days: external_exports.number().int().min(1).max(30).optional().describe("How many recent closes to list; 30 when left out") },
     annotations: READ
   }, async (a) => answer(`checked price table of ${a.symbol}`, () => verifiedSnapshot(a.symbol, a.analysis_date, a.look_back_days ?? 30)));
   const days = external_exports.number().int().min(1).max(30).optional().describe("Calendar days before the analysis date; " + a0.newsLookbackDays + " when left out");
   server.registerTool("get_company_news", {
     title: "Company news",
     description: "Headlines about the instrument from Yahoo Finance, with publisher and time, over the days before the analysis date. Search returns a recent sample: an empty or unreachable window is said to be so, never no news.",
-    inputSchema: { symbol: symbol2, analysis_date: analysis, look_back_days: days },
+    inputSchema: { symbol: symbol3, analysis_date: analysis, look_back_days: days },
     annotations: READ
   }, async (a) => answer("news about " + a.symbol, () => companyNews(a.symbol, a.analysis_date, a.look_back_days ?? a0.newsLookbackDays, a0.companyNewsLimit)));
   server.registerTool("get_world_news", {
@@ -37745,7 +38385,7 @@ function deskServer(root = process.cwd(), fetchImpl2) {
   server.registerTool("get_social_posts", {
     title: "StockTwits and Reddit posts",
     description: "What people posted about the instrument over the week before the analysis date: StockTwits messages with their authors' Bullish or Bearish tags and counts, and Reddit posts from the investing communities (crypto ones for a crypto pair). Each source that fails is named as unavailable, never as quiet.",
-    inputSchema: { symbol: symbol2, analysis_date: analysis },
+    inputSchema: { symbol: symbol3, analysis_date: analysis },
     annotations: READ
   }, async (a) => answer("posts about " + a.symbol, () => socialPosts(a.symbol, a.analysis_date, { lookBackDays: a0.newsLookbackDays, stocktwitsLimit: a0.stocktwitsLimit, subreddits: a0.subreddits, cryptoSubreddits: a0.cryptoSubreddits })));
   server.registerTool("get_economic_series", {
@@ -37763,14 +38403,14 @@ function deskServer(root = process.cwd(), fetchImpl2) {
   server.registerTool("get_company_overview", {
     title: "Company profile and ratios",
     description: "The company's name, sector and industry, market value, valuation multiples (P/E, forward P/E, PEG, price to book), margins, returns, debt to equity, dividend yield, beta and the 52-week range, from Yahoo Finance as they stand today. Withheld for a past analysis date.",
-    inputSchema: { symbol: symbol2, analysis_date: analysis },
+    inputSchema: { symbol: symbol3, analysis_date: analysis },
     annotations: READ
   }, async (a) => answer("profile of " + a.symbol, () => companyOverview(a.symbol, a.analysis_date)));
   server.registerTool("get_financial_statement", {
     title: "Financial statement",
     description: "A balance sheet, income statement or cash flow statement, quarterly or annual, latest periods first. For a US filer it is the SEC filing as it stood on the analysis date; otherwise Yahoo Finance's, for today only.",
     inputSchema: {
-      symbol: symbol2,
+      symbol: symbol3,
       analysis_date: analysis,
       statement: external_exports.enum(["balance_sheet", "income_statement", "cashflow"]),
       frequency: external_exports.enum(["quarterly", "annual"]).optional().describe("quarterly when left out")
@@ -37780,9 +38420,10 @@ function deskServer(root = process.cwd(), fetchImpl2) {
   server.registerTool("get_insider_transactions", {
     title: "Insider transactions",
     description: "Recent buying and selling by the company's directors and officers, from Yahoo Finance: who, their role, what, how many shares and the value. Withheld for a past analysis date.",
-    inputSchema: { symbol: symbol2, analysis_date: analysis },
+    inputSchema: { symbol: symbol3, analysis_date: analysis },
     annotations: READ
   }, async (a) => answer("insider transactions of " + a.symbol, () => insiderTransactions(a.symbol, a.analysis_date)));
+  registerDeskTools(server, root);
   return server;
 }
 

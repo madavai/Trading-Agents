@@ -4,8 +4,12 @@
     "outputLanguage": "English",
     "debateRounds": 1,
     "riskRounds": 1,
-    "analysts": ["market", "sentiment", "news", "fundamentals"],
-    "maxStepsPerAnalyst": 20,
+    "analysts": [
+      "market",
+      "sentiment",
+      "news",
+      "fundamentals"
+    ],
     "newsLookbackDays": 7,
     "companyNewsLimit": 20,
     "worldNewsLimit": 10,
@@ -17,17 +21,46 @@
       "oil commodities supply chain energy"
     ],
     "stocktwitsLimit": 30,
-    "subreddits": ["wallstreetbets", "stocks", "investing"],
-    "cryptoSubreddits": ["CryptoCurrency", "CryptoMarkets"]
+    "subreddits": [
+      "wallstreetbets",
+      "stocks",
+      "investing"
+    ],
+    "cryptoSubreddits": [
+      "CryptoCurrency",
+      "CryptoMarkets"
+    ],
+    "managerModel": ""
   },
   "scoring": {
     "holdingPeriodDays": 5,
     "benchmarks": {
       "": "SPY",
-      ".NS": "^NSEI", ".BO": "^BSESN", ".T": "^N225", ".TW": "^TWII", ".KS": "^KS11", ".HK": "^HSI",
-      ".SI": "^STI", ".L": "^FTSE", ".DE": "^GDAXI", ".PA": "^FCHI", ".AS": "^AEX", ".SW": "^SSMI",
-      ".MI": "FTSEMIB.MI", ".TO": "^GSPTSE", ".AX": "^AXJO", ".SS": "000001.SS", ".SZ": "399001.SZ", ".SA": "^BVSP"
-    }
+      ".NS": "^NSEI",
+      ".BO": "^BSESN",
+      ".T": "^N225",
+      ".TW": "^TWII",
+      ".KS": "^KS11",
+      ".HK": "^HSI",
+      ".SI": "^STI",
+      ".L": "^FTSE",
+      ".DE": "^GDAXI",
+      ".PA": "^FCHI",
+      ".AS": "^AEX",
+      ".SW": "^SSMI",
+      ".MI": "FTSEMIB.MI",
+      ".TO": "^GSPTSE",
+      ".AX": "^AXJO",
+      ".SS": "000001.SS",
+      ".SZ": "399001.SZ",
+      ".SA": "^BVSP",
+      ".TWO": "^TWII",
+      ".KQ": "^KQ11"
+    },
+    "benchmark": ""
+  },
+  "journal": {
+    "maxResolvedEntries": null
   },
   "trading": {
     "enabled": false,
@@ -40,8 +73,16 @@
       "Sell": "sell everything held",
       "Needs review": "no order"
     },
-    "caps": { "perOrderUsd": 500, "perStockPercent": 10, "ordersPerDay": 3 },
-    "orderDefaults": { "type": "limit", "timeInForce": "day", "addStopLossAfterFill": false }
+    "caps": {
+      "perOrderUsd": 500,
+      "perStockPercent": 10,
+      "ordersPerDay": 3
+    },
+    "orderDefaults": {
+      "type": "limit",
+      "timeInForce": "day",
+      "addStopLossAfterFill": false
+    }
   },
   "sources": {
     "contact": "trading-agents (+https://github.com/madavai/trading-agents)"
