@@ -16,8 +16,22 @@ export interface Entry {
 const SEPARATOR = '\n\n<!-- ENTRY_END -->\n\n';
 const pct = (v: number) => `${v >= 0 ? '+' : '-'}${(Math.abs(v) * 100).toFixed(1)}%`;
 
-/** A model's words made safe to keep: they can never end the entry early or fake a section of it. */
-const keep = (text: string) => text.replace(/<!--\s*ENTRY_END\s*-->/gi, '').replace(/^([ \t]*)(DECISION|REFLECTION):/gim, '$1$2 -').trim();
+const MARK = /<!--\s*ENTRY_END\s*-->/i;
+
+/** A model's words made safe to keep: they can never end the entry early or fake a section of it. The separator is removed
+ *  until none is left, since taking one out can join the pieces around it into another. */
+function keep(text: string): string {
+  let s = text;
+  while (MARK.test(s)) s = s.replace(MARK, '');
+  return s.replace(/^([ \t]*)(DECISION|REFLECTION):/gim, '$1$2 -').trim();
+}
+
+const DATE = /^\d{4}-\d{2}-\d{2}$/, TICKER = /^[A-Za-z0-9.\-=^]{1,20}$/;
+/** The parts of an entry's tag are checked, not trusted: a stray bar or bracket would split or forge the tag. */
+function checkTag(ticker: string, date: string): void {
+  if (!TICKER.test(ticker)) throw new Error(`"${ticker}" is not a ticker the journal can keep`);
+  if (!DATE.test(date)) throw new Error(`"${date}" is not a date in YYYY-MM-DD form`);
+}
 
 function parse(block: string): Entry | null {
   const lines = block.trim().split(/\r?\n/);
@@ -45,6 +59,7 @@ export class Journal {
 
   /** Adds a pending entry. One entry per stock and day, settled or not: a re-run must not count the same call twice. */
   storeDecision(ticker: string, date: string, decision: string, rating?: string): 'stored' | 'exists' {
+    checkTag(ticker, date);
     fs.mkdirSync(path.dirname(this.file), { recursive: true });
     return withLock(this.file, () => {
       if (this.load().some((e) => e.date === date && e.ticker === ticker)) return 'exists';

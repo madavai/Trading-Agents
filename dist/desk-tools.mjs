@@ -6958,10 +6958,10 @@ var require_formats = __commonJS({
     function isLeapYear(year) {
       return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
     }
-    var DATE = /^(\d\d\d\d)-(\d\d)-(\d\d)$/;
+    var DATE2 = /^(\d\d\d\d)-(\d\d)-(\d\d)$/;
     var DAYS = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
     function date5(str) {
-      const matches = DATE.exec(str);
+      const matches = DATE2.exec(str);
       if (!matches)
         return false;
       const year = +matches[1];
@@ -37850,7 +37850,18 @@ var parseRating = (text3) => extractRating(text3) ?? REVIEW;
 // src/desk/journal.ts
 var SEPARATOR = "\n\n<!-- ENTRY_END -->\n\n";
 var pct = (v) => `${v >= 0 ? "+" : "-"}${(Math.abs(v) * 100).toFixed(1)}%`;
-var keep = (text3) => text3.replace(/<!--\s*ENTRY_END\s*-->/gi, "").replace(/^([ \t]*)(DECISION|REFLECTION):/gim, "$1$2 -").trim();
+var MARK = /<!--\s*ENTRY_END\s*-->/i;
+function keep(text3) {
+  let s = text3;
+  while (MARK.test(s)) s = s.replace(MARK, "");
+  return s.replace(/^([ \t]*)(DECISION|REFLECTION):/gim, "$1$2 -").trim();
+}
+var DATE = /^\d{4}-\d{2}-\d{2}$/;
+var TICKER = /^[A-Za-z0-9.\-=^]{1,20}$/;
+function checkTag(ticker, date5) {
+  if (!TICKER.test(ticker)) throw new Error(`"${ticker}" is not a ticker the journal can keep`);
+  if (!DATE.test(date5)) throw new Error(`"${date5}" is not a date in YYYY-MM-DD form`);
+}
 function parse3(block) {
   const lines = block.trim().split(/\r?\n/);
   const tag = lines[0]?.trim() ?? "";
@@ -37893,6 +37904,7 @@ var Journal = class {
   }
   /** Adds a pending entry. One entry per stock and day, settled or not: a re-run must not count the same call twice. */
   storeDecision(ticker, date5, decision, rating) {
+    checkTag(ticker, date5);
     fs6.mkdirSync(path6.dirname(this.file), { recursive: true });
     return withLock(this.file, () => {
       if (this.load().some((e) => e.date === date5 && e.ticker === ticker)) return "exists";
