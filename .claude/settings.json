@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__trading-desk",
+      "Bash(node dist/desk-tools.mjs --check)",
+      "Bash(node dist/robinhood.mjs connect)",
+      "Bash(node dist/robinhood.mjs status)"
+    ],
+    "deny": [
+      "Read(~/.trading-agents/**)",
+      "Edit(~/.trading-agents/**)"
+    ]
+  },
+  "enabledMcpjsonServers": ["trading-desk"],
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [{ "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard.mjs\"" }]
+      }
+    ]
+  }
+}

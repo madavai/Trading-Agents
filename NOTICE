@@ -1,0 +1,18 @@
+Trading Agents
+Copyright (c) 2026 Madavai. Licensed under the MIT License (see LICENSE).
+
+This project adapts the design of TradingAgents by Tauric Research
+(https://github.com/TauricResearch/TradingAgents): its roles (analysts, bull and bear researchers, research manager,
+trader, risk voices, portfolio manager), its rules for honest data, its settings and its decision journal.
+TradingAgents is licensed under the Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0).
+Changes: the design is rebuilt as Claude Code agents and skills with a TypeScript tool server, for Madav, with no Python.
+Any file adapted from TradingAgents' own text says so at its top and remains under the Apache License 2.0.
+Trading Agents is not affiliated with or endorsed by Tauric Research.
+
+docs/design/desk-mock.html carries the Madav House theme (c) Madavai, and these fonts, each under the SIL Open Font
+License 1.1 (texts in docs/design/fonts/):
+- Source Serif 4 (OFL-SourceSerif4.txt)
+- Fraunces (OFL-Fraunces.txt)
+- Inter (OFL-Inter.txt)
+
+Nothing in this project is investment advice.

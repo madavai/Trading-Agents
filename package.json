@@ -1,0 +1,26 @@
+{
+  "name": "trading-agents",
+  "version": "0.0.1",
+  "private": true,
+  "description": "A trading desk of AI agents for Madav: analysis, decisions you approve, and orders through Robinhood's agent connection.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run typecheck && tsc -p tsconfig.test.json && node --test build/test/*.test.js",
+    "check-dist": "npm run build && git diff --exit-code -- dist"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "zod": "4.6.6"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "esbuild": "0.28.2",
+    "typescript": "5.9.3"
+  }
+}
