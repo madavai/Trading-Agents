@@ -26,6 +26,7 @@
     <symbol id="i-bot" viewBox="0 0 24 24"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2M20 14h2M15 13v2M9 13v2"/></symbol>
     <symbol id="i-file" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4M16 13H8M16 17H8M10 9H8"/></symbol>
     <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
     <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></symbol>
   </defs>
 </svg>
@@ -37,6 +38,7 @@
       <div class="at-side-body fixed">
         <nav class="at-list" aria-label="Sections">
           <button class="at-li" data-act="goto" data-to="top" aria-current="page"><svg class="g"><use href="#i-grid"/></svg><span class="at-li-t">Overview</span></button>
+          <button class="at-li" data-act="goto" data-to="sec-account"><svg class="g"><use href="#i-link"/></svg><span class="at-li-t">Your account</span></button>
           <button class="at-li" data-act="goto" data-to="sec-chart"><svg class="g"><use href="#i-candle"/></svg><span class="at-li-t">Chart</span></button>
           <button class="at-li" data-act="goto" data-to="sec-watch"><svg class="g"><use href="#i-star"/></svg><span class="at-li-t">Watchlist</span></button>
           <button class="at-li" data-act="goto" data-to="sec-calls"><svg class="g"><use href="#i-check"/></svg><span class="at-li-t">The desk's calls</span></button>
@@ -47,7 +49,10 @@
         <div class="at-list small" id="favs"></div>
       </div>
       <div class="at-side-foot">
-        <div class="at-list"><div class="at-li at-inert"><span class="at-dot"></span><span class="at-li-t">Trading is not switched on</span></div></div>
+        <div class="at-list">
+          <div class="at-li at-inert"><span class="at-dot" id="rhDot"></span><span class="at-li-t" id="rhText">Robinhood</span></div>
+          <div class="at-li at-inert"><span class="at-dot"></span><span class="at-li-t">Trading is not switched on</span></div>
+        </div>
         <p class="at-quiet">Prices up to 15 min late · not advice</p>
       </div>
     </aside>
@@ -80,6 +85,11 @@
               <button class="at-btn at-press primary" type="submit"><svg class="g"><use href="#i-plus"/></svg><span>Add to watchlist</span></button>
             </form>
           </div>
+
+          <section class="at-section" id="sec-account">
+            <div class="at-sect-head"><div class="at-head-words"><h2>Your account</h2><p id="accountSub">Robinhood · the desk only reads, it cannot place an order</p></div></div>
+            <div class="at-card at-box" id="accountCard"></div>
+          </section>
 
           <section class="at-section" id="sec-markets">
             <div class="at-sect-head"><div class="at-head-words"><h2>Markets</h2><p>Press one to chart it · from Yahoo Finance</p></div></div>

@@ -247,13 +247,13 @@ var require_scope = __commonJS({
       }
     };
     exports.ValueScopeName = ValueScopeName;
-    var line2 = (0, code_1._)`\n`;
+    var line = (0, code_1._)`\n`;
     var ValueScope = class extends Scope {
       constructor(opts) {
         super(opts);
         this._values = {};
         this._scope = opts.scope;
-        this.opts = { ...opts, _n: opts.lines ? line2 : code_1.nil };
+        this.opts = { ...opts, _n: opts.lines ? line : code_1.nil };
       }
       get() {
         return this._scope;
@@ -8965,8 +8965,8 @@ var Doc = class {
     const lines = content.split("\n").filter((x) => x);
     const minIndent = Math.min(...lines.map((x) => x.length - x.trimStart().length));
     const dedented = lines.map((x) => x.slice(minIndent)).map((x) => " ".repeat(this.indent * 2) + x);
-    for (const line2 of dedented) {
-      this.content.push(line2);
+    for (const line of dedented) {
+      this.content.push(line);
     }
   }
   compile() {
@@ -18414,20 +18414,20 @@ ${value2}`, dataLines++;
     }
     if (firstCharCode === 58) {
       if (onComment) {
-        const line22 = chunk.slice(start, end);
-        onComment(line22.slice(chunk.charCodeAt(start + 1) === SPACE ? 2 : 1));
+        const line2 = chunk.slice(start, end);
+        onComment(line2.slice(chunk.charCodeAt(start + 1) === SPACE ? 2 : 1));
       }
       return;
     }
-    const line2 = chunk.slice(start, end), fieldSeparatorIndex = line2.indexOf(":");
+    const line = chunk.slice(start, end), fieldSeparatorIndex = line.indexOf(":");
     if (fieldSeparatorIndex === -1) {
-      processField(line2, "", line2);
+      processField(line, "", line);
       return;
     }
-    const field = line2.slice(0, fieldSeparatorIndex), offset = line2.charCodeAt(fieldSeparatorIndex + 1) === SPACE ? 2 : 1, value = line2.slice(fieldSeparatorIndex + offset);
-    processField(field, value, line2);
+    const field = line.slice(0, fieldSeparatorIndex), offset = line.charCodeAt(fieldSeparatorIndex + 1) === SPACE ? 2 : 1, value = line.slice(fieldSeparatorIndex + offset);
+    processField(field, value, line);
   }
-  function processField(field, value, line2) {
+  function processField(field, value, line) {
     switch (field) {
       case "event":
         eventType = value || void 0;
@@ -18444,7 +18444,7 @@ ${value}`, dataLines++;
           new ParseError(`Invalid \`retry\` value: "${value}"`, {
             type: "invalid-retry",
             value,
-            line: line2
+            line
           })
         );
         break;
@@ -18452,7 +18452,7 @@ ${value}`, dataLines++;
         onError(
           new ParseError(
             `Unknown field "${field.length > 20 ? `${field.slice(0, 20)}\u2026` : field}"`,
-            { type: "unknown-field", field, value, line: line2 }
+            { type: "unknown-field", field, value, line }
           )
         );
         break;
@@ -19001,6 +19001,123 @@ var FileAuth = class {
   }
 };
 
+// src/robinhood/rules.ts
+var TRADE_WORDS = /order|trade|buy|sell|liquidat|close.?position|transfer|withdraw|deposit|payment/i;
+var isOrderTool = (name) => TRADE_WORDS.test(name);
+var READ_NAME = /^(get|list|search|find|view|fetch|read)_/i;
+function kindOf(tool) {
+  if (isOrderTool(tool.name)) return "order";
+  return tool.annotations?.readOnlyHint === true && READ_NAME.test(tool.name) ? "read" : "other";
+}
+function typeOf(s) {
+  if (!s) return "any";
+  if (Array.isArray(s.enum)) return `one of ${s.enum.slice(0, 12).map((v) => JSON.stringify(v)).join(" | ")}${s.enum.length > 12 ? " | ..." : ""}`;
+  const alt = s.anyOf ?? s.oneOf;
+  if (alt?.length) return [...new Set(alt.map(typeOf))].join(" or ");
+  if (s.type === "array") return `list of ${typeOf(s.items)}`;
+  if (Array.isArray(s.type)) return s.type.join(" or ");
+  return s.type ?? "any";
+}
+function argsOf(tool) {
+  const schema = tool.inputSchema;
+  const required2 = new Set(schema.required ?? []);
+  return Object.entries(schema.properties ?? {}).map(([name, s]) => ({ name, type: typeOf(s), required: required2.has(name), note: (s.description ?? "").replace(/\s+/g, " ").slice(0, 160) }));
+}
+var labelOf = (v) => {
+  if (v === null) return "null";
+  if (typeof v === "string") {
+    if (v === "") return "empty text";
+    if (/^-?\d+(\.\d+)?$/.test(v)) return "text that is a number";
+    if (/^\d{4}-\d{2}-\d{2}(T|$)/.test(v)) return "text that is a date";
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)) return "text that is an id";
+    return "text";
+  }
+  if (typeof v === "number") return Number.isInteger(v) ? "whole number" : "number";
+  return typeof v;
+};
+var MAX_DEPTH = 8;
+var MAX_KEYS = 60;
+var MAX_ITEMS = 200;
+function describe2(values, words, depth) {
+  const present = values.filter((v) => v !== void 0);
+  const objects = present.filter((v) => !!v && typeof v === "object" && !Array.isArray(v));
+  const lists = present.filter(Array.isArray);
+  const scalars = present.filter((v) => v === null || typeof v !== "object");
+  const heads = [], body = [], pad = "  ".repeat(depth + 1);
+  if (scalars.length) {
+    heads.push([...new Set(scalars.map(labelOf))].join(" or "));
+    const seen = words ? [...new Set(scalars.filter((v) => typeof v === "string" && /^[a-z][a-z_]{1,23}$/.test(v)))].sort().slice(0, 12) : [];
+    if (seen.length) heads[heads.length - 1] += ` (words seen: ${seen.join(", ")})`;
+  }
+  if (lists.length) {
+    const all = lists.flatMap((l) => l.slice(0, MAX_ITEMS));
+    heads.push(`list of ${lists.reduce((n, l) => n + l.length, 0)}`);
+    if (all.length && depth < MAX_DEPTH) {
+      const inner = describe2(all, words, depth + 1);
+      body.push(`${pad}each: ${inner.head}`, ...inner.body);
+    }
+  }
+  if (objects.length) {
+    heads.push("object");
+    if (depth < MAX_DEPTH) {
+      const keys = [...new Set(objects.flatMap((o) => Object.keys(o)))].slice(0, MAX_KEYS);
+      for (const k of keys) {
+        const inner = describe2(objects.map((o) => o[k]), words, depth + 1);
+        body.push(`${pad}${k}${objects.some((o) => !(k in o)) ? "?" : ""}: ${inner.head}`, ...inner.body);
+      }
+    }
+  }
+  return { head: heads.join(" or ") || "nothing", body };
+}
+function shapeLines(value, words = false) {
+  const d = describe2([value], words, 0);
+  return [`answer: ${d.head}`, ...d.body];
+}
+var oneLine = (s, max) => {
+  const t = s.replace(/\s+/g, " ").trim();
+  return t.length > max ? `${t.slice(0, max - 3)}...` : t;
+};
+var masked = (s) => oneLine(s, 300).replace(/\d{5,}/g, "#####");
+
+// src/robinhood/reader.ts
+var Refused = class extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "Refused";
+  }
+};
+var Reader = class {
+  constructor(client, tools) {
+    this.client = client;
+    this.tools = tools;
+  }
+  client;
+  tools;
+  /** Tools by kind: what the desk may read, what orders or moves money, and the rest. */
+  byKind() {
+    const out = { read: [], order: [], other: [] };
+    for (const t of this.tools) out[kindOf(t)].push(t);
+    return out;
+  }
+  async read(name, args = {}) {
+    const tool = this.tools.find((t) => t.name === name);
+    if (!tool) throw new Refused(`Robinhood's connection offers no tool called ${name}.`);
+    const kind = kindOf(tool);
+    if (kind === "order") throw new Refused(`${name} orders or moves money, or reviews an order, so this part of the desk never calls it.`);
+    if (kind !== "read") throw new Refused(`${name} is not labelled read-only by Robinhood, so this part of the desk never calls it.`);
+    const r = await this.client.callTool({ name, arguments: args });
+    const text = (r.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
+    let data = r.structuredContent ?? null;
+    if (data === null) {
+      try {
+        data = JSON.parse(text);
+      } catch {
+      }
+    }
+    return { data, text, failed: r.isError === true };
+  }
+};
+
 // src/version.ts
 var VERSION = true ? "0.0.1" : "dev";
 
@@ -19008,8 +19125,6 @@ var VERSION = true ? "0.0.1" : "dev";
 var ROBINHOOD_MCP = "https://agent.robinhood.com/mcp/trading";
 var CALLBACK_PORT = 47613;
 var redirectFor = (port) => `http://127.0.0.1:${port}/callback`;
-var TRADE_WORDS = /order|trade|buy|sell|liquidat|close.?position|transfer|withdraw|deposit|payment/i;
-var isOrderTool = (name) => TRADE_WORDS.test(name);
 var isPositionsRead = (name) => /^(get|list)_/i.test(name) && /position/i.test(name) && !isOrderTool(name);
 function openBrowser(url2) {
   const href = url2.toString();
@@ -19025,25 +19140,28 @@ function waitForCode(port, expectedState, timeoutMs = 5 * 6e4) {
   };
   const code = new Promise((resolve, reject) => {
     const page = (words) => `<!doctype html><meta charset="utf-8"><title>Trading Agents</title><body style="font:16px system-ui;padding:40px">${words}</body>`;
+    const answer = (res, status, words) => {
+      res.writeHead(status, { connection: "close", ...words ? { "content-type": "text/html" } : {} }).end(words ? page(words) : void 0);
+    };
     const server = http.createServer((req, res) => {
       const url2 = new URL(req.url ?? "/", `http://127.0.0.1:${port}`);
       if (url2.pathname !== "/callback") {
-        res.writeHead(404).end();
+        answer(res, 404);
         return;
       }
       const error2 = url2.searchParams.get("error"), got = url2.searchParams.get("code"), state = url2.searchParams.get("state");
       const want = expectedState();
       if (error2) {
-        res.writeHead(200, { "content-type": "text/html" }).end(page("Robinhood did not sign you in. You can close this tab."));
+        answer(res, 200, "Robinhood did not sign you in. You can close this tab.");
         finish();
         reject(new Error(`Robinhood refused the sign-in: ${error2}`));
         return;
       }
       if (!got || want && state !== want) {
-        res.writeHead(400, { "content-type": "text/html" }).end(page("This sign-in link does not match. Start again from Madav."));
+        answer(res, 400, "This sign-in link does not match. Start again from Madav.");
         return;
       }
-      res.writeHead(200, { "content-type": "text/html" }).end(page("Signed in to Robinhood. You can close this tab and go back to Madav."));
+      answer(res, 200, "Signed in to Robinhood. You can close this tab and go back to Madav.");
       finish();
       resolve(got);
     });
@@ -19054,6 +19172,7 @@ function waitForCode(port, expectedState, timeoutMs = 5 * 6e4) {
     const finish = () => {
       clearTimeout(timer);
       server.close();
+      server.closeIdleConnections();
     };
     close = finish;
     server.on("error", (e) => {
@@ -19064,7 +19183,7 @@ function waitForCode(port, expectedState, timeoutMs = 5 * 6e4) {
   });
   return { code, close };
 }
-var line = (t) => ({ name: t.name, readOnly: t.annotations?.readOnlyHint === true, order: isOrderTool(t.name), description: (t.description ?? "").split("\n")[0].slice(0, 120) });
+var toolLine = (t) => ({ name: t.name, readOnly: t.annotations?.readOnlyHint === true, kind: kindOf(t), order: isOrderTool(t.name), description: (t.description ?? "").split("\n")[0].slice(0, 120) });
 function summarise(result) {
   const content = result.content ?? [];
   const text = content.filter((c) => c.type === "text").map((c) => c.text ?? "").join("");
@@ -19080,28 +19199,37 @@ function summarise(result) {
   }
   return `${text.length} characters of text`;
 }
-async function connect(file, opts = {}) {
+var NotSignedIn = class extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "NotSignedIn";
+  }
+};
+async function openSession(file, opts) {
   const port = opts.port ?? CALLBACK_PORT, say2 = opts.say ?? (() => {
-  });
+  }), endpoint = new URL(opts.url ?? ROBINHOOD_MCP);
+  if (!opts.signIn && !readSaved(file).tokens) throw new NotSignedIn("No Robinhood sign-in is saved.");
   const auth2 = new FileAuth(file, redirectFor(port), (url2) => {
+    if (!opts.signIn) return;
     say2(`Opening Robinhood's sign-in page. If no browser opens, visit:
 ${url2}`);
     (opts.open ?? openBrowser)(url2);
   });
-  const transport = () => new StreamableHTTPClientTransport(new URL(ROBINHOOD_MCP), { authProvider: auth2 });
+  const transport = () => new StreamableHTTPClientTransport(endpoint, { authProvider: auth2 });
   const client = () => new Client({ name: "trading-agents", version: VERSION });
   let c = client(), t = transport();
-  const waiting = waitForCode(port, () => auth2.expectedState());
-  waiting.code.catch(() => {
+  const waiting = opts.signIn ? waitForCode(port, () => auth2.expectedState()) : null;
+  waiting?.code.catch(() => {
   });
   try {
     await c.connect(t);
-    waiting.close();
+    waiting?.close();
   } catch (e) {
     if (!(e instanceof UnauthorizedError)) {
-      waiting.close();
+      waiting?.close();
       throw e;
     }
+    if (!waiting) throw new NotSignedIn("Robinhood asks for a new sign-in.");
     const code = await waiting.code;
     await t.finishAuth(code);
     c = client();
@@ -19109,20 +19237,70 @@ ${url2}`);
     await c.connect(t);
   }
   try {
-    const { tools } = await c.listTools();
-    const out = { tools: tools.map(line) };
-    const positions = tools.find((x) => isPositionsRead(x.name) && !x.inputSchema.required?.length);
-    if (positions) out.positions = `${positions.name} answered: ${summarise(await c.callTool({ name: positions.name, arguments: {} }))}`;
-    return out;
-  } finally {
+    return { reader: new Reader(c, (await c.listTools()).tools), close: () => c.close().catch(() => {
+    }) };
+  } catch (e) {
     await c.close().catch(() => {
     });
+    throw e;
   }
+}
+async function connect(file, opts = {}) {
+  const session = await openSession(file, { ...opts, signIn: true });
+  try {
+    const { reader } = session;
+    const out = { tools: reader.tools.map(toolLine) };
+    const positions = reader.tools.find((x) => isPositionsRead(x.name) && !x.inputSchema.required?.length);
+    if (positions) {
+      if (kindOf(positions) !== "read") out.positions = `${positions.name} is not labelled read-only by Robinhood, so it was not called.`;
+      else {
+        const r = await reader.read(positions.name);
+        out.positions = `${positions.name} answered: ${r.failed ? "Robinhood reported an error" : summarise({ content: [{ type: "text", text: r.text }] })}`;
+      }
+    }
+    return out;
+  } finally {
+    await session.close();
+  }
+}
+
+// src/robinhood/discover.ts
+var takes = (args) => args.length ? args.map((a) => `${a.name} (${a.type}${a.required ? ", required" : ""})${a.note ? ` - ${a.note}` : ""}`).join("; ") : "nothing";
+async function discover(reader, opts = {}) {
+  const out = [], { read, order, other } = reader.byKind();
+  out.push(`Robinhood's connection offers ${reader.tools.length} tools: ${read.length} that only read, ${order.length} that order, review or move money, ${other.length} others.`);
+  out.push("", `READ TOOLS (${read.length}) - the only ones the desk may call:`);
+  for (const t of read) {
+    const args = argsOf(t), needed = args.filter((a) => a.required);
+    out.push("", `* ${t.name}`, `  says: ${oneLine(t.description ?? "", 400) || "(no description)"}`, `  takes: ${takes(args)}`);
+    if (needed.length) {
+      out.push(`  not called here: it needs ${needed.map((a) => a.name).join(", ")}. To see its shape: node dist/robinhood.mjs shape ${t.name} '{"${needed[0].name}": "..."}'`);
+      continue;
+    }
+    try {
+      for (const l of await shapeOfRead(reader, t.name, {}, opts)) out.push(`  ${l}`);
+    } catch (e) {
+      out.push(`  could not be read: ${masked(e.message)}`);
+    }
+  }
+  out.push("", `TOOLS THAT ORDER, REVIEW OR MOVE MONEY (${order.length}) - never called by this program:`);
+  for (const t of order) out.push("", `* ${t.name}`, `  says: ${oneLine(t.description ?? "", 400) || "(no description)"}`, `  takes: ${takes(argsOf(t))}`, `  labelled read-only by Robinhood: ${t.annotations?.readOnlyHint === true ? "yes" : "no"}`);
+  out.push("", `OTHER TOOLS (${other.length}) - not labelled read-only, never called:`);
+  for (const t of other) out.push("", `* ${t.name}`, `  says: ${oneLine(t.description ?? "", 200) || "(no description)"}`, `  takes: ${takes(argsOf(t))}`);
+  out.push("", "Nothing was ordered, changed or cancelled. No value from your account is shown above: only the names and kinds of what Robinhood answers.");
+  return out;
+}
+async function shapeOfRead(reader, name, args, opts = {}) {
+  const r = await reader.read(name, args);
+  if (r.failed) return [`Robinhood reported an error: ${masked(r.text)}`];
+  if (r.data === null) return [`answered with plain text (${r.text.length} characters), not data`];
+  return shapeLines(r.data, opts.words === true);
 }
 
 // src/robinhood/cli.ts
 var say = (words) => console.log(words);
-async function main(command) {
+async function main(args) {
+  const words = args.includes("--words"), [command, ...rest] = args.filter((a) => a !== "--words");
   const file = robinhoodFile();
   if (command === "status") {
     say(fs2.existsSync(file) ? `A Robinhood sign-in is saved (last refreshed ${fs2.statSync(file).mtime.toISOString().slice(0, 16).replace("T", " ")} UTC).` : "No Robinhood sign-in is saved yet.");
@@ -19133,20 +19311,53 @@ async function main(command) {
     say("The saved Robinhood sign-in is deleted. Connect again whenever you like.");
     return 0;
   }
+  if (command === "discover" || command === "shape") {
+    let json = {};
+    if (command === "shape") {
+      if (!rest[0]) {
+        say(`Use: node dist/robinhood.mjs shape TOOL '{"argument": "value"}'`);
+        return 2;
+      }
+      try {
+        const v = JSON.parse(rest[1] ?? "{}");
+        if (!v || typeof v !== "object" || Array.isArray(v)) throw new Error("not an object");
+        json = v;
+      } catch {
+        say(`The arguments must be a JSON object, for example '{"account_number": "123"}'.`);
+        return 2;
+      }
+    }
+    try {
+      const session = await openSession(file, { signIn: true, say });
+      try {
+        for (const l of command === "discover" ? await discover(session.reader, { words }) : await shapeOfRead(session.reader, rest[0], json, { words })) say(l);
+      } finally {
+        await session.close();
+      }
+      return 0;
+    } catch (e) {
+      say(`The Robinhood connection did not work: ${masked(e.message)}`);
+      say("Nothing was ordered.");
+      return 1;
+    }
+  }
   if (command !== "connect") {
-    say("Use: node dist/robinhood.mjs connect | status | forget");
+    say("Use: node dist/robinhood.mjs connect | status | forget | discover | shape TOOL [JSON]");
     return 2;
   }
   try {
     const c = await connect(file, { say });
-    const order = c.tools.filter((t) => t.order), read = c.tools.filter((t) => !t.order);
+    const read = c.tools.filter((t) => t.kind === "read"), order = c.tools.filter((t) => t.kind === "order"), other = c.tools.filter((t) => t.kind === "other");
     say(`Connected to Robinhood. Its connection offers ${c.tools.length} tools.`);
     say(`
-Read tools (${read.length}):`);
-    for (const t of read) say(`- ${t.name}${t.readOnly ? " (read-only)" : ""}: ${t.description}`);
+Read tools (${read.length}) - the only kind the desk ever calls:`);
+    for (const t of read) say(`- ${t.name} (read-only): ${t.description}`);
     say(`
 Tools that order, review orders or move money (${order.length}) - agents can never call these; only your Confirm in the dashboard will place an order:`);
-    for (const t of order) say(`- ${t.name}: ${t.description}`);
+    for (const t of order) say(`- ${t.name}${t.readOnly ? " (labelled read-only)" : ""}: ${t.description}`);
+    say(`
+Other tools (${other.length}) - not labelled read-only, so the desk never calls them:`);
+    for (const t of other) say(`- ${t.name}: ${t.description}`);
     say(`
 ${c.positions ?? "No positions tool without inputs was found, so nothing was read."}`);
     say("Nothing was ordered, changed or cancelled.");
@@ -19157,7 +19368,7 @@ ${c.positions ?? "No positions tool without inputs was found, so nothing was rea
     return 1;
   }
 }
-process.exitCode = await main(process.argv[2]);
+process.exitCode = await main(process.argv.slice(2));
 /*! Bundled license information:
 
 content-type/index.js:

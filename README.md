@@ -8,10 +8,11 @@ You do. What works today is listed under Status; everything else is marked as co
 Adapted from [TradingAgents](https://github.com/TauricResearch/TradingAgents) by Tauric Research (see `NOTICE`); not
 affiliated with them. **Nothing here is investment advice.**
 
-> **Status: milestone 3.** Built: the desk check, a read-only Robinhood connection test, the data tools, the desk's
+> **Status: milestone 4, first part.** Built: the desk check, a read-only Robinhood connection test, the data tools, the desk's
 > records (plan, journal, scoring, lessons, holdings), the analysis team with `/analyse` and `/settle`, `/backtest`, and
-> the dashboard with `/terminal` (markets, charts, watchlist, the desk's calls and scorecard). The dashboard shows no
-> account and has no order button yet: Robinhood in the dashboard, and trading, come in the next milestones.
+> the dashboard with `/terminal` (markets, charts, watchlist, the desk's calls and scorecard). The dashboard can now
+> connect to Robinhood (you press Connect, sign in on Robinhood's own page) and says whether it works; it shows no
+> balance or holdings yet and has no order button: those, and trading, come in the next steps.
 > **Not yet proven on a real computer:** the dashboard, and a full analysis with company accounts.
 
 ## Start in three steps
@@ -39,7 +40,8 @@ other source sees it.
    your own computer shows the markets, a chart of any stock (area or candles, 50- and 200-day averages, volume), your
    watchlist, the desk's calls with their full reasoning, and how the desk has scored. Its "Analyse" buttons list a
    request; the analysis itself runs in Madav when you type `/analyse` with no stock. Prices are Yahoo Finance's and may
-   be up to 15 minutes late. The page works on this computer only, keeps no key, and cannot place an order.
+   be up to 15 minutes late. The page works on this computer only, keeps no key, and cannot place an order. Its
+   "Your account" card connects to Robinhood on your press of Connect and only reads.
 3. **You trade** (coming later, and only after a real order has been proven end to end). Decide, Review (Robinhood's own
    dry run), Place, Confirm. Only that confirm sends an order, only the exact order you confirmed, within your caps.
    Trading ships switched off.
