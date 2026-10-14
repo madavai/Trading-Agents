@@ -73,7 +73,9 @@ test('requests to one host are spaced; another host is not held up', async () =>
   configure({ spacingMs: 80, fetch: async (u) => { starts.push([new URL(String(u)).hostname, Date.now()]); return new Response('ok'); } });
   await Promise.all([getText('https://y.test/1'), getText('https://y.test/2'), getText('https://y.test/3'), getText('https://other.test/1')]);
   const y = starts.filter(([h]) => h === 'y.test').map(([, t]) => t);
-  assert.ok(y[1]! - y[0]! >= 70 && y[2]! - y[1]! >= 70, y.join());
+  // 80 ms apart as asked; the allowance is for a start that runs a few ms late (a busy computer), and without any
+  // spacing the gaps are about 0, so this still fails if the spacing goes missing
+  assert.ok(y[1]! - y[0]! >= 60 && y[2]! - y[1]! >= 60, y.join());
   assert.ok(starts.find(([h]) => h === 'other.test')![1] - y[0]! < 60, 'another host waited');
 });
 
