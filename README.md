@@ -8,10 +8,11 @@ You do. What works today is listed under Status; everything else is marked as co
 Adapted from [TradingAgents](https://github.com/TauricResearch/TradingAgents) by Tauric Research (see `NOTICE`); not
 affiliated with them. **Nothing here is investment advice.**
 
-> **Status: milestone 2c.** Built: the desk check, a read-only Robinhood connection test, the data tools, the desk's
-> records (plan, journal, scoring, lessons, holdings), the analysis team with `/analyse` and `/settle`, and `/backtest`.
-> **Not yet proven on a real computer:** a full analysis on live data, and that Madav runs the twelve agents as written.
-> The dashboard and trading come in the next milestones.
+> **Status: milestone 3.** Built: the desk check, a read-only Robinhood connection test, the data tools, the desk's
+> records (plan, journal, scoring, lessons, holdings), the analysis team with `/analyse` and `/settle`, `/backtest`, and
+> the dashboard with `/terminal` (markets, charts, watchlist, the desk's calls and scorecard). The dashboard shows no
+> account and has no order button yet: Robinhood in the dashboard, and trading, come in the next milestones.
+> **Not yet proven on a real computer:** the dashboard, and a full analysis with company accounts.
 
 ## Start in three steps
 1. In Madav, clone this repository and open its folder.
@@ -34,8 +35,11 @@ other source sees it.
    runs the team over past dates in a journal of its own and reports, by rating, how often the direction was right and
    the mean alpha. It is slow and uses a lot of model time, and for past dates only prices, indicators, economic figures
    and SEC accounts are as known then: news, posts, odds and insider trades are recent-only, so they are thin.
-2. **You decide** (coming later). The dashboard shows your markets, your watchlist, charts, the desk's call and its
-   record.
+2. **You decide** (the dashboard is built; your account and the Decide step come later). Type `/terminal`: a page on
+   your own computer shows the markets, a chart of any stock (area or candles, 50- and 200-day averages, volume), your
+   watchlist, the desk's calls with their full reasoning, and how the desk has scored. Its "Analyse" buttons list a
+   request; the analysis itself runs in Madav when you type `/analyse` with no stock. Prices are Yahoo Finance's and may
+   be up to 15 minutes late. The page works on this computer only, keeps no key, and cannot place an order.
 3. **You trade** (coming later, and only after a real order has been proven end to end). Decide, Review (Robinhood's own
    dry run), Place, Confirm. Only that confirm sends an order, only the exact order you confirmed, within your caps.
    Trading ships switched off.
@@ -57,8 +61,9 @@ that does not answer is reported as unavailable, never as "nothing happened".
 - A source that cannot be reached is reported as unavailable, never as "no news". No number is invented.
 
 ## Design
-`docs/design/desk-mock.html` is the dashboard's design reference, in the Madav House theme (open it in a browser; the
-prices in it are made up).
+The dashboard wears the Madav House theme in a light and a dark face (the button at the top right). Its look is in
+`src/terminal/ui/house.css`; the dashboard's own sheet only places those objects. `docs/design/desk-mock.html` is the
+design reference (open it in a browser; the prices in it are made up).
 
 ## Licence
 MIT (see `LICENSE`). Files adapted from TradingAgents say so at their top and stay under the Apache License 2.0

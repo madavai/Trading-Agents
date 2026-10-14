@@ -14,6 +14,7 @@ import { ASK_FOR_EMAIL, readContactEmail } from '../contact.js';
 import { cells, iterGrid, renderSummary, summarize } from '../desk/backtest.js';
 import { buildPlan, journalOf, NeedsEmail, renderPlan, type Plan } from '../desk/plan.js';
 import { SWEEP_ID, workspaceOf } from '../desk/workspace.js';
+import { dequeue, readQueue } from '../terminal/store.js';
 import { writeWhole } from '../desk/lock.js';
 import { parseRating, RATINGS } from '../desk/rating.js';
 import { progress, readSections, savedPlan, saveSection, SECTIONS, writeReport } from '../desk/runs.js';
@@ -181,6 +182,22 @@ export function registerDeskTools(server: McpServer, root: string): void {
     const entries = journalOf(root, w).load();
     return `Backtest sweep ${id}: ${entries.length} call(s) recorded${meta}\n\n${renderSummary(summarize(entries))}`;
   }));
+
+  server.registerTool('read_queue', {
+    title: 'Analyses waiting',
+    description: 'The stocks the person asked the desk to analyse from the dashboard, oldest first. /analyse with no ticker runs these. Read-only.',
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  }, async () => act(() => {
+    const q = readQueue(dir);
+    return q.length ? `${q.length} analysis request(s) waiting, oldest first:\n${q.map((i, n) => `${n + 1}. ${i.symbol} (asked ${i.requestedAt.slice(0, 16).replace('T', ' ')} UTC)`).join('\n')}` : 'Nothing is waiting: the person has not asked for any analysis from the dashboard.';
+  }));
+
+  server.registerTool('finish_queue_item', {
+    title: 'Mark a waiting analysis done',
+    description: 'Take a stock off the waiting list once its analysis has been run and recorded (or the person no longer wants it).',
+    inputSchema: { symbol },
+    annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false },
+  }, async (a) => act(() => { const left = dequeue(dir, a.symbol); return `Taken off the waiting list. ${left.length} left.`; }));
 
   server.registerTool('set_holdings', {
     title: 'Save what the person holds',

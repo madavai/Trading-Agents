@@ -98,3 +98,13 @@ export function deleteRun(dir: string, ticker: string, date: string): void {
 }
 
 export const reportFolder = (dir: string, ticker: string, date: string): string => folder(dir, ticker, date);
+
+/** Everything written for a run, section by section; a debate section lists its turns in order. Read-only, for the dashboard. */
+export function sectionsOf(dir: string, ticker: string, date: string): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const e of load(dir, ticker, date).log) (out[e.section] ??= []).push(e.text);
+  return out;
+}
+
+/** Whether the finished report has been written for a run. */
+export const hasReport = (dir: string, ticker: string, date: string): boolean => fs.existsSync(path.join(folder(dir, ticker, date), 'complete_report.md'));
