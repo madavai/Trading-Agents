@@ -3263,8 +3263,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path10) {
-      let input2 = path10;
+    function removeDotSegments(path12) {
+      let input2 = path12;
       const output2 = [];
       let nextSlash = -1;
       let len = 0;
@@ -3673,8 +3673,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path10 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path10 && path10 !== "/" ? path10 : void 0;
+        const path12 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path12 && path12 !== "/" ? path12 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -7187,18 +7187,21 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list2, fs9, exportName) {
+    function addFormats(ajv, list2, fs10, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list2)
-        ajv.addFormat(f, fs9[f]);
+        ajv.addFormat(f, fs10[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.default = formatsPlugin;
   }
 });
+
+// src/tools/main.ts
+import path11 from "node:path";
 
 // node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
 import process2 from "node:process";
@@ -8020,10 +8023,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path10) {
-  if (!path10)
+function getElementAtPath(obj, path12) {
+  if (!path12)
     return obj;
-  return path10.reduce((acc, key) => acc?.[key], obj);
+  return path12.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -8363,11 +8366,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path10, issues) {
+function prefixIssues(path12, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path10);
+    iss.path.unshift(path12);
     return iss;
   });
 }
@@ -8829,16 +8832,16 @@ function flattenError(error62, mapper = (issue2) => issue2.message) {
 }
 function formatError(error62, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error63, path10 = []) => {
+  const processError = (error63, path12 = []) => {
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path10, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path12, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path10, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path12, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path10, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path12, ...issue2.path]);
       } else {
-        const fullpath = [...path10, ...issue2.path];
+        const fullpath = [...path12, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -8877,17 +8880,17 @@ function formatError(error62, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error62, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error63, path10 = []) => {
+  const processError = (error63, path12 = []) => {
     var _a3;
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path10, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path12, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path10, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path12, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path10, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path12, ...issue2.path]);
       } else {
-        const fullpath = [...path10, ...issue2.path];
+        const fullpath = [...path12, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -8926,8 +8929,8 @@ function treeifyError(error62, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path10 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path10) {
+  const path12 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path12) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -26065,13 +26068,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path10 = ref.slice(1).split("/").filter(Boolean);
-  if (path10.length === 0) {
+  const path12 = ref.slice(1).split("/").filter(Boolean);
+  if (path12.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path10[0] === defsKey) {
-    const key = path10[1] === void 0 ? void 0 : decodeJSONPointerSegment(path10[1]);
+  if (path12[0] === defsKey) {
+    const key = path12[1] === void 0 ? void 0 : decodeJSONPointerSegment(path12[1]);
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -28929,8 +28932,8 @@ function getErrorMap2() {
 
 // node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path10, errorMaps, issueData } = params;
-  const fullPath = [...path10, ...issueData.path || []];
+  const { data, path: path12, errorMaps, issueData } = params;
+  const fullPath = [...path12, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -29045,11 +29048,11 @@ var errorUtil;
 
 // node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path10, key) {
+  constructor(parent, value, path12, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path10;
+    this._path = path12;
     this._key = key;
   }
   get path() {
@@ -32600,11 +32603,11 @@ function normalizeObjectSchema(schema) {
   }
   return void 0;
 }
-function getDotPath(path10) {
-  if (path10.length === 0) {
+function getDotPath(path12) {
+  if (path12.length === 0) {
     return "object root";
   }
-  return path10.reduce((acc, seg, index) => {
+  return path12.reduce((acc, seg, index) => {
     if (index === 0) {
       return String(seg);
     }
@@ -36793,6 +36796,58 @@ async function deskCheck(root = process.cwd(), fetchImpl2 = fetch) {
 }
 
 // src/data/http.ts
+import fs5 from "node:fs";
+import path5 from "node:path";
+import { createHash } from "node:crypto";
+
+// src/desk/lock.ts
+import fs4 from "node:fs";
+var STALE_MS = 6e4;
+var nap = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+function withLock(file4, run, waitMs = 15e3) {
+  const lock = `${file4}.lock`, until = Date.now() + waitMs;
+  for (; ; ) {
+    try {
+      fs4.mkdirSync(lock);
+      break;
+    } catch (e) {
+      if (e.code !== "EEXIST") throw e;
+      try {
+        if (Date.now() - fs4.statSync(lock).mtimeMs > STALE_MS) {
+          fs4.rmdirSync(lock);
+          continue;
+        }
+      } catch {
+        continue;
+      }
+      if (Date.now() > until) throw new Error(`${file4} is in use by another run; try again in a moment`);
+      nap(40);
+    }
+  }
+  try {
+    return run();
+  } finally {
+    try {
+      fs4.rmdirSync(lock);
+    } catch {
+    }
+  }
+}
+function writeWhole(file4, text3) {
+  const temp = `${file4}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
+  try {
+    fs4.writeFileSync(temp, text3);
+    fs4.renameSync(temp, file4);
+  } catch (e) {
+    try {
+      fs4.rmSync(temp, { force: true });
+    } catch {
+    }
+    throw e;
+  }
+}
+
+// src/data/http.ts
 var Unavailable = class extends Error {
   name = "Unavailable";
 };
@@ -36802,43 +36857,99 @@ var NoData = class extends Error {
 var fetchImpl = (...a) => fetch(...a);
 var contact = "trading-agents (+https://github.com/madavai/trading-agents)";
 var secEmail = "";
+var spacingMs = 0;
+var cacheDir = null;
+var emailNow = () => typeof secEmail === "function" ? secEmail() : secEmail;
 function configure(opts) {
   if (opts.fetch) fetchImpl = opts.fetch;
   if (opts.contact) contact = opts.contact;
   if (opts.secEmail !== void 0) secEmail = opts.secEmail;
+  if (opts.spacingMs !== void 0) spacingMs = opts.spacingMs;
+  if (opts.cacheDir !== void 0) {
+    cacheDir = opts.cacheDir;
+    if (cacheDir) pruneCache(cacheDir);
+  }
 }
 var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+var nextSlot = /* @__PURE__ */ new Map();
+async function pace(host) {
+  if (!spacingMs) return;
+  const now = Date.now(), at = Math.max(now, nextSlot.get(host) ?? 0);
+  nextSlot.set(host, at + spacingMs);
+  if (at > now) await sleep(at - now);
+}
+var MINUTE = 6e4;
+var ttlFor = (host) => /(^|\.)sec\.gov$/.test(host) ? 24 * 60 * MINUTE : /fred/.test(host) ? 6 * 60 * MINUTE : 5 * MINUTE;
+var keyOf = (url2) => {
+  const u = new URL(url2);
+  u.searchParams.delete("crumb");
+  return createHash("sha256").update(u.toString()).digest("hex").slice(0, 40);
+};
+function readCache(url2) {
+  if (!cacheDir) return null;
+  try {
+    const file4 = path5.join(cacheDir, `${keyOf(url2)}.txt`);
+    return Date.now() - fs5.statSync(file4).mtimeMs < ttlFor(new URL(url2).hostname) ? fs5.readFileSync(file4, "utf8") : null;
+  } catch {
+    return null;
+  }
+}
+function writeCache(url2, text3) {
+  if (!cacheDir) return;
+  try {
+    fs5.mkdirSync(cacheDir, { recursive: true });
+    writeWhole(path5.join(cacheDir, `${keyOf(url2)}.txt`), text3);
+  } catch {
+  }
+}
+function pruneCache(dir) {
+  try {
+    for (const f of fs5.readdirSync(dir)) {
+      const file4 = path5.join(dir, f);
+      if (Date.now() - fs5.statSync(file4).mtimeMs > 3 * 24 * 60 * MINUTE) fs5.rmSync(file4, { force: true });
+    }
+  } catch {
+  }
+}
+var excerpt = (body) => body.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 140);
 async function getText(url2, opts = {}) {
-  const host = new URL(url2).host;
+  const host = new URL(url2).host, cached3 = readCache(url2);
+  if (cached3 !== null) return cached3;
   for (let attempt = 0; ; attempt++) {
     let res;
+    await pace(host);
     try {
-      res = await fetchImpl(url2, { headers: { "User-Agent": userAgentFor(url2, contact, secEmail), Accept: "*/*", ...opts.headers }, signal: AbortSignal.timeout(opts.timeoutMs ?? 15e3) });
+      res = await fetchImpl(url2, { headers: { "User-Agent": userAgentFor(url2, contact, emailNow()), Accept: "*/*", ...opts.headers }, signal: AbortSignal.timeout(opts.timeoutMs ?? 15e3) });
     } catch (e) {
       const err = e;
-      if (attempt === 0 && err.name !== "TimeoutError") {
-        await sleep(800);
+      if (attempt < 2 && err.name !== "TimeoutError") {
+        await sleep(800 * (attempt + 1));
         continue;
       }
       throw new Unavailable(`${host} did not answer (${err.name === "TimeoutError" ? "no answer in time" : err.message})`);
     }
-    if ((res.status === 429 || res.status >= 500) && attempt === 0) {
+    if ((res.status === 429 || res.status >= 500) && attempt < 2) {
       await res.body?.cancel().catch(() => {
       });
-      const wait = Math.min(5e3, (Number(res.headers.get("retry-after")) || 1.5) * 1e3);
-      await sleep(wait);
+      const said = res.headers.get("retry-after"), wait = said !== null && said !== "" && Number.isFinite(Number(said)) ? Number(said) * 1e3 : [2e3, 5e3][attempt];
+      await sleep(Math.min(2e4, wait));
       continue;
     }
     const text3 = await res.text();
     if (res.status === 404) throw new NoData(`${host} has nothing at that address (HTTP 404)`);
-    if (!res.ok) throw new Unavailable(`${host} refused (HTTP ${res.status})`);
+    if (!res.ok) {
+      const sec = /(^|\.)sec\.gov$/.test(new URL(url2).hostname);
+      const said = res.status === 403 || res.status === 429 ? excerpt(text3) : "";
+      throw new Unavailable(`${host} refused (HTTP ${res.status})${said ? `, saying "${said}"` : ""}${res.status === 429 ? "; it is rate-limiting this computer, so try again in a few minutes" : ""}${sec ? emailNow().trim() ? " [a contact email was sent]" : " [no contact email was sent]" : ""}`);
+    }
+    writeCache(url2, text3);
     return text3;
   }
 }
 async function getCookies(url2) {
   let res;
   try {
-    res = await fetchImpl(url2, { headers: { "User-Agent": userAgentFor(url2, contact, secEmail) }, redirect: "manual", signal: AbortSignal.timeout(15e3) });
+    res = await fetchImpl(url2, { headers: { "User-Agent": userAgentFor(url2, contact, emailNow()) }, redirect: "manual", signal: AbortSignal.timeout(15e3) });
   } catch (e) {
     throw new Unavailable(`${new URL(url2).host} did not answer (${e.message})`);
   }
@@ -37211,6 +37322,7 @@ async function verifiedSnapshot(raw, analysis2, lookBack = 30) {
     `- Analysis date: ${day2}`,
     `- Latest trading row used: ${last.date}`,
     "- Rows after the analysis date are excluded.",
+    ...last.date === today() ? ["- **The latest row is today's session. If the market is still open it is partial: its close, high, low and volume are the latest so far, and every indicator on it will change by the close. Do not treat a level as broken or held on this row alone.**"] : [],
     `- Prices adjusted for splits and dividends${s.meta.currency ? `, in ${s.meta.currency}` : ""}.`,
     "",
     "### Latest row",
@@ -37555,11 +37667,11 @@ function yahooSession() {
   });
   return session;
 }
-async function yahooJson(path10) {
+async function yahooJson(path12) {
   for (let attempt = 0; ; attempt++) {
     const s = await yahooSession();
     try {
-      return await getJson(`${HOSTS[1]}${path10}&crumb=${encodeURIComponent(s.crumb)}`, { headers: { Cookie: s.cookie } });
+      return await getJson(`${HOSTS[1]}${path12}&crumb=${encodeURIComponent(s.crumb)}`, { headers: { Cookie: s.cookie } });
     } catch (e) {
       if (attempt === 0 && /HTTP 401/.test(e.message)) {
         session = null;
@@ -37683,7 +37795,7 @@ function renderTable(t, head2, note) {
 }
 var reason = (e) => {
   const m2 = e.message;
-  return /sec\.gov refused \(HTTP 403\)/.test(m2) ? `${m2}: ${ASK_FOR_EMAIL}` : m2;
+  return /sec\.gov refused \(HTTP 403\)/.test(m2) && m2.includes("[no contact email was sent]") ? `${m2}: ${ASK_FOR_EMAIL}` : m2;
 };
 async function financialStatement(raw, kind, freq, analysis2) {
   const day2 = analysisDate(analysis2), sym = companySymbol(raw), title = STATEMENTS[kind].title;
@@ -37709,62 +37821,13 @@ async function financialStatement(raw, kind, freq, analysis2) {
 }
 
 // src/tools/desk.ts
-import fs8 from "node:fs";
-import path9 from "node:path";
+import fs9 from "node:fs";
+import path10 from "node:path";
 
 // src/desk/holdings.ts
-import fs5 from "node:fs";
-import path5 from "node:path";
-
-// src/desk/lock.ts
-import fs4 from "node:fs";
-var STALE_MS = 6e4;
-var nap = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-function withLock(file4, run, waitMs = 15e3) {
-  const lock = `${file4}.lock`, until = Date.now() + waitMs;
-  for (; ; ) {
-    try {
-      fs4.mkdirSync(lock);
-      break;
-    } catch (e) {
-      if (e.code !== "EEXIST") throw e;
-      try {
-        if (Date.now() - fs4.statSync(lock).mtimeMs > STALE_MS) {
-          fs4.rmdirSync(lock);
-          continue;
-        }
-      } catch {
-        continue;
-      }
-      if (Date.now() > until) throw new Error(`${file4} is in use by another run; try again in a moment`);
-      nap(40);
-    }
-  }
-  try {
-    return run();
-  } finally {
-    try {
-      fs4.rmdirSync(lock);
-    } catch {
-    }
-  }
-}
-function writeWhole(file4, text3) {
-  const temp = `${file4}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
-  try {
-    fs4.writeFileSync(temp, text3);
-    fs4.renameSync(temp, file4);
-  } catch (e) {
-    try {
-      fs4.rmSync(temp, { force: true });
-    } catch {
-    }
-    throw e;
-  }
-}
-
-// src/desk/holdings.ts
-var file3 = (dir) => path5.join(dir, "holdings.json");
+import fs6 from "node:fs";
+import path6 from "node:path";
+var file3 = (dir) => path6.join(dir, "holdings.json");
 var num2 = (v, what) => {
   if (typeof v !== "number" || !Number.isFinite(v)) throw new Error(`${what} must be a number`);
   return v;
@@ -37787,13 +37850,13 @@ function saveHoldings(dir, input2, today2, source = "person") {
   const currency = input2.currency?.trim().toUpperCase();
   if (currency !== void 0 && !/^[A-Z]{3}$/.test(currency)) throw new Error(`"${input2.currency}" is not a three-letter currency such as USD`);
   const h = { ...cash === void 0 ? {} : { cash }, ...currency ? { currency } : {}, positions, source, savedOn: today2 };
-  fs5.mkdirSync(dir, { recursive: true });
+  fs6.mkdirSync(dir, { recursive: true });
   writeWhole(file3(dir), JSON.stringify(h, null, 2) + "\n");
   return h;
 }
 function readHoldings(dir) {
   try {
-    const h = JSON.parse(fs5.readFileSync(file3(dir), "utf8"));
+    const h = JSON.parse(fs6.readFileSync(file3(dir), "utf8"));
     return Array.isArray(h.positions) ? h : null;
   } catch {
     return null;
@@ -37801,7 +37864,7 @@ function readHoldings(dir) {
 }
 function forgetHoldings(dir) {
   try {
-    fs5.rmSync(file3(dir));
+    fs6.rmSync(file3(dir));
     return true;
   } catch {
     return false;
@@ -37898,11 +37961,11 @@ function renderSummary(s) {
 }
 
 // src/desk/workspace.ts
-import path7 from "node:path";
+import path8 from "node:path";
 
 // src/desk/journal.ts
-import fs6 from "node:fs";
-import path6 from "node:path";
+import fs7 from "node:fs";
+import path7 from "node:path";
 var SEPARATOR = "\n\n<!-- ENTRY_END -->\n\n";
 var pct = (v) => `${v >= 0 ? "+" : "-"}${(Math.abs(v) * 100).toFixed(1)}%`;
 var MARK = /<!--\s*ENTRY_END\s*-->/i;
@@ -37939,13 +38002,13 @@ var Journal = class {
   maxResolved;
   read() {
     try {
-      return fs6.readFileSync(this.file, "utf8");
+      return fs7.readFileSync(this.file, "utf8");
     } catch {
       return "";
     }
   }
   write(text3) {
-    fs6.mkdirSync(path6.dirname(this.file), { recursive: true });
+    fs7.mkdirSync(path7.dirname(this.file), { recursive: true });
     writeWhole(this.file, text3);
   }
   blocks() {
@@ -37960,7 +38023,7 @@ var Journal = class {
   /** Adds a pending entry. One entry per stock and day, settled or not: a re-run must not count the same call twice. */
   storeDecision(ticker, date5, decision, rating) {
     checkTag(ticker, date5);
-    fs6.mkdirSync(path6.dirname(this.file), { recursive: true });
+    fs7.mkdirSync(path7.dirname(this.file), { recursive: true });
     return withLock(this.file, () => {
       if (this.load().some((e) => e.date === date5 && e.ticker === ticker)) return "exists";
       const r = rating && RATINGS.includes(rating) ? rating : parseRating(decision);
@@ -38039,13 +38102,13 @@ function workspaceOf(root, sweep = null) {
   const live = deskDataDir(root);
   if (sweep === null) return { dir: live, sweep: null };
   if (!SWEEP_ID.test(sweep)) throw new Error(`"${sweep}" is not a sweep name: use up to 40 letters, digits, dashes or underscores`);
-  return { dir: path7.join(live, "backtest", sweep), sweep };
+  return { dir: path8.join(live, "backtest", sweep), sweep };
 }
-var journalIn = (root, ws) => new Journal(path7.join(ws.dir, "journal.md"), readSettings(root).journal.maxResolvedEntries);
+var journalIn = (root, ws) => new Journal(path8.join(ws.dir, "journal.md"), readSettings(root).journal.maxResolvedEntries);
 
 // src/desk/runs.ts
-import fs7 from "node:fs";
-import path8 from "node:path";
+import fs8 from "node:fs";
+import path9 from "node:path";
 var SECTIONS = ["market", "sentiment", "news", "fundamentals", "bull", "bear", "research_plan", "trader", "aggressive", "conservative", "neutral", "decision"];
 var DEBATES = { investment_debate: ["bull", "bear"], risk_debate: ["aggressive", "conservative", "neutral"] };
 var TURNS = new Set(Object.values(DEBATES).flat());
@@ -38058,18 +38121,18 @@ var PARTS = [
   ["IV. Risk Management Team Decision", ["aggressive", "conservative", "neutral"]],
   ["V. Portfolio Manager Decision", ["decision"]]
 ];
-var folder = (dir, ticker, date5) => path8.join(dir, "runs", `${safeSymbol(ticker).replace(/\^/g, "IDX_").replace(/=/g, "_EQ_")}_${date5}`);
-var runFile = (dir, ticker, date5) => path8.join(folder(dir, ticker, date5), "run.json");
+var folder = (dir, ticker, date5) => path9.join(dir, "runs", `${safeSymbol(ticker).replace(/\^/g, "IDX_").replace(/=/g, "_EQ_")}_${date5}`);
+var runFile = (dir, ticker, date5) => path9.join(folder(dir, ticker, date5), "run.json");
 function load(dir, ticker, date5) {
   try {
-    return JSON.parse(fs7.readFileSync(runFile(dir, ticker, date5), "utf8"));
+    return JSON.parse(fs8.readFileSync(runFile(dir, ticker, date5), "utf8"));
   } catch {
     return { ticker: safeSymbol(ticker), date: date5, startedAt: (/* @__PURE__ */ new Date()).toISOString(), log: [] };
   }
 }
 function change(dir, ticker, date5, edit) {
   const file4 = runFile(dir, ticker, date5);
-  fs7.mkdirSync(path8.dirname(file4), { recursive: true });
+  fs8.mkdirSync(path9.dirname(file4), { recursive: true });
   return withLock(file4, () => {
     const r = load(dir, ticker, date5);
     edit(r);
@@ -38124,14 +38187,14 @@ ${written.map(({ s, texts }) => `### ${LABELS[s]}
 ${texts.join("\n\n")}`).join("\n\n")}`];
   });
   const title = [`# Trading Analysis Report: ${safeSymbol(ticker)}`, "", `- Analysis date: ${date5}`, ...header.map((h) => `- ${h}`), ""].join("\n");
-  const out = path8.join(root, "complete_report.md");
+  const out = path9.join(root, "complete_report.md");
   writeWhole(out, `${title}
 ${body.join("\n\n")}
 `);
   return out;
 }
 function deleteRun(dir, ticker, date5) {
-  fs7.rmSync(folder(dir, ticker, date5), { recursive: true, force: true });
+  fs8.rmSync(folder(dir, ticker, date5), { recursive: true, force: true });
 }
 
 // src/desk/scoring.ts
@@ -38288,10 +38351,10 @@ async function act(run) {
 function registerDeskTools(server, root) {
   const dir = deskDataDir(root);
   const write = { readOnlyHint: false, openWorldHint: false };
-  const activeFile = path9.join(dir, "backtest", "active.json"), IDLE_MS = 2 * 36e5;
+  const activeFile = path10.join(dir, "backtest", "active.json"), IDLE_MS = 2 * 36e5;
   const getSweep = () => {
     try {
-      const a = JSON.parse(fs8.readFileSync(activeFile, "utf8"));
+      const a = JSON.parse(fs9.readFileSync(activeFile, "utf8"));
       if (typeof a.sweep === "string" && SWEEP_ID.test(a.sweep) && typeof a.at === "number" && Date.now() - a.at < IDLE_MS) return a.sweep;
     } catch {
     }
@@ -38299,10 +38362,10 @@ function registerDeskTools(server, root) {
   };
   const setSweep = (id) => {
     if (id === null) {
-      fs8.rmSync(activeFile, { force: true });
+      fs9.rmSync(activeFile, { force: true });
       return;
     }
-    fs8.mkdirSync(path9.dirname(activeFile), { recursive: true });
+    fs9.mkdirSync(path10.dirname(activeFile), { recursive: true });
     writeWhole(activeFile, JSON.stringify({ sweep: id, at: Date.now() }));
   };
   const ws = () => {
@@ -38401,10 +38464,10 @@ Rating: ${rating}`;
     if (!readContactEmail(root)) throw new NeedsEmail(ASK_FOR_EMAIL);
     const every = a.every_days ?? 7, dates = iterGrid(a.start_date, a.end_date, every), grid = cells(a.symbols, dates);
     const id = a.sweep_id ?? (/* @__PURE__ */ new Date()).toISOString().replace(/\D/g, "").slice(0, 14), w = workspaceOf(root, id);
-    fs8.mkdirSync(w.dir, { recursive: true });
+    fs9.mkdirSync(w.dir, { recursive: true });
     const recorded = new Set(journalOf(root, w).load().map((e) => `${e.ticker}|${e.date}`));
     const todo = grid.filter((c) => !recorded.has(`${c.symbol}|${c.date}`));
-    writeWhole(path9.join(w.dir, "sweep.json"), JSON.stringify({ symbols: [...new Set(grid.map((c) => c.symbol))], dates, every, cells: grid.length }));
+    writeWhole(path10.join(w.dir, "sweep.json"), JSON.stringify({ symbols: [...new Set(grid.map((c) => c.symbol))], dates, every, cells: grid.length }));
     setSweep(id);
     const symbols = new Set(grid.map((c) => c.symbol)).size;
     return [
@@ -38436,10 +38499,10 @@ Rating: ${rating}`;
     const id = a.sweep_id ?? getSweep();
     if (!id) throw new Error("no backtest is running: name the sweep to score");
     const w = workspaceOf(root, id);
-    if (!fs8.existsSync(path9.join(w.dir, "journal.md"))) throw new Error(`sweep ${id} has no recorded calls yet`);
+    if (!fs9.existsSync(path10.join(w.dir, "journal.md"))) throw new Error(`sweep ${id} has no recorded calls yet`);
     let meta3 = "";
     try {
-      const m2 = JSON.parse(fs8.readFileSync(path9.join(w.dir, "sweep.json"), "utf8"));
+      const m2 = JSON.parse(fs9.readFileSync(path10.join(w.dir, "sweep.json"), "utf8"));
       meta3 = ` of ${m2.cells} planned`;
     } catch {
     }
@@ -38484,7 +38547,7 @@ var analysis = external_exports.string().describe("The analysis date, YYYY-MM-DD
 var READ = { readOnlyHint: true, openWorldHint: true };
 function deskServer(root = process.cwd(), fetchImpl2) {
   const settings = readSettings(root), a0 = settings.analysis;
-  configure({ contact: settings.sources.contact, secEmail: readContactEmail(root) });
+  configure({ contact: settings.sources.contact, secEmail: () => readContactEmail(root) });
   if (fetchImpl2) configure({ fetch: fetchImpl2 });
   const server = new McpServer({ name: "trading-desk", version: VERSION });
   server.registerTool("desk_check", {
@@ -38500,7 +38563,6 @@ function deskServer(root = process.cwd(), fetchImpl2) {
   }, async (a) => {
     try {
       const email3 = saveContactEmail(root, a.email);
-      configure({ secEmail: email3 });
       return text2(`Saved. The SEC will see ${email3} as the contact for this desk's requests; no other source sees it.`);
     } catch (e) {
       return text2(`INPUT_ERROR: ${e.message}. Ask the person for their own email address and call again.`);
@@ -38590,4 +38652,7 @@ function deskServer(root = process.cwd(), fetchImpl2) {
 
 // src/tools/main.ts
 if (process.argv.includes("--check")) console.log(await deskCheck());
-else await deskServer().connect(new StdioServerTransport());
+else {
+  configure({ spacingMs: 250, cacheDir: path11.join(deskDataDir(process.cwd()), "cache") });
+  await deskServer().connect(new StdioServerTransport());
+}

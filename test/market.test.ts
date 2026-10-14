@@ -43,6 +43,12 @@ test('the data tools send the SEC contact email to the SEC alone', async () => {
   configure({ secEmail: '' });
 });
 
+test('the checked price table says when its latest row is a session still in progress', async () => {
+  configure({ fetch: chartFetch(() => series('2026-10-12', 300)) });
+  assert.match(await verifiedSnapshot('nvda', '2026-10-12'), /The latest row is today's session\. If the market is still open it is partial/);
+  assert.doesNotMatch(await verifiedSnapshot('nvda', '2026-10-09'), /today's session/);
+});
+
 test('the checked price table never uses a row after the analysis date', async () => {
   configure({ fetch: chartFetch(() => series('2026-10-09', 300)) });
   const t = await verifiedSnapshot('nvda', '2026-10-01');
