@@ -9,7 +9,9 @@
 - `src/tools/` - the desk tool server, the one MCP server this folder gives the engine (`.mcp.json`).
 - `src/check/` - the desk check: this computer, and the free data sources.
 - `src/robinhood/` - the connection to Robinhood's Trading MCP: sign-in (OAuth, kept in `~/.trading-agents`), and reads.
-- `.claude/` - what Madav and Claude Code load in this folder: settings, the guard hook, skills, and later the agents.
+- `.claude/` - what Madav and Claude Code load in this folder: settings, the guard hook, skills, and the agents.
+  The twelve agent files in `.claude/agents/` are written from `scripts/agents-src.mjs` (`npm run agents`); edit the
+  source, not the files, and a test fails if they differ.
 - `desk-settings.json` - the desk's settings; `docs/design/` - the dashboard's design reference.
 
 ## Rules
