@@ -9,8 +9,8 @@ Changes: the design is rebuilt as Claude Code agents and skills with a TypeScrip
 Any file adapted from TradingAgents' own text says so at its top and remains under the Apache License 2.0.
 Trading Agents is not affiliated with or endorsed by Tauric Research.
 
-docs/design/desk-mock.html carries the Madav House theme (c) Madavai, and these fonts, each under the SIL Open Font
-License 1.1 (texts in docs/design/fonts/):
+docs/design/desk-mock.html and the dashboard (src/terminal/ui/house.css and fonts/) carry the Madav House theme
+(c) Madavai, and these fonts, each under the SIL Open Font License 1.1 (texts in docs/design/fonts/):
 - Source Serif 4 (OFL-SourceSerif4.txt)
 - Fraunces (OFL-Fraunces.txt)
 - Inter (OFL-Inter.txt)

@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-width="wide">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="desk-token" content="__DESK_TOKEN__">
+<title>Trading Agents Desk</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<svg class="ta-sprite" aria-hidden="true">
+  <defs>
+    <linearGradient id="g-accent" x1="0" y1="0" x2="0" y2="1"><stop class="gs-accent" offset="0" stop-opacity="0.3"/><stop class="gs-accent" offset="1" stop-opacity="0"/></linearGradient>
+    <linearGradient id="g-ok" x1="0" y1="0" x2="0" y2="1"><stop class="gs-ok" offset="0" stop-opacity="0.22"/><stop class="gs-ok" offset="1" stop-opacity="0"/></linearGradient>
+    <linearGradient id="g-bad" x1="0" y1="0" x2="0" y2="1"><stop class="gs-bad" offset="0" stop-opacity="0.22"/><stop class="gs-bad" offset="1" stop-opacity="0"/></linearGradient>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></symbol>
+    <symbol id="i-candle" viewBox="0 0 24 24"><path d="M9 5v4"/><rect x="7" y="9" width="4" height="6" rx="1"/><path d="M9 15v2"/><path d="M17 3v2"/><rect x="15" y="5" width="4" height="8" rx="1"/><path d="M17 13v3"/><path d="M3 3v18h18"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+    <symbol id="i-bot" viewBox="0 0 24 24"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2M20 14h2M15 13v2M9 13v2"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4M16 13H8M16 17H8M10 9H8"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></symbol>
+  </defs>
+</svg>
+
+<div class="app-v">
+  <div class="app-body">
+    <aside class="sb-rail at-box at-side" aria-label="Desk">
+      <div class="at-side-head"><span class="ta-word">Trading <em>Agents</em></span></div>
+      <div class="at-side-body fixed">
+        <nav class="at-list" aria-label="Sections">
+          <button class="at-li" data-act="goto" data-to="top" aria-current="page"><svg class="g"><use href="#i-grid"/></svg><span class="at-li-t">Overview</span></button>
+          <button class="at-li" data-act="goto" data-to="sec-chart"><svg class="g"><use href="#i-candle"/></svg><span class="at-li-t">Chart</span></button>
+          <button class="at-li" data-act="goto" data-to="sec-watch"><svg class="g"><use href="#i-star"/></svg><span class="at-li-t">Watchlist</span></button>
+          <button class="at-li" data-act="goto" data-to="sec-calls"><svg class="g"><use href="#i-check"/></svg><span class="at-li-t">The desk's calls</span></button>
+          <button class="at-li" data-act="goto" data-to="sec-score"><svg class="g"><use href="#i-target"/></svg><span class="at-li-t">Scorecard</span></button>
+        </nav>
+      </div>
+      <div class="at-side-scroll">
+        <div class="at-list small" id="favs"></div>
+      </div>
+      <div class="at-side-foot">
+        <div class="at-list"><div class="at-li at-inert"><span class="at-dot"></span><span class="at-li-t">Trading is not switched on</span></div></div>
+        <p class="at-quiet">Prices up to 15 min late · not advice</p>
+      </div>
+    </aside>
+
+    <div class="main-col">
+      <header class="at-top">
+        <div class="at-top-back"></div>
+        <div class="at-tabs-box"></div>
+        <div class="at-top-end">
+          <button class="icon-btn at-press" id="themeBtn" data-act="theme" aria-label="Switch to the light face" title="Switch to the light face"><svg class="g"><use href="#i-sun"/></svg></button>
+        </div>
+      </header>
+
+      <main class="app-page" id="page">
+        <div class="at-page-col">
+
+          <div class="at-page-top" id="top">
+            <div class="at-page-head">
+              <div class="at-head-words">
+                <h1 class="page-title">Your <em>desk.</em></h1>
+                <p class="page-sub" id="subline">Reading the desk's files.</p>
+              </div>
+              <div class="at-head-tail">
+                <span class="at-chip warn">Prices up to 15 min late</span>
+                <span class="at-chip">Trading off</span>
+              </div>
+            </div>
+            <form class="at-row" id="addForm" autocomplete="off">
+              <label class="at-search at-box"><svg class="g"><use href="#i-search"/></svg><input id="addInput" placeholder="Add a stock to watch, e.g. NVDA" aria-label="Add a stock to watch" maxlength="20" spellcheck="false"></label>
+              <button class="at-btn at-press primary" type="submit"><svg class="g"><use href="#i-plus"/></svg><span>Add to watchlist</span></button>
+            </form>
+          </div>
+
+          <section class="at-section" id="sec-markets">
+            <div class="at-sect-head"><div class="at-head-words"><h2>Markets</h2><p>Press one to chart it · from Yahoo Finance</p></div></div>
+            <div class="at-deck ta-deck-6" id="marketDeck"></div>
+          </section>
+
+          <section class="at-section" id="sec-chart">
+            <div class="ta-main">
+              <div class="at-card at-box">
+                <div class="at-card-head">
+                  <h3 id="heroName">Chart</h3>
+                  <span class="at-chip" id="heroTicker"></span>
+                  <div class="at-card-tail">
+                    <div class="at-seg" id="kindSeg" role="tablist" aria-label="Chart kind">
+                      <button class="at-seg-b on" data-act="kind" data-kind="area">Area</button>
+                      <button class="at-seg-b" data-act="kind" data-kind="candles">Candles</button>
+                    </div>
+                    <div class="at-seg" id="rangeSeg" role="tablist" aria-label="Time range"></div>
+                  </div>
+                </div>
+                <div class="ta-price-line">
+                  <span class="at-num ta-big" id="heroPrice">—</span>
+                  <span class="at-chip" id="heroChange"></span>
+                  <span class="at-quiet" id="heroAsOf"></span>
+                </div>
+                <div class="ta-chart" id="heroChart"><div class="ta-fill" id="heroSvg"></div><div class="ta-tip at-box" id="heroTip"></div></div>
+                <div class="ta-legend" id="heroLegend">
+                  <button class="at-chip at-press on" data-act="layer" data-layer="ma50"><span class="ta-swatch ma50-sw"></span>50-day average</button>
+                  <button class="at-chip at-press on" data-act="layer" data-layer="ma200"><span class="ta-swatch dash ma200-sw"></span>200-day average</button>
+                  <button class="at-chip at-press on" data-act="layer" data-layer="vol">Volume</button>
+                  <span class="at-quiet" id="heroNote"></span>
+                </div>
+              </div>
+
+              <div class="ta-col">
+                <div class="at-card at-box" id="callCard"></div>
+                <div class="at-card at-box" id="queueCard"></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="at-section" id="sec-watch">
+            <div class="at-sect-head"><div class="at-head-words"><h2>Watchlist</h2><p>Press a row to chart it · the star keeps it in the side list</p></div></div>
+            <div class="at-box at-tablewrap" id="watchWrap"><table class="at-table fill" id="watchTable"></table></div>
+          </section>
+
+          <section class="at-section" id="sec-calls">
+            <div class="at-sect-head"><div class="at-head-words"><h2>The desk's calls</h2><p id="callsSub">Every analysis the team has recorded</p></div></div>
+            <div class="at-box at-tablewrap" id="callsWrap"><table class="at-table fill" id="callsTable"></table></div>
+          </section>
+
+          <section class="at-section" id="sec-score">
+            <div class="at-sect-head"><div class="at-head-words"><h2>How the desk is doing</h2><p id="scoreSub"></p></div></div>
+            <div class="at-card at-box" id="score"></div>
+          </section>
+
+          <p class="at-honest">Prices come from Yahoo Finance and may be up to 15 minutes late. Nothing here is investment advice, and this page never places an order: trading is not switched on.</p>
+        </div>
+      </main>
+    </div>
+  </div>
+</div>
+
+<dialog class="at-pop l" id="callDialog" aria-label="A call in full"></dialog>
+<div class="at-toast-host" id="toasts"></div>
+<script src="/app.js"></script>
+</body>
+</html>

@@ -3263,8 +3263,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path12) {
-      let input2 = path12;
+    function removeDotSegments(path13) {
+      let input2 = path13;
       const output2 = [];
       let nextSlash = -1;
       let len = 0;
@@ -3673,8 +3673,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path12 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path12 && path12 !== "/" ? path12 : void 0;
+        const path13 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path13 && path13 !== "/" ? path13 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -7187,12 +7187,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list2, fs10, exportName) {
+    function addFormats(ajv, list2, fs11, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list2)
-        ajv.addFormat(f, fs10[f]);
+        ajv.addFormat(f, fs11[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -7201,7 +7201,7 @@ var require_dist = __commonJS({
 });
 
 // src/tools/main.ts
-import path11 from "node:path";
+import path12 from "node:path";
 
 // node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
 import process2 from "node:process";
@@ -8023,10 +8023,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path12) {
-  if (!path12)
+function getElementAtPath(obj, path13) {
+  if (!path13)
     return obj;
-  return path12.reduce((acc, key) => acc?.[key], obj);
+  return path13.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -8366,11 +8366,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path12, issues) {
+function prefixIssues(path13, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path12);
+    iss.path.unshift(path13);
     return iss;
   });
 }
@@ -8832,16 +8832,16 @@ function flattenError(error62, mapper = (issue2) => issue2.message) {
 }
 function formatError(error62, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error63, path12 = []) => {
+  const processError = (error63, path13 = []) => {
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path12, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path13, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path12, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path13, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path12, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path13, ...issue2.path]);
       } else {
-        const fullpath = [...path12, ...issue2.path];
+        const fullpath = [...path13, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -8880,17 +8880,17 @@ function formatError(error62, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error62, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error63, path12 = []) => {
+  const processError = (error63, path13 = []) => {
     var _a3;
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path12, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path13, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path12, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path13, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path12, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path13, ...issue2.path]);
       } else {
-        const fullpath = [...path12, ...issue2.path];
+        const fullpath = [...path13, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -8929,8 +8929,8 @@ function treeifyError(error62, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path12 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path12) {
+  const path13 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path13) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -26068,13 +26068,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path12 = ref.slice(1).split("/").filter(Boolean);
-  if (path12.length === 0) {
+  const path13 = ref.slice(1).split("/").filter(Boolean);
+  if (path13.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path12[0] === defsKey) {
-    const key = path12[1] === void 0 ? void 0 : decodeJSONPointerSegment(path12[1]);
+  if (path13[0] === defsKey) {
+    const key = path13[1] === void 0 ? void 0 : decodeJSONPointerSegment(path13[1]);
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -28932,8 +28932,8 @@ function getErrorMap2() {
 
 // node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path12, errorMaps, issueData } = params;
-  const fullPath = [...path12, ...issueData.path || []];
+  const { data, path: path13, errorMaps, issueData } = params;
+  const fullPath = [...path13, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -29048,11 +29048,11 @@ var errorUtil;
 
 // node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path12, key) {
+  constructor(parent, value, path13, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path12;
+    this._path = path13;
     this._key = key;
   }
   get path() {
@@ -32603,11 +32603,11 @@ function normalizeObjectSchema(schema) {
   }
   return void 0;
 }
-function getDotPath(path12) {
-  if (path12.length === 0) {
+function getDotPath(path13) {
+  if (path13.length === 0) {
     return "object root";
   }
-  return path12.reduce((acc, seg, index) => {
+  return path13.reduce((acc, seg, index) => {
     if (index === 0) {
       return String(seg);
     }
@@ -37501,13 +37501,13 @@ async function economicSeries(indicator, analysis2, lookBackDays = 365) {
   if (past) obs = obs.filter((o) => addDays(o.date, lag) <= day2);
   obs = obs.filter((o) => o.date >= addDays(day2, -Math.max(30, Math.min(3650, lookBackDays))));
   if (!obs.length) throw new NoData(`FRED has no ${id} values published by ${day2} in this window`);
-  const first = obs[0], last = obs[obs.length - 1], change2 = last.value - first.value, pct3 = first.value ? change2 / Math.abs(first.value) * 100 : 0;
+  const first = obs[0], last = obs[obs.length - 1], change3 = last.value - first.value, pct3 = first.value ? change3 / Math.abs(first.value) * 100 : 0;
   const fmt = (v) => Math.abs(v) >= 1e3 ? v.toLocaleString("en-US", { maximumFractionDigits: 1 }) : v.toFixed(2);
   const lines = [
     `## ${known?.[1] ?? id} - FRED series ${id}`,
     "",
     `- Latest value known by ${day2}: ${fmt(last.value)} (for ${last.date})`,
-    `- Change since ${first.date}: ${change2 >= 0 ? "+" : ""}${fmt(change2)} (${pct3 >= 0 ? "+" : ""}${pct3.toFixed(1)}%)`,
+    `- Change since ${first.date}: ${change3 >= 0 ? "+" : ""}${fmt(change3)} (${pct3 >= 0 ? "+" : ""}${pct3.toFixed(1)}%)`,
     past ? `- A past analysis date: values are kept only if published by ${day2} (a ${lag}-day release lag for this series), and are today's revised figures; first releases may have differed slightly.` : "- Values as published today, revisions included.",
     "",
     "Date | Value",
@@ -37667,11 +37667,11 @@ function yahooSession() {
   });
   return session;
 }
-async function yahooJson(path12) {
+async function yahooJson(path13) {
   for (let attempt = 0; ; attempt++) {
     const s = await yahooSession();
     try {
-      return await getJson(`${HOSTS[1]}${path12}&crumb=${encodeURIComponent(s.crumb)}`, { headers: { Cookie: s.cookie } });
+      return await getJson(`${HOSTS[1]}${path13}&crumb=${encodeURIComponent(s.crumb)}`, { headers: { Cookie: s.cookie } });
     } catch (e) {
       if (attempt === 0 && /HTTP 401/.test(e.message)) {
         session = null;
@@ -37821,8 +37821,8 @@ async function financialStatement(raw, kind, freq, analysis2) {
 }
 
 // src/tools/desk.ts
-import fs9 from "node:fs";
-import path10 from "node:path";
+import fs10 from "node:fs";
+import path11 from "node:path";
 
 // src/desk/holdings.ts
 import fs6 from "node:fs";
@@ -38296,6 +38296,33 @@ ${lessons}` : "Lessons from past calls: none yet (no earlier call has been settl
   ].join("\n");
 }
 
+// src/terminal/store.ts
+import fs9 from "node:fs";
+import path10 from "node:path";
+var read = (file4, ok) => {
+  try {
+    const v = JSON.parse(fs9.readFileSync(file4, "utf8"));
+    return Array.isArray(v) ? v.filter(ok) : [];
+  } catch {
+    return [];
+  }
+};
+function change2(file4, edit, ok) {
+  fs9.mkdirSync(path10.dirname(file4), { recursive: true });
+  return withLock(file4, () => {
+    const next = edit(read(file4, ok));
+    writeWhole(file4, JSON.stringify(next, null, 2) + "\n");
+    return next;
+  });
+}
+var isQueued = (v) => !!v && typeof v.symbol === "string" && typeof v.requestedAt === "string";
+var queueFile = (dir) => path10.join(dir, "queue.json");
+var readQueue = (dir) => read(queueFile(dir), isQueued);
+function dequeue(dir, raw) {
+  const symbol4 = safeSymbol(raw);
+  return change2(queueFile(dir), (list2) => list2.filter((q) => q.symbol !== symbol4), isQueued);
+}
+
 // src/desk/settle.ts
 var pct2 = (v) => `${v >= 0 ? "+" : "-"}${(Math.abs(v) * 100).toFixed(1)}%`;
 var line = (o, e) => `${e.ticker} ${pct2(o.raw)} from ${o.entry} to ${o.exit} (${o.holdingDays} trading days); ${o.benchmark} ${pct2(o.benchmarkReturn)}; alpha ${pct2(o.alpha)}`;
@@ -38351,10 +38378,10 @@ async function act(run) {
 function registerDeskTools(server, root) {
   const dir = deskDataDir(root);
   const write = { readOnlyHint: false, openWorldHint: false };
-  const activeFile = path10.join(dir, "backtest", "active.json"), IDLE_MS = 2 * 36e5;
+  const activeFile = path11.join(dir, "backtest", "active.json"), IDLE_MS = 2 * 36e5;
   const getSweep = () => {
     try {
-      const a = JSON.parse(fs9.readFileSync(activeFile, "utf8"));
+      const a = JSON.parse(fs10.readFileSync(activeFile, "utf8"));
       if (typeof a.sweep === "string" && SWEEP_ID.test(a.sweep) && typeof a.at === "number" && Date.now() - a.at < IDLE_MS) return a.sweep;
     } catch {
     }
@@ -38362,10 +38389,10 @@ function registerDeskTools(server, root) {
   };
   const setSweep = (id) => {
     if (id === null) {
-      fs9.rmSync(activeFile, { force: true });
+      fs10.rmSync(activeFile, { force: true });
       return;
     }
-    fs9.mkdirSync(path10.dirname(activeFile), { recursive: true });
+    fs10.mkdirSync(path11.dirname(activeFile), { recursive: true });
     writeWhole(activeFile, JSON.stringify({ sweep: id, at: Date.now() }));
   };
   const ws = () => {
@@ -38464,10 +38491,10 @@ Rating: ${rating}`;
     if (!readContactEmail(root)) throw new NeedsEmail(ASK_FOR_EMAIL);
     const every = a.every_days ?? 7, dates = iterGrid(a.start_date, a.end_date, every), grid = cells(a.symbols, dates);
     const id = a.sweep_id ?? (/* @__PURE__ */ new Date()).toISOString().replace(/\D/g, "").slice(0, 14), w = workspaceOf(root, id);
-    fs9.mkdirSync(w.dir, { recursive: true });
+    fs10.mkdirSync(w.dir, { recursive: true });
     const recorded = new Set(journalOf(root, w).load().map((e) => `${e.ticker}|${e.date}`));
     const todo = grid.filter((c) => !recorded.has(`${c.symbol}|${c.date}`));
-    writeWhole(path10.join(w.dir, "sweep.json"), JSON.stringify({ symbols: [...new Set(grid.map((c) => c.symbol))], dates, every, cells: grid.length }));
+    writeWhole(path11.join(w.dir, "sweep.json"), JSON.stringify({ symbols: [...new Set(grid.map((c) => c.symbol))], dates, every, cells: grid.length }));
     setSweep(id);
     const symbols = new Set(grid.map((c) => c.symbol)).size;
     return [
@@ -38499,10 +38526,10 @@ Rating: ${rating}`;
     const id = a.sweep_id ?? getSweep();
     if (!id) throw new Error("no backtest is running: name the sweep to score");
     const w = workspaceOf(root, id);
-    if (!fs9.existsSync(path10.join(w.dir, "journal.md"))) throw new Error(`sweep ${id} has no recorded calls yet`);
+    if (!fs10.existsSync(path11.join(w.dir, "journal.md"))) throw new Error(`sweep ${id} has no recorded calls yet`);
     let meta3 = "";
     try {
-      const m2 = JSON.parse(fs9.readFileSync(path10.join(w.dir, "sweep.json"), "utf8"));
+      const m2 = JSON.parse(fs10.readFileSync(path11.join(w.dir, "sweep.json"), "utf8"));
       meta3 = ` of ${m2.cells} planned`;
     } catch {
     }
@@ -38510,6 +38537,24 @@ Rating: ${rating}`;
     return `Backtest sweep ${id}: ${entries.length} call(s) recorded${meta3}
 
 ${renderSummary(summarize(entries))}`;
+  }));
+  server.registerTool("read_queue", {
+    title: "Analyses waiting",
+    description: "The stocks the person asked the desk to analyse from the dashboard, oldest first. /analyse with no ticker runs these. Read-only.",
+    annotations: { readOnlyHint: true, openWorldHint: false }
+  }, async () => act(() => {
+    const q = readQueue(dir);
+    return q.length ? `${q.length} analysis request(s) waiting, oldest first:
+${q.map((i, n2) => `${n2 + 1}. ${i.symbol} (asked ${i.requestedAt.slice(0, 16).replace("T", " ")} UTC)`).join("\n")}` : "Nothing is waiting: the person has not asked for any analysis from the dashboard.";
+  }));
+  server.registerTool("finish_queue_item", {
+    title: "Mark a waiting analysis done",
+    description: "Take a stock off the waiting list once its analysis has been run and recorded (or the person no longer wants it).",
+    inputSchema: { symbol: symbol2 },
+    annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false }
+  }, async (a) => act(() => {
+    const left = dequeue(dir, a.symbol);
+    return `Taken off the waiting list. ${left.length} left.`;
   }));
   server.registerTool("set_holdings", {
     title: "Save what the person holds",
@@ -38653,6 +38698,6 @@ function deskServer(root = process.cwd(), fetchImpl2) {
 // src/tools/main.ts
 if (process.argv.includes("--check")) console.log(await deskCheck());
 else {
-  configure({ spacingMs: 250, cacheDir: path11.join(deskDataDir(process.cwd()), "cache") });
+  configure({ spacingMs: 250, cacheDir: path12.join(deskDataDir(process.cwd()), "cache") });
   await deskServer().connect(new StdioServerTransport());
 }

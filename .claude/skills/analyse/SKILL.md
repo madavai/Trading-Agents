@@ -11,7 +11,7 @@ The person asked: $ARGUMENTS
 You run the desk: you call its agents in order and keep the work moving. You do not analyse yourself, and nothing you or any agent does places, changes or cancels an order.
 
 ## 1. Read the request
-- **Ticker**: required. If none is given, ask for one and stop.
+- **Ticker**: required, unless the person typed nothing after /analyse. Then call `read_queue`: if the dashboard has stocks waiting, tell the person which and analyse them one after another, each by steps 2 to 5 below with today's date and the default depth, calling `finish_queue_item` for a stock once its call is recorded (and not before). If nothing is waiting, ask for a ticker and stop.
 - **Date**: the analysis date, YYYY-MM-DD; today when none is given. A past date is analysed with only what was known then.
 - **Depth**: shallow = 1, medium = 3, deep = 5 rounds of both the research and the risk debate. When none is given, leave the rounds out and the settings decide.
 - **Analysts**: only if the person names some (market, sentiment, news, fundamentals).
@@ -49,6 +49,7 @@ After each step, check it was saved: call `read_run` without sections and see th
 ## 5. Finish
 1. Call `write_report`.
 2. Call `record_decision` with the rating the portfolio manager's decision states (from its **Rating** line).
+   If this stock was on the dashboard's waiting list (`read_queue`), call `finish_queue_item` for it now.
 3. Inside a backtest (the plan starts with a line naming the sweep), skip the summary: reply with one line, the ticker, date and rating.
    Otherwise tell the person, in plain words:
    - the rating, and the executive summary in two or three sentences, from the saved decision (`read_run`, section decision);

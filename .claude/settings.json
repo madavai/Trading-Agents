@@ -3,6 +3,8 @@
     "allow": [
       "mcp__trading-desk",
       "Bash(node dist/desk-tools.mjs --check)",
+      "Bash(node dist/terminal.mjs)",
+      "Bash(node dist/terminal.mjs --no-open)",
       "Bash(node dist/robinhood.mjs connect)",
       "Bash(node dist/robinhood.mjs status)"
     ],
