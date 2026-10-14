@@ -8,10 +8,10 @@ You do. What works today is listed under Status; everything else is marked as co
 Adapted from [TradingAgents](https://github.com/TauricResearch/TradingAgents) by Tauric Research (see `NOTICE`); not
 affiliated with them. **Nothing here is investment advice.**
 
-> **Status: milestone 2b.** Built: the desk check, a read-only Robinhood connection test, the data tools, the desk's
-> records (plan, journal, scoring, lessons, holdings), and the analysis team with `/analyse` and `/settle`. **Not yet
-> proven on a real computer:** a full analysis on live data, and that Madav runs the twelve agents as written. The
-> dashboard and trading come in the next milestones.
+> **Status: milestone 2c.** Built: the desk check, a read-only Robinhood connection test, the data tools, the desk's
+> records (plan, journal, scoring, lessons, holdings), the analysis team with `/analyse` and `/settle`, and `/backtest`.
+> **Not yet proven on a real computer:** a full analysis on live data, and that Madav runs the twelve agents as written.
+> The dashboard and trading come in the next milestones.
 
 ## Start in three steps
 1. In Madav, clone this repository and open its folder.
@@ -30,7 +30,10 @@ other source sees it.
    mood, news, company accounts), a bull and a bear, a research manager, a trader, three risk voices and a portfolio
    manager work in turn, from free public data, and give a rating. Choose `shallow`, `medium` or `deep` (1, 3 or 5
    rounds of debate), which analysts run, and the report language. Each call is scored a few trading days later against
-   its market's index (`/settle`), and the lessons go into later analyses.
+   its market's index (`/settle`), and the lessons go into later analyses. `/backtest NVDA,AAPL 2026-06-01 2026-08-01`
+   runs the team over past dates in a journal of its own and reports, by rating, how often the direction was right and
+   the mean alpha. It is slow and uses a lot of model time, and for past dates only prices, indicators, economic figures
+   and SEC accounts are as known then: news, posts, odds and insider trades are recent-only, so they are thin.
 2. **You decide** (coming later). The dashboard shows your markets, your watchlist, charts, the desk's call and its
    record.
 3. **You trade** (coming later, and only after a real order has been proven end to end). Decide, Review (Robinhood's own

@@ -3263,8 +3263,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path8) {
-      let input2 = path8;
+    function removeDotSegments(path10) {
+      let input2 = path10;
       const output2 = [];
       let nextSlash = -1;
       let len = 0;
@@ -3673,8 +3673,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path8 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path8 && path8 !== "/" ? path8 : void 0;
+        const path10 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path10 && path10 !== "/" ? path10 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -7187,12 +7187,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list2, fs8, exportName) {
+    function addFormats(ajv, list2, fs9, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list2)
-        ajv.addFormat(f, fs8[f]);
+        ajv.addFormat(f, fs9[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -8020,10 +8020,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path8) {
-  if (!path8)
+function getElementAtPath(obj, path10) {
+  if (!path10)
     return obj;
-  return path8.reduce((acc, key) => acc?.[key], obj);
+  return path10.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -8363,11 +8363,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path8, issues) {
+function prefixIssues(path10, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path8);
+    iss.path.unshift(path10);
     return iss;
   });
 }
@@ -8829,16 +8829,16 @@ function flattenError(error62, mapper = (issue2) => issue2.message) {
 }
 function formatError(error62, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error63, path8 = []) => {
+  const processError = (error63, path10 = []) => {
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path8, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path10, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path8, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path10, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path8, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path10, ...issue2.path]);
       } else {
-        const fullpath = [...path8, ...issue2.path];
+        const fullpath = [...path10, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -8877,17 +8877,17 @@ function formatError(error62, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error62, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error63, path8 = []) => {
+  const processError = (error63, path10 = []) => {
     var _a3;
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path8, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path10, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path8, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path10, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path8, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path10, ...issue2.path]);
       } else {
-        const fullpath = [...path8, ...issue2.path];
+        const fullpath = [...path10, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -8926,8 +8926,8 @@ function treeifyError(error62, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path8 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path8) {
+  const path10 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path10) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -26065,13 +26065,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path8 = ref.slice(1).split("/").filter(Boolean);
-  if (path8.length === 0) {
+  const path10 = ref.slice(1).split("/").filter(Boolean);
+  if (path10.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path8[0] === defsKey) {
-    const key = path8[1] === void 0 ? void 0 : decodeJSONPointerSegment(path8[1]);
+  if (path10[0] === defsKey) {
+    const key = path10[1] === void 0 ? void 0 : decodeJSONPointerSegment(path10[1]);
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -28929,8 +28929,8 @@ function getErrorMap2() {
 
 // node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path8, errorMaps, issueData } = params;
-  const fullPath = [...path8, ...issueData.path || []];
+  const { data, path: path10, errorMaps, issueData } = params;
+  const fullPath = [...path10, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -29045,11 +29045,11 @@ var errorUtil;
 
 // node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path8, key) {
+  constructor(parent, value, path10, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path8;
+    this._path = path10;
     this._key = key;
   }
   get path() {
@@ -32600,11 +32600,11 @@ function normalizeObjectSchema(schema) {
   }
   return void 0;
 }
-function getDotPath(path8) {
-  if (path8.length === 0) {
+function getDotPath(path10) {
+  if (path10.length === 0) {
     return "object root";
   }
-  return path8.reduce((acc, seg, index) => {
+  return path10.reduce((acc, seg, index) => {
     if (index === 0) {
       return String(seg);
     }
@@ -37555,11 +37555,11 @@ function yahooSession() {
   });
   return session;
 }
-async function yahooJson(path8) {
+async function yahooJson(path10) {
   for (let attempt = 0; ; attempt++) {
     const s = await yahooSession();
     try {
-      return await getJson(`${HOSTS[1]}${path8}&crumb=${encodeURIComponent(s.crumb)}`, { headers: { Cookie: s.cookie } });
+      return await getJson(`${HOSTS[1]}${path10}&crumb=${encodeURIComponent(s.crumb)}`, { headers: { Cookie: s.cookie } });
     } catch (e) {
       if (attempt === 0 && /HTTP 401/.test(e.message)) {
         session = null;
@@ -37708,6 +37708,10 @@ async function financialStatement(raw, kind, freq, analysis2) {
   }
 }
 
+// src/tools/desk.ts
+import fs8 from "node:fs";
+import path9 from "node:path";
+
 // src/desk/holdings.ts
 import fs5 from "node:fs";
 import path5 from "node:path";
@@ -37816,10 +37820,6 @@ function renderHoldings(h, ticker) {
 ${lines.join("\n")}`;
 }
 
-// src/desk/journal.ts
-import fs6 from "node:fs";
-import path6 from "node:path";
-
 // src/desk/rating.ts
 var RATINGS = ["Buy", "Overweight", "Hold", "Underweight", "Sell"];
 var REVIEW = "Needs review";
@@ -37847,7 +37847,62 @@ function extractRating(text3) {
 }
 var parseRating = (text3) => extractRating(text3) ?? REVIEW;
 
+// src/desk/backtest.ts
+var MAX_CELLS = 100;
+var MAX_SYMBOLS = 10;
+function iterGrid(start, end, every) {
+  const s = parseDate(start, "start date"), e = parseDate(end, "end date");
+  if (!Number.isInteger(every) || every < 1) throw new Error("every must be a whole number of days, at least 1");
+  if (e < s) throw new Error(`the grid ends before it starts: ${e} is before ${s}`);
+  const last = e < today() ? e : today(), out = [];
+  for (let d = s; d <= last; d = addDays(d, every)) out.push(d);
+  if (!out.length) throw new Error(`the grid starts after today (${today()}): there is nothing to analyse yet`);
+  return out;
+}
+function cells(symbols, dates) {
+  const syms = [...new Set(symbols.map((s) => safeSymbol(s)))];
+  if (!syms.length) throw new Error("name at least one stock");
+  if (syms.length > MAX_SYMBOLS) throw new Error(`${syms.length} stocks is more than a sweep takes (${MAX_SYMBOLS}): run them in separate sweeps`);
+  const all = syms.flatMap((symbol4) => [...new Set(dates)].map((date5) => ({ symbol: symbol4, date: date5 })));
+  if (all.length > MAX_CELLS) throw new Error(`${all.length} cells is more than a sweep takes (${MAX_CELLS}); every cell is a full team run. Use fewer stocks, a shorter span or a longer step`);
+  return all;
+}
+var DIRECTION = { Buy: 1, Overweight: 1, Hold: 0, Underweight: -1, Sell: -1 };
+var alphaOf = (e) => {
+  const t = (e.alpha ?? "").trim().replace(/%$/, "");
+  const v = /^[+-]?\d+(\.\d+)?$/.test(t) ? Number(t) : NaN;
+  return Number.isFinite(v) ? v / 100 : null;
+};
+function summarize(entries) {
+  const resolved2 = entries.filter((e) => !e.pending && e.rating !== REVIEW).map((e) => ({ e, a: alphaOf(e) })).filter((x) => x.a !== null);
+  const byRating = {};
+  for (const rating of new Set(resolved2.map((x) => x.e.rating))) {
+    const alphas = resolved2.filter((x) => x.e.rating === rating).map((x) => x.a), dir = DIRECTION[rating] ?? 0;
+    byRating[rating] = { count: alphas.length, hitRate: dir ? alphas.filter((a) => a * dir > 0).length / alphas.length : null, meanAlpha: alphas.reduce((s, a) => s + a, 0) / alphas.length };
+  }
+  const unscored = entries.filter((e) => e.rating === REVIEW).length;
+  const windows = [...new Set(resolved2.map((x) => x.e.holding).filter((h) => !!h && h.endsWith("d")).map((h) => `${h.slice(0, -1)} trading days`))].sort();
+  return { resolved: resolved2.length, pending: entries.length - resolved2.length - unscored, unscored, byRating, holding: windows.join(", ") || "the configured window" };
+}
+var pctText = (v) => `${v >= 0 ? "+" : "-"}${(Math.abs(v) * 100).toFixed(2)}%`;
+function renderSummary(s) {
+  const lines = [`Resolved cells: ${s.resolved} \xB7 pending: ${s.pending}${s.unscored ? ` \xB7 unscored: ${s.unscored}` : ""}`];
+  for (const [rating, sc] of Object.entries(s.byRating)) {
+    lines.push(`- ${rating}: n=${sc.count}, ${sc.hitRate !== null ? `called the direction ${Math.round(sc.hitRate * 100)}%` : "no direction claimed"}, mean alpha ${pctText(sc.meanAlpha)} vs the benchmark`);
+  }
+  lines.push("");
+  if (s.pending) lines.push("Pending cells are not scored above; settle them when their window has traded.");
+  if (s.unscored) lines.push("Unscored cells had no readable rating (Needs review): they count neither for nor against the desk.");
+  lines.push(`Alpha is measured over ${s.holding} after each analysis date. One model sampling per cell, and text feeds are not archived, so these figures are indicative rather than repeatable. A handful of cells proves nothing: a hit rate over fewer than about 30 calls per rating is noise.`);
+  return lines.join("\n");
+}
+
+// src/desk/workspace.ts
+import path7 from "node:path";
+
 // src/desk/journal.ts
+import fs6 from "node:fs";
+import path6 from "node:path";
 var SEPARATOR = "\n\n<!-- ENTRY_END -->\n\n";
 var pct = (v) => `${v >= 0 ? "+" : "-"}${(Math.abs(v) * 100).toFixed(1)}%`;
 var MARK = /<!--\s*ENTRY_END\s*-->/i;
@@ -37978,9 +38033,19 @@ ${e.reflection || e.decision.slice(0, 300) + (e.decision.length > 300 ? "..." : 
   }
 };
 
+// src/desk/workspace.ts
+var SWEEP_ID = /^[A-Za-z0-9_-]{1,40}$/;
+function workspaceOf(root, sweep = null) {
+  const live = deskDataDir(root);
+  if (sweep === null) return { dir: live, sweep: null };
+  if (!SWEEP_ID.test(sweep)) throw new Error(`"${sweep}" is not a sweep name: use up to 40 letters, digits, dashes or underscores`);
+  return { dir: path7.join(live, "backtest", sweep), sweep };
+}
+var journalIn = (root, ws) => new Journal(path7.join(ws.dir, "journal.md"), readSettings(root).journal.maxResolvedEntries);
+
 // src/desk/runs.ts
 import fs7 from "node:fs";
-import path7 from "node:path";
+import path8 from "node:path";
 var SECTIONS = ["market", "sentiment", "news", "fundamentals", "bull", "bear", "research_plan", "trader", "aggressive", "conservative", "neutral", "decision"];
 var DEBATES = { investment_debate: ["bull", "bear"], risk_debate: ["aggressive", "conservative", "neutral"] };
 var TURNS = new Set(Object.values(DEBATES).flat());
@@ -37993,8 +38058,8 @@ var PARTS = [
   ["IV. Risk Management Team Decision", ["aggressive", "conservative", "neutral"]],
   ["V. Portfolio Manager Decision", ["decision"]]
 ];
-var folder = (dir, ticker, date5) => path7.join(dir, "runs", `${safeSymbol(ticker).replace(/\^/g, "IDX_").replace(/=/g, "_EQ_")}_${date5}`);
-var runFile = (dir, ticker, date5) => path7.join(folder(dir, ticker, date5), "run.json");
+var folder = (dir, ticker, date5) => path8.join(dir, "runs", `${safeSymbol(ticker).replace(/\^/g, "IDX_").replace(/=/g, "_EQ_")}_${date5}`);
+var runFile = (dir, ticker, date5) => path8.join(folder(dir, ticker, date5), "run.json");
 function load(dir, ticker, date5) {
   try {
     return JSON.parse(fs7.readFileSync(runFile(dir, ticker, date5), "utf8"));
@@ -38004,7 +38069,7 @@ function load(dir, ticker, date5) {
 }
 function change(dir, ticker, date5, edit) {
   const file4 = runFile(dir, ticker, date5);
-  fs7.mkdirSync(path7.dirname(file4), { recursive: true });
+  fs7.mkdirSync(path8.dirname(file4), { recursive: true });
   return withLock(file4, () => {
     const r = load(dir, ticker, date5);
     edit(r);
@@ -38059,7 +38124,7 @@ ${written.map(({ s, texts }) => `### ${LABELS[s]}
 ${texts.join("\n\n")}`).join("\n\n")}`];
   });
   const title = [`# Trading Analysis Report: ${safeSymbol(ticker)}`, "", `- Analysis date: ${date5}`, ...header.map((h) => `- ${h}`), ""].join("\n");
-  const out = path7.join(root, "complete_report.md");
+  const out = path8.join(root, "complete_report.md");
   writeWhole(out, `${title}
 ${body.join("\n\n")}
 `);
@@ -38095,8 +38160,7 @@ var NeedsEmail = class extends Error {
   name = "NeedsEmail";
 };
 var ANALYST_SECTION = { market: "market", sentiment: "sentiment", news: "news", fundamentals: "fundamentals" };
-var journalFile = (root) => `${deskDataDir(root)}/journal.md`;
-var journalOf = (root) => new Journal(journalFile(root), readSettings(root).journal.maxResolvedEntries);
+var journalOf = (root, ws = workspaceOf(root)) => journalIn(root, ws);
 function kindOf(raw, symbol4) {
   if (cryptoBase(raw)) return "crypto";
   return /[\^=]/.test(symbol4) ? "other" : "stock";
@@ -38109,9 +38173,9 @@ function stepsFor(analysts, debateRounds, riskRounds) {
   steps.push({ section: "decision", turn: 1 });
   return steps;
 }
-function buildPlan(root, req) {
+function buildPlan(root, req, ws = workspaceOf(root)) {
   if (!readContactEmail(root)) throw new NeedsEmail(ASK_FOR_EMAIL);
-  const s = readSettings(root), dir = deskDataDir(root);
+  const s = readSettings(root), dir = ws.dir;
   const symbol4 = safeSymbol(req.symbol), day2 = analysisDate(req.analysisDate), notes = [];
   const kind = kindOf(req.symbol, symbol4);
   if (req.restart) deleteRun(dir, symbol4, day2);
@@ -38143,8 +38207,8 @@ function buildPlan(root, req) {
   const plan = { symbol: symbol4, analysisDate: day2, kind, analysts, debateRounds, riskRounds, language, managerModel: s.analysis.managerModel, benchmark, holdingDays: s.scoring.holdingPeriodDays, steps: [], notes };
   plan.steps = stepsFor(analysts, debateRounds, riskRounds).map((st) => ({ ...st, done: (done[st.section] ?? 0) >= st.turn }));
   if (!resumed) startRun(dir, symbol4, day2, plan);
-  const lessons = journalOf(root).pastContext(symbol4, isHistorical(day2) ? { asOf: day2 } : {});
-  return { plan, holdings: renderHoldings(readHoldings(dir), symbol4), lessons, resumed };
+  const lessons = journalOf(root, ws).pastContext(symbol4, isHistorical(day2) ? { asOf: day2 } : {});
+  return { plan, holdings: renderHoldings(readHoldings(deskDataDir(root)), symbol4), lessons, resumed };
 }
 function renderPlan({ plan: p, holdings, lessons, resumed }) {
   const next = p.steps.find((x) => !x.done);
@@ -38224,6 +38288,28 @@ async function act(run) {
 function registerDeskTools(server, root) {
   const dir = deskDataDir(root);
   const write = { readOnlyHint: false, openWorldHint: false };
+  const activeFile = path9.join(dir, "backtest", "active.json"), IDLE_MS = 2 * 36e5;
+  const getSweep = () => {
+    try {
+      const a = JSON.parse(fs8.readFileSync(activeFile, "utf8"));
+      if (typeof a.sweep === "string" && SWEEP_ID.test(a.sweep) && typeof a.at === "number" && Date.now() - a.at < IDLE_MS) return a.sweep;
+    } catch {
+    }
+    return null;
+  };
+  const setSweep = (id) => {
+    if (id === null) {
+      fs8.rmSync(activeFile, { force: true });
+      return;
+    }
+    fs8.mkdirSync(path9.dirname(activeFile), { recursive: true });
+    writeWhole(activeFile, JSON.stringify({ sweep: id, at: Date.now() }));
+  };
+  const ws = () => {
+    const id = getSweep();
+    if (id) setSweep(id);
+    return workspaceOf(root, id);
+  };
   server.registerTool("plan_analysis", {
     title: "Plan an analysis",
     description: "Draw up the plan for analysing a stock on a date, before any agent speaks: the instrument, the analysts that run, the debate rounds, the report language, the index the call will be judged against, what the person holds, the lessons from past calls, and - for a run that stopped half way - the next step. Refused with NEEDS_EMAIL until the person has given their email. Call it first, and follow it.",
@@ -38237,14 +38323,15 @@ function registerDeskTools(server, root) {
       restart: external_exports.boolean().optional().describe("Throw away an earlier unfinished run of this stock and day and start over")
     },
     annotations: write
-  }, async (a) => act(() => renderPlan(buildPlan(root, { symbol: a.symbol, analysisDate: a.analysis_date, analysts: a.analysts, debateRounds: a.debate_rounds, riskRounds: a.risk_rounds, language: a.language, restart: a.restart }))));
+  }, async (a) => act(() => (getSweep() ? `[Backtest sweep ${getSweep()}: this run is recorded in the sweep's own journal, not the live one.]
+` : "") + renderPlan(buildPlan(root, { symbol: a.symbol, analysisDate: a.analysis_date, analysts: a.analysts, debateRounds: a.debate_rounds, riskRounds: a.risk_rounds, language: a.language, restart: a.restart }, ws()))));
   server.registerTool("save_run_section", {
     title: "Save a run section",
     description: `Save what you wrote for your step of an analysis, so the next agent reads it from the desk and a stopped run can resume. section is one of ${SECTIONS.join(", ")}. A debate turn (bull, bear, aggressive, conservative, neutral) is added; any other section replaces the earlier text.`,
     inputSchema: { symbol: symbol2, analysis_date: day, section: external_exports.enum(SECTIONS), text: external_exports.string().min(1).max(6e4) },
     annotations: write
   }, async (a) => act(() => {
-    const d = analysisDate(a.analysis_date), turns = saveSection(dir, a.symbol, d, a.section, a.text);
+    const d = analysisDate(a.analysis_date), turns = saveSection(ws().dir, a.symbol, d, a.section, a.text);
     return `Saved ${a.section} for ${safeSymbol(a.symbol)} on ${d} (${turns > 1 ? `turn ${turns}` : "one text"}).`;
   }));
   server.registerTool("read_run", {
@@ -38254,8 +38341,8 @@ function registerDeskTools(server, root) {
     annotations: { readOnlyHint: true, openWorldHint: false }
   }, async (a) => act(() => {
     const d = analysisDate(a.analysis_date);
-    if (a.sections?.length) return readSections(dir, a.symbol, d, a.sections);
-    const p = progress(dir, a.symbol, d);
+    if (a.sections?.length) return readSections(ws().dir, a.symbol, d, a.sections);
+    const p = progress(ws().dir, a.symbol, d);
     return Object.keys(p).length ? `Written so far for ${safeSymbol(a.symbol)} on ${d}: ${Object.entries(p).map(([k, n2]) => `${k} (${n2})`).join(", ")}` : `Nothing written yet for ${safeSymbol(a.symbol)} on ${d}.`;
   }));
   server.registerTool("write_report", {
@@ -38264,12 +38351,12 @@ function registerDeskTools(server, root) {
     inputSchema: { symbol: symbol2, analysis_date: day },
     annotations: write
   }, async (a) => act(() => {
-    const d = analysisDate(a.analysis_date), sym = safeSymbol(a.symbol), plan = savedPlan(dir, sym, d);
-    if (!progress(dir, sym, d)["decision"]) throw new Error(`the portfolio manager's decision is not saved yet for ${sym} on ${d}`);
-    const rating = parseRating(readSections(dir, sym, d, ["decision"]));
+    const d = analysisDate(a.analysis_date), sym = safeSymbol(a.symbol), plan = savedPlan(ws().dir, sym, d);
+    if (!progress(ws().dir, sym, d)["decision"]) throw new Error(`the portfolio manager's decision is not saved yet for ${sym} on ${d}`);
+    const rating = parseRating(readSections(ws().dir, sym, d, ["decision"]));
     const header = [`Rating: ${rating}`, `Generated: ${(/* @__PURE__ */ new Date()).toISOString().slice(0, 16).replace("T", " ")} UTC`];
     if (plan?.analysts) header.push(`Analysts: ${plan.analysts.join(", ")}; research debate rounds ${plan.debateRounds}, risk debate rounds ${plan.riskRounds}; language ${plan.language}`, `Judged after ${plan.holdingDays} trading days against ${plan.benchmark}`);
-    const file4 = writeReport(dir, sym, d, header);
+    const file4 = writeReport(ws().dir, sym, d, header);
     return `Report written: ${file4}
 Rating: ${rating}`;
   }));
@@ -38280,10 +38367,10 @@ Rating: ${rating}`;
     annotations: write
   }, async (a) => act(() => {
     const d = analysisDate(a.analysis_date), sym = safeSymbol(a.symbol);
-    const decision = readSections(dir, sym, d, ["decision"]);
-    if (!progress(dir, sym, d)["decision"]) throw new Error(`the portfolio manager's decision is not saved yet for ${sym} on ${d}`);
+    const decision = readSections(ws().dir, sym, d, ["decision"]);
+    if (!progress(ws().dir, sym, d)["decision"]) throw new Error(`the portfolio manager's decision is not saved yet for ${sym} on ${d}`);
     const body = decision.replace(/^## [^\n]*\n/, "");
-    const r = journalOf(root).storeDecision(sym, d, body, a.rating ?? void 0);
+    const r = journalOf(root, ws()).storeDecision(sym, d, body, a.rating ?? void 0);
     const rating = a.rating ?? parseRating(body);
     return r === "stored" ? `Recorded: ${sym} on ${d}, ${rating}, pending. It is scored after ${readSettings(root).scoring.holdingPeriodDays} trading days.` : `${sym} on ${d} is already in the journal; nothing changed.`;
   }));
@@ -38292,13 +38379,75 @@ Rating: ${rating}`;
     description: "List the calls in the journal that are not settled yet. For each whose holding window has finished trading, it shows the measured outcome (return, the index's return, alpha) and the decision, so you can write the lesson; the others are marked NOT YET. The figures come from price rows only.",
     inputSchema: { symbol: symbol2.optional() },
     annotations: { readOnlyHint: true, openWorldHint: true }
-  }, async (a) => act(() => dueSettlements(journalOf(root), readSettings(root).scoring, a.symbol ? safeSymbol(a.symbol) : void 0)));
+  }, async (a) => act(() => dueSettlements(journalOf(root, ws()), readSettings(root).scoring, a.symbol ? safeSymbol(a.symbol) : void 0)));
   server.registerTool("record_outcome", {
     title: "Settle a call",
     description: "Settle one pending call whose window has finished: the desk measures the outcome again itself and keeps it with your lesson. Give only the lesson - 2 to 4 plain sentences naming what the alpha shows, what part of the thesis it supports or undercuts, and one thing to do next time. Never pass or invent a number.",
     inputSchema: { symbol: symbol2, trade_date: day, lesson: external_exports.string().min(1).max(1200) },
     annotations: { readOnlyHint: false, openWorldHint: true }
-  }, async (a) => act(() => settleOne(journalOf(root), readSettings(root).scoring, safeSymbol(a.symbol), a.trade_date, a.lesson)));
+  }, async (a) => act(() => settleOne(journalOf(root, ws()), readSettings(root).scoring, safeSymbol(a.symbol), a.trade_date, a.lesson)));
+  server.registerTool("start_backtest", {
+    title: "Start a backtest sweep",
+    description: "Lay out a backtest: the team is run over every stock on every date from start to end (every few days) and the calls are scored later against the market index. From now until end_backtest every desk tool records into this sweep's own journal and runs, so the live journal and its lessons are untouched. Repeat the call with the same sweep_id to resume: cells already recorded are skipped. Every cell is a full team run, so tell the person the number of cells before running any.",
+    inputSchema: {
+      symbols: external_exports.array(symbol2).min(1).max(10),
+      start_date: day,
+      end_date: day,
+      every_days: external_exports.number().int().min(1).max(60).optional().describe("Days between analysis dates; 7 when left out"),
+      sweep_id: external_exports.string().max(40).optional().describe("Name of the sweep, to resume it; made from the time when left out")
+    },
+    annotations: write
+  }, async (a) => act(() => {
+    if (!readContactEmail(root)) throw new NeedsEmail(ASK_FOR_EMAIL);
+    const every = a.every_days ?? 7, dates = iterGrid(a.start_date, a.end_date, every), grid = cells(a.symbols, dates);
+    const id = a.sweep_id ?? (/* @__PURE__ */ new Date()).toISOString().replace(/\D/g, "").slice(0, 14), w = workspaceOf(root, id);
+    fs8.mkdirSync(w.dir, { recursive: true });
+    const recorded = new Set(journalOf(root, w).load().map((e) => `${e.ticker}|${e.date}`));
+    const todo = grid.filter((c) => !recorded.has(`${c.symbol}|${c.date}`));
+    writeWhole(path9.join(w.dir, "sweep.json"), JSON.stringify({ symbols: [...new Set(grid.map((c) => c.symbol))], dates, every, cells: grid.length }));
+    setSweep(id);
+    const symbols = new Set(grid.map((c) => c.symbol)).size;
+    return [
+      `Backtest sweep ${id}: ${grid.length} cell(s) (${symbols} stock(s) on ${dates.length} date(s), every ${every} day(s), ${dates[0]} to ${dates[dates.length - 1]}); ${grid.length - todo.length} already recorded, ${todo.length} to run.`,
+      "From now until end_backtest every desk tool records into this sweep's own journal and runs. The live journal and its lessons are untouched.",
+      "",
+      `Cells to run, in order (${todo.length ? "each is a full team run" : "none left"}):`,
+      ...todo.slice(0, 30).map((c, i) => `${i + 1}. ${c.symbol} ${c.date}`),
+      ...todo.length > 30 ? [`... and ${todo.length - 30} more`] : [],
+      "",
+      "Limits to tell the person: for a past date, prices, indicators, economic figures and SEC accounts are as known on that date, but news, posts, odds, the company profile and insider trades exist only for recent days, so those reads are thin or unavailable and say so. Results are indicative, not repeatable."
+    ].join("\n");
+  }));
+  server.registerTool("end_backtest", {
+    title: "End the backtest sweep",
+    description: "Go back to the live desk: from now on the desk tools record into the live journal and runs again. The sweep and its results stay on disk.",
+    annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false }
+  }, async () => act(() => {
+    const was = getSweep();
+    setSweep(null);
+    return was ? `Backtest sweep ${was} ended. The desk is back on the live journal.` : "No backtest was running; the desk is on the live journal.";
+  }));
+  server.registerTool("backtest_summary", {
+    title: "Backtest results",
+    description: "Score a sweep's settled calls by rating: how many, how often the direction was called right (not for Hold, which claims none), and the mean alpha against each stock's market index. Calls whose window has not traded are pending; calls with no readable rating are unscored. Report the figures as they are and say that a few calls prove nothing.",
+    inputSchema: { sweep_id: external_exports.string().max(40).optional().describe("The sweep to score; the running one when left out") },
+    annotations: { readOnlyHint: true, openWorldHint: false }
+  }, async (a) => act(() => {
+    const id = a.sweep_id ?? getSweep();
+    if (!id) throw new Error("no backtest is running: name the sweep to score");
+    const w = workspaceOf(root, id);
+    if (!fs8.existsSync(path9.join(w.dir, "journal.md"))) throw new Error(`sweep ${id} has no recorded calls yet`);
+    let meta3 = "";
+    try {
+      const m2 = JSON.parse(fs8.readFileSync(path9.join(w.dir, "sweep.json"), "utf8"));
+      meta3 = ` of ${m2.cells} planned`;
+    } catch {
+    }
+    const entries = journalOf(root, w).load();
+    return `Backtest sweep ${id}: ${entries.length} call(s) recorded${meta3}
+
+${renderSummary(summarize(entries))}`;
+  }));
   server.registerTool("set_holdings", {
     title: "Save what the person holds",
     description: "Save the positions and free cash the person tells you they hold, so the trader and risk voices size against their real book. Pass exactly what they said; never guess. An empty list of positions means they hold nothing (a flat book) - different from not having said, which is the default.",

@@ -7,7 +7,8 @@ import { cryptoBase, safeSymbol } from '../data/symbols.js';
 import { ASK_FOR_EMAIL, readContactEmail } from '../contact.js';
 import { ANALYSTS, languageName, readSettings, type Analyst } from '../settings.js';
 import { deskDataDir } from '../paths.js';
-import { Journal } from './journal.js';
+import { type Journal } from './journal.js';
+import { journalIn, workspaceOf, type Workspace } from './workspace.js';
 import { readHoldings, renderHoldings } from './holdings.js';
 import { deleteRun, progress, savedPlan, startRun, type Section } from './runs.js';
 import { resolveBenchmark } from './scoring.js';
@@ -25,8 +26,8 @@ export interface PlanRequest { symbol: string; analysisDate: string; analysts?: 
 
 const ANALYST_SECTION: Record<Analyst, Section> = { market: 'market', sentiment: 'sentiment', news: 'news', fundamentals: 'fundamentals' };
 
-export const journalFile = (root: string): string => `${deskDataDir(root)}/journal.md`;
-export const journalOf = (root: string): Journal => new Journal(journalFile(root), readSettings(root).journal.maxResolvedEntries);
+/** The journal of the live desk, or of the sweep being run. */
+export const journalOf = (root: string, ws: Workspace = workspaceOf(root)): Journal => journalIn(root, ws);
 
 function kindOf(raw: string, symbol: string): Plan['kind'] {
   if (cryptoBase(raw)) return 'crypto';
@@ -44,9 +45,9 @@ export function stepsFor(analysts: Analyst[], debateRounds: number, riskRounds: 
   return steps;
 }
 
-export function buildPlan(root: string, req: PlanRequest): { plan: Plan; holdings: string; lessons: string; resumed: boolean } {
+export function buildPlan(root: string, req: PlanRequest, ws: Workspace = workspaceOf(root)): { plan: Plan; holdings: string; lessons: string; resumed: boolean } {
   if (!readContactEmail(root)) throw new NeedsEmail(ASK_FOR_EMAIL);
-  const s = readSettings(root), dir = deskDataDir(root);
+  const s = readSettings(root), dir = ws.dir;
   const symbol = safeSymbol(req.symbol), day = analysisDate(req.analysisDate), notes: string[] = [];
   const kind = kindOf(req.symbol, symbol);
   if (req.restart) deleteRun(dir, symbol, day);
@@ -81,8 +82,8 @@ export function buildPlan(root: string, req: PlanRequest): { plan: Plan; holding
   const plan: Plan = { symbol, analysisDate: day, kind, analysts, debateRounds, riskRounds, language, managerModel: s.analysis.managerModel, benchmark, holdingDays: s.scoring.holdingPeriodDays, steps: [], notes };
   plan.steps = stepsFor(analysts, debateRounds, riskRounds).map((st) => ({ ...st, done: (done[st.section] ?? 0) >= st.turn }));
   if (!resumed) startRun(dir, symbol, day, plan);
-  const lessons = journalOf(root).pastContext(symbol, isHistorical(day) ? { asOf: day } : {});
-  return { plan, holdings: renderHoldings(readHoldings(dir), symbol), lessons, resumed };
+  const lessons = journalOf(root, ws).pastContext(symbol, isHistorical(day) ? { asOf: day } : {});
+  return { plan, holdings: renderHoldings(readHoldings(deskDataDir(root)), symbol), lessons, resumed };
 }
 
 export function renderPlan({ plan: p, holdings, lessons, resumed }: ReturnType<typeof buildPlan>): string {
