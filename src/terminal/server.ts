@@ -9,6 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { today } from '../data/dates.js';
 import { clearCache } from '../data/yahoo.js';
+import { safeSymbol } from '../data/symbols.js';
 import { deskDataDir } from '../paths.js';
 import { VERSION } from '../version.js';
 import { callOf, stateOf, versionOf } from './state.js';
@@ -57,7 +58,7 @@ export async function startTerminal(opts: { root: string; assets: Assets; port?:
   const body = (req: http.IncomingMessage): Promise<Record<string, unknown>> => new Promise((resolve, reject) => {
     if (!/^application\/json\b/i.test(req.headers['content-type'] ?? '')) return reject(new Refused(415, 'send JSON'));
     let size = 0; const chunks: Buffer[] = [];
-    req.on('data', (c: Buffer) => { size += c.length; if (size > 4096) { reject(new Refused(413, 'too large')); req.destroy(); } else chunks.push(c); });
+    req.on('data', (c: Buffer) => { size += c.length; if (size > 4096) reject(new Refused(413, 'too large')); else chunks.push(c); });
     req.on('end', () => { try { const v = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}') as unknown; v && typeof v === 'object' && !Array.isArray(v) ? resolve(v as Record<string, unknown>) : reject(new Refused(400, 'send a JSON object')); } catch { reject(new Refused(400, 'that is not JSON')); } });
     req.on('error', reject);
   });
@@ -106,6 +107,7 @@ export async function startTerminal(opts: { root: string; assets: Assets; port?:
     const b = method === 'POST' ? await body(req) : {};
     const name = typeof b.symbol === 'string' ? b.symbol : sym;
     if (p === '/api/watchlist' && method === 'POST') {
+      safeSymbol(name);                                       // a name that is not a ticker is refused before Yahoo is asked
       const q = await quote(name);
       if ('error' in q && q.error === 'no-data') throw new Refused(422, q.message);
       return json(res, 200, { watchlist: addWatch(dir, name, day) });
@@ -120,7 +122,11 @@ export async function startTerminal(opts: { root: string; assets: Assets; port?:
   const server = http.createServer((req, res) => {
     handle(req, res).catch((e: unknown) => {
       if (res.headersSent) return res.end();
-      if (e instanceof Refused) return json(res, e.status, { error: e.message });
+      if (e instanceof Refused) {
+        // An oversized body is answered, then the connection is cut so the rest is never read.
+        if (e.status === 413) res.once('finish', () => req.socket.destroy());
+        return json(res, e.status, { error: e.message });
+      }
       // Our own checks (a bad ticker, a full list) speak plainly; anything else is not shown.
       const m = e instanceof Error ? e.message : '';
       json(res, /not a ticker|not on the watchlist|holds \d+ stocks|are already waiting/.test(m) ? 400 : 500, { error: /not a ticker|not on the watchlist|holds \d+ stocks|are already waiting/.test(m) ? m : 'something went wrong' });
