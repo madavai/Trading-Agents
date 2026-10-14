@@ -7,9 +7,12 @@ export interface Source {
   url: string;
   /** whether the answer is the kind of data the desk reads, from its first bytes */
   looksRight: (body: string) => boolean;
-  /** what to tell the person when the source refuses */
-  onRefused?: string;
+  /** what to tell the person when the source refuses, given whether the person's email was sent with the request */
+  onRefused?: (emailSent: boolean) => string;
 }
+
+/** What the check says when the SEC refuses although the person's email was sent: the email is not what is missing. */
+const SEC_REFUSED_WITH_EMAIL = 'the SEC refused even though a contact email was sent, so the email is not what is missing; it sometimes blocks a computer for a few minutes, so try again shortly';
 
 export const SOURCES: Source[] = [
   { name: 'Yahoo Finance prices', url: 'https://query1.finance.yahoo.com/v8/finance/chart/SPY?range=5d&interval=1d', looksRight: (b) => b.includes('"chart"') },
@@ -19,7 +22,7 @@ export const SOURCES: Source[] = [
   { name: 'FRED economic data', url: 'https://fred.stlouisfed.org/graph/fredgraph.csv?id=DGS10', looksRight: (b) => /observation_date|DATE/.test(b) },
   { name: 'Polymarket', url: 'https://gamma-api.polymarket.com/public-search?q=fed&limit_per_type=1', looksRight: (b) => b.trimStart().startsWith('{') },
   { name: 'SEC EDGAR', url: 'https://www.sec.gov/files/company_tickers.json', looksRight: (b) => b.includes('"ticker"'),
-    onRefused: ASK_FOR_EMAIL },
+    onRefused: (emailSent) => (emailSent ? SEC_REFUSED_WITH_EMAIL : ASK_FOR_EMAIL) },
 ];
 
 export interface ProbeResult { name: string; ok: boolean; detail: string }
@@ -43,14 +46,14 @@ async function head(res: Response): Promise<string> {
   return new TextDecoder().decode(Buffer.concat(chunks));
 }
 
-export async function probe(source: Source, userAgent: string, fetchImpl: Fetch = fetch, timeoutMs = 8000): Promise<ProbeResult> {
+export async function probe(source: Source, userAgent: string, fetchImpl: Fetch = fetch, timeoutMs = 8000, emailSent = false): Promise<ProbeResult> {
   const started = Date.now();
   try {
     const res = await fetchImpl(source.url, { headers: { 'User-Agent': userAgent, Accept: '*/*' }, signal: AbortSignal.timeout(timeoutMs) });
     const ms = Date.now() - started;
     if (!res.ok) {
       await res.body?.cancel().catch(() => {});
-      const why = source.onRefused && (res.status === 403 || res.status === 401) ? `: ${source.onRefused}` : '';
+      const why = source.onRefused && (res.status === 403 || res.status === 401) ? `: ${source.onRefused(emailSent)}` : '';
       return { name: source.name, ok: false, detail: `refused (HTTP ${res.status})${why}` };
     }
     const body = await head(res);
@@ -65,13 +68,18 @@ export async function probe(source: Source, userAgent: string, fetchImpl: Fetch 
 }
 
 /** The user agent a source sees: the project's name and address. The person's email goes to the SEC alone, which asks
- *  every caller for one; no other source ever sees it. */
+ *  every caller for one; no other source ever sees it. The SEC is told the project's name and the email only: tried on
+ *  14 Oct 2026, it refused (HTTP 403, "Request Rate Threshold Exceeded") every introduction that carried a web address in
+ *  brackets, even with the email, and answered the same request normally with just "name email". */
 export function userAgentFor(url: string, contact: string, email: string): string {
   const host = new URL(url).hostname;
   const sec = host === 'sec.gov' || host.endsWith('.sec.gov');
-  return sec && email.trim() ? `${contact} ${email.trim()}` : contact;
+  if (!sec || !email.trim()) return contact;
+  const name = contact.replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim() || 'trading-agents';
+  return `${name} ${email.trim()}`;
 }
 
 export async function probeAll(contact: string, secEmail: string, fetchImpl: Fetch = fetch, timeoutMs = 8000): Promise<ProbeResult[]> {
-  return Promise.all(SOURCES.map((s) => probe(s, userAgentFor(s.url, contact, secEmail), fetchImpl, timeoutMs)));
+  const emailSent = secEmail.trim() !== '';
+  return Promise.all(SOURCES.map((s) => probe(s, userAgentFor(s.url, contact, secEmail), fetchImpl, timeoutMs, emailSent)));
 }

@@ -7348,7 +7348,9 @@ var MAX_BYTES = 64 * 1024;
 function userAgentFor(url2, contact2, email2) {
   const host = new URL(url2).hostname;
   const sec = host === "sec.gov" || host.endsWith(".sec.gov");
-  return sec && email2.trim() ? `${contact2} ${email2.trim()}` : contact2;
+  if (!sec || !email2.trim()) return contact2;
+  const name = contact2.replace(/\([^)]*\)/g, " ").replace(/\s+/g, " ").trim() || "trading-agents";
+  return `${name} ${email2.trim()}`;
 }
 
 // src/desk/lock.ts
