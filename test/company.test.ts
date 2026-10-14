@@ -78,7 +78,7 @@ test('the tool serves a US filer from the SEC, in millions, with the email sent 
   assert.match(t, /Diluted EPS \(USD per share\) \| 1\.23 \| – \| –/);
   assert.match(t, /Not reported by this source: Cost of Revenue, Gross Profit, Operating Income, Net Income\./);
   assert.match(t, /A fourth quarter is never derived/);
-  assert.ok(seen.every((s) => s.headers['User-Agent'] === 'ta (+x) me@example.com'), 'both SEC hosts get the email');
+  assert.ok(seen.every((s) => s.headers['User-Agent'] === 'ta me@example.com'), 'both SEC hosts get the name and the email, with no bracketed address');
 });
 
 test('when the SEC refuses, today falls back to Yahoo and a past day is told why', async () => {

@@ -36633,6 +36633,7 @@ function saveContactEmail(root, raw) {
 var ASK_FOR_EMAIL = "the SEC asks everyone who reads its filings for a contact email, and none is saved yet: ask the person for their own email (never invent one) and save it with set_contact_email";
 
 // src/check/probes.ts
+var SEC_REFUSED_WITH_EMAIL = "the SEC refused even though a contact email was sent, so the email is not what is missing; it sometimes blocks a computer for a few minutes, so try again shortly";
 var SOURCES = [
   { name: "Yahoo Finance prices", url: "https://query1.finance.yahoo.com/v8/finance/chart/SPY?range=5d&interval=1d", looksRight: (b) => b.includes('"chart"') },
   { name: "Yahoo Finance news", url: "https://query1.finance.yahoo.com/v1/finance/search?q=SPY&newsCount=3&quotesCount=1", looksRight: (b) => b.includes('"news"') },
@@ -36644,7 +36645,7 @@ var SOURCES = [
     name: "SEC EDGAR",
     url: "https://www.sec.gov/files/company_tickers.json",
     looksRight: (b) => b.includes('"ticker"'),
-    onRefused: ASK_FOR_EMAIL
+    onRefused: (emailSent) => emailSent ? SEC_REFUSED_WITH_EMAIL : ASK_FOR_EMAIL
   }
 ];
 var MAX_BYTES = 64 * 1024;
@@ -36663,7 +36664,7 @@ async function head(res) {
   });
   return new TextDecoder().decode(Buffer.concat(chunks));
 }
-async function probe(source, userAgent, fetchImpl2 = fetch, timeoutMs = 8e3) {
+async function probe(source, userAgent, fetchImpl2 = fetch, timeoutMs = 8e3, emailSent = false) {
   const started = Date.now();
   try {
     const res = await fetchImpl2(source.url, { headers: { "User-Agent": userAgent, Accept: "*/*" }, signal: AbortSignal.timeout(timeoutMs) });
@@ -36671,7 +36672,7 @@ async function probe(source, userAgent, fetchImpl2 = fetch, timeoutMs = 8e3) {
     if (!res.ok) {
       await res.body?.cancel().catch(() => {
       });
-      const why = source.onRefused && (res.status === 403 || res.status === 401) ? `: ${source.onRefused}` : "";
+      const why = source.onRefused && (res.status === 403 || res.status === 401) ? `: ${source.onRefused(emailSent)}` : "";
       return { name: source.name, ok: false, detail: `refused (HTTP ${res.status})${why}` };
     }
     const body = await head(res);
@@ -36685,10 +36686,13 @@ async function probe(source, userAgent, fetchImpl2 = fetch, timeoutMs = 8e3) {
 function userAgentFor(url2, contact2, email3) {
   const host = new URL(url2).hostname;
   const sec = host === "sec.gov" || host.endsWith(".sec.gov");
-  return sec && email3.trim() ? `${contact2} ${email3.trim()}` : contact2;
+  if (!sec || !email3.trim()) return contact2;
+  const name = contact2.replace(/\([^)]*\)/g, " ").replace(/\s+/g, " ").trim() || "trading-agents";
+  return `${name} ${email3.trim()}`;
 }
 async function probeAll(contact2, secEmail2, fetchImpl2 = fetch, timeoutMs = 8e3) {
-  return Promise.all(SOURCES.map((s) => probe(s, userAgentFor(s.url, contact2, secEmail2), fetchImpl2, timeoutMs)));
+  const emailSent = secEmail2.trim() !== "";
+  return Promise.all(SOURCES.map((s) => probe(s, userAgentFor(s.url, contact2, secEmail2), fetchImpl2, timeoutMs, emailSent)));
 }
 
 // src/version.ts

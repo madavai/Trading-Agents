@@ -39,11 +39,31 @@ test('every source is asked with the contact as the user agent, and only the SEC
   const f: typeof fetch = async (url, init) => { seen.set(new URL(String(url)).hostname, String((init?.headers as Record<string, string>)['User-Agent'])); return new Response('{"chart":1,"news":1,"messages":1,"ticker":1} <feed observation_date', { status: 200 }); };
   const all = await probeAll('trading-agents (+x)', 'me@example.com', f);
   assert.equal(all.length, SOURCES.length);
-  for (const [host, ua] of seen) assert.equal(ua, host === 'www.sec.gov' ? 'trading-agents (+x) me@example.com' : 'trading-agents (+x)', host);
+  for (const [host, ua] of seen) assert.equal(ua, host === 'www.sec.gov' ? 'trading-agents me@example.com' : 'trading-agents (+x)', host);
   assert.ok(seen.has('www.sec.gov'));
   assert.equal(userAgentFor('https://data.sec.gov/x', 'c', 'me@example.com'), 'c me@example.com');
   assert.equal(userAgentFor('https://notsec.gov/x', 'c', 'me@example.com'), 'c');
   assert.equal(userAgentFor('https://www.sec.gov/x', 'c', '  '), 'c');
+});
+
+test('the SEC is told the project name and the email, never a bracketed web address, which it refuses (HTTP 403) even with the email', () => {
+  const contact = 'trading-agents (+https://github.com/madavai/trading-agents)';
+  assert.equal(userAgentFor('https://www.sec.gov/files/company_tickers.json', contact, 'me@mail.com'), 'trading-agents me@mail.com');
+  assert.equal(userAgentFor('https://data.sec.gov/api/xbrl/companyfacts/CIK0001045810.json', contact, ' me@mail.com '), 'trading-agents me@mail.com');
+  assert.equal(userAgentFor('https://data.sec.gov/x', '(+only a web address)', 'me@mail.com'), 'trading-agents me@mail.com');   // nothing left of the name: the project's own
+  assert.equal(userAgentFor('https://query1.finance.yahoo.com/x', contact, 'me@mail.com'), contact);                          // every other source still sees the project's name and address, never the email
+  assert.equal(userAgentFor('https://www.sec.gov/x', contact, ''), contact);                                                  // no email yet: nothing more to say
+});
+
+test('when the SEC refuses with the email sent, the check does not claim the email is missing', async () => {
+  const sent = await probe(source, 'ua', answer(403, 'Request Rate Threshold Exceeded'), 8000, true);
+  assert.equal(sent.ok, false);
+  assert.match(sent.detail, /refused \(HTTP 403\): the SEC refused even though a contact email was sent, so the email is not what is missing/);
+  assert.doesNotMatch(sent.detail, /none is saved|set_contact_email/);
+  const refusedAll = (await probeAll('c', 'me@mail.com', answer(403, 'no'))).find((r) => r.name === 'SEC EDGAR')!;
+  assert.match(refusedAll.detail, /even though a contact email was sent/);
+  const noEmail = (await probeAll('c', '', answer(403, 'no'))).find((r) => r.name === 'SEC EDGAR')!;
+  assert.match(noEmail.detail, /none is saved yet.*set_contact_email/);
 });
 
 test('the machine lines say what is missing in plain words', () => {

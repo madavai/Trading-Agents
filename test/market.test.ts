@@ -39,7 +39,7 @@ test('the data tools send the SEC contact email to the SEC alone', async () => {
   const seen = new Map<string, string>();
   configure({ contact: 'ta (+x)', secEmail: 'me@example.com', fetch: async (url, init) => { seen.set(new URL(String(url)).hostname, String((init?.headers as Record<string, string>)['User-Agent'])); return new Response('ok'); } });
   for (const u of ['https://query1.finance.yahoo.com/a', 'https://www.reddit.com/b', 'https://data.sec.gov/c']) await getText(u);
-  assert.deepEqual(Object.fromEntries(seen), { 'query1.finance.yahoo.com': 'ta (+x)', 'www.reddit.com': 'ta (+x)', 'data.sec.gov': 'ta (+x) me@example.com' });
+  assert.deepEqual(Object.fromEntries(seen), { 'query1.finance.yahoo.com': 'ta (+x)', 'www.reddit.com': 'ta (+x)', 'data.sec.gov': 'ta me@example.com' });
   configure({ secEmail: '' });
 });
 
