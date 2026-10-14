@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
@@ -32,7 +33,7 @@ test('the team is the original\'s twelve, one agent for each step the plan can a
 
 test('every agent has only desk tools that exist, none of which can order, and no shell, files or web', async () => {
   const [a, b] = InMemoryTransport.createLinkedPair();
-  await deskServer(fs.mkdtempSync(path.join(process.env.TMPDIR ?? '/tmp', 'ta-team-'))).connect(a);
+  await deskServer(fs.mkdtempSync(path.join(os.tmpdir(), 'ta-team-'))).connect(a);
   const client = new Client({ name: 'test', version: '0' });
   await client.connect(b);
   const offered = new Set((await client.listTools()).tools.map((t) => `mcp__trading-desk__${t.name}`));
