@@ -11,6 +11,8 @@ team are in (not yet proven on real data); the dashboard and trading come next.
 - `/analyse TICKER [date] [shallow|medium|deep]`: the desk's twelve agents analyse a stock and record their call in the
   journal. It proposes only; it never places an order.
 - `/settle`: scores past calls whose holding window has finished against their market index and writes the lessons.
+- `/backtest TICKERS START END`: runs the team over past dates in a journal of its own and scores the calls by rating.
+  Slow and costly: every date is a full team run.
 - Coming in later milestones: `/terminal`, `/schedule`.
 
 ## Rules for every agent in this folder

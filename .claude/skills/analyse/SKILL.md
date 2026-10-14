@@ -28,6 +28,8 @@ Call `plan_analysis` with the ticker, date, and any rounds, analysts or language
 
 Tell the person in two lines what will run: the analysts, the rounds, the language, and that it takes a few minutes.
 
+If the plan starts with a line naming a backtest sweep, and you were not asked to run one by the /backtest skill, an earlier sweep was left running: call `end_backtest`, then plan again, so this analysis goes into the live journal.
+
 ## 4. Run the steps, in the plan's order, skipping the ones marked done
 Each agent is called with the Agent tool, `subagent_type` set to its name. Every request names the symbol (exactly as the plan gives it), the analysis date and the report language, and asks the agent to save its work. Agents save their work on the desk and reply with one line; do not paste their reports into the next request.
 
@@ -47,7 +49,8 @@ After each step, check it was saved: call `read_run` without sections and see th
 ## 5. Finish
 1. Call `write_report`.
 2. Call `record_decision` with the rating the portfolio manager's decision states (from its **Rating** line).
-3. Tell the person, in plain words:
+3. Inside a backtest (the plan starts with a line naming the sweep), skip the summary: reply with one line, the ticker, date and rating.
+   Otherwise tell the person, in plain words:
    - the rating, and the executive summary in two or three sentences, from the saved decision (`read_run`, section decision);
    - any data that was unavailable, from the reports;
    - where the full report is;
