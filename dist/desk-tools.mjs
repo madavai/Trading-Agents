@@ -36876,7 +36876,7 @@ async function pace(host) {
   if (!spacingMs) return;
   const now = Date.now(), at = Math.max(now, nextSlot.get(host) ?? 0);
   nextSlot.set(host, at + spacingMs);
-  if (at > now) await sleep(at - now);
+  for (let i = 0; i < 3 && Date.now() < at; i++) await sleep(at - Date.now());
 }
 var MINUTE = 6e4;
 var ttlFor = (host) => /(^|\.)sec\.gov$/.test(host) ? 24 * 60 * MINUTE : /fred/.test(host) ? 6 * 60 * MINUTE : 5 * MINUTE;

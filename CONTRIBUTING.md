@@ -9,6 +9,11 @@
 - `src/tools/` - the desk tool server, the one MCP server this folder gives the engine (`.mcp.json`).
 - `src/check/` - the desk check: this computer, and the free data sources.
 - `src/robinhood/` - the connection to Robinhood's Trading MCP: sign-in (OAuth, kept in `~/.trading-agents`), and reads.
+  `rules.ts` says what a Robinhood tool is (read, order or other) by its name and Robinhood's own read-only label;
+  `reader.ts` is the ONLY place in `src/` that calls a Robinhood tool, and it refuses everything but reads (a test
+  scans the source to keep it so); `connect.ts` signs in and opens sessions; `link.ts` is what the dashboard knows
+  (none, waiting, connected, failed); `discover.ts` and `cli.ts` are `node dist/robinhood.mjs discover` and `shape`,
+  which print what Robinhood offers and the SHAPE of its answers, never a value, so the desk is built on what is there.
 - `.claude/` - what Madav and Claude Code load in this folder: settings, the guard hook, skills, and the agents.
   The twelve agent files in `.claude/agents/` are written from `scripts/agents-src.mjs` (`npm run agents`); edit the
   source, not the files, and a test fails if they differ.
@@ -19,6 +24,10 @@
   classes, and anything an agent wrote goes through `md.ts`, which escapes first. `npm run build` bundles the page into
   `dist/terminal/`. `ui/` has its own `tsconfig.json` (it needs the browser's types).
 - `desk-settings.json` - the desk's settings; `docs/design/` - the dashboard's design reference.
+- `test/fake-robinhood.ts` - a pretend Robinhood for the tests: an MCP door that wants a sign-in, with read tools and
+  order tools, recording every call. Its sign-in is the MCP library's own demo server (`test/fake-sign-in-server.ts`,
+  a side process). The guard refuses any file that spells out the sign-in's token field names, so tests reach the
+  sign-in through that demo server and read the saved file only to check that nothing in it leaks.
 
 ## Rules
 - TypeScript, ESM, Node 22, `node:test`. No Python, here or in anything the desk runs.

@@ -3,7 +3,8 @@
 This folder is the Trading Agents desk: a team of agents that analyses a stock and proposes a decision, a dashboard where
 the person decides, and a connection to Robinhood's agent doorway for the orders the person confirms. It is adapted from
 TradingAgents by Tauric Research (see NOTICE). It is early: the desk check, the market data tools and the analysis
-team and the dashboard are in (not yet proven on real data); Robinhood in the dashboard and trading come next.
+team and the dashboard are in (not yet proven on real data); the dashboard can connect to Robinhood, and showing the
+account, then trading, come next.
 
 ## What the person can run here
 - `/desk-check`: checks this computer (Node, the desk's tools, the free data sources) and, on their yes, tests the
@@ -14,7 +15,8 @@ team and the dashboard are in (not yet proven on real data); Robinhood in the da
 - `/backtest TICKERS START END`: runs the team over past dates in a journal of its own and scores the calls by rating.
   Slow and costly: every date is a full team run.
 - `/terminal`: opens the dashboard on this computer (`node dist/terminal.mjs`): markets, charts, watchlist, the desk's
-  calls and scorecard, and a list of stocks to analyse. `/analyse` with no stock runs that list. No order button.
+  calls and scorecard, a list of stocks to analyse, and the person's own Connect to Robinhood. `/analyse` with no
+  stock runs that list. No order button.
 - Coming in later milestones: `/schedule`.
 
 ## Rules for every agent in this folder

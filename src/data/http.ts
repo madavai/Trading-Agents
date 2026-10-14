@@ -41,7 +41,9 @@ async function pace(host: string): Promise<void> {
   if (!spacingMs) return;
   const now = Date.now(), at = Math.max(now, nextSlot.get(host) ?? 0);
   nextSlot.set(host, at + spacingMs);
-  if (at > now) await sleep(at - now);
+  // A timer can wake a few milliseconds early (on Windows, up to one 15 ms clock tick), so the clock is read again: the
+  // spacing promised is the spacing kept.
+  for (let i = 0; i < 3 && Date.now() < at; i++) await sleep(at - Date.now());
 }
 
 // Answers are kept on disk, shared by every copy of the tool server, so the analysts and a repeated question do not ask a

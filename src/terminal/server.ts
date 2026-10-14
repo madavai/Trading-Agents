@@ -1,7 +1,8 @@
 // The dashboard's local server: one page and its data, on this computer only. It reads the desk's own files and Yahoo
-// Finance's public prices, keeps the person's watchlist and the analyses they ask for, and holds no order, no broker
-// connection and no key. Everything it accepts is checked: the address it was reached by, where a change came from, and a
-// token made at start-up that only the page it served knows, so another web page open in the same browser cannot use it.
+// Finance's public prices, keeps the person's watchlist and the analyses they ask for, and can connect to Robinhood to
+// read (robinhood/link.ts); it holds no order and never hands the page a key. Everything it accepts is checked: the
+// address it was reached by, where a change came from, and a token made at start-up that only the page it served knows,
+// so another web page open in the same browser cannot use it.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
@@ -10,7 +11,8 @@ import { fileURLToPath } from 'node:url';
 import { today } from '../data/dates.js';
 import { clearCache } from '../data/yahoo.js';
 import { safeSymbol } from '../data/symbols.js';
-import { deskDataDir } from '../paths.js';
+import { deskDataDir, robinhoodFile } from '../paths.js';
+import { Link } from '../robinhood/link.js';
 import { VERSION } from '../version.js';
 import { callOf, stateOf, versionOf } from './state.js';
 import { clearQuotes, history, isRange, MARKETS, quote } from './quotes.js';
@@ -42,8 +44,9 @@ const SECURITY = {
 
 class Refused extends Error { constructor(readonly status: number, message: string) { super(message); } }
 
-export async function startTerminal(opts: { root: string; assets: Assets; port?: number }): Promise<Terminal> {
+export async function startTerminal(opts: { root: string; assets: Assets; port?: number; robinhood?: Link }): Promise<Terminal> {
   const { root, assets } = opts, dir = deskDataDir(root), token = crypto.randomBytes(24).toString('hex'), deskId = deskIdOf(root);
+  const robinhood = opts.robinhood ?? new Link(robinhoodFile());
   let port = 0;
   const hosts = () => new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
   const origins = () => new Set([`http://127.0.0.1:${port}`, `http://localhost:${port}`]);
@@ -86,6 +89,7 @@ export async function startTerminal(opts: { root: string; assets: Assets; port?:
     if (method === 'GET') {
       if (p === '/api/state') return json(res, 200, stateOf(root, day));
       if (p === '/api/version') return json(res, 200, { version: versionOf(root) });
+      if (p === '/api/robinhood') return json(res, 200, robinhood.info());
       if (p === '/api/quotes') {
         const list = [...new Set((url.searchParams.get('symbols') ?? '').split(',').map((s) => s.trim()).filter(Boolean))].slice(0, 30);
         return json(res, 200, { quotes: await Promise.all(list.map(quote)) });
@@ -116,6 +120,10 @@ export async function startTerminal(opts: { root: string; assets: Assets; port?:
     if (p === '/api/favourite' && method === 'POST') return json(res, 200, { watchlist: setFavourite(dir, name, b.favourite === true) });
     if (p === '/api/queue' && method === 'POST') return json(res, 200, { queue: enqueue(dir, name, new Date().toISOString()) });
     if (p === '/api/queue' && method === 'DELETE') return json(res, 200, { queue: dequeue(dir, name) });
+    // Robinhood: connect (sends the person to Robinhood's own page), check (asks, opens nothing) and disconnect (deletes the saved sign-in).
+    if (p === '/api/robinhood/connect' && method === 'POST') return json(res, 200, robinhood.startSignIn());
+    if (p === '/api/robinhood/check' && method === 'POST') return json(res, 200, await robinhood.check());
+    if (p === '/api/robinhood' && method === 'DELETE') return json(res, 200, robinhood.forget());
     throw new Refused(404, 'not found');
   };
 

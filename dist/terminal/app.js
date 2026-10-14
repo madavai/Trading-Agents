@@ -32,7 +32,11 @@
     removeWatch: (symbol) => call("DELETE", `/api/watchlist?${q({ symbol })}`),
     favourite: (symbol, favourite) => call("POST", "/api/favourite", { symbol, favourite }),
     enqueue: (symbol) => call("POST", "/api/queue", { symbol }),
-    dequeue: (symbol) => call("DELETE", `/api/queue?${q({ symbol })}`)
+    dequeue: (symbol) => call("DELETE", `/api/queue?${q({ symbol })}`),
+    robinhood: () => call("GET", "/api/robinhood"),
+    connectRobinhood: () => call("POST", "/api/robinhood/connect", {}),
+    checkRobinhood: () => call("POST", "/api/robinhood/check", {}),
+    disconnectRobinhood: () => call("DELETE", "/api/robinhood")
   };
 
   // src/terminal/ui/fmt.ts
@@ -277,6 +281,7 @@
   var RATINGS = ["Buy", "Overweight", "Hold", "Underweight", "Sell"];
   var S = {
     desk: null,
+    rh: null,
     quotes: /* @__PURE__ */ new Map(),
     markets: [],
     symbol: "",
@@ -359,6 +364,54 @@
       const q2 = quoteOf(w.symbol);
       return `<button class="at-li ${w.symbol === S.symbol ? "on" : ""}" data-act="select" data-symbol="${esc(w.symbol)}"><span class="at-li-t">${esc(w.symbol)}</span><small>${q2 ? pct(q2.changePct) : ""}</small></button>`;
     }).join("") : '<p class="at-quiet">Star a stock in the watchlist to keep it here.</p>';
+  }
+  var RH_WORDS = {
+    none: { chip: "", label: "Not connected", dot: "" },
+    saved: { chip: "", label: "Sign-in saved", dot: "" },
+    waiting: { chip: "warn", label: "Waiting for you", dot: "warn" },
+    connected: { chip: "ok", label: "Connected", dot: "ok" },
+    failed: { chip: "danger", label: "Not working", dot: "bad" }
+  };
+  var rhButton = (act, words, o = {}) => `<button class="at-btn at-press${o.primary ? " primary" : ""}" data-act="${act}"${o.title ? ` title="${esc(o.title)}"` : ""}>${o.icon ? `<svg class="g"><use href="#${o.icon}"/></svg>` : ""}<span>${esc(words)}</span></button>`;
+  function renderAccount() {
+    const r = S.rh;
+    if (!r) {
+      $("#accountCard").innerHTML = '<p class="at-quiet">Asking whether Robinhood is connected.</p>';
+      return;
+    }
+    const w = RH_WORDS[r.state];
+    $("#rhDot").className = `at-dot ${w.dot}`.trim();
+    $("#rhText").textContent = `Robinhood \xB7 ${w.label.toLowerCase()}`;
+    const connect = (words, primary) => rhButton("rh-connect", words, { primary, icon: "i-link" });
+    const check = (words, primary) => rhButton("rh-check", words, { primary });
+    const leave = rhButton("rh-forget", "Disconnect", { icon: "i-trash", title: "Deletes the Robinhood sign-in saved on this computer" });
+    let lede = r.message, actions = "", facts = "";
+    if (r.state === "none") {
+      lede = "Connect Robinhood to bring your account here. Connecting opens Robinhood's own sign-in page in your browser. The desk only reads: it cannot place an order.";
+      actions = connect("Connect Robinhood", true);
+    } else if (r.state === "saved") actions = check("Check the connection", true) + leave;
+    else if (r.state === "connected") {
+      const when = r.checkedAt ? clock(r.checkedAt) : "";
+      lede = "The sign-in works and Robinhood answered. Nothing from your account is shown yet.";
+      facts = `<p class="at-quiet">${esc(r.message)}${when ? ` Checked at ${esc(when)}.` : ""}</p>`;
+      actions = check("Check again", false) + leave;
+    } else if (r.state === "failed") actions = connect("Connect again", true) + check("Check again", false);
+    $("#accountCard").innerHTML = `<div class="at-card-head"><h3>Robinhood</h3><span class="at-chip ${w.chip}">${esc(w.label)}</span></div>
+    <p class="at-lede">${esc(lede)}</p>${facts}${actions ? `<div class="at-row">${actions}</div>` : ""}
+    <p class="at-honest">Your Robinhood sign-in is kept on this computer only and is never shown on this page.</p>`;
+  }
+  var rhTimer = 0;
+  async function refreshRobinhood() {
+    const was = S.rh?.state;
+    try {
+      S.rh = await api.robinhood();
+    } catch {
+      return;
+    }
+    renderAccount();
+    clearTimeout(rhTimer);
+    if (S.rh.state === "waiting") rhTimer = window.setTimeout(() => void refreshRobinhood(), 2e3);
+    else if (was === "waiting") toast(S.rh.state === "connected" ? "Robinhood is connected." : S.rh.message, S.rh.state === "connected" ? "ok" : "bad");
   }
   function renderMarkets() {
     $("#marketDeck").innerHTML = S.markets.length ? S.markets.map((m, i) => {
@@ -520,6 +573,7 @@
   function renderAll() {
     renderSub();
     renderFavs();
+    renderAccount();
     renderControls();
     renderHero();
     renderCall();
@@ -667,6 +721,28 @@
       case "open-call":
         void openCall(sym, el.dataset.date ?? "");
         break;
+      case "rh-connect":
+        void run(async () => {
+          S.rh = await api.connectRobinhood();
+          renderAccount();
+          toast("Robinhood's sign-in page is opening in your browser.");
+          void refreshRobinhood();
+        });
+        break;
+      case "rh-check":
+        void run(async () => {
+          S.rh = await api.checkRobinhood();
+          renderAccount();
+          toast(S.rh.state === "connected" ? "Robinhood answered: the connection works." : S.rh.message, S.rh.state === "connected" ? "ok" : "bad");
+        });
+        break;
+      case "rh-forget":
+        void run(async () => {
+          S.rh = await api.disconnectRobinhood();
+          renderAccount();
+          toast("The saved Robinhood sign-in is deleted from this computer.");
+        });
+        break;
       case "close-dialog":
         dlg.close();
         break;
@@ -709,5 +785,6 @@
   });
   renderControls();
   void refreshState().then(() => void prices());
+  void refreshRobinhood();
   setInterval(() => void watchFiles(), 3e3);
 })();

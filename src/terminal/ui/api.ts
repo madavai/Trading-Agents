@@ -2,8 +2,9 @@
 import type { DeskState } from '../state.js';
 import type { History, QuoteResult } from '../quotes.js';
 import type { WatchItem, QueueItem } from '../store.js';
+import type { LinkInfo } from '../../robinhood/link.js';
 
-export type { DeskState, History, QuoteResult, WatchItem, QueueItem };
+export type { DeskState, History, QuoteResult, WatchItem, QueueItem, LinkInfo };
 export interface Market { symbol: string; name: string; unit?: '%'; quote: QuoteResult }
 export interface CallDetail { decision: string; sections: Record<string, string[]>; hasReport: boolean }
 
@@ -36,4 +37,8 @@ export const api = {
   favourite: (symbol: string, favourite: boolean) => call<{ watchlist: WatchItem[] }>('POST', '/api/favourite', { symbol, favourite }),
   enqueue: (symbol: string) => call<{ queue: QueueItem[] }>('POST', '/api/queue', { symbol }),
   dequeue: (symbol: string) => call<{ queue: QueueItem[] }>('DELETE', `/api/queue?${q({ symbol })}`),
+  robinhood: () => call<LinkInfo>('GET', '/api/robinhood'),
+  connectRobinhood: () => call<LinkInfo>('POST', '/api/robinhood/connect', {}),
+  checkRobinhood: () => call<LinkInfo>('POST', '/api/robinhood/check', {}),
+  disconnectRobinhood: () => call<LinkInfo>('DELETE', '/api/robinhood'),
 };
