@@ -8,10 +8,12 @@ You do. What works today is listed under Status; everything else is marked as co
 Adapted from [TradingAgents](https://github.com/TauricResearch/TradingAgents) by Tauric Research (see `NOTICE`); not
 affiliated with them. **Nothing here is investment advice.**
 
-> **Status: milestone 1c.** The desk check, a read-only Robinhood connection test, and the data tools: prices,
-> 13 indicators, the checked price table, instrument identity, company and world news, StockTwits and Reddit posts,
-> economic figures (FRED), prediction-market odds, and company accounts (SEC filings as filed, Yahoo Finance's profile,
-> ratios and insider trades). The analysis team, the dashboard and trading come in the next milestones.
+> **Status: milestone 2a.** Working today: the desk check, a read-only Robinhood connection test, the data tools (prices,
+> 13 indicators, the checked price table, news, StockTwits and Reddit posts, economic figures, prediction-market odds,
+> company accounts), and the desk's records: the plan for an analysis, the run's working record and report, the journal
+> of calls with their scoring against the stock's market index after 5 trading days, lessons from past calls (a past-dated
+> analysis only sees outcomes already known on its day), and what you hold. The analysts and the rest of the team that use
+> them, the dashboard and trading come in the next milestones.
 
 ## Start in three steps
 1. In Madav, clone this repository and open its folder.

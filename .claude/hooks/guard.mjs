@@ -28,17 +28,21 @@ const NO_SITE = 'Agents never open Robinhood\'s site or connection. The person t
 /** The refusal for one tool call, or null to let it pass. */
 export function verdict(call) {
   const name = String(call?.tool_name ?? '');
+  let own = false;
   if (name.startsWith('mcp__')) {
     const [, server = '', ...rest] = name.split('__');
     const tool = rest.join('__');
-    if (!OWN_SERVERS.has(server)) {
+    own = OWN_SERVERS.has(server);
+    if (!own) {
       if (BROKER_SERVER.test(server) || BROKER_TOOL.test(tool)) return NO_BROKER;
       if (TRADE_WORDS.test(tool)) return NO_TRADE;
     }
   }
   const input = JSON.stringify(call?.tool_input ?? {});
   if (PRIVATE.test(input)) return NO_PRIVATE;
-  if (BROKER_SITE.test(input)) return NO_SITE;
+  // The desk's own tools cannot open a site, so Robinhood's address in their text is data (an analysis of Robinhood's
+  // own stock quotes its news links); every other tool is refused it, since it might open the page.
+  if (!own && BROKER_SITE.test(input)) return NO_SITE;
   return null;
 }
 

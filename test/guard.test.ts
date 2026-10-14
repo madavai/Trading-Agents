@@ -33,6 +33,14 @@ test('the desk\'s own tools and Madav\'s tools pass', () => {
   }
 });
 
+test('an analysis of Robinhood\'s own stock can quote its address; no other tool may reach it, and the private folder is never named', () => {
+  const text = { text: 'Robinhood Markets (HOOD) said on https://newsroom.robinhood.com/q3 that funded customers grew.' };
+  assert.equal(guard.verdict(mcp('trading-desk', 'save_run_section', text)), null);
+  for (const tool of ['WebFetch', 'Bash', 'mcp__madav__browse_read']) assert.match(guard.verdict({ tool_name: tool, tool_input: { url: 'https://robinhood.com/stocks/HOOD' } }) ?? '', /never open Robinhood's site/, tool);
+  assert.match(guard.verdict(mcp('trading-desk', 'save_run_section', { text: 'see ~/.trading-agents/robinhood.json' })) ?? '', /private to them/);
+  assert.match(guard.verdict(mcp('trading-desk', 'save_run_section', { text: 'the refresh_token is' })) ?? '', /private to them/);
+});
+
 test('the guard and the Robinhood client name trading tools the same way', () => {
   for (const t of ['place_equity_order', 'review_equity_order', 'create_crypto_order', 'get_equity_positions', 'get_equity_quotes', 'buy', 'list_accounts']) {
     assert.equal(guard.TRADE_WORDS.test(t), isOrderTool(t), t);
