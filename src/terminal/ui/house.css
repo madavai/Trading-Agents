@@ -1,0 +1,801 @@
+/* The Madav House theme, copied unchanged from Madav's own design sheets (packages/ui/src/design and components/shell.css)
+   on 2026-10-14. (c) Madavai. The dashboard places these objects and adds no design of its own except dashboard.css, which
+   only sets sizes from these tokens. Fonts: Source Serif 4, Fraunces and Inter, each under the SIL Open Font License 1.1
+   (docs/design/fonts). */
+/* ---- Madav House theme: design/tokens.css ---- */
+/* tokens.css - generated from tokens.json by scripts/tokens.mjs; never edited by hand. */
+:root, [data-theme="dark"] {
+  --canvas: rgb(23, 21, 18);
+  --panel: rgb(32, 31, 28);
+  --tab-on: var(--canvas);
+  --tint: rgba(233, 228, 220, 0.07);
+  --raise: rgba(233, 228, 220, 0.07);
+  --accent-tint: color-mix(in srgb, var(--accent) 16%, transparent);
+  --line: rgba(233, 228, 220, 0.11);
+  --line-strong: rgba(233, 228, 220, 0.22);
+  --text: rgb(239, 234, 226);
+  --text-2: rgb(170, 163, 150);
+  --text-3: rgb(156, 149, 137);
+  --accent: #06AEFE;
+  --on-accent: #ffffff;
+  --plate: #ffffff;
+  --ok: rgb(76, 175, 114);
+  --warn: rgb(255, 209, 102);
+  --bad: rgb(255, 138, 128);
+  --merged: rgb(163, 113, 247);
+  --file-pdf: rgb(214, 54, 46);
+  --file-word: rgb(43, 106, 210);
+  --file-sheet: rgb(28, 128, 70);
+  --file-slides: rgb(214, 96, 20);
+  --file-page: rgb(86, 186, 176);
+  --file-picture: rgb(226, 138, 184);
+  --hues: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+  --ok-tint: color-mix(in srgb, var(--ok) 12%, transparent);
+  --bad-tint: color-mix(in srgb, var(--bad) 10%, transparent);
+  --shadow: 0 calc(var(--unit) * 3) calc(var(--unit) * 8) rgba(0, 0, 0, 0.45);
+  --shadow-rest: inset 0 calc(var(--unit) * 0.25) 0 rgba(233, 228, 220, 0.05), 0 calc(var(--unit) * 0.75) calc(var(--unit) * 1.5) rgba(0, 0, 0, 0.35);
+  --scrim: rgba(12, 11, 9, 0.6);
+  --scroll: rgba(233, 228, 220, 0.12);
+  --scroll-hover: rgba(233, 228, 220, 0.2);
+  --code-kw: #b48ef0;
+  --code-str: #7ec699;
+  --code-num: #e8a45f;
+  --code-fn: #61b3e6;
+  --font: "Source Serif 4", "Madav Text", "Inter", "Segoe UI", system-ui, sans-serif;
+  --font-title: "Madav Display", Georgia, "Times New Roman", serif;
+  --font-code: ui-monospace, Consolas, "Courier New", monospace;
+  --font-system: system-ui, "Segoe UI", -apple-system, "Helvetica Neue", sans-serif;
+  --font-inter: "Madav Text", "Inter", sans-serif;
+  --font-georgia: Georgia, "Times New Roman", serif;
+  --transcript-small: 0.9;
+  --transcript-large: 1.15;
+  --size-title: calc(var(--unit) * 7.5);
+  --size-heading: calc(var(--unit) * 4);
+  --size-text: calc(var(--unit) * 3.5);
+  --size-small: calc(var(--unit) * 3.125);
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --line-height: 1.5;
+  --line-tight: 1.25;
+  --scale: 16px;
+  --unit: calc(var(--scale) / 4);
+  --radius: calc(var(--unit) * 2.25);
+  --radius-small: calc(var(--unit) * 1.5);
+  --control: calc(var(--unit) * 8);
+  --list-row: calc(var(--unit) * 7);
+  --icon: calc(var(--unit) * 4);
+  --icon-large: calc(var(--unit) * 6);
+  --icon-box: calc(var(--unit) * 8);
+  --avatar: calc(var(--unit) * 7);
+  --mark: calc(var(--unit) * 8);
+  --mark-large: calc(var(--unit) * 40);
+  --dot: calc(var(--unit) * 2);
+  --switch-width: calc(var(--unit) * 7);
+  --switch-height: calc(var(--unit) * 4);
+  --tick: calc(var(--unit) * 4);
+  --bar: calc(var(--unit) * 1);
+  --ring: calc(var(--unit) * 14);
+  --ring-small: calc(var(--unit) * 4.5);
+  --space-half: calc(var(--unit) * 0.5);
+  --space-1: calc(var(--unit) * 1);
+  --space-2: calc(var(--unit) * 2);
+  --space-3: calc(var(--unit) * 3);
+  --space-4: calc(var(--unit) * 4);
+  --space-5: calc(var(--unit) * 6);
+  --space-6: calc(var(--unit) * 8);
+  --page-padding: calc(var(--unit) * 8);
+  --section-gap: calc(var(--unit) * 8);
+  --block-gap: calc(var(--unit) * 3);
+  --grid-gap: calc(var(--unit) * 3);
+  --control-gap: calc(var(--unit) * 2);
+  --card-padding: calc(var(--unit) * 4);
+  --row-padding: calc(var(--unit) * 3) calc(var(--unit) * 4);
+  --button-padding: 0 calc(var(--unit) * 3.5);
+  --field-padding: 0 calc(var(--unit) * 3);
+  --chip-height: calc(var(--unit) * 5.5);
+  --chip-padding: 0 calc(var(--unit) * 2);
+  --menu-padding: calc(var(--unit) * 1);
+  --menu-row-padding: calc(var(--unit) * 1) calc(var(--unit) * 2);
+  --dialog-padding: calc(var(--unit) * 6);
+  --toast-padding: calc(var(--unit) * 2.5) calc(var(--unit) * 3.5);
+  --tip-padding: calc(var(--unit) * 2) calc(var(--unit) * 2.5);
+  --column: calc(var(--unit) * 240);
+  --column-wide: calc(var(--unit) * 360);
+  --measure: calc(var(--unit) * 240);
+  --sidebar: calc(var(--unit) * 62);
+  --sidebar-folded: calc(var(--unit) * 17.5);
+  --sidebar-gap: calc(var(--unit) * 3);
+  --topbar: calc(var(--unit) * 8.25);
+  --tab-width: calc(var(--unit) * 37.5);
+  --card-min: calc(var(--unit) * 65);
+  --choice-min: calc(var(--unit) * 28);
+  --menu-min: calc(var(--unit) * 55);
+  --menu-max: calc(var(--unit) * 85);
+  --menu-cap: calc(var(--unit) * 84);
+  --dialog-small: calc(var(--unit) * 110);
+  --dialog: calc(var(--unit) * 150);
+  --dialog-large: calc(var(--unit) * 240);
+  --dialog-cap: 94vw;
+  --dialog-cap-height: 92vh;
+  --picker-width: calc(var(--unit) * 180);
+  --picker-height: calc(var(--unit) * 130);
+  --pane: calc(var(--unit) * 95);
+  --pane-min: calc(var(--unit) * 65);
+  --toast: calc(var(--unit) * 90);
+  --field-width: calc(var(--unit) * 45);
+  --field-tall: calc(var(--unit) * 37.5);
+  --code-max: calc(var(--unit) * 60);
+  --editor-gutter: calc(var(--unit) * 11);
+  --fact-key: calc(var(--unit) * 24);
+  --chart-height: calc(var(--unit) * 45);
+  --fast: 120ms;
+  --normal: 200ms;
+  --ease: cubic-bezier(0.33, 0.02, 0.2, 1);
+  --spin: 0.9s;
+  --breath: 2.6s;
+  --breath-low: 0.55;
+  --faded: 0.45;
+  --z-menu: 100;
+  --z-dialog: 200;
+  --z-toast: 300;
+  --z-tip: 400;
+}
+[data-theme="light"] {
+  --canvas: rgb(252, 251, 248);
+  --panel: rgb(255, 255, 255);
+  --tab-on: var(--panel);
+  --tint: rgba(62, 55, 42, 0.05);
+  --raise: transparent;
+  --accent-tint: color-mix(in srgb, var(--accent) 10%, transparent);
+  --line: rgba(62, 55, 42, 0.12);
+  --line-strong: rgba(62, 55, 42, 0.24);
+  --text: rgb(38, 34, 26);
+  --text-2: rgb(92, 85, 74);
+  --text-3: rgb(120, 112, 98);
+  --ok: rgb(28, 135, 80);
+  --warn: rgb(150, 105, 0);
+  --bad: rgb(170, 45, 38);
+  --merged: rgb(130, 80, 223);
+  --file-page: rgb(0, 122, 110);
+  --file-picture: rgb(176, 58, 122);
+  --shadow: 0 calc(var(--unit) * 3) calc(var(--unit) * 8) rgba(62, 55, 42, 0.16);
+  --shadow-rest: 0 calc(var(--unit) * 0.25) calc(var(--unit) * 0.5) rgba(62, 55, 42, 0.06), 0 calc(var(--unit) * 0.75) calc(var(--unit) * 2) rgba(62, 55, 42, 0.07);
+  --scrim: rgba(38, 34, 26, 0.25);
+  --scroll: rgba(62, 55, 42, 0.2);
+  --scroll-hover: rgba(62, 55, 42, 0.3);
+  --code-kw: #7c3aed;
+  --code-str: #1a7f37;
+  --code-num: #b45309;
+  --code-fn: #0b69a3;
+}
+
+/* ---- Madav House theme: design/base.css ---- */
+/* base.css - the floor under every object: the fonts (reading and title, roman and italic; Inter kept behind the reading font),
+   the reset, the two faces, focus, selection, the scrollbar and the reduced-motion switch. The reading font reads and presses
+   (--font); the title and code fonts are opted into by their objects only (rule 1). Nothing here has a class of its own. */
+@font-face { font-family: "Source Serif 4"; font-style: normal; font-weight: 200 900; font-display: swap; src: url("fonts/source-serif-4-roman.woff2") format("woff2"); }
+@font-face { font-family: "Source Serif 4"; font-style: italic; font-weight: 200 900; font-display: swap; src: url("fonts/source-serif-4-italic.woff2") format("woff2"); }
+@font-face { font-family: "Madav Display"; font-style: italic; font-weight: 340 640; font-display: swap; src: url("fonts/fraunces-italic.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Madav Display"; font-style: normal; font-weight: 340 640; font-display: swap; src: url("fonts/fraunces-roman.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Madav Text"; font-style: normal; font-weight: 100 900; font-display: swap; src: url("fonts/inter-var.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+html { color-scheme: dark; }
+[data-theme="light"] { color-scheme: light; }
+/* every face carries its own ink and floor, so a wrapper in the other face (Foundations) reads right */
+body, [data-theme] {
+  background: var(--canvas); color: var(--text);
+  font-family: var(--font); font-weight: var(--weight-regular); font-size: var(--size-text); line-height: var(--line-height);
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+}
+h1, h2, h3, h4, p, ul, ol, figure, blockquote, pre, dl, dd { margin: 0; }
+h1, h2, h3, h4 { font-size: inherit; font-weight: inherit; }
+ul, ol { padding: 0; list-style: none; }
+img, svg { display: block; max-width: 100%; }
+svg { flex: none; }
+button, input, textarea, select { font: inherit; color: inherit; letter-spacing: inherit; margin: 0; }
+button { cursor: pointer; background: none; border: 0; padding: 0; text-align: inherit; }
+button:disabled { cursor: default; }
+summary { list-style: none; }
+summary::-webkit-details-marker { display: none; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 2px; }
+hr { height: 0; border: 0; border-top: 1px solid var(--line); }
+code, kbd, pre { font-family: var(--font-code); font-size: var(--size-small); }
+b, strong { font-weight: var(--weight-semibold); }
+small { font-size: var(--size-small); }
+em, i { font-style: normal; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+::selection { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+::placeholder { color: var(--text-3); opacity: 1; }
+
+*::-webkit-scrollbar { width: var(--space-2); height: var(--space-2); }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: transparent; border-radius: var(--radius-small); border: 2px solid transparent; background-clip: padding-box; }
+*:hover::-webkit-scrollbar-thumb { background: var(--scroll); background-clip: padding-box; }
+*::-webkit-scrollbar-thumb:hover { background: var(--scroll-hover); background-clip: padding-box; }
+@supports not selector(::-webkit-scrollbar) { * { scrollbar-color: transparent transparent; scrollbar-width: thin; } *:hover { scrollbar-color: var(--scroll) transparent; } }
+
+/* Wide: the one column widens (rule 5); the reading font from Settings, wherever it is set (rule 1) */
+[data-width="wide"] { --column: var(--column-wide); }
+[data-font] { font-family: var(--font); }
+[data-font="system"] { --font: var(--font-system); }
+[data-font="inter"] { --font: var(--font-inter); }
+[data-font="georgia"] { --font: var(--font-georgia); }
+
+/* Reduced motion: every duration is a token, so zeroing them stands all motion down at once. */
+@media (prefers-reduced-motion: reduce) {
+  :root { --fast: 0ms; --normal: 0ms; --spin: 0ms; --breath: 0ms; }
+}
+
+/* ---- Madav House theme: design/objects/surface.css ---- */
+/* surface.css - the box every boxed object stands on. Written once: the panel, the one hairline, the one corner, the
+   resting shadow.
+   .at-box    a box that shows.
+   .at-press  a box you press: under the pointer it takes the accent tint (nothing lifts, nothing glows); the chosen
+              one (.on, aria-pressed, aria-selected, aria-current) takes the accent edge; a disabled one fades.
+   Every box rests a little forward with the one resting shadow (--shadow-rest), fields too; only things that float
+   (menus, dialogs, toasts, tips) carry --shadow. An object adds its shape
+   (padding, size, type) in its own sheet and never restates any of this. */
+.at-box, .at-press { border: 1px solid var(--line); border-radius: var(--radius); background-color: var(--panel); box-shadow: var(--shadow-rest); }
+:is(.at-box, .at-press, dialog, [popover], [role=dialog]) :is(.at-box, .at-press):not(:where(.primary, .at-check)) { background-image: linear-gradient(var(--raise), var(--raise)); }   /* a box in a box steps forward; a fill or a check keeps its own */
+.at-press { cursor: pointer; transition: border-color var(--fast) var(--ease), background-color var(--fast) var(--ease), color var(--fast) var(--ease); }
+.at-press:hover:not(:disabled, [aria-disabled="true"], .at-inert) { background-image: linear-gradient(var(--accent-tint), var(--accent-tint)); }
+:is(.at-box, .at-press):is(.on, [aria-pressed="true"], [aria-selected="true"], [aria-current]) { border-color: var(--accent); }
+.at-press:is(:disabled, [aria-disabled="true"]) { opacity: var(--faded); cursor: default; }
+.at-press.at-inert { cursor: default; }
+
+/* ---- Madav House theme: design/objects/frame.css ---- */
+/* frame.css - the window's frame. The sidebar floats in the title font: a box off the window's edges, its head (the
+   wordmark, its controls), its rows, its foot over a hairline, and its round ‹ on the top bar's line. Folded, a column:
+   the M in its circle, the +. The top bar: the back seat, the tabs, the controls at the right, a hairline under it. */
+.at-side { position: relative; font-family: var(--font-title); display: flex; flex-direction: column; gap: var(--space-2); min-height: 0; padding: var(--space-3) var(--space-2); }
+.at-side-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: var(--control); padding-left: var(--space-3); }
+.at-wordmark { display: block; height: var(--icon); width: auto; }
+.at-wordmark-go { display: flex; align-items: center; height: var(--control); border-radius: var(--radius-small); }
+:is(.at-side-body, .at-side-scroll) { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-2); }
+.at-side-body.fixed { flex: none; overflow: visible; }
+.at-side-foot { flex: none; display: flex; flex-direction: column; gap: var(--space-1); padding-top: var(--space-2); border-top: 1px solid var(--line); }
+.at-side-foot > p { padding: 0 var(--space-3); }   /* a line of words in the foot stands at its rows' inset */
+.at-side-hide { position: absolute; z-index: 1; top: calc(var(--topbar) - var(--list-row) / 2 - 1px * 1.5); right: calc(var(--list-row) / -2); display: grid; place-items: center; width: var(--list-row); height: var(--list-row); border-radius: 50%; color: var(--accent); }   /* on the top bar's line */
+.at-side-hide > svg { width: var(--icon); height: var(--icon); }
+.at-side-folded { position: relative; display: flex; flex-direction: column; align-items: center; gap: var(--space-3); padding-top: calc(var(--topbar) - (var(--sidebar-folded) - var(--space-4) + 1px) / 2); }   /* on the top bar's line */
+.at-side-folded > :first-child { width: calc(var(--sidebar-folded) - var(--space-4)); height: calc(var(--sidebar-folded) - var(--space-4)); }
+.at-side-folded::after { content: ""; position: absolute; top: calc(var(--topbar) - 1px); left: calc(50% + (var(--sidebar-folded) - var(--space-4)) / 2); right: calc(-1 * var(--sidebar-gap)); height: 1px; background: var(--line); }   /* the line meets it */
+
+.at-top { display: flex; align-items: center; gap: var(--space-2); flex: none; min-width: 0; height: var(--topbar); padding: 0 var(--space-2); border-bottom: 1px solid var(--line); }
+.at-top > .at-top-back { flex: none; display: grid; place-items: center; width: var(--control); }
+.at-top :is(.at-top-back, .at-top-end) > button, .at-top-end > details > summary { height: var(--list-row); }
+.at-top-back > button { width: var(--list-row); min-width: 0; padding: 0; }
+.at-top > .at-top-end { margin-left: auto; flex: none; display: flex; align-items: center; gap: var(--space-1); }
+
+/* ---- Madav House theme: design/objects/button.css ---- */
+/* button.css - one button shape at one height (--control): the button (outlined, on .at-press, in the font of where
+   it stands, rule 1), the main one (primary: the accent, once per page), the dial (plain, the accent tint under the
+   pointer; its name ends in "…", whole in its title), and send (round, the accent, in the ask box). */
+.at-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--control-gap); flex: none;
+  height: var(--control); padding: var(--button-padding); vertical-align: middle; white-space: nowrap;
+  font-family: inherit; font-weight: var(--weight-medium); font-size: var(--size-text); line-height: 1;
+  color: var(--text);
+}
+.at-btn > svg { width: var(--icon); height: var(--icon); }
+.at-btn > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.at-btn.primary { background-color: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.at-btn.primary:is(.on, [aria-pressed="true"]) { border-color: var(--accent); }
+.at-btn.danger { color: var(--bad); }
+.at-btn.on { border-color: var(--accent); }
+
+.at-dial {
+  display: inline-flex; align-items: center; gap: var(--space-1); max-width: 100%;
+  height: var(--control); padding: 0 var(--space-3); border-radius: var(--radius); white-space: nowrap;
+  font-family: var(--font); font-weight: var(--weight-medium); font-size: var(--size-text); line-height: 1;
+  color: var(--text-2); cursor: pointer; transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+.at-dial > svg { width: var(--icon); height: var(--icon); }
+.at-dial-t { display: inline-flex; align-items: center; gap: var(--space-1); min-width: 0; }   /* a dial's glyph and words, centred as they stood */
+.at-dial-t > * { flex: none; }
+.at-dial-t > .at-dial-w { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-block: var(--space-1); margin-block: calc(-1 * var(--space-1)); }   /* the words: cut with "…"; the cut edge stands below the letters' tails, the line where it stood */
+.at-dial:hover:not(:disabled, [aria-disabled="true"]) { background: var(--accent-tint); color: var(--text); }
+.at-dial.on { color: var(--accent); }
+.at-dial:is(:disabled, [aria-disabled="true"]) { opacity: var(--faded); cursor: default; }
+
+.at-send {
+  display: grid; place-items: center; flex: none;
+  width: var(--control); height: var(--control); border: 0; border-radius: 50%;
+  background: var(--accent); color: var(--on-accent);
+}
+.at-send > svg { width: var(--icon); height: var(--icon); }
+.at-send:disabled { opacity: var(--faded); cursor: default; }   /* faded until typed */
+
+/* ---- Madav House theme: design/objects/chip.css ---- */
+/* chip.css - the chip: a short label on the tint, the small corner, no edge. A choice (a chip you press: a filter, an
+   answer, a chip that opens a menu) stands on the box at the press height, and the chosen one takes the accent edge. Colour says one of four meanings. */
+.at-chip {
+  display: inline-flex; align-items: center; gap: var(--space-1); flex: none;
+  height: var(--chip-height); padding: var(--chip-padding); border-radius: var(--radius-small); vertical-align: middle; white-space: nowrap;
+  background: var(--tint); font-family: var(--font); font-weight: var(--weight-medium); font-size: var(--size-small); line-height: 1;
+  color: var(--text-2);
+}
+.at-chip > svg { width: var(--space-3); height: var(--space-3); }
+.at-chip > .at-chip-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; padding-block: var(--space-1); margin-block: calc(-1 * var(--space-1)); }   /* the cut edge below the tails */
+.at-chip > .at-chip-x { position: relative; display: inline-grid; place-items: center end; width: var(--list-row); height: var(--list-row); margin: calc((var(--icon) - var(--list-row)) / 2) calc(-1 * var(--space-2)); padding-right: calc(var(--space-1) + (var(--icon) - var(--space-3)) / 2); color: var(--text-3); }   /* the ×: presses as a list row square, out to the chip's edge (rule 4) */
+.at-chip > .at-chip-x::before { content: ""; position: absolute; top: calc((var(--list-row) - var(--icon)) / 2); right: var(--space-1); width: var(--icon); height: var(--icon); border-radius: var(--radius-small); }
+.at-chip > .at-chip-x:hover { color: var(--text); }
+.at-chip > .at-chip-x:hover::before { background: var(--accent-tint); }
+.at-chip > .at-chip-x > svg { position: relative; width: var(--space-3); height: var(--space-3); }
+.at-chip.at-press { min-width: 0; max-width: 100%; height: var(--control); padding: 0 var(--space-3); border-radius: var(--radius-small); background-color: var(--panel); }   /* rule 4 */
+.at-chip.at-press:is(.on, [aria-pressed="true"]) { color: var(--text); }
+.at-chip.radio { padding: var(--button-padding); font-size: var(--size-text); }
+.at-chip.ok, .at-chip.free { color: var(--ok); }
+.at-chip.warn { color: var(--warn); }
+.at-chip.danger { color: var(--bad); }
+.at-chip.accent { color: var(--accent); }
+
+/* ---- Madav House theme: design/objects/field.css ---- */
+/* field.css - what a person types into, at the control height, on the Surface: the input, the select's shut face, the
+   search (a glass in the box), the textarea; the label over a field (its ? beside it), its hint under it; the ask bar (the words,
+   send at the right, its dials under it). Focus turns the edge the accent. */
+.at-input {
+  display: block; width: 100%; min-width: 0; height: var(--control);
+  padding: var(--field-padding);
+  font-family: var(--font); font-weight: var(--weight-regular); font-size: var(--size-text); line-height: var(--line-height);
+  color: var(--text); caret-color: var(--accent); transition: border-color var(--fast) var(--ease);
+}
+.at-input[aria-invalid="true"] { border-color: var(--bad); background: var(--bad-tint); }
+.at-input:focus, .at-input:focus-visible { outline: none; border-color: var(--accent); }   /* after the bad edge: a bad field in focus shows its focus, its bad tint kept */
+.at-input:disabled { opacity: var(--faded); }
+.at-input.mono { font-family: var(--font-code); font-size: var(--size-small); }
+textarea.at-input { height: auto; min-height: var(--field-tall); padding: var(--space-2) var(--space-3); resize: vertical; }
+.at-input.small { min-height: calc(var(--control) * 2.5); }
+.at-input.at-select { display: flex; align-items: center; gap: var(--control-gap); cursor: pointer; text-align: left; }
+.at-input.at-select > .at-select-v { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.at-input.at-select > svg { flex: none; width: var(--icon); height: var(--icon); }
+details[open] > .at-input.at-select { border-color: var(--accent); }
+.at-input.at-select[aria-disabled="true"] { opacity: var(--faded); cursor: default; }
+.at-combo { display: block; min-width: 0; }
+
+.at-field { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+:is(.at-field, .at-field-head) > .at-field-l { font-weight: var(--weight-medium); font-size: var(--size-small); color: var(--text-2); }
+.at-field > .at-field-head { display: flex; align-items: center; gap: var(--space-1); min-width: 0; }   /* the label, then its ? one small step after it */
+.at-field > .at-field-hint { font-size: var(--size-small); color: var(--text-3); }   /* the hint, under its field */
+.at-fixit { font-size: var(--size-small); color: var(--bad); }
+
+.at-search {
+  display: flex; align-items: center; gap: var(--control-gap); flex: none; min-width: 0;
+  height: var(--control); padding: var(--field-padding); color: var(--text-3); transition: border-color var(--fast) var(--ease);
+}
+.at-search:focus-within { border-color: var(--accent); }
+.at-search > svg { width: var(--icon); height: var(--icon); }
+.at-search > input { flex: 1; min-width: 0; border: 0; padding: 0; background: none; outline: none; color: var(--text); font-family: var(--font); font-size: var(--size-text); }
+
+.at-ask { position: relative; display: flex; flex-direction: column; gap: var(--space-1); width: 100%; max-width: var(--column); margin-inline: auto; }
+.at-ask-box { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4); transition: border-color var(--fast) var(--ease); }
+.at-ask-box:focus-within { border-color: var(--accent); }
+.at-ask-text { display: flex; align-items: flex-end; gap: var(--space-2); }
+.at-ask-text > .at-ask-hint { flex: none; padding-bottom: var(--space-1); font-size: var(--size-small); color: var(--text-3); }
+.at-ask-box > .at-ask-text > textarea { flex: 1; min-height: var(--space-6); field-sizing: content; max-height: 50vh; border: 0; padding: var(--space-1) 0; background: none; outline: none; resize: none; color: var(--text); font-family: var(--font); font-size: var(--size-text); line-height: var(--line-height); }
+.at-ask-row { display: flex; align-items: center; gap: var(--space-half); flex-wrap: wrap; }
+.at-ask-row > .at-ask-tail { margin-left: auto; min-width: 0; max-width: 100%; display: inline-flex; align-items: center; gap: var(--space-half); }
+.at-ask-row .at-dial { padding-inline: var(--space-2); }
+
+/* ---- Madav House theme: design/objects/switch.css ---- */
+/* switch.css - the switch (on/off: the accent track with the white knob), the tick (a checkbox, the small corner; it
+   presses as a list row square around the box, rule 4), and the toggle that puts words beside either. */
+.at-switch {
+  position: relative; display: inline-block; flex: none; vertical-align: middle;
+  width: var(--switch-width); height: var(--switch-height); padding: 0; border: 0; border-radius: calc(var(--switch-height) / 2);
+  background: var(--line-strong); transition: background var(--normal) var(--ease);
+}
+.at-switch::after {
+  content: ""; position: absolute; top: 2px; left: 2px;
+  width: calc(var(--switch-height) - 2px - 2px); height: calc(var(--switch-height) - 2px - 2px); border-radius: 50%;
+  background: var(--plate); transition: left var(--normal) var(--ease);
+}
+.at-switch.on { background: var(--accent); }
+.at-switch.on::after { left: calc(var(--switch-width) - var(--switch-height) + 2px); }
+.at-switch:disabled { opacity: var(--faded); }
+
+.at-tick {
+  position: relative; display: inline-grid; place-items: center; flex: none; vertical-align: middle;
+  width: var(--list-row); height: var(--list-row); margin: calc((var(--tick) - var(--list-row)) / 2); padding: 0; color: var(--on-accent);
+}
+.at-tick::before {
+  content: ""; position: absolute; inset: calc((var(--list-row) - var(--tick)) / 2);
+  border: 1px solid var(--line-strong); border-radius: var(--radius-small); background: var(--panel);
+  transition: background var(--fast) var(--ease), border-color var(--fast) var(--ease);
+}
+.at-tick > svg { position: relative; width: var(--space-3); height: var(--space-3); opacity: 0; }
+.at-tick.on::before { background: var(--accent); border-color: var(--accent); }
+.at-tick.on > svg { opacity: 1; }
+.at-tick:disabled { opacity: var(--faded); }
+.at-chip > .at-tick { margin-left: calc((var(--tick) - var(--list-row)) / 2 - var(--space-1)); }   /* a chip's tick */
+
+.at-toggle { display: inline-flex; align-items: center; gap: var(--control-gap); cursor: pointer; user-select: none; font-weight: var(--weight-medium); font-size: var(--size-text); color: var(--text-2); }
+
+/* ---- Madav House theme: design/objects/dot.css ---- */
+/* dot.css - the status dot: a small circle in one of the four meanings, or the muted "off"; still. The swatch: a
+   colour as a small square over the check; pressed, it opens the picker. */
+.at-dot { display: inline-block; flex: none; width: var(--dot); height: var(--dot); border-radius: 50%; background: currentColor; vertical-align: middle; color: var(--text-3); }
+.at-dot.ring { background: transparent; border: 2px solid currentColor; }
+.at-dot.ok { color: var(--ok); }
+.at-dot.warn { color: var(--warn); }
+.at-dot.bad { color: var(--bad); }
+.at-dot.accent { color: var(--accent); }
+.at-dot.empty { background: transparent; border: 1px solid var(--line-strong); }
+.at-dots { display: inline-flex; align-items: center; gap: var(--space-1); }
+.at-swatch { display: inline-block; flex: none; width: var(--icon-box); height: var(--icon-box); border: 1px solid var(--line); border-radius: var(--radius-small); vertical-align: middle; overflow: hidden; padding: 0; }
+.at-swatch > i { display: block; width: 100%; height: 100%; }
+
+/* ---- Madav House theme: design/objects/icon.css ---- */
+/* icon.css - the icon button (a glyph with no box: the accent tint under the pointer, at the control height), the glyph sizes,
+   the avatar (a round picture or an initial), the M (Madav's mark), a provider's logo in its square, and a file's kind:
+   a PDF, a Word document, a spreadsheet and a presentation filled in their colours, a page and a picture quieter on the box. */
+.icon-btn {
+  display: inline-grid; grid-auto-flow: column; gap: var(--space-1); place-items: center; flex: none;
+  min-width: var(--control); height: var(--control); padding: 0 var(--space-2); border: 0; border-radius: var(--radius); vertical-align: middle;
+  background: transparent; color: var(--text-2); font-family: var(--font); font-weight: var(--weight-medium); font-size: var(--size-small);
+  cursor: pointer; transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+.icon-btn > svg { width: var(--icon); height: var(--icon); }
+.icon-btn:hover:not(:disabled, [aria-disabled="true"]) { background: var(--accent-tint); color: var(--text); }
+.icon-btn.round { aspect-ratio: 1; border-radius: 50%; padding: 0; background: var(--tint); }
+.icon-btn.round > .at-mark { width: 60%; height: 60%; }   /* the M in its circle */
+.icon-btn.at-press { aspect-ratio: 1; min-width: 0; padding: 0; border: 1px solid var(--line); }   /* boxed: always square */
+.icon-btn.round.at-press { background-color: var(--panel); }
+.icon-btn.danger { color: var(--bad); }
+.icon-btn:is(.on, [aria-pressed="true"]) { background: var(--tint); color: var(--accent); }
+.icon-btn.at-press.accent { border: calc(var(--space-half) * 1.5) solid var(--accent); color: var(--accent); }
+.icon-btn.accent:is(.on, [aria-pressed="true"]) { background: var(--accent-tint); }
+.icon-btn:is(:disabled, [aria-disabled="true"]) { opacity: var(--faded); cursor: default; }
+
+.at-ic { display: inline-block; flex: none; width: var(--icon); height: var(--icon); vertical-align: middle; }
+.at-ic.lg { width: var(--icon-large); height: var(--icon-large); }
+.at-ic.muted { color: var(--text-3); }
+.at-ic.accent { color: var(--accent); }
+.at-ic.ok { color: var(--ok); }
+.at-ic.bad { color: var(--bad); }
+.at-ic.merged { color: var(--merged); }
+
+.at-face { display: inline-grid; place-items: center; flex: none; overflow: hidden; width: var(--avatar); height: var(--avatar); border-radius: 50%; background: var(--accent); color: var(--on-accent); font-family: var(--font); font-size: var(--size-small); font-weight: var(--weight-semibold); }
+.at-face.md { width: var(--icon-box); height: var(--icon-box); }
+.at-face > img { width: 100%; height: 100%; object-fit: cover; }
+
+.at-mark { display: block; flex: none; width: var(--mark); height: var(--mark); object-fit: contain; }
+.at-mark.sm { width: var(--avatar); height: var(--avatar); }
+.at-mark.lg { width: var(--mark-large); height: var(--mark-large); }
+
+.at-logo-box { display: grid; place-items: center; flex: none; width: var(--icon-box); height: var(--icon-box); border-radius: var(--radius); background: var(--tint); overflow: hidden; }
+.at-logo-box.dark { background: var(--plate); }
+.at-logo { display: block; width: var(--icon); height: var(--icon); object-fit: contain; }
+.at-logo.fallback { display: grid; place-items: center; color: var(--text-2); font-weight: var(--weight-semibold); font-size: var(--size-small); }
+.at-logo-box.sm { width: var(--avatar); height: var(--avatar); border-radius: var(--radius-small); }
+
+.at-file { display: inline-grid; place-items: center; flex: none; width: var(--icon-box); height: var(--icon-box); border-radius: var(--radius); color: var(--text-2); }
+.at-file > svg { width: var(--icon); height: var(--icon); }
+.at-file:is(.pdf, .word, .sheet, .slides) { color: var(--plate); }
+.at-file.pdf { background-color: var(--file-pdf); } .at-file.word { background-color: var(--file-word); } .at-file.sheet { background-color: var(--file-sheet); } .at-file.slides { background-color: var(--file-slides); }
+.at-file.page { color: var(--file-page); } .at-file.picture { color: var(--file-picture); }
+
+/* ---- Madav House theme: design/objects/tile.css ---- */
+/* tile.css - the card (rule 7: every card in a grid the same size): head (glyph, name; a team's name under its faces),
+   two lines at most, chips, a foot; the deck (equal columns) and the band (equal tiles that wrap into columns). A deck as
+   a list: the same cards one to a row in one box, ruled as rows are, sharing its columns - mark, name and its one line,
+   chips, the foot; what opens a card leads its row, anything else stands under the line. */
+.at-tile { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; padding: var(--card-padding); text-align: left; color: var(--text); }
+.at-tile-head { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.at-tile-head > .at-tile-icon { flex: none; display: grid; place-items: center; width: var(--icon-box); height: var(--icon-box); color: var(--text-2); }
+.at-tile-icon > svg { width: var(--icon); height: var(--icon); }
+.at-tile-head:has(> .at-avatars) { display: grid; }
+.at-tile-name { font-family: var(--font-title); max-width: 100%; font-weight: var(--weight-medium); font-size: var(--size-text); line-height: var(--line-tight); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.at-avatars + .at-tile-name { white-space: normal; overflow-wrap: anywhere; }
+.at-tile-sub { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; max-width: 100%; font-size: var(--size-small); line-height: var(--line-height); color: var(--text-2); }
+.at-tile-chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); }
+.at-tile-foot { margin-top: auto; display: flex; flex-wrap: wrap; align-items: center; gap: var(--control-gap); min-width: 0; padding-top: var(--space-2); }
+.at-tile-foot > .at-tail { margin-left: auto; }
+
+.at-deck { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(var(--card-min), 100%), 1fr)); grid-auto-rows: 1fr; gap: var(--grid-gap); }
+.at-band { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(var(--choice-min), 100%), 1fr)); gap: var(--space-2); }   /* equal tiles */
+.at-band > .at-chip { justify-content: center; }
+:is(.at-deck, .at-band) > * { min-width: 0; }
+
+.at-deck.list { grid-template-columns: auto minmax(min(var(--choice-min), 100%), 1fr) minmax(0, auto) max-content; grid-auto-rows: auto; gap: 0; overflow: hidden; }
+.at-deck.list > .at-tile { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; grid-template-areas: "mark name chips foot" "mark sub chips foot"; align-items: center; gap: var(--space-half) 0; padding: var(--row-padding); border: 0; border-radius: 0; box-shadow: none; background-color: transparent; }
+:where(.at-deck).list > .at-tile { background-image: none; }   /* no box in a box; tinted under the pointer */
+.at-deck.list > .at-tile:has(> .at-tile-head > .at-avatars) { grid-template-areas: "mark mark chips foot" "name name chips foot" "sub sub chips foot"; }
+.at-deck.list > .at-tile + .at-tile { border-top: 1px solid var(--line); }
+.at-deck.list > .at-tile.on { background-color: var(--tint); }
+.at-deck.list > .at-tile > .at-tile-head { display: contents; }
+.at-deck.list > .at-tile > .at-tile-head > :first-child:not(.at-tile-name) { grid-area: mark; margin-right: var(--space-3); }
+.at-deck.list .at-tile-name { grid-area: name; }
+.at-deck.list > .at-tile > .at-tile-sub { grid-area: sub; -webkit-line-clamp: 1; }
+.at-deck.list > .at-tile > .at-tile-chips { grid-area: chips; justify-content: flex-end; margin-left: var(--space-4); }
+.at-deck.list > .at-tile > .at-tile-foot { grid-area: foot; flex-wrap: nowrap; margin: 0 0 0 var(--space-4); padding: 0; }
+.at-deck.list > .at-tile > :not(.at-tile-head, .at-tile-name, .at-tile-sub, .at-tile-chips, .at-tile-foot) { grid-column: 2 / -1; }
+.at-deck.list > .at-tile > :first-child:not(.at-tile-head, .at-tile-name, .at-tile-sub, .at-tile-chips, .at-tile-foot) { grid-area: mark; margin-right: var(--space-3); }
+
+/* ---- Madav House theme: design/objects/panel.css ---- */
+/* panel.css - the page (one centred column, the chat's width: the head, under it tabs, a search or both, then sections), the
+   section, the card (a box with a head; the empty card says what will fill it), the strip, and the row and tail that
+   place things. Every gap is a shared one. */
+.app-page { height: 100%; min-height: 0; width: 100%; overflow-y: auto; }
+.app-page > .at-page-col { width: 100%; max-width: var(--column); margin-inline: auto; padding: var(--page-padding); display: flex; flex-direction: column; gap: var(--section-gap); }
+.app-page > .at-page-col > * { flex-shrink: 0; }
+.at-page-top { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
+.app-page.embed { height: auto; overflow: visible; }
+.app-page.embed > .at-page-col { max-width: none; padding: 0; }
+
+.at-section { display: flex; flex-direction: column; gap: var(--block-gap); min-width: 0; }
+
+.at-card { display: flex; flex-direction: column; gap: var(--block-gap); min-width: 0; padding: var(--card-padding); }
+.at-card > .at-card-head { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.at-card > .at-card-head > h3 { font-family: var(--font-title); font-weight: var(--weight-medium); font-size: var(--size-text); line-height: var(--line-tight); color: var(--text); }
+.at-card > .at-card-head > .at-card-tail { margin-left: auto; flex: none; display: flex; align-items: center; gap: var(--control-gap); }
+.at-card.empty { align-items: center; justify-content: center; padding: var(--space-5) var(--card-padding); text-align: center; color: var(--text-2); }
+.at-card.bad { border-color: var(--bad); background: var(--bad-tint); }
+
+.at-strip { display: flex; align-items: center; gap: var(--control-gap); flex-wrap: nowrap; min-width: 0; padding: var(--space-2) var(--space-3); }
+:is(.at-strip > .at-tail > span:not(:has(button)), .at-toggle-t) { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.at-strip > svg { flex: none; width: var(--icon); height: var(--icon); color: var(--text-2); }
+.at-strip > .at-strip-t { flex: 1 99 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: var(--size-text); color: var(--text); }
+.at-strip > .at-tail { margin-left: auto; flex: 0 1 auto; min-width: 0; display: inline-flex; align-items: center; gap: var(--space-1); white-space: nowrap; }
+
+.at-row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--control-gap); min-width: 0; }
+.at-row > .at-tail { margin-left: auto; }
+.at-row > .at-search { flex: 1 1 var(--card-min); }
+.at-row.compact { gap: var(--space-1); }   /* the one exception: names give way to their glyph; it wraps only when even that won't fit */
+.at-row.compact > :is(.icon-btn, :last-child) { flex-shrink: 0; }
+.at-row.compact > :is(:has(> summary.at-chip), .at-chip:not(.at-press)) { flex: 1 1 var(--list-row); min-width: var(--list-row); max-width: max-content; }
+.at-row.compact :is(.at-dial-w, .at-chip-t) { max-width: calc(var(--choice-min) - var(--control)); }
+.at-row.compact summary.at-chip > .at-dial-t { flex-shrink: 99; min-width: var(--space-3); }
+.at-row.compact summary.at-chip > svg:last-child { min-width: 0; flex-shrink: 1; }
+.at-row.compact > .at-chip:has(> .at-tick) { flex: 9 1 var(--control); min-width: var(--control); max-width: max-content; overflow: hidden; }
+.at-row.compact :is(.at-chip.at-press, .at-btn, .icon-btn):not(:is([role=menu], dialog) *) { height: var(--chip-height); padding: var(--chip-padding); }
+.at-row.compact .icon-btn:not(:is([role=menu], dialog) *) { min-width: var(--chip-height); padding: 0; }
+.at-row.compact svg:not(:is([role=menu], dialog) *) { width: var(--space-3); height: var(--space-3); }
+.at-tail { display: inline-flex; align-items: center; gap: var(--control-gap); }
+
+/* ---- Madav House theme: design/objects/table.css ---- */
+/* table.css - records in columns, in the box: the head in the small medium words over a hairline, rows with a hairline
+   between them that take the accent tint under the pointer, the chosen one the tint. Cells: .num (right; its figures are Num), .wrap (may break), .trunc (cut with
+   …), .name (a machine name, in the code font). */
+.at-tablewrap { overflow: auto; min-width: 0; }
+.at-tablewrap > .at-table { width: max-content; min-width: 100%; }
+.at-tablewrap > .at-table.fill { width: 100%; }
+.at-table { border-collapse: collapse; background: transparent; }
+.at-table thead th { position: sticky; top: 0; z-index: 1; padding: var(--space-2) var(--space-3); text-align: left; white-space: nowrap; background: var(--panel); border-bottom: 1px solid var(--line); font-weight: var(--weight-medium); font-size: var(--size-small); color: var(--text-2); }
+.at-table tbody td { padding: var(--space-2) var(--space-3); vertical-align: middle; white-space: nowrap; border-bottom: 1px solid var(--line); font-size: var(--size-small); line-height: var(--line-height); color: var(--text); }
+.at-table tbody tr:last-child td { border-bottom: 0; }
+.at-table tr > :is(td, th) + :is(td, th) { border-left: 1px solid var(--line); }
+.at-table tbody tr:hover td { background: var(--accent-tint); }
+.at-table tbody tr.on td { background: var(--tint); }
+.at-table tbody tr.go { cursor: pointer; }
+.at-table :is(td, th).num { text-align: right; font-variant-numeric: tabular-nums; }
+.at-table :is(td, th).wrap { white-space: normal; overflow-wrap: anywhere; min-width: 18ch; }
+.at-table :is(td, th).trunc { max-width: 40ch; overflow: hidden; text-overflow: ellipsis; }
+.at-table td.name { font-family: var(--font-code); }
+.at-table td small { color: var(--text-3); }
+.at-table td > .at-dot { margin-inline: auto; display: block; }
+.at-table td > .at-row { flex-wrap: nowrap; }
+.at-table th.sortable { cursor: pointer; user-select: none; }
+.at-table th.sortable:hover { color: var(--text); }
+.at-table tr.open td { border-bottom: 0; background: var(--tint); }
+.at-table tr.drawer td { padding: var(--space-4); white-space: normal; background: var(--tint); }
+
+/* ---- Madav House theme: design/objects/heading.css ---- */
+/* heading.css - the words. The page's head (the title in the title font, its last word in the accent italic; one line
+   under it; the main button at the right) and the section's (a heading, one line, its controls at the right). The
+   number that stands alone. Then the small words: kicker, quiet, honest, lede, a verdict's. No capitals for show. */
+.page-title { font-family: var(--font-title); font-weight: var(--weight-medium); font-size: var(--size-title); line-height: var(--line-tight); color: var(--text); overflow-wrap: anywhere; }
+.page-title em { font-style: italic; color: var(--accent); }   /* the accented word: the object marks a title's last word */
+.page-title.small { font-size: var(--size-heading); font-weight: var(--weight-medium); }   /* the greeting over Home's headline */
+.at-cycle { display: grid; } .at-cycle > * { grid-area: 1 / 1; } .at-cycle-room { visibility: hidden; }   /* over a hidden copy per word: its tallest height */
+.at-num { font-family: var(--font-title); font-variant-numeric: lining-nums tabular-nums; }   /* a number that stands alone, with its unit */
+.page-sub { font-size: var(--size-text); line-height: var(--line-height); color: var(--text-2); }
+.page-sub b { font-weight: var(--weight-medium); color: var(--text); }
+
+.at-page-head, .at-sect-head { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-5); min-width: 0; }
+.at-page-head { align-items: flex-start; }
+.at-sect-head { align-items: flex-end; }
+:is(.at-page-head, .at-sect-head) > .at-head-words { flex: 1 1 var(--card-min); min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.at-sect-head > .at-head-words { gap: var(--space-half); }
+:is(.at-page-head, .at-sect-head) > .at-head-tail { flex: none; display: inline-flex; align-items: center; gap: var(--control-gap); }
+.at-sect-head > .at-head-words > h2 { font-family: var(--font-title); font-weight: var(--weight-semibold); font-size: var(--size-heading); line-height: var(--line-tight); color: var(--text); }
+.at-sect-head > .at-head-words > p { font-size: var(--size-small); line-height: var(--line-height); color: var(--text-2); }
+
+.at-kicker { display: flex; align-items: center; gap: var(--space-2); font-weight: var(--weight-medium); font-size: var(--size-small); line-height: var(--line-tight); color: var(--text-2); }
+.at-kicker > svg { width: var(--icon); height: var(--icon); }
+.at-kicker.accent { color: var(--accent); }
+.at-quiet { font-size: var(--size-small); color: var(--text-2); overflow-wrap: anywhere; }
+.at-honest { font-size: var(--size-small); line-height: var(--line-height); color: var(--text-2); }
+.at-honest.bad { color: var(--bad); }
+.at-honest.ok { color: var(--ok); }
+.at-lede { font-size: var(--size-text); line-height: var(--line-height); color: var(--text-2); }
+.at-verdict { font-weight: var(--weight-semibold); font-size: var(--size-heading); line-height: var(--line-tight); color: var(--text); }
+.at-verdict.ok { color: var(--ok); }
+.at-verdict.warn { color: var(--warn); }
+.at-rank { font-weight: var(--weight-medium); font-size: var(--size-small); color: var(--accent); }
+.at-cost { font-weight: var(--weight-medium); font-size: var(--size-small); color: var(--ok); }
+.at-cost.paid { color: var(--warn); }
+
+/* ---- Madav House theme: design/objects/tabs.css ---- */
+/* tabs.css - the segmented choice (a few on the tint, the chosen one on the box); the top bar's tabs, folder tabs on
+   its line, sharing it the Chrome way (names cut, then glyphs, then slivers; never a scroll), the open one's accent edge. */
+.at-seg { display: inline-flex; align-items: center; gap: var(--space-half); width: fit-content; max-width: 100%; padding: 2px; border-radius: var(--radius); background: var(--tint); }
+.at-seg > .at-seg-b { display: inline-flex; align-items: center; gap: var(--space-1); height: calc(var(--control) - 2px - 2px); padding: 0 var(--space-3); border: 1px solid transparent; border-radius: var(--radius-small); white-space: nowrap; font-weight: var(--weight-medium); font-size: var(--size-text); color: var(--text-2); transition: color var(--fast) var(--ease), background var(--fast) var(--ease); }
+.at-seg > .at-seg-b > svg { width: var(--icon); height: var(--icon); }
+.at-seg > .at-seg-b:hover:not(:disabled, .on) { color: var(--text); }
+.at-seg > .at-seg-b:is(.on, [aria-selected="true"]) { color: var(--text); background: var(--panel); border-color: var(--line); }
+.at-seg > .at-seg-b:disabled { opacity: var(--faded); }
+
+.at-tabs-box { display: flex; align-items: center; gap: var(--space-1); min-width: 0; align-self: stretch; }
+.at-tabs { display: flex; align-items: flex-end; gap: var(--space-half); flex: 0 1 auto; min-width: 0; align-self: stretch; overflow: hidden; }
+.at-tab { display: inline-flex; align-items: center; flex: 0 1 var(--tab-width); width: var(--tab-width); min-width: calc(var(--icon) + var(--space-3) * 2); height: var(--control); border-bottom-width: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0; background-color: transparent; box-shadow: none; transition: background var(--fast) var(--ease), border-color var(--fast) var(--ease); }
+.at-tab:not(.on):hover { background: var(--accent-tint); }
+.at-tab.on { min-width: calc(var(--icon) + var(--avatar) + var(--space-3) * 2); height: calc(var(--control) + 1px); margin-bottom: -1px; background: var(--tab-on); border: calc(var(--space-half) * 1.5) solid var(--accent); border-bottom: 0; }
+.at-tab.on > .at-tab-go > svg { color: var(--accent); }
+.at-tab > .at-tab-go { display: inline-flex; align-items: center; gap: var(--control-gap); flex: 1; min-width: 0; height: 100%; padding: 0 var(--space-2) 0 var(--space-3); font-weight: var(--weight-medium); font-size: var(--size-text); color: var(--text-2); }
+.at-tab > .at-tab-go > svg { flex: none; width: var(--icon); height: var(--icon); color: var(--text-3); }
+.at-tab > .at-tab-go > .at-tab-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.at-tab.on > .at-tab-go { color: var(--text); }
+.at-tab > .at-tab-x { display: inline-grid; place-items: center; flex: none; width: var(--avatar); height: var(--avatar); margin-right: var(--space-1); border-radius: var(--radius-small); color: var(--text-3); }
+.at-tab > .at-tab-x > svg { width: var(--icon); height: var(--icon); }
+.at-tab:not(.on, :hover, :focus-within) > .at-tab-x { display: none; }   /* the x only when shown */
+.at-tabs.icons > .at-tab > .at-tab-go > .at-tab-t { display: none; }
+.at-tabs.icons > .at-tab:not(.on) > .at-tab-go { justify-content: center; padding: 0; }
+.at-tabs.over > .at-tab:not(.on) { min-width: 0; overflow: hidden; }
+.at-tab > .at-tab-x:hover { color: var(--text); background: var(--accent-tint); }
+.at-tab-add { display: grid; place-items: center; flex: none; width: var(--control); height: var(--control); border-radius: var(--radius); color: var(--text-2); transition: background var(--fast) var(--ease); }
+.at-tab-add > svg { width: var(--icon); height: var(--icon); }
+.at-tab-add:hover:not(:disabled) { color: var(--text); background: var(--accent-tint); }
+.at-tab-add:disabled { opacity: var(--faded); cursor: default; }
+
+/* page tabs: plain words under a page's head, the open one underlined in the accent */
+.at-ptabs { display: flex; align-items: flex-end; gap: var(--space-5); overflow-x: auto; scrollbar-width: none; background: linear-gradient(var(--line), var(--line)) bottom / 100% 1px no-repeat; }
+.at-ptab { font-family: var(--font-title); display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-2) 0; border-bottom: 2px solid transparent; white-space: nowrap; font-weight: var(--weight-medium); font-size: var(--size-text); color: var(--text-2); transition: color var(--fast) var(--ease); }
+.at-ptab > svg { width: var(--icon); height: var(--icon); }
+.at-ptab:hover { color: var(--text); }
+.at-ptab.on { color: var(--text); border-bottom-color: var(--accent); }
+
+/* ---- Madav House theme: design/objects/progress.css ---- */
+/* progress.css - how much, how full: the bar (a thin track with the accent fill, or a meaning's colour), the meter
+   (the bar with its number), the line beside a bar, and the ring (a percent as an arc; the small one at the end of the
+   ask bar has no number). */
+.at-bar { appearance: none; display: block; width: 100%; height: var(--bar); border: 0; border-radius: calc(var(--bar) / 2); background: var(--tint); overflow: hidden; }
+.at-bar::-webkit-progress-bar { background: var(--tint); border-radius: calc(var(--bar) / 2); }
+.at-bar::-webkit-progress-value { background: var(--accent); border-radius: calc(var(--bar) / 2); transition: width var(--normal) var(--ease); }
+.at-bar::-moz-progress-bar { background: var(--accent); border-radius: calc(var(--bar) / 2); }
+.at-bar.ok::-webkit-progress-value, .at-bar.ok::-moz-progress-bar { background: var(--ok); }
+.at-bar.warn::-webkit-progress-value, .at-bar.warn::-moz-progress-bar { background: var(--warn); }
+.at-bar.bad::-webkit-progress-value, .at-bar.bad::-moz-progress-bar { background: var(--bad); }
+.at-meter { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.at-meter > .at-bar { flex: 1 1 auto; width: auto; min-width: 0; }
+.at-meter > b { flex: none; font-size: var(--size-small); font-weight: var(--weight-medium); font-variant-numeric: tabular-nums; color: var(--text); }
+.at-meter.ok > b { color: var(--ok); }
+.at-meter.warn > b { color: var(--warn); }
+.at-meter.bad > b { color: var(--bad); }
+.at-bar-l { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; font-size: var(--size-small); color: var(--text-2); }
+.at-bar-l b { color: var(--text); font-weight: var(--weight-medium); font-variant-numeric: tabular-nums; }
+.at-bar-l > .at-tail { margin-left: auto; }
+.at-ring { position: relative; display: grid; place-items: center; flex: none; width: var(--ring); height: var(--ring); }
+.at-ring > svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.at-ring > svg circle { fill: none; stroke-width: 3.6; }
+.at-ring > svg .tr { stroke: var(--tint); }
+.at-ring > svg .fl { stroke: var(--ok); stroke-linecap: round; }
+.at-ring.warn > svg .fl { stroke: var(--warn); }
+.at-ring.bad > svg .fl { stroke: var(--bad); }
+.at-ring.sm { width: var(--ring-small); height: var(--ring-small); }
+.at-ring.sm > svg circle { stroke-width: 5; }
+.at-ring.sm > svg .tr { stroke: var(--line-strong); }
+.at-ring > i { position: relative; font-weight: var(--weight-semibold); font-size: var(--size-small); font-variant-numeric: tabular-nums; color: var(--text); }
+
+/* ---- Madav House theme: design/objects/row.css ---- */
+/* row.css - rows. The list (rule 7): one box, rows ruled by hairlines; a row is an icon in its box, the name and a line,
+   at the right a status, a button, a switch or a time; a faint row (set aside, not found) in the faint ink, its mark
+   faded. The sidebar's list: rows at the list row's height, the page you
+   are on in the accent on the tint with a bar at its left; a chat's row with its ⋮; a small heading over a group; the
+   chats at the small size; a see-all row as a tile. */
+.at-rows { display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+.at-item { display: flex; align-items: center; gap: var(--space-3); min-width: 0; padding: var(--row-padding); text-align: left; color: var(--text); }
+.at-item + .at-item { border-top: 1px solid var(--line); }
+.at-item.go { cursor: pointer; transition: background var(--fast) var(--ease); }
+.at-item.go:hover { background: var(--accent-tint); }
+.at-item.on { background: var(--tint); }
+.at-item.go:focus-visible { outline-offset: -2px; }
+.at-item > .at-item-icon { flex: none; display: inline-grid; place-items: center; min-width: var(--icon-box); color: var(--text-2); }
+.at-item > .at-item-icon > svg { width: var(--icon-box); height: var(--icon-box); padding: var(--space-2); border-radius: var(--radius); background: var(--tint); }
+.at-item > .at-item-words { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--space-half); }
+.at-item-words > .at-item-name { font-family: var(--font-title); font-weight: var(--weight-medium); font-size: var(--size-text); line-height: var(--line-tight); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.at-item-words > .at-item-sub { font-size: var(--size-small); line-height: var(--line-height); color: var(--text-2); overflow-wrap: anywhere; }
+.at-item-words > .at-item-sub b { font-weight: var(--weight-semibold); color: var(--text); }
+.at-item.faint .at-item-words :is(.at-item-name, .at-item-sub, b) { color: var(--text-3); }   /* set aside or not found: the faint ink */
+.at-item.faint > .at-item-icon { opacity: var(--faded); }   /* its mark faded, a filled one too */
+.at-item > .at-item-more { flex: none; display: inline-flex; align-items: center; gap: var(--space-1); opacity: 0; transition: opacity var(--fast) var(--ease); }
+.at-item:is(:hover, :focus-within) > .at-item-more { opacity: 1; }
+.at-item > .at-item-tail { flex: none; display: inline-flex; align-items: center; gap: var(--control-gap); font-size: var(--size-small); color: var(--text-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.at-list { display: flex; flex-direction: column; gap: 0; min-width: 0; }
+.at-list > .at-li { display: flex; align-items: center; gap: var(--space-3); width: 100%; min-width: 0; min-height: var(--list-row); padding: 0 var(--space-3); border-radius: var(--radius); font-weight: var(--weight-regular); font-size: var(--size-text); line-height: var(--line-tight); color: var(--text-2); cursor: pointer; transition: color var(--fast) var(--ease), background var(--fast) var(--ease); }
+.at-list > .at-li:is(.has-menu, .has-aside) { padding: 0; gap: 0; }
+.at-li > .at-li-go { flex: 1 1 auto; align-self: stretch; display: flex; align-items: center; gap: var(--space-3); min-width: 0; padding: 0 var(--space-3); border-radius: var(--radius); text-align: left; cursor: pointer; }
+.at-li > .at-li-go:focus-visible { outline-offset: -2px; }
+:is(.at-list > .at-li, .at-li-go) > svg { width: var(--icon); height: var(--icon); color: var(--text-2); }
+:is(.at-list > .at-li, .at-li-go) > .at-li-t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:is(.at-list > .at-li, .at-li-go) > small { color: var(--text-3); }
+.at-li > .at-li-more { display: none; flex: none; margin-right: var(--space-half); }
+.at-li > .at-li-more > summary { height: var(--list-row); min-width: var(--list-row); padding: 0; }
+.at-li:is(:hover, :focus-within, :has(> .at-li-more[open])) > .at-li-more { display: inline-block; }
+.at-li:is(:hover, :focus-within, :has(> .at-li-more[open])) > .at-li-go > small { display: none; }
+.at-list > .at-li:not(.on, [aria-current]):is(:hover, :has(> .at-li-more[open])) { color: var(--text); background: var(--accent-tint); }
+.at-list > .at-li:is(.on, [aria-current]), .at-dd-row.on { position: relative; color: var(--accent); background: var(--tint); }   /* the page you are on (a row, the profile while Settings is open): the accent words, a bar at its left */
+:is(.at-list > .at-li:is(.on, [aria-current]), .at-dd-row.on)::before { content: ""; position: absolute; left: 0; inset-block: var(--space-2); width: 2px; border-radius: var(--radius-small); background: var(--accent); }
+:is(.at-list > .at-li:is(.on, [aria-current]), .at-li.on > .at-li-go) > svg { color: var(--accent); }
+.at-list > .at-li.quiet:not(.on, [aria-current]) { color: var(--text-3); }
+.at-list > .at-li.quiet:not(.on, [aria-current]):is(:hover, :has(> .at-li-more[open])) { color: var(--text-2); }
+.at-list > .at-li.at-inert { cursor: default; color: var(--text-3); }
+.at-list > .at-li.at-inert:hover { background: none; }
+.at-list.small > .at-li { font-size: var(--size-small); }
+.at-list > .at-li.tile { height: var(--control); }
+.at-list > .at-li.tile:is(.on, [aria-current]) { border-color: var(--line); }   /* marked by the bar, as the rows */
+:is(.at-list > .at-li.tile > small, .at-li-aside > .at-num) { color: var(--accent); }
+.at-li.has-aside:has(.at-dd[open]) { background: var(--accent-tint); }
+.at-li > .at-li-aside { flex: none; display: inline-flex; align-items: center; gap: var(--space-1); padding-right: var(--space-1); font-size: var(--size-small); }
+.at-li-aside .icon-btn { min-width: var(--list-row); height: var(--list-row); padding: 0; }
+.at-list > .at-lh > :is(.at-dd, .icon-btn) { margin-block: calc(var(--space-2) * -1); }
+.at-lh .icon-btn { min-width: var(--list-row); height: var(--list-row); padding: 0; }
+.at-list > .at-lh > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.at-list > .at-lh { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-4) var(--space-3) var(--space-1); font-weight: var(--weight-medium); font-size: var(--size-small); color: var(--text-3); }
+
+/* ---- Madav House theme: design/objects/dialog.css ---- */
+/* dialog.css - the pop-up: a native <dialog> in three widths over the scrim, the box with the float shadow, its title
+   at the heading size and its buttons at the bottom right. It fades in once. */
+.at-pop { position: fixed; inset: 0; margin: auto; z-index: var(--z-dialog); width: min(var(--dialog), var(--dialog-cap)); max-width: var(--dialog-cap); max-height: var(--dialog-cap-height); overflow: auto; padding: var(--dialog-padding); border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); color: var(--text); box-shadow: var(--shadow); display: flex; flex-direction: column; gap: var(--block-gap); }
+.at-pop:not([open]) { display: none; }
+.at-pop.inline { position: static; display: flex; inset: auto; box-shadow: none; }
+.at-pop.s { width: min(var(--dialog-small), var(--dialog-cap)); }
+.at-pop.l { width: min(var(--dialog-large), var(--dialog-cap)); resize: both; }
+.at-pop::backdrop { background: var(--scrim); }
+.at-pop[open] { animation: at-fade var(--normal) var(--ease) both; }
+@keyframes at-fade { from { opacity: 0; } to { opacity: 1; } }
+.at-pop > h2 { font-family: var(--font-title); font-weight: var(--weight-semibold); font-size: var(--size-heading); line-height: var(--line-tight); }
+.at-pop > .at-pop-do { display: flex; justify-content: flex-end; gap: var(--control-gap); padding-top: var(--space-2); }
+
+/* ---- Madav House theme: design/objects/toast.css ---- */
+/* toast.css - a short word from the app, bottom right, that goes away: the box with the float shadow; a good or bad
+   one takes the colour of its meaning on its edge. */
+.at-toast-host { position: fixed; right: var(--space-4); bottom: var(--space-4); z-index: var(--z-toast); display: flex; flex-direction: column; gap: var(--space-2); max-width: var(--toast); pointer-events: none; }
+.at-toast { pointer-events: auto; cursor: pointer; padding: var(--toast-padding); border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); color: var(--text); box-shadow: var(--shadow); font-size: var(--size-small); line-height: var(--line-height); transition: opacity var(--normal) var(--ease); }
+.at-toast.bad { border-color: var(--bad); }
+.at-toast.ok { border-color: var(--ok); }
+.at-toast.gone { opacity: 0; }
+.at-toast-host.inline { position: static; }
+
+/* ---- Madav House theme: design/objects/facts.css ---- */
+/* facts.css - a short list of facts, each a Fact: term, value. In a grid (the terms in one column, the values in the
+   next), side by side (row: the term over the value), or ruled one under another with the term in a fixed column. */
+.at-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--space-1) var(--space-3); font-size: var(--size-small); }
+.at-facts > div { display: contents; }   /* a Fact in the grid: its term and value are the grid's own cells */
+.at-facts dt { color: var(--text-2); }
+.at-facts dd { color: var(--text); overflow-wrap: anywhere; }
+.at-facts.row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-5); }
+.at-facts.row > div { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-half); text-align: left; }
+.at-facts.row dd { font-weight: var(--weight-medium); font-size: var(--size-text); font-variant-numeric: tabular-nums; }
+.at-facts.ruled { display: flex; flex-direction: column; gap: 0; }
+.at-facts.ruled > div { display: grid; grid-template-columns: var(--fact-key) minmax(0, 1fr); gap: var(--space-1) var(--space-2); align-items: baseline; padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--line); }
+.at-facts.ruled > div:last-child { border-bottom: 0; }
+.at-facts.ruled dd { font-weight: var(--weight-medium); color: var(--text); font-variant-numeric: tabular-nums; }
+
+/* ---- Madav House theme: components/shell.css ---- */
+/* shell.css - where the frame stands: the floating sidebar held off the window's edges beside the main column, the
+   folded sidebar's width, the profile row's words. Every look is the objects' (frame.css). */
+.app-v { display: flex; flex-direction: column; height: 100vh; }
+.app-body { flex: 1; display: flex; min-height: 0; gap: var(--sidebar-gap); padding: var(--sidebar-gap); }
+.sb-rail { flex: 0 0 var(--sidebar); width: var(--sidebar); }
+.sb-folded { flex: 0 0 var(--sidebar-folded); }
+.app-body > .sb-gutter { margin-inline: calc((var(--sidebar-gap) + var(--space-2)) / -2); }   /* the sidebar's drag edge sits in the gap beside it, which stays as wide as before */
+.sb-profile { width: 100%; }
+.sb-profile .sb-profile-meta { display: flex; flex-direction: column; align-items: flex-start; flex: 1; min-width: 0; overflow: hidden; }
+.main-col { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.lane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
