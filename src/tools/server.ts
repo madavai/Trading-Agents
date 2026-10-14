@@ -34,7 +34,7 @@ const READ = { readOnlyHint: true, openWorldHint: true } as const;
 
 export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetch): McpServer {
   const settings = readSettings(root), a0 = settings.analysis;
-  configure({ contact: settings.sources.contact, secEmail: readContactEmail(root) });
+  configure({ contact: settings.sources.contact, secEmail: () => readContactEmail(root) });
   if (fetchImpl) configure({ fetch: fetchImpl });
   const server = new McpServer({ name: 'trading-desk', version: VERSION });
 
@@ -52,7 +52,6 @@ export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetc
   }, async (a) => {
     try {
       const email = saveContactEmail(root, a.email);
-      configure({ secEmail: email });
       return text(`Saved. The SEC will see ${email} as the contact for this desk's requests; no other source sees it.`);
     } catch (e) {
       return text(`INPUT_ERROR: ${(e as Error).message}. Ask the person for their own email address and call again.`);

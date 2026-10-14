@@ -161,7 +161,8 @@ export function renderTable(t: Table, head: string, note: string): string {
   return out.join('\n');
 }
 
-const reason = (e: unknown) => { const m = (e as Error).message; return /sec\.gov refused \(HTTP 403\)/.test(m) ? `${m}: ${ASK_FOR_EMAIL}` : m; };
+// A refusal by the SEC asks for the email only when none was sent; if one was, the SEC's own words are the diagnosis.
+const reason = (e: unknown) => { const m = (e as Error).message; return /sec\.gov refused \(HTTP 403\)/.test(m) && m.includes('[no contact email was sent]') ? `${m}: ${ASK_FOR_EMAIL}` : m; };
 
 /** A financial statement: as filed with the SEC by the analysis date for a US filer; else, for today only, Yahoo's. */
 export async function financialStatement(raw: string, kind: Statement, freq: Frequency, analysis: string): Promise<string> {

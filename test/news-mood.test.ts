@@ -91,7 +91,7 @@ test('posts: StockTwits tags counted, Reddit held to the window, crypto read in 
 test('a source that fails is named unavailable while the other still answers', async () => {
   configure({ fetch: route([[/stocktwits/, () => new Response('blocked', { status: 403 })], [/reddit/, () => new Response(ATOM)]]) });
   const t = await socialPosts('NVDA', '2026-10-10', OPTS);
-  assert.match(t, /StockTwits unavailable: api\.stocktwits\.com refused \(HTTP 403\)\. This is not a quiet crowd\./);
+  assert.match(t, /StockTwits unavailable: api\.stocktwits\.com refused \(HTTP 403\), saying "blocked"\. This is not a quiet crowd\./);
   assert.match(t, /NVDA earnings thread/);
 });
 

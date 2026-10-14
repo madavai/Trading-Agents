@@ -5,42 +5,99 @@
 export class Unavailable extends Error { override name = 'Unavailable'; }
 export class NoData extends Error { override name = 'NoData'; }
 
+import fs from 'node:fs';
+import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { userAgentFor } from '../check/probes.js';
+import { writeWhole } from '../desk/lock.js';
 
 type Fetch = typeof fetch;
 let fetchImpl: Fetch = (...a) => fetch(...a);
 let contact = 'trading-agents (+https://github.com/madavai/trading-agents)';
-let secEmail = '';
+// The person's email is looked up when a request is made, never kept from start-up: a copy of the tool server that began
+// before the email was saved must still send it.
+let secEmail: string | (() => string) = '';
+let spacingMs = 0;
+let cacheDir: string | null = null;
 
-/** For the tests and the server: the fetch to use, the user agent every source sees, and the email only the SEC sees. */
-export function configure(opts: { fetch?: Fetch; contact?: string; secEmail?: string }): void {
+const emailNow = (): string => (typeof secEmail === 'function' ? secEmail() : secEmail);
+
+/** For the tests and the server: the fetch to use, the user agent every source sees, the email only the SEC sees (or where
+ *  to look it up), the least time between requests to one host, and a folder to keep answers in. */
+export function configure(opts: { fetch?: Fetch; contact?: string; secEmail?: string | (() => string); spacingMs?: number; cacheDir?: string | null }): void {
   if (opts.fetch) fetchImpl = opts.fetch;
   if (opts.contact) contact = opts.contact;
   if (opts.secEmail !== undefined) secEmail = opts.secEmail;
+  if (opts.spacingMs !== undefined) spacingMs = opts.spacingMs;
+  if (opts.cacheDir !== undefined) { cacheDir = opts.cacheDir; if (cacheDir) pruneCache(cacheDir); }
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// One request at a time may start per host each `spacingMs`: several analysts asking Yahoo at once is what gets a computer
+// rate-limited. The slot is taken before waiting, so callers queue in order.
+const nextSlot = new Map<string, number>();
+async function pace(host: string): Promise<void> {
+  if (!spacingMs) return;
+  const now = Date.now(), at = Math.max(now, nextSlot.get(host) ?? 0);
+  nextSlot.set(host, at + spacingMs);
+  if (at > now) await sleep(at - now);
+}
+
+// Answers are kept on disk, shared by every copy of the tool server, so the analysts and a repeated question do not ask a
+// source again. The SEC's filings change only when something is filed; the rest are short-lived. A failure is never kept.
+const MINUTE = 60_000;
+const ttlFor = (host: string): number => (/(^|\.)sec\.gov$/.test(host) ? 24 * 60 * MINUTE : /fred/.test(host) ? 6 * 60 * MINUTE : 5 * MINUTE);
+const keyOf = (url: string): string => { const u = new URL(url); u.searchParams.delete('crumb'); return createHash('sha256').update(u.toString()).digest('hex').slice(0, 40); };
+
+function readCache(url: string): string | null {
+  if (!cacheDir) return null;
+  try {
+    const file = path.join(cacheDir, `${keyOf(url)}.txt`);
+    return Date.now() - fs.statSync(file).mtimeMs < ttlFor(new URL(url).hostname) ? fs.readFileSync(file, 'utf8') : null;
+  } catch { return null; }
+}
+
+function writeCache(url: string, text: string): void {
+  if (!cacheDir) return;
+  try { fs.mkdirSync(cacheDir, { recursive: true }); writeWhole(path.join(cacheDir, `${keyOf(url)}.txt`), text); } catch { /* a cache that cannot be written is only a missed saving */ }
+}
+
+function pruneCache(dir: string): void {
+  try { for (const f of fs.readdirSync(dir)) { const file = path.join(dir, f); if (Date.now() - fs.statSync(file).mtimeMs > 3 * 24 * 60 * MINUTE) fs.rmSync(file, { force: true }); } } catch { /* no cache yet */ }
+}
+
+/** What a source said when it refused, in a few plain words: its own explanation can be the whole diagnosis. */
+const excerpt = (body: string): string => body.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 140);
+
 export async function getText(url: string, opts: { timeoutMs?: number; headers?: Record<string, string> } = {}): Promise<string> {
-  const host = new URL(url).host;
+  const host = new URL(url).host, cached = readCache(url);
+  if (cached !== null) return cached;
   for (let attempt = 0; ; attempt++) {
     let res: Response;
+    await pace(host);
     try {
-      res = await fetchImpl(url, { headers: { 'User-Agent': userAgentFor(url, contact, secEmail), Accept: '*/*', ...opts.headers }, signal: AbortSignal.timeout(opts.timeoutMs ?? 15_000) });
+      res = await fetchImpl(url, { headers: { 'User-Agent': userAgentFor(url, contact, emailNow()), Accept: '*/*', ...opts.headers }, signal: AbortSignal.timeout(opts.timeoutMs ?? 15_000) });
     } catch (e) {
       const err = e as Error;
-      if (attempt === 0 && err.name !== 'TimeoutError') { await sleep(800); continue; }
+      if (attempt < 2 && err.name !== 'TimeoutError') { await sleep(800 * (attempt + 1)); continue; }
       throw new Unavailable(`${host} did not answer (${err.name === 'TimeoutError' ? 'no answer in time' : err.message})`);
     }
-    if ((res.status === 429 || res.status >= 500) && attempt === 0) {
+    // A busy source is asked again, waiting as long as it says (up to 20 s) or, if it does not say, a little longer each time.
+    if ((res.status === 429 || res.status >= 500) && attempt < 2) {
       await res.body?.cancel().catch(() => {});
-      const wait = Math.min(5_000, (Number(res.headers.get('retry-after')) || 1.5) * 1000);
-      await sleep(wait);
+      const said = res.headers.get('retry-after'), wait = said !== null && said !== '' && Number.isFinite(Number(said)) ? Number(said) * 1000 : [2_000, 5_000][attempt]!;
+      await sleep(Math.min(20_000, wait));
       continue;
     }
     const text = await res.text();
     if (res.status === 404) throw new NoData(`${host} has nothing at that address (HTTP 404)`);
-    if (!res.ok) throw new Unavailable(`${host} refused (HTTP ${res.status})`);
+    if (!res.ok) {
+      const sec = /(^|\.)sec\.gov$/.test(new URL(url).hostname);
+      const said = res.status === 403 || res.status === 429 ? excerpt(text) : '';
+      throw new Unavailable(`${host} refused (HTTP ${res.status})${said ? `, saying "${said}"` : ''}${res.status === 429 ? '; it is rate-limiting this computer, so try again in a few minutes' : ''}${sec ? (emailNow().trim() ? ' [a contact email was sent]' : ' [no contact email was sent]') : ''}`);
+    }
+    writeCache(url, text);
     return text;
   }
 }
@@ -49,7 +106,7 @@ export async function getText(url: string, opts: { timeoutMs?: number; headers?:
 export async function getCookies(url: string): Promise<string> {
   let res: Response;
   try {
-    res = await fetchImpl(url, { headers: { 'User-Agent': userAgentFor(url, contact, secEmail) }, redirect: 'manual', signal: AbortSignal.timeout(15_000) });
+    res = await fetchImpl(url, { headers: { 'User-Agent': userAgentFor(url, contact, emailNow()) }, redirect: 'manual', signal: AbortSignal.timeout(15_000) });
   } catch (e) {
     throw new Unavailable(`${new URL(url).host} did not answer (${(e as Error).message})`);
   }

@@ -2,7 +2,7 @@
 // the checked price table every exact number must come from. Everything is held to the analysis date.
 // The checked price table and its rules are adapted from TradingAgents (tradingagents/dataflows/vendors/yahoo/
 // snapshot.py and agents/context.py), Apache License 2.0.
-import { analysisDate, addDays, isHistorical, window } from './dates.js';
+import { analysisDate, addDays, isHistorical, today, window } from './dates.js';
 import { compute, INDICATORS, INDICATOR_NAMES, isIndicator, type IndicatorName } from './indicators.js';
 import { cryptoBase, normalizeSymbol } from './symbols.js';
 import { daily, history, type Bar } from './yahoo.js';
@@ -63,7 +63,8 @@ export async function verifiedSnapshot(raw: string, analysis: string, lookBack =
   const recent = bars.slice(-Math.max(1, Math.min(30, Math.round(lookBack))));
   const lines = [
     `## Checked price table for ${resolved(raw)}`, '',
-    `- Analysis date: ${day}`, `- Latest trading row used: ${last.date}`, '- Rows after the analysis date are excluded.', `- Prices adjusted for splits and dividends${s.meta.currency ? `, in ${s.meta.currency}` : ''}.`, '',
+    `- Analysis date: ${day}`, `- Latest trading row used: ${last.date}`, '- Rows after the analysis date are excluded.',
+    ...(last.date === today() ? ['- **The latest row is today\'s session. If the market is still open it is partial: its close, high, low and volume are the latest so far, and every indicator on it will change by the close. Do not treat a level as broken or held on this row alone.**'] : []), `- Prices adjusted for splits and dividends${s.meta.currency ? `, in ${s.meta.currency}` : ''}.`, '',
     '### Latest row', '', '| Field | Value |', '|---|---:|',
     `| Open | ${f2(last.open)} |`, `| High | ${f2(last.high)} |`, `| Low | ${f2(last.low)} |`, `| Close | ${f2(last.close)} |`, `| Volume | ${vol(last.volume)} |`, '',
     '### Indicators on the latest row', '', '| Indicator | Value |', '|---|---:|',
