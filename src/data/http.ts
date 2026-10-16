@@ -35,15 +35,22 @@ export function configure(opts: { fetch?: Fetch; contact?: string; secEmail?: st
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // One request at a time may start per host each `spacingMs`: several analysts asking Yahoo at once is what gets a computer
-// rate-limited. The slot is taken before waiting, so callers queue in order.
-const nextSlot = new Map<string, number>();
+// rate-limited. Callers queue in order, and each waits for the one before it to have really started, then the whole gap:
+// when the computer stalls, the requests that were waiting go one after another, never together. The clock is read
+// again after each wait, since a timer can wake early (on Windows, by up to one 15 ms clock tick).
+const lastStart = new Map<string, number>(), queue = new Map<string, Promise<void>>();
 async function pace(host: string): Promise<void> {
   if (!spacingMs) return;
-  const now = Date.now(), at = Math.max(now, nextSlot.get(host) ?? 0);
-  nextSlot.set(host, at + spacingMs);
-  // A timer can wake a few milliseconds early (on Windows, up to one 15 ms clock tick), so the clock is read again: the
-  // spacing promised is the spacing kept.
-  for (let i = 0; i < 3 && Date.now() < at; i++) await sleep(at - Date.now());
+  const turn = (queue.get(host) ?? Promise.resolve()).then(async () => {
+    for (let i = 0; i < 5; i++) {
+      const wait = (lastStart.get(host) ?? -Infinity) + spacingMs - Date.now();
+      if (wait <= 0) break;
+      await sleep(wait);
+    }
+    lastStart.set(host, Date.now());
+  });
+  queue.set(host, turn);
+  await turn;
 }
 
 // Answers are kept on disk, shared by every copy of the tool server, so the analysts and a repeated question do not ask a

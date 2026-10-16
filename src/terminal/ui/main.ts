@@ -1,7 +1,7 @@
 // The dashboard page. It shows only what the desk really has: prices from Yahoo Finance, the calls in the journal, the
 // scorecard worked out from them, the watchlist, the analyses waiting and whether Robinhood is connected. A number that
 // cannot be had is a dash. There is no order button: trading is not switched on, and nothing here can place one.
-import { api, ApiError, type CallDetail, type DeskState, type History, type LinkInfo, type Market, type QuoteResult, type Account, type AccountView, type Holding, type Order, type Snapshot, type TicketOpen, type Check, type Review } from './api.js';
+import { api, ApiError, type CallDetail, type DeskState, type History, type LinkInfo, type Market, type QuoteResult, type Account, type AccountView, type Holding, type Order, type Snapshot, type TicketOpen, type Check, type Review, type Placed, type Trading } from './api.js';
 import { heroChart, sparkline } from './chart.js';
 import { clock, dayText, esc, money, num, pct, ratingTone, SECTION_NAMES, tone } from './fmt.js';
 import { markdown } from './md.js';
@@ -117,7 +117,7 @@ function renderAccount(): void {
   } else if (r.state === 'failed') actions = connect('Connect again', true) + check('Check again', false);
   $('#accountCard').innerHTML = `<div class="at-card-head"><h3>Robinhood</h3><span class="at-chip ${w.chip}">${esc(w.label)}</span></div>
     <p class="at-lede">${esc(lede)}</p>${facts}${actions ? `<div class="at-row">${actions}</div>` : ''}
-    <p class="at-honest">Your Robinhood sign-in is kept on this computer only and is never shown on this page.</p>`;
+    <p class="at-honest">Your Robinhood sign-in is kept on this computer only and is never shown on this page.</p>${tradingBlock()}`;
 }
 
 // ---------- the accounts the person chose to show ----------
@@ -202,8 +202,37 @@ async function openPicker(): Promise<void> {
   renderViews();
 }
 
-// ---------- the order ticket: proposed, checked, reviewed by Robinhood; nothing is placed from here ----------
-const T = { open: null as TicketOpen | null, checks: [] as Check[], review: null as Review | null, quantity: 0, limit: 0, busy: false, timer: 0 };
+// ---------- the trading switch: the person's alone, off until they switch it on ----------
+const TR = { state: null as (Trading & { placedToday?: number }) | null, asking: false };
+const tradingOn = () => TR.state?.on === true;
+
+function renderTrading(): void {
+  const on = tradingOn();
+  $('#tradeDot').className = `at-dot ${on ? 'warn' : ''}`.trim();
+  $('#tradeText').textContent = on ? 'Trading is switched on' : 'Trading is switched off';
+  $('#tradeChip').className = `at-chip ${on ? 'warn' : ''}`.trim(); $('#tradeChip').textContent = on ? 'Trading on' : 'Trading off';
+  $('#tradeFoot').textContent = on ? 'An order is placed only when you press Confirm on a ticket Robinhood has checked.' : 'This page places no order: trading is switched off.';
+}
+
+function tradingBlock(): string {
+  if (!signedIn()) return '';
+  if (tradingOn()) return `<div class="at-card at-box"><div class="at-card-head"><h3>Trading</h3><span class="at-chip warn">On${TR.state?.since ? ` since ${esc(dayText(TR.state.since))}` : ''}</span></div>
+    <p class="at-lede">You can place an order from a ticket, in the Agentic account only, within your caps, after Robinhood's check and your Confirm.</p>
+    <div class="at-row">${rhButton('tr-off', 'Switch trading off')}</div></div>`;
+  if (!TR.asking) return `<div class="at-card at-box"><div class="at-card-head"><h3>Trading</h3><span class="at-chip">Off</span></div>
+    <p class="at-lede">With trading off, a ticket can be checked by Robinhood but never placed.</p><div class="at-row">${rhButton('tr-ask', 'Switch trading on…')}</div></div>`;
+  return `<div class="at-card at-box"><div class="at-card-head"><h3>Switch trading on?</h3></div>
+    <p class="at-lede">From then on, a ticket you open from one of the desk's calls can place a real order with real money in your Agentic account. Every order still needs Robinhood's check with no alerts, your caps, and your own Confirm naming the exact order. Keep Robinhood's approval on your phone switched on until you trust the desk. This is not investment advice.</p>
+    <div class="at-row">${rhButton('tr-on', 'Yes, switch trading on', { primary: true })}${rhButton('tr-cancel', 'Cancel')}</div></div>`;
+}
+
+async function loadTrading(): Promise<void> {
+  try { TR.state = await api.trading(); } catch { return; }
+  renderTrading(); renderAccount();
+}
+
+// ---------- the order ticket: proposed, checked, reviewed by Robinhood, placed only on the person's Confirm ----------
+const T = { open: null as TicketOpen | null, checks: [] as Check[], review: null as Review | null, quantity: 0, limit: 0, busy: false, timer: 0, confirm: '', confirming: false, placed: null as Placed | null };
 const hasAgentic = () => !!A.snapshot?.views.some((v) => v.account.agentic);
 
 function renderTicketDyn(): void {
@@ -217,9 +246,31 @@ function renderTicketDyn(): void {
       ${r.approvalRequired === null ? '' : `<p class="at-lede">${r.approvalRequired ? 'Robinhood would ask you to approve this order on your phone before it is sent.' : 'Robinhood would not ask for your approval on your phone: an order would be sent at once.'}</p>`}
       ${r.facts.length ? `<dl class="at-facts ruled at-box">${r.facts.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>` : ''}
       <p class="at-quiet">This was Robinhood's dry run: nothing was placed.</p></div>` : '';
-  $('#tkDyn').innerHTML = `${checks}${review}
-    <p class="at-honest">Nothing is placed from here yet: placing an order, only on your own Confirm, comes in the next step. This is not investment advice.</p>
-    <div class="at-pop-do"><button class="at-btn at-press" data-act="tk-cancel">Close</button>${t.proposal.order ? `<button class="at-btn at-press primary" data-act="tk-review"${ok && !T.busy ? '' : ' disabled'}>${T.busy ? 'Asking Robinhood…' : 'Review with Robinhood'}</button>` : ''}</div>`;
+  const clean = !!r && r.answered && r.alerts.length === 0;
+  const p = T.placed;
+  const placed = p ? `<div class="at-card at-box"><div class="at-card-head"><h3>Sent to Robinhood</h3>${p.answered ? '<span class="at-chip ok">Robinhood took it</span>' : '<span class="at-chip danger">Robinhood refused it</span>'}</div>
+      ${p.error ? `<p class="at-honest bad">${esc(p.error)}</p>` : ''}
+      ${p.answered ? `<p class="at-lede">${p.approvalRequired === true ? 'Robinhood now asks you to approve it on your phone: it is not sent to the market until you do.' : p.approvalRequired === false ? 'Robinhood sent it to the market.' : 'Check the order in Robinhood.'}${p.state ? ` State: ${esc(p.state)}.` : ''}</p>` : ''}
+      ${p.facts.length ? `<dl class="at-facts ruled at-box">${p.facts.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>` : ''}</div>` : '';
+  let buttons = '';
+  if (p) buttons = '';
+  else if (clean && tradingOn() && T.confirming) buttons = `<button class="at-btn at-press" data-act="tk-back">Back</button><button class="at-btn at-press primary" data-act="tk-confirm"${T.busy ? ' disabled' : ''}>${T.busy ? 'Sending to Robinhood…' : `Confirm: ${esc(T.confirm)}`}</button>`;
+  else if (clean && tradingOn()) buttons = `<button class="at-btn at-press primary" data-act="tk-place">Place order…</button>`;
+  else if (t.proposal.order) buttons = `<button class="at-btn at-press primary" data-act="tk-review"${ok && !T.busy ? '' : ' disabled'}>${T.busy ? 'Asking Robinhood…' : r ? 'Review again' : 'Review with Robinhood'}</button>`;
+  const note = p ? '' : clean && !tradingOn() ? '<p class="at-honest">Trading is switched off, so this order cannot be placed: switch it on in Your account first.</p>'
+    : clean && T.confirming ? `<p class="at-honest">Pressing Confirm sends a real order with real money to Robinhood${r?.approvalRequired === false ? ', and Robinhood will not ask you again on your phone' : ''}.</p>` : '';
+  $('#tkDyn').innerHTML = `${checks}${review}${placed}${note}
+    <p class="at-honest">An order is placed only when you press Confirm. This is not investment advice.</p>
+    <div class="at-pop-do"><button class="at-btn at-press" data-act="tk-cancel">Close</button>${buttons}</div>`;
+}
+
+async function placeTicket(): Promise<void> {
+  const t = T.open;
+  if (!t || T.busy || T.placed) return;
+  T.busy = true; renderTicketDyn();
+  try { T.placed = (await api.placeTicket(t.id, T.confirm)).placed; toast(T.placed.answered ? 'The order is with Robinhood.' : 'Robinhood refused the order.', T.placed.answered ? 'ok' : 'bad'); void readAccounts(); void loadTrading(); }
+  catch (e) { T.confirming = false; toast(say(e), 'bad'); }
+  finally { T.busy = false; renderTicketDyn(); }
 }
 
 function renderTicket(): void {
@@ -239,7 +290,7 @@ function renderTicket(): void {
 
 async function openTicket(symbol: string, date: string): Promise<void> {
   const dlg = $<HTMLDialogElement>('#ticketDialog');
-  T.open = null; T.review = null; T.busy = false;
+  T.open = null; T.review = null; T.busy = false; T.confirming = false; T.placed = null; T.confirm = '';
   $('#tkHead').innerHTML = `<p class="at-quiet">Reading the Agentic account and the live price from Robinhood.</p>`; $('#tkFields').innerHTML = ''; $('#tkDyn').innerHTML = '';
   dlg.showModal();
   try {
@@ -254,7 +305,7 @@ function ticketEdited(): void {
   if (!t?.proposal.order) return;
   T.quantity = Number($<HTMLInputElement>('#tkQty').value);
   T.limit = Number($<HTMLInputElement>('#tkLimit').value.replace(/[$,\s]/g, ''));
-  T.review = null; T.checks = []; renderTicketDyn();
+  T.review = null; T.checks = []; T.confirming = false; renderTicketDyn();
   clearTimeout(T.timer);
   T.timer = window.setTimeout(() => void run(async () => { if (T.open?.id !== t.id) return; T.checks = (await api.checkTicket(t.id, T.quantity, T.limit)).checks; renderTicketDyn(); }), 350);
 }
@@ -263,7 +314,7 @@ async function reviewTicket(): Promise<void> {
   const t = T.open;
   if (!t || T.busy) return;
   T.busy = true; renderTicketDyn();
-  try { const r = await api.reviewTicket(t.id, T.quantity, T.limit); T.checks = r.checks; T.review = r.review; }
+  try { const r = await api.reviewTicket(t.id, T.quantity, T.limit); T.checks = r.checks; T.review = r.review; T.confirm = r.confirm; T.confirming = false; TR.state = { ...TR.state, ...r.trading }; renderTrading(); }
   catch (e) { toast(say(e), 'bad'); }
   finally { T.busy = false; renderTicketDyn(); }
 }
@@ -277,7 +328,7 @@ async function refreshRobinhood(): Promise<void> {
   clearTimeout(rhTimer);
   if (S.rh.state === 'waiting') { rhTimer = window.setTimeout(() => void refreshRobinhood(), 2000); return; }
   if (was === 'waiting') toast(S.rh.state === 'connected' ? 'Robinhood is connected.' : S.rh.message, S.rh.state === 'connected' ? 'ok' : 'bad');
-  void loadSnapshot();
+  void loadSnapshot(); void loadTrading();
 }
 
 // ---------- markets ----------
@@ -523,7 +574,15 @@ document.addEventListener('click', (e) => {
     case 'decide': void openTicket(sym, el.dataset.date ?? ''); break;
     case 'tk-cancel': $<HTMLDialogElement>('#ticketDialog').close(); T.open = null; break;
     case 'tk-review': void reviewTicket(); break;
-    case 'rh-connect': void run(async () => { S.rh = await api.connectRobinhood(); renderAccount(); toast("Robinhood's sign-in page is opening in your browser."); void refreshRobinhood(); }); break;
+    case 'tk-place': T.confirming = true; renderTicketDyn(); break;
+    case 'tk-back': T.confirming = false; renderTicketDyn(); break;
+    case 'tk-confirm': void placeTicket(); break;
+    case 'tr-ask': TR.asking = true; renderAccount(); break;
+    case 'tr-cancel': TR.asking = false; renderAccount(); break;
+    case 'tr-on': void run(async () => { TR.state = await api.setTrading(true); TR.asking = false; renderTrading(); renderAccount(); toast('Trading is switched on. Every order still needs your Confirm.'); }); break;
+    case 'tr-off': void run(async () => { TR.state = await api.setTrading(false); renderTrading(); renderAccount(); renderTicketDyn(); toast('Trading is switched off.'); }); break;
+    case 'rh-connect': void run(async () => { S.rh = await api.connectRobinhood(); renderAccount(); toast("Robinhood's sign-in page is opening in your browser."); void refreshRobinhood();
+void loadTrading(); }); break;
     case 'rh-check': void run(async () => { S.rh = await api.checkRobinhood(); renderAccount(); void loadSnapshot(); toast(S.rh.state === 'connected' ? 'Robinhood answered: the connection works.' : S.rh.message, S.rh.state === 'connected' ? 'ok' : 'bad'); }); break;
     case 'rh-forget': void run(async () => { S.rh = await api.disconnectRobinhood(); A.snapshot = null; A.chosen = []; A.picking = false; renderAccount(); renderViews(); toast('The saved Robinhood sign-in is deleted from this computer.'); }); break;
     case 'acc-pick': void openPicker(); break;

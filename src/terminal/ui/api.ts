@@ -6,6 +6,9 @@ import type { LinkInfo, Snapshot } from '../../robinhood/link.js';
 import type { Account, AccountView, Holding, Order } from '../../robinhood/account.js';
 import type { Check, Proposal, TicketContext } from '../../desk/ticket.js';
 import type { Review } from '../../robinhood/review.js';
+import type { Placed } from '../../robinhood/order.js';
+export interface Trading { on: boolean; since: string | null }
+export type { Placed };
 export interface TicketOpen { id: string; context: TicketContext; proposal: Proposal; checks: Check[]; caps: { perOrderUsd: number; perStockPercent: number; ordersPerDay: number } }
 
 export type { Check, Proposal, Review, TicketContext };
@@ -51,6 +54,9 @@ export const api = {
   snapshot: () => call<{ snapshot: Snapshot | null; chosen: string[] }>('GET', '/api/robinhood/snapshot'),
   openTicket: (symbol: string, date: string) => call<TicketOpen>('POST', '/api/ticket', { symbol, date }),
   checkTicket: (id: string, quantity: number, limitPrice: number) => call<{ checks: Check[] }>('POST', '/api/ticket/check', { id, quantity, limitPrice }),
-  reviewTicket: (id: string, quantity: number, limitPrice: number) => call<{ checks: Check[]; review: Review }>('POST', '/api/ticket/review', { id, quantity, limitPrice }),
+  reviewTicket: (id: string, quantity: number, limitPrice: number) => call<{ checks: Check[]; review: Review; confirm: string; trading: Trading }>('POST', '/api/ticket/review', { id, quantity, limitPrice }),
+  placeTicket: (id: string, confirm: string) => call<{ placed: Placed }>('POST', '/api/ticket/place', { id, confirm }),
+  trading: () => call<Trading & { placedToday: number }>('GET', '/api/trading'),
+  setTrading: (on: boolean) => call<Trading>('POST', '/api/trading', on ? { on, confirm: 'switch trading on' } : { on }),
   readAccounts: () => call<{ snapshot: Snapshot; chosen: string[]; holdingsShared: boolean }>('POST', '/api/robinhood/refresh', {}),
 };

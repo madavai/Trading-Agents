@@ -6,6 +6,7 @@ import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 import type { Order } from '../desk/ticket.js';
 import { Refused } from './reader.js';
+import { masked } from './rules.js';
 
 const REVIEW = 'review_equity_order';
 
@@ -34,7 +35,7 @@ const words = (v: unknown): string[] => {
 };
 
 export function parseReview(answer: { data: unknown; text: string; failed: boolean }): Review {
-  if (answer.failed) return { answered: false, alerts: [], approvalRequired: null, facts: [], error: answer.text.replace(/\d{5,}/g, '#####').slice(0, 300) };
+  if (answer.failed) return { answered: false, alerts: [], approvalRequired: null, facts: [], error: masked(answer.text) };
   const d = obj(obj(answer.data).data);
   const alerts = [...new Set([...words(d.order_checks), ...words(d.alerts), ...words(d.warnings)])].slice(0, 12).map((x) => x.slice(0, 300));
   const facts: Array<[string, string]> = [];
@@ -42,7 +43,7 @@ export function parseReview(answer: { data: unknown; text: string; failed: boole
     for (const [k, v] of Object.entries(o)) {
       if (facts.length >= 24 || ['order_checks', 'alerts', 'warnings', 'customer_approval_required', 'account_number', 'rhs_account_number'].includes(k)) continue;
       const name = `${prefix}${k.replace(/_/g, ' ')}`;
-      if (v === null || typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') facts.push([name, String(v).replace(/\d{7,}/g, '#####').slice(0, 120)]);
+      if (v === null || typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') facts.push([name, String(v).replace(/\b[a-z0-9]*\d{7,}[a-z0-9]*\b/gi, '#####').slice(0, 120)]);
       else if (!Array.isArray(v) && depth < 2) walk(obj(v), `${name} · `, depth + 1);
     }
   };

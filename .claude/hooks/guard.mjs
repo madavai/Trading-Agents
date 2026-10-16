@@ -24,6 +24,11 @@ const NO_BROKER = 'Agents in this folder never use a broker connection. Only the
 const NO_TRADE = 'Agents never place, change or cancel orders or move money. The person does that in the Trading Agents dashboard, after reviewing and confirming the exact order.';
 const NO_PRIVATE = 'The ~/.trading-agents folder holds the person\'s Robinhood sign-in and is private to them. Agents never open, search, read, copy or change it.';
 const NO_SITE = 'Agents never open Robinhood\'s site or connection. The person trades in the Trading Agents dashboard.';
+/** The dashboard's own address (this computer, ports 47615 to 47625) and its order ticket and trading switch: the
+ *  person's alone. Refused to every tool that could reach a web address (a shell, a fetch, a browser), not to the editor. */
+export const DASHBOARD = /(?:127\.0\.0\.1|localhost|\[::1\]|0\.0\.0\.0):476(?:1[5-9]|2[0-5])\b|\/api\/(?:ticket|trading)\b/i;
+export const REACHES_WEB = /^(?:Bash|PowerShell|WebFetch|WebSearch)$|^mcp__/;
+const NO_DASHBOARD = 'Agents never use the Trading Agents dashboard\'s address, its order ticket or its trading switch. Only the person uses the dashboard, and only their Confirm sends an order.';
 
 /** The refusal for one tool call, or null to let it pass. */
 export function verdict(call) {
@@ -43,6 +48,7 @@ export function verdict(call) {
   // The desk's own tools cannot open a site, so Robinhood's address in their text is data (an analysis of Robinhood's
   // own stock quotes its news links); every other tool is refused it, since it might open the page.
   if (!own && BROKER_SITE.test(input)) return NO_SITE;
+  if (!own && REACHES_WEB.test(name) && DASHBOARD.test(input)) return NO_DASHBOARD;
   return null;
 }
 

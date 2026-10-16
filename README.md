@@ -14,7 +14,8 @@ affiliated with them. **Nothing here is investment advice.**
 > to Robinhood (you press Connect, sign in on Robinhood's own page) and shows the accounts you choose: value, cash,
 > buying power, holdings at Robinhood's live prices, and for the Agentic account its orders and whether Robinhood's
 > phone approval is on. The agents see those holdings when they analyse. A call's "Decide…" opens an order ticket
-> sized by your settings and checked against your caps, which Robinhood can check in a dry run. Nothing places an order yet.
+> sized by your settings and checked against your caps, which Robinhood can check in a dry run. With trading switched on (you do that on the
+> dashboard), a checked ticket can place a real limit order, only on your own Confirm naming the exact order.
 > **Not yet proven on a real computer:** the dashboard, and a full analysis with company accounts.
 
 ## Start in three steps

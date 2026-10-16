@@ -51,7 +51,7 @@
       <div class="at-side-foot">
         <div class="at-list">
           <div class="at-li at-inert"><span class="at-dot" id="rhDot"></span><span class="at-li-t" id="rhText">Robinhood</span></div>
-          <div class="at-li at-inert"><span class="at-dot"></span><span class="at-li-t">Trading is not switched on</span></div>
+          <div class="at-li at-inert"><span class="at-dot" id="tradeDot"></span><span class="at-li-t" id="tradeText">Trading is switched off</span></div>
         </div>
         <p class="at-quiet">Prices up to 15 min late · not advice</p>
       </div>
@@ -77,7 +77,7 @@
               </div>
               <div class="at-head-tail">
                 <span class="at-chip warn">Prices up to 15 min late</span>
-                <span class="at-chip">Trading off</span>
+                <span class="at-chip" id="tradeChip">Trading off</span>
               </div>
             </div>
             <form class="at-row" id="addForm" autocomplete="off">
@@ -147,7 +147,7 @@
             <div class="at-card at-box" id="score"></div>
           </section>
 
-          <p class="at-honest">Prices come from Yahoo Finance and may be up to 15 minutes late. Nothing here is investment advice, and this page never places an order: trading is not switched on.</p>
+          <p class="at-honest">Prices come from Yahoo Finance and may be up to 15 minutes late. Nothing here is investment advice. <span id="tradeFoot">This page places no order: trading is switched off.</span></p>
         </div>
       </main>
     </div>

@@ -16,6 +16,7 @@ import { Link, plainFailure, type Snapshot } from '../robinhood/link.js';
 import { saveAccountHoldings } from '../desk/holdings.js';
 import { check, passes, propose, type Check, type Order, type Proposal, type TicketContext } from '../desk/ticket.js';
 import type { Review } from '../robinhood/review.js';
+import type { Placed } from '../robinhood/order.js';
 import { Journal } from '../desk/journal.js';
 import { readSettings } from '../settings.js';
 import { VERSION } from '../version.js';
@@ -50,6 +51,20 @@ export function shareHoldings(dir: string, snap: Snapshot, day: string): boolean
   return true;
 }
 
+const REVIEW_MS = 5 * 60_000;
+/** The exact words the person confirms: what is bought or sold, how many, at what limit. */
+export const confirmWords = (o: Order): string => `${o.side === 'buy' ? 'Buy' : 'Sell'} ${o.quantity} ${o.symbol} at $${o.limitPrice.toFixed(2)}`;
+
+/** Every order the dashboard sent, one line each, in desk-data (which git ignores): what, when, from which call, and what
+ *  Robinhood answered. No account number is written. */
+const ordersFile = (dir: string) => path.join(dir, 'orders.jsonl');
+export function logOrder(dir: string, line: Record<string, unknown>): void { fs.mkdirSync(dir, { recursive: true }); fs.appendFileSync(ordersFile(dir), JSON.stringify(line) + '\n'); }
+/** How many orders the dashboard sent today (New York's day), whatever Robinhood's own list says yet. */
+export function placedToday(dir: string, now: Date): number {
+  const day = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(d);
+  try { return fs.readFileSync(ordersFile(dir), 'utf8').split('\n').filter((l) => { try { const v = JSON.parse(l) as { at?: string }; return !!v.at && day(new Date(v.at)) === day(now); } catch { return false; } }).length; } catch { return 0; }
+}
+
 export interface Terminal { url: string; port: number; token: string; deskId: string; close: () => Promise<void> }
 
 export const deskIdOf = (root: string): string => crypto.createHash('sha256').update(path.resolve(root)).digest('hex').slice(0, 12);
@@ -67,7 +82,7 @@ export async function startTerminal(opts: { root: string; assets: Assets; port?:
   const robinhood = opts.robinhood ?? new Link(robinhoodFile());
   // Tickets the person has open: what the call proposed on the real figures, and Robinhood's check once they press Review.
   // Kept in memory for a quarter of an hour; the page names a ticket by its id and can change only its quantity and price.
-  interface Ticket { id: string; at: number; context: TicketContext; proposal: Proposal; order: Order | null; checks: Check[]; review: Review | null }
+  interface Ticket { id: string; at: number; context: TicketContext; proposal: Proposal; order: Order | null; checks: Check[]; review: Review | null; reviewedAt: number; refId: string; placing: boolean; placed: Placed | null }
   const tickets = new Map<string, Ticket>();
   const TICKET_MS = 15 * 60_000;
   const ticketOf = (id: unknown): Ticket => {
@@ -103,7 +118,7 @@ export async function startTerminal(opts: { root: string; assets: Assets; port?:
   // Robinhood's failures are told in plain words; one of the person's own choices that is refused says why.
   const askRobinhood = async <T>(job: () => Promise<T>): Promise<T> => {
     try { return await job(); } catch (e) {
-      const m = e instanceof Error ? e.message : '', own = /not one of your Robinhood accounts|show your Agentic account|not the Agentic account|not complete, so it was not sent/.test(m);
+      const m = e instanceof Error ? e.message : '', own = /not one of your Robinhood accounts|show your Agentic account|not the Agentic account|not complete, so it was not sent|no longer passes on Robinhood's latest figures|trading is switched off/.test(m);
       throw new Refused(own ? 400 : 502, own ? m : plainFailure(e));
     }
   };
@@ -132,6 +147,7 @@ export async function startTerminal(opts: { root: string; assets: Assets; port?:
       if (p === '/api/state') return json(res, 200, stateOf(root, day));
       if (p === '/api/version') return json(res, 200, { version: versionOf(root) });
       if (p === '/api/robinhood') return json(res, 200, robinhood.info());
+      if (p === '/api/trading') return json(res, 200, { ...robinhood.trading(), placedToday: placedToday(dir, new Date()) });
       if (p === '/api/robinhood/accounts') return json(res, 200, await askRobinhood(() => robinhood.accounts()));
       if (p === '/api/robinhood/snapshot') return json(res, 200, { snapshot: robinhood.snapshot(), chosen: robinhood.chosen() });
       if (p === '/api/quotes') {
@@ -180,21 +196,51 @@ export async function startTerminal(opts: { root: string; assets: Assets; port?:
       const trading = readSettings(root).trading;
       const context: TicketContext = { ...(await askRobinhood(() => robinhood.ticketContext(symbol))), rating: call.rating, callDate: call.date };
       const proposal = propose(context, trading), id = crypto.randomBytes(12).toString('hex');
-      const t: Ticket = { id, at: Date.now(), context, proposal, order: proposal.order, checks: proposal.order ? check(proposal.order, context, trading) : [], review: null };
+      const t: Ticket = { id, at: Date.now(), context, proposal, order: proposal.order, checks: proposal.order ? check(proposal.order, context, trading) : [], review: null, reviewedAt: 0, refId: crypto.randomUUID(), placing: false, placed: null };
       tickets.set(id, t);
       return json(res, 200, { id, context, proposal, checks: t.checks, caps: trading.caps });
     }
     if (p === '/api/ticket/check' && method === 'POST') {
-      const t = ticketOf(b.id), o = edited(t, b);
+      const t = ticketOf(b.id);
+      if (t.placed || t.placing) throw new Refused(409, 'this ticket has already sent its order');
+      const o = edited(t, b);
       t.order = o; t.review = null; t.checks = check(o, t.context, readSettings(root).trading);
       return json(res, 200, { checks: t.checks });
     }
     if (p === '/api/ticket/review' && method === 'POST') {
-      const t = ticketOf(b.id), o = edited(t, b), checks = check(o, t.context, readSettings(root).trading);
-      t.order = o; t.checks = checks; t.review = null;
+      const t = ticketOf(b.id);
+      if (t.placed || t.placing) throw new Refused(409, 'this ticket has already sent its order');
+      const o = edited(t, b), checks = check(o, t.context, readSettings(root).trading);
+      t.order = o; t.checks = checks; t.review = null; t.reviewedAt = 0;
       if (!passes(checks)) throw new Refused(400, 'the order does not pass every check, so it was not sent to Robinhood');
       t.review = await askRobinhood(() => robinhood.review(o));
-      return json(res, 200, { checks, review: t.review });
+      t.reviewedAt = Date.now();
+      return json(res, 200, { checks, review: t.review, confirm: confirmWords(o), trading: robinhood.trading() });
+    }
+    // Placing: only a ticket Robinhood checked with no alerts in the last five minutes, unchanged since, with trading
+    // switched on, and the person's Confirm naming exactly this order; every cap is checked again on Robinhood's latest
+    // figures just before it is sent, and a ticket sends at most one order.
+    if (p === '/api/ticket/place' && method === 'POST') {
+      const t = ticketOf(b.id);
+      if (!robinhood.trading().on) throw new Refused(403, 'trading is switched off: switch it on in Your account first');
+      if (t.placed || t.placing) throw new Refused(409, 'this ticket has already sent its order');
+      if (!t.order || !t.review || !t.reviewedAt) throw new Refused(400, 'have Robinhood check this order first');
+      if (Date.now() - t.reviewedAt > REVIEW_MS) throw new Refused(400, "Robinhood's check is more than five minutes old: review the order again");
+      if (!t.review.answered || t.review.alerts.length) throw new Refused(400, 'Robinhood raised alerts on this order, so it cannot be placed');
+      if (b.confirm !== confirmWords(t.order)) throw new Refused(400, 'the confirmation does not name this order: nothing was sent');
+      const order = t.order, trading = readSettings(root).trading, sentToday = placedToday(dir, new Date());
+      t.placing = true;
+      try {
+        const { placed } = await askRobinhood(() => robinhood.placeChecked(order, t.refId, (fresh) => check(order, { ...fresh, rating: t.context.rating, callDate: t.context.callDate, ordersToday: Math.max(fresh.ordersToday, sentToday) }, trading)));
+        t.placed = placed;
+        logOrder(dir, { at: new Date().toISOString(), symbol: order.symbol, side: order.side, quantity: order.quantity, limitPrice: order.limitPrice, timeInForce: order.timeInForce, call: { date: t.context.callDate, rating: t.context.rating }, ticket: t.id, robinhood: { answered: placed.answered, approvalRequired: placed.approvalRequired, orderId: placed.orderId, state: placed.state, error: placed.error } });
+        return json(res, 200, { placed });
+      } finally { t.placing = false; }
+    }
+    if (p === '/api/trading' && method === 'POST') {
+      if (b.on === false) return json(res, 200, robinhood.setTrading(false));
+      if (b.on !== true || b.confirm !== 'switch trading on') throw new Refused(400, 'to switch trading on, confirm it on the page');
+      return json(res, 200, robinhood.setTrading(true));
     }
     if (p === '/api/robinhood/refresh' && method === 'POST') {
       const snapshot = await askRobinhood(() => robinhood.refresh());

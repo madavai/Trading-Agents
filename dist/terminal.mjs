@@ -870,12 +870,12 @@ var require_codegen = __commonJS({
       }
       // `for-in` statement.
       // With option `ownProperties` replaced with a `for-of` loop for object keys
-      forIn(nameOrPrefix, obj3, forBody, varKind = this.opts.es5 ? scope_1.varKinds.var : scope_1.varKinds.const) {
+      forIn(nameOrPrefix, obj4, forBody, varKind = this.opts.es5 ? scope_1.varKinds.var : scope_1.varKinds.const) {
         if (this.opts.ownProperties) {
-          return this.forOf(nameOrPrefix, (0, code_1._)`Object.keys(${obj3})`, forBody);
+          return this.forOf(nameOrPrefix, (0, code_1._)`Object.keys(${obj4})`, forBody);
         }
         const name = this._scope.toName(nameOrPrefix);
-        return this._for(new ForIter("in", varKind, name, obj3), () => forBody(name));
+        return this._for(new ForIter("in", varKind, name, obj4), () => forBody(name));
       }
       // end `for` loop
       endFor() {
@@ -2695,11 +2695,11 @@ var require_validate = __commonJS({
         if (!this.allErrors)
           this.gen.if(cond);
       }
-      setParams(obj3, assign) {
+      setParams(obj4, assign) {
         if (assign)
-          Object.assign(this.params, obj3);
+          Object.assign(this.params, obj4);
         else
-          this.params = obj3;
+          this.params = obj4;
       }
       block$data(valid, codeBlock, $dataValid = codegen_1.nil) {
         this.gen.block(() => {
@@ -7212,12 +7212,12 @@ var require_content_type = __commonJS({
     var TYPE_REGEXP = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+\/[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
     exports.format = format;
     exports.parse = parse4;
-    function format(obj3) {
-      if (!obj3 || typeof obj3 !== "object") {
+    function format(obj4) {
+      if (!obj4 || typeof obj4 !== "object") {
         throw new TypeError("argument obj is required");
       }
-      var parameters = obj3.parameters;
-      var type = obj3.type;
+      var parameters = obj4.parameters;
+      var type = obj4.type;
       if (!type || !TYPE_REGEXP.test(type)) {
         throw new TypeError("invalid type");
       }
@@ -7248,7 +7248,7 @@ var require_content_type = __commonJS({
       if (!TYPE_REGEXP.test(type)) {
         throw new TypeError("invalid media type");
       }
-      var obj3 = new ContentType(type.toLowerCase());
+      var obj4 = new ContentType(type.toLowerCase());
       if (index !== -1) {
         var key;
         var match;
@@ -7267,20 +7267,20 @@ var require_content_type = __commonJS({
               value = value.replace(QESC_REGEXP, "$1");
             }
           }
-          obj3.parameters[key] = value;
+          obj4.parameters[key] = value;
         }
         if (index !== header.length) {
           throw new TypeError("invalid parameter format");
         }
       }
-      return obj3;
+      return obj4;
     }
-    function getcontenttype(obj3) {
+    function getcontenttype(obj4) {
       var header;
-      if (typeof obj3.getHeader === "function") {
-        header = obj3.getHeader("content-type");
-      } else if (typeof obj3.headers === "object") {
-        header = obj3.headers && obj3.headers["content-type"];
+      if (typeof obj4.getHeader === "function") {
+        header = obj4.getHeader("content-type");
+      } else if (typeof obj4.headers === "object") {
+        header = obj4.headers && obj4.headers["content-type"];
       }
       if (typeof header !== "string") {
         throw new TypeError("content-type header is missing from object");
@@ -7424,12 +7424,20 @@ function configure(opts) {
   }
 }
 var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-var nextSlot = /* @__PURE__ */ new Map();
+var lastStart = /* @__PURE__ */ new Map();
+var queue = /* @__PURE__ */ new Map();
 async function pace(host) {
   if (!spacingMs) return;
-  const now = Date.now(), at = Math.max(now, nextSlot.get(host) ?? 0);
-  nextSlot.set(host, at + spacingMs);
-  for (let i = 0; i < 3 && Date.now() < at; i++) await sleep(at - Date.now());
+  const turn = (queue.get(host) ?? Promise.resolve()).then(async () => {
+    for (let i = 0; i < 5; i++) {
+      const wait = (lastStart.get(host) ?? -Infinity) + spacingMs - Date.now();
+      if (wait <= 0) break;
+      await sleep(wait);
+    }
+    lastStart.set(host, Date.now());
+  });
+  queue.set(host, turn);
+  await turn;
 }
 var MINUTE = 6e4;
 var ttlFor = (host) => /(^|\.)sec\.gov$/.test(host) ? 24 * 60 * MINUTE : /fred/.test(host) ? 6 * 60 * MINUTE : 5 * MINUTE;
@@ -7942,8 +7950,8 @@ function defineLazy(object3, key, getter) {
     configurable: true
   });
 }
-function objectClone(obj3) {
-  return Object.create(Object.getPrototypeOf(obj3), Object.getOwnPropertyDescriptors(obj3));
+function objectClone(obj4) {
+  return Object.create(Object.getPrototypeOf(obj4), Object.getOwnPropertyDescriptors(obj4));
 }
 function assignProp(target, prop, value) {
   Object.defineProperty(target, prop, {
@@ -8014,10 +8022,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj3, path13) {
+function getElementAtPath(obj4, path13) {
   if (!path13)
-    return obj3;
-  return path13.reduce((acc, key) => acc?.[key], obj3);
+    return obj4;
+  return path13.reduce((acc, key) => acc?.[key], obj4);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -8453,9 +8461,9 @@ function parsedType(data) {
       if (Array.isArray(data)) {
         return "array";
       }
-      const obj3 = data;
-      if (obj3 && Object.getPrototypeOf(obj3) !== Object.prototype && "constructor" in obj3 && obj3.constructor) {
-        return obj3.constructor.name;
+      const obj4 = data;
+      if (obj4 && Object.getPrototypeOf(obj4) !== Object.prototype && "constructor" in obj4 && obj4.constructor) {
+        return obj4.constructor.name;
       }
     }
   }
@@ -8473,8 +8481,8 @@ function issue(...args) {
   }
   return { ...iss };
 }
-function cleanEnum(obj3) {
-  return Object.entries(obj3).filter(([k, _]) => {
+function cleanEnum(obj4) {
+  return Object.entries(obj4).filter(([k, _]) => {
     return Number.isNaN(Number.parseInt(k, 10));
   }).map((el) => el[1]);
 }
@@ -8798,15 +8806,15 @@ var $ZodError = $constructor("$ZodError", initializer);
 var $ZodRealError = $constructor("$ZodError", initializer, void 0, {
   Parent: Error
 });
-function node(obj3, key, make) {
-  if (!Object.prototype.hasOwnProperty.call(obj3, key)) {
+function node(obj4, key, make) {
+  if (!Object.prototype.hasOwnProperty.call(obj4, key)) {
     if (key === "__proto__") {
-      Object.defineProperty(obj3, key, { value: make(), writable: true, enumerable: true, configurable: true });
+      Object.defineProperty(obj4, key, { value: make(), writable: true, enumerable: true, configurable: true });
     } else {
-      obj3[key] = make();
+      obj4[key] = make();
     }
   }
-  return obj3[key];
+  return obj4[key];
 }
 function flattenError(error2, mapper = (issue2) => issue2.message) {
   const fieldErrors = {};
@@ -17249,15 +17257,15 @@ function applyElicitationDefaults(schema, data) {
   if (!schema || data === null || typeof data !== "object")
     return;
   if (schema.type === "object" && schema.properties && typeof schema.properties === "object") {
-    const obj3 = data;
+    const obj4 = data;
     const props = schema.properties;
     for (const key of Object.keys(props)) {
       const propSchema = props[key];
-      if (obj3[key] === void 0 && Object.prototype.hasOwnProperty.call(propSchema, "default")) {
-        obj3[key] = propSchema.default;
+      if (obj4[key] === void 0 && Object.prototype.hasOwnProperty.call(propSchema, "default")) {
+        obj4[key] = propSchema.default;
       }
-      if (obj3[key] !== void 0) {
-        applyElicitationDefaults(propSchema, obj3[key]);
+      if (obj4[key] !== void 0) {
+        applyElicitationDefaults(propSchema, obj4[key]);
       }
     }
   }
@@ -19475,7 +19483,7 @@ var oneLine = (s, max) => {
   const t2 = s.replace(/\s+/g, " ").trim();
   return t2.length > max ? `${t2.slice(0, max - 3)}...` : t2;
 };
-var masked = (s) => oneLine(s, 300).replace(/\d{5,}/g, "#####");
+var masked = (s) => oneLine(s, 300).replace(/\b[a-z0-9]*\d{5,}[a-z0-9]*\b/gi, "#####");
 
 // src/robinhood/reader.ts
 var Refused = class extends Error {
@@ -19527,7 +19535,7 @@ var words = (v) => {
   return own2 ? [own2.trim()] : Object.values(o).flatMap(words);
 };
 function parseReview(answer) {
-  if (answer.failed) return { answered: false, alerts: [], approvalRequired: null, facts: [], error: answer.text.replace(/\d{5,}/g, "#####").slice(0, 300) };
+  if (answer.failed) return { answered: false, alerts: [], approvalRequired: null, facts: [], error: masked(answer.text) };
   const d = obj2(obj2(answer.data).data);
   const alerts = [.../* @__PURE__ */ new Set([...words(d.order_checks), ...words(d.alerts), ...words(d.warnings)])].slice(0, 12).map((x) => x.slice(0, 300));
   const facts = [];
@@ -19535,7 +19543,7 @@ function parseReview(answer) {
     for (const [k, v] of Object.entries(o)) {
       if (facts.length >= 24 || ["order_checks", "alerts", "warnings", "customer_approval_required", "account_number", "rhs_account_number"].includes(k)) continue;
       const name = `${prefix}${k.replace(/_/g, " ")}`;
-      if (v === null || typeof v === "string" || typeof v === "number" || typeof v === "boolean") facts.push([name, String(v).replace(/\d{7,}/g, "#####").slice(0, 120)]);
+      if (v === null || typeof v === "string" || typeof v === "number" || typeof v === "boolean") facts.push([name, String(v).replace(/\b[a-z0-9]*\d{7,}[a-z0-9]*\b/gi, "#####").slice(0, 120)]);
       else if (!Array.isArray(v) && depth < 2) walk(obj2(v), `${name} \xB7 `, depth + 1);
     }
   };
@@ -19573,6 +19581,61 @@ var Reviewer = class {
       }
     }
     return parseReview({ data, text: text2, failed: r.isError === true });
+  }
+};
+
+// src/robinhood/order.ts
+var PLACE = "place_equity_order";
+var obj3 = (v) => v && typeof v === "object" && !Array.isArray(v) ? v : {};
+function parsePlaced(answer) {
+  if (answer.failed) return { answered: false, approvalRequired: null, orderId: null, state: null, facts: [], error: masked(answer.text) };
+  const d = obj3(obj3(answer.data).data), order = obj3(d.order);
+  const id = [d.order_id, d.id, order.id, d.approval_id].find((v) => typeof v === "string" && v.trim());
+  const state = [d.state, order.state, d.status].find((v) => typeof v === "string" && v.trim());
+  const facts = [];
+  const walk = (o, prefix, depth) => {
+    for (const [k, v] of Object.entries(o)) {
+      if (facts.length >= 24 || ["account_number", "rhs_account_number", "customer_approval_required"].includes(k)) continue;
+      const name = `${prefix}${k.replace(/_/g, " ")}`;
+      if (v === null || typeof v === "string" || typeof v === "number" || typeof v === "boolean") facts.push([name, (/(^|_)id$/.test(k) ? String(v) : String(v).replace(/\b[a-z0-9]*\d{7,}[a-z0-9]*\b/gi, "#####")).slice(0, 120)]);
+      else if (!Array.isArray(v) && depth < 2) walk(obj3(v), `${name} \xB7 `, depth + 1);
+    }
+  };
+  walk(d, "", 0);
+  return { answered: true, approvalRequired: typeof d.customer_approval_required === "boolean" ? d.customer_approval_required : null, orderId: id ?? null, state: state ?? null, facts, error: null };
+}
+var Placer = class {
+  constructor(client, tools) {
+    this.client = client;
+    this.tools = tools;
+  }
+  client;
+  tools;
+  /** Places one limit order of whole shares on the Agentic account. Call only after the person's Confirm. */
+  async place(account, o, refId) {
+    if (!account.agentic) throw new Refused("Only the Agentic account can trade, and this is not it.");
+    if (!this.tools.some((t2) => t2.name === PLACE)) throw new Refused("Robinhood's connection no longer offers placing a stock order, so nothing was sent.");
+    if (!Number.isInteger(o.quantity) || o.quantity < 1 || !(o.limitPrice > 0) || o.side !== "buy" && o.side !== "sell" || !/^[0-9a-f-]{36}$/.test(refId)) throw new Refused("That order is not complete, so it was not sent.");
+    const r = await this.client.callTool({ name: PLACE, arguments: {
+      account_number: account.accountNumber,
+      symbol: o.symbol,
+      side: o.side,
+      type: "limit",
+      quantity: String(o.quantity),
+      limit_price: o.limitPrice.toFixed(2),
+      time_in_force: o.timeInForce,
+      market_hours: "regular_hours",
+      ref_id: refId
+    } });
+    const text2 = (r.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
+    let data = r.structuredContent ?? null;
+    if (data === null) {
+      try {
+        data = JSON.parse(text2);
+      } catch {
+      }
+    }
+    return parsePlaced({ data, text: text2, failed: r.isError === true });
   }
 };
 
@@ -19679,7 +19742,7 @@ ${url2}`);
   }
   try {
     const { tools } = await c.listTools();
-    return { reader: new Reader(c, tools), reviewer: new Reviewer(c, tools), close: () => c.close().catch(() => {
+    return { reader: new Reader(c, tools), reviewer: new Reviewer(c, tools), placer: new Placer(c, tools), close: () => c.close().catch(() => {
     }) };
   } catch (e) {
     await c.close().catch(() => {
@@ -19758,7 +19821,10 @@ var Link = class {
   /** The real figures a ticket for one stock is sized and checked on: the Agentic account's value, buying power and
    *  holding of the stock, Robinhood's live price, and how many orders the account has had today (New York's day). */
   async ticketContext(symbol, now = /* @__PURE__ */ new Date()) {
-    return this.withReader(async (r) => {
+    return this.withReader((r) => this.contextWith(r, symbol, now));
+  }
+  async contextWith(r, symbol, now) {
+    {
       const a = await r.read("get_accounts");
       if (a.failed) throw new Error("Robinhood could not list the accounts");
       this.learn(a.data);
@@ -19774,7 +19840,39 @@ var Link = class {
       const day = (iso) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date(iso));
       const ordersToday = parseOrders(await data("get_equity_orders", { account_number: ids.accountNumber })).orders.filter((o) => o.at && day(o.at) === day(now.toISOString())).length;
       return { symbol, accountValue: p.total, buyingPower: p.buyingPower, held, price, ordersToday };
-    });
+    }
+  }
+  /** Whether the person has switched trading on, on the dashboard. Kept beside the sign-in, where agents are refused. */
+  get switchFile() {
+    return path5.join(path5.dirname(this.file), "trading.json");
+  }
+  trading() {
+    try {
+      const v = JSON.parse(fs5.readFileSync(this.switchFile, "utf8"));
+      return v.on === true ? { on: true, since: typeof v.since === "string" ? v.since : null } : { on: false, since: null };
+    } catch {
+      return { on: false, since: null };
+    }
+  }
+  setTrading(on) {
+    fs5.mkdirSync(path5.dirname(this.switchFile), { recursive: true });
+    fs5.writeFileSync(this.switchFile, JSON.stringify(on ? { on: true, since: this.now() } : { on: false }, null, 2) + "\n", { mode: 384 });
+    return this.trading();
+  }
+  /** Places one order on the Agentic account, in one session: reads the account afresh, has `approve` check the order on
+   *  those figures, and only if every check passes sends it. The caller has already had the person Confirm it. */
+  async placeChecked(order, refId, approve) {
+    if (!this.trading().on) throw new Error("trading is switched off: switch it on in Your account first");
+    const session = await openSession(this.file, { ...this.opts, signIn: false });
+    try {
+      const context = await this.contextWith(session.reader, order.symbol, /* @__PURE__ */ new Date());
+      const failed = approve(context).filter((c) => !c.ok);
+      if (failed.length) throw new Error(`the order no longer passes on Robinhood's latest figures: ${failed.map((c) => c.words).join("; ")}`);
+      const placed = await session.placer.place({ accountNumber: this.agenticIds().accountNumber, agentic: true }, order, refId);
+      return { placed, context };
+    } finally {
+      await session.close();
+    }
   }
   /** Robinhood's own check of an order on the Agentic account. Nothing is placed. */
   async review(order) {
@@ -19878,6 +19976,7 @@ var Link = class {
   forget() {
     fs5.rmSync(this.file, { force: true });
     fs5.rmSync(this.choiceFile, { force: true });
+    fs5.rmSync(this.switchFile, { force: true });
     this.last = null;
     this.last_snapshot = null;
     this.known = null;
@@ -20641,6 +20740,28 @@ function shareHoldings(dir, snap, day) {
   })), day);
   return true;
 }
+var REVIEW_MS = 5 * 6e4;
+var confirmWords = (o) => `${o.side === "buy" ? "Buy" : "Sell"} ${o.quantity} ${o.symbol} at $${o.limitPrice.toFixed(2)}`;
+var ordersFile = (dir) => path12.join(dir, "orders.jsonl");
+function logOrder(dir, line) {
+  fs12.mkdirSync(dir, { recursive: true });
+  fs12.appendFileSync(ordersFile(dir), JSON.stringify(line) + "\n");
+}
+function placedToday(dir, now) {
+  const day = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(d);
+  try {
+    return fs12.readFileSync(ordersFile(dir), "utf8").split("\n").filter((l) => {
+      try {
+        const v = JSON.parse(l);
+        return !!v.at && day(new Date(v.at)) === day(now);
+      } catch {
+        return false;
+      }
+    }).length;
+  } catch {
+    return 0;
+  }
+}
 var deskIdOf = (root2) => crypto4.createHash("sha256").update(path12.resolve(root2)).digest("hex").slice(0, 12);
 var PORTS = [47615, 47625];
 var SECURITY = {
@@ -20705,7 +20826,7 @@ async function startTerminal(opts) {
     try {
       return await job();
     } catch (e) {
-      const m = e instanceof Error ? e.message : "", own2 = /not one of your Robinhood accounts|show your Agentic account|not the Agentic account|not complete, so it was not sent/.test(m);
+      const m = e instanceof Error ? e.message : "", own2 = /not one of your Robinhood accounts|show your Agentic account|not the Agentic account|not complete, so it was not sent|no longer passes on Robinhood's latest figures|trading is switched off/.test(m);
       throw new Refused2(own2 ? 400 : 502, own2 ? m : plainFailure(e));
     }
   };
@@ -20731,6 +20852,7 @@ async function startTerminal(opts) {
       if (p === "/api/state") return json(res, 200, stateOf(root2, day));
       if (p === "/api/version") return json(res, 200, { version: versionOf(root2) });
       if (p === "/api/robinhood") return json(res, 200, robinhood.info());
+      if (p === "/api/trading") return json(res, 200, { ...robinhood.trading(), placedToday: placedToday(dir, /* @__PURE__ */ new Date()) });
       if (p === "/api/robinhood/accounts") return json(res, 200, await askRobinhood(() => robinhood.accounts()));
       if (p === "/api/robinhood/snapshot") return json(res, 200, { snapshot: robinhood.snapshot(), chosen: robinhood.chosen() });
       if (p === "/api/quotes") {
@@ -20781,25 +20903,55 @@ async function startTerminal(opts) {
       const trading = readSettings(root2).trading;
       const context = { ...await askRobinhood(() => robinhood.ticketContext(symbol)), rating: call.rating, callDate: call.date };
       const proposal = propose(context, trading), id = crypto4.randomBytes(12).toString("hex");
-      const t2 = { id, at: Date.now(), context, proposal, order: proposal.order, checks: proposal.order ? check(proposal.order, context, trading) : [], review: null };
+      const t2 = { id, at: Date.now(), context, proposal, order: proposal.order, checks: proposal.order ? check(proposal.order, context, trading) : [], review: null, reviewedAt: 0, refId: crypto4.randomUUID(), placing: false, placed: null };
       tickets.set(id, t2);
       return json(res, 200, { id, context, proposal, checks: t2.checks, caps: trading.caps });
     }
     if (p === "/api/ticket/check" && method === "POST") {
-      const t2 = ticketOf(b.id), o = edited(t2, b);
+      const t2 = ticketOf(b.id);
+      if (t2.placed || t2.placing) throw new Refused2(409, "this ticket has already sent its order");
+      const o = edited(t2, b);
       t2.order = o;
       t2.review = null;
       t2.checks = check(o, t2.context, readSettings(root2).trading);
       return json(res, 200, { checks: t2.checks });
     }
     if (p === "/api/ticket/review" && method === "POST") {
-      const t2 = ticketOf(b.id), o = edited(t2, b), checks = check(o, t2.context, readSettings(root2).trading);
+      const t2 = ticketOf(b.id);
+      if (t2.placed || t2.placing) throw new Refused2(409, "this ticket has already sent its order");
+      const o = edited(t2, b), checks = check(o, t2.context, readSettings(root2).trading);
       t2.order = o;
       t2.checks = checks;
       t2.review = null;
+      t2.reviewedAt = 0;
       if (!passes(checks)) throw new Refused2(400, "the order does not pass every check, so it was not sent to Robinhood");
       t2.review = await askRobinhood(() => robinhood.review(o));
-      return json(res, 200, { checks, review: t2.review });
+      t2.reviewedAt = Date.now();
+      return json(res, 200, { checks, review: t2.review, confirm: confirmWords(o), trading: robinhood.trading() });
+    }
+    if (p === "/api/ticket/place" && method === "POST") {
+      const t2 = ticketOf(b.id);
+      if (!robinhood.trading().on) throw new Refused2(403, "trading is switched off: switch it on in Your account first");
+      if (t2.placed || t2.placing) throw new Refused2(409, "this ticket has already sent its order");
+      if (!t2.order || !t2.review || !t2.reviewedAt) throw new Refused2(400, "have Robinhood check this order first");
+      if (Date.now() - t2.reviewedAt > REVIEW_MS) throw new Refused2(400, "Robinhood's check is more than five minutes old: review the order again");
+      if (!t2.review.answered || t2.review.alerts.length) throw new Refused2(400, "Robinhood raised alerts on this order, so it cannot be placed");
+      if (b.confirm !== confirmWords(t2.order)) throw new Refused2(400, "the confirmation does not name this order: nothing was sent");
+      const order = t2.order, trading = readSettings(root2).trading, sentToday = placedToday(dir, /* @__PURE__ */ new Date());
+      t2.placing = true;
+      try {
+        const { placed } = await askRobinhood(() => robinhood.placeChecked(order, t2.refId, (fresh) => check(order, { ...fresh, rating: t2.context.rating, callDate: t2.context.callDate, ordersToday: Math.max(fresh.ordersToday, sentToday) }, trading)));
+        t2.placed = placed;
+        logOrder(dir, { at: (/* @__PURE__ */ new Date()).toISOString(), symbol: order.symbol, side: order.side, quantity: order.quantity, limitPrice: order.limitPrice, timeInForce: order.timeInForce, call: { date: t2.context.callDate, rating: t2.context.rating }, ticket: t2.id, robinhood: { answered: placed.answered, approvalRequired: placed.approvalRequired, orderId: placed.orderId, state: placed.state, error: placed.error } });
+        return json(res, 200, { placed });
+      } finally {
+        t2.placing = false;
+      }
+    }
+    if (p === "/api/trading" && method === "POST") {
+      if (b.on === false) return json(res, 200, robinhood.setTrading(false));
+      if (b.on !== true || b.confirm !== "switch trading on") throw new Refused2(400, "to switch trading on, confirm it on the page");
+      return json(res, 200, robinhood.setTrading(true));
     }
     if (p === "/api/robinhood/refresh" && method === "POST") {
       const snapshot = await askRobinhood(() => robinhood.refresh());

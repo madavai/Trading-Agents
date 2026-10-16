@@ -4,10 +4,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseAccounts, parseOrders, parsePortfolio, parsePositions, parseQuotes, readAccount, sortAccounts, type Account, type AccountIds, type AccountView } from './account.js';
-import type { Order, TicketContext } from '../desk/ticket.js';
+import type { Check, Order, TicketContext } from '../desk/ticket.js';
+import type { Placed } from './order.js';
+import type { Reader } from './reader.js';
 import type { Review } from './review.js';
 import { NotSignedIn, openSession, type SessionOptions } from './connect.js';
-import type { Reader } from './reader.js';
 import { readSaved } from './store.js';
 import { masked, oneLine } from './rules.js';
 
@@ -86,7 +87,11 @@ export class Link {
   /** The real figures a ticket for one stock is sized and checked on: the Agentic account's value, buying power and
    *  holding of the stock, Robinhood's live price, and how many orders the account has had today (New York's day). */
   async ticketContext(symbol: string, now: Date = new Date()): Promise<Omit<TicketContext, 'rating' | 'callDate'>> {
-    return this.withReader(async (r) => {
+    return this.withReader((r) => this.contextWith(r, symbol, now));
+  }
+
+  private async contextWith(r: Reader, symbol: string, now: Date): Promise<Omit<TicketContext, 'rating' | 'callDate'>> {
+    {
       const a = await r.read('get_accounts');
       if (a.failed) throw new Error('Robinhood could not list the accounts');
       this.learn(a.data);
@@ -98,7 +103,32 @@ export class Link {
       const day = (iso: string) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date(iso));
       const ordersToday = parseOrders(await data('get_equity_orders', { account_number: ids.accountNumber })).orders.filter((o) => o.at && day(o.at) === day(now.toISOString())).length;
       return { symbol, accountValue: p.total, buyingPower: p.buyingPower, held, price, ordersToday };
-    });
+    }
+  }
+
+  /** Whether the person has switched trading on, on the dashboard. Kept beside the sign-in, where agents are refused. */
+  private get switchFile(): string { return path.join(path.dirname(this.file), 'trading.json'); }
+  trading(): { on: boolean; since: string | null } {
+    try { const v = JSON.parse(fs.readFileSync(this.switchFile, 'utf8')) as { on?: unknown; since?: unknown }; return v.on === true ? { on: true, since: typeof v.since === 'string' ? v.since : null } : { on: false, since: null }; } catch { return { on: false, since: null }; }
+  }
+  setTrading(on: boolean): { on: boolean; since: string | null } {
+    fs.mkdirSync(path.dirname(this.switchFile), { recursive: true });
+    fs.writeFileSync(this.switchFile, JSON.stringify(on ? { on: true, since: this.now() } : { on: false }, null, 2) + '\n', { mode: 0o600 });
+    return this.trading();
+  }
+
+  /** Places one order on the Agentic account, in one session: reads the account afresh, has `approve` check the order on
+   *  those figures, and only if every check passes sends it. The caller has already had the person Confirm it. */
+  async placeChecked(order: Order, refId: string, approve: (context: Omit<TicketContext, 'rating' | 'callDate'>) => Check[]): Promise<{ placed: Placed; context: Omit<TicketContext, 'rating' | 'callDate'> }> {
+    if (!this.trading().on) throw new Error('trading is switched off: switch it on in Your account first');
+    const session = await openSession(this.file, { ...this.opts, signIn: false });
+    try {
+      const context = await this.contextWith(session.reader, order.symbol, new Date());
+      const failed = approve(context).filter((c) => !c.ok);
+      if (failed.length) throw new Error(`the order no longer passes on Robinhood's latest figures: ${failed.map((c) => c.words).join('; ')}`);
+      const placed = await session.placer.place({ accountNumber: this.agenticIds().accountNumber, agentic: true }, order, refId);
+      return { placed, context };
+    } finally { await session.close(); }
   }
 
   /** Robinhood's own check of an order on the Agentic account. Nothing is placed. */
@@ -194,6 +224,7 @@ export class Link {
   forget(): LinkInfo {
     fs.rmSync(this.file, { force: true });
     fs.rmSync(this.choiceFile, { force: true });
+    fs.rmSync(this.switchFile, { force: true });   // disconnecting switches trading off too
     this.last = null; this.last_snapshot = null; this.known = null; this.ids.clear();
     return this.info();
   }
