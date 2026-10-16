@@ -10,6 +10,7 @@ import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js';
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 import { FileAuth, readSaved } from './store.js';
 import { Reader } from './reader.js';
+import { Reviewer } from './review.js';
 import { isOrderTool, kindOf, TRADE_WORDS, type Kind } from './rules.js';
 import { VERSION } from '../version.js';
 
@@ -87,7 +88,8 @@ export interface SessionOptions {
   signIn: boolean;
   url?: string; port?: number; open?: (url: URL) => void; say?: (words: string) => void;
 }
-export interface Session { reader: Reader; close: () => Promise<void> }
+/** reader: the read tools. reviewer: Robinhood's order check alone, used only on the person's Review. */
+export interface Session { reader: Reader; reviewer: Reviewer; close: () => Promise<void> }
 
 /** Opens a connection to Robinhood and lists what it offers. The caller closes it. */
 export async function openSession(file: string, opts: SessionOptions): Promise<Session> {
@@ -116,7 +118,8 @@ export async function openSession(file: string, opts: SessionOptions): Promise<S
     await c.connect(t);
   }
   try {
-    return { reader: new Reader(c, (await c.listTools()).tools), close: () => c.close().catch(() => {}) };
+    const { tools } = await c.listTools();
+    return { reader: new Reader(c, tools), reviewer: new Reviewer(c, tools), close: () => c.close().catch(() => {}) };
   } catch (e) {
     await c.close().catch(() => {});
     throw e;

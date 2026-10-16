@@ -870,12 +870,12 @@ var require_codegen = __commonJS({
       }
       // `for-in` statement.
       // With option `ownProperties` replaced with a `for-of` loop for object keys
-      forIn(nameOrPrefix, obj, forBody, varKind = this.opts.es5 ? scope_1.varKinds.var : scope_1.varKinds.const) {
+      forIn(nameOrPrefix, obj2, forBody, varKind = this.opts.es5 ? scope_1.varKinds.var : scope_1.varKinds.const) {
         if (this.opts.ownProperties) {
-          return this.forOf(nameOrPrefix, (0, code_1._)`Object.keys(${obj})`, forBody);
+          return this.forOf(nameOrPrefix, (0, code_1._)`Object.keys(${obj2})`, forBody);
         }
         const name = this._scope.toName(nameOrPrefix);
-        return this._for(new ForIter("in", varKind, name, obj), () => forBody(name));
+        return this._for(new ForIter("in", varKind, name, obj2), () => forBody(name));
       }
       // end `for` loop
       endFor() {
@@ -2695,11 +2695,11 @@ var require_validate = __commonJS({
         if (!this.allErrors)
           this.gen.if(cond);
       }
-      setParams(obj, assign) {
+      setParams(obj2, assign) {
         if (assign)
-          Object.assign(this.params, obj);
+          Object.assign(this.params, obj2);
         else
-          this.params = obj;
+          this.params = obj2;
       }
       block$data(valid, codeBlock, $dataValid = codegen_1.nil) {
         this.gen.block(() => {
@@ -7212,12 +7212,12 @@ var require_content_type = __commonJS({
     var TYPE_REGEXP = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+\/[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
     exports.format = format;
     exports.parse = parse3;
-    function format(obj) {
-      if (!obj || typeof obj !== "object") {
+    function format(obj2) {
+      if (!obj2 || typeof obj2 !== "object") {
         throw new TypeError("argument obj is required");
       }
-      var parameters = obj.parameters;
-      var type = obj.type;
+      var parameters = obj2.parameters;
+      var type = obj2.type;
       if (!type || !TYPE_REGEXP.test(type)) {
         throw new TypeError("invalid type");
       }
@@ -7248,7 +7248,7 @@ var require_content_type = __commonJS({
       if (!TYPE_REGEXP.test(type)) {
         throw new TypeError("invalid media type");
       }
-      var obj = new ContentType(type.toLowerCase());
+      var obj2 = new ContentType(type.toLowerCase());
       if (index !== -1) {
         var key;
         var match;
@@ -7267,20 +7267,20 @@ var require_content_type = __commonJS({
               value = value.replace(QESC_REGEXP, "$1");
             }
           }
-          obj.parameters[key] = value;
+          obj2.parameters[key] = value;
         }
         if (index !== header.length) {
           throw new TypeError("invalid parameter format");
         }
       }
-      return obj;
+      return obj2;
     }
-    function getcontenttype(obj) {
+    function getcontenttype(obj2) {
       var header;
-      if (typeof obj.getHeader === "function") {
-        header = obj.getHeader("content-type");
-      } else if (typeof obj.headers === "object") {
-        header = obj.headers && obj.headers["content-type"];
+      if (typeof obj2.getHeader === "function") {
+        header = obj2.getHeader("content-type");
+      } else if (typeof obj2.headers === "object") {
+        header = obj2.headers && obj2.headers["content-type"];
       }
       if (typeof header !== "string") {
         throw new TypeError("content-type header is missing from object");
@@ -7482,8 +7482,8 @@ function defineLazy(object3, key, getter) {
     configurable: true
   });
 }
-function objectClone(obj) {
-  return Object.create(Object.getPrototypeOf(obj), Object.getOwnPropertyDescriptors(obj));
+function objectClone(obj2) {
+  return Object.create(Object.getPrototypeOf(obj2), Object.getOwnPropertyDescriptors(obj2));
 }
 function assignProp(target, prop, value) {
   Object.defineProperty(target, prop, {
@@ -7554,10 +7554,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path3) {
+function getElementAtPath(obj2, path3) {
   if (!path3)
-    return obj;
-  return path3.reduce((acc, key) => acc?.[key], obj);
+    return obj2;
+  return path3.reduce((acc, key) => acc?.[key], obj2);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -7993,9 +7993,9 @@ function parsedType(data) {
       if (Array.isArray(data)) {
         return "array";
       }
-      const obj = data;
-      if (obj && Object.getPrototypeOf(obj) !== Object.prototype && "constructor" in obj && obj.constructor) {
-        return obj.constructor.name;
+      const obj2 = data;
+      if (obj2 && Object.getPrototypeOf(obj2) !== Object.prototype && "constructor" in obj2 && obj2.constructor) {
+        return obj2.constructor.name;
       }
     }
   }
@@ -8013,8 +8013,8 @@ function issue(...args) {
   }
   return { ...iss };
 }
-function cleanEnum(obj) {
-  return Object.entries(obj).filter(([k, _]) => {
+function cleanEnum(obj2) {
+  return Object.entries(obj2).filter(([k, _]) => {
     return Number.isNaN(Number.parseInt(k, 10));
   }).map((el) => el[1]);
 }
@@ -8338,15 +8338,15 @@ var $ZodError = $constructor("$ZodError", initializer);
 var $ZodRealError = $constructor("$ZodError", initializer, void 0, {
   Parent: Error
 });
-function node(obj, key, make) {
-  if (!Object.prototype.hasOwnProperty.call(obj, key)) {
+function node(obj2, key, make) {
+  if (!Object.prototype.hasOwnProperty.call(obj2, key)) {
     if (key === "__proto__") {
-      Object.defineProperty(obj, key, { value: make(), writable: true, enumerable: true, configurable: true });
+      Object.defineProperty(obj2, key, { value: make(), writable: true, enumerable: true, configurable: true });
     } else {
-      obj[key] = make();
+      obj2[key] = make();
     }
   }
-  return obj[key];
+  return obj2[key];
 }
 function flattenError(error2, mapper = (issue2) => issue2.message) {
   const fieldErrors = {};
@@ -16789,15 +16789,15 @@ function applyElicitationDefaults(schema, data) {
   if (!schema || data === null || typeof data !== "object")
     return;
   if (schema.type === "object" && schema.properties && typeof schema.properties === "object") {
-    const obj = data;
+    const obj2 = data;
     const props = schema.properties;
     for (const key of Object.keys(props)) {
       const propSchema = props[key];
-      if (obj[key] === void 0 && Object.prototype.hasOwnProperty.call(propSchema, "default")) {
-        obj[key] = propSchema.default;
+      if (obj2[key] === void 0 && Object.prototype.hasOwnProperty.call(propSchema, "default")) {
+        obj2[key] = propSchema.default;
       }
-      if (obj[key] !== void 0) {
-        applyElicitationDefaults(propSchema, obj[key]);
+      if (obj2[key] !== void 0) {
+        applyElicitationDefaults(propSchema, obj2[key]);
       }
     }
   }
@@ -19040,7 +19040,7 @@ var labelOf = (v) => {
 var MAX_DEPTH = 8;
 var MAX_KEYS = 60;
 var MAX_ITEMS = 200;
-function describe2(values, words, depth) {
+function describe2(values, words2, depth) {
   const present = values.filter((v) => v !== void 0);
   const objects = present.filter((v) => !!v && typeof v === "object" && !Array.isArray(v));
   const lists = present.filter(Array.isArray);
@@ -19048,14 +19048,14 @@ function describe2(values, words, depth) {
   const heads = [], body = [], pad = "  ".repeat(depth + 1);
   if (scalars.length) {
     heads.push([...new Set(scalars.map(labelOf))].join(" or "));
-    const seen = words ? [...new Set(scalars.filter((v) => typeof v === "string" && /^[a-z][a-z_]{1,23}$/.test(v)))].sort().slice(0, 12) : [];
+    const seen = words2 ? [...new Set(scalars.filter((v) => typeof v === "string" && /^[a-z][a-z_]{1,23}$/.test(v)))].sort().slice(0, 12) : [];
     if (seen.length) heads[heads.length - 1] += ` (words seen: ${seen.join(", ")})`;
   }
   if (lists.length) {
     const all = lists.flatMap((l) => l.slice(0, MAX_ITEMS));
     heads.push(`list of ${lists.reduce((n, l) => n + l.length, 0)}`);
     if (all.length && depth < MAX_DEPTH) {
-      const inner = describe2(all, words, depth + 1);
+      const inner = describe2(all, words2, depth + 1);
       body.push(`${pad}each: ${inner.head}`, ...inner.body);
     }
   }
@@ -19064,15 +19064,15 @@ function describe2(values, words, depth) {
     if (depth < MAX_DEPTH) {
       const keys = [...new Set(objects.flatMap((o) => Object.keys(o)))].slice(0, MAX_KEYS);
       for (const k of keys) {
-        const inner = describe2(objects.map((o) => o[k]), words, depth + 1);
+        const inner = describe2(objects.map((o) => o[k]), words2, depth + 1);
         body.push(`${pad}${k}${objects.some((o) => !(k in o)) ? "?" : ""}: ${inner.head}`, ...inner.body);
       }
     }
   }
   return { head: heads.join(" or ") || "nothing", body };
 }
-function shapeLines(value, words = false) {
-  const d = describe2([value], words, 0);
+function shapeLines(value, words2 = false) {
+  const d = describe2([value], words2, 0);
   return [`answer: ${d.head}`, ...d.body];
 }
 var oneLine = (s, max) => {
@@ -19120,6 +19120,66 @@ var Reader = class {
   }
 };
 
+// src/robinhood/review.ts
+var REVIEW = "review_equity_order";
+var obj = (v) => v && typeof v === "object" && !Array.isArray(v) ? v : {};
+var words = (v) => {
+  if (typeof v === "string") return v.trim() ? [v.trim()] : [];
+  if (Array.isArray(v)) return v.flatMap(words);
+  const o = obj(v);
+  const own2 = ["message", "detail", "description", "title", "reason", "text"].map((k) => o[k]).find((x) => typeof x === "string" && x.trim());
+  return own2 ? [own2.trim()] : Object.values(o).flatMap(words);
+};
+function parseReview(answer) {
+  if (answer.failed) return { answered: false, alerts: [], approvalRequired: null, facts: [], error: answer.text.replace(/\d{5,}/g, "#####").slice(0, 300) };
+  const d = obj(obj(answer.data).data);
+  const alerts = [.../* @__PURE__ */ new Set([...words(d.order_checks), ...words(d.alerts), ...words(d.warnings)])].slice(0, 12).map((x) => x.slice(0, 300));
+  const facts = [];
+  const walk = (o, prefix, depth) => {
+    for (const [k, v] of Object.entries(o)) {
+      if (facts.length >= 24 || ["order_checks", "alerts", "warnings", "customer_approval_required", "account_number", "rhs_account_number"].includes(k)) continue;
+      const name = `${prefix}${k.replace(/_/g, " ")}`;
+      if (v === null || typeof v === "string" || typeof v === "number" || typeof v === "boolean") facts.push([name, String(v).replace(/\d{7,}/g, "#####").slice(0, 120)]);
+      else if (!Array.isArray(v) && depth < 2) walk(obj(v), `${name} \xB7 `, depth + 1);
+    }
+  };
+  walk(d, "", 0);
+  return { answered: true, alerts, approvalRequired: typeof d.customer_approval_required === "boolean" ? d.customer_approval_required : null, facts, error: null };
+}
+var Reviewer = class {
+  constructor(client, tools) {
+    this.client = client;
+    this.tools = tools;
+  }
+  client;
+  tools;
+  /** Asks Robinhood to check the order on the Agentic account. Nothing is placed. */
+  async review(account, o) {
+    if (!account.agentic) throw new Refused("Only the Agentic account can have an order checked, and this is not it.");
+    if (!this.tools.some((t) => t.name === REVIEW)) throw new Refused("Robinhood's connection no longer offers its order check, so nothing was sent.");
+    if (!Number.isInteger(o.quantity) || o.quantity < 1 || !(o.limitPrice > 0) || o.side !== "buy" && o.side !== "sell") throw new Refused("That order is not complete, so it was not sent for checking.");
+    const r = await this.client.callTool({ name: REVIEW, arguments: {
+      account_number: account.accountNumber,
+      symbol: o.symbol,
+      side: o.side,
+      type: "limit",
+      quantity: String(o.quantity),
+      limit_price: o.limitPrice.toFixed(2),
+      time_in_force: o.timeInForce,
+      market_hours: "regular_hours"
+    } });
+    const text = (r.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
+    let data = r.structuredContent ?? null;
+    if (data === null) {
+      try {
+        data = JSON.parse(text);
+      } catch {
+      }
+    }
+    return parseReview({ data, text, failed: r.isError === true });
+  }
+};
+
 // src/version.ts
 var VERSION = true ? "0.0.1" : "dev";
 
@@ -19141,9 +19201,9 @@ function waitForCode(port, expectedState, timeoutMs = 5 * 6e4) {
   let close = () => {
   };
   const code = new Promise((resolve, reject) => {
-    const page = (words) => `<!doctype html><meta charset="utf-8"><title>Trading Agents</title><body style="font:16px system-ui;padding:40px">${words}</body>`;
-    const answer = (res, status, words) => {
-      res.writeHead(status, { connection: "close", ...words ? { "content-type": "text/html" } : {} }).end(words ? page(words) : void 0);
+    const page = (words2) => `<!doctype html><meta charset="utf-8"><title>Trading Agents</title><body style="font:16px system-ui;padding:40px">${words2}</body>`;
+    const answer = (res, status, words2) => {
+      res.writeHead(status, { connection: "close", ...words2 ? { "content-type": "text/html" } : {} }).end(words2 ? page(words2) : void 0);
     };
     const server = http.createServer((req, res) => {
       const url2 = new URL(req.url ?? "/", `http://127.0.0.1:${port}`);
@@ -19239,7 +19299,8 @@ ${url2}`);
     await c.connect(t);
   }
   try {
-    return { reader: new Reader(c, (await c.listTools()).tools), close: () => c.close().catch(() => {
+    const { tools } = await c.listTools();
+    return { reader: new Reader(c, tools), reviewer: new Reviewer(c, tools), close: () => c.close().catch(() => {
     }) };
   } catch (e) {
     await c.close().catch(() => {
@@ -19300,9 +19361,9 @@ async function shapeOfRead(reader, name, args, opts = {}) {
 }
 
 // src/robinhood/cli.ts
-var say = (words) => console.log(words);
+var say = (words2) => console.log(words2);
 async function main(args) {
-  const words = args.includes("--words"), [command, ...rest] = args.filter((a) => a !== "--words");
+  const words2 = args.includes("--words"), [command, ...rest] = args.filter((a) => a !== "--words");
   const file = robinhoodFile();
   if (command === "status") {
     say(fs2.existsSync(file) ? `A Robinhood sign-in is saved (last refreshed ${fs2.statSync(file).mtime.toISOString().slice(0, 16).replace("T", " ")} UTC).` : "No Robinhood sign-in is saved yet.");
@@ -19332,7 +19393,7 @@ async function main(args) {
     try {
       const session = await openSession(file, { signIn: true, say });
       try {
-        for (const l of command === "discover" ? await discover(session.reader, { words }) : await shapeOfRead(session.reader, rest[0], json, { words })) say(l);
+        for (const l of command === "discover" ? await discover(session.reader, { words: words2 }) : await shapeOfRead(session.reader, rest[0], json, { words: words2 })) say(l);
       } finally {
         await session.close();
       }

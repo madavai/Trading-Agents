@@ -36702,6 +36702,7 @@ var VERSION = true ? "0.0.1" : "dev";
 import fs2 from "node:fs";
 import path3 from "node:path";
 var ANALYSTS = ["market", "sentiment", "news", "fundamentals"];
+var ACTIONS = ["buy a full position", "buy half a position", "no order", "sell half of what is held", "sell everything held"];
 var DEFAULTS = {
   analysis: {
     outputLanguage: "English",
@@ -36723,8 +36724,33 @@ var DEFAULTS = {
     benchmarks: { "": "SPY", ".NS": "^NSEI", ".BO": "^BSESN", ".T": "^N225", ".TW": "^TWII", ".TWO": "^TWII", ".KS": "^KS11", ".KQ": "^KQ11", ".HK": "^HSI", ".SI": "^STI", ".L": "^FTSE", ".DE": "^GDAXI", ".PA": "^FCHI", ".AS": "^AEX", ".SW": "^SSMI", ".MI": "FTSEMIB.MI", ".TO": "^GSPTSE", ".AX": "^AXJO", ".SS": "000001.SS", ".SZ": "399001.SZ", ".SA": "^BVSP" }
   },
   journal: { maxResolvedEntries: null },
-  sources: { contact: "trading-agents (+https://github.com/madavai/trading-agents)" }
+  sources: { contact: "trading-agents (+https://github.com/madavai/trading-agents)" },
+  trading: {
+    enabled: false,
+    fullPositionPercent: 10,
+    ratingToOrder: { Buy: "buy a full position", Overweight: "buy half a position", Hold: "no order", Underweight: "sell half of what is held", Sell: "sell everything held", "Needs review": "no order" },
+    caps: { perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 3 },
+    orderDefaults: { type: "limit", timeInForce: "gfd" }
+  }
 };
+var within = (v, lo, hi, fallback) => typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi ? v : fallback;
+function tradingOf(raw) {
+  const t = raw && typeof raw === "object" ? raw : {}, d = DEFAULTS.trading;
+  const caps = t.caps && typeof t.caps === "object" ? t.caps : {};
+  const od = t.orderDefaults && typeof t.orderDefaults === "object" ? t.orderDefaults : {};
+  const map2 = t.ratingToOrder && typeof t.ratingToOrder === "object" ? t.ratingToOrder : {};
+  const ratingToOrder = { ...d.ratingToOrder };
+  for (const [k, v] of Object.entries(map2)) if (k.length <= 20 && ACTIONS.includes(v)) ratingToOrder[k] = v;
+  ratingToOrder["Needs review"] = "no order";
+  const tif = od.timeInForce === "gtc" ? "gtc" : "gfd";
+  return {
+    enabled: t.enabled === true,
+    fullPositionPercent: within(t.fullPositionPercent, 1, 100, d.fullPositionPercent),
+    ratingToOrder,
+    caps: { perOrderUsd: within(caps.perOrderUsd, 1, 1e5, d.caps.perOrderUsd), perStockPercent: within(caps.perStockPercent, 1, 100, d.caps.perStockPercent), ordersPerDay: int2(caps.ordersPerDay, 1, 50, d.caps.ordersPerDay) },
+    orderDefaults: { type: "limit", timeInForce: tif }
+  };
+}
 var int2 = (v, lo, hi, fallback) => Number.isInteger(v) && v >= lo && v <= hi ? v : fallback;
 function languageName(v, fallback = "English") {
   const s = typeof v === "string" ? v.trim() : "";
@@ -36754,7 +36780,8 @@ function readSettings(root) {
       benchmarks: { ...DEFAULTS.scoring.benchmarks, ...benchmarks }
     },
     journal: { maxResolvedEntries: Number.isInteger(j.maxResolvedEntries) && j.maxResolvedEntries > 0 ? j.maxResolvedEntries : null },
-    sources: { ...DEFAULTS.sources, ...raw.sources }
+    sources: { ...DEFAULTS.sources, ...raw.sources },
+    trading: tradingOf(raw.trading)
   };
 }
 
