@@ -13,7 +13,8 @@ affiliated with them. **Nothing here is investment advice.**
 > the dashboard with `/terminal` (markets, charts, watchlist, the desk's calls and scorecard). The dashboard connects
 > to Robinhood (you press Connect, sign in on Robinhood's own page) and shows the accounts you choose: value, cash,
 > buying power, holdings at Robinhood's live prices, and for the Agentic account its orders and whether Robinhood's
-> phone approval is on. The agents see those holdings when they analyse. There is no order button yet.
+> phone approval is on. The agents see those holdings when they analyse. A call's "Decide…" opens an order ticket
+> sized by your settings and checked against your caps, which Robinhood can check in a dry run. Nothing places an order yet.
 > **Not yet proven on a real computer:** the dashboard, and a full analysis with company accounts.
 
 ## Start in three steps

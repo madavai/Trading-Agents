@@ -40,7 +40,7 @@ export const MAIN_TOTAL = '9112.50', AGENTIC_CASH = '2500.00';
 const answer = (data: unknown) => text({ data, guide: 'Present the accounts in a table and always confirm with the user.' });
 
 /** Two live accounts (the default one, and the one agents may trade) and a closed one; the default holds NVDA and AAPL. */
-export function accountTools(calls: string[], o: { approvalsOn?: boolean; orders?: unknown[] } = {}): McpServer {
+export function accountTools(calls: string[], o: { approvalsOn?: boolean; orders?: unknown[]; reviewAlerts?: string[]; reviewed?: Array<Record<string, unknown>>; agenticBuyingPower?: string } = {}): McpServer {
   const s = new McpServer({ name: 'fake-robinhood-accounts', version: '0' });
   const acct = { account_number: z.string() }, rhs = { rhs_account_number: z.string() };
   const reg = (name: string, readOnlyHint: boolean, run: (a: Record<string, unknown>) => unknown, inputSchema?: Record<string, z.ZodType>) => {
@@ -54,13 +54,16 @@ export function accountTools(calls: string[], o: { approvalsOn?: boolean; orders
   ] }));
   reg('get_portfolio', true, (a) => (a.account_number === MAIN
     ? { total_value: MAIN_TOTAL, equity_value: '6009.50', crypto_value: '0', options_value: '0', cash: '3103.00', currency: 'USD', buying_power: { buying_power: '3103.00' } }
-    : { total_value: AGENTIC_CASH, equity_value: '0', crypto_value: '0', options_value: '0', cash: AGENTIC_CASH, currency: 'USD', buying_power: { buying_power: 'not a number' } }), acct);
+    : { total_value: AGENTIC_CASH, equity_value: '0', crypto_value: '0', options_value: '0', cash: AGENTIC_CASH, currency: 'USD', buying_power: { buying_power: o.agenticBuyingPower ?? 'not a number' } }), acct);
   reg('get_equity_positions', true, (a) => ({ positions: a.account_number === MAIN ? [{ symbol: 'NVDA', quantity: '20.0000', average_buy_price: '141.20' }, { symbol: 'AAPL', quantity: '10.0000', average_buy_price: '198.50' }, { symbol: 'ZERO', quantity: '0.0000' }] : [] }), acct);
   reg('get_crypto_positions', true, () => ({ results: [] }), rhs);
   reg('get_equity_quotes', true, (a) => ({ results: (a.symbols as string[]).filter((x) => x !== 'AAPL').map((symbol) => ({ quote: { symbol, last_trade_price: symbol === 'NVDA' ? '182.40' : '1.00' } })) }), { symbols: z.array(z.string()) });
   reg('get_equity_orders', true, () => ({ orders: o.orders ?? [] }), acct);
   reg('get_trade_approval_setting', true, (a) => ({ setting: { account_number: a.account_number, human_must_approve_trades: o.approvalsOn ?? true } }), acct);
   reg('get_trade_approvals', true, () => ({ approvals: [] }), acct);
+  // Robinhood labels its order check as not read-only, though it places nothing: it is reached only through the Reviewer.
+  reg('review_equity_order', false, (a) => { o.reviewed?.push(a); return { order_checks: (o.reviewAlerts ?? []).map((message) => ({ message })), customer_approval_required: o.approvalsOn ?? true, estimated_cost: String(Number(a.quantity) * Number(a.limit_price)), quote: { last_trade_price: '182.40' } }; },
+    { ...acct, symbol: z.string(), side: z.string(), type: z.string(), quantity: z.string(), limit_price: z.string(), time_in_force: z.string(), market_hours: z.string() });
   reg('place_equity_order', false, () => ({ placed: true }), { ...acct, symbol: z.string() });
   return s;
 }

@@ -13,7 +13,8 @@
   `reader.ts` is the ONLY place in `src/` that calls a Robinhood tool, and it refuses everything but reads (a test
   scans the source to keep it so); `connect.ts` signs in and opens sessions; `link.ts` is what the dashboard knows
   (none, waiting, connected, failed), which accounts the person chose (kept beside the sign-in as keys, never numbers)
-  and the last read of them; `account.ts` reads Robinhood's answers into figures (a dash, never a zero, for what it
+  and the last read of them; `review.ts` is the only other door: Robinhood's own
+  order check (`review_equity_order`) and nothing else, for the Agentic account only; `account.ts` reads Robinhood's answers into figures (a dash, never a zero, for what it
   did not give); `discover.ts` and `cli.ts` are `node dist/robinhood.mjs discover` and `shape`,
   which print what Robinhood offers and the SHAPE of its answers, never a value, so the desk is built on what is there.
 - `.claude/` - what Madav and Claude Code load in this folder: settings, the guard hook, skills, and the agents.
@@ -25,7 +26,8 @@
   rest are the page). The page has no inline script or style (the policy refuses them): colours in charts come from
   classes, and anything an agent wrote goes through `md.ts`, which escapes first. `npm run build` bundles the page into
   `dist/terminal/`. `ui/` has its own `tsconfig.json` (it needs the browser's types).
-- `desk-settings.json` - the desk's settings; `docs/design/` - the dashboard's design reference.
+- `src/desk/ticket.ts` - the order ticket: sizing from the person's settings and every cap check, on real figures only.
+- `desk-settings.json` - the desk's settings (read and checked by `src/settings.ts`, trading part included); `docs/design/` - the dashboard's design reference.
 - `test/fake-robinhood.ts` - a pretend Robinhood for the tests: an MCP door that wants a sign-in, with read tools and
   order tools, recording every call. Its sign-in is the MCP library's own demo server (`test/fake-sign-in-server.ts`,
   a side process). The guard refuses any file that spells out the sign-in's token field names, so tests reach the

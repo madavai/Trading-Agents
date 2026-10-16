@@ -40,6 +40,9 @@
     accounts: () => call("GET", "/api/robinhood/accounts"),
     chooseAccounts: (show) => call("POST", "/api/robinhood/accounts", { show }),
     snapshot: () => call("GET", "/api/robinhood/snapshot"),
+    openTicket: (symbol, date) => call("POST", "/api/ticket", { symbol, date }),
+    checkTicket: (id, quantity, limitPrice) => call("POST", "/api/ticket/check", { id, quantity, limitPrice }),
+    reviewTicket: (id, quantity, limitPrice) => call("POST", "/api/ticket/review", { id, quantity, limitPrice }),
     readAccounts: () => call("POST", "/api/robinhood/refresh", {})
   };
 
@@ -156,7 +159,7 @@
       el.replaceChildren();
       return null;
     }
-    const W = el.clientWidth || 600, H = el.clientHeight || 300, R = 64, T = 10, VOL = o.layers.vol ? 52 : 0, X = 26;
+    const W = el.clientWidth || 600, H = el.clientHeight || 300, R = 64, T2 = 10, VOL = o.layers.vol ? 52 : 0, X = 26;
     const PB = H - VOL - X - (VOL ? 10 : 0), pw = W - R, step = pw / n;
     const x = (i) => step * (i + 0.5);
     let lo = Math.min(...bars.map((b) => o.kind === "candles" ? b.l : b.c)), hi = Math.max(...bars.map((b) => o.kind === "candles" ? b.h : b.c));
@@ -170,7 +173,7 @@
     const padv = (hi - lo) * 0.08 || hi * 0.01;
     lo -= padv;
     hi += padv;
-    const y = (v) => T + (1 - (v - lo) / (hi - lo)) * (PB - T);
+    const y = (v) => T2 + (1 - (v - lo) / (hi - lo)) * (PB - T2);
     const first = bars[0].c, last = bars[n - 1].c, t = o.kind === "area" ? "accent" : last >= first ? "ok" : "bad";
     let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(h.symbol)} price over ${esc(h.range)}">`;
     const ly = y(last);
@@ -200,7 +203,7 @@
     s += `<line x1="0" x2="${pw}" y1="${ly}" y2="${ly}" class="ch-last s-${t}"/>`;
     s += `<rect x="${pw + 4}" y="${ly - 11}" width="${R - 6}" height="22" rx="5" class="f-${t}"/><text x="${pw + 4 + (R - 6) / 2}" y="${ly + 4.5}" text-anchor="middle" class="ch-tag">${num(last)}</text>`;
     if (o.kind === "area") s += `<circle cx="${x(n - 1)}" cy="${ly}" r="4" class="dot f-accent"/>`;
-    s += `<g id="xh" class="hide"><line id="xhl" y1="${T}" y2="${PB}" class="ch-cross"/><circle id="xhd" r="4.5" class="dot f-accent"/></g>`;
+    s += `<g id="xh" class="hide"><line id="xhl" y1="${T2}" y2="${PB}" class="ch-cross"/><circle id="xhd" r="4.5" class="dot f-accent"/></g>`;
     s += `<rect x="0" y="0" width="${pw}" height="${H}" class="ch-hit" id="hit"/></svg>`;
     el.innerHTML = s;
     const hit = el.querySelector("#hit"), xh = el.querySelector("#xh"), xhl = el.querySelector("#xhl"), xhd = el.querySelector("#xhd");
@@ -218,7 +221,7 @@
       let left = x(i) + 16;
       if (left + tw > pw) left = x(i) - tw - 16;
       tip.style.left = `${Math.max(0, left)}px`;
-      tip.style.top = `${T}px`;
+      tip.style.top = `${T2}px`;
     });
     hit.addEventListener("mouseleave", () => {
       xh.classList.add("hide");
@@ -492,6 +495,7 @@
     } finally {
       A.reading = false;
       renderViews();
+      renderCall();
     }
   }
   async function openPicker() {
@@ -507,6 +511,89 @@
       toast(say(e), "bad");
     }
     renderViews();
+  }
+  var T = { open: null, checks: [], review: null, quantity: 0, limit: 0, busy: false, timer: 0 };
+  var hasAgentic = () => !!A.snapshot?.views.some((v) => v.account.agentic);
+  function renderTicketDyn() {
+    const t = T.open;
+    if (!t) return;
+    const ok = T.checks.length > 0 && T.checks.every((c) => c.ok);
+    const checks = t.proposal.order ? `<div class="at-card-head"><h3>Your checks</h3></div><div class="at-row">${T.checks.map((c) => `<span class="at-chip ${c.ok ? "ok" : "danger"}">${esc(c.words)}</span>`).join("")}</div>` : "";
+    const r = T.review;
+    const review = r ? `<div class="at-card at-box"><div class="at-card-head"><h3>Robinhood's check</h3>${!r.answered ? '<span class="at-chip danger">Robinhood reported an error</span>' : r.alerts.length ? `<span class="at-chip danger">${r.alerts.length} alert(s)</span>` : '<span class="at-chip ok">No alerts</span>'}</div>
+      ${r.error ? `<p class="at-honest bad">${esc(r.error)}</p>` : ""}${r.alerts.map((a) => `<p class="at-honest bad">${esc(a)}</p>`).join("")}
+      ${r.approvalRequired === null ? "" : `<p class="at-lede">${r.approvalRequired ? "Robinhood would ask you to approve this order on your phone before it is sent." : "Robinhood would not ask for your approval on your phone: an order would be sent at once."}</p>`}
+      ${r.facts.length ? `<dl class="at-facts ruled at-box">${r.facts.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>` : ""}
+      <p class="at-quiet">This was Robinhood's dry run: nothing was placed.</p></div>` : "";
+    $("#tkDyn").innerHTML = `${checks}${review}
+    <p class="at-honest">Nothing is placed from here yet: placing an order, only on your own Confirm, comes in the next step. This is not investment advice.</p>
+    <div class="at-pop-do"><button class="at-btn at-press" data-act="tk-cancel">Close</button>${t.proposal.order ? `<button class="at-btn at-press primary" data-act="tk-review"${ok && !T.busy ? "" : " disabled"}>${T.busy ? "Asking Robinhood\u2026" : "Review with Robinhood"}</button>` : ""}</div>`;
+  }
+  function renderTicket() {
+    const t = T.open;
+    if (!t) return;
+    const o = t.proposal.order, c = t.context;
+    const title = o ? `${o.side === "buy" ? "Buy" : "Sell"} ${c.symbol}` : `No order for ${c.symbol}`;
+    $("#tkHead").innerHTML = `<div class="ta-pophead"><h2>${esc(title)}</h2>${ratingChip(c.rating)}<button class="icon-btn" data-act="tk-cancel" aria-label="Close"><svg class="g"><use href="#i-x"/></svg></button></div>
+    <p class="at-lede">The desk rated ${esc(c.symbol)} ${esc(c.rating)} on ${esc(dayText(c.callDate))}: ${esc(t.proposal.action)}. In the Agentic account only.</p>
+    <dl class="at-facts ruled at-box"><div><dt>Account value</dt><dd>${money(c.accountValue)}</dd></div><div><dt>Buying power</dt><dd>${money(c.buyingPower)}</dd></div><div><dt>Held now</dt><dd>${esc(String(c.held))} share(s)</dd></div><div><dt>Live price</dt><dd>${money(c.price)}</dd></div><div><dt>Orders today</dt><dd>${c.ordersToday} of ${t.caps.ordersPerDay}</dd></div></dl>
+    ${t.proposal.why.map((w) => `<p class="at-quiet">${esc(w)}</p>`).join("")}`;
+    $("#tkFields").innerHTML = o ? `<div class="at-row">
+      <label class="at-field"><span class="at-field-l">Shares (${o.side === "buy" ? "to buy" : "to sell"})</span><input class="at-input at-box" id="tkQty" type="number" min="1" step="1" inputmode="numeric" value="${o.quantity}"></label>
+      <label class="at-field"><span class="at-field-l">Limit price, $ \xB7 good for the ${o.timeInForce === "gtc" ? "next 90 days" : "day"}</span><input class="at-input at-box" id="tkLimit" type="text" inputmode="decimal" value="${o.limitPrice.toFixed(2)}"></label></div>` : "";
+    renderTicketDyn();
+  }
+  async function openTicket(symbol, date) {
+    const dlg = $("#ticketDialog");
+    T.open = null;
+    T.review = null;
+    T.busy = false;
+    $("#tkHead").innerHTML = `<p class="at-quiet">Reading the Agentic account and the live price from Robinhood.</p>`;
+    $("#tkFields").innerHTML = "";
+    $("#tkDyn").innerHTML = "";
+    dlg.showModal();
+    try {
+      const t = await api.openTicket(symbol, date);
+      T.open = t;
+      T.checks = t.checks;
+      T.quantity = t.proposal.order?.quantity ?? 0;
+      T.limit = t.proposal.order?.limitPrice ?? 0;
+      renderTicket();
+    } catch (e) {
+      dlg.close();
+      toast(say(e), "bad");
+    }
+  }
+  function ticketEdited() {
+    const t = T.open;
+    if (!t?.proposal.order) return;
+    T.quantity = Number($("#tkQty").value);
+    T.limit = Number($("#tkLimit").value.replace(/[$,\s]/g, ""));
+    T.review = null;
+    T.checks = [];
+    renderTicketDyn();
+    clearTimeout(T.timer);
+    T.timer = window.setTimeout(() => void run(async () => {
+      if (T.open?.id !== t.id) return;
+      T.checks = (await api.checkTicket(t.id, T.quantity, T.limit)).checks;
+      renderTicketDyn();
+    }), 350);
+  }
+  async function reviewTicket() {
+    const t = T.open;
+    if (!t || T.busy) return;
+    T.busy = true;
+    renderTicketDyn();
+    try {
+      const r = await api.reviewTicket(t.id, T.quantity, T.limit);
+      T.checks = r.checks;
+      T.review = r.review;
+    } catch (e) {
+      toast(say(e), "bad");
+    } finally {
+      T.busy = false;
+      renderTicketDyn();
+    }
   }
   var rhTimer = 0;
   async function refreshRobinhood() {
@@ -613,8 +700,9 @@
     <div class="at-row">
       <button class="at-dial" data-act="open-call" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}"><span class="at-dial-t"><svg class="g"><use href="#i-file"/></svg><span class="at-dial-w">Read the reasoning</span></span></button>
       ${ask2}
+      ${signedIn() && hasAgentic() ? `<button class="at-btn at-press primary" data-act="decide" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}"><span>Decide\u2026</span></button>` : ""}
     </div>
-    <p class="at-honest">The desk proposes; it does not place orders.</p>`;
+    <p class="at-honest">The desk proposes; it does not place orders.${signedIn() && !hasAgentic() ? " Show your Agentic account above to decide on this call." : ""}</p>`;
   }
   function renderQueue() {
     const q2 = S.desk?.queue ?? [];
@@ -766,6 +854,11 @@
       dlg.close();
       return;
     }
+    if (e.target === $("#ticketDialog")) {
+      $("#ticketDialog").close();
+      T.open = null;
+      return;
+    }
     const el = e.target.closest("[data-act]");
     if (!el) return;
     const sym = el.dataset.symbol ?? "";
@@ -833,6 +926,16 @@
       case "open-call":
         void openCall(sym, el.dataset.date ?? "");
         break;
+      case "decide":
+        void openTicket(sym, el.dataset.date ?? "");
+        break;
+      case "tk-cancel":
+        $("#ticketDialog").close();
+        T.open = null;
+        break;
+      case "tk-review":
+        void reviewTicket();
+        break;
       case "rh-connect":
         void run(async () => {
           S.rh = await api.connectRobinhood();
@@ -893,6 +996,10 @@
         dlg.close();
         break;
     }
+  });
+  document.addEventListener("input", (e) => {
+    const id = e.target.id;
+    if (id === "tkQty" || id === "tkLimit") ticketEdited();
   });
   $("#addForm").addEventListener("submit", (e) => {
     e.preventDefault();

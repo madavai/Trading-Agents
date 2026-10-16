@@ -870,12 +870,12 @@ var require_codegen = __commonJS({
       }
       // `for-in` statement.
       // With option `ownProperties` replaced with a `for-of` loop for object keys
-      forIn(nameOrPrefix, obj2, forBody, varKind = this.opts.es5 ? scope_1.varKinds.var : scope_1.varKinds.const) {
+      forIn(nameOrPrefix, obj3, forBody, varKind = this.opts.es5 ? scope_1.varKinds.var : scope_1.varKinds.const) {
         if (this.opts.ownProperties) {
-          return this.forOf(nameOrPrefix, (0, code_1._)`Object.keys(${obj2})`, forBody);
+          return this.forOf(nameOrPrefix, (0, code_1._)`Object.keys(${obj3})`, forBody);
         }
         const name = this._scope.toName(nameOrPrefix);
-        return this._for(new ForIter("in", varKind, name, obj2), () => forBody(name));
+        return this._for(new ForIter("in", varKind, name, obj3), () => forBody(name));
       }
       // end `for` loop
       endFor() {
@@ -2695,11 +2695,11 @@ var require_validate = __commonJS({
         if (!this.allErrors)
           this.gen.if(cond);
       }
-      setParams(obj2, assign) {
+      setParams(obj3, assign) {
         if (assign)
-          Object.assign(this.params, obj2);
+          Object.assign(this.params, obj3);
         else
-          this.params = obj2;
+          this.params = obj3;
       }
       block$data(valid, codeBlock, $dataValid = codegen_1.nil) {
         this.gen.block(() => {
@@ -7212,12 +7212,12 @@ var require_content_type = __commonJS({
     var TYPE_REGEXP = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+\/[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
     exports.format = format;
     exports.parse = parse4;
-    function format(obj2) {
-      if (!obj2 || typeof obj2 !== "object") {
+    function format(obj3) {
+      if (!obj3 || typeof obj3 !== "object") {
         throw new TypeError("argument obj is required");
       }
-      var parameters = obj2.parameters;
-      var type = obj2.type;
+      var parameters = obj3.parameters;
+      var type = obj3.type;
       if (!type || !TYPE_REGEXP.test(type)) {
         throw new TypeError("invalid type");
       }
@@ -7248,7 +7248,7 @@ var require_content_type = __commonJS({
       if (!TYPE_REGEXP.test(type)) {
         throw new TypeError("invalid media type");
       }
-      var obj2 = new ContentType(type.toLowerCase());
+      var obj3 = new ContentType(type.toLowerCase());
       if (index !== -1) {
         var key;
         var match;
@@ -7267,20 +7267,20 @@ var require_content_type = __commonJS({
               value = value.replace(QESC_REGEXP, "$1");
             }
           }
-          obj2.parameters[key] = value;
+          obj3.parameters[key] = value;
         }
         if (index !== header.length) {
           throw new TypeError("invalid parameter format");
         }
       }
-      return obj2;
+      return obj3;
     }
-    function getcontenttype(obj2) {
+    function getcontenttype(obj3) {
       var header;
-      if (typeof obj2.getHeader === "function") {
-        header = obj2.getHeader("content-type");
-      } else if (typeof obj2.headers === "object") {
-        header = obj2.headers && obj2.headers["content-type"];
+      if (typeof obj3.getHeader === "function") {
+        header = obj3.getHeader("content-type");
+      } else if (typeof obj3.headers === "object") {
+        header = obj3.headers && obj3.headers["content-type"];
       }
       if (typeof header !== "string") {
         throw new TypeError("content-type header is missing from object");
@@ -7942,8 +7942,8 @@ function defineLazy(object3, key, getter) {
     configurable: true
   });
 }
-function objectClone(obj2) {
-  return Object.create(Object.getPrototypeOf(obj2), Object.getOwnPropertyDescriptors(obj2));
+function objectClone(obj3) {
+  return Object.create(Object.getPrototypeOf(obj3), Object.getOwnPropertyDescriptors(obj3));
 }
 function assignProp(target, prop, value) {
   Object.defineProperty(target, prop, {
@@ -8014,10 +8014,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj2, path13) {
+function getElementAtPath(obj3, path13) {
   if (!path13)
-    return obj2;
-  return path13.reduce((acc, key) => acc?.[key], obj2);
+    return obj3;
+  return path13.reduce((acc, key) => acc?.[key], obj3);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -8453,9 +8453,9 @@ function parsedType(data) {
       if (Array.isArray(data)) {
         return "array";
       }
-      const obj2 = data;
-      if (obj2 && Object.getPrototypeOf(obj2) !== Object.prototype && "constructor" in obj2 && obj2.constructor) {
-        return obj2.constructor.name;
+      const obj3 = data;
+      if (obj3 && Object.getPrototypeOf(obj3) !== Object.prototype && "constructor" in obj3 && obj3.constructor) {
+        return obj3.constructor.name;
       }
     }
   }
@@ -8473,8 +8473,8 @@ function issue(...args) {
   }
   return { ...iss };
 }
-function cleanEnum(obj2) {
-  return Object.entries(obj2).filter(([k, _]) => {
+function cleanEnum(obj3) {
+  return Object.entries(obj3).filter(([k, _]) => {
     return Number.isNaN(Number.parseInt(k, 10));
   }).map((el) => el[1]);
 }
@@ -8798,15 +8798,15 @@ var $ZodError = $constructor("$ZodError", initializer);
 var $ZodRealError = $constructor("$ZodError", initializer, void 0, {
   Parent: Error
 });
-function node(obj2, key, make) {
-  if (!Object.prototype.hasOwnProperty.call(obj2, key)) {
+function node(obj3, key, make) {
+  if (!Object.prototype.hasOwnProperty.call(obj3, key)) {
     if (key === "__proto__") {
-      Object.defineProperty(obj2, key, { value: make(), writable: true, enumerable: true, configurable: true });
+      Object.defineProperty(obj3, key, { value: make(), writable: true, enumerable: true, configurable: true });
     } else {
-      obj2[key] = make();
+      obj3[key] = make();
     }
   }
-  return obj2[key];
+  return obj3[key];
 }
 function flattenError(error2, mapper = (issue2) => issue2.message) {
   const fieldErrors = {};
@@ -11188,7 +11188,7 @@ function isRecursive(inst, stack, resolve) {
     return PROVEN;
   stack.add(inst);
   let result = NONE;
-  const check = (child) => {
+  const check2 = (child) => {
     if (result !== PROVEN && child?._zod) {
       const answer = isRecursive(child, stack, resolve);
       if (answer > result)
@@ -11217,32 +11217,32 @@ function isRecursive(inst, stack, resolve) {
     case "object": {
       const raw = rawShape(def);
       merge2(raw ? shape(raw, true) : ASSUMED);
-      check(def.catchall);
+      check2(def.catchall);
       break;
     }
     case "array":
-      check(def.element);
+      check2(def.element);
       break;
     case "tuple":
       for (const el of def.items)
-        check(el);
-      check(def.rest);
+        check2(el);
+      check2(def.rest);
       break;
     case "record":
     case "map":
-      check(def.keyType);
-      check(def.valueType);
+      check2(def.keyType);
+      check2(def.valueType);
       break;
     case "set":
-      check(def.valueType);
+      check2(def.valueType);
       break;
     case "union":
       for (const el of def.options)
-        check(el);
+        check2(el);
       break;
     case "intersection":
-      check(def.left);
-      check(def.right);
+      check2(def.left);
+      check2(def.right);
       break;
     case "optional":
     case "nullable":
@@ -11253,15 +11253,15 @@ function isRecursive(inst, stack, resolve) {
     case "nonoptional":
     case "promise":
     case "success":
-      check(def.innerType);
+      check2(def.innerType);
       break;
     case "pipe":
-      check(def.in);
-      check(def.out);
+      check2(def.in);
+      check2(def.out);
       break;
     case "function":
-      check(def.input);
-      check(def.output);
+      check2(def.input);
+      check2(def.output);
       break;
     // `$ZodLazy` caches its inner on the def, so a resolved edge is followed exactly
     case "lazy": {
@@ -11302,10 +11302,10 @@ function isRecursive(inst, stack, resolve) {
         if (!value || typeof value !== "object")
           continue;
         if (value._zod)
-          check(value);
+          check2(value);
         else if (Array.isArray(value))
           for (const el of value)
-            check(el);
+            check2(el);
       }
     }
   }
@@ -13409,8 +13409,8 @@ var ZodType = /* @__PURE__ */ $constructor("ZodType", (inst, def) => {
     reg.add(this, meta2);
     return this;
   },
-  refine(check, params) {
-    return this.check(refine(check, params));
+  refine(check2, params) {
+    return this.check(refine(check2, params));
   },
   superRefine(refinement, params) {
     return this.check(superRefine(refinement, params));
@@ -17249,15 +17249,15 @@ function applyElicitationDefaults(schema, data) {
   if (!schema || data === null || typeof data !== "object")
     return;
   if (schema.type === "object" && schema.properties && typeof schema.properties === "object") {
-    const obj2 = data;
+    const obj3 = data;
     const props = schema.properties;
     for (const key of Object.keys(props)) {
       const propSchema = props[key];
-      if (obj2[key] === void 0 && Object.prototype.hasOwnProperty.call(propSchema, "default")) {
-        obj2[key] = propSchema.default;
+      if (obj3[key] === void 0 && Object.prototype.hasOwnProperty.call(propSchema, "default")) {
+        obj3[key] = propSchema.default;
       }
-      if (obj2[key] !== void 0) {
-        applyElicitationDefaults(propSchema, obj2[key]);
+      if (obj3[key] !== void 0) {
+        applyElicitationDefaults(propSchema, obj3[key]);
       }
     }
   }
@@ -19516,6 +19516,66 @@ var Reader = class {
   }
 };
 
+// src/robinhood/review.ts
+var REVIEW = "review_equity_order";
+var obj2 = (v) => v && typeof v === "object" && !Array.isArray(v) ? v : {};
+var words = (v) => {
+  if (typeof v === "string") return v.trim() ? [v.trim()] : [];
+  if (Array.isArray(v)) return v.flatMap(words);
+  const o = obj2(v);
+  const own2 = ["message", "detail", "description", "title", "reason", "text"].map((k) => o[k]).find((x) => typeof x === "string" && x.trim());
+  return own2 ? [own2.trim()] : Object.values(o).flatMap(words);
+};
+function parseReview(answer) {
+  if (answer.failed) return { answered: false, alerts: [], approvalRequired: null, facts: [], error: answer.text.replace(/\d{5,}/g, "#####").slice(0, 300) };
+  const d = obj2(obj2(answer.data).data);
+  const alerts = [.../* @__PURE__ */ new Set([...words(d.order_checks), ...words(d.alerts), ...words(d.warnings)])].slice(0, 12).map((x) => x.slice(0, 300));
+  const facts = [];
+  const walk = (o, prefix, depth) => {
+    for (const [k, v] of Object.entries(o)) {
+      if (facts.length >= 24 || ["order_checks", "alerts", "warnings", "customer_approval_required", "account_number", "rhs_account_number"].includes(k)) continue;
+      const name = `${prefix}${k.replace(/_/g, " ")}`;
+      if (v === null || typeof v === "string" || typeof v === "number" || typeof v === "boolean") facts.push([name, String(v).replace(/\d{7,}/g, "#####").slice(0, 120)]);
+      else if (!Array.isArray(v) && depth < 2) walk(obj2(v), `${name} \xB7 `, depth + 1);
+    }
+  };
+  walk(d, "", 0);
+  return { answered: true, alerts, approvalRequired: typeof d.customer_approval_required === "boolean" ? d.customer_approval_required : null, facts, error: null };
+}
+var Reviewer = class {
+  constructor(client, tools) {
+    this.client = client;
+    this.tools = tools;
+  }
+  client;
+  tools;
+  /** Asks Robinhood to check the order on the Agentic account. Nothing is placed. */
+  async review(account, o) {
+    if (!account.agentic) throw new Refused("Only the Agentic account can have an order checked, and this is not it.");
+    if (!this.tools.some((t2) => t2.name === REVIEW)) throw new Refused("Robinhood's connection no longer offers its order check, so nothing was sent.");
+    if (!Number.isInteger(o.quantity) || o.quantity < 1 || !(o.limitPrice > 0) || o.side !== "buy" && o.side !== "sell") throw new Refused("That order is not complete, so it was not sent for checking.");
+    const r = await this.client.callTool({ name: REVIEW, arguments: {
+      account_number: account.accountNumber,
+      symbol: o.symbol,
+      side: o.side,
+      type: "limit",
+      quantity: String(o.quantity),
+      limit_price: o.limitPrice.toFixed(2),
+      time_in_force: o.timeInForce,
+      market_hours: "regular_hours"
+    } });
+    const text2 = (r.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
+    let data = r.structuredContent ?? null;
+    if (data === null) {
+      try {
+        data = JSON.parse(text2);
+      } catch {
+      }
+    }
+    return parseReview({ data, text: text2, failed: r.isError === true });
+  }
+};
+
 // src/version.ts
 var VERSION = true ? "0.0.1" : "dev";
 
@@ -19536,9 +19596,9 @@ function waitForCode(port, expectedState, timeoutMs = 5 * 6e4) {
   let close = () => {
   };
   const code = new Promise((resolve, reject) => {
-    const page = (words) => `<!doctype html><meta charset="utf-8"><title>Trading Agents</title><body style="font:16px system-ui;padding:40px">${words}</body>`;
-    const answer = (res, status, words) => {
-      res.writeHead(status, { connection: "close", ...words ? { "content-type": "text/html" } : {} }).end(words ? page(words) : void 0);
+    const page = (words2) => `<!doctype html><meta charset="utf-8"><title>Trading Agents</title><body style="font:16px system-ui;padding:40px">${words2}</body>`;
+    const answer = (res, status, words2) => {
+      res.writeHead(status, { connection: "close", ...words2 ? { "content-type": "text/html" } : {} }).end(words2 ? page(words2) : void 0);
     };
     const server = http.createServer((req, res) => {
       const url2 = new URL(req.url ?? "/", `http://127.0.0.1:${port}`);
@@ -19618,7 +19678,8 @@ ${url2}`);
     await c.connect(t2);
   }
   try {
-    return { reader: new Reader(c, (await c.listTools()).tools), close: () => c.close().catch(() => {
+    const { tools } = await c.listTools();
+    return { reader: new Reader(c, tools), reviewer: new Reviewer(c, tools), close: () => c.close().catch(() => {
     }) };
   } catch (e) {
     await c.close().catch(() => {
@@ -19688,6 +19749,45 @@ var Link = class {
     this.last_snapshot = null;
     return show;
   }
+  /** The Agentic account's numbers, when the person chose to show it. A ticket is only ever for that account. */
+  agenticIds() {
+    const a = this.known?.find((x) => x.agentic && !x.deactivated);
+    if (!a || !this.chosen().includes(a.key)) throw new Error("show your Agentic account on the dashboard first: an order can only ever be for that account");
+    return this.ids.get(a.key);
+  }
+  /** The real figures a ticket for one stock is sized and checked on: the Agentic account's value, buying power and
+   *  holding of the stock, Robinhood's live price, and how many orders the account has had today (New York's day). */
+  async ticketContext(symbol, now = /* @__PURE__ */ new Date()) {
+    return this.withReader(async (r) => {
+      const a = await r.read("get_accounts");
+      if (a.failed) throw new Error("Robinhood could not list the accounts");
+      this.learn(a.data);
+      const ids = this.agenticIds();
+      const data = async (name, args) => {
+        const x = await r.read(name, args);
+        if (x.failed) throw new Error(`Robinhood could not give ${name.replace(/^get_|_/g, " ").trim()}`);
+        return x.data;
+      };
+      const p = parsePortfolio(await data("get_portfolio", { account_number: ids.accountNumber }));
+      const held = parsePositions(await data("get_equity_positions", { account_number: ids.accountNumber })).find((x) => x.symbol === symbol)?.quantity ?? 0;
+      const price = parseQuotes(await data("get_equity_quotes", { symbols: [symbol] })).get(symbol) ?? null;
+      const day = (iso) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date(iso));
+      const ordersToday = parseOrders(await data("get_equity_orders", { account_number: ids.accountNumber })).orders.filter((o) => o.at && day(o.at) === day(now.toISOString())).length;
+      return { symbol, accountValue: p.total, buyingPower: p.buyingPower, held, price, ordersToday };
+    });
+  }
+  /** Robinhood's own check of an order on the Agentic account. Nothing is placed. */
+  async review(order) {
+    const session = await openSession(this.file, { ...this.opts, signIn: false });
+    try {
+      const a = await session.reader.read("get_accounts");
+      if (a.failed) throw new Error("Robinhood could not list the accounts");
+      this.learn(a.data);
+      return await session.reviewer.review({ accountNumber: this.agenticIds().accountNumber, agentic: true }, order);
+    } finally {
+      await session.close();
+    }
+  }
   /** The last read of the chosen accounts, without asking Robinhood again. */
   snapshot() {
     return this.last_snapshot;
@@ -19730,8 +19830,8 @@ var Link = class {
     };
   }
   bad(e) {
-    const words = oneLine(e instanceof Error ? e.message : String(e), 200);
-    const why = e instanceof NotSignedIn ? "Robinhood asks you to sign in again." : /^Robinhood refused/.test(words) ? words : `Robinhood did not answer as expected: ${words}`;
+    const words2 = oneLine(e instanceof Error ? e.message : String(e), 200);
+    const why = e instanceof NotSignedIn ? "Robinhood asks you to sign in again." : /^Robinhood refused/.test(words2) ? words2 : `Robinhood did not answer as expected: ${words2}`;
     return { state: "failed", checkedAt: this.now(), tools: null, message: why };
   }
   /** Sends the person to Robinhood's sign-in page and waits for them to come back, in the background. */
@@ -19820,9 +19920,69 @@ function saveAccountHoldings(dir, accounts, today2) {
   return { saved, leftOut };
 }
 
-// src/terminal/state.ts
-import fs11 from "node:fs";
-import path11 from "node:path";
+// src/desk/ticket.ts
+var money = (n) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+var cents = (n) => Math.round(n * 100) / 100;
+var actionOf = (rating, t2) => t2.ratingToOrder[rating] ?? "no order";
+function propose(c, t2) {
+  const action = actionOf(c.rating, t2), why = [];
+  const none = (reason) => ({ action, order: null, why: [...why, reason] });
+  if (action === "no order") return none(`The desk rated ${c.symbol} ${c.rating}: your settings place no order for that rating.`);
+  if (c.price === null || c.price <= 0) return none(`Robinhood gave no live price for ${c.symbol}, so no order can be sized.`);
+  const limitPrice = cents(c.price);
+  why.push(`Limit price: Robinhood's live price, ${money(limitPrice)}. You can change it.`);
+  if (action === "sell half of what is held" || action === "sell everything held") {
+    if (c.held <= 0) return none(`The desk rated ${c.symbol} ${c.rating}, but the Agentic account holds none to sell.`);
+    const quantity2 = Math.floor(action === "sell everything held" ? c.held : c.held / 2);
+    if (quantity2 < 1) return none(`The Agentic account holds ${c.held} share(s); half of that is less than one whole share, and a limit order sells whole shares only.`);
+    why.push(`${action === "sell everything held" ? "Everything held" : "Half of what is held"}: ${quantity2} of ${c.held} share(s), whole shares only.`);
+    return { action, order: { symbol: c.symbol, side: "sell", quantity: quantity2, limitPrice, timeInForce: t2.orderDefaults.timeInForce }, why };
+  }
+  if (c.accountValue === null || c.accountValue <= 0) return none("Robinhood gave no total value for the Agentic account, so a position cannot be sized.");
+  if (c.buyingPower === null) return none("Robinhood gave no buying power for the Agentic account, so a buy cannot be sized.");
+  const share = action === "buy a full position" ? t2.fullPositionPercent : t2.fullPositionPercent / 2;
+  const target = c.accountValue * share / 100;
+  why.push(`${action === "buy a full position" ? "A full position" : "Half a position"}: ${share}% of the account's ${money(c.accountValue)} is ${money(target)}.`);
+  let amount = target;
+  if (amount > t2.caps.perOrderUsd) {
+    amount = t2.caps.perOrderUsd;
+    why.push(`Your cap of ${money(t2.caps.perOrderUsd)} an order makes it ${money(amount)}.`);
+  }
+  if (amount > c.buyingPower) {
+    amount = c.buyingPower;
+    why.push(`Buying power is ${money(c.buyingPower)}, so at most that.`);
+  }
+  const quantity = Math.floor(amount / limitPrice);
+  if (quantity < 1) return none(`${money(amount)} buys less than one share at ${money(limitPrice)}, and a limit order buys whole shares only.`);
+  why.push(`${money(amount)} \xF7 ${money(limitPrice)}, rounded down: ${quantity} share(s).`);
+  return { action, order: { symbol: c.symbol, side: "buy", quantity, limitPrice, timeInForce: t2.orderDefaults.timeInForce }, why };
+}
+function check(o, c, t2) {
+  const out = [];
+  const add = (ok, words2) => out.push({ ok, words: words2 });
+  add(Number.isInteger(o.quantity) && o.quantity >= 1 && o.quantity <= 1e5, Number.isInteger(o.quantity) && o.quantity >= 1 ? `${o.quantity} whole share(s)` : "The quantity must be a whole number of shares, at least one");
+  const priceOk = Number.isFinite(o.limitPrice) && o.limitPrice > 0 && cents(o.limitPrice) === o.limitPrice;
+  add(priceOk, priceOk ? `Limit price ${money(o.limitPrice)}` : "The limit price must be above zero, in dollars and cents");
+  if (!out.every((x) => x.ok)) return out;
+  if (c.price !== null && c.price > 0) {
+    const off = Math.abs(o.limitPrice / c.price - 1) * 100;
+    add(off <= 10, off <= 10 ? `${off.toFixed(1)}% from Robinhood's live price` : `${off.toFixed(1)}% from Robinhood's live price of ${money(c.price)}: more than 10% away, which looks like a typing slip`);
+  } else add(false, `Robinhood gave no live price for ${o.symbol} to check the limit against`);
+  const cost = cents(o.quantity * o.limitPrice);
+  if (o.side === "buy") {
+    add(cost <= t2.caps.perOrderUsd, cost <= t2.caps.perOrderUsd ? `${money(cost)} is within your cap of ${money(t2.caps.perOrderUsd)} an order` : `${money(cost)} is over your cap of ${money(t2.caps.perOrderUsd)} an order`);
+    if (c.buyingPower === null) add(false, "Robinhood gave no buying power for the Agentic account");
+    else add(cost <= c.buyingPower, cost <= c.buyingPower ? `Buying power ${money(c.buyingPower)} covers it` : `Buying power is ${money(c.buyingPower)}: not enough`);
+    if (c.accountValue === null || c.accountValue <= 0) add(false, "Robinhood gave no total value for the Agentic account to check your per-stock cap");
+    else {
+      const after = (c.held + o.quantity) * o.limitPrice / c.accountValue * 100;
+      add(after <= t2.caps.perStockPercent, `${o.symbol} would be ${after.toFixed(1)}% of the account; your cap is ${t2.caps.perStockPercent}%`);
+    }
+  } else add(o.quantity <= c.held, o.quantity <= c.held ? `Selling ${o.quantity} of the ${c.held} held` : `Only ${c.held} share(s) are held in the Agentic account`);
+  add(c.ordersToday < t2.caps.ordersPerDay, `${c.ordersToday} of your ${t2.caps.ordersPerDay} orders a day used`);
+  return out;
+}
+var passes = (checks) => checks.length > 0 && checks.every((x) => x.ok);
 
 // src/desk/journal.ts
 import fs7 from "node:fs";
@@ -19830,7 +19990,7 @@ import path7 from "node:path";
 
 // src/desk/rating.ts
 var RATINGS = ["Buy", "Overweight", "Hold", "Underweight", "Sell"];
-var REVIEW = "Needs review";
+var REVIEW2 = "Needs review";
 var SET = new Set(RATINGS.map((r) => r.toLowerCase()));
 var cap = (s) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
 var LABEL = /(?<![a-z])rating\b[^:\-\u2010-\u2015]*[:\-\u2010-\u2015][\s*]*(\w+)/gi;
@@ -19853,7 +20013,7 @@ function extractRating(text2) {
   const found = own2.length ? own2 : labels;
   return found.length && new Set(found).size === 1 ? found[0] : null;
 }
-var parseRating = (text2) => extractRating(text2) ?? REVIEW;
+var parseRating = (text2) => extractRating(text2) ?? REVIEW2;
 
 // src/desk/journal.ts
 var SEPARATOR = "\n\n<!-- ENTRY_END -->\n\n";
@@ -19986,62 +20146,11 @@ ${e.reflection || e.decision.slice(0, 300) + (e.decision.length > 300 ? "..." : 
   }
 };
 
-// src/desk/runs.ts
+// src/settings.ts
 import fs8 from "node:fs";
 import path8 from "node:path";
-var DEBATES = { investment_debate: ["bull", "bear"], risk_debate: ["aggressive", "conservative", "neutral"] };
-var TURNS = new Set(Object.values(DEBATES).flat());
-var folder = (dir, ticker, date4) => path8.join(dir, "runs", `${safeSymbol(ticker).replace(/\^/g, "IDX_").replace(/=/g, "_EQ_")}_${date4}`);
-var runFile = (dir, ticker, date4) => path8.join(folder(dir, ticker, date4), "run.json");
-function load(dir, ticker, date4) {
-  try {
-    return JSON.parse(fs8.readFileSync(runFile(dir, ticker, date4), "utf8"));
-  } catch {
-    return { ticker: safeSymbol(ticker), date: date4, startedAt: (/* @__PURE__ */ new Date()).toISOString(), log: [] };
-  }
-}
-function sectionsOf(dir, ticker, date4) {
-  const out = {};
-  for (const e of load(dir, ticker, date4).log) (out[e.section] ??= []).push(e.text);
-  return out;
-}
-var hasReport = (dir, ticker, date4) => fs8.existsSync(path8.join(folder(dir, ticker, date4), "complete_report.md"));
-
-// src/desk/backtest.ts
-var DIRECTION = { Buy: 1, Overweight: 1, Hold: 0, Underweight: -1, Sell: -1 };
-var alphaOf = (e) => {
-  const t2 = (e.alpha ?? "").trim().replace(/%$/, "");
-  const v = /^[+-]?\d+(\.\d+)?$/.test(t2) ? Number(t2) : NaN;
-  return Number.isFinite(v) ? v / 100 : null;
-};
-function summarize(entries) {
-  const resolved = entries.filter((e) => !e.pending && e.rating !== REVIEW).map((e) => ({ e, a: alphaOf(e) })).filter((x) => x.a !== null);
-  const byRating = {};
-  for (const rating of new Set(resolved.map((x) => x.e.rating))) {
-    const alphas = resolved.filter((x) => x.e.rating === rating).map((x) => x.a), dir = DIRECTION[rating] ?? 0;
-    byRating[rating] = { count: alphas.length, hitRate: dir ? alphas.filter((a) => a * dir > 0).length / alphas.length : null, meanAlpha: alphas.reduce((s, a) => s + a, 0) / alphas.length };
-  }
-  const unscored = entries.filter((e) => e.rating === REVIEW).length;
-  const windows = [...new Set(resolved.map((x) => x.e.holding).filter((h) => !!h && h.endsWith("d")).map((h) => `${h.slice(0, -1)} trading days`))].sort();
-  return { resolved: resolved.length, pending: entries.length - resolved.length - unscored, unscored, byRating, holding: windows.join(", ") || "the configured window" };
-}
-var pctText = (v) => `${v >= 0 ? "+" : "-"}${(Math.abs(v) * 100).toFixed(2)}%`;
-function renderSummary(s) {
-  const lines = [`Resolved cells: ${s.resolved} \xB7 pending: ${s.pending}${s.unscored ? ` \xB7 unscored: ${s.unscored}` : ""}`];
-  for (const [rating, sc] of Object.entries(s.byRating)) {
-    lines.push(`- ${rating}: n=${sc.count}, ${sc.hitRate !== null ? `called the direction ${Math.round(sc.hitRate * 100)}%` : "no direction claimed"}, mean alpha ${pctText(sc.meanAlpha)} vs the benchmark`);
-  }
-  lines.push("");
-  if (s.pending) lines.push("Pending cells are not scored above; settle them when their window has traded.");
-  if (s.unscored) lines.push("Unscored cells had no readable rating (Needs review): they count neither for nor against the desk.");
-  lines.push(`Alpha is measured over ${s.holding} after each analysis date. One model sampling per cell, and text feeds are not archived, so these figures are indicative rather than repeatable. A handful of cells proves nothing: a hit rate over fewer than about 30 calls per rating is noise.`);
-  return lines.join("\n");
-}
-
-// src/settings.ts
-import fs9 from "node:fs";
-import path9 from "node:path";
 var ANALYSTS = ["market", "sentiment", "news", "fundamentals"];
+var ACTIONS = ["buy a full position", "buy half a position", "no order", "sell half of what is held", "sell everything held"];
 var DEFAULTS = {
   analysis: {
     outputLanguage: "English",
@@ -20063,8 +20172,33 @@ var DEFAULTS = {
     benchmarks: { "": "SPY", ".NS": "^NSEI", ".BO": "^BSESN", ".T": "^N225", ".TW": "^TWII", ".TWO": "^TWII", ".KS": "^KS11", ".KQ": "^KQ11", ".HK": "^HSI", ".SI": "^STI", ".L": "^FTSE", ".DE": "^GDAXI", ".PA": "^FCHI", ".AS": "^AEX", ".SW": "^SSMI", ".MI": "FTSEMIB.MI", ".TO": "^GSPTSE", ".AX": "^AXJO", ".SS": "000001.SS", ".SZ": "399001.SZ", ".SA": "^BVSP" }
   },
   journal: { maxResolvedEntries: null },
-  sources: { contact: "trading-agents (+https://github.com/madavai/trading-agents)" }
+  sources: { contact: "trading-agents (+https://github.com/madavai/trading-agents)" },
+  trading: {
+    enabled: false,
+    fullPositionPercent: 10,
+    ratingToOrder: { Buy: "buy a full position", Overweight: "buy half a position", Hold: "no order", Underweight: "sell half of what is held", Sell: "sell everything held", "Needs review": "no order" },
+    caps: { perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 3 },
+    orderDefaults: { type: "limit", timeInForce: "gfd" }
+  }
 };
+var within = (v, lo, hi, fallback) => typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi ? v : fallback;
+function tradingOf(raw) {
+  const t2 = raw && typeof raw === "object" ? raw : {}, d = DEFAULTS.trading;
+  const caps = t2.caps && typeof t2.caps === "object" ? t2.caps : {};
+  const od = t2.orderDefaults && typeof t2.orderDefaults === "object" ? t2.orderDefaults : {};
+  const map = t2.ratingToOrder && typeof t2.ratingToOrder === "object" ? t2.ratingToOrder : {};
+  const ratingToOrder = { ...d.ratingToOrder };
+  for (const [k, v] of Object.entries(map)) if (k.length <= 20 && ACTIONS.includes(v)) ratingToOrder[k] = v;
+  ratingToOrder["Needs review"] = "no order";
+  const tif = od.timeInForce === "gtc" ? "gtc" : "gfd";
+  return {
+    enabled: t2.enabled === true,
+    fullPositionPercent: within(t2.fullPositionPercent, 1, 100, d.fullPositionPercent),
+    ratingToOrder,
+    caps: { perOrderUsd: within(caps.perOrderUsd, 1, 1e5, d.caps.perOrderUsd), perStockPercent: within(caps.perStockPercent, 1, 100, d.caps.perStockPercent), ordersPerDay: int2(caps.ordersPerDay, 1, 50, d.caps.ordersPerDay) },
+    orderDefaults: { type: "limit", timeInForce: tif }
+  };
+}
 var int2 = (v, lo, hi, fallback) => Number.isInteger(v) && v >= lo && v <= hi ? v : fallback;
 function languageName(v, fallback = "English") {
   const s = typeof v === "string" ? v.trim() : "";
@@ -20073,7 +20207,7 @@ function languageName(v, fallback = "English") {
 function readSettings(root2) {
   let raw = {};
   try {
-    raw = JSON.parse(fs9.readFileSync(path9.join(root2, "desk-settings.json"), "utf8"));
+    raw = JSON.parse(fs8.readFileSync(path8.join(root2, "desk-settings.json"), "utf8"));
   } catch {
   }
   const a = { ...DEFAULTS.analysis, ...raw.analysis }, s = { ...DEFAULTS.scoring, ...raw.scoring }, j = { ...DEFAULTS.journal, ...raw.journal };
@@ -20094,8 +20228,65 @@ function readSettings(root2) {
       benchmarks: { ...DEFAULTS.scoring.benchmarks, ...benchmarks }
     },
     journal: { maxResolvedEntries: Number.isInteger(j.maxResolvedEntries) && j.maxResolvedEntries > 0 ? j.maxResolvedEntries : null },
-    sources: { ...DEFAULTS.sources, ...raw.sources }
+    sources: { ...DEFAULTS.sources, ...raw.sources },
+    trading: tradingOf(raw.trading)
   };
+}
+
+// src/terminal/state.ts
+import fs11 from "node:fs";
+import path11 from "node:path";
+
+// src/desk/runs.ts
+import fs9 from "node:fs";
+import path9 from "node:path";
+var DEBATES = { investment_debate: ["bull", "bear"], risk_debate: ["aggressive", "conservative", "neutral"] };
+var TURNS = new Set(Object.values(DEBATES).flat());
+var folder = (dir, ticker, date4) => path9.join(dir, "runs", `${safeSymbol(ticker).replace(/\^/g, "IDX_").replace(/=/g, "_EQ_")}_${date4}`);
+var runFile = (dir, ticker, date4) => path9.join(folder(dir, ticker, date4), "run.json");
+function load(dir, ticker, date4) {
+  try {
+    return JSON.parse(fs9.readFileSync(runFile(dir, ticker, date4), "utf8"));
+  } catch {
+    return { ticker: safeSymbol(ticker), date: date4, startedAt: (/* @__PURE__ */ new Date()).toISOString(), log: [] };
+  }
+}
+function sectionsOf(dir, ticker, date4) {
+  const out = {};
+  for (const e of load(dir, ticker, date4).log) (out[e.section] ??= []).push(e.text);
+  return out;
+}
+var hasReport = (dir, ticker, date4) => fs9.existsSync(path9.join(folder(dir, ticker, date4), "complete_report.md"));
+
+// src/desk/backtest.ts
+var DIRECTION = { Buy: 1, Overweight: 1, Hold: 0, Underweight: -1, Sell: -1 };
+var alphaOf = (e) => {
+  const t2 = (e.alpha ?? "").trim().replace(/%$/, "");
+  const v = /^[+-]?\d+(\.\d+)?$/.test(t2) ? Number(t2) : NaN;
+  return Number.isFinite(v) ? v / 100 : null;
+};
+function summarize(entries) {
+  const resolved = entries.filter((e) => !e.pending && e.rating !== REVIEW2).map((e) => ({ e, a: alphaOf(e) })).filter((x) => x.a !== null);
+  const byRating = {};
+  for (const rating of new Set(resolved.map((x) => x.e.rating))) {
+    const alphas = resolved.filter((x) => x.e.rating === rating).map((x) => x.a), dir = DIRECTION[rating] ?? 0;
+    byRating[rating] = { count: alphas.length, hitRate: dir ? alphas.filter((a) => a * dir > 0).length / alphas.length : null, meanAlpha: alphas.reduce((s, a) => s + a, 0) / alphas.length };
+  }
+  const unscored = entries.filter((e) => e.rating === REVIEW2).length;
+  const windows = [...new Set(resolved.map((x) => x.e.holding).filter((h) => !!h && h.endsWith("d")).map((h) => `${h.slice(0, -1)} trading days`))].sort();
+  return { resolved: resolved.length, pending: entries.length - resolved.length - unscored, unscored, byRating, holding: windows.join(", ") || "the configured window" };
+}
+var pctText = (v) => `${v >= 0 ? "+" : "-"}${(Math.abs(v) * 100).toFixed(2)}%`;
+function renderSummary(s) {
+  const lines = [`Resolved cells: ${s.resolved} \xB7 pending: ${s.pending}${s.unscored ? ` \xB7 unscored: ${s.unscored}` : ""}`];
+  for (const [rating, sc] of Object.entries(s.byRating)) {
+    lines.push(`- ${rating}: n=${sc.count}, ${sc.hitRate !== null ? `called the direction ${Math.round(sc.hitRate * 100)}%` : "no direction claimed"}, mean alpha ${pctText(sc.meanAlpha)} vs the benchmark`);
+  }
+  lines.push("");
+  if (s.pending) lines.push("Pending cells are not scored above; settle them when their window has traded.");
+  if (s.unscored) lines.push("Unscored cells had no readable rating (Needs review): they count neither for nor against the desk.");
+  lines.push(`Alpha is measured over ${s.holding} after each analysis date. One model sampling per cell, and text feeds are not archived, so these figures are indicative rather than repeatable. A handful of cells proves nothing: a hit rate over fewer than about 30 calls per rating is noise.`);
+  return lines.join("\n");
 }
 
 // src/terminal/store.ts
@@ -20469,6 +20660,19 @@ var Refused2 = class extends Error {
 async function startTerminal(opts) {
   const { root: root2, assets } = opts, dir = deskDataDir(root2), token = crypto4.randomBytes(24).toString("hex"), deskId = deskIdOf(root2);
   const robinhood = opts.robinhood ?? new Link(robinhoodFile());
+  const tickets = /* @__PURE__ */ new Map();
+  const TICKET_MS = 15 * 6e4;
+  const ticketOf = (id) => {
+    for (const [k, t3] of tickets) if (Date.now() - t3.at > TICKET_MS) tickets.delete(k);
+    const t2 = typeof id === "string" ? tickets.get(id) : void 0;
+    if (!t2) throw new Refused2(404, "that ticket has expired: open it again from the call");
+    return t2;
+  };
+  const edited = (t2, b) => {
+    if (!t2.proposal.order) throw new Refused2(400, "this call proposes no order");
+    const quantity = typeof b.quantity === "number" ? b.quantity : NaN, limitPrice = typeof b.limitPrice === "number" ? b.limitPrice : NaN;
+    return { ...t2.proposal.order, quantity, limitPrice };
+  };
   let port = 0;
   const hosts = () => /* @__PURE__ */ new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
   const origins = () => /* @__PURE__ */ new Set([`http://127.0.0.1:${port}`, `http://localhost:${port}`]);
@@ -20501,7 +20705,8 @@ async function startTerminal(opts) {
     try {
       return await job();
     } catch (e) {
-      throw new Refused2(/not one of your Robinhood accounts/.test(e.message) ? 400 : 502, /not one of your Robinhood accounts/.test(e.message) ? e.message : plainFailure(e));
+      const m = e instanceof Error ? e.message : "", own2 = /not one of your Robinhood accounts|show your Agentic account|not the Agentic account|not complete, so it was not sent/.test(m);
+      throw new Refused2(own2 ? 400 : 502, own2 ? m : plainFailure(e));
     }
   };
   const handle = async (req, res) => {
@@ -20568,6 +20773,33 @@ async function startTerminal(opts) {
       const keys = b.show;
       if (!Array.isArray(keys) || keys.length > 10 || !keys.every((k) => typeof k === "string" && /^[0-9a-f]{16}$/.test(k))) throw new Refused2(400, "choose up to ten of your accounts");
       return json(res, 200, { chosen: await askRobinhood(() => robinhood.choose(keys)) });
+    }
+    if (p === "/api/ticket" && method === "POST") {
+      const symbol = safeSymbol(typeof b.symbol === "string" ? b.symbol : ""), date4 = typeof b.date === "string" ? b.date : "";
+      const call = new Journal(path12.join(dir, "journal.md")).load().find((e) => e.ticker === symbol && e.date === date4);
+      if (!call) throw new Refused2(404, "no such call");
+      const trading = readSettings(root2).trading;
+      const context = { ...await askRobinhood(() => robinhood.ticketContext(symbol)), rating: call.rating, callDate: call.date };
+      const proposal = propose(context, trading), id = crypto4.randomBytes(12).toString("hex");
+      const t2 = { id, at: Date.now(), context, proposal, order: proposal.order, checks: proposal.order ? check(proposal.order, context, trading) : [], review: null };
+      tickets.set(id, t2);
+      return json(res, 200, { id, context, proposal, checks: t2.checks, caps: trading.caps });
+    }
+    if (p === "/api/ticket/check" && method === "POST") {
+      const t2 = ticketOf(b.id), o = edited(t2, b);
+      t2.order = o;
+      t2.review = null;
+      t2.checks = check(o, t2.context, readSettings(root2).trading);
+      return json(res, 200, { checks: t2.checks });
+    }
+    if (p === "/api/ticket/review" && method === "POST") {
+      const t2 = ticketOf(b.id), o = edited(t2, b), checks = check(o, t2.context, readSettings(root2).trading);
+      t2.order = o;
+      t2.checks = checks;
+      t2.review = null;
+      if (!passes(checks)) throw new Refused2(400, "the order does not pass every check, so it was not sent to Robinhood");
+      t2.review = await askRobinhood(() => robinhood.review(o));
+      return json(res, 200, { checks, review: t2.review });
     }
     if (p === "/api/robinhood/refresh" && method === "POST") {
       const snapshot = await askRobinhood(() => robinhood.refresh());

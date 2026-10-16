@@ -4,7 +4,11 @@ import type { History, QuoteResult } from '../quotes.js';
 import type { WatchItem, QueueItem } from '../store.js';
 import type { LinkInfo, Snapshot } from '../../robinhood/link.js';
 import type { Account, AccountView, Holding, Order } from '../../robinhood/account.js';
+import type { Check, Proposal, TicketContext } from '../../desk/ticket.js';
+import type { Review } from '../../robinhood/review.js';
+export interface TicketOpen { id: string; context: TicketContext; proposal: Proposal; checks: Check[]; caps: { perOrderUsd: number; perStockPercent: number; ordersPerDay: number } }
 
+export type { Check, Proposal, Review, TicketContext };
 export type { DeskState, History, QuoteResult, WatchItem, QueueItem, LinkInfo, Snapshot, Account, AccountView, Holding, Order };
 export interface Market { symbol: string; name: string; unit?: '%'; quote: QuoteResult }
 export interface CallDetail { decision: string; sections: Record<string, string[]>; hasReport: boolean }
@@ -45,5 +49,8 @@ export const api = {
   accounts: () => call<{ accounts: Account[]; chosen: string[] }>('GET', '/api/robinhood/accounts'),
   chooseAccounts: (show: string[]) => call<{ chosen: string[] }>('POST', '/api/robinhood/accounts', { show }),
   snapshot: () => call<{ snapshot: Snapshot | null; chosen: string[] }>('GET', '/api/robinhood/snapshot'),
+  openTicket: (symbol: string, date: string) => call<TicketOpen>('POST', '/api/ticket', { symbol, date }),
+  checkTicket: (id: string, quantity: number, limitPrice: number) => call<{ checks: Check[] }>('POST', '/api/ticket/check', { id, quantity, limitPrice }),
+  reviewTicket: (id: string, quantity: number, limitPrice: number) => call<{ checks: Check[]; review: Review }>('POST', '/api/ticket/review', { id, quantity, limitPrice }),
   readAccounts: () => call<{ snapshot: Snapshot; chosen: string[]; holdingsShared: boolean }>('POST', '/api/robinhood/refresh', {}),
 };

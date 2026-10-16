@@ -1,7 +1,7 @@
 // The dashboard page. It shows only what the desk really has: prices from Yahoo Finance, the calls in the journal, the
 // scorecard worked out from them, the watchlist, the analyses waiting and whether Robinhood is connected. A number that
 // cannot be had is a dash. There is no order button: trading is not switched on, and nothing here can place one.
-import { api, ApiError, type CallDetail, type DeskState, type History, type LinkInfo, type Market, type QuoteResult, type Account, type AccountView, type Holding, type Order, type Snapshot } from './api.js';
+import { api, ApiError, type CallDetail, type DeskState, type History, type LinkInfo, type Market, type QuoteResult, type Account, type AccountView, type Holding, type Order, type Snapshot, type TicketOpen, type Check, type Review } from './api.js';
 import { heroChart, sparkline } from './chart.js';
 import { clock, dayText, esc, money, num, pct, ratingTone, SECTION_NAMES, tone } from './fmt.js';
 import { markdown } from './md.js';
@@ -188,7 +188,7 @@ async function readAccounts(): Promise<void> {
   if (A.reading) return;
   A.reading = true; renderViews();
   try { const r = await api.readAccounts(); A.snapshot = r.snapshot; A.chosen = r.chosen; A.shared = r.holdingsShared; } catch (e) { toast(say(e), 'bad'); }
-  finally { A.reading = false; renderViews(); }
+  finally { A.reading = false; renderViews(); renderCall(); }
 }
 
 async function openPicker(): Promise<void> {
@@ -200,6 +200,72 @@ async function openPicker(): Promise<void> {
     A.pick = new Set(r.chosen.length ? r.chosen : r.accounts.filter((a) => (a.agentic || a.isDefault) && !a.deactivated).map((a) => a.key));
   } catch (e) { A.picking = false; toast(say(e), 'bad'); }
   renderViews();
+}
+
+// ---------- the order ticket: proposed, checked, reviewed by Robinhood; nothing is placed from here ----------
+const T = { open: null as TicketOpen | null, checks: [] as Check[], review: null as Review | null, quantity: 0, limit: 0, busy: false, timer: 0 };
+const hasAgentic = () => !!A.snapshot?.views.some((v) => v.account.agentic);
+
+function renderTicketDyn(): void {
+  const t = T.open;
+  if (!t) return;
+  const ok = T.checks.length > 0 && T.checks.every((c) => c.ok);
+  const checks = t.proposal.order ? `<div class="at-card-head"><h3>Your checks</h3></div><div class="at-row">${T.checks.map((c) => `<span class="at-chip ${c.ok ? 'ok' : 'danger'}">${esc(c.words)}</span>`).join('')}</div>` : '';
+  const r = T.review;
+  const review = r ? `<div class="at-card at-box"><div class="at-card-head"><h3>Robinhood's check</h3>${!r.answered ? '<span class="at-chip danger">Robinhood reported an error</span>' : r.alerts.length ? `<span class="at-chip danger">${r.alerts.length} alert(s)</span>` : '<span class="at-chip ok">No alerts</span>'}</div>
+      ${r.error ? `<p class="at-honest bad">${esc(r.error)}</p>` : ''}${r.alerts.map((a) => `<p class="at-honest bad">${esc(a)}</p>`).join('')}
+      ${r.approvalRequired === null ? '' : `<p class="at-lede">${r.approvalRequired ? 'Robinhood would ask you to approve this order on your phone before it is sent.' : 'Robinhood would not ask for your approval on your phone: an order would be sent at once.'}</p>`}
+      ${r.facts.length ? `<dl class="at-facts ruled at-box">${r.facts.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>` : ''}
+      <p class="at-quiet">This was Robinhood's dry run: nothing was placed.</p></div>` : '';
+  $('#tkDyn').innerHTML = `${checks}${review}
+    <p class="at-honest">Nothing is placed from here yet: placing an order, only on your own Confirm, comes in the next step. This is not investment advice.</p>
+    <div class="at-pop-do"><button class="at-btn at-press" data-act="tk-cancel">Close</button>${t.proposal.order ? `<button class="at-btn at-press primary" data-act="tk-review"${ok && !T.busy ? '' : ' disabled'}>${T.busy ? 'Asking Robinhood…' : 'Review with Robinhood'}</button>` : ''}</div>`;
+}
+
+function renderTicket(): void {
+  const t = T.open;
+  if (!t) return;
+  const o = t.proposal.order, c = t.context;
+  const title = o ? `${o.side === 'buy' ? 'Buy' : 'Sell'} ${c.symbol}` : `No order for ${c.symbol}`;
+  $('#tkHead').innerHTML = `<div class="ta-pophead"><h2>${esc(title)}</h2>${ratingChip(c.rating)}<button class="icon-btn" data-act="tk-cancel" aria-label="Close"><svg class="g"><use href="#i-x"/></svg></button></div>
+    <p class="at-lede">The desk rated ${esc(c.symbol)} ${esc(c.rating)} on ${esc(dayText(c.callDate))}: ${esc(t.proposal.action)}. In the Agentic account only.</p>
+    <dl class="at-facts ruled at-box"><div><dt>Account value</dt><dd>${money(c.accountValue)}</dd></div><div><dt>Buying power</dt><dd>${money(c.buyingPower)}</dd></div><div><dt>Held now</dt><dd>${esc(String(c.held))} share(s)</dd></div><div><dt>Live price</dt><dd>${money(c.price)}</dd></div><div><dt>Orders today</dt><dd>${c.ordersToday} of ${t.caps.ordersPerDay}</dd></div></dl>
+    ${t.proposal.why.map((w) => `<p class="at-quiet">${esc(w)}</p>`).join('')}`;
+  $('#tkFields').innerHTML = o ? `<div class="at-row">
+      <label class="at-field"><span class="at-field-l">Shares (${o.side === 'buy' ? 'to buy' : 'to sell'})</span><input class="at-input at-box" id="tkQty" type="number" min="1" step="1" inputmode="numeric" value="${o.quantity}"></label>
+      <label class="at-field"><span class="at-field-l">Limit price, $ · good for the ${o.timeInForce === 'gtc' ? 'next 90 days' : 'day'}</span><input class="at-input at-box" id="tkLimit" type="text" inputmode="decimal" value="${o.limitPrice.toFixed(2)}"></label></div>` : '';
+  renderTicketDyn();
+}
+
+async function openTicket(symbol: string, date: string): Promise<void> {
+  const dlg = $<HTMLDialogElement>('#ticketDialog');
+  T.open = null; T.review = null; T.busy = false;
+  $('#tkHead').innerHTML = `<p class="at-quiet">Reading the Agentic account and the live price from Robinhood.</p>`; $('#tkFields').innerHTML = ''; $('#tkDyn').innerHTML = '';
+  dlg.showModal();
+  try {
+    const t = await api.openTicket(symbol, date);
+    T.open = t; T.checks = t.checks; T.quantity = t.proposal.order?.quantity ?? 0; T.limit = t.proposal.order?.limitPrice ?? 0;
+    renderTicket();
+  } catch (e) { dlg.close(); toast(say(e), 'bad'); }
+}
+
+function ticketEdited(): void {
+  const t = T.open;
+  if (!t?.proposal.order) return;
+  T.quantity = Number($<HTMLInputElement>('#tkQty').value);
+  T.limit = Number($<HTMLInputElement>('#tkLimit').value.replace(/[$,\s]/g, ''));
+  T.review = null; T.checks = []; renderTicketDyn();
+  clearTimeout(T.timer);
+  T.timer = window.setTimeout(() => void run(async () => { if (T.open?.id !== t.id) return; T.checks = (await api.checkTicket(t.id, T.quantity, T.limit)).checks; renderTicketDyn(); }), 350);
+}
+
+async function reviewTicket(): Promise<void> {
+  const t = T.open;
+  if (!t || T.busy) return;
+  T.busy = true; renderTicketDyn();
+  try { const r = await api.reviewTicket(t.id, T.quantity, T.limit); T.checks = r.checks; T.review = r.review; }
+  catch (e) { toast(say(e), 'bad'); }
+  finally { T.busy = false; renderTicketDyn(); }
 }
 
 let rhTimer = 0;
@@ -296,8 +362,9 @@ function renderCall(): void {
     <div class="at-row">
       <button class="at-dial" data-act="open-call" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}"><span class="at-dial-t"><svg class="g"><use href="#i-file"/></svg><span class="at-dial-w">Read the reasoning</span></span></button>
       ${ask}
+      ${signedIn() && hasAgentic() ? `<button class="at-btn at-press primary" data-act="decide" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}"><span>Decide…</span></button>` : ''}
     </div>
-    <p class="at-honest">The desk proposes; it does not place orders.</p>`;
+    <p class="at-honest">The desk proposes; it does not place orders.${signedIn() && !hasAgentic() ? ' Show your Agentic account above to decide on this call.' : ''}</p>`;
 }
 
 function renderQueue(): void {
@@ -437,6 +504,7 @@ async function ask(sym: string): Promise<void> {
 document.addEventListener('click', (e) => {
   const dlg = $<HTMLDialogElement>('#callDialog');
   if (e.target === dlg) { dlg.close(); return; }
+  if (e.target === $('#ticketDialog')) { $<HTMLDialogElement>('#ticketDialog').close(); T.open = null; return; }
   const el = (e.target as Element).closest<HTMLElement>('[data-act]');
   if (!el) return;
   const sym = el.dataset.symbol ?? '';
@@ -452,6 +520,9 @@ document.addEventListener('click', (e) => {
     case 'analyse': void ask(sym); break;
     case 'dequeue': void run(async () => { await api.dequeue(sym); await refreshState(); }); break;
     case 'open-call': void openCall(sym, el.dataset.date ?? ''); break;
+    case 'decide': void openTicket(sym, el.dataset.date ?? ''); break;
+    case 'tk-cancel': $<HTMLDialogElement>('#ticketDialog').close(); T.open = null; break;
+    case 'tk-review': void reviewTicket(); break;
     case 'rh-connect': void run(async () => { S.rh = await api.connectRobinhood(); renderAccount(); toast("Robinhood's sign-in page is opening in your browser."); void refreshRobinhood(); }); break;
     case 'rh-check': void run(async () => { S.rh = await api.checkRobinhood(); renderAccount(); void loadSnapshot(); toast(S.rh.state === 'connected' ? 'Robinhood answered: the connection works.' : S.rh.message, S.rh.state === 'connected' ? 'ok' : 'bad'); }); break;
     case 'rh-forget': void run(async () => { S.rh = await api.disconnectRobinhood(); A.snapshot = null; A.chosen = []; A.picking = false; renderAccount(); renderViews(); toast('The saved Robinhood sign-in is deleted from this computer.'); }); break;
@@ -463,6 +534,8 @@ document.addEventListener('click', (e) => {
     case 'close-dialog': dlg.close(); break;
   }
 });
+
+document.addEventListener('input', (e) => { const id = (e.target as Element).id; if (id === 'tkQty' || id === 'tkLimit') ticketEdited(); });
 
 $('#addForm').addEventListener('submit', (e) => {
   e.preventDefault();

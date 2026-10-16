@@ -3,7 +3,9 @@
 // session only when asked: a check never opens a browser, and only "Connect" sends the person to Robinhood's page.
 import fs from 'node:fs';
 import path from 'node:path';
-import { parseAccounts, readAccount, sortAccounts, type Account, type AccountIds, type AccountView } from './account.js';
+import { parseAccounts, parseOrders, parsePortfolio, parsePositions, parseQuotes, readAccount, sortAccounts, type Account, type AccountIds, type AccountView } from './account.js';
+import type { Order, TicketContext } from '../desk/ticket.js';
+import type { Review } from './review.js';
 import { NotSignedIn, openSession, type SessionOptions } from './connect.js';
 import type { Reader } from './reader.js';
 import { readSaved } from './store.js';
@@ -72,6 +74,42 @@ export class Link {
     fs.writeFileSync(this.choiceFile, JSON.stringify({ show }, null, 2) + '\n', { mode: 0o600 });
     this.last_snapshot = null;
     return show;
+  }
+
+  /** The Agentic account's numbers, when the person chose to show it. A ticket is only ever for that account. */
+  private agenticIds(): AccountIds {
+    const a = this.known?.find((x) => x.agentic && !x.deactivated);
+    if (!a || !this.chosen().includes(a.key)) throw new Error('show your Agentic account on the dashboard first: an order can only ever be for that account');
+    return this.ids.get(a.key)!;
+  }
+
+  /** The real figures a ticket for one stock is sized and checked on: the Agentic account's value, buying power and
+   *  holding of the stock, Robinhood's live price, and how many orders the account has had today (New York's day). */
+  async ticketContext(symbol: string, now: Date = new Date()): Promise<Omit<TicketContext, 'rating' | 'callDate'>> {
+    return this.withReader(async (r) => {
+      const a = await r.read('get_accounts');
+      if (a.failed) throw new Error('Robinhood could not list the accounts');
+      this.learn(a.data);
+      const ids = this.agenticIds();
+      const data = async (name: string, args: Record<string, unknown>) => { const x = await r.read(name, args); if (x.failed) throw new Error(`Robinhood could not give ${name.replace(/^get_|_/g, ' ').trim()}`); return x.data; };
+      const p = parsePortfolio(await data('get_portfolio', { account_number: ids.accountNumber }));
+      const held = parsePositions(await data('get_equity_positions', { account_number: ids.accountNumber })).find((x) => x.symbol === symbol)?.quantity ?? 0;
+      const price = parseQuotes(await data('get_equity_quotes', { symbols: [symbol] })).get(symbol) ?? null;
+      const day = (iso: string) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date(iso));
+      const ordersToday = parseOrders(await data('get_equity_orders', { account_number: ids.accountNumber })).orders.filter((o) => o.at && day(o.at) === day(now.toISOString())).length;
+      return { symbol, accountValue: p.total, buyingPower: p.buyingPower, held, price, ordersToday };
+    });
+  }
+
+  /** Robinhood's own check of an order on the Agentic account. Nothing is placed. */
+  async review(order: Order): Promise<Review> {
+    const session = await openSession(this.file, { ...this.opts, signIn: false });
+    try {
+      const a = await session.reader.read('get_accounts');
+      if (a.failed) throw new Error('Robinhood could not list the accounts');
+      this.learn(a.data);
+      return await session.reviewer.review({ accountNumber: this.agenticIds().accountNumber, agentic: true }, order);
+    } finally { await session.close(); }
   }
 
   /** The last read of the chosen accounts, without asking Robinhood again. */
