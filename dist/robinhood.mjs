@@ -19005,7 +19005,9 @@ var FileAuth = class {
 var TRADE_WORDS = /order|trade|buy|sell|liquidat|close.?position|transfer|withdraw|deposit|payment/i;
 var isOrderTool = (name) => TRADE_WORDS.test(name);
 var READ_NAME = /^(get|list|search|find|view|fetch|read)_/i;
+var NAMED_READS = /* @__PURE__ */ new Set(["get_equity_orders", "get_option_orders", "get_crypto_orders", "get_trade_approvals", "get_trade_approval_setting", "get_pnl_trade_history"]);
 function kindOf(tool) {
+  if (NAMED_READS.has(tool.name)) return tool.annotations?.readOnlyHint === true ? "read" : "order";
   if (isOrderTool(tool.name)) return "order";
   return tool.annotations?.readOnlyHint === true && READ_NAME.test(tool.name) ? "read" : "other";
 }

@@ -36,7 +36,11 @@
     robinhood: () => call("GET", "/api/robinhood"),
     connectRobinhood: () => call("POST", "/api/robinhood/connect", {}),
     checkRobinhood: () => call("POST", "/api/robinhood/check", {}),
-    disconnectRobinhood: () => call("DELETE", "/api/robinhood")
+    disconnectRobinhood: () => call("DELETE", "/api/robinhood"),
+    accounts: () => call("GET", "/api/robinhood/accounts"),
+    chooseAccounts: (show) => call("POST", "/api/robinhood/accounts", { show }),
+    snapshot: () => call("GET", "/api/robinhood/snapshot"),
+    readAccounts: () => call("POST", "/api/robinhood/refresh", {})
   };
 
   // src/terminal/ui/fmt.ts
@@ -392,13 +396,117 @@
     } else if (r.state === "saved") actions = check("Check the connection", true) + leave;
     else if (r.state === "connected") {
       const when = r.checkedAt ? clock(r.checkedAt) : "";
-      lede = "The sign-in works and Robinhood answered. Nothing from your account is shown yet.";
+      lede = "The sign-in works and Robinhood answered. The desk only reads here: it cannot place an order.";
       facts = `<p class="at-quiet">${esc(r.message)}${when ? ` Checked at ${esc(when)}.` : ""}</p>`;
       actions = check("Check again", false) + leave;
     } else if (r.state === "failed") actions = connect("Connect again", true) + check("Check again", false);
     $("#accountCard").innerHTML = `<div class="at-card-head"><h3>Robinhood</h3><span class="at-chip ${w.chip}">${esc(w.label)}</span></div>
     <p class="at-lede">${esc(lede)}</p>${facts}${actions ? `<div class="at-row">${actions}</div>` : ""}
     <p class="at-honest">Your Robinhood sign-in is kept on this computer only and is never shown on this page.</p>`;
+  }
+  var A = {
+    list: null,
+    chosen: [],
+    snapshot: null,
+    picking: false,
+    pick: /* @__PURE__ */ new Set(),
+    reading: false,
+    triedOnce: false,
+    shared: null
+  };
+  var signedIn = () => S.rh?.state === "saved" || S.rh?.state === "connected";
+  var tile = (name, value, line = "") => `<div class="at-tile at-box ta-stat"><span class="at-tile-sub">${esc(name)}</span><span class="at-tile-name at-num ta-mid">${value}</span>${line ? `<div class="ta-stat-line"><span class="at-quiet">${esc(line)}</span></div>` : ""}</div>`;
+  var sideWord = (s) => s === "buy" ? "Buy" : s === "sell" ? "Sell" : s ?? "\u2014";
+  function viewCard(v, at) {
+    const a = v.account, cur = v.portfolio?.currency ?? "USD", p = v.portfolio;
+    const stocks = v.holdings.filter((h) => h.kind === "stock").length, coins = v.holdings.filter((h) => h.kind === "crypto").length;
+    const role = a.agentic ? '<span class="at-chip accent">Agentic \xB7 the desk may trade here, only on your Confirm</span>' : '<span class="at-chip">View only \xB7 the desk never trades here</span>';
+    const tiles = `<div class="at-deck ta-deck-4">${tile("Total value", money(p?.total, cur))}${tile("Cash", money(p?.cash, cur))}${tile("Buying power", money(p?.buyingPower, cur))}${tile("Holdings", String(v.holdings.length), `${stocks} ${stocks === 1 ? "stock" : "stocks"}${coins ? ` \xB7 ${coins} crypto` : ""}`)}</div>`;
+    const rows = v.holdings.map((h) => `<tr><td><b>${esc(h.symbol)}</b>${h.kind === "crypto" ? ' <small class="at-quiet">crypto</small>' : ""}</td><td class="num">${num(h.quantity, h.quantity % 1 ? 4 : 0)}</td><td class="num">${money(h.averageCost, cur)}</td><td class="num">${money(h.price, cur)}</td><td class="num">${money(h.value, cur)}</td><td class="num">${h.gainPct === null ? "\u2014" : `<span class="at-chip ${tone(h.gainPct)}">${pct(h.gainPct)}</span>`}</td></tr>`).join("");
+    const table = v.holdings.length ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>Holding</th><th class="num">Quantity</th><th class="num">Average cost</th><th class="num">Price now</th><th class="num">Value</th><th class="num">Since bought</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="at-quiet">Nothing is held in this account.</p>';
+    let agentic = "";
+    if (a.agentic) {
+      const ap = v.approvals;
+      const phone = ap === null ? "Robinhood's phone approval setting could not be read." : `${ap.required === null ? "Robinhood's phone approval setting could not be read" : ap.required ? "Robinhood asks you to approve every trade on your phone" : "Robinhood does not ask you to approve trades on your phone"}${ap.pending ? ` \xB7 ${ap.pending} waiting for your approval now` : ""}.`;
+      const o = v.orders;
+      const orders = o === null ? '<p class="at-quiet">The orders could not be read.</p>' : o.count === 0 ? '<p class="at-quiet">No orders in this account yet.</p>' : `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>When</th><th>Order</th><th class="num">Quantity</th><th class="num">Price</th><th>State</th></tr></thead><tbody>${o.orders.map((x) => `<tr><td>${esc(x.at ? dayText(x.at) : "\u2014")}</td><td>${esc(`${sideWord(x.side)} ${x.symbol ?? ""}`.trim())}${x.type ? ` <small class="at-quiet">${esc(x.type)}</small>` : ""}</td><td class="num">${num(x.quantity, 0)}</td><td class="num">${money(x.price, cur)}</td><td>${esc(x.state ?? "\u2014")}</td></tr>`).join("")}</tbody></table></div>${o.count > o.orders.length ? `<p class="at-quiet">The latest ${o.orders.length} of ${o.count}.</p>` : ""}`;
+      agentic = `<div class="at-card-head"><h3>Orders in this account</h3></div>${orders}<p class="at-honest">${esc(phone)} Keep it on until you trust the desk.</p>`;
+    }
+    const problems = v.problems.length ? `<p class="at-honest bad">Not read: ${esc(v.problems.join("; "))}. Those figures are left as dashes.</p>` : "";
+    const unread = v.unread ? `<p class="at-honest">${v.unread} holding(s) could not be read and are left out.</p>` : "";
+    return `<div class="at-card at-box"><div class="at-card-head"><h3>${esc(a.label)}</h3><span class="at-chip">\u2022\u2022\u2022\u2022 ${esc(a.last4)}</span>${role}</div>
+    ${tiles}${table}${unread}${agentic}${problems}
+    <p class="at-quiet">From Robinhood at ${esc(clock(at))}; holdings valued at Robinhood's live prices.</p></div>`;
+  }
+  function renderViews() {
+    const el = $("#accountViews");
+    if (!signedIn()) {
+      el.innerHTML = "";
+      return;
+    }
+    if (A.picking) {
+      el.innerHTML = `<div class="at-card at-box"><div class="at-card-head"><h3>Which accounts should the dashboard show?</h3></div>
+      ${A.list === null ? '<p class="at-quiet">Asking Robinhood for your accounts.</p>' : `<div class="at-row">${A.list.filter((a) => !a.deactivated).map((a) => `<button class="at-chip at-press" data-act="acc-toggle" data-key="${esc(a.key)}" aria-pressed="${A.pick.has(a.key)}">${esc(a.label)} \xB7 \u2022\u2022\u2022\u2022 ${esc(a.last4)}${a.agentic ? " \xB7 Agentic" : a.isDefault ? " \xB7 your default" : ""}</button>`).join("")}</div>
+      <p class="at-honest">Only the Agentic account can ever be traded by the desk, and only on your Confirm. Every other account you choose is shown view-only.</p>
+      <div class="at-row">${rhButton("acc-save", "Show these accounts", { primary: true })}${A.chosen.length ? rhButton("acc-cancel", "Cancel") : ""}</div>`}</div>`;
+      return;
+    }
+    if (!A.chosen.length) {
+      el.innerHTML = `<div class="at-card at-box"><div class="at-card-head"><h3>Your accounts</h3></div><p class="at-lede">Choose which of your Robinhood accounts to show here.</p><div class="at-row">${rhButton("acc-pick", "Choose accounts", { primary: true })}</div></div>`;
+      return;
+    }
+    const head = `<div class="at-row">${rhButton("acc-refresh", A.reading ? "Reading from Robinhood\u2026" : "Refresh from Robinhood", { primary: !A.snapshot })}${rhButton("acc-pick", "Change accounts")}</div>`;
+    const body = A.snapshot ? A.snapshot.views.map((v) => viewCard(v, A.snapshot.at)).join("") : `<p class="at-quiet">${A.reading ? "Reading your accounts from Robinhood." : "Press Refresh to read your accounts from Robinhood."}</p>`;
+    const shared = A.snapshot && A.shared !== null ? `<p class="at-honest">${A.shared ? "The desk's agents now see these holdings when they analyse a stock: the Agentic account as the one they may size a trade to, the others as view-only context." : "Some holdings could not be read, so the agents were not given this read: they keep the last complete one."}</p>` : "";
+    el.innerHTML = head + body + shared;
+  }
+  async function loadSnapshot() {
+    if (!signedIn()) {
+      renderViews();
+      return;
+    }
+    try {
+      const r = await api.snapshot();
+      A.snapshot = r.snapshot;
+      A.chosen = r.chosen;
+    } catch {
+      return;
+    }
+    renderViews();
+    if (!A.snapshot && A.chosen.length && !A.triedOnce) {
+      A.triedOnce = true;
+      void readAccounts();
+    }
+  }
+  async function readAccounts() {
+    if (A.reading) return;
+    A.reading = true;
+    renderViews();
+    try {
+      const r = await api.readAccounts();
+      A.snapshot = r.snapshot;
+      A.chosen = r.chosen;
+      A.shared = r.holdingsShared;
+    } catch (e) {
+      toast(say(e), "bad");
+    } finally {
+      A.reading = false;
+      renderViews();
+    }
+  }
+  async function openPicker() {
+    A.picking = true;
+    A.list = null;
+    renderViews();
+    try {
+      const r = await api.accounts();
+      A.list = r.accounts;
+      A.pick = new Set(r.chosen.length ? r.chosen : r.accounts.filter((a) => (a.agentic || a.isDefault) && !a.deactivated).map((a) => a.key));
+    } catch (e) {
+      A.picking = false;
+      toast(say(e), "bad");
+    }
+    renderViews();
   }
   var rhTimer = 0;
   async function refreshRobinhood() {
@@ -410,8 +518,12 @@
     }
     renderAccount();
     clearTimeout(rhTimer);
-    if (S.rh.state === "waiting") rhTimer = window.setTimeout(() => void refreshRobinhood(), 2e3);
-    else if (was === "waiting") toast(S.rh.state === "connected" ? "Robinhood is connected." : S.rh.message, S.rh.state === "connected" ? "ok" : "bad");
+    if (S.rh.state === "waiting") {
+      rhTimer = window.setTimeout(() => void refreshRobinhood(), 2e3);
+      return;
+    }
+    if (was === "waiting") toast(S.rh.state === "connected" ? "Robinhood is connected." : S.rh.message, S.rh.state === "connected" ? "ok" : "bad");
+    void loadSnapshot();
   }
   function renderMarkets() {
     $("#marketDeck").innerHTML = S.markets.length ? S.markets.map((m, i) => {
@@ -733,15 +845,49 @@
         void run(async () => {
           S.rh = await api.checkRobinhood();
           renderAccount();
+          void loadSnapshot();
           toast(S.rh.state === "connected" ? "Robinhood answered: the connection works." : S.rh.message, S.rh.state === "connected" ? "ok" : "bad");
         });
         break;
       case "rh-forget":
         void run(async () => {
           S.rh = await api.disconnectRobinhood();
+          A.snapshot = null;
+          A.chosen = [];
+          A.picking = false;
           renderAccount();
+          renderViews();
           toast("The saved Robinhood sign-in is deleted from this computer.");
         });
+        break;
+      case "acc-pick":
+        void openPicker();
+        break;
+      case "acc-toggle": {
+        const k = el.dataset.key ?? "";
+        if (A.pick.has(k)) A.pick.delete(k);
+        else A.pick.add(k);
+        renderViews();
+        break;
+      }
+      case "acc-cancel":
+        A.picking = false;
+        renderViews();
+        break;
+      case "acc-save":
+        void run(async () => {
+          if (!A.pick.size) {
+            toast("Choose at least one account.", "bad");
+            return;
+          }
+          A.chosen = (await api.chooseAccounts([...A.pick])).chosen;
+          A.picking = false;
+          A.snapshot = null;
+          await readAccounts();
+        });
+        break;
+      case "acc-refresh":
+        void readAccounts();
         break;
       case "close-dialog":
         dlg.close();

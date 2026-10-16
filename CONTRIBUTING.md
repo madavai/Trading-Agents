@@ -12,7 +12,9 @@
   `rules.ts` says what a Robinhood tool is (read, order or other) by its name and Robinhood's own read-only label;
   `reader.ts` is the ONLY place in `src/` that calls a Robinhood tool, and it refuses everything but reads (a test
   scans the source to keep it so); `connect.ts` signs in and opens sessions; `link.ts` is what the dashboard knows
-  (none, waiting, connected, failed); `discover.ts` and `cli.ts` are `node dist/robinhood.mjs discover` and `shape`,
+  (none, waiting, connected, failed), which accounts the person chose (kept beside the sign-in as keys, never numbers)
+  and the last read of them; `account.ts` reads Robinhood's answers into figures (a dash, never a zero, for what it
+  did not give); `discover.ts` and `cli.ts` are `node dist/robinhood.mjs discover` and `shape`,
   which print what Robinhood offers and the SHAPE of its answers, never a value, so the desk is built on what is there.
 - `.claude/` - what Madav and Claude Code load in this folder: settings, the guard hook, skills, and the agents.
   The twelve agent files in `.claude/agents/` are written from `scripts/agents-src.mjs` (`npm run agents`); edit the

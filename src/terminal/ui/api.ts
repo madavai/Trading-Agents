@@ -2,9 +2,10 @@
 import type { DeskState } from '../state.js';
 import type { History, QuoteResult } from '../quotes.js';
 import type { WatchItem, QueueItem } from '../store.js';
-import type { LinkInfo } from '../../robinhood/link.js';
+import type { LinkInfo, Snapshot } from '../../robinhood/link.js';
+import type { Account, AccountView, Holding, Order } from '../../robinhood/account.js';
 
-export type { DeskState, History, QuoteResult, WatchItem, QueueItem, LinkInfo };
+export type { DeskState, History, QuoteResult, WatchItem, QueueItem, LinkInfo, Snapshot, Account, AccountView, Holding, Order };
 export interface Market { symbol: string; name: string; unit?: '%'; quote: QuoteResult }
 export interface CallDetail { decision: string; sections: Record<string, string[]>; hasReport: boolean }
 
@@ -41,4 +42,8 @@ export const api = {
   connectRobinhood: () => call<LinkInfo>('POST', '/api/robinhood/connect', {}),
   checkRobinhood: () => call<LinkInfo>('POST', '/api/robinhood/check', {}),
   disconnectRobinhood: () => call<LinkInfo>('DELETE', '/api/robinhood'),
+  accounts: () => call<{ accounts: Account[]; chosen: string[] }>('GET', '/api/robinhood/accounts'),
+  chooseAccounts: (show: string[]) => call<{ chosen: string[] }>('POST', '/api/robinhood/accounts', { show }),
+  snapshot: () => call<{ snapshot: Snapshot | null; chosen: string[] }>('GET', '/api/robinhood/snapshot'),
+  readAccounts: () => call<{ snapshot: Snapshot; chosen: string[]; holdingsShared: boolean }>('POST', '/api/robinhood/refresh', {}),
 };

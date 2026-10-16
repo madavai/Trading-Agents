@@ -37876,7 +37876,20 @@ function forgetHoldings(dir) {
 }
 var n = (v) => v.toLocaleString("en-US", { maximumSignificantDigits: 4 });
 var m = (v) => v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function renderAccounts(h, ticker) {
+  const lines = (h.accounts ?? []).map((a) => {
+    const held = a.positions.find((p) => p.ticker === ticker), others = a.positions.filter((p) => p !== held), cur = a.currency ? ` ${a.currency}` : "";
+    const parts = [held ? `position in ${ticker}: ${n(held.quantity)} units${held.averagePrice ? `, average price ${m(held.averagePrice)}` : ""}` : `no position in ${ticker}`];
+    if (a.cash !== void 0) parts.push(`cash ${m(a.cash)}${cur}`);
+    if (a.buyingPower !== void 0) parts.push(`buying power ${m(a.buyingPower)}${cur}`);
+    if (others.length) parts.push(`other positions: ${others.map((p) => `${p.ticker} ${n(p.quantity)}`).join(", ")}`);
+    return `- ${a.label} (${a.tradable ? "the only account the desk may trade in, and only on the person's Confirm" : "view only: the desk never trades in it"}): ${parts.join("; ")}`;
+  });
+  return `Portfolio as read from Robinhood on ${h.savedOn} (it may have changed since). Size any trade to the tradable account; the other accounts are the rest of the person's holdings, for context only:
+${lines.join("\n")}`;
+}
 function renderHoldings(h, ticker) {
+  if (h?.accounts?.length) return renderAccounts(h, ticker);
   if (!h) return "Portfolio context: not provided. You do not know the person's current holdings or cash, so do not assume a flat book; give direction and sizing guidance in terms they can apply to their own position.";
   const held = h.positions.find((p) => p.ticker === ticker);
   const lines = [held ? `- Current position in ${ticker}: ${n(held.quantity)} units${held.averagePrice ? `, average price ${m(held.averagePrice)}` : ""}` : `- No current position in ${ticker}`];

@@ -12,7 +12,8 @@ import { today } from '../data/dates.js';
 import { clearCache } from '../data/yahoo.js';
 import { safeSymbol } from '../data/symbols.js';
 import { deskDataDir, robinhoodFile } from '../paths.js';
-import { Link } from '../robinhood/link.js';
+import { Link, plainFailure, type Snapshot } from '../robinhood/link.js';
+import { saveAccountHoldings } from '../desk/holdings.js';
 import { VERSION } from '../version.js';
 import { callOf, stateOf, versionOf } from './state.js';
 import { clearQuotes, history, isRange, MARKETS, quote } from './quotes.js';
@@ -30,6 +31,19 @@ export function loadAssets(dir: string = path.join(path.dirname(fileURLToPath(im
   for (const f of ['index.html', 'app.js', 'app.css']) add(f);
   try { for (const f of fs.readdirSync(path.join(dir, 'fonts'))) if (f.endsWith('.woff2')) add(`fonts/${f}`); } catch { /* no fonts folder */ }
   return out;
+}
+
+/** Gives the desk's agents what the dashboard read, so their analyses size trades to the real accounts. Only a read in
+ *  which every account's holdings came back whole is kept: a half-read account would tell the agents "no position" where
+ *  there may be one. */
+export function shareHoldings(dir: string, snap: Snapshot, day: string): boolean {
+  if (!snap.views.length || snap.views.some((v) => v.problems.some((x) => /held/.test(x)) || v.unread > 0)) return false;
+  saveAccountHoldings(dir, snap.views.map((v) => ({
+    label: v.account.label, tradable: v.account.agentic, currency: v.portfolio?.currency,
+    ...(v.portfolio?.cash == null ? {} : { cash: v.portfolio.cash }), ...(v.portfolio?.buyingPower == null ? {} : { buyingPower: v.portfolio.buyingPower }),
+    positions: v.holdings.map((h) => ({ ticker: h.symbol, quantity: h.quantity, ...(h.averageCost == null ? {} : { averagePrice: h.averageCost }) })),
+  })), day);
+  return true;
 }
 
 export interface Terminal { url: string; port: number; token: string; deskId: string; close: () => Promise<void> }
@@ -66,6 +80,11 @@ export async function startTerminal(opts: { root: string; assets: Assets; port?:
     req.on('error', reject);
   });
 
+  // Robinhood's failures are told in plain words; one of the person's own choices that is refused says why.
+  const askRobinhood = async <T>(job: () => Promise<T>): Promise<T> => {
+    try { return await job(); } catch (e) { throw new Refused(/not one of your Robinhood accounts/.test((e as Error).message) ? 400 : 502, /not one of your Robinhood accounts/.test((e as Error).message) ? (e as Error).message : plainFailure(e)); }
+  };
+
   const handle = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
     // Only this computer, by its own name and port: a page that has pointed another name at this address cannot reach it.
     if (!hosts().has(String(req.headers.host ?? '').toLowerCase())) throw new Refused(421, 'wrong address');
@@ -90,6 +109,8 @@ export async function startTerminal(opts: { root: string; assets: Assets; port?:
       if (p === '/api/state') return json(res, 200, stateOf(root, day));
       if (p === '/api/version') return json(res, 200, { version: versionOf(root) });
       if (p === '/api/robinhood') return json(res, 200, robinhood.info());
+      if (p === '/api/robinhood/accounts') return json(res, 200, await askRobinhood(() => robinhood.accounts()));
+      if (p === '/api/robinhood/snapshot') return json(res, 200, { snapshot: robinhood.snapshot(), chosen: robinhood.chosen() });
       if (p === '/api/quotes') {
         const list = [...new Set((url.searchParams.get('symbols') ?? '').split(',').map((s) => s.trim()).filter(Boolean))].slice(0, 30);
         return json(res, 200, { quotes: await Promise.all(list.map(quote)) });
@@ -124,6 +145,15 @@ export async function startTerminal(opts: { root: string; assets: Assets; port?:
     if (p === '/api/robinhood/connect' && method === 'POST') return json(res, 200, robinhood.startSignIn());
     if (p === '/api/robinhood/check' && method === 'POST') return json(res, 200, await robinhood.check());
     if (p === '/api/robinhood' && method === 'DELETE') return json(res, 200, robinhood.forget());
+    if (p === '/api/robinhood/accounts' && method === 'POST') {
+      const keys = b.show;
+      if (!Array.isArray(keys) || keys.length > 10 || !keys.every((k) => typeof k === 'string' && /^[0-9a-f]{16}$/.test(k))) throw new Refused(400, 'choose up to ten of your accounts');
+      return json(res, 200, { chosen: await askRobinhood(() => robinhood.choose(keys as string[])) });
+    }
+    if (p === '/api/robinhood/refresh' && method === 'POST') {
+      const snapshot = await askRobinhood(() => robinhood.refresh());
+      return json(res, 200, { snapshot, chosen: robinhood.chosen(), holdingsShared: shareHoldings(dir, snapshot, day) });
+    }
     throw new Refused(404, 'not found');
   };
 
