@@ -14,6 +14,8 @@ import { safeSymbol } from '../data/symbols.js';
 import { deskDataDir, robinhoodFile } from '../paths.js';
 import { Link, plainFailure, type Snapshot } from '../robinhood/link.js';
 import { saveAccountHoldings } from '../desk/holdings.js';
+import { logOrder, placedToday } from '../desk/orders.js';
+export { placedToday };
 import { check, passes, propose, type Check, type Order, type Proposal, type TicketContext } from '../desk/ticket.js';
 import type { Review } from '../robinhood/review.js';
 import type { Placed } from '../robinhood/order.js';
@@ -54,16 +56,6 @@ export function shareHoldings(dir: string, snap: Snapshot, day: string): boolean
 const REVIEW_MS = 5 * 60_000;
 /** The exact words the person confirms: what is bought or sold, how many, at what limit. */
 export const confirmWords = (o: Order): string => `${o.side === 'buy' ? 'Buy' : 'Sell'} ${o.quantity} ${o.symbol} at $${o.limitPrice.toFixed(2)}`;
-
-/** Every order the dashboard sent, one line each, in desk-data (which git ignores): what, when, from which call, and what
- *  Robinhood answered. No account number is written. */
-const ordersFile = (dir: string) => path.join(dir, 'orders.jsonl');
-export function logOrder(dir: string, line: Record<string, unknown>): void { fs.mkdirSync(dir, { recursive: true }); fs.appendFileSync(ordersFile(dir), JSON.stringify(line) + '\n'); }
-/** How many orders the dashboard sent today (New York's day), whatever Robinhood's own list says yet. */
-export function placedToday(dir: string, now: Date): number {
-  const day = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(d);
-  try { return fs.readFileSync(ordersFile(dir), 'utf8').split('\n').filter((l) => { try { const v = JSON.parse(l) as { at?: string }; return !!v.at && day(new Date(v.at)) === day(now); } catch { return false; } }).length; } catch { return 0; }
-}
 
 export interface Terminal { url: string; port: number; token: string; deskId: string; close: () => Promise<void> }
 

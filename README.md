@@ -51,6 +51,18 @@ other source sees it.
    dry run), Place, Confirm. Only that confirm sends an order, only the exact order you confirmed, within your caps.
    Trading ships switched off.
 
+## Routines
+The trading-desk team has two routines, which Madav's scheduler can start for you:
+- **Morning routine**: scores past calls, then analyses what you asked for on the dashboard and your starred watchlist
+  stocks (at most 5 a morning, set in `desk-settings.json` under `routines`), and ends with the new calls to decide on.
+  On a weekend it only scores past calls.
+- **Evening wrap-up**: scores what is ready and tells you the day's calls, the orders the dashboard sent and what
+  Robinhood answered.
+
+To schedule one in Madav: Routines, new routine, run as **trading-desk**, the words "Run the morning routine" (or
+"Run the evening wrap-up"), on weekdays at the time you choose. In a chat here: `/routine morning`. Neither ever
+places an order, and the team reads your holdings as the dashboard last read them from Robinhood.
+
 ## Where the data comes from
 Free public sources, with no keys: Yahoo Finance (prices, news, company profile), StockTwits, Reddit, FRED (economic
 figures), Polymarket (odds) and SEC EDGAR (company filings). Yahoo Finance has no official free service: the desk reads

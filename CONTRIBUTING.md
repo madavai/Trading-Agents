@@ -33,6 +33,8 @@
   rest are the page). The page has no inline script or style (the policy refuses them): colours in charts come from
   classes, and anything an agent wrote goes through `md.ts`, which escapes first. `npm run build` bundles the page into
   `dist/terminal/`. `ui/` has its own `tsconfig.json` (it needs the browser's types).
+- `src/desk/routine.ts` - the morning and evening briefs the routines run from (desk tool `routine_brief`, skill
+  `/routine`, the team's playbook); `src/desk/orders.ts` - the dashboard's log of the orders it sent.
 - `src/desk/ticket.ts` - the order ticket: sizing from the person's settings and every cap check, on real figures only.
 - `desk-settings.json` - the desk's settings (read and checked by `src/settings.ts`, trading part included); `docs/design/` - the dashboard's design reference.
 - `test/fake-robinhood.ts` - a pretend Robinhood for the tests: an MCP door that wants a sign-in, with read tools and

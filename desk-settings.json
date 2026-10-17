@@ -86,5 +86,8 @@
   },
   "sources": {
     "contact": "trading-agents (+https://github.com/madavai/trading-agents)"
+  },
+  "routines": {
+    "maxAnalyses": 5
   }
 }

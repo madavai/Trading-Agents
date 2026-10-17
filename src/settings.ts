@@ -26,6 +26,8 @@ export interface Settings {
   journal: { maxResolvedEntries: number | null };
   sources: { contact: string };
   trading: Trading;
+  /** The morning routine analyses at most this many stocks: each is a full team run. */
+  routines: { maxAnalyses: number };
 }
 
 /** What a rating asks of the Agentic account. */
@@ -69,6 +71,7 @@ export const DEFAULTS: Settings = {
     caps: { perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 3 },
     orderDefaults: { type: 'limit', timeInForce: 'gfd' },
   },
+  routines: { maxAnalyses: 5 },
 };
 
 const within = (v: unknown, lo: number, hi: number, fallback: number): number => (typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi ? v : fallback);
@@ -123,5 +126,6 @@ export function readSettings(root: string): Settings {
     journal: { maxResolvedEntries: Number.isInteger(j.maxResolvedEntries) && (j.maxResolvedEntries as number) > 0 ? (j.maxResolvedEntries as number) : null },
     sources: { ...DEFAULTS.sources, ...raw.sources } as Settings['sources'],
     trading: tradingOf(raw.trading),
+    routines: { maxAnalyses: int((raw.routines as Record<string, unknown> | undefined)?.maxAnalyses, 1, 20, DEFAULTS.routines.maxAnalyses) },
   };
 }

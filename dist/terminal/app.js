@@ -499,6 +499,7 @@
       A.reading = false;
       renderViews();
       renderCall();
+      renderStock();
     }
   }
   async function openPicker() {
@@ -781,6 +782,31 @@
     $("#queueCard").innerHTML = `<div class="at-card-head"><h3>Waiting to be analysed</h3></div>` + (q2.length ? `<div class="ta-queue">${q2.map((x) => `<div class="ta-queue-row"><b>${esc(x.symbol)}</b><span class="at-quiet">asked ${esc(dayText(x.requestedAt))}</span><button class="icon-btn" data-act="dequeue" data-symbol="${esc(x.symbol)}" aria-label="Take ${esc(x.symbol)} off the list" title="Take off the list"><svg class="g"><use href="#i-x"/></svg></button></div>`).join("")}</div>
          <p class="at-honest">Analyses run in Madav, not here. Open this folder in Madav and type /analyse with no stock to run these.</p>` : '<p class="at-quiet">Nothing is waiting. Ask the desk to analyse a stock and it is listed here until Madav runs it.</p>');
   }
+  function renderStock() {
+    const sym = S.symbol, d = S.desk;
+    $("#sec-stock").classList.toggle("hide", !sym || isIndex(sym) || !d);
+    if (!sym || isIndex(sym) || !d) return;
+    const q2 = quoteOf(sym);
+    $("#stockTitle").textContent = `Everything on ${sym}`;
+    $("#stockSub").textContent = `${nameOf(sym)}${q2 ? ` \xB7 ${priceText(sym, q2)}${q2.changePct === null ? "" : ` (${pct(q2.changePct)} today)`} on Yahoo Finance, up to 15 min late` : ""} \xB7 the chart is above`;
+    let held;
+    if (!signedIn()) held = '<p class="at-quiet">Connect Robinhood in Your account to see what you hold of it.</p>';
+    else if (!A.snapshot) held = '<p class="at-quiet">Read your accounts (Your account, Refresh from Robinhood) to see what you hold of it.</p>';
+    else {
+      const rows = A.snapshot.views.flatMap((v) => v.holdings.filter((h) => h.symbol === sym).map((h) => {
+        const cur = v.portfolio?.currency ?? "USD";
+        return `<div><dt>${esc(v.account.label)} \xB7 ${v.account.agentic ? "Agentic" : "view only"}</dt><dd>${num(h.quantity, h.quantity % 1 ? 4 : 0)} at ${money(h.averageCost, cur)} average \xB7 now ${money(h.value, cur)}${h.gainPct === null ? "" : ` <span class="at-chip ${tone(h.gainPct)}">${pct(h.gainPct)}</span>`}</dd></div>`;
+      }));
+      held = rows.length ? `<dl class="at-facts ruled at-box">${rows.join("")}</dl><p class="at-quiet">Valued at Robinhood's live price, read at ${esc(clock(A.snapshot.at))}.</p>` : `<p class="at-quiet">Not held in the accounts you show.</p>`;
+    }
+    const calls = d.calls.filter((c) => c.ticker === sym);
+    const list = calls.length ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>Date</th><th>Rating</th><th>Result</th><th></th></tr></thead><tbody>${calls.map((c) => `<tr class="ta-go" data-act="open-call" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}"><td>${esc(dayText(c.date))}</td><td>${ratingChip(c.rating)}</td><td>${c.pending ? '<span class="at-chip">not scored yet</span>' : `<span class="at-chip ${tone(parseFloat(c.alpha ?? ""))}">alpha ${esc(c.alpha ?? "\u2014")}</span>`}</td><td><span class="at-quiet">Read</span></td></tr>`).join("")}</tbody></table></div>` : `<p class="at-quiet">The desk has no call on ${esc(sym)} yet.</p>`;
+    const latest = calls[0];
+    $("#stockBody").innerHTML = `<div class="at-card at-box"><div class="at-card-head"><h3>What you hold</h3></div>${held}</div>
+    <div class="at-card at-box"><div class="at-card-head"><h3>The desk's calls on it</h3></div>${latest ? `<p class="at-lede">${esc(latest.summary)}</p>` : ""}${list}</div>`;
+    const queued = d.queue.some((x) => x.symbol === sym);
+    $("#stockActions").innerHTML = `${queued ? '<span class="at-chip">waiting to be analysed</span>' : `<button class="at-btn at-press" data-act="analyse" data-symbol="${esc(sym)}"><svg class="g"><use href="#i-bot"/></svg><span>Ask the desk to analyse</span></button>`}${latest && signedIn() && hasAgentic() ? `<button class="at-btn at-press primary" data-act="decide" data-symbol="${esc(sym)}" data-date="${esc(latest.date)}"><span>Decide\u2026</span></button>` : ""}`;
+  }
   function renderWatch() {
     const list = S.desk?.watchlist ?? [];
     const rows = list.map((w) => {
@@ -849,6 +875,7 @@
     renderControls();
     renderHero();
     renderCall();
+    renderStock();
     renderQueue();
     renderWatch();
     renderCalls();
@@ -863,6 +890,7 @@
     renderControls();
     renderHero();
     renderCall();
+    renderStock();
     renderWatch();
     void loadHistory();
     void refreshQuotes();
@@ -890,6 +918,7 @@
       renderFavs();
       renderHero();
       renderWatch();
+      renderStock();
     } catch {
     }
   }
