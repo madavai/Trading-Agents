@@ -1,0 +1,64 @@
+// What the dashboard remembers between visits, so the person finds it as they left it: the face, the side list, the page
+// they were on, the stock on the chart with its range and lines, and the stocks they looked at last. It is kept in one
+// small file in desk-data on this computer, so it outlives a restart, another browser and another port. Nothing about an
+// order is ever kept here: every ticket starts afresh, with Robinhood's check and the person's Confirm.
+import fs from 'node:fs';
+import path from 'node:path';
+import { safeSymbol } from '../data/symbols.js';
+import { withLock, writeWhole } from '../desk/lock.js';
+
+export interface Recent { symbol: string; name: string }
+export interface Prefs {
+  theme?: 'light' | 'dark'; side?: 'open' | 'folded'; view?: 'overview' | 'account';
+  symbol?: string; range?: '1M' | '3M' | '6M' | '1Y' | '5Y'; kind?: 'area' | 'candles';
+  layers?: { ma50: boolean; ma200: boolean; vol: boolean };
+  recent?: Recent[];
+}
+
+export const MAX_RECENT = 6;
+const one = <T extends string>(v: unknown, of: readonly T[]): T | undefined => (of.includes(v as T) ? (v as T) : undefined);
+const sym = (v: unknown): string | undefined => { try { return typeof v === 'string' ? safeSymbol(v) : undefined; } catch { return undefined; } };
+/** A name as words only: no markup, at most 80 characters. */
+const words = (v: unknown, or: string): string => (typeof v === 'string' ? v.replace(/<[^>]*>/g, '').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 80) : '') || or;
+
+/** Keeps only what the dashboard knows, each in its own shape; anything else is dropped, never stored. */
+export function cleanPrefs(raw: unknown): Prefs {
+  const r = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+  const out: Prefs = {};
+  const theme = one(r.theme, ['light', 'dark'] as const); if (theme) out.theme = theme;
+  const side = one(r.side, ['open', 'folded'] as const); if (side) out.side = side;
+  const view = one(r.view, ['overview', 'account'] as const); if (view) out.view = view;
+  const symbol = sym(r.symbol); if (symbol) out.symbol = symbol;
+  const range = one(r.range, ['1M', '3M', '6M', '1Y', '5Y'] as const); if (range) out.range = range;
+  const kind = one(r.kind, ['area', 'candles'] as const); if (kind) out.kind = kind;
+  const l = r.layers as Record<string, unknown> | undefined;
+  if (l && typeof l === 'object' && ['ma50', 'ma200', 'vol'].every((k) => typeof l[k] === 'boolean')) out.layers = { ma50: l.ma50 as boolean, ma200: l.ma200 as boolean, vol: l.vol as boolean };
+  if (Array.isArray(r.recent)) {
+    const seen = new Set<string>(), recent: Recent[] = [];
+    for (const x of r.recent as unknown[]) {
+      const s = sym((x as Recent | null)?.symbol);
+      if (!s || seen.has(s)) continue;
+      seen.add(s); recent.push({ symbol: s, name: words((x as Recent).name, s) });
+      if (recent.length >= MAX_RECENT) break;
+    }
+    out.recent = recent;
+  }
+  return out;
+}
+
+const prefsFile = (dir: string) => path.join(dir, 'dashboard.json');
+
+export function readPrefs(dir: string): Prefs {
+  try { return cleanPrefs(JSON.parse(fs.readFileSync(prefsFile(dir), 'utf8'))); } catch { return {}; }
+}
+
+/** Merges what changed into what is kept, and returns the whole. */
+export function savePrefs(dir: string, change: unknown): Prefs {
+  const file = prefsFile(dir);
+  fs.mkdirSync(dir, { recursive: true });
+  return withLock(file, () => {
+    const next = cleanPrefs({ ...readPrefs(dir), ...cleanPrefs(change) });
+    writeWhole(file, JSON.stringify(next, null, 2) + '\n');
+    return next;
+  });
+}

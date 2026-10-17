@@ -63,9 +63,9 @@ var require_code = __commonJS({
     };
     exports.Name = Name;
     var _Code = class extends _CodeOrName {
-      constructor(code) {
+      constructor(code2) {
         super();
-        this._items = typeof code === "string" ? [code] : code;
+        this._items = typeof code2 === "string" ? [code2] : code2;
       }
       toString() {
         return this.str;
@@ -92,13 +92,13 @@ var require_code = __commonJS({
     exports._Code = _Code;
     exports.nil = new _Code("");
     function _(strs, ...args) {
-      const code = [strs[0]];
+      const code2 = [strs[0]];
       let i = 0;
       while (i < args.length) {
-        addCodeArg(code, args[i]);
-        code.push(strs[++i]);
+        addCodeArg(code2, args[i]);
+        code2.push(strs[++i]);
       }
-      return new _Code(code);
+      return new _Code(code2);
     }
     exports._ = _;
     var plus = new _Code("+");
@@ -114,13 +114,13 @@ var require_code = __commonJS({
       return new _Code(expr);
     }
     exports.str = str;
-    function addCodeArg(code, arg) {
+    function addCodeArg(code2, arg) {
       if (arg instanceof _Code)
-        code.push(...arg._items);
+        code2.push(...arg._items);
       else if (arg instanceof Name)
-        code.push(arg);
+        code2.push(arg);
       else
-        code.push(interpolate(arg));
+        code2.push(interpolate(arg));
     }
     exports.addCodeArg = addCodeArg;
     function optimize(expr) {
@@ -304,7 +304,7 @@ var require_scope = __commonJS({
         }, usedValues, getCode);
       }
       _reduceValues(values, valueCode, usedValues = {}, getCode) {
-        let code = code_1.nil;
+        let code2 = code_1.nil;
         for (const prefix in values) {
           const vs = values[prefix];
           if (!vs)
@@ -317,16 +317,16 @@ var require_scope = __commonJS({
             let c = valueCode(name);
             if (c) {
               const def = this.opts.es5 ? exports.varKinds.var : exports.varKinds.const;
-              code = (0, code_1._)`${code}${def} ${name} = ${c};${this.opts._n}`;
+              code2 = (0, code_1._)`${code2}${def} ${name} = ${c};${this.opts._n}`;
             } else if (c = getCode === null || getCode === void 0 ? void 0 : getCode(name)) {
-              code = (0, code_1._)`${code}${c}${this.opts._n}`;
+              code2 = (0, code_1._)`${code2}${c}${this.opts._n}`;
             } else {
               throw new ValueError(name);
             }
             nameSet.set(name, UsedValueState.Completed);
           });
         }
-        return code;
+        return code2;
       }
     };
     exports.ValueScope = ValueScope;
@@ -486,9 +486,9 @@ var require_codegen = __commonJS({
       }
     };
     var AnyCode = class extends Node {
-      constructor(code) {
+      constructor(code2) {
         super();
-        this.code = code;
+        this.code = code2;
       }
       render({ _n }) {
         return `${this.code};` + _n;
@@ -510,7 +510,7 @@ var require_codegen = __commonJS({
         this.nodes = nodes;
       }
       render(opts) {
-        return this.nodes.reduce((code, n) => code + n.render(opts), "");
+        return this.nodes.reduce((code2, n) => code2 + n.render(opts), "");
       }
       optimizeNodes() {
         const { nodes } = this;
@@ -558,10 +558,10 @@ var require_codegen = __commonJS({
         this.condition = condition;
       }
       render(opts) {
-        let code = `if(${this.condition})` + super.render(opts);
+        let code2 = `if(${this.condition})` + super.render(opts);
         if (this.else)
-          code += "else " + this.else.render(opts);
-        return code;
+          code2 += "else " + this.else.render(opts);
+        return code2;
       }
       optimizeNodes() {
         super.optimizeNodes();
@@ -682,12 +682,12 @@ var require_codegen = __commonJS({
     Return.kind = "return";
     var Try = class extends BlockNode {
       render(opts) {
-        let code = "try" + super.render(opts);
+        let code2 = "try" + super.render(opts);
         if (this.catch)
-          code += this.catch.render(opts);
+          code2 += this.catch.render(opts);
         if (this.finally)
-          code += this.finally.render(opts);
-        return code;
+          code2 += this.finally.render(opts);
+        return code2;
       }
       optimizeNodes() {
         var _a3, _b;
@@ -804,18 +804,18 @@ var require_codegen = __commonJS({
       }
       // returns code for object literal for the passed argument list of key-value pairs
       object(...keyValues) {
-        const code = ["{"];
+        const code2 = ["{"];
         for (const [key, value] of keyValues) {
-          if (code.length > 1)
-            code.push(",");
-          code.push(key);
+          if (code2.length > 1)
+            code2.push(",");
+          code2.push(key);
           if (key !== value || this.opts.es5) {
-            code.push(":");
-            (0, code_1.addCodeArg)(code, value);
+            code2.push(":");
+            (0, code_1.addCodeArg)(code2, value);
           }
         }
-        code.push("}");
-        return new code_1._Code(code);
+        code2.push("}");
+        return new code_1._Code(code2);
       }
       // `if` clause (or statement if `thenBody` and, optionally, `elseBody` are passed)
       if(condition, thenBody, elseBody) {
@@ -1078,12 +1078,12 @@ var require_util = __commonJS({
     }
     exports.alwaysValidSchema = alwaysValidSchema;
     function checkUnknownRules(it, schema = it.schema) {
-      const { opts, self } = it;
+      const { opts, self: self2 } = it;
       if (!opts.strictSchema)
         return;
       if (typeof schema === "boolean")
         return;
-      const rules = self.RULES.keywords;
+      const rules = self2.RULES.keywords;
       for (const key in schema) {
         if (!rules[key])
           checkStrictMode(it, `unknown keyword: "${key}"`);
@@ -1469,8 +1469,8 @@ var require_applicability = __commonJS({
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.shouldUseRule = exports.shouldUseGroup = exports.schemaHasRulesForType = void 0;
-    function schemaHasRulesForType({ schema, self }, type) {
-      const group = self.RULES.types[type];
+    function schemaHasRulesForType({ schema, self: self2 }, type) {
+      const group = self2.RULES.types[type];
       return group && group !== true && shouldUseGroup(schema, group);
     }
     exports.schemaHasRulesForType = schemaHasRulesForType;
@@ -1935,7 +1935,7 @@ var require_keyword = __commonJS({
       return !schemaType.length || schemaType.some((st) => st === "array" ? Array.isArray(schema) : st === "object" ? schema && typeof schema == "object" && !Array.isArray(schema) : typeof schema == st || allowUndefined && typeof schema == "undefined");
     }
     exports.validSchemaType = validSchemaType;
-    function validateKeywordUsage({ schema, opts, self, errSchemaPath }, def, keyword) {
+    function validateKeywordUsage({ schema, opts, self: self2, errSchemaPath }, def, keyword) {
       if (Array.isArray(def.keyword) ? !def.keyword.includes(keyword) : def.keyword !== keyword) {
         throw new Error("ajv implementation error");
       }
@@ -1946,9 +1946,9 @@ var require_keyword = __commonJS({
       if (def.validateSchema) {
         const valid = def.validateSchema(schema[keyword]);
         if (!valid) {
-          const msg = `keyword "${keyword}" value is invalid at path "${errSchemaPath}": ` + self.errorsText(def.validateSchema.errors);
+          const msg = `keyword "${keyword}" value is invalid at path "${errSchemaPath}": ` + self2.errorsText(def.validateSchema.errors);
           if (opts.validateSchema === "log")
-            self.logger.error(msg);
+            self2.logger.error(msg);
           else
             throw new Error(msg);
         }
@@ -2415,11 +2415,11 @@ var require_validate = __commonJS({
       }
       (0, boolSchema_1.boolOrEmptySchema)(it, valid);
     }
-    function schemaCxtHasRules({ schema, self }) {
+    function schemaCxtHasRules({ schema, self: self2 }) {
       if (typeof schema == "boolean")
         return !schema;
       for (const key in schema)
-        if (self.RULES.all[key])
+        if (self2.RULES.all[key])
           return true;
       return false;
     }
@@ -2448,9 +2448,9 @@ var require_validate = __commonJS({
       schemaKeywords(it, types, !checkedTypes, errsCount);
     }
     function checkRefsAndKeywords(it) {
-      const { schema, errSchemaPath, opts, self } = it;
-      if (schema.$ref && opts.ignoreKeywordsWithRef && (0, util_1.schemaHasRulesButRef)(schema, self.RULES)) {
-        self.logger.warn(`$ref: keywords ignored in schema at path "${errSchemaPath}"`);
+      const { schema, errSchemaPath, opts, self: self2 } = it;
+      if (schema.$ref && opts.ignoreKeywordsWithRef && (0, util_1.schemaHasRulesButRef)(schema, self2.RULES)) {
+        self2.logger.warn(`$ref: keywords ignored in schema at path "${errSchemaPath}"`);
       }
     }
     function checkNoDefault(it) {
@@ -2496,8 +2496,8 @@ var require_validate = __commonJS({
         gen.assign((0, codegen_1._)`${evaluated}.items`, items);
     }
     function schemaKeywords(it, types, typeErrors, errsCount) {
-      const { gen, schema, data, allErrors, opts, self } = it;
-      const { RULES } = self;
+      const { gen, schema, data, allErrors, opts, self: self2 } = it;
+      const { RULES } = self2;
       if (schema.$ref && (opts.ignoreKeywordsWithRef || !(0, util_1.schemaHasRulesButRef)(schema, RULES))) {
         gen.block(() => keywordCode(it, "$ref", RULES.all.$ref.definition));
         return;
@@ -3134,22 +3134,22 @@ var require_utils = __commonJS({
     }
     function stringArrayToHexStripped(input) {
       let acc = "";
-      let code = 0;
+      let code2 = 0;
       let i = 0;
       for (i = 0; i < input.length; i++) {
-        code = input[i].charCodeAt(0);
-        if (code === 48) {
+        code2 = input[i].charCodeAt(0);
+        if (code2 === 48) {
           continue;
         }
-        if (!(code >= 48 && code <= 57 || code >= 65 && code <= 70 || code >= 97 && code <= 102)) {
+        if (!(code2 >= 48 && code2 <= 57 || code2 >= 65 && code2 <= 70 || code2 >= 97 && code2 <= 102)) {
           return "";
         }
         acc += input[i];
         break;
       }
       for (i += 1; i < input.length; i++) {
-        code = input[i].charCodeAt(0);
-        if (!(code >= 48 && code <= 57 || code >= 65 && code <= 70 || code >= 97 && code <= 102)) {
+        code2 = input[i].charCodeAt(0);
+        if (!(code2 >= 48 && code2 <= 57 || code2 >= 65 && code2 <= 70 || code2 >= 97 && code2 <= 102)) {
           return "";
         }
         acc += input[i];
@@ -3263,8 +3263,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path15) {
-      let input = path15;
+    function removeDotSegments(path17) {
+      let input = path17;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3391,15 +3391,15 @@ var require_utils = __commonJS({
         if (isPathCharacter(ch)) {
           output += ch;
         } else {
-          const code = input.charCodeAt(i);
-          if (code < 128) {
-            output += isEscapeSafe(code) ? ch : BYTE_HEX[code];
-          } else if (code < 55296 || code > 57343) {
-            output += percentEncodeNonAscii(code);
-          } else if (code <= 56319 && i + 1 < input.length) {
+          const code2 = input.charCodeAt(i);
+          if (code2 < 128) {
+            output += isEscapeSafe(code2) ? ch : BYTE_HEX[code2];
+          } else if (code2 < 55296 || code2 > 57343) {
+            output += percentEncodeNonAscii(code2);
+          } else if (code2 <= 56319 && i + 1 < input.length) {
             const low = input.charCodeAt(i + 1);
             if (low >= 56320 && low <= 57343) {
-              output += percentEncodeNonAscii(65536 + (code - 55296 << 10) + (low - 56320));
+              output += percentEncodeNonAscii(65536 + (code2 - 55296 << 10) + (low - 56320));
               i++;
             } else {
               output += percentEncodeNonAscii(65533);
@@ -3430,15 +3430,15 @@ var require_utils = __commonJS({
         if (isPathCharacter(ch) && (ch !== ":" || !firstSegment)) {
           output += ch;
         } else {
-          const code = input.charCodeAt(i);
-          if (code < 128) {
-            output += BYTE_HEX[code];
-          } else if (code < 55296 || code > 57343) {
-            output += percentEncodeNonAscii(code);
-          } else if (code <= 56319 && i + 1 < input.length) {
+          const code2 = input.charCodeAt(i);
+          if (code2 < 128) {
+            output += BYTE_HEX[code2];
+          } else if (code2 < 55296 || code2 > 57343) {
+            output += percentEncodeNonAscii(code2);
+          } else if (code2 <= 56319 && i + 1 < input.length) {
             const low = input.charCodeAt(i + 1);
             if (low >= 56320 && low <= 57343) {
-              output += percentEncodeNonAscii(65536 + (code - 55296 << 10) + (low - 56320));
+              output += percentEncodeNonAscii(65536 + (code2 - 55296 << 10) + (low - 56320));
               i++;
             } else {
               output += percentEncodeNonAscii(65533);
@@ -3465,15 +3465,15 @@ var require_utils = __commonJS({
         if (isAllowed(ch)) {
           output += ch;
         } else {
-          const code = input.charCodeAt(i);
-          if (code < 128) {
-            output += BYTE_HEX[code];
-          } else if (code < 55296 || code > 57343) {
-            output += percentEncodeNonAscii(code);
-          } else if (code <= 56319 && i + 1 < input.length) {
+          const code2 = input.charCodeAt(i);
+          if (code2 < 128) {
+            output += BYTE_HEX[code2];
+          } else if (code2 < 55296 || code2 > 57343) {
+            output += percentEncodeNonAscii(code2);
+          } else if (code2 <= 56319 && i + 1 < input.length) {
             const low = input.charCodeAt(i + 1);
             if (low >= 56320 && low <= 57343) {
-              output += percentEncodeNonAscii(65536 + (code - 55296 << 10) + (low - 56320));
+              output += percentEncodeNonAscii(65536 + (code2 - 55296 << 10) + (low - 56320));
               i++;
             } else {
               output += percentEncodeNonAscii(65533);
@@ -3518,15 +3518,15 @@ var require_utils = __commonJS({
         if (isQueryFragmentCharacter(ch)) {
           output += ch;
         } else {
-          const code = input.charCodeAt(i);
-          if (code < 128) {
-            output += isEscapeSafe(code) ? ch : BYTE_HEX[code];
-          } else if (code < 55296 || code > 57343) {
-            output += percentEncodeNonAscii(code);
-          } else if (code <= 56319 && i + 1 < input.length) {
+          const code2 = input.charCodeAt(i);
+          if (code2 < 128) {
+            output += isEscapeSafe(code2) ? ch : BYTE_HEX[code2];
+          } else if (code2 < 55296 || code2 > 57343) {
+            output += percentEncodeNonAscii(code2);
+          } else if (code2 <= 56319 && i + 1 < input.length) {
             const low = input.charCodeAt(i + 1);
             if (low >= 56320 && low <= 57343) {
-              output += percentEncodeNonAscii(65536 + (code - 55296 << 10) + (low - 56320));
+              output += percentEncodeNonAscii(65536 + (code2 - 55296 << 10) + (low - 56320));
               i++;
             } else {
               output += percentEncodeNonAscii(65533);
@@ -3673,8 +3673,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path15 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path15 && path15 !== "/" ? path15 : void 0;
+        const path17 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path17 && path17 !== "/" ? path17 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -3875,10 +3875,10 @@ var require_fast_uri = __commonJS({
       schemelessOptions.skipEscape = true;
       return serialize(resolved, schemelessOptions);
     }
-    function resolveComponent(base, relative, options, skipNormalization) {
+    function resolveComponent(base2, relative, options, skipNormalization) {
       const target = {};
       if (!skipNormalization) {
-        base = parse4(serialize(base, options), options);
+        base2 = parse4(serialize(base2, options), options);
         relative = parse4(serialize(relative, options), options);
       }
       options = options || {};
@@ -3898,32 +3898,32 @@ var require_fast_uri = __commonJS({
           target.query = relative.query;
         } else {
           if (!relative.path) {
-            target.path = base.path;
+            target.path = base2.path;
             if (relative.query !== void 0) {
               target.query = relative.query;
             } else {
-              target.query = base.query;
+              target.query = base2.query;
             }
           } else {
             if (relative.path[0] === "/") {
               target.path = removeDotSegments(relative.path);
             } else {
-              if ((base.userinfo !== void 0 || base.host !== void 0 || base.port !== void 0) && !base.path) {
+              if ((base2.userinfo !== void 0 || base2.host !== void 0 || base2.port !== void 0) && !base2.path) {
                 target.path = "/" + relative.path;
-              } else if (!base.path) {
+              } else if (!base2.path) {
                 target.path = relative.path;
               } else {
-                target.path = base.path.slice(0, base.path.lastIndexOf("/") + 1) + relative.path;
+                target.path = base2.path.slice(0, base2.path.lastIndexOf("/") + 1) + relative.path;
               }
               target.path = removeDotSegments(target.path);
             }
             target.query = relative.query;
           }
-          target.userinfo = base.userinfo;
-          target.host = base.host;
-          target.port = base.port;
+          target.userinfo = base2.userinfo;
+          target.host = base2.host;
+          target.port = base2.port;
         }
-        target.scheme = base.scheme;
+        target.scheme = base2.scheme;
       }
       target.fragment = relative.fragment;
       return target;
@@ -4877,11 +4877,11 @@ var require_ref = __commonJS({
       schemaType: "string",
       code(cxt) {
         const { gen, schema: $ref, it } = cxt;
-        const { baseId, schemaEnv: env, validateName, opts, self } = it;
+        const { baseId, schemaEnv: env, validateName, opts, self: self2 } = it;
         const { root: root2 } = env;
         if (($ref === "#" || $ref === "#/") && baseId === root2.baseId)
           return callRootRef();
-        const schOrEnv = compile_1.resolveRef.call(self, root2, baseId, $ref);
+        const schOrEnv = compile_1.resolveRef.call(self2, root2, baseId, $ref);
         if (schOrEnv === void 0)
           throw new ref_error_1.default(it.opts.uriResolver, baseId, $ref);
         if (schOrEnv instanceof compile_1.SchemaEnv)
@@ -6409,7 +6409,7 @@ var require_format = __commonJS({
       error: error2,
       code(cxt, ruleType) {
         const { gen, data, $data, schema, schemaCode, it } = cxt;
-        const { opts, errSchemaPath, schemaEnv, self } = it;
+        const { opts, errSchemaPath, schemaEnv, self: self2 } = it;
         if (!opts.validateFormats)
           return;
         if ($data)
@@ -6418,7 +6418,7 @@ var require_format = __commonJS({
           validateFormat();
         function validate$DataFormat() {
           const fmts = gen.scopeValue("formats", {
-            ref: self.formats,
+            ref: self2.formats,
             code: opts.code.formats
           });
           const fDef = gen.const("fDef", (0, codegen_1._)`${fmts}[${schemaCode}]`);
@@ -6438,7 +6438,7 @@ var require_format = __commonJS({
           }
         }
         function validateFormat() {
-          const formatDef = self.formats[schema];
+          const formatDef = self2.formats[schema];
           if (!formatDef) {
             unknownFormat();
             return;
@@ -6450,7 +6450,7 @@ var require_format = __commonJS({
             cxt.pass(validCondition());
           function unknownFormat() {
             if (opts.strictSchema === false) {
-              self.logger.warn(unknownMsg());
+              self2.logger.warn(unknownMsg());
               return;
             }
             throw new Error(unknownMsg());
@@ -6459,8 +6459,8 @@ var require_format = __commonJS({
             }
           }
           function getFormat(fmtDef) {
-            const code = fmtDef instanceof RegExp ? (0, codegen_1.regexpCode)(fmtDef) : opts.code.formats ? (0, codegen_1._)`${opts.code.formats}${(0, codegen_1.getProperty)(schema)}` : void 0;
-            const fmt = gen.scopeValue("formats", { key: schema, ref: fmtDef, code });
+            const code2 = fmtDef instanceof RegExp ? (0, codegen_1.regexpCode)(fmtDef) : opts.code.formats ? (0, codegen_1._)`${opts.code.formats}${(0, codegen_1.getProperty)(schema)}` : void 0;
+            const fmt = gen.scopeValue("formats", { key: schema, ref: fmtDef, code: code2 });
             if (typeof fmtDef == "object" && !(fmtDef instanceof RegExp)) {
               return [fmtDef.type || "string", fmtDef.validate, (0, codegen_1._)`${fmt}.validate`];
             }
@@ -7113,17 +7113,17 @@ var require_limit = __commonJS({
       error: error2,
       code(cxt) {
         const { gen, data, schemaCode, keyword, it } = cxt;
-        const { opts, self } = it;
+        const { opts, self: self2 } = it;
         if (!opts.validateFormats)
           return;
-        const fCxt = new ajv_1.KeywordCxt(it, self.RULES.all.format.definition, "format");
+        const fCxt = new ajv_1.KeywordCxt(it, self2.RULES.all.format.definition, "format");
         if (fCxt.$data)
           validate$DataFormat();
         else
           validateFormat();
         function validate$DataFormat() {
           const fmts = gen.scopeValue("formats", {
-            ref: self.formats,
+            ref: self2.formats,
             code: opts.code.formats
           });
           const fmt = gen.const("fmt", (0, codegen_1._)`${fmts}[${fCxt.schemaCode}]`);
@@ -7131,7 +7131,7 @@ var require_limit = __commonJS({
         }
         function validateFormat() {
           const format = fCxt.schema;
-          const fmtDef = self.formats[format];
+          const fmtDef = self2.formats[format];
           if (!fmtDef || fmtDef === true)
             return;
           if (typeof fmtDef != "object" || fmtDef instanceof RegExp || typeof fmtDef.compare != "function") {
@@ -7187,12 +7187,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list2, fs14, exportName) {
+    function addFormats(ajv, list2, fs15, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list2)
-        ajv.addFormat(f, fs14[f]);
+        ajv.addFormat(f, fs15[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -7306,7 +7306,9 @@ var require_content_type = __commonJS({
 
 // src/terminal/main.ts
 import http3 from "node:http";
+import path16 from "node:path";
 import { spawn as spawn2 } from "node:child_process";
+import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // src/data/http.ts
 import fs3 from "node:fs";
@@ -7518,9 +7520,9 @@ async function getJson(url2, opts = {}) {
 
 // src/terminal/server.ts
 import crypto5 from "node:crypto";
-import fs13 from "node:fs";
+import fs14 from "node:fs";
 import http2 from "node:http";
-import path14 from "node:path";
+import path15 from "node:path";
 import { fileURLToPath } from "node:url";
 
 // src/data/dates.ts
@@ -7576,8 +7578,8 @@ function cryptoBase(raw) {
   const compact = raw.trim().toUpperCase().replace(/\+$/, "").replaceAll("-", "");
   for (const q of CRYPTO_QUOTES) {
     if (compact.endsWith(q)) {
-      const base = compact.slice(0, -q.length);
-      return CRYPTO_BASES.has(base) ? base : null;
+      const base2 = compact.slice(0, -q.length);
+      return CRYPTO_BASES.has(base2) ? base2 : null;
     }
   }
   return null;
@@ -7586,8 +7588,8 @@ function normalizeSymbol(raw) {
   const s = raw.trim().toUpperCase().replace(/\+$/, "");
   if (!s) return s;
   if (ALIASES[s]) return ALIASES[s];
-  const base = cryptoBase(s);
-  if (base) return `${base}-USD`;
+  const base2 = cryptoBase(s);
+  if (base2) return `${base2}-USD`;
   if (s.length === 6 && FOREX.has(s.slice(0, 3)) && FOREX.has(s.slice(3))) return `${s}=X`;
   const hk = /^(\d{1,5})\.HK$/.exec(s);
   if (hk) return `${String(Number(hk[1])).padStart(4, "0")}.HK`;
@@ -7761,13 +7763,13 @@ async function readAccount(reader, account, ids) {
   const stocks = await read2("the stocks held", "get_equity_positions", { account_number: ids.accountNumber });
   const coins = ids.rhsAccountNumber ? await read2("the crypto held", "get_crypto_positions", { rhs_account_number: ids.rhsAccountNumber }) : null;
   const crypto6 = coins === null ? { holdings: [], unread: 0 } : parseCrypto(coins);
-  const base = [...parsePositions(stocks).map((h) => ({ ...h, kind: "stock" })), ...crypto6.holdings.map((h) => ({ ...h, kind: "crypto" }))];
-  const prices = /* @__PURE__ */ new Map(), symbols = base.filter((h) => h.kind === "stock").map((h) => h.symbol);
+  const base2 = [...parsePositions(stocks).map((h) => ({ ...h, kind: "stock" })), ...crypto6.holdings.map((h) => ({ ...h, kind: "crypto" }))];
+  const prices = /* @__PURE__ */ new Map(), symbols = base2.filter((h) => h.kind === "stock").map((h) => h.symbol);
   for (let i = 0; i < symbols.length; i += QUOTES_PER_CALL) {
     const q = await read2("live prices", "get_equity_quotes", { symbols: symbols.slice(i, i + QUOTES_PER_CALL) });
     for (const [s, v] of parseQuotes(q)) prices.set(s, v);
   }
-  const holdings = base.map((h) => {
+  const holdings = base2.map((h) => {
     const price = prices.get(h.symbol) ?? null;
     return { ...h, price, value: price === null ? null : price * h.quantity, gainPct: price !== null && h.averageCost ? (price / h.averageCost - 1) * 100 : null };
   }).sort((a, b) => (b.value ?? -1) - (a.value ?? -1));
@@ -7916,9 +7918,9 @@ function nullish(input) {
   return input === null || input === void 0;
 }
 function cleanRegex(source) {
-  const start = source.startsWith("^") ? 1 : 0;
+  const start2 = source.startsWith("^") ? 1 : 0;
   const end = source.endsWith("$") ? source.length - 1 : source.length;
-  return source.slice(start, end);
+  return source.slice(start2, end);
 }
 function floatSafeRemainder(val, step) {
   const ratio = val / step;
@@ -8023,10 +8025,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj4, path15) {
-  if (!path15)
+function getElementAtPath(obj4, path17) {
+  if (!path17)
     return obj4;
-  return path15.reduce((acc, key) => acc?.[key], obj4);
+  return path17.reduce((acc, key) => acc?.[key], obj4);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -8366,11 +8368,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path15, issues) {
+function prefixIssues(path17, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path15);
+    iss.path.unshift(path17);
     return iss;
   });
 }
@@ -8389,9 +8391,9 @@ function sizeCaps(defChecks) {
   }
   return caps;
 }
-function attachSchema(issues, start, inst) {
+function attachSchema(issues, start2, inst) {
   var _a3;
-  for (let i = start; i < issues.length; i++) {
+  for (let i = start2; i < issues.length; i++) {
     (_a3 = issues[i]).schema ?? (_a3.schema = inst);
   }
 }
@@ -8831,16 +8833,16 @@ function flattenError(error2, mapper = (issue2) => issue2.message) {
 }
 function formatError(error2, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error3, path15 = []) => {
+  const processError = (error3, path17 = []) => {
     for (const issue2 of error3.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path15, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path17, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path15, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path17, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path15, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path17, ...issue2.path]);
       } else {
-        const fullpath = [...path15, ...issue2.path];
+        const fullpath = [...path17, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -10085,10 +10087,10 @@ function capSize(inst, size) {
     if (n > cap2 && !ctx?.skipChecks && ctx?.direction !== "backward") {
       for (const [max, ch] of sizeCaps(inst._zod.def.checks)) {
         if (n > max && ch._zod.def.when(payload)) {
-          const start = payload.issues.length;
+          const start2 = payload.issues.length;
           ch._zod.check(payload);
-          payload.issues[start].continue = false;
-          attachSchema(payload.issues, start, inst);
+          payload.issues[start2].continue = false;
+          attachSchema(payload.issues, start2, inst);
           return payload;
         }
       }
@@ -10105,8 +10107,8 @@ function handleArrayResult(result, final, index) {
 }
 var $ZodArray = /* @__PURE__ */ $constructor("$ZodArray", (inst, def) => {
   $ZodType.init(inst, def);
-  const memo3 = globalConfig.memoizer;
-  memo3?.attach(inst);
+  const memo4 = globalConfig.memoizer;
+  memo4?.attach(inst);
   inst._zod.parse = (payload, ctx) => {
     const input = payload.value;
     if (!Array.isArray(input)) {
@@ -10118,7 +10120,7 @@ var $ZodArray = /* @__PURE__ */ $constructor("$ZodArray", (inst, def) => {
       });
       return payload;
     }
-    payload.value = memo3 ? memo3.alloc(inst, payload, Array(input.length), ctx) : Array(input.length);
+    payload.value = memo4 ? memo4.alloc(inst, payload, Array(input.length), ctx) : Array(input.length);
     const proms = [];
     const abortEarly = ctx?.abortEarly;
     for (let i = 0; i < input.length; i++) {
@@ -10278,8 +10280,8 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
   const isObject2 = isObject;
   const catchall = def.catchall;
   let value;
-  const memo3 = globalConfig.memoizer;
-  memo3?.attach(inst);
+  const memo4 = globalConfig.memoizer;
+  memo4?.attach(inst);
   inst._zod.parse = (payload, ctx) => {
     value ?? (value = _normalized.value);
     const input = payload.value;
@@ -10292,7 +10294,7 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
       });
       return payload;
     }
-    payload.value = memo3 ? memo3.alloc(inst, payload, {}, ctx) : {};
+    payload.value = memo4 ? memo4.alloc(inst, payload, {}, ctx) : {};
     const proms = [];
     const shape = value.shape;
     const abortEarly = ctx?.abortEarly;
@@ -10325,11 +10327,11 @@ var $ZodObjectJIT = /* @__PURE__ */ $constructor("$ZodObjectJIT", (inst, def) =>
   $ZodObject.init(inst, def);
   const superParse = inst._zod.parse;
   const _normalized = cached(() => normalizeDef(def));
-  const memo3 = globalConfig.memoizer;
+  const memo4 = globalConfig.memoizer;
   const generateFastpass = (shape) => {
     const normalized = _normalized.value;
     const syms = normalized.symbolKeys;
-    const doc = new Doc(["payload", "ctx"], { shape, inst, memo: memo3, syms });
+    const doc = new Doc(["payload", "ctx"], { shape, inst, memo: memo4, syms });
     const parseStr = (k) => `shape[${k}]._zod.run({ value: input[${k}], issues: [] }, ctx)`;
     const prefixStr = (id, k) => `
           let ${id}_ab = false;
@@ -10349,7 +10351,7 @@ var $ZodObjectJIT = /* @__PURE__ */ $constructor("$ZodObjectJIT", (inst, def) =>
     for (const key of normalized.allKeys) {
       ids[key] = `key_${counter++}`;
     }
-    doc.write(memo3 ? `const newResult = memo.alloc(inst, payload, {}, ctx);` : `const newResult = {};`);
+    doc.write(memo4 ? `const newResult = memo.alloc(inst, payload, {}, ctx);` : `const newResult = {};`);
     for (const key of normalized.allKeys) {
       if (key === "__proto__")
         continue;
@@ -10712,8 +10714,8 @@ function handleIntersectionResults(result, left, right) {
 }
 var $ZodRecord = /* @__PURE__ */ $constructor("$ZodRecord", (inst, def) => {
   $ZodType.init(inst, def);
-  const memo3 = globalConfig.memoizer;
-  memo3?.attach(inst);
+  const memo4 = globalConfig.memoizer;
+  memo4?.attach(inst);
   inst._zod.parse = (payload, ctx) => {
     const input = payload.value;
     if (!isPlainObject(input)) {
@@ -10728,7 +10730,7 @@ var $ZodRecord = /* @__PURE__ */ $constructor("$ZodRecord", (inst, def) => {
     const proms = [];
     const values = def.keyType._zod.values;
     if (values && !def.partial) {
-      payload.value = memo3 ? memo3.alloc(inst, payload, {}, ctx) : {};
+      payload.value = memo4 ? memo4.alloc(inst, payload, {}, ctx) : {};
       const recordKeys = /* @__PURE__ */ new Set();
       for (const key of values) {
         if (typeof key === "string" || typeof key === "number" || typeof key === "symbol") {
@@ -10792,7 +10794,7 @@ var $ZodRecord = /* @__PURE__ */ $constructor("$ZodRecord", (inst, def) => {
         });
       }
     } else {
-      payload.value = memo3 ? memo3.alloc(inst, payload, {}, ctx) : {};
+      payload.value = memo4 ? memo4.alloc(inst, payload, {}, ctx) : {};
       let unrecognized;
       for (const key of Reflect.ownKeys(input)) {
         if (key === "__proto__")
@@ -11351,14 +11353,14 @@ var memo = {
     var _a3;
     (_a3 = inst._zod).deferred ?? (_a3.deferred = []);
     inst._zod.deferred.push(() => {
-      const base = inst._zod.parse;
+      const base2 = inst._zod.parse;
       const wrapped = (payload, ctx) => {
         if (ctx.direction !== "backward" && isBackEdge(ctx, payload.value))
           throw new $ZodCyclicError();
-        return base(payload, ctx);
+        return base2(payload, ctx);
       };
       inst._zod.parse = wrapped;
-      if (inst._zod.run === base)
+      if (inst._zod.run === base2)
         inst._zod.run = wrapped;
     });
   },
@@ -11370,15 +11372,15 @@ var memo = {
     let lastBucket;
     (_a3 = inst._zod).deferred ?? (_a3.deferred = []);
     inst._zod.deferred.push(() => {
-      const base = inst._zod.parse;
+      const base2 = inst._zod.parse;
       const wrapped = (payload, ctx) => {
         if (isRecursiveInst === void 0) {
           const walked = isRecursive(inst, /* @__PURE__ */ new Set(), false);
           if (walked === NONE) {
-            inst._zod.parse = base;
+            inst._zod.parse = base2;
             if (inst._zod.run === wrapped)
-              inst._zod.run = base;
-            return base(payload, ctx);
+              inst._zod.run = base2;
+            return base2(payload, ctx);
           }
           if (walked === PROVEN || rechecked)
             isRecursiveInst = true;
@@ -11387,7 +11389,7 @@ var memo = {
         }
         const input = payload.value;
         if (!isRef(input))
-          return base(payload, ctx);
+          return base2(payload, ctx);
         let state = ctx[STATE];
         if (!state) {
           state = { buckets: /* @__PURE__ */ new WeakMap(), backEdges: void 0 };
@@ -11416,7 +11418,7 @@ var memo = {
         }
         handoff = bucket;
         const depth = open.length;
-        const result = base(payload, ctx);
+        const result = base2(payload, ctx);
         handoff = void 0;
         const entry = open.length > depth ? open.pop() : void 0;
         if (result instanceof Promise) {
@@ -11431,7 +11433,7 @@ var memo = {
         return result;
       };
       inst._zod.parse = wrapped;
-      if (inst._zod.run === base)
+      if (inst._zod.run === base2)
         inst._zod.run = wrapped;
     });
   }
@@ -13344,15 +13346,15 @@ var initializer2 = (inst, issues) => {
   if (_installedErrorProtos.has(proto))
     return;
   _installedErrorProtos.add(proto);
-  _lazyMethod(proto, "format", (self) => (mapper) => formatError(self, mapper));
-  _lazyMethod(proto, "flatten", (self) => (mapper) => flattenError(self, mapper));
-  _lazyMethod(proto, "addIssue", (self) => (issue2) => {
-    self.issues.push(issue2);
-    self.message = JSON.stringify(self.issues, jsonStringifyReplacer, 2);
+  _lazyMethod(proto, "format", (self2) => (mapper) => formatError(self2, mapper));
+  _lazyMethod(proto, "flatten", (self2) => (mapper) => flattenError(self2, mapper));
+  _lazyMethod(proto, "addIssue", (self2) => (issue2) => {
+    self2.issues.push(issue2);
+    self2.message = JSON.stringify(self2.issues, jsonStringifyReplacer, 2);
   });
-  _lazyMethod(proto, "addIssues", (self) => (issues2) => {
-    self.issues.push(...issues2);
-    self.message = JSON.stringify(self.issues, jsonStringifyReplacer, 2);
+  _lazyMethod(proto, "addIssues", (self2) => (issues2) => {
+    self2.issues.push(...issues2);
+    self2.message = JSON.stringify(self2.issues, jsonStringifyReplacer, 2);
   });
   Object.defineProperty(proto, "isEmpty", {
     configurable: true,
@@ -14026,7 +14028,7 @@ var ZodObject = /* @__PURE__ */ $constructor("ZodObject", (inst, def) => {
   $ZodObjectJIT.init(inst, def);
   ZodType.init(inst, def);
   inst._zod.processJSONSchema = (ctx, json, params) => objectProcessor(inst, ctx, json, params);
-  util_exports.installLazyProp(inst, "shape", (self) => self._zod.def.shape, false);
+  util_exports.installLazyProp(inst, "shape", (self2) => self2._zod.def.shape, false);
 }, {
   keyof() {
     return _enum(Object.keys(this._zod.def.shape));
@@ -15960,23 +15962,23 @@ var ServerResultSchema = union([
   CreateTaskResultSchema
 ]);
 var McpError = class _McpError extends Error {
-  constructor(code, message, data) {
-    super(`MCP error ${code}: ${message}`);
-    this.code = code;
+  constructor(code2, message, data) {
+    super(`MCP error ${code2}: ${message}`);
+    this.code = code2;
     this.data = data;
     this.name = "McpError";
   }
   /**
    * Factory method to create the appropriate error type based on the error code and data
    */
-  static fromError(code, message, data) {
-    if (code === ErrorCode.UrlElicitationRequired && data) {
+  static fromError(code2, message, data) {
+    if (code2 === ErrorCode.UrlElicitationRequired && data) {
       const errorData = data;
       if (errorData.elicitations) {
         return new UrlElicitationRequiredError(errorData.elicitations, message);
       }
     }
-    return new _McpError(code, message, data);
+    return new _McpError(code2, message, data);
   }
 };
 var UrlElicitationRequiredError = class extends McpError {
@@ -16979,8 +16981,8 @@ var Protocol = class {
 function isPlainObject2(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
-function mergeCapabilities(base, additional) {
-  const result = { ...base };
+function mergeCapabilities(base2, additional) {
+  const result = { ...base2 };
   for (const key in additional) {
     const k = key;
     const addValue = additional[k];
@@ -18860,35 +18862,35 @@ ${value}`, dataLines++;
     }
     return chunk.slice(searchIndex);
   }
-  function parseLine(chunk, start, end) {
-    if (start === end) {
+  function parseLine(chunk, start2, end) {
+    if (start2 === end) {
       dispatchEvent();
       return;
     }
-    const firstCharCode = chunk.charCodeAt(start);
-    if (isDataPrefix(chunk, start, firstCharCode)) {
-      const valueStart = chunk.charCodeAt(start + 5) === SPACE ? start + 6 : start + 5, value2 = chunk.slice(valueStart, end);
+    const firstCharCode = chunk.charCodeAt(start2);
+    if (isDataPrefix(chunk, start2, firstCharCode)) {
+      const valueStart = chunk.charCodeAt(start2 + 5) === SPACE ? start2 + 6 : start2 + 5, value2 = chunk.slice(valueStart, end);
       data = dataLines === 0 ? value2 : `${data}
 ${value2}`, dataLines++;
       return;
     }
-    if (isEventPrefix(chunk, start, firstCharCode)) {
-      eventType = chunk.slice(chunk.charCodeAt(start + 6) === SPACE ? start + 7 : start + 6, end) || void 0;
+    if (isEventPrefix(chunk, start2, firstCharCode)) {
+      eventType = chunk.slice(chunk.charCodeAt(start2 + 6) === SPACE ? start2 + 7 : start2 + 6, end) || void 0;
       return;
     }
-    if (firstCharCode === 105 && chunk.charCodeAt(start + 1) === 100 && chunk.charCodeAt(start + 2) === 58) {
-      const value2 = chunk.slice(chunk.charCodeAt(start + 3) === SPACE ? start + 4 : start + 3, end);
+    if (firstCharCode === 105 && chunk.charCodeAt(start2 + 1) === 100 && chunk.charCodeAt(start2 + 2) === 58) {
+      const value2 = chunk.slice(chunk.charCodeAt(start2 + 3) === SPACE ? start2 + 4 : start2 + 3, end);
       value2.includes("\0") || (id = value2);
       return;
     }
     if (firstCharCode === 58) {
       if (onComment) {
-        const line2 = chunk.slice(start, end);
-        onComment(line2.slice(chunk.charCodeAt(start + 1) === SPACE ? 2 : 1));
+        const line2 = chunk.slice(start2, end);
+        onComment(line2.slice(chunk.charCodeAt(start2 + 1) === SPACE ? 2 : 1));
       }
       return;
     }
-    const line = chunk.slice(start, end), fieldSeparatorIndex = line.indexOf(":");
+    const line = chunk.slice(start2, end), fieldSeparatorIndex = line.indexOf(":");
     if (fieldSeparatorIndex === -1) {
       processField(line, "", line);
       return;
@@ -18983,9 +18985,9 @@ var DEFAULT_STREAMABLE_HTTP_RECONNECTION_OPTIONS = {
   maxRetries: 2
 };
 var StreamableHTTPError = class extends Error {
-  constructor(code, message) {
+  constructor(code2, message) {
     super(`Streamable HTTP error: ${message}`);
-    this.code = code;
+    this.code = code2;
   }
 };
 var StreamableHTTPClientTransport = class {
@@ -19659,10 +19661,10 @@ function openBrowser(url2) {
 function waitForCode(port, expectedState, timeoutMs = 5 * 6e4) {
   let close = () => {
   };
-  const code = new Promise((resolve, reject) => {
-    const page = (words2) => `<!doctype html><meta charset="utf-8"><title>Trading Agents</title><body style="font:16px system-ui;padding:40px">${words2}</body>`;
-    const answer = (res, status, words2) => {
-      res.writeHead(status, { connection: "close", ...words2 ? { "content-type": "text/html" } : {} }).end(words2 ? page(words2) : void 0);
+  const code2 = new Promise((resolve, reject) => {
+    const page = (words3) => `<!doctype html><meta charset="utf-8"><title>Trading Agents</title><body style="font:16px system-ui;padding:40px">${words3}</body>`;
+    const answer = (res, status, words3) => {
+      res.writeHead(status, { connection: "close", ...words3 ? { "content-type": "text/html" } : {} }).end(words3 ? page(words3) : void 0);
     };
     const server = http.createServer((req, res) => {
       const url2 = new URL(req.url ?? "/", `http://127.0.0.1:${port}`);
@@ -19702,7 +19704,7 @@ function waitForCode(port, expectedState, timeoutMs = 5 * 6e4) {
     });
     server.listen(port, "127.0.0.1");
   });
-  return { code, close };
+  return { code: code2, close };
 }
 var NotSignedIn = class extends Error {
   constructor(message) {
@@ -19735,8 +19737,8 @@ ${url2}`);
       throw e;
     }
     if (!waiting) throw new NotSignedIn("Robinhood asks for a new sign-in.");
-    const code = await waiting.code;
-    await t2.finishAuth(code);
+    const code2 = await waiting.code;
+    await t2.finishAuth(code2);
     c = client();
     t2 = transport();
     await c.connect(t2);
@@ -19929,8 +19931,8 @@ var Link = class {
     };
   }
   bad(e) {
-    const words2 = oneLine(e instanceof Error ? e.message : String(e), 200);
-    const why = e instanceof NotSignedIn ? "Robinhood asks you to sign in again." : /^Robinhood refused/.test(words2) ? words2 : `Robinhood did not answer as expected: ${words2}`;
+    const words3 = oneLine(e instanceof Error ? e.message : String(e), 200);
+    const why = e instanceof NotSignedIn ? "Robinhood asks you to sign in again." : /^Robinhood refused/.test(words3) ? words3 : `Robinhood did not answer as expected: ${words3}`;
     return { state: "failed", checkedAt: this.now(), tools: null, message: why };
   }
   /** Sends the person to Robinhood's sign-in page and waits for them to come back, in the background. */
@@ -20096,7 +20098,7 @@ function proposeOwn(c, side, t2) {
 }
 function check(o, c, t2) {
   const out = [];
-  const add = (ok, words2) => out.push({ ok, words: words2 });
+  const add = (ok, words3) => out.push({ ok, words: words3 });
   add(Number.isInteger(o.quantity) && o.quantity >= 1 && o.quantity <= 1e5, Number.isInteger(o.quantity) && o.quantity >= 1 ? `${o.quantity} whole share(s)` : "The quantity must be a whole number of shares, at least one");
   const priceOk = Number.isFinite(o.limitPrice) && o.limitPrice > 0 && cents(o.limitPrice) === o.limitPrice;
   add(priceOk, priceOk ? `Limit price ${money(o.limitPrice)}` : "The limit price must be above zero, in dollars and cents");
@@ -20495,8 +20497,8 @@ function summaryOf(decision) {
   const heading = /^\s{0,3}#{1,6}\s*Executive Summary\s*:?\s*\n+([\s\S]*?)(?=\n\s{0,3}#{1,6}\s|\n\s*\n\*\*[^*\n]+\*\*\s*:|$)/im.exec(text2);
   const found = [label, heading].filter((m) => !!m && !!m[1]?.trim()).sort((a, b) => a.index - b.index)[0];
   const source = found?.[1] ?? text2.split("\n").filter((l) => !/^\s{0,3}#/.test(l) && !/^\s*\*\*[^*\n]+\*\*\s*:/.test(l) && !/^\s*\|/.test(l)).join("\n");
-  const words2 = plainText(source) || plainText(text2);
-  return words2.length > 320 ? `${words2.slice(0, 317).trimEnd()}...` : words2;
+  const words3 = plainText(source) || plainText(text2);
+  return words3.length > 320 ? `${words3.slice(0, 317).trimEnd()}...` : words3;
 }
 var stamp = (file4) => {
   try {
@@ -20761,20 +20763,126 @@ var MARKETS = [
   { symbol: "BTC-USD", name: "Bitcoin" }
 ];
 
+// src/terminal/search.ts
+var KINDS = { EQUITY: "Stock", ETF: "ETF", INDEX: "Index", MUTUALFUND: "Fund", CRYPTOCURRENCY: "Crypto", CURRENCY: "Currency" };
+var QUERY = /^[\p{L}\p{N} .&'\-^=,]{1,40}$/u;
+function parseSearch(json, limit = 8) {
+  const out = [], seen = /* @__PURE__ */ new Set();
+  for (const q of json.quotes ?? []) {
+    const kind = KINDS[q.quoteType ?? ""];
+    if (!kind || !q.symbol || q.isYahooFinance === false) continue;
+    let symbol;
+    try {
+      symbol = safeSymbol(q.symbol);
+    } catch {
+      continue;
+    }
+    if (seen.has(symbol)) continue;
+    seen.add(symbol);
+    out.push({ symbol, name: (q.longname || q.shortname || symbol).trim(), exchange: (q.exchDisp ?? "").trim(), kind });
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+var memo3 = /* @__PURE__ */ new Map();
+var MEMO_MS2 = 5 * 6e4;
+function findSymbols(raw) {
+  const q = raw.trim().replace(/\s+/g, " ");
+  const key = q.toLowerCase(), hit = memo3.get(key);
+  if (hit && Date.now() - hit.at < MEMO_MS2) return hit.value;
+  const qs = `q=${encodeURIComponent(q)}&quotesCount=12&newsCount=0&listsCount=0&enableFuzzyQuery=false`;
+  const value = (async () => {
+    let last;
+    for (const host of HOSTS) {
+      try {
+        return parseSearch(await getJson(`${host}/v1/finance/search?${qs}`));
+      } catch (e) {
+        last = e;
+      }
+    }
+    throw last instanceof Unavailable ? last : new Unavailable("Yahoo Finance's search did not answer");
+  })();
+  value.catch(() => memo3.delete(key));
+  if (memo3.size > 500) memo3.clear();
+  memo3.set(key, { at: Date.now(), value });
+  return value;
+}
+
+// src/terminal/prefs.ts
+import fs13 from "node:fs";
+import path13 from "node:path";
+var MAX_RECENT = 6;
+var one = (v, of) => of.includes(v) ? v : void 0;
+var sym = (v) => {
+  try {
+    return typeof v === "string" ? safeSymbol(v) : void 0;
+  } catch {
+    return void 0;
+  }
+};
+var words2 = (v, or) => (typeof v === "string" ? v.replace(/<[^>]*>/g, "").replace(/[<>]/g, "").replace(/\s+/g, " ").trim().slice(0, 80) : "") || or;
+function cleanPrefs(raw) {
+  const r = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+  const out = {};
+  const theme = one(r.theme, ["light", "dark"]);
+  if (theme) out.theme = theme;
+  const side = one(r.side, ["open", "folded"]);
+  if (side) out.side = side;
+  const view = one(r.view, ["overview", "account"]);
+  if (view) out.view = view;
+  const symbol = sym(r.symbol);
+  if (symbol) out.symbol = symbol;
+  const range = one(r.range, ["1M", "3M", "6M", "1Y", "5Y"]);
+  if (range) out.range = range;
+  const kind = one(r.kind, ["area", "candles"]);
+  if (kind) out.kind = kind;
+  const l = r.layers;
+  if (l && typeof l === "object" && ["ma50", "ma200", "vol"].every((k) => typeof l[k] === "boolean")) out.layers = { ma50: l.ma50, ma200: l.ma200, vol: l.vol };
+  if (Array.isArray(r.recent)) {
+    const seen = /* @__PURE__ */ new Set(), recent = [];
+    for (const x of r.recent) {
+      const s = sym(x?.symbol);
+      if (!s || seen.has(s)) continue;
+      seen.add(s);
+      recent.push({ symbol: s, name: words2(x.name, s) });
+      if (recent.length >= MAX_RECENT) break;
+    }
+    out.recent = recent;
+  }
+  return out;
+}
+var prefsFile = (dir) => path13.join(dir, "dashboard.json");
+function readPrefs(dir) {
+  try {
+    return cleanPrefs(JSON.parse(fs13.readFileSync(prefsFile(dir), "utf8")));
+  } catch {
+    return {};
+  }
+}
+function savePrefs(dir, change2) {
+  const file4 = prefsFile(dir);
+  fs13.mkdirSync(dir, { recursive: true });
+  return withLock(file4, () => {
+    const next = cleanPrefs({ ...readPrefs(dir), ...cleanPrefs(change2) });
+    writeWhole(file4, JSON.stringify(next, null, 2) + "\n");
+    return next;
+  });
+}
+
 // src/terminal/launch.ts
 import crypto4 from "node:crypto";
-import path13 from "node:path";
+import path14 from "node:path";
 var PORTS = [47615, 47625];
-var deskIdOf = (root2) => crypto4.createHash("sha256").update(path13.resolve(root2)).digest("hex").slice(0, 12);
+var deskIdOf = (root2) => crypto4.createHash("sha256").update(path14.resolve(root2)).digest("hex").slice(0, 12);
 
 // src/terminal/server.ts
 var TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".woff2": "font/woff2", ".svg": "image/svg+xml" };
-function loadAssets(dir = path14.join(path14.dirname(fileURLToPath(import.meta.url)), "terminal")) {
+function loadAssets(dir = path15.join(path15.dirname(fileURLToPath(import.meta.url)), "terminal")) {
   const out = /* @__PURE__ */ new Map();
-  const add = (rel) => out.set(`/${rel.replace(/\\/g, "/")}`, { type: TYPES[path14.extname(rel)] ?? "application/octet-stream", body: fs13.readFileSync(path14.join(dir, rel)) });
+  const add = (rel) => out.set(`/${rel.replace(/\\/g, "/")}`, { type: TYPES[path15.extname(rel)] ?? "application/octet-stream", body: fs14.readFileSync(path15.join(dir, rel)) });
   for (const f of ["index.html", "app.js", "app.css"]) add(f);
   try {
-    for (const f of fs13.readdirSync(path14.join(dir, "fonts"))) if (f.endsWith(".woff2")) add(`fonts/${f}`);
+    for (const f of fs14.readdirSync(path15.join(dir, "fonts"))) if (f.endsWith(".woff2")) add(`fonts/${f}`);
   } catch {
   }
   return out;
@@ -20807,8 +20915,21 @@ var Refused2 = class extends Error {
   }
   status;
 };
+function fingerprint(files) {
+  const h = crypto5.createHash("sha256");
+  for (const f of files) {
+    try {
+      h.update(fs14.readFileSync(f));
+    } catch {
+      h.update(`missing ${f}`);
+    }
+  }
+  return h.digest("hex").slice(0, 12);
+}
 async function startTerminal(opts) {
   const { root: root2, assets } = opts, dir = deskDataDir(root2), token = crypto5.randomBytes(24).toString("hex"), deskId = deskIdOf(root2);
+  const code2 = opts.code ?? [], build = fingerprint(code2);
+  let updated = false, restarting = false;
   const robinhood = opts.robinhood ?? new Link(robinhoodFile());
   const tickets = /* @__PURE__ */ new Map();
   const TICKET_MS = 15 * 6e4;
@@ -20874,17 +20995,27 @@ async function startTerminal(opts) {
       const text2 = p === "/" ? String(a.body).replace("__DESK_TOKEN__", token) : a.body;
       return send(res, 200, text2, a.type, { "Cache-Control": "no-cache" });
     }
-    if (method === "GET" && p === "/api/ping") return json(res, 200, { app: "trading-agents", version: VERSION, desk: deskId });
+    if (method === "GET" && p === "/api/ping") return json(res, 200, { app: "trading-agents", version: VERSION, desk: deskId, build });
     if (!p.startsWith("/api/")) throw new Refused2(404, "not found");
     if (!same(String(req.headers["x-desk-token"] ?? ""), token)) throw new Refused2(403, "not allowed");
     if (method !== "GET") {
       const o = req.headers.origin;
       if (o !== void 0 && !origins().has(o)) throw new Refused2(403, "not allowed");
     }
-    const day = today(), sym = url2.searchParams.get("symbol") ?? "";
+    const day = today(), sym2 = url2.searchParams.get("symbol") ?? "";
     if (method === "GET") {
       if (p === "/api/state") return json(res, 200, stateOf(root2, day));
-      if (p === "/api/version") return json(res, 200, { version: versionOf(root2) });
+      if (p === "/api/version") return json(res, 200, { version: versionOf(root2), build, update: updated, restarting });
+      if (p === "/api/prefs") return json(res, 200, readPrefs(dir));
+      if (p === "/api/search") {
+        const q = (url2.searchParams.get("q") ?? "").trim();
+        if (!QUERY.test(q)) throw new Refused2(400, "type a name or a ticker, in at most 40 letters");
+        try {
+          return json(res, 200, { matches: await findSymbols(q) });
+        } catch {
+          throw new Refused2(502, "Yahoo Finance's search did not answer: type the ticker instead");
+        }
+      }
       if (p === "/api/robinhood") return json(res, 200, robinhood.info());
       if (p === "/api/trading") return json(res, 200, { ...robinhood.trading(), placedToday: placedToday(dir, /* @__PURE__ */ new Date()) });
       if (p === "/api/robinhood/accounts") return json(res, 200, await askRobinhood(() => robinhood.accounts()));
@@ -20898,20 +21029,20 @@ async function startTerminal(opts) {
         const range = url2.searchParams.get("range") ?? "6M";
         if (!isRange(range)) throw new Refused2(400, "range is one of 1M, 3M, 6M, 1Y, 5Y");
         try {
-          return json(res, 200, await history(sym, range));
+          return json(res, 200, await history(sym2, range));
         } catch (e) {
           throw new Refused2(e instanceof Error && e.name === "NoData" ? 404 : 502, e.message);
         }
       }
       if (p === "/api/call") {
-        const c = callOf(root2, sym.toUpperCase(), url2.searchParams.get("date") ?? "");
+        const c = callOf(root2, sym2.toUpperCase(), url2.searchParams.get("date") ?? "");
         if (!c) throw new Refused2(404, "no such call");
         return json(res, 200, c);
       }
       throw new Refused2(404, "not found");
     }
     const b = method === "POST" ? await body(req) : {};
-    const name = typeof b.symbol === "string" ? b.symbol : sym;
+    const name = typeof b.symbol === "string" ? b.symbol : sym2;
     if (p === "/api/watchlist" && method === "POST") {
       safeSymbol(name);
       const q = await quote(name);
@@ -20922,6 +21053,27 @@ async function startTerminal(opts) {
     if (p === "/api/favourite" && method === "POST") return json(res, 200, { watchlist: setFavourite(dir, name, b.favourite === true) });
     if (p === "/api/queue" && method === "POST") return json(res, 200, { queue: enqueue(dir, name, (/* @__PURE__ */ new Date()).toISOString()) });
     if (p === "/api/queue" && method === "DELETE") return json(res, 200, { queue: dequeue(dir, name) });
+    if (p === "/api/prefs" && method === "POST") return json(res, 200, savePrefs(dir, b));
+    if (p === "/api/stop" && method === "POST") {
+      if (!opts.stop) throw new Refused2(404, "not found");
+      const stop = opts.stop;
+      res.once("finish", () => {
+        setTimeout(stop, 100);
+      });
+      return json(res, 200, { stopping: true });
+    }
+    if (p === "/api/restart" && method === "POST") {
+      if (!opts.restart) throw new Refused2(404, "not found");
+      if (!updated) throw new Refused2(409, "there is no update to restart into");
+      if ([...tickets.values()].some((t2) => t2.placing)) throw new Refused2(409, "an order is being sent: restart when it is done");
+      restarting = true;
+      const restart2 = opts.restart;
+      res.once("finish", () => {
+        setTimeout(restart2, 100);
+      });
+      return json(res, 200, { restarting: true });
+    }
+    if (restarting && p.startsWith("/api/ticket")) throw new Refused2(503, "the dashboard is restarting with an update: open the ticket again in a moment");
     if (p === "/api/robinhood/connect" && method === "POST") return json(res, 200, robinhood.startSignIn());
     if (p === "/api/robinhood/check" && method === "POST") return json(res, 200, await robinhood.check());
     if (p === "/api/robinhood" && method === "DELETE") return json(res, 200, robinhood.forget());
@@ -20932,7 +21084,7 @@ async function startTerminal(opts) {
     }
     if (p === "/api/ticket" && method === "POST") {
       const symbol = safeSymbol(typeof b.symbol === "string" ? b.symbol : ""), date4 = typeof b.date === "string" ? b.date : "";
-      const call = new Journal(path14.join(dir, "journal.md")).load().find((e) => e.ticker === symbol && e.date === date4);
+      const call = new Journal(path15.join(dir, "journal.md")).load().find((e) => e.ticker === symbol && e.date === date4);
       if (!call) throw new Refused2(404, "no such call");
       const trading = readSettings(root2).trading;
       const context = { ...await askRobinhood(() => robinhood.ticketContext(symbol)), rating: call.rating, callDate: call.date };
@@ -21041,8 +21193,24 @@ async function startTerminal(opts) {
     clearQuotes();
   }, 6e4);
   sweep.unref();
+  let pending = "";
+  const updates = opts.restart && code2.length ? setInterval(() => {
+    if (updated) return;
+    const now = fingerprint(code2);
+    if (now === build) {
+      pending = "";
+      return;
+    }
+    if (now !== pending) {
+      pending = now;
+      return;
+    }
+    updated = true;
+  }, opts.updateCheckMs ?? 15e3) : null;
+  updates?.unref();
   return { url: `http://127.0.0.1:${port}/`, port, token, deskId, close: () => new Promise((resolve) => {
     clearInterval(sweep);
+    if (updates) clearInterval(updates);
     server.close(() => resolve());
     server.closeAllConnections?.();
   }) };
@@ -21051,6 +21219,9 @@ async function startTerminal(opts) {
 // src/terminal/main.ts
 var root = process.cwd();
 var noOpen = process.argv.includes("--no-open");
+var portArg = process.argv.find((a) => a.startsWith("--port="));
+var wanted = portArg ? Number(portArg.slice("--port=".length)) : NaN;
+var again = Number.isInteger(wanted) && wanted >= PORTS[0] && wanted <= PORTS[1];
 function open2(url2) {
   const [cmd, args] = process.platform === "win32" ? ["rundll32", ["url.dll,FileProtocolHandler", url2]] : process.platform === "darwin" ? ["open", [url2]] : ["xdg-open", [url2]];
   try {
@@ -21080,23 +21251,48 @@ var running = (port) => new Promise((resolve) => {
   });
   req.on("error", () => resolve(false));
 });
-for (let p = PORTS[0]; p <= PORTS[1]; p++) {
-  if (await running(p)) {
-    console.log(`The Trading Agents dashboard is already running: http://127.0.0.1:${p}/`);
-    if (!noOpen) open2(`http://127.0.0.1:${p}/`);
-    process.exit(0);
+if (!again) {
+  for (let p = PORTS[0]; p <= PORTS[1]; p++) {
+    if (await running(p)) {
+      console.log(`The Trading Agents dashboard is already running: http://127.0.0.1:${p}/`);
+      if (!noOpen) open2(`http://127.0.0.1:${p}/`);
+      process.exit(0);
+    }
   }
 }
+var self = fileURLToPath2(import.meta.url);
+var code = [self, ...["index.html", "app.js", "app.css"].map((f) => path16.join(path16.dirname(self), "terminal", f))];
+var t = null;
+var quit = () => {
+  void (t?.close() ?? Promise.resolve()).then(() => process.exit(0));
+};
+var restart = () => {
+  const port = t?.port;
+  void (t?.close() ?? Promise.resolve()).then(() => {
+    spawn2(process.execPath, [self, "--no-open", ...port ? [`--port=${port}`] : []], { cwd: root, detached: true, stdio: "ignore", windowsHide: true }).on("error", () => {
+    }).unref();
+    setTimeout(() => process.exit(0), 200);
+  });
+};
 configure({ spacingMs: 250 });
-var t = await startTerminal({ root, assets: loadAssets() });
+var quick = Number(process.env.TRADING_AGENTS_UPDATE_MS) || void 0;
+var base = { root, assets: loadAssets(), code, restart, stop: quit, ...quick ? { updateCheckMs: quick } : {} };
+async function start() {
+  if (again) for (let i = 0; i < 20; i++) {
+    try {
+      return await startTerminal({ ...base, port: wanted });
+    } catch {
+      await new Promise((r) => setTimeout(r, 250));
+    }
+  }
+  return startTerminal(base);
+}
+t = await start();
 console.log(`The Trading Agents dashboard is running: ${t.url}`);
 console.log("It works on this computer only. Leave this window open while you use it; press Ctrl+C to stop it.");
 if (!noOpen) open2(t.url);
-var stop = () => {
-  void t.close().then(() => process.exit(0));
-};
-process.on("SIGINT", stop);
-process.on("SIGTERM", stop);
+process.on("SIGINT", quit);
+process.on("SIGTERM", quit);
 /*! Bundled license information:
 
 content-type/index.js:

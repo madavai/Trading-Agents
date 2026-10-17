@@ -24,6 +24,13 @@
   var api = {
     state: () => call("GET", "/api/state"),
     version: () => call("GET", "/api/version"),
+    restart: () => call("POST", "/api/restart", {}),
+    /** Asked without the token: whether a dashboard answers here, and which build of it (after a restart, a new one). */
+    ping: async () => (await fetch("/api/ping", { cache: "no-store" })).json(),
+    search: (query) => call("GET", `/api/search?${q({ q: query })}`),
+    prefs: () => call("GET", "/api/prefs"),
+    savePrefs: (p) => call("POST", "/api/prefs", p),
+    stop: () => call("POST", "/api/stop", {}),
     quotes: (symbols) => call("GET", `/api/quotes?${q({ symbols: symbols.join(",") })}`),
     markets: () => call("GET", "/api/markets"),
     history: (symbol, range) => call("GET", `/api/history?${q({ symbol, range })}`),
@@ -348,14 +355,32 @@
   };
   var marketOf = (sym) => S.markets.find((m) => m.symbol === sym);
   var say = (e) => e instanceof ApiError ? e.message : "The dashboard could not reach the desk.";
-  var keep = (k, v) => {
+  var P = {};
+  var saving = null;
+  function remember(change) {
+    Object.assign(P, change);
     try {
-      if (v !== void 0) localStorage.setItem(`ta.${k}`, v);
-      return localStorage.getItem(`ta.${k}`);
+      localStorage.setItem("ta.prefs", JSON.stringify(P));
     } catch {
-      return null;
     }
-  };
+    if (saving) clearTimeout(saving);
+    saving = setTimeout(() => {
+      saving = null;
+      void api.savePrefs(P).catch(() => {
+      });
+    }, 400);
+  }
+  function browserPrefs() {
+    try {
+      const kept = JSON.parse(localStorage.getItem("ta.prefs") ?? "null");
+      if (kept && typeof kept === "object") return kept;
+      const old = (k) => localStorage.getItem(`ta.${k}`) ?? void 0;
+      return { theme: old("theme"), side: old("side"), range: old("range"), kind: old("kind") };
+    } catch {
+      return {};
+    }
+  }
+  var RECENT_MAX = 6;
   function toast(text, kind = "ok") {
     const el = document.createElement("div");
     el.className = `at-toast ${kind}`;
@@ -372,19 +397,36 @@
       toast(say(e), "bad");
     }
   }
-  function setTheme(t) {
+  function setTheme(t, save = true) {
     document.documentElement.dataset.theme = t;
     const btn = $("#themeBtn"), to = t === "dark" ? "light" : "dark";
     btn.setAttribute("aria-label", `Switch to the ${to} face`);
     btn.title = `Switch to the ${to} face`;
     btn.querySelector("use").setAttribute("href", t === "dark" ? "#i-sun" : "#i-moon");
-    keep("theme", t);
+    if (save) remember({ theme: t });
   }
-  function setSide(folded) {
+  function setSide(folded, save = true) {
     $("#sideOpen").hidden = folded;
     $("#sideFolded").hidden = !folded;
-    keep("side", folded ? "folded" : "open");
+    if (save) remember({ side: folded ? "folded" : "open" });
     if (S.symbol) renderHero();
+  }
+  function adopt(p) {
+    if (p.theme === "light" || p.theme === "dark") setTheme(p.theme, false);
+    if (p.side === "open" || p.side === "folded") setSide(p.side === "folded", false);
+    if (p.range && RANGES.includes(p.range)) S.range = p.range;
+    if (p.kind === "area" || p.kind === "candles") S.kind = p.kind;
+    if (p.layers && ["ma50", "ma200", "vol"].every((k) => typeof p.layers[k] === "boolean")) S.layers = { ...p.layers };
+    Object.assign(P, {
+      ...p.theme ? { theme: p.theme } : {},
+      ...p.side ? { side: p.side } : {},
+      ...p.view ? { view: p.view } : {},
+      ...p.symbol ? { symbol: p.symbol } : {},
+      range: S.range,
+      kind: S.kind,
+      layers: { ...S.layers },
+      recent: Array.isArray(p.recent) ? p.recent.slice(0, RECENT_MAX) : P.recent ?? []
+    });
   }
   var ratingChip = (r) => `<span class="at-chip ${ratingTone(r)}">${esc(r)}</span>`;
   var changeChip = (q2) => q2 && q2.changePct !== null ? `<span class="at-chip ${tone(q2.changePct)}">${pct(q2.changePct)}</span>` : '<span class="at-chip">\u2014</span>';
@@ -394,8 +436,17 @@
   };
   var latestCall = (sym) => S.desk?.calls.find((c) => c.ticker === sym) ?? null;
   var nameOf = (sym) => quoteOf(sym)?.name ?? S.history?.name ?? marketOf(sym)?.name ?? sym;
+  var life = { stopped: false, updating: false };
   function renderSub() {
     const d = S.desk;
+    if (life.stopped) {
+      $("#subline").textContent = 'The dashboard is stopped. To open it again, ask the trading-desk team to "open the dashboard", or run /terminal.';
+      return;
+    }
+    if (life.updating) {
+      $("#subline").textContent = "The desk was updated: the dashboard is restarting with the new version, and this page reloads by itself.";
+      return;
+    }
     if (S.lost) {
       $("#subline").textContent = "The dashboard has lost the desk. Run /terminal in Madav to start it again.";
       return;
@@ -1118,9 +1169,10 @@
     renderCalls();
     renderScore();
   }
-  function showView(v) {
+  function showView(v, save = true) {
     const was = view;
     view = v;
+    if (save) remember({ view: v });
     $("#view-overview").hidden = v !== "overview";
     $("#view-account").hidden = v !== "account";
     const nav = $("#navOverview");
@@ -1136,11 +1188,12 @@
     toast(!signedIn() ? "Connect Robinhood first, then show your Agentic account: orders go to it alone." : "Show your Agentic account (Choose accounts) to open an order ticket: orders go to it alone.", "bad");
     return false;
   }
-  function select(sym) {
+  function select(sym, chosen = true, name = "") {
     if (!sym) return;
     S.symbol = sym;
     S.history = null;
     S.historyError = "";
+    if (chosen) remember({ symbol: sym, recent: withRecent(sym, name) });
     renderFavs();
     renderControls();
     renderHero();
@@ -1151,14 +1204,21 @@
     void loadHistory();
     void refreshQuotes();
   }
+  function withRecent(sym, name = "") {
+    const before = (P.recent ?? []).find((r) => r.symbol === sym)?.name ?? "";
+    const known = name || nameOf(sym);
+    const named = known && known !== sym ? known : before || sym;
+    return [{ symbol: sym, name: named }, ...(P.recent ?? []).filter((r) => r.symbol !== sym)].slice(0, RECENT_MAX);
+  }
   async function refreshState() {
     try {
       S.desk = await api.state();
       S.lost = false;
       const watch = S.desk.watchlist.map((w) => w.symbol);
-      if (!S.symbol || !watch.includes(S.symbol) && !isIndex(S.symbol)) {
-        const first = S.desk.watchlist.find((w) => w.favourite)?.symbol ?? watch[0] ?? "^GSPC";
-        select(first);
+      const shown = (s) => !!s && (watch.includes(s) || isIndex(s));
+      if (!shown(S.symbol)) {
+        const first = shown(P.symbol) ? P.symbol : S.desk.watchlist.find((w) => w.favourite)?.symbol ?? watch[0] ?? "^GSPC";
+        select(first, false);
       }
       renderAll();
     } catch {
@@ -1216,6 +1276,10 @@
       T.open = null;
       return;
     }
+    if (e.target === $("#stopDialog")) {
+      $("#stopDialog").close();
+      return;
+    }
     const el = e.target.closest("[data-act]");
     if (!el) return;
     const sym = el.dataset.symbol ?? "";
@@ -1237,7 +1301,7 @@
         break;
       case "kind":
         S.kind = el.dataset.kind === "candles" ? "candles" : "area";
-        keep("kind", S.kind);
+        remember({ kind: S.kind });
         renderControls();
         renderHero();
         break;
@@ -1245,7 +1309,7 @@
         const r = el.dataset.range;
         if (RANGES.includes(r) && r !== S.range) {
           S.range = r;
-          keep("range", r);
+          remember({ range: r });
           S.history = null;
           S.historyError = "";
           renderControls();
@@ -1257,10 +1321,46 @@
       case "layer": {
         const k = el.dataset.layer;
         S.layers[k] = !S.layers[k];
+        remember({ layers: { ...S.layers } });
         renderControls();
         renderHero();
         break;
       }
+      case "find-pick": {
+        const r = findRows()[Number(el.dataset.i)];
+        if (r) pick(r);
+        break;
+      }
+      case "find-clear":
+        remember({ recent: [] });
+        F.mode = "closed";
+        renderFind();
+        break;
+      case "restart":
+        if ($("#ticketDialog").open) {
+          toast("Finish or close the order ticket first, then restart.", "bad");
+          break;
+        }
+        void run(async () => {
+          await api.restart();
+          await updating();
+        });
+        break;
+      case "stop-ask":
+        $("#stopDialog").showModal();
+        break;
+      case "stop-cancel":
+        $("#stopDialog").close();
+        break;
+      case "stop-yes":
+        void run(async () => {
+          await api.stop();
+          life.stopped = true;
+          $("#stopDialog").close();
+          renderSub();
+          toast("The dashboard is stopped. Ask the team to open it again any time.");
+        });
+        break;
       case "select":
         select(sym);
         break;
@@ -1411,33 +1511,209 @@
     const id = e.target.id;
     if (id === "tkQty" || id === "tkLimit") ticketEdited();
   });
+  var F = { mode: "closed", query: "", matches: [], active: -1, seq: 0, timer: null };
+  var FIND_QUERY = /^[\p{L}\p{N} .&'\-^=,]{1,40}$/u;
+  var findInput = $("#addInput");
+  var findRows = () => F.mode === "recent" ? P.recent ?? [] : F.mode === "matches" || F.mode === "loading" ? F.matches : [];
+  function findRow(r, i) {
+    const watched = S.desk?.watchlist.some((w) => w.symbol === r.symbol), call2 = latestCall(r.symbol);
+    const where = [r.exchange, r.kind].filter(Boolean).join(" \xB7 ");
+    const name = r.name && r.name !== r.symbol ? r.name : "";
+    return `<li class="ta-opt${i === F.active ? " on" : ""}" role="option" id="find-${i}" aria-selected="${i === F.active}" data-act="find-pick" data-i="${i}">
+    <b class="ta-opt-sym">${esc(r.symbol)}</b>
+    <span class="ta-opt-name"><span>${esc(name)}</span>${where ? `<small>${esc(where)}</small>` : ""}</span>
+    <span class="ta-opt-tags">${call2 ? ratingChip(call2.rating) : ""}${watched ? '<span class="at-chip">Watched</span>' : ""}</span>
+  </li>`;
+  }
+  function renderFind() {
+    const rows = findRows(), panel = $("#findPanel");
+    const open = F.mode !== "closed" && (rows.length > 0 || F.mode !== "recent");
+    panel.hidden = !open;
+    findInput.setAttribute("aria-expanded", String(open));
+    if (F.active >= 0 && rows[F.active]) findInput.setAttribute("aria-activedescendant", `find-${F.active}`);
+    else findInput.removeAttribute("aria-activedescendant");
+    if (!open) return;
+    const q2 = esc(F.query);
+    $("#findHead").innerHTML = F.mode === "recent" ? '<span><svg class="g"><use href="#i-history"/></svg>Recent</span><button type="button" class="at-btn at-press" data-act="find-clear">Clear</button>' : `<span><svg class="g"><use href="#i-search"/></svg>${F.mode === "loading" ? `Looking for \u201C${q2}\u201D\u2026` : `Matches for \u201C${q2}\u201D`}</span>`;
+    $("#findList").innerHTML = rows.map(findRow).join("");
+    $("#findFoot").textContent = F.mode === "failed" ? `Yahoo Finance's search did not answer. Press Enter to add \u201C${F.query}\u201D as a ticker.` : F.mode === "matches" && !rows.length ? `Nothing matches \u201C${F.query}\u201D at Yahoo Finance. Check the spelling, or type the ticker.` : F.mode === "recent" ? "The stocks you looked at last. Type to search." : "From Yahoo Finance \xB7 \u2191 \u2193 to move \xB7 Enter to add \xB7 Esc to close";
+    document.getElementById(`find-${F.active}`)?.scrollIntoView({ block: "nearest" });
+  }
+  async function findNow(q2) {
+    const seq = ++F.seq;
+    try {
+      const { matches } = await api.search(q2);
+      if (seq !== F.seq) return null;
+      F.matches = matches;
+      F.mode = "matches";
+      const exact = matches.findIndex((m) => m.symbol === q2.toUpperCase());
+      F.active = matches.length ? Math.max(0, exact) : -1;
+    } catch {
+      if (seq !== F.seq) return null;
+      F.matches = [];
+      F.mode = "failed";
+      F.active = -1;
+    }
+    renderFind();
+    return F.matches[F.active] ?? null;
+  }
+  function closeFind(clear = false) {
+    if (F.timer) {
+      clearTimeout(F.timer);
+      F.timer = null;
+    }
+    F.seq++;
+    F.mode = "closed";
+    F.active = -1;
+    if (clear) {
+      findInput.value = "";
+      F.matches = [];
+      F.query = "";
+    }
+    renderFind();
+  }
+  function pick(r) {
+    closeFind(true);
+    findInput.blur();
+    if (S.desk?.watchlist.some((w) => w.symbol === r.symbol) || isIndex(r.symbol)) select(r.symbol, true, r.name);
+    else {
+      remember({ recent: withRecent(r.symbol, r.name) });
+      void addStock(r.symbol);
+    }
+  }
+  findInput.addEventListener("input", () => {
+    const q2 = findInput.value.trim();
+    if (F.timer) {
+      clearTimeout(F.timer);
+      F.timer = null;
+    }
+    F.active = -1;
+    if (!q2) {
+      F.seq++;
+      F.query = "";
+      F.matches = [];
+      F.mode = P.recent?.length ? "recent" : "closed";
+      renderFind();
+      return;
+    }
+    if (!FIND_QUERY.test(q2)) {
+      closeFind();
+      return;
+    }
+    F.query = q2;
+    F.mode = "loading";
+    renderFind();
+    F.timer = setTimeout(() => {
+      F.timer = null;
+      void findNow(q2);
+    }, 250);
+  });
+  findInput.addEventListener("focus", () => {
+    if (!findInput.value.trim() && P.recent?.length) {
+      F.mode = "recent";
+      F.active = -1;
+      renderFind();
+    }
+  });
+  findInput.addEventListener("blur", () => closeFind());
+  findInput.addEventListener("keydown", (e) => {
+    const rows = findRows();
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      if (F.mode === "closed" && !findInput.value.trim() && P.recent?.length) {
+        F.mode = "recent";
+        renderFind();
+      }
+      const n = findRows().length;
+      if (!n) return;
+      e.preventDefault();
+      F.active = e.key === "ArrowDown" ? (F.active + 1) % n : (F.active - 1 + n) % n;
+      renderFind();
+    } else if (e.key === "Escape" && F.mode !== "closed") {
+      e.preventDefault();
+      closeFind();
+    } else if (e.key === "Enter" && F.active >= 0 && rows[F.active]) {
+      e.preventDefault();
+      pick(rows[F.active]);
+    }
+  });
+  $("#findPanel").addEventListener("mousedown", (e) => e.preventDefault());
   $("#addForm").addEventListener("submit", (e) => {
     e.preventDefault();
-    const input = $("#addInput");
-    const raw = input.value;
-    input.value = "";
-    void addStock(raw);
+    void (async () => {
+      const q2 = findInput.value.trim();
+      if (!q2) return;
+      if (F.mode === "loading" && FIND_QUERY.test(q2)) {
+        if (F.timer) {
+          clearTimeout(F.timer);
+          F.timer = null;
+        }
+        const best = await findNow(q2);
+        if (best) {
+          pick(best);
+          return;
+        }
+      }
+      closeFind(true);
+      void addStock(q2);
+    })();
   });
-  var savedRange = keep("range");
-  var savedKind = keep("kind");
-  var savedTheme = keep("theme");
-  if (savedRange && RANGES.includes(savedRange)) S.range = savedRange;
-  if (savedKind === "candles") S.kind = "candles";
-  setTheme(savedTheme === "light" || savedTheme === "dark" ? savedTheme : matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
-  setSide(keep("side") === "folded");
-  var seen = "";
-  async function watchFiles() {
-    if (document.hidden) return;
+  var here = browserPrefs();
+  adopt(here);
+  if (here.theme !== "light" && here.theme !== "dark") setTheme(matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark", false);
+  async function loadPrefs() {
     try {
-      const { version } = await api.version();
-      if (version !== seen || S.lost) {
-        seen = version;
+      const kept = await api.prefs();
+      if (Object.keys(kept).length) adopt(kept);
+      else if (Object.values(here).some((v) => v !== void 0)) remember({});
+      try {
+        localStorage.setItem("ta.prefs", JSON.stringify(P));
+      } catch {
+      }
+    } catch {
+    }
+    if (P.view === "account") showView("account", false);
+  }
+  var seen = "";
+  var build = "";
+  async function watchFiles() {
+    if (document.hidden || life.stopped || life.updating) return;
+    try {
+      const v = await api.version();
+      build ||= v.build;
+      if (v.restarting) {
+        void updating();
+        return;
+      }
+      $("#updateBar").hidden = !v.update;
+      if (v.version !== seen || S.lost) {
+        seen = v.version;
         await refreshState();
       }
     } catch {
       S.lost = true;
       renderSub();
     }
+  }
+  async function updating() {
+    if (life.updating) return;
+    life.updating = true;
+    renderSub();
+    $("#updateBar").hidden = true;
+    toast("The dashboard is restarting with the new version. This page reloads in a moment.");
+    for (const until = Date.now() + 9e4; Date.now() < until; ) {
+      await new Promise((r) => setTimeout(r, 1e3));
+      try {
+        const p = await api.ping();
+        if (p.build && p.build !== build) {
+          location.reload();
+          return;
+        }
+      } catch {
+      }
+    }
+    life.updating = false;
+    S.lost = true;
+    $("#subline").textContent = "The dashboard did not come back after its update. Ask the trading-desk team to open the dashboard, or run /terminal.";
   }
   async function prices() {
     if (!document.hidden) await Promise.all([refreshQuotes(), refreshMarkets()]);
@@ -1448,7 +1724,7 @@
     renderHero();
   });
   renderControls();
-  void refreshState().then(() => void prices());
+  void loadPrefs().then(() => refreshState()).then(() => void prices());
   void refreshRobinhood();
   setInterval(() => void watchFiles(), 3e3);
 })();

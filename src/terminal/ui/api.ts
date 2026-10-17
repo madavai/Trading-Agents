@@ -7,6 +7,9 @@ import type { Account, AccountView, Holding, Order } from '../../robinhood/accou
 import type { Check, Proposal, TicketContext } from '../../desk/ticket.js';
 import type { Review } from '../../robinhood/review.js';
 import type { Placed } from '../../robinhood/order.js';
+import type { Match } from '../search.js';
+import type { Prefs, Recent } from '../prefs.js';
+export type { Match, Prefs, Recent };
 export interface Trading { on: boolean; since: string | null }
 export type { Placed };
 /** An open ticket; own: the person's own order for a stock they chose, not one of the desk's calls. */
@@ -36,7 +39,14 @@ const q = (o: Record<string, string>) => new URLSearchParams(o).toString();
 
 export const api = {
   state: () => call<DeskState>('GET', '/api/state'),
-  version: () => call<{ version: string }>('GET', '/api/version'),
+  version: () => call<{ version: string; build: string; update: boolean; restarting: boolean }>('GET', '/api/version'),
+  restart: () => call<{ restarting: boolean }>('POST', '/api/restart', {}),
+  /** Asked without the token: whether a dashboard answers here, and which build of it (after a restart, a new one). */
+  ping: async (): Promise<{ build?: string }> => (await fetch('/api/ping', { cache: 'no-store' })).json() as Promise<{ build?: string }>,
+  search: (query: string) => call<{ matches: Match[] }>('GET', `/api/search?${q({ q: query })}`),
+  prefs: () => call<Prefs>('GET', '/api/prefs'),
+  savePrefs: (p: Prefs) => call<Prefs>('POST', '/api/prefs', p),
+  stop: () => call<{ stopping: boolean }>('POST', '/api/stop', {}),
   quotes: (symbols: string[]) => call<{ quotes: QuoteResult[] }>('GET', `/api/quotes?${q({ symbols: symbols.join(',') })}`),
   markets: () => call<{ markets: Market[] }>('GET', '/api/markets'),
   history: (symbol: string, range: string) => call<History>('GET', `/api/history?${q({ symbol, range })}`),
