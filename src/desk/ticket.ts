@@ -23,7 +23,9 @@ export interface TicketContext {
 export type Side = 'buy' | 'sell';
 export interface Order { symbol: string; side: Side; quantity: number; limitPrice: number; timeInForce: 'gfd' | 'gtc' }
 export interface Check { ok: boolean; words: string }
-export interface Proposal { action: Action; order: Order | null; why: string[] }
+/** What a ticket proposes: from a call, the action its rating asks in the person's settings; from the person, their own. */
+export type OwnAction = 'your own buy' | 'your own sell';
+export interface Proposal { action: Action | OwnAction; order: Order | null; why: string[] }
 
 const money = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const cents = (n: number) => Math.round(n * 100) / 100;
@@ -59,6 +61,21 @@ export function propose(c: TicketContext, t: Trading): Proposal {
   if (quantity < 1) return none(`${money(amount)} buys less than one share at ${money(limitPrice)}, and a limit order buys whole shares only.`);
   why.push(`${money(amount)} ÷ ${money(limitPrice)}, rounded down: ${quantity} share(s).`);
   return { action, order: { symbol: c.symbol, side: 'buy', quantity, limitPrice, timeInForce: t.orderDefaults.timeInForce }, why };
+}
+
+/** A ticket the person opens themselves, for one stock and one side, not from a call: one whole share at Robinhood's live
+ *  price to start (they change both), in the Agentic account only, and then exactly the checks, the review and the
+ *  Confirm of a call's ticket. Nothing is sized for them: the smallest order is where a person's own order begins. */
+export function proposeOwn(c: TicketContext, side: Side, t: Trading): Proposal {
+  const action: OwnAction = side === 'buy' ? 'your own buy' : 'your own sell';
+  const none = (reason: string): Proposal => ({ action, order: null, why: [reason] });
+  if (c.price === null || c.price <= 0) return none(`Robinhood gave no live price for ${c.symbol}, so no order can be priced.`);
+  if (side === 'sell' && c.held <= 0) return none(`The Agentic account holds no ${c.symbol} to sell.`);
+  if (side === 'sell' && c.held < 1) return none(`The Agentic account holds ${c.held} of a share of ${c.symbol}; a limit order sells whole shares only.`);
+  const limitPrice = cents(c.price);
+  const why = [`Your own order: one whole share to start, at Robinhood's live price of ${money(limitPrice)}. Change the shares and the limit price below.`];
+  if (side === 'sell') why.push(`The Agentic account holds ${c.held} share(s) of ${c.symbol}.`);
+  return { action, order: { symbol: c.symbol, side, quantity: 1, limitPrice, timeInForce: t.orderDefaults.timeInForce }, why };
 }
 
 /** Every check an order must pass before it may be reviewed (and, later, placed). The page shows each one. */

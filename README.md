@@ -48,14 +48,16 @@ other source sees it.
    and SEC accounts are as known then: news, posts, odds and insider trades are recent-only, so they are thin.
 2. **You see.** Ask the team to open the dashboard, or type `/terminal`: a page on your own computer with the markets,
    a chart of any stock (area or candles, 50- and 200-day averages, volume), your watchlist, a page per stock, the
-   desk's calls with their full reasoning, and how the desk has scored. Under "Your account" you connect Robinhood
-   yourself (on Robinhood's own sign-in page) and choose which accounts to show: value, cash, buying power and
+   desk's calls with their full reasoning, and how the desk has scored. "Your account", in the side list and on a page
+   of its own, is where you connect Robinhood yourself (on Robinhood's own sign-in page) and choose which accounts to
+   show: value, cash, buying power and
    holdings at Robinhood's live prices; for the Agentic account its orders and whether Robinhood's phone approval is
    on. The agents see those holdings when they analyse. Market prices are Yahoo Finance's and may be up to 15 minutes
    late. The page works on this computer only and keeps no key.
 3. **You decide and trade.** On a call, "Decide…" opens a ticket for the Agentic account, sized by your settings and
-   checked against your caps; "Review with Robinhood" is Robinhood's own dry run. With trading switched on (by you,
-   on the dashboard), "Place order…" then "Confirm: Buy 1 NVDA at $182.40" sends exactly that order. Trading ships
+   checked against your caps; beside a stock's price, "Trade…" opens your own ticket instead, buy or sell, starting at
+   one share. Either way "Review with Robinhood" is Robinhood's own dry run, and with trading switched on (by you, on
+   the dashboard), "Place order…" then "Confirm: Buy 1 NVDA at $182.40" sends exactly that order. Trading ships
    switched off.
 
 ## Routines

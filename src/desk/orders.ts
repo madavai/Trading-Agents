@@ -5,7 +5,7 @@ import path from 'node:path';
 
 export interface SentOrder {
   at: string; symbol: string; side: 'buy' | 'sell'; quantity: number; limitPrice: number; timeInForce?: string;
-  call?: { date: string; rating: string }; ticket?: string;
+  call?: { date: string; rating: string }; own?: true; ticket?: string;   // own: the person's own order, not from a call
   robinhood: { answered: boolean; approvalRequired: boolean | null; orderId: string | null; state: string | null; error: string | null };
 }
 

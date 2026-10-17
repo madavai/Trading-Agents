@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { check, passes, propose, type Order, type TicketContext } from '../src/desk/ticket.js';
+import { check, passes, propose, proposeOwn, type Order, type TicketContext } from '../src/desk/ticket.js';
 import { DEFAULTS, readSettings, tradingOf } from '../src/settings.js';
 import { parseReview, Reviewer } from '../src/robinhood/review.js';
 import { Refused } from '../src/robinhood/reader.js';
@@ -25,6 +25,25 @@ test('the trading settings are read and checked: out of range falls back to what
   assert.deepEqual([t.ratingToOrder.Hold, t.ratingToOrder['Needs review'], t.ratingToOrder.Buy], ['buy a full position', 'no order', 'buy a full position']);
   assert.deepEqual(readSettings(fs.mkdtempSync(path.join(os.tmpdir(), 'ta-set-'))).trading, T);
   assert.equal(readSettings('.').trading.enabled, false, 'trading ships switched off');
+});
+
+test('the person\'s own ticket starts at one whole share at the live price, sells only what is held, and is held to every check', () => {
+  const own = (o: Partial<TicketContext>, side: 'buy' | 'sell') => proposeOwn(ctx({ rating: '', callDate: '', ...o }), side, T);
+  const buy = own({}, 'buy');
+  assert.equal(buy.action, 'your own buy');
+  assert.deepEqual(buy.order, { symbol: 'NVDA', side: 'buy', quantity: 1, limitPrice: 182.4, timeInForce: 'gfd' });
+  assert.match(buy.why[0]!, /^Your own order: one whole share to start, at Robinhood's live price of \$182\.40\./);
+  assert.equal(own({ price: null }, 'buy').order, null, 'no live price, no order');
+  assert.match(own({}, 'sell').why[0]!, /holds no NVDA to sell/);
+  assert.equal(own({ held: 0.4 }, 'sell').order, null, 'a limit order sells whole shares only');
+  const sell = own({ held: 3 }, 'sell');
+  assert.deepEqual([sell.action, sell.order?.side, sell.order?.quantity], ['your own sell', 'sell', 1]);
+  // the same checks as a call's ticket: a person's own order is no way around the caps
+  const c = ctx({ rating: '', callDate: '' });
+  assert.equal(passes(check(buy.order!, c, T)), true);
+  assert.equal(passes(check({ ...buy.order!, quantity: 3 }, c, T)), false, '$547.20 is over the $500 cap');
+  assert.equal(passes(check({ ...sell.order!, quantity: 4 }, ctx({ held: 3 }), T)), false, 'only three are held');
+  assert.equal(passes(check(buy.order!, ctx({ ordersToday: 3 }), T)), false, 'three orders a day');
 });
 
 test('a buy is sized from the account, then held to the caps and buying power, in whole shares', () => {

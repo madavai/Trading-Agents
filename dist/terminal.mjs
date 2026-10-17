@@ -7595,6 +7595,7 @@ function normalizeSymbol(raw) {
   if (sh) return `${sh[1]}.SS`;
   return s;
 }
+var isCrypto = (raw) => cryptoBase(raw) !== null;
 function safeSymbol(raw) {
   const s = normalizeSymbol(raw);
   if (!/^[A-Z0-9.\-=^]{1,20}$/.test(s)) throw new Error(`"${raw}" is not a ticker symbol this desk can look up`);
@@ -20082,6 +20083,17 @@ function propose(c, t2) {
   why.push(`${money(amount)} \xF7 ${money(limitPrice)}, rounded down: ${quantity} share(s).`);
   return { action, order: { symbol: c.symbol, side: "buy", quantity, limitPrice, timeInForce: t2.orderDefaults.timeInForce }, why };
 }
+function proposeOwn(c, side, t2) {
+  const action = side === "buy" ? "your own buy" : "your own sell";
+  const none = (reason) => ({ action, order: null, why: [reason] });
+  if (c.price === null || c.price <= 0) return none(`Robinhood gave no live price for ${c.symbol}, so no order can be priced.`);
+  if (side === "sell" && c.held <= 0) return none(`The Agentic account holds no ${c.symbol} to sell.`);
+  if (side === "sell" && c.held < 1) return none(`The Agentic account holds ${c.held} of a share of ${c.symbol}; a limit order sells whole shares only.`);
+  const limitPrice = cents(c.price);
+  const why = [`Your own order: one whole share to start, at Robinhood's live price of ${money(limitPrice)}. Change the shares and the limit price below.`];
+  if (side === "sell") why.push(`The Agentic account holds ${c.held} share(s) of ${c.symbol}.`);
+  return { action, order: { symbol: c.symbol, side, quantity: 1, limitPrice, timeInForce: t2.orderDefaults.timeInForce }, why };
+}
 function check(o, c, t2) {
   const out = [];
   const add = (ok, words2) => out.push({ ok, words: words2 });
@@ -20476,10 +20488,15 @@ function dequeue(dir, raw) {
 }
 
 // src/terminal/state.ts
+var plainText = (s) => s.replace(/\*\*([^*]+)\*\*/g, "$1").replace(/(^|\s)[*_]([^*_\n]+)[*_](?=\s|[.,;:!?]|$)/g, "$1$2").replace(/`([^`]+)`/g, "$1").replace(/^\s{0,3}#{1,6}\s*/gm, "").replace(/^\s*(?:[-*+]|\d+\.)\s+/gm, "").replace(/\|/g, " ").replace(/\s+/g, " ").trim();
 function summaryOf(decision) {
-  const m = /\*\*Executive Summary\*\*:?\s*([\s\S]*?)(?=\n\s*\n\*\*|\n\*\*|$)/i.exec(decision);
-  const text2 = (m?.[1] ?? decision).replace(/\s+/g, " ").trim();
-  return text2.length > 320 ? `${text2.slice(0, 317).trimEnd()}...` : text2;
+  const text2 = decision.replace(/\r\n/g, "\n");
+  const label = /\*\*Executive Summary:?\*\*:?[ \t]*([\s\S]*?)(?=\n\s*\n\*\*|\n\*\*|\n\s{0,3}#{1,6}\s|$)/i.exec(text2);
+  const heading = /^\s{0,3}#{1,6}\s*Executive Summary\s*:?\s*\n+([\s\S]*?)(?=\n\s{0,3}#{1,6}\s|\n\s*\n\*\*[^*\n]+\*\*\s*:|$)/im.exec(text2);
+  const found = [label, heading].filter((m) => !!m && !!m[1]?.trim()).sort((a, b) => a.index - b.index)[0];
+  const source = found?.[1] ?? text2.split("\n").filter((l) => !/^\s{0,3}#/.test(l) && !/^\s*\*\*[^*\n]+\*\*\s*:/.test(l) && !/^\s*\|/.test(l)).join("\n");
+  const words2 = plainText(source) || plainText(text2);
+  return words2.length > 320 ? `${words2.slice(0, 317).trimEnd()}...` : words2;
 }
 var stamp = (file4) => {
   try {
@@ -20798,11 +20815,16 @@ async function startTerminal(opts) {
   const ticketOf = (id) => {
     for (const [k, t3] of tickets) if (Date.now() - t3.at > TICKET_MS) tickets.delete(k);
     const t2 = typeof id === "string" ? tickets.get(id) : void 0;
-    if (!t2) throw new Refused2(404, "that ticket has expired: open it again from the call");
+    if (!t2) throw new Refused2(404, "that ticket has expired: open it again");
+    return t2;
+  };
+  const opened = (own2, context, proposal, trading) => {
+    const t2 = { id: crypto5.randomBytes(12).toString("hex"), at: Date.now(), own: own2, context, proposal, order: proposal.order, checks: proposal.order ? check(proposal.order, context, trading) : [], review: null, reviewedAt: 0, refId: crypto5.randomUUID(), placing: false, placed: null };
+    tickets.set(t2.id, t2);
     return t2;
   };
   const edited = (t2, b) => {
-    if (!t2.proposal.order) throw new Refused2(400, "this call proposes no order");
+    if (!t2.proposal.order) throw new Refused2(400, "this ticket proposes no order");
     const quantity = typeof b.quantity === "number" ? b.quantity : NaN, limitPrice = typeof b.limitPrice === "number" ? b.limitPrice : NaN;
     return { ...t2.proposal.order, quantity, limitPrice };
   };
@@ -20914,10 +20936,23 @@ async function startTerminal(opts) {
       if (!call) throw new Refused2(404, "no such call");
       const trading = readSettings(root2).trading;
       const context = { ...await askRobinhood(() => robinhood.ticketContext(symbol)), rating: call.rating, callDate: call.date };
-      const proposal = propose(context, trading), id = crypto5.randomBytes(12).toString("hex");
-      const t2 = { id, at: Date.now(), context, proposal, order: proposal.order, checks: proposal.order ? check(proposal.order, context, trading) : [], review: null, reviewedAt: 0, refId: crypto5.randomUUID(), placing: false, placed: null };
-      tickets.set(id, t2);
-      return json(res, 200, { id, context, proposal, checks: t2.checks, caps: trading.caps });
+      const t2 = opened(false, context, propose(context, trading), trading);
+      return json(res, 200, { id: t2.id, own: false, context, proposal: t2.proposal, checks: t2.checks, caps: trading.caps });
+    }
+    if (p === "/api/ticket/own" && method === "POST") {
+      let symbol;
+      try {
+        symbol = safeSymbol(typeof b.symbol === "string" ? b.symbol : "");
+      } catch (e) {
+        throw new Refused2(400, e.message);
+      }
+      if (/[\^=]/.test(symbol) || isCrypto(symbol)) throw new Refused2(400, "the order ticket trades stocks only, not indices, currencies or crypto");
+      const side = b.side === "buy" || b.side === "sell" ? b.side : null;
+      if (!side) throw new Refused2(400, "say whether to buy or to sell");
+      const trading = readSettings(root2).trading;
+      const context = { ...await askRobinhood(() => robinhood.ticketContext(symbol)), rating: "", callDate: "" };
+      const t2 = opened(true, context, proposeOwn(context, side, trading), trading);
+      return json(res, 200, { id: t2.id, own: true, context, proposal: t2.proposal, checks: t2.checks, caps: trading.caps });
     }
     if (p === "/api/ticket/check" && method === "POST") {
       const t2 = ticketOf(b.id);
@@ -20954,7 +20989,7 @@ async function startTerminal(opts) {
       try {
         const { placed } = await askRobinhood(() => robinhood.placeChecked(order, t2.refId, (fresh) => check(order, { ...fresh, rating: t2.context.rating, callDate: t2.context.callDate, ordersToday: Math.max(fresh.ordersToday, sentToday) }, trading)));
         t2.placed = placed;
-        logOrder(dir, { at: (/* @__PURE__ */ new Date()).toISOString(), symbol: order.symbol, side: order.side, quantity: order.quantity, limitPrice: order.limitPrice, timeInForce: order.timeInForce, call: { date: t2.context.callDate, rating: t2.context.rating }, ticket: t2.id, robinhood: { answered: placed.answered, approvalRequired: placed.approvalRequired, orderId: placed.orderId, state: placed.state, error: placed.error } });
+        logOrder(dir, { at: (/* @__PURE__ */ new Date()).toISOString(), symbol: order.symbol, side: order.side, quantity: order.quantity, limitPrice: order.limitPrice, timeInForce: order.timeInForce, ...t2.own ? { own: true } : { call: { date: t2.context.callDate, rating: t2.context.rating } }, ticket: t2.id, robinhood: { answered: placed.answered, approvalRequired: placed.approvalRequired, orderId: placed.orderId, state: placed.state, error: placed.error } });
         return json(res, 200, { placed });
       } finally {
         t2.placing = false;

@@ -20,11 +20,23 @@ export interface DeskState {
   desk: { emailSaved: boolean; tradingEnabled: boolean; holdingDays: number };
 }
 
-/** The call in a few words: the decision's own summary line, else its first sentences. */
+/** Markdown's marks taken out, so a few words read as words: bold, slanted, code, headings, list marks, table bars. */
+const plainText = (s: string): string => s
+  .replace(/\*\*([^*]+)\*\*/g, '$1').replace(/(^|\s)[*_]([^*_\n]+)[*_](?=\s|[.,;:!?]|$)/g, '$1$2').replace(/`([^`]+)`/g, '$1')
+  .replace(/^\s{0,3}#{1,6}\s*/gm, '').replace(/^\s*(?:[-*+]|\d+\.)\s+/gm, '').replace(/\|/g, ' ')
+  .replace(/\s+/g, ' ').trim();
+
+/** The call in a few words, as plain text: the decision's own executive summary, whether the portfolio manager wrote it
+ *  as a bold label ("**Executive Summary**: ...") or as a heading ("## Executive Summary"); else its first sentences,
+ *  without its headings and labelled lines (the rating and the like). */
 export function summaryOf(decision: string): string {
-  const m = /\*\*Executive Summary\*\*:?\s*([\s\S]*?)(?=\n\s*\n\*\*|\n\*\*|$)/i.exec(decision);
-  const text = (m?.[1] ?? decision).replace(/\s+/g, ' ').trim();
-  return text.length > 320 ? `${text.slice(0, 317).trimEnd()}...` : text;
+  const text = decision.replace(/\r\n/g, '\n');
+  const label = /\*\*Executive Summary:?\*\*:?[ \t]*([\s\S]*?)(?=\n\s*\n\*\*|\n\*\*|\n\s{0,3}#{1,6}\s|$)/i.exec(text);
+  const heading = /^\s{0,3}#{1,6}\s*Executive Summary\s*:?\s*\n+([\s\S]*?)(?=\n\s{0,3}#{1,6}\s|\n\s*\n\*\*[^*\n]+\*\*\s*:|$)/im.exec(text);
+  const found = [label, heading].filter((m): m is RegExpExecArray => !!m && !!m[1]?.trim()).sort((a, b) => a.index - b.index)[0];
+  const source = found?.[1] ?? text.split('\n').filter((l) => !/^\s{0,3}#/.test(l) && !/^\s*\*\*[^*\n]+\*\*\s*:/.test(l) && !/^\s*\|/.test(l)).join('\n');
+  const words = plainText(source) || plainText(text);
+  return words.length > 320 ? `${words.slice(0, 317).trimEnd()}...` : words;
 }
 
 const stamp = (file: string): string => { try { return String(fs.statSync(file).mtimeMs); } catch { return '0'; } };
