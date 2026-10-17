@@ -14,7 +14,9 @@
   scans the source to keep it so); `connect.ts` signs in and opens sessions; `link.ts` is what the dashboard knows
   (none, waiting, connected, failed), which accounts the person chose (kept beside the sign-in as keys, never numbers)
   and the last read of them; `review.ts` is the only other door: Robinhood's own
-  order check (`review_equity_order`) and nothing else, for the Agentic account only; `account.ts` reads Robinhood's answers into figures (a dash, never a zero, for what it
+  order check (`review_equity_order`) and nothing else, for the Agentic account only; `order.ts` is the third and last:
+  one limit order (`place_equity_order`), reached only from the dashboard's server after the person's Confirm, with
+  trading switched on (kept beside the sign-in) and every cap checked again on fresh figures; `account.ts` reads Robinhood's answers into figures (a dash, never a zero, for what it
   did not give); `discover.ts` and `cli.ts` are `node dist/robinhood.mjs discover` and `shape`,
   which print what Robinhood offers and the SHAPE of its answers, never a value, so the desk is built on what is there.
 - `.claude/` - what Madav and Claude Code load in this folder: settings, the guard hook, skills, and the agents.

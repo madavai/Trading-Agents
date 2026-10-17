@@ -67,6 +67,25 @@ test('agents never open Robinhood\'s site', () => {
   assert.match(guard.verdict({ tool_name: 'Bash', tool_input: { command: 'curl https://agent.robinhood.com/mcp/trading' } }) ?? '', /never open Robinhood/);
 });
 
+test('agents never reach the dashboard: its address, its order ticket or its trading switch, by shell, fetch or browser', () => {
+  const refused = [
+    { tool_name: 'Bash', tool_input: { command: 'curl -s http://127.0.0.1:47615/api/state' } },
+    { tool_name: 'Bash', tool_input: { command: 'node -e "fetch(\'http://localhost:47625/\')"' } },
+    { tool_name: 'PowerShell', tool_input: { command: 'Invoke-WebRequest http://[::1]:47619/' } },
+    { tool_name: 'WebFetch', tool_input: { url: 'http://localhost:47620/api/ticket/place' } },
+    { tool_name: 'Bash', tool_input: { command: 'curl -X POST http://some-host/api/trading -d on=true' } },
+    mcp('madav', 'navigate', { url: 'http://127.0.0.1:47616/' }),
+  ];
+  for (const call of refused) assert.match(guard.verdict(call) ?? '', /never use the Trading Agents dashboard/, JSON.stringify(call));
+  const passing = [
+    { tool_name: 'Bash', tool_input: { command: 'node dist/terminal.mjs' } },
+    { tool_name: 'Bash', tool_input: { command: 'curl http://127.0.0.1:47660/' } },                     // another port
+    { tool_name: 'Edit', tool_input: { file_path: 'src/terminal/server.ts', new_string: "p === '/api/ticket/place'" } },   // the editor cannot reach a web address
+    mcp('trading-desk', 'save_run_section', { text: 'the desk is at http://127.0.0.1:47615/' }),
+  ];
+  for (const call of passing) assert.equal(guard.verdict(call), null, JSON.stringify(call));
+});
+
 test('ordinary work in the repository passes', () => {
   const allowed = [
     { tool_name: 'Read', tool_input: { file_path: '/home/ann/trading-agents/desk-data/journal.md' } },

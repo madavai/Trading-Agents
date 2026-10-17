@@ -40,7 +40,7 @@ export const MAIN_TOTAL = '9112.50', AGENTIC_CASH = '2500.00';
 const answer = (data: unknown) => text({ data, guide: 'Present the accounts in a table and always confirm with the user.' });
 
 /** Two live accounts (the default one, and the one agents may trade) and a closed one; the default holds NVDA and AAPL. */
-export function accountTools(calls: string[], o: { approvalsOn?: boolean; orders?: unknown[]; reviewAlerts?: string[]; reviewed?: Array<Record<string, unknown>>; agenticBuyingPower?: string } = {}): McpServer {
+export function accountTools(calls: string[], o: { approvalsOn?: boolean; orders?: unknown[]; reviewAlerts?: string[]; reviewed?: Array<Record<string, unknown>>; agenticBuyingPower?: string; placed?: Array<Record<string, unknown>> } = {}): McpServer {
   const s = new McpServer({ name: 'fake-robinhood-accounts', version: '0' });
   const acct = { account_number: z.string() }, rhs = { rhs_account_number: z.string() };
   const reg = (name: string, readOnlyHint: boolean, run: (a: Record<string, unknown>) => unknown, inputSchema?: Record<string, z.ZodType>) => {
@@ -64,7 +64,8 @@ export function accountTools(calls: string[], o: { approvalsOn?: boolean; orders
   // Robinhood labels its order check as not read-only, though it places nothing: it is reached only through the Reviewer.
   reg('review_equity_order', false, (a) => { o.reviewed?.push(a); return { order_checks: (o.reviewAlerts ?? []).map((message) => ({ message })), customer_approval_required: o.approvalsOn ?? true, estimated_cost: String(Number(a.quantity) * Number(a.limit_price)), quote: { last_trade_price: '182.40' } }; },
     { ...acct, symbol: z.string(), side: z.string(), type: z.string(), quantity: z.string(), limit_price: z.string(), time_in_force: z.string(), market_hours: z.string() });
-  reg('place_equity_order', false, () => ({ placed: true }), { ...acct, symbol: z.string() });
+  reg('place_equity_order', false, (a) => { o.placed?.push(a); return { order_id: '6f1c2b9e-0000-4000-8000-00000000abcd', state: 'queued', customer_approval_required: o.approvalsOn ?? true, message: 'Waiting for the customer to approve in the Robinhood app.' }; },
+    { ...acct, symbol: z.string(), side: z.string(), type: z.string(), quantity: z.string(), limit_price: z.string(), time_in_force: z.string(), market_hours: z.string(), ref_id: z.string() });
   return s;
 }
 

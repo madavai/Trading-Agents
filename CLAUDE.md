@@ -5,7 +5,7 @@ the person decides, and a connection to Robinhood's agent doorway for the orders
 TradingAgents by Tauric Research (see NOTICE). It is early: the desk check, the market data tools and the analysis
 team and the dashboard are in (not yet proven on real data); the dashboard shows the person's chosen Robinhood accounts
 (read-only), the agents see those holdings, and a call can be turned into an order ticket that
-Robinhood checks (a dry run); placing an order, only on the person's Confirm, comes next.
+Robinhood checks (a dry run) and, with trading switched on by the person, places on their own Confirm.
 
 ## What the person can run here
 - `/desk-check`: checks this computer (Node, the desk's tools, the free data sources) and, on their yes, tests the

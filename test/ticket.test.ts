@@ -74,7 +74,7 @@ test('Robinhood\'s check is read into its alerts, its approval flag and its own 
   assert.deepEqual(r.alerts, ['Not enough buying power.', 'Halted']);
   assert.equal(r.approvalRequired, true);
   assert.deepEqual(r.facts, [['estimated cost', '182.40'], ['quote · last trade price', '182.40']]);
-  assert.equal(parseReview({ failed: true, text: 'account 5RH88004321 is not agentic', data: null }).error, 'account 5RH88004321 is not agentic'.replace(/\d{5,}/g, '#####'));
+  assert.equal(parseReview({ failed: true, text: 'account 5RH88004321 is not agentic', data: null }).error, 'account ##### is not agentic', 'the whole account number is hidden, letters and all');
 });
 
 test('the reviewer asks only for Robinhood\'s check, only on the Agentic account, only for a whole limit order', async () => {

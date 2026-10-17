@@ -73,10 +73,9 @@ test('requests to one host are spaced; another host is not held up', async () =>
   configure({ spacingMs: 80, fetch: async (u) => { starts.push([new URL(String(u)).hostname, Date.now()]); return new Response('ok'); } });
   await Promise.all([getText('https://y.test/1'), getText('https://y.test/2'), getText('https://y.test/3'), getText('https://other.test/1')]);
   const y = starts.filter(([h]) => h === 'y.test').map(([, t]) => t);
-  // Starts are slots on the clock (now, +80, +160), so one start that runs late on a busy computer makes the gap after it
-  // shorter. The span across both gaps is steady: it is at least one whole spacing, while with no spacing at all the three
-  // starts fall within a few milliseconds of each other.
-  assert.ok(y[1]! > y[0]! && y[2]! > y[1]! && y[2]! - y[0]! >= 80, y.join());
+  // Each start waits for the one before it to have really started, then the whole gap: a stall makes gaps longer, never
+  // shorter, and two waiting requests never go together.
+  assert.ok(y[1]! - y[0]! >= 80 && y[2]! - y[1]! >= 80, y.join());
   assert.ok(starts.find(([h]) => h === 'other.test')![1] - y[0]! < 60, 'another host waited');
 });
 

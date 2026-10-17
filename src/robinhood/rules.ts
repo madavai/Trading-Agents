@@ -100,5 +100,6 @@ export function shapeLines(value: unknown, words = false): string[] {
 
 /** Words on one line, cut to a length. */
 export const oneLine = (s: string, max: number): string => { const t = s.replace(/\s+/g, ' ').trim(); return t.length > max ? `${t.slice(0, max - 3)}...` : t; };
-/** A failure's words, short, with any long run of digits hidden (an account number the person typed into an argument). */
-export const masked = (s: string): string => oneLine(s, 300).replace(/\d{5,}/g, '#####');
+/** A failure's words, short, with any word holding a long run of digits hidden whole (an account number, which can mix
+ *  letters and digits). Dates and prices, with shorter runs, are left as they are. */
+export const masked = (s: string): string => oneLine(s, 300).replace(/\b[a-z0-9]*\d{5,}[a-z0-9]*\b/gi, '#####');

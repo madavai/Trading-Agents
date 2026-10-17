@@ -36902,12 +36902,20 @@ function configure(opts) {
   }
 }
 var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-var nextSlot = /* @__PURE__ */ new Map();
+var lastStart = /* @__PURE__ */ new Map();
+var queue = /* @__PURE__ */ new Map();
 async function pace(host) {
   if (!spacingMs) return;
-  const now = Date.now(), at = Math.max(now, nextSlot.get(host) ?? 0);
-  nextSlot.set(host, at + spacingMs);
-  for (let i = 0; i < 3 && Date.now() < at; i++) await sleep(at - Date.now());
+  const turn = (queue.get(host) ?? Promise.resolve()).then(async () => {
+    for (let i = 0; i < 5; i++) {
+      const wait = (lastStart.get(host) ?? -Infinity) + spacingMs - Date.now();
+      if (wait <= 0) break;
+      await sleep(wait);
+    }
+    lastStart.set(host, Date.now());
+  });
+  queue.set(host, turn);
+  await turn;
 }
 var MINUTE = 6e4;
 var ttlFor = (host) => /(^|\.)sec\.gov$/.test(host) ? 24 * 60 * MINUTE : /fred/.test(host) ? 6 * 60 * MINUTE : 5 * MINUTE;

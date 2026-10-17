@@ -1,0 +1,149 @@
+import { test, afterEach } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import net from 'node:net';
+import os from 'node:os';
+import path from 'node:path';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { parsePlaced, Placer } from '../src/robinhood/order.js';
+import { Refused } from '../src/robinhood/reader.js';
+import { Link } from '../src/robinhood/link.js';
+import { openSession } from '../src/robinhood/connect.js';
+import { Journal } from '../src/desk/journal.js';
+import { confirmWords, placedToday, startTerminal, type Assets } from '../src/terminal/server.js';
+import { accountTools, AGENTIC, fakeRobinhood, MAIN, type Fake } from './fake-robinhood.js';
+
+const ORDER = { symbol: 'NVDA', side: 'buy' as const, quantity: 1, limitPrice: 182.4, timeInForce: 'gfd' as const };
+const UUID = '0b6f6a52-2f3c-4f4e-9b1a-6a0c5e3d2a11';
+
+test('the placer places only a whole-share limit order on the Agentic account, with Robinhood\'s duplicate protection', async () => {
+  const calls: string[] = [], placed: Array<Record<string, unknown>> = [];
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  await accountTools(calls, { placed }).connect(a);
+  const client = new Client({ name: 'test', version: '0' }); await client.connect(b);
+  const p = new Placer(client, (await client.listTools()).tools);
+  await assert.rejects(p.place({ accountNumber: MAIN, agentic: false }, ORDER, UUID), Refused);
+  await assert.rejects(p.place({ accountNumber: AGENTIC, agentic: true }, { ...ORDER, quantity: 1.5 }, UUID), /not complete/);
+  await assert.rejects(p.place({ accountNumber: AGENTIC, agentic: true }, ORDER, 'not-a-uuid'), /not complete/);
+  assert.deepEqual(calls, []);
+  const r = await p.place({ accountNumber: AGENTIC, agentic: true }, ORDER, UUID);
+  assert.deepEqual(placed, [{ account_number: AGENTIC, symbol: 'NVDA', side: 'buy', type: 'limit', quantity: '1', limit_price: '182.40', time_in_force: 'gfd', market_hours: 'regular_hours', ref_id: UUID }]);
+  assert.deepEqual([r.answered, r.approvalRequired, r.orderId, r.state], [true, true, '6f1c2b9e-0000-4000-8000-00000000abcd', 'queued']);
+  await client.close();
+});
+
+test('Robinhood\'s answer to an order is read into its id, state and approval flag; a refusal keeps its words, without account numbers', () => {
+  assert.equal(parsePlaced({ failed: true, text: 'account 5RH88004321 cannot trade', data: null }).error, 'account ##### cannot trade');
+  const r = parsePlaced({ failed: false, text: '', data: { data: { order: { id: 'abc', state: 'confirmed' }, customer_approval_required: false, account_number: '5RH88004321' } } });
+  assert.deepEqual([r.orderId, r.state, r.approvalRequired], ['abc', 'confirmed', false]);
+  assert.ok(!JSON.stringify(r).includes('5RH88004321'));
+});
+
+test('only three doors call Robinhood, each naming its tools; the agents\' tool server holds none of the order doors', () => {
+  const files = (fs.readdirSync('src', { recursive: true }) as string[]).filter((f) => f.endsWith('.ts')).map((f) => f.replace(/\\/g, '/'));
+  assert.deepEqual(files.filter((f) => /\.callTool\(/.test(fs.readFileSync(path.join('src', f), 'utf8'))).sort(), ['robinhood/order.ts', 'robinhood/reader.ts', 'robinhood/review.ts']);
+  const named = (f: string) => [...new Set(fs.readFileSync(f, 'utf8').match(/\b(?:get|list|place|cancel|review|preview|replace|decline|submit|create)_[a-z_]+/g))];
+  assert.deepEqual(named('src/robinhood/order.ts'), ['place_equity_order']);
+  assert.deepEqual(named('src/robinhood/review.ts'), ['review_equity_order']);
+  // who can run the order door: a type-only import carries no code
+  const importers = files.filter((f) => /^import (?!type )[^;]*from '\.{1,2}\/(?:robinhood\/)?order\.js'/m.test(fs.readFileSync(path.join('src', f), 'utf8')));
+  assert.deepEqual(importers.sort(), ['robinhood/connect.ts']);
+  const tools = fs.readFileSync('dist/desk-tools.mjs', 'utf8');
+  for (const word of ['place_equity_order', 'review_equity_order', 'cancel_equity_order', '/api/ticket']) assert.ok(!tools.includes(word), `the agents' tool server must not contain ${word}`);
+});
+
+// ---------- through the dashboard ----------
+let fake: Fake | undefined;
+afterEach(async () => { await fake?.close(); fake = undefined; });
+const freePort = () => new Promise<number>((resolve) => { const s = net.createServer().listen(0, '127.0.0.1', () => { const p = (s.address() as net.AddressInfo).port; s.close(() => resolve(p)); }); });
+const approves = (url: URL) => { void (async () => { const r = await fetch(url, { redirect: 'manual' }); await fetch(r.headers.get('location')!); })(); };
+
+async function desk(caps = { perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 3 }) {
+  const o = { placed: [] as Array<Record<string, unknown>>, reviewed: [] as Array<Record<string, unknown>>, agenticBuyingPower: '2500.00' };
+  fake = await fakeRobinhood((calls) => accountTools(calls, o));
+  const port = await freePort(), file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ta-pl-')), 'sign-in.json');
+  await (await openSession(file, { signIn: true, url: fake.url, port, open: approves })).close();
+  const link = new Link(file, { url: fake.url, port });
+  const { accounts } = await link.accounts();
+  await link.choose(accounts.filter((a) => !a.deactivated).map((a) => a.key));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ta-pl-term-')), dir = path.join(root, 'desk-data');
+  fs.writeFileSync(path.join(root, 'desk-settings.json'), JSON.stringify({ trading: { caps } }));
+  new Journal(path.join(dir, 'journal.md')).storeDecision('NVDA', '2026-10-15', '**Rating**: Buy\n\n**Executive Summary**: Buy.');
+  const term = await startTerminal({ root, assets: new Map([['/index.html', { type: 'text/html', body: '<meta name="desk-token" content="__DESK_TOKEN__">' }]]) as Assets, port: 0, robinhood: link });
+  const post = async (p: string, body: unknown) => { const r = await fetch(`${term.url}${p.slice(1)}`, { method: 'POST', headers: { 'x-desk-token': term.token, 'content-type': 'application/json' }, body: JSON.stringify(body) }); const t = await r.text(); return { status: r.status, body: t, json: () => JSON.parse(t) }; };
+  const ticket = async () => (await post('/api/ticket', { symbol: 'NVDA', date: '2026-10-15' })).json() as { id: string };
+  return { o, link, file, dir, term, post, ticket };
+}
+
+test('an order is placed only with trading switched on, after Robinhood\'s clean check, on a Confirm naming that exact order, once', async () => {
+  const { o, file, dir, term, post, ticket } = await desk();
+  try {
+    const t = await ticket();
+    assert.equal((await post('/api/ticket/place', { id: t.id, confirm: confirmWords(ORDER) })).status, 403, 'trading is off');
+    assert.equal((await post('/api/trading', { on: true })).status, 400, 'switching on needs the page\'s confirmation');
+    assert.equal((await post('/api/trading', { on: true, confirm: 'switch trading on' })).json().on, true);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(path.dirname(file), 'trading.json'), 'utf8')).on, true, 'the switch is kept beside the sign-in, where agents are refused');
+
+    assert.match((await post('/api/ticket/place', { id: t.id, confirm: confirmWords(ORDER) })).json().error, /have Robinhood check this order first/);
+    const reviewed = (await post('/api/ticket/review', { id: t.id, quantity: 1, limitPrice: 182.4 })).json();
+    assert.equal(reviewed.confirm, 'Buy 1 NVDA at $182.40');
+    assert.match((await post('/api/ticket/place', { id: t.id, confirm: 'Buy 2 NVDA at $182.40' })).json().error, /does not name this order/);
+    assert.deepEqual(o.placed, []);
+
+    const ok = await post('/api/ticket/place', { id: t.id, confirm: 'Buy 1 NVDA at $182.40' });
+    assert.equal(ok.status, 200, ok.body);
+    assert.deepEqual([ok.json().placed.answered, ok.json().placed.approvalRequired, ok.json().placed.state], [true, true, 'queued']);
+    const sent = o.placed as unknown as Array<Record<string, unknown>>;   // the earlier empty check narrowed its type
+    assert.equal(sent.length, 1);
+    assert.deepEqual({ ...sent[0], ref_id: 'x' }, { account_number: AGENTIC, symbol: 'NVDA', side: 'buy', type: 'limit', quantity: '1', limit_price: '182.40', time_in_force: 'gfd', market_hours: 'regular_hours', ref_id: 'x' });
+    assert.match(String(sent[0]!.ref_id), /^[0-9a-f-]{36}$/);
+    for (const n of [MAIN, AGENTIC]) assert.ok(!ok.body.includes(n));
+
+    assert.equal((await post('/api/ticket/place', { id: t.id, confirm: 'Buy 1 NVDA at $182.40' })).status, 409, 'a ticket sends one order');
+    assert.equal((await post('/api/ticket/review', { id: t.id, quantity: 1, limitPrice: 182.4 })).status, 409);
+    assert.equal(o.placed.length, 1);
+    const log = fs.readFileSync(path.join(dir, 'orders.jsonl'), 'utf8');
+    assert.equal(log.trim().split('\n').length, 1);
+    for (const n of [MAIN, AGENTIC]) assert.ok(!log.includes(n), 'no account number in the desk\'s order log');
+    assert.equal(placedToday(dir, new Date()), 1);
+  } finally { await term.close(); }
+});
+
+test('every cap is checked again on Robinhood\'s latest figures just before sending; the desk\'s own log counts toward orders a day', async () => {
+  const { o, term, post, ticket, link } = await desk({ perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 1 });
+  try {
+    link.setTrading(true);
+    const t = await ticket();
+    await post('/api/ticket/review', { id: t.id, quantity: 1, limitPrice: 182.4 });
+    o.agenticBuyingPower = '100.00';   // spent elsewhere since the check
+    const stale = await post('/api/ticket/place', { id: t.id, confirm: 'Buy 1 NVDA at $182.40' });
+    assert.equal(stale.status, 400);
+    assert.match(stale.json().error, /no longer passes on Robinhood's latest figures: Buying power is \$100\.00: not enough/);
+    assert.deepEqual(o.placed, []);
+
+    o.agenticBuyingPower = '2500.00';
+    const again = await ticket();
+    await post('/api/ticket/review', { id: again.id, quantity: 1, limitPrice: 182.4 });
+    assert.equal((await post('/api/ticket/place', { id: again.id, confirm: 'Buy 1 NVDA at $182.40' })).status, 200);
+    const third = await ticket();
+    await post('/api/ticket/review', { id: third.id, quantity: 1, limitPrice: 182.4 }).catch(() => undefined);
+    const over = await post('/api/ticket/place', { id: third.id, confirm: 'Buy 1 NVDA at $182.40' });
+    assert.notEqual(over.status, 200, 'one order a day, already used by the desk itself');
+    assert.equal(o.placed.length, 1);
+  } finally { await term.close(); }
+});
+
+test('switching off, or disconnecting, stops any order; disconnecting switches trading off', async () => {
+  const { o, link, term, post, ticket } = await desk();
+  try {
+    assert.equal((await post('/api/trading', { on: true, confirm: 'switch trading on' })).status, 200);
+    const t = await ticket();
+    await post('/api/ticket/review', { id: t.id, quantity: 1, limitPrice: 182.4 });
+    assert.equal((await post('/api/trading', { on: false })).json().on, false);
+    assert.equal((await post('/api/ticket/place', { id: t.id, confirm: 'Buy 1 NVDA at $182.40' })).status, 403);
+    link.setTrading(true); link.forget();
+    assert.equal(link.trading().on, false);
+    assert.deepEqual(o.placed, []);
+  } finally { await term.close(); }
+});
