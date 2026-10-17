@@ -71,7 +71,7 @@ test('a search may not start at the home folder or above it, however it is writt
     { tool_name: 'Grep', tool_input: { path: home, pattern: 'x', glob: '*', output_mode: 'content' } },
     { tool_name: 'Glob', tool_input: { path: path.dirname(home), pattern: '*/.t*/*' } },
     { tool_name: 'Glob', tool_input: { pattern: `${home}/.t*/*` } },
-    { tool_name: 'Grep', tool_input: { path: path.join(cwd, path.relative(cwd, home)), pattern: 'x' } },
+    { tool_name: 'Grep', tool_input: { path: path.relative(cwd, home), pattern: 'x' }, cwd },   // home, written from the project (on another drive, as an absolute path)
     { tool_name: 'LS', tool_input: { path: home } },
   ];
   for (const call of refused) assert.match(guard.verdict(call) ?? '', /never search the whole home folder/, JSON.stringify(call));
