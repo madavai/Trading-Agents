@@ -1,0 +1,1203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inside the Trading Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,340..640;1,9..144,340..640&family=Source+Serif+4:ital,opsz,wght@0,8..60,400..600;1,8..60,400..600&display=swap">
+<style>
+/* The Madav House theme (Trading Agents' dashboard sheet), dark face first, with a Light/Dark switch. One colour per actor,
+   from House's own meanings: the free sources teal, the desk's agents the House blue, you purple, Robinhood green, the
+   guard red. Layout: one wide column; every block runs edge to edge on the same two lines, and groups of cards are joined
+   into one box ruled by hairlines, each part marked by a coloured top edge. */
+:root {
+  color-scheme: dark;
+  --canvas: rgb(23, 21, 18);
+  --panel: rgb(32, 31, 28);
+  --tint: rgba(233, 228, 220, 0.07);
+  --line: rgba(233, 228, 220, 0.11);
+  --line-strong: rgba(233, 228, 220, 0.22);
+  --text: rgb(239, 234, 226);
+  --text-2: rgb(170, 163, 150);
+  --text-3: rgb(156, 149, 137);
+  --accent: #06AEFE;
+  --on-accent: #ffffff;
+  --desk-ink: #06AEFE;
+  --up: rgb(76, 175, 114);
+  --down: rgb(255, 138, 128);
+  --desk-t: color-mix(in srgb, var(--accent) 15%, transparent);
+  --up-t: color-mix(in srgb, var(--up) 13%, transparent);
+  --down-t: color-mix(in srgb, var(--down) 11%, transparent);
+  --bar-bg: color-mix(in srgb, var(--canvas) 90%, transparent);
+  --shadow-rest: inset 0 1px 0 rgba(233, 228, 220, 0.05), 0 3px 6px rgba(0, 0, 0, 0.35);
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  --font: "Source Serif 4", "Inter", "Segoe UI", system-ui, sans-serif;
+  --font-title: "Fraunces", Georgia, "Times New Roman", serif;
+  --size-hero: clamp(34px, 5.4vw, 52px); --size-h2: clamp(22px, 2.6vw, 28px); --size-h3: 16px;
+  --size-text: 15px; --size-body: 14px; --size-small: 12.5px; --size-tiny: 11.5px;
+  --radius: 9px; --radius-small: 6px; --radius-large: 14px;
+  --ease: cubic-bezier(0.33, 0.02, 0.2, 1);
+}
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) {
+  color-scheme: light;
+  --canvas: rgb(252, 251, 248); --panel: rgb(255, 255, 255);
+  --tint: rgba(62, 55, 42, 0.05);
+  --line: rgba(62, 55, 42, 0.12); --line-strong: rgba(62, 55, 42, 0.24);
+  --text: rgb(38, 34, 26); --text-2: rgb(92, 85, 74); --text-3: rgb(120, 112, 98);
+  --desk-ink: rgb(0, 112, 178);
+  --up: rgb(28, 135, 80); --down: rgb(170, 45, 38);
+  --desk-t: color-mix(in srgb, var(--accent) 11%, transparent);
+  --shadow-rest: 0 1px 2px rgba(62, 55, 42, 0.06), 0 3px 8px rgba(62, 55, 42, 0.07);
+  --shadow: 0 12px 32px rgba(62, 55, 42, 0.16);
+} }
+:root[data-theme="light"] {
+  color-scheme: light;
+  --canvas: rgb(252, 251, 248); --panel: rgb(255, 255, 255);
+  --tint: rgba(62, 55, 42, 0.05);
+  --line: rgba(62, 55, 42, 0.12); --line-strong: rgba(62, 55, 42, 0.24);
+  --text: rgb(38, 34, 26); --text-2: rgb(92, 85, 74); --text-3: rgb(120, 112, 98);
+  --desk-ink: rgb(0, 112, 178);
+  --up: rgb(28, 135, 80); --down: rgb(170, 45, 38);
+  --desk-t: color-mix(in srgb, var(--accent) 11%, transparent);
+  --shadow-rest: 0 1px 2px rgba(62, 55, 42, 0.06), 0 3px 8px rgba(62, 55, 42, 0.07);
+  --shadow: 0 12px 32px rgba(62, 55, 42, 0.16);
+}
+
+/* ---- House base ---- */
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--canvas); color: var(--text);
+  font-family: var(--font); font-size: var(--size-body); line-height: 1.5;
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  transition: background-color 200ms var(--ease), color 200ms var(--ease);
+}
+h1, h2, h3, p, ul, ol, dl, dd, figure { margin: 0; }
+h1, h2, h3 { font-weight: inherit; font-size: inherit; }
+ul, ol { padding: 0; list-style: none; }
+button { font: inherit; color: inherit; cursor: pointer; background: none; border: 0; padding: 0; }
+a { color: var(--desk-ink); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 2px; }
+b, strong { font-weight: 600; }
+em { font-style: normal; }
+p { text-wrap: pretty; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+::selection { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+.ic { width: 18px; height: 18px; flex: none; display: block; }
+.ic.sm { width: 14px; height: 14px; }
+.ic.lg { width: 22px; height: 22px; }
+
+/* colour, used sparingly: the House blue for everything the desk and you do; green and red only for up and down, and
+   red for what the guard refuses; everything else is ink */
+.c-src, .c-desk, .c-you, .c-rh, .c-store { --c: var(--accent); --ct: var(--desk-t); }
+.c-bull { --c: var(--up); --ct: var(--up-t); }
+.c-bear, .c-guard { --c: var(--down); --ct: var(--down-t); }
+.c-mid, .c-warm { --c: var(--text-2); --ct: var(--tint); }
+
+/* ---- House objects ---- */
+.at-box { border: 1px solid var(--line); border-radius: var(--radius); background-color: var(--panel); box-shadow: var(--shadow-rest); }
+.at-chip {
+  display: inline-flex; align-items: center; gap: 6px; flex: none; height: 22px; padding: 0 8px; border-radius: var(--radius-small);
+  background: var(--tint); font-weight: 500; font-size: var(--size-small); line-height: 1; color: var(--text-2); white-space: nowrap;
+}
+.at-chip > i { display: none; width: 7px; height: 7px; border-radius: 50%; background: var(--c, var(--text-3)); flex: none; }
+.at-chip:is(.c-bull, .c-bear) > i { display: block; }
+.at-seg { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border-radius: var(--radius); background: var(--tint); max-width: 100%; }
+.at-seg > button { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 1px solid transparent; border-radius: var(--radius-small); font-weight: 500; font-size: var(--size-body); color: var(--text-2); white-space: nowrap; transition: color 120ms var(--ease), background 120ms var(--ease); }
+.at-seg > button:hover { color: var(--text); }
+.at-seg > button[aria-pressed="true"] { color: var(--text); background: var(--panel); border-color: var(--line); }
+.at-seg > button[aria-pressed="true"] .ic { color: var(--accent); }
+.at-seg > button b { font-family: var(--font-title); color: var(--desk-ink); font-weight: 600; }
+.kicker { font-weight: 500; font-size: var(--size-small); line-height: 1.25; color: var(--desk-ink); }
+.quiet { font-size: var(--size-small); color: var(--text-2); }
+.icbox { width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center; flex: none; background: var(--ct, var(--tint)); color: var(--c, var(--text-2)); }
+.icbox.lg { width: 42px; height: 42px; border-radius: 10px; }
+
+/* joined: one box, its parts ruled by hairlines and touching edge to edge; each part may carry a coloured top edge */
+.joined { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-rest); }
+.joined > * { min-width: 0; background-color: var(--panel); }
+.pillars > .edge { box-shadow: inset 0 2px 0 var(--accent); }
+
+/* ---- the page ---- */
+.page {
+  max-width: 1120px; margin-inline: auto; display: flex; flex-direction: column; gap: 56px;
+  padding-block: 32px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+/* the opening banner */
+.hero { display: flex; flex-direction: column; overflow: hidden; border-radius: var(--radius-large); }
+.hero-words { display: flex; flex-direction: column; gap: 14px; padding: 32px 32px 26px; background: radial-gradient(120% 140% at 100% 0%, var(--desk-t), transparent 55%), var(--panel); }
+.hero h1 { font-family: var(--font-title); font-weight: 500; font-size: var(--size-hero); line-height: 1.05; letter-spacing: -0.015em; text-wrap: balance; }
+.hero h1 em { font-style: italic; color: var(--accent); }
+.lede { font-size: 18px; line-height: 1.55; color: var(--text-2); }
+.lede b { color: var(--text); font-weight: 500; }
+.hero .joined { border-radius: 0; border-width: 1px 0 0; box-shadow: none; }
+.pillars { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.pillar { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 14px; align-items: start; padding: 18px 22px; }
+.pillar .icbox { grid-row: 1 / span 2; }
+.pillar b { font-family: var(--font-title); font-weight: 600; font-size: 16px; line-height: 1.25; }
+.pillar p { grid-column: 2; font-size: var(--size-small); color: var(--text-2); }
+
+/* the sticky bar: chapters and the light/dark switch */
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; display: flex; align-items: center; gap: 10px; margin-block: -40px -24px; padding-block: 10px; background: var(--bar-bg); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.chapters { flex: 1; min-width: 0; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+.chapters a { display: flex; align-items: center; justify-content: center; gap: 6px; height: 38px; padding: 0 12px; font-weight: 500; font-size: var(--size-body); color: var(--text-2); white-space: nowrap; transition: color 120ms var(--ease), background-color 120ms var(--ease); }
+.chapters a:hover { color: var(--text); text-decoration: none; background-image: linear-gradient(var(--desk-t), var(--desk-t)); }
+.chapters a[aria-current="true"] { color: var(--desk-ink); box-shadow: inset 0 -2px 0 var(--accent); }
+.chapters a .ic { color: var(--text-3); }
+.chapters a[aria-current="true"] .ic { color: var(--accent); }
+.hero-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.icon-btn { display: inline-grid; place-items: center; flex: none; width: 34px; height: 34px; border: 1px solid var(--line); border-radius: var(--radius); background-color: var(--panel); color: var(--text-2); box-shadow: var(--shadow-rest); transition: color 120ms var(--ease), border-color 120ms var(--ease); }
+.icon-btn:hover { color: var(--text); border-color: var(--accent); background-image: linear-gradient(var(--desk-t), var(--desk-t)); text-decoration: none; }
+.hero-tools { display: flex; align-items: center; gap: 8px; flex: none; }
+.icon-btn .ic { width: 16px; height: 16px; }
+
+/* the notice: one line in the opening banner, the whole of it at the end */
+.caution { display: flex; align-items: center; gap: 12px; padding: 13px 22px; border-top: 1px solid var(--line); font-size: var(--size-body); color: var(--text-2); }
+.caution .ic { color: var(--down); }
+.caution b { color: var(--text); font-weight: 600; }
+.caution a { margin-left: auto; flex: none; font-weight: 500; }
+.notice-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ntc { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 4px 12px; align-items: start; padding: 18px; }
+.ntc b { font-family: var(--font-title); font-weight: 600; font-size: 15.5px; line-height: 1.25; padding-top: 7px; }
+.ntc p { grid-column: 2; font-size: var(--size-body); color: var(--text-2); }
+.careful { padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.careful-h { display: flex; align-items: center; gap: 10px; font-family: var(--font-title); font-weight: 600; font-size: 16px; }
+.careful .checks li { font-size: var(--size-body); }
+@media (max-width: 760px) {
+  .notice-grid { grid-template-columns: minmax(0, 1fr); }
+  .caution { flex-wrap: wrap; padding: 12px 20px; }
+  .caution a { margin-left: 0; }
+}
+
+/* chapter heads: the title at the left, the words at the right, a rule under both from edge to edge */
+.chapter { display: flex; flex-direction: column; gap: 20px; scroll-margin-top: 76px; }
+.ch-head { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 8px 48px; align-items: end; padding-bottom: 18px; border-bottom: 1px solid var(--line-strong); }
+.ch-title { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ch-head h2 { font-family: var(--font-title); font-weight: 600; font-size: var(--size-h2); line-height: 1.15; text-wrap: balance; }
+.ch-head > p { font-size: var(--size-text); color: var(--text-2); line-height: 1.55; }
+.why { font-size: var(--size-small); color: var(--text-2); line-height: 1.5; }
+.why b { color: var(--text); font-weight: 600; }
+
+/* 1. the map */
+.map { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+.flow { display: grid; grid-template-columns: minmax(0, 1fr) 52px minmax(0, 1fr) 52px minmax(0, 1fr) 52px minmax(0, 1fr) 52px minmax(0, 1fr); }
+/* every lane shares the row's two tracks (its head, then its list), so the heads end, and the lists start, on one line */
+.lane { min-width: 0; grid-row: span 2; display: grid; grid-template-rows: subgrid; row-gap: 12px; padding: 14px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--tint); }
+.lane > ul { align-self: start; }
+.lane-h { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; }
+.lane-name { font-family: var(--font-title); font-weight: 600; font-size: 15px; line-height: 1.2; }
+.lane-sub { font-size: var(--size-tiny); color: var(--text-2); line-height: 1.35; }
+.lane ul { display: flex; flex-direction: column; gap: 1px; border: 1px solid var(--line); border-radius: var(--radius-small); overflow: hidden; background: var(--line); }
+.lane li { font-size: 13px; line-height: 1.35; padding: 6px 9px; background: var(--panel); overflow-wrap: anywhere; }
+.lane li small { display: block; font-size: var(--size-tiny); color: var(--text-3); }
+.link { grid-row: span 2; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding-inline: 4px; }
+.link .lbl { font-size: var(--size-tiny); color: var(--text-2); text-align: center; line-height: 1.2; }
+/* an arrow: a solid rounded line in a muted House blue, ending in a swept head (curved back, pointed tip) */
+.wire {
+  --arrow: color-mix(in srgb, var(--accent) 65%, var(--text-3));
+  --head: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13 14'%3E%3Cpath d='M1.6 1.6L11.6 7L1.6 12.4Q4.8 7 1.6 1.6Z' fill='%23000' stroke='%23000' stroke-width='1.3' stroke-linejoin='round'/%3E%3C/svg%3E");
+  position: relative; width: 100%; height: 2px; border-radius: 2px; background: var(--arrow);
+}
+.wire::after, .wire.two::before { content: ""; position: absolute; top: 50%; width: 12px; height: 13px; background: var(--arrow); -webkit-mask: var(--head) center / contain no-repeat; mask: var(--head) center / contain no-repeat; }
+.wire::after { right: -3px; transform: translateY(-50%); }
+.wire.two::before { left: -3px; transform: translateY(-50%) scaleX(-1); }
+.pulse { position: absolute; top: -3px; left: 0; width: 8px; height: 8px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 3px var(--ct); animation: travel 2.8s var(--ease) infinite; animation-delay: var(--d, 0s); }
+@keyframes travel { 0% { left: 0; opacity: 0; } 15%, 80% { opacity: 1; } 100% { left: calc(100% - 8px); opacity: 0; } }
+@keyframes travel-down { 0% { top: 0; opacity: 0; } 15%, 80% { opacity: 1; } 100% { top: calc(100% - 8px); opacity: 0; } }
+.bands { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); border-radius: var(--radius); }
+.band { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; font-size: var(--size-body); line-height: 1.5; }
+.band .ic { margin-top: 2px; color: var(--c); }
+.band.guard { background-image: linear-gradient(var(--down-t), var(--down-t)); }
+
+/* 2. sources */
+.src-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.src { padding: 18px; display: flex; flex-direction: column; gap: 8px; }
+.src-h { display: flex; align-items: center; gap: 10px; }
+.src-name { font-family: var(--font-title); font-weight: 600; font-size: var(--size-h3); line-height: 1.2; }
+.src-kind { font-size: var(--size-tiny); color: var(--text-3); }
+.src > p { font-size: var(--size-body); color: var(--text); }
+.src .note { display: flex; align-items: flex-start; gap: 6px; margin-top: auto; padding-top: 4px; font-size: var(--size-small); color: var(--text-2); }
+.src .note .ic { margin-top: 1px; color: var(--text-3); }
+.src.wide { grid-column: 1 / -1; display: grid; grid-template-columns: auto minmax(0, 200px) minmax(0, 1fr); align-items: center; gap: 12px 20px; background-image: linear-gradient(var(--desk-t), var(--desk-t)); }
+.matrix-wrap { overflow-x: auto; border-radius: var(--radius); }
+.matrix { width: 100%; min-width: 760px; border-collapse: collapse; font-size: var(--size-small); }
+.matrix th, .matrix td { padding: 11px 12px; border-bottom: 1px solid var(--line); text-align: center; vertical-align: middle; }
+.matrix tr > :first-child { text-align: left; white-space: nowrap; }
+.matrix tbody th { font-family: var(--font-title); font-weight: 500; font-size: 14px; color: var(--text); }
+.matrix thead th { font-weight: 500; color: var(--text-2); background: var(--tint); }
+.matrix thead th small { display: block; font-weight: 400; color: var(--text-3); }
+.matrix tbody tr:last-child > * { border-bottom: 0; }
+.matrix tr > * + * { border-left: 1px solid var(--line); }
+.matrix caption { caption-side: bottom; padding: 10px 12px; text-align: left; border-top: 1px solid var(--line); }
+.cell { display: inline-flex; flex-direction: column; align-items: center; gap: 4px; color: var(--text-2); line-height: 1.25; }
+.cell::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 3px var(--ct); }
+.none { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--line-strong); }
+
+/* 3. agents */
+.lead { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; padding: 20px; border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); background-image: linear-gradient(var(--desk-t), var(--desk-t)); }
+.lead-name { font-family: var(--font-title); font-weight: 600; font-size: 18px; line-height: 1.2; }
+.lead p { color: var(--text-2); font-size: var(--size-body); }
+.lead p b { color: var(--text); font-weight: 500; }
+.stations { display: flex; flex-direction: column; }
+.station { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 28px; padding-block: 22px; border-bottom: 1px solid var(--line); }
+.station:last-child { border-bottom: 0; padding-bottom: 0; }
+.st-words { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.st-top { display: flex; align-items: center; gap: 10px; }
+.st-num { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; flex: none; background: var(--desk-t); color: var(--desk-ink); font-family: var(--font-title); font-weight: 600; font-variant-numeric: lining-nums; border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); }
+.st-name { font-family: var(--font-title); font-weight: 600; font-size: 18px; line-height: 1.2; }
+.st-makes { font-size: var(--size-small); color: var(--text-2); }
+.st-makes b { color: var(--text); font-weight: 500; }
+.agents.n2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.agents.n3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.agents.n1 { grid-template-columns: minmax(0, 1fr); }
+.agent { padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+.agent-h { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.agent-name { font-family: var(--font-title); font-weight: 500; font-size: 15px; line-height: 1.2; }
+.agent-id { font-size: var(--size-tiny); color: var(--text-3); overflow-wrap: anywhere; }
+.agent-role { font-size: var(--size-body); line-height: 1.5; }
+.agent dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 3px 10px; margin-top: auto; padding-top: 8px; border-top: 1px solid var(--line); font-size: var(--size-small); }
+.agent dt { color: var(--text-3); }
+.agent dd { color: var(--text-2); }
+.agents.n1 .agent { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 24px; align-items: start; }
+.agents.n1 .agent > .agent-h, .agents.n1 .agent > .agent-role { grid-column: 1; }
+.agents.n1 .agent > dl { grid-column: 2; grid-row: 1 / span 2; margin-top: 0; padding-top: 0; padding-left: 20px; border-top: 0; border-left: 1px solid var(--line); }
+
+/* 4. the journey */
+.depth { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 12px 16px; font-size: var(--size-small); color: var(--text-2); }
+.depth-l { display: flex; align-items: center; gap: 10px; font-family: var(--font-title); font-weight: 600; font-size: 15px; color: var(--text); }
+.depth-l .ic { color: var(--accent); }
+.phases { display: flex; flex-direction: column; }
+.phase { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 28px; padding-block: 24px; border-bottom: 1px solid var(--line); }
+.phase:last-child { border-bottom: 0; padding-bottom: 0; }
+.phase-h { display: flex; flex-direction: column; gap: 6px; }
+.phase-h h3 { font-family: var(--font-title); font-weight: 600; font-size: 20px; line-height: 1.2; }
+.phase-h span { font-size: var(--size-small); color: var(--text-3); }
+.steps { display: flex; flex-direction: column; min-width: 0; }
+.step { position: relative; display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 16px; padding-bottom: 24px; }
+.step::before { content: ""; position: absolute; left: 19px; top: 44px; bottom: 4px; width: 2px; border-radius: 1px; background: var(--line); }
+.steps > .step:last-child { padding-bottom: 0; }
+.steps > .step:last-child::before { display: none; }
+.badge { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--ct); color: var(--c); border: 1px solid color-mix(in srgb, var(--c) 50%, transparent); font-family: var(--font-title); font-weight: 600; font-size: 16px; font-variant-numeric: lining-nums; }
+.step-body { display: flex; flex-direction: column; gap: 8px; min-width: 0; padding-top: 8px; }
+.step-h { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.step-title { font-family: var(--font-title); font-weight: 500; font-size: 17px; line-height: 1.25; margin-right: 4px; }
+.step p { font-size: var(--size-body); color: var(--text-2); }
+.step p b { color: var(--text); font-weight: 500; }
+.para { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.mini { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; }
+.mini-h { display: flex; align-items: center; gap: 8px; font-family: var(--font-title); font-weight: 500; font-size: 14px; line-height: 1.2; }
+.mini-h .ic { color: var(--accent); }
+.turns { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.turn { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 13px; font-size: var(--size-small); font-weight: 500; background: var(--ct); color: var(--c); border: 1px solid color-mix(in srgb, var(--c) 35%, transparent); }
+.turn b { font-family: var(--font-title); font-variant-numeric: lining-nums; }
+.turns .to { display: inline-flex; align-items: center; gap: 6px; font-size: var(--size-small); color: var(--text-2); }
+.scale { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.rate { display: flex; flex-direction: column; gap: 4px; padding: 11px 12px; background-image: linear-gradient(var(--ct), var(--ct)); }
+.rate b { font-family: var(--font-title); font-weight: 600; font-size: 14px; color: var(--c); }
+.rate span { font-size: var(--size-small); color: var(--text-2); line-height: 1.35; }
+.rate.mid b { color: var(--text); }
+.rate.soft { --ct: color-mix(in srgb, var(--c) 6%, transparent); }
+.caps { display: flex; flex-wrap: wrap; gap: 6px; }
+.caps .at-chip { height: 26px; background: var(--panel); border: 1px solid var(--line); color: var(--text); }
+.caps .at-chip b { font-family: var(--font-title); font-variant-numeric: lining-nums; color: var(--desk-ink); }
+.loop { display: inline-flex; align-items: center; gap: 8px; font-size: var(--size-small); color: var(--text-2); padding: 6px 10px; border-radius: var(--radius-small); background: var(--desk-t); align-self: flex-start; }
+.loop .ic { color: var(--accent); }
+.aside { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; font-size: var(--size-body); color: var(--text-2); background-image: linear-gradient(var(--desk-t), var(--desk-t)); }
+.aside .ic { color: var(--accent); margin-top: 2px; }
+.aside b { color: var(--text); font-weight: 500; }
+
+/* 5. where it is kept */
+.computer { display: flex; flex-direction: column; gap: 14px; padding: 16px; border: 1.5px dashed var(--line-strong); border-radius: var(--radius-large); }
+.computer-h { display: flex; align-items: center; gap: 8px; padding-inline: 4px; font-family: var(--font-title); font-weight: 600; font-size: 15px; color: var(--text-2); }
+.drawers { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.drawer { padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+.drawer-h { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.drawer-name { font-family: var(--font-title); font-weight: 600; font-size: var(--size-h3); line-height: 1.2; }
+.drawer-where { font-size: var(--size-tiny); color: var(--text-3); }
+.drawer-where code { font-family: ui-monospace, Consolas, monospace; font-size: 11px; padding: 1px 4px; border-radius: 4px; background: var(--tint); color: var(--text-2); }
+.drawer ul { display: flex; flex-direction: column; }
+.drawer li { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 2px 12px; padding-block: 7px; border-top: 1px solid var(--line); font-size: 13px; line-height: 1.45; }
+.drawer li b { font-weight: 500; color: var(--text); }
+.drawer li span { color: var(--text-2); }
+.never { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: var(--radius); background: var(--tint); font-size: var(--size-body); }
+.never .ic { color: var(--accent); }
+.leaves-wrap { display: flex; flex-direction: column; gap: 10px; }
+.leaves-h { font-family: var(--font-title); font-weight: 600; font-size: 16px; }
+.leaves { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.leave { display: flex; flex-direction: column; gap: 6px; padding: 16px; }
+.leave-h { display: flex; align-items: center; gap: 8px; font-weight: 500; font-size: 14px; }
+.leave-h .ic { color: var(--c); }
+.leave p { font-size: var(--size-small); color: var(--text-2); }
+
+/* 6. the doors */
+.doors { display: grid; grid-template-columns: minmax(0, 0.95fr) 56px minmax(0, 1.35fr) 56px minmax(0, 1fr); grid-template-rows: repeat(3, auto); row-gap: 10px; align-items: stretch; }
+.d-agents { grid-column: 1; grid-row: 1 / span 3; display: flex; flex-direction: column; gap: 10px; padding: 16px; min-width: 0; }
+.d-x { grid-column: 2; grid-row: 1 / span 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
+.wall { width: 4px; flex: 1; border-radius: 2px; background: repeating-linear-gradient(to bottom, var(--down) 0 8px, transparent 8px 13px); max-height: 140px; }
+.xmark { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--down-t); color: var(--down); border: 1px solid color-mix(in srgb, var(--down) 50%, transparent); }
+.d-x .lbl { font-size: var(--size-tiny); color: var(--down); text-align: center; }
+.door { grid-column: 3; display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 4px 12px; align-items: start; padding: 14px; min-width: 0; }
+.door-name { font-family: var(--font-title); font-weight: 600; font-size: 15px; line-height: 1.2; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.door p { grid-column: 2; font-size: var(--size-small); color: var(--text-2); }
+.d-arrow { grid-column: 4; display: flex; align-items: center; padding-inline: 6px; }
+.r1 { grid-row: 1; } .r2 { grid-row: 2; } .r3 { grid-row: 3; }
+.d-rh { grid-column: 5; grid-row: 1 / span 3; display: flex; flex-direction: column; gap: 10px; padding: 16px; min-width: 0; }
+.d-title { display: flex; align-items: center; gap: 10px; font-family: var(--font-title); font-weight: 600; font-size: 16px; }
+.d-agents p, .d-rh p { font-size: var(--size-small); color: var(--text-2); }
+.acct { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: var(--radius-small); border: 1px solid var(--line); }
+.acct b { font-family: var(--font-title); font-weight: 600; font-size: 14px; }
+.acct.agentic { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); background: var(--desk-t); }
+.refused { display: flex; flex-direction: column; gap: 4px; }
+.refused li { display: flex; align-items: center; gap: 8px; font-size: var(--size-small); color: var(--text-2); }
+.refused li .ic { color: var(--down); }
+.only-narrow { display: none; }
+.door-notes { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); }
+.signin { display: flex; align-items: flex-start; gap: 12px; padding: 18px; font-size: var(--size-body); color: var(--text-2); }
+.signin .ic { color: var(--accent); margin-top: 2px; }
+.signin b { color: var(--text); font-weight: 500; display: block; font-family: var(--font-title); font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+.checks-box { padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.checks-h { display: flex; align-items: center; gap: 10px; font-family: var(--font-title); font-weight: 600; font-size: 16px; }
+.checks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px 22px; }
+.checks li { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; align-items: start; font-size: var(--size-small); color: var(--text-2); }
+.tick { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--desk-t); color: var(--accent); }
+
+/* 7. the dashboard */
+.window { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--canvas); box-shadow: var(--shadow); }
+.win-top { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px; border-bottom: 1px solid var(--line); background: var(--panel); font-size: var(--size-small); color: var(--text-2); }
+.win-top i { width: 9px; height: 9px; border-radius: 50%; background: var(--line-strong); }
+.win-top span { margin-left: 8px; }
+.win-body { display: grid; grid-template-columns: 190px minmax(0, 1fr); }
+.win-side { display: flex; flex-direction: column; gap: 2px; padding: 12px 8px; border-right: 1px solid var(--line); font-family: var(--font-title); font-size: 13.5px; color: var(--text-2); }
+.win-side li { position: relative; display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px; border-radius: var(--radius-small); }
+.win-side li.on { color: var(--accent); background: var(--tint); }
+.win-side li.on::before { content: ""; position: absolute; left: 0; top: 7px; bottom: 7px; width: 2px; border-radius: 2px; background: var(--accent); }
+.win-main { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; padding: 14px; min-width: 0; }
+.pn { display: flex; flex-direction: column; gap: 8px; padding: 12px; min-width: 0; }
+.pn-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-family: var(--font-title); font-weight: 600; font-size: 13.5px; }
+.pn-h small { font-family: var(--font); font-weight: 400; font-size: var(--size-tiny); color: var(--text-3); }
+.pn.markets { grid-column: 1 / -1; }
+.pn.chart { grid-column: 1 / 5; }
+.pn.watch { grid-column: 5 / -1; }
+.pn.calls { grid-column: 1 / 4; }
+.pn.acct-pn { grid-column: 4 / -1; }
+.pn.ticket { grid-column: 1 / -1; border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.tiles { grid-template-columns: repeat(6, minmax(0, 1fr)); border-radius: var(--radius-small); box-shadow: none; }
+.tile { display: flex; flex-direction: column; gap: 6px; padding: 8px; font-size: var(--size-tiny); color: var(--text-2); overflow-wrap: anywhere; }
+.sk { display: block; height: 7px; border-radius: 4px; background: var(--line); }
+.chart svg { width: 100%; height: auto; display: block; }
+.wl { display: flex; flex-direction: column; gap: 8px; }
+.wl li { display: flex; align-items: center; gap: 8px; }
+.wl li .sk { flex: 1; }
+.wl .ic { color: var(--text-3); }
+.wl .ic.star { color: var(--accent); }
+.wl .ic.bot { color: var(--accent); }
+.callrow { display: flex; align-items: center; gap: 8px; }
+.callrow .sk { flex: 1; }
+.rchip { height: 20px; padding: 0 8px; border-radius: 10px; display: inline-flex; align-items: center; font-size: var(--size-tiny); font-weight: 500; background: var(--ct); color: var(--c); }
+.callrow .dec { font-size: var(--size-tiny); color: var(--desk-ink); }
+.acards { grid-template-columns: repeat(2, minmax(0, 1fr)); border-radius: var(--radius-small); box-shadow: none; }
+.acard { display: flex; flex-direction: column; gap: 6px; padding: 8px; font-size: var(--size-tiny); color: var(--text-2); }
+.acard b { font-family: var(--font-title); font-size: 12.5px; color: var(--text); }
+.tflow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.tbtn { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: var(--radius-small); border: 1px solid var(--line); background: var(--panel); font-size: var(--size-small); font-weight: 500; }
+.tbtn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.tflow .ic { color: var(--text-3); }
+.feats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.feat { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 4px 12px; align-items: start; padding: 16px; }
+.feat b { font-family: var(--font-title); font-weight: 600; font-size: 14.5px; line-height: 1.25; padding-top: 2px; }
+.feat p { grid-column: 2; font-size: var(--size-small); color: var(--text-2); }
+.facts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.facts span { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 11px 12px; font-size: var(--size-small); font-weight: 500; color: var(--text-2); text-align: center; }
+.facts .ic { color: var(--text-3); }
+
+.built { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.built-mark { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-title); font-weight: 500; font-size: 13px; color: var(--text-2); white-space: nowrap; }
+.built-mark img { display: block; height: 16px; width: auto; }
+.foot { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 48px; padding-top: 18px; border-top: 1px solid var(--line-strong); font-size: var(--size-small); color: var(--text-2); }
+
+/* narrower screens */
+@media (max-width: 980px) {
+  .flow { grid-template-columns: minmax(0, 1fr); }
+  .lane, .link { grid-row: auto; }
+  .lane { display: flex; flex-direction: column; gap: 12px; }
+  .lane-h { flex-direction: row; align-items: center; gap: 10px; }
+  .link { flex-direction: row; justify-content: flex-start; height: 44px; padding-left: 24px; gap: 12px; }
+  .link .wire { order: -1; }
+  .wire { width: 2px; height: 100%; }
+  .wire::after { top: auto; right: auto; bottom: -3px; left: 50%; transform: translateX(-50%) rotate(90deg); }
+  .wire.two::before { top: -3px; left: 50%; transform: translateX(-50%) rotate(-90deg); }
+  .pulse { left: -3px; top: 0; animation-name: travel-down; }
+  .station, .phase { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .leaves { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .feats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .key { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .doors { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
+  .d-agents, .d-x, .door, .d-rh { grid-column: 1; grid-row: auto; }
+  .d-x { flex-direction: row; justify-content: flex-start; padding-left: 24px; height: 52px; }
+  .wall { width: auto; height: 4px; flex: 0 0 60px; background: repeating-linear-gradient(to right, var(--down) 0 8px, transparent 8px 13px); }
+  .d-arrow { display: none; }
+  .only-narrow { display: flex; height: 40px; padding-left: 24px; align-items: center; }
+  .only-narrow .wire { width: 2px; height: 100%; }
+  .win-body { grid-template-columns: minmax(0, 1fr); }
+  .win-side { display: none; }
+  .chapters { grid-auto-columns: max-content; overflow-x: auto; scrollbar-width: none; }
+  .chapters::-webkit-scrollbar { display: none; }
+}
+@media (max-width: 760px) {
+  .ch-head, .bands, .door-notes, .foot { grid-template-columns: minmax(0, 1fr); }
+  .pillars { grid-template-columns: minmax(0, 1fr); }
+  .src-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .src.wide { grid-template-columns: auto minmax(0, 1fr); }
+  .src.wide > :last-child { grid-column: 1 / -1; }
+  .agents.n3 { grid-template-columns: minmax(0, 1fr); }
+  .agents.n1 .agent { grid-template-columns: minmax(0, 1fr); }
+  .agents.n1 .agent > dl { grid-column: 1; grid-row: auto; padding: 8px 0 0; border-left: 0; border-top: 1px solid var(--line); }
+  .para { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .scale { grid-template-columns: minmax(0, 1fr); }
+  .rate { flex-direction: row; align-items: baseline; gap: 10px; }
+  .rate b { flex: 0 0 96px; }
+  .drawers, .checks, .facts { grid-template-columns: minmax(0, 1fr); }
+  .win-main { grid-template-columns: minmax(0, 1fr); }
+  .pn.markets, .pn.chart, .pn.watch, .pn.calls, .pn.acct-pn, .pn.ticket { grid-column: 1; }
+  .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .hero-words { padding: 24px 20px 20px; }
+}
+@media (max-width: 520px) {
+  .src-grid, .agents.n2, .leaves, .feats, .para { grid-template-columns: minmax(0, 1fr); }
+  .key { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .drawer li { grid-template-columns: minmax(0, 1fr); }
+  .lead { grid-template-columns: minmax(0, 1fr); }
+  .map, .computer { padding: 12px; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .pulse { display: none; } * { transition: none !important; } }
+</style>
+
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-globe" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18"/></g></symbol>
+    <symbol id="i-compass" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></g></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2z"/><path d="M5 20a2 2 0 0 0 2 1h12v-3M9 7h6M9 10.5h4"/></g></symbol>
+    <symbol id="i-screen" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></g></symbol>
+    <symbol id="i-bank" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 4l9 5.5M5 10v8M9.7 10v8M14.3 10v8M19 10v8M3 20.5h18"/></g></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5.5c0 4.3-3 7.6-7 9.5-4-1.9-7-5.2-7-9.5V6z"/></g></symbol>
+    <symbol id="i-block" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M6 6l12 12"/></g></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"/></g></symbol>
+    <symbol id="i-loop" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 11a7.5 7.5 0 0 1 13-4.5M19.5 3.5v4h-4M19.5 13a7.5 7.5 0 0 1-13 4.5M4.5 20.5v-4h4"/></g></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></g></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H10l-5 4v-4H4z"/><path d="M8 9.5h8M8 12.5h5"/></g></symbol>
+    <symbol id="i-news" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h6M7 12.5h10M7 15.5h10"/></g></symbol>
+    <symbol id="i-ledger" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/></g></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 18L18 5M9 5h9v9"/></g></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6l13 13M18 10v9H9"/></g></symbol>
+    <symbol id="i-scale" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16M8 20h8M5 8h14M5 8l-2.5 6h5zM19 8l-2.5 6h5z"/></g></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/></g><circle cx="12" cy="12" r="1.4" fill="currentColor"/></symbol>
+    <symbol id="i-bolt" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2.5L5 13.5h6l-1 8 8-11h-6z"/></g></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></g><g style="fill: var(--panel)" stroke="currentColor" stroke-width="1.6"><circle cx="9" cy="7" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="7" cy="17" r="2"/></g></symbol>
+    <symbol id="i-flag" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 21V4M5.5 4.5h11.5l-2.5 4 2.5 4H5.5"/></g></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></g></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></g></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></g></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></g></symbol>
+    <symbol id="i-clip" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="4.5" width="13" height="16" rx="2"/><path d="M9 4.5h6v2.5H9zM9 13.5l2 2 4-4"/></g></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 11.5L20.5 4l-7.5 17-2.5-7z"/><path d="M10.5 14l4-4"/></g></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/></g></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4.5 21c.8-3.8 3.7-6 7.5-6s6.7 2.2 7.5 6"/></g></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12.5l4 4 8-9"/></g></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></g></symbol>
+    <symbol id="i-key" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2.5 2.5M14 9l2 2"/></g></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z"/></g></symbol>
+    <symbol id="i-bot" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="8" width="15" height="11" rx="3"/><path d="M12 4.5V8M9 13v1M15 13v1"/></g></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></g></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M6 18l2.5-2.5M15.5 8.5L18 6"/></g></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5L2.5 20h19z"/><path d="M12 10v4.5"/></g><circle cx="12" cy="17.3" r="1.1" fill="currentColor"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></g></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></g></symbol>
+  </defs>
+</svg>
+
+<div class="page">
+
+  <header class="hero at-box">
+    <div class="hero-words">
+      <div class="hero-top">
+        <p class="kicker">Trading Agents 0.9.0 · how the desk works</p>
+        <div class="hero-tools">
+          <a class="icon-btn" href="https://github.com/madavai/Trading-Agents" target="_blank" rel="noopener" aria-label="Trading Agents on GitHub" title="Trading Agents on GitHub"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a>
+          <button type="button" class="icon-btn" id="themeBtn" aria-label="Switch to light mode" title="Switch to light mode"><svg class="ic" aria-hidden="true"><use href="#i-sun"/></svg></button>
+        </div>
+      </div>
+      <h1>Inside the Trading <em>Desk</em></h1>
+      <p class="lede">Trading Agents is a desk of <b>twelve AI agents</b> that studies a stock the way a trading firm would. This page shows how it works, end to end: the data it reads, who does what, where everything is kept, and how <b>your dashboard</b> and <b>Robinhood</b> fit in.</p>
+    </div>
+    <ol class="joined pillars">
+      <li class="pillar edge c-desk"><span class="icbox"><svg class="ic"><use href="#i-compass"/></svg></span><b>Twelve agents research</b><p>They study a stock from free public data, debate it, and propose a rated call.</p></li>
+      <li class="pillar edge c-you"><span class="icbox"><svg class="ic"><use href="#i-screen"/></svg></span><b>You see it beside your accounts</b><p>The call, its reasoning and your Robinhood accounts, on your own dashboard.</p></li>
+      <li class="pillar edge c-rh"><span class="icbox"><svg class="ic"><use href="#i-check"/></svg></span><b>Only your Confirm trades</b><p>One check by Robinhood, one Confirm by you. The agents never trade.</p></li>
+    </ol>
+    <p class="caution"><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg><span><b>Not financial advice.</b> For information and education only, and not a recommendation to buy or sell anything. Anyone who uses the desk does so at their own risk.</span><a href="#notice">Read the notice</a></p>
+  </header>
+
+  <div class="bar">
+    <nav class="joined chapters" aria-label="Chapters">
+      <a href="#glance"><svg class="ic sm" aria-hidden="true"><use href="#i-grid"/></svg>Overview</a>
+      <a href="#sources"><svg class="ic sm" aria-hidden="true"><use href="#i-globe"/></svg>Sources</a>
+      <a href="#agents"><svg class="ic sm" aria-hidden="true"><use href="#i-compass"/></svg>Agents</a>
+      <a href="#journey"><svg class="ic sm" aria-hidden="true"><use href="#i-loop"/></svg>Start to finish</a>
+      <a href="#kept"><svg class="ic sm" aria-hidden="true"><use href="#i-folder"/></svg>Storage</a>
+      <a href="#robinhood"><svg class="ic sm" aria-hidden="true"><use href="#i-bank"/></svg>Robinhood</a>
+      <a href="#dashboard"><svg class="ic sm" aria-hidden="true"><use href="#i-screen"/></svg>Dashboard</a>
+    </nav>
+  </div>
+
+  <!-- 1 -->
+  <section class="chapter" id="glance">
+    <div class="ch-head">
+      <div class="ch-title"><p class="kicker">The whole picture</p><h2>The desk on one page</h2></div>
+      <p>Information flows from left to right. Public data goes in, the agents turn it into a call, the call is kept on your computer, and you decide on the dashboard. Robinhood is reached by the dashboard alone.</p>
+    </div>
+    <figure class="at-box map" aria-label="How the desk fits together">
+      <div class="flow">
+        <div class="lane c-src">
+          <div class="lane-h"><span class="icbox"><svg class="ic"><use href="#i-globe"/></svg></span><div><p class="lane-name">Free sources</p><p class="lane-sub">Public data, no keys</p></div></div>
+          <ul><li>Yahoo Finance</li><li>StockTwits</li><li>Reddit</li><li>FRED</li><li>Polymarket</li><li>SEC EDGAR</li></ul>
+        </div>
+        <div class="link c-src"><span class="lbl">read</span><span class="wire"><span class="pulse"></span></span></div>
+        <div class="lane c-desk">
+          <div class="lane-h"><span class="icbox"><svg class="ic"><use href="#i-compass"/></svg></span><div><p class="lane-name">The desk</p><p class="lane-sub">Twelve agents and their lead</p></div></div>
+          <ul><li>Four analysts</li><li>Bull and bear</li><li>Research manager</li><li>Trader</li><li>Three risk voices</li><li>Portfolio manager</li></ul>
+        </div>
+        <div class="link c-desk"><span class="lbl">save</span><span class="wire"><span class="pulse" style="--d:.5s"></span></span></div>
+        <div class="lane c-store">
+          <div class="lane-h"><span class="icbox"><svg class="ic"><use href="#i-book"/></svg></span><div><p class="lane-name">The records</p><p class="lane-sub">In the project, on this computer</p></div></div>
+          <ul><li>Journal of calls</li><li>Full reports</li><li>Watchlist</li><li>Waiting list</li><li>Your holdings</li><li>Orders log</li></ul>
+        </div>
+        <div class="link c-you"><span class="lbl">show</span><span class="wire two"><span class="pulse" style="--d:1s"></span></span></div>
+        <div class="lane c-you">
+          <div class="lane-h"><span class="icbox"><svg class="ic"><use href="#i-screen"/></svg></span><div><p class="lane-name">Your dashboard</p><p class="lane-sub">On this computer only</p></div></div>
+          <ul><li>Markets and charts</li><li>The desk's calls</li><li>Scorecard</li><li>Your accounts</li><li>Decide, then Confirm</li></ul>
+        </div>
+        <div class="link c-rh"><span class="lbl">three doors</span><span class="wire two"><span class="pulse" style="--d:1.5s"></span></span></div>
+        <div class="lane c-rh">
+          <div class="lane-h"><span class="icbox"><svg class="ic"><use href="#i-bank"/></svg></span><div><p class="lane-name">Robinhood</p><p class="lane-sub">Reached by the dashboard only</p></div></div>
+          <ul><li>Agentic account<small>may trade, on your Confirm</small></li><li>Main account<small>view only</small></li><li>Phone approval<small>if you keep it on</small></li></ul>
+        </div>
+      </div>
+      <div class="joined bands">
+        <p class="band guard c-guard"><svg class="ic"><use href="#i-shield"/></svg><span><b>The guard</b> stands between every agent and your money. No agent has a broker tool or an order tool, and none may open Robinhood's site, your sign-in or the dashboard's address, whatever it is told. Orders come only from your Confirm.</span></p>
+        <p class="band c-desk"><svg class="ic"><use href="#i-loop"/></svg><span><b>Two things flow back.</b> The dashboard shares your holdings with the desk, so the trader and the portfolio manager fit their advice to what you own. And every call is scored five trading days later, so the desk learns from its own record.</span></p>
+      </div>
+    </figure>
+  </section>
+
+  <!-- 2 -->
+  <section class="chapter" id="sources">
+    <div class="ch-head">
+      <div class="ch-title"><p class="kicker">Where the information comes from</p><h2>Seven sources, all public but one</h2></div>
+      <p>Six free public sources feed the agents, with no keys and no accounts. The seventh, Robinhood, is yours and private: only the dashboard reads it. A source that does not answer is reported as unavailable, never as "nothing happened".</p>
+    </div>
+    <div class="joined src-grid">
+      <article class="src edge c-src">
+        <div class="src-h"><span class="icbox"><svg class="ic"><use href="#i-chart"/></svg></span><div><p class="src-name">Yahoo Finance</p><p class="src-kind">Prices, news and company data</p></div></div>
+        <p>Daily prices for charts and indicators, company and world news, and a company's profile, ratios and insider trades.</p>
+        <p class="note"><svg class="ic sm"><use href="#i-clock"/></svg><span>Prices can be up to 15 minutes late. It has no official free service: the desk reads the public pages its website uses, for personal use.</span></p>
+      </article>
+      <article class="src edge c-src">
+        <div class="src-h"><span class="icbox"><svg class="ic"><use href="#i-chat"/></svg></span><div><p class="src-name">StockTwits</p><p class="src-kind">Traders' posts</p></div></div>
+        <p>What traders are saying about the stock right now, with their own bullish or bearish tags.</p>
+        <p class="note"><svg class="ic sm"><use href="#i-clock"/></svg><span>Recent posts only, so a past date gets few.</span></p>
+      </article>
+      <article class="src edge c-src">
+        <div class="src-h"><span class="icbox"><svg class="ic"><use href="#i-chat"/></svg></span><div><p class="src-name">Reddit</p><p class="src-kind">Investor forums</p></div></div>
+        <p>Recent posts from wallstreetbets, stocks and investing; for a coin, from CryptoCurrency and CryptoMarkets.</p>
+        <p class="note"><svg class="ic sm"><use href="#i-clock"/></svg><span>Recent posts only.</span></p>
+      </article>
+      <article class="src edge c-src">
+        <div class="src-h"><span class="icbox"><svg class="ic"><use href="#i-bank"/></svg></span><div><p class="src-name">FRED</p><p class="src-kind">The St. Louis Fed's economic data</p></div></div>
+        <p>Interest rates, bond yields, inflation, jobs and growth, for the US and the euro area.</p>
+        <p class="note"><svg class="ic sm"><use href="#i-clock"/></svg><span>For a past date, only figures that were already published by then.</span></p>
+      </article>
+      <article class="src edge c-src">
+        <div class="src-h"><span class="icbox"><svg class="ic"><use href="#i-spark"/></svg></span><div><p class="src-name">Polymarket</p><p class="src-kind">Prediction-market odds</p></div></div>
+        <p>The crowd's priced chance of events ahead: rate decisions, recession, elections, conflicts and crypto.</p>
+        <p class="note"><svg class="ic sm"><use href="#i-clock"/></svg><span>Live odds only, so a past date gets none.</span></p>
+      </article>
+      <article class="src edge c-src">
+        <div class="src-h"><span class="icbox"><svg class="ic"><use href="#i-ledger"/></svg></span><div><p class="src-name">SEC EDGAR</p><p class="src-kind">Company filings</p></div></div>
+        <p>A US company's accounts exactly as filed: revenue, profit, cash and debt, quarter by quarter.</p>
+        <p class="note"><svg class="ic sm"><use href="#i-key"/></svg><span>The SEC asks every reader for a contact email, so the desk sends yours, to the SEC alone.</span></p>
+      </article>
+      <article class="src wide edge c-rh">
+        <span class="icbox lg"><svg class="ic lg"><use href="#i-bank"/></svg></span>
+        <div><p class="src-name">Robinhood</p><p class="src-kind">Private, and yours</p></div>
+        <p>Your accounts: value, cash, buying power, holdings, live prices, orders and whether trades need your phone's approval. Read by the dashboard alone, after you connect it yourself. The agents see only the holdings the dashboard shares with them.</p>
+      </article>
+    </div>
+    <div class="matrix-wrap at-box">
+      <table class="matrix">
+        <caption class="quiet">Who reads what. A dot means that agent, or the dashboard, reads that source; the words say what it takes.</caption>
+        <thead>
+          <tr><th scope="col">Source</th><th scope="col">Market<small>analyst</small></th><th scope="col">Sentiment<small>analyst</small></th><th scope="col">News<small>analyst</small></th><th scope="col">Fundamentals<small>analyst</small></th><th scope="col">Trader<small>agent</small></th><th scope="col">Dashboard<small>yours</small></th></tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">Yahoo Finance</th><td><span class="cell c-src">prices, indicators</span></td><td><span class="cell c-src">headlines</span></td><td><span class="cell c-src">company and world news</span></td><td><span class="cell c-src">profile, ratios, insider trades</span></td><td><span class="cell c-src">checked price table</span></td><td><span class="cell c-src">markets, charts</span></td></tr>
+          <tr><th scope="row">StockTwits</th><td><span class="none" aria-label="no"></span></td><td><span class="cell c-src">traders' posts</span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td></tr>
+          <tr><th scope="row">Reddit</th><td><span class="none" aria-label="no"></span></td><td><span class="cell c-src">forum posts</span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td></tr>
+          <tr><th scope="row">FRED</th><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="cell c-src">economic figures</span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td></tr>
+          <tr><th scope="row">Polymarket</th><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="cell c-src">odds</span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td></tr>
+          <tr><th scope="row">SEC EDGAR</th><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="cell c-src">filed accounts</span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td></tr>
+          <tr><th scope="row">Robinhood</th><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="cell c-rh">your accounts</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 3 -->
+  <section class="chapter" id="agents">
+    <div class="ch-head">
+      <div class="ch-title"><p class="kicker">The role of each agent, and who does what</p><h2>Twelve agents in five stations</h2></div>
+      <p>The desk is laid out like a trading firm. Each station hands its work to the next, and each agent saves its part where the others can read it. A lead runs the line.</p>
+    </div>
+    <article class="at-box lead c-desk">
+      <span class="icbox lg"><svg class="ic lg"><use href="#i-compass"/></svg></span>
+      <div>
+        <p class="lead-name">trading-desk, the lead</p>
+        <p>The team you put to work in Madav / Claude. It <b>plans</b> each analysis, <b>calls each agent</b> in turn and checks it saved its work, <b>writes the report</b>, <b>records the call</b>, scores past calls, runs the morning and evening routines, and opens the dashboard. It has no order tool.</p>
+      </div>
+    </article>
+    <div class="stations">
+      <div class="station">
+        <div class="st-words">
+          <div class="st-top"><span class="st-num">1</span><p class="st-name">The analysts</p></div>
+          <p class="st-makes">Gather the facts, all four at once. Makes <b>four reports</b>.</p>
+          <p class="why"><b>Why it matters.</b> Everything after this argues from these reports. Every exact figure comes from the data, never from memory.</p>
+        </div>
+        <div class="joined agents n2">
+          <article class="agent edge c-desk">
+            <div class="agent-h"><span class="icbox"><svg class="ic"><use href="#i-chart"/></svg></span><div><p class="agent-name">Market analyst</p><p class="agent-id">market-analyst</p></div></div>
+            <p class="agent-role">Reads the price chart with thirteen indicators: moving averages, MACD, RSI, Bollinger bands, ATR, money flow and more.</p>
+            <dl><dt>Reads</dt><dd>Yahoo Finance prices, the checked price table</dd><dt>Writes</dt><dd>The market report</dd></dl>
+          </article>
+          <article class="agent edge c-desk">
+            <div class="agent-h"><span class="icbox"><svg class="ic"><use href="#i-chat"/></svg></span><div><p class="agent-name">Sentiment analyst</p><p class="agent-id">sentiment-analyst</p></div></div>
+            <p class="agent-role">Measures the mood around the stock this week: what the headlines say and how traders feel.</p>
+            <dl><dt>Reads</dt><dd>News headlines, StockTwits, Reddit</dd><dt>Writes</dt><dd>The sentiment report</dd></dl>
+          </article>
+          <article class="agent edge c-desk">
+            <div class="agent-h"><span class="icbox"><svg class="ic"><use href="#i-news"/></svg></span><div><p class="agent-name">News analyst</p><p class="agent-id">news-analyst</p></div></div>
+            <p class="agent-role">Puts the stock in the bigger picture: company news, world events, the economy and the odds of what comes next.</p>
+            <dl><dt>Reads</dt><dd>Company and world news, FRED, Polymarket</dd><dt>Writes</dt><dd>The news report</dd></dl>
+          </article>
+          <article class="agent edge c-desk">
+            <div class="agent-h"><span class="icbox"><svg class="ic"><use href="#i-ledger"/></svg></span><div><p class="agent-name">Fundamentals analyst</p><p class="agent-id">fundamentals-analyst</p></div></div>
+            <p class="agent-role">Checks the business itself: its accounts as filed, its ratios, and who inside the company is buying or selling. Not used for a coin.</p>
+            <dl><dt>Reads</dt><dd>SEC filings, Yahoo profile, ratios, insider trades</dd><dt>Writes</dt><dd>The fundamentals report</dd></dl>
+          </article>
+        </div>
+      </div>
+
+      <div class="station">
+        <div class="st-words">
+          <div class="st-top"><span class="st-num">2</span><p class="st-name">The researchers</p></div>
+          <p class="st-makes">Argue both sides in turn. Makes <b>the investment plan</b>.</p>
+          <p class="why"><b>Why it matters.</b> A case is trusted only after the other side has had its say. The depth you choose sets the turns: 1, 3 or 5.</p>
+        </div>
+        <div class="joined agents n3">
+          <article class="agent edge c-bull">
+            <div class="agent-h"><span class="icbox"><svg class="ic"><use href="#i-up"/></svg></span><div><p class="agent-name">Bull researcher</p><p class="agent-id">bull-researcher</p></div></div>
+            <p class="agent-role">Builds the strongest case for the stock, from the four reports.</p>
+            <dl><dt>Reads</dt><dd>The reports, the bear's last turn</dd><dt>Writes</dt><dd>Its turns of the debate</dd></dl>
+          </article>
+          <article class="agent edge c-bear">
+            <div class="agent-h"><span class="icbox"><svg class="ic"><use href="#i-down"/></svg></span><div><p class="agent-name">Bear researcher</p><p class="agent-id">bear-researcher</p></div></div>
+            <p class="agent-role">Builds the strongest case against, and answers the bull point by point.</p>
+            <dl><dt>Reads</dt><dd>The reports, the bull's last turn</dd><dt>Writes</dt><dd>Its turns of the debate</dd></dl>
+          </article>
+          <article class="agent edge c-desk">
+            <div class="agent-h"><span class="icbox"><svg class="ic"><use href="#i-scale"/></svg></span><div><p class="agent-name">Research manager</p><p class="agent-id">research-manager</p></div></div>
+            <p class="agent-role">Judges the debate, decides which side made the better case, and writes the plan.</p>
+            <dl><dt>Reads</dt><dd>The whole debate</dd><dt>Writes</dt><dd>The investment plan</dd></dl>
+          </article>
+        </div>
+      </div>
+
+      <div class="station">
+        <div class="st-words">
+          <div class="st-top"><span class="st-num">3</span><p class="st-name">The trader</p></div>
+          <p class="st-makes">Makes the plan concrete. Makes <b>the trade proposal</b>.</p>
+          <p class="why"><b>Why it matters.</b> A view becomes a trade you can judge: a price, a stop and a size, fitted to your Agentic account.</p>
+        </div>
+        <div class="joined agents n1">
+          <article class="agent edge c-desk">
+            <div class="agent-h"><span class="icbox"><svg class="ic"><use href="#i-target"/></svg></span><div><p class="agent-name">Trader</p><p class="agent-id">trader</p></div></div>
+            <p class="agent-role">Turns the plan into a proposal: when to enter, where to stop a loss, and how much to buy or sell.</p>
+            <dl><dt>Reads</dt><dd>The investment plan, the checked price table, your holdings</dd><dt>Writes</dt><dd>The trade proposal</dd></dl>
+          </article>
+        </div>
+      </div>
+
+      <div class="station">
+        <div class="st-words">
+          <div class="st-top"><span class="st-num">4</span><p class="st-name">The risk team</p></div>
+          <p class="st-makes">Stress-test the proposal in turn. Makes <b>the risk debate</b>.</p>
+          <p class="why"><b>Why it matters.</b> The trade is challenged by three temperaments before anyone rules on it.</p>
+        </div>
+        <div class="joined agents n3">
+          <article class="agent c-desk">
+            <div class="agent-h"><span class="icbox"><svg class="ic"><use href="#i-bolt"/></svg></span><div><p class="agent-name">Aggressive</p><p class="agent-id">aggressive-risk-analyst</p></div></div>
+            <p class="agent-role">Argues for the bigger reward, even at more risk.</p>
+            <dl><dt>Reads</dt><dd>The proposal, the other two voices</dd><dt>Writes</dt><dd>Its turns</dd></dl>
+          </article>
+          <article class="agent edge c-rh">
+            <div class="agent-h"><span class="icbox"><svg class="ic"><use href="#i-shield"/></svg></span><div><p class="agent-name">Conservative</p><p class="agent-id">conservative-risk-analyst</p></div></div>
+            <p class="agent-role">Argues to protect what you have and limit the loss.</p>
+            <dl><dt>Reads</dt><dd>The proposal, the other two voices</dd><dt>Writes</dt><dd>Its turns</dd></dl>
+          </article>
+          <article class="agent c-desk">
+            <div class="agent-h"><span class="icbox"><svg class="ic"><use href="#i-sliders"/></svg></span><div><p class="agent-name">Neutral</p><p class="agent-id">neutral-risk-analyst</p></div></div>
+            <p class="agent-role">Weighs the two and argues for a balanced trade.</p>
+            <dl><dt>Reads</dt><dd>The proposal, the other two voices</dd><dt>Writes</dt><dd>Its turns</dd></dl>
+          </article>
+        </div>
+      </div>
+
+      <div class="station">
+        <div class="st-words">
+          <div class="st-top"><span class="st-num">5</span><p class="st-name">The portfolio manager</p></div>
+          <p class="st-makes">Rules on it. Makes <b>the call</b>.</p>
+          <p class="why"><b>Why it matters.</b> One clear rating, which the dashboard can turn into an order ticket. It also weighs how the desk's past calls scored.</p>
+        </div>
+        <div class="joined agents n1">
+          <article class="agent edge c-desk">
+            <div class="agent-h"><span class="icbox"><svg class="ic"><use href="#i-flag"/></svg></span><div><p class="agent-name">Portfolio manager</p><p class="agent-id">portfolio-manager</p></div></div>
+            <p class="agent-role">Gives the final rating on a five-step scale, with a short summary of why.</p>
+            <dl><dt>Reads</dt><dd>The risk debate, lessons from past calls, your holdings</dd><dt>Writes</dt><dd>The decision and its rating</dd></dl>
+          </article>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 -->
+  <section class="chapter" id="journey">
+    <div class="ch-head">
+      <div class="ch-title"><p class="kicker">Each agent's part in one call, start to finish</p><h2>One call, from question to order</h2></div>
+      <p>Thirteen steps in three parts: the desk researches, you decide, and the desk learns. Choose a depth below to see how the two debates grow.</p>
+    </div>
+    <div class="at-box depth">
+      <p class="depth-l"><svg class="ic"><use href="#i-sliders"/></svg>Depth of the analysis</p>
+      <div class="at-seg" id="depth" role="group" aria-label="Depth of the analysis">
+        <button type="button" id="depth-1" data-d="1" aria-pressed="true">Shallow <b>1</b></button>
+        <button type="button" id="depth-3" data-d="3" aria-pressed="false">Medium <b>3</b></button>
+        <button type="button" id="depth-5" data-d="5" aria-pressed="false">Deep <b>5</b></button>
+      </div>
+      <span id="depth-note">1 turn each. The desk's setting today.</span>
+    </div>
+
+    <div class="phases">
+      <div class="phase">
+        <div class="phase-h s9"><h3>The desk researches</h3><span>Steps 1 to 9. A few minutes, more at depth.</span></div>
+        <ol class="steps">
+          <li class="step c-you"><span class="badge">1</span><div class="step-body">
+            <div class="step-h"><p class="step-title">You ask</p><span class="at-chip c-you"><i></i>You</span></div>
+            <p>In Madav / Claude: ask the team ("analyse NVDA"), or type /analyse NVDA in a chat. Or from a morning routine, or with the robot button on a watchlist stock.</p>
+            <p class="why"><b>Why it matters.</b> Nothing starts on its own. A routine runs only because you scheduled it.</p>
+          </div></li>
+          <li class="step c-desk"><span class="badge">2</span><div class="step-body">
+            <div class="step-h"><p class="step-title">Past calls are scored first</p><span class="at-chip c-desk"><i></i>The lead</span></div>
+            <p>Any call whose five trading days are up is scored against its market's index, and gets a short lesson.</p>
+            <p class="why"><b>Why it matters.</b> Today's analysis starts from the desk's own track record.</p>
+          </div></li>
+          <li class="step c-desk"><span class="badge">3</span><div class="step-body">
+            <div class="step-h"><p class="step-title">The plan</p><span class="at-chip c-desk"><i></i>The lead</span></div>
+            <p>Which analysts run, how many turns, the report's language, <b>your holdings</b> as the dashboard last read them, and the lessons. The first time, it asks for your email for the SEC.</p>
+            <p class="why"><b>Why it matters.</b> Every agent works from the same brief, so a run can stop and resume where it left off.</p>
+          </div></li>
+          <li class="step c-src"><span class="badge">4</span><div class="step-body">
+            <div class="step-h"><p class="step-title">Four analysts gather the facts</p><span class="at-chip c-desk"><i></i>Analysts</span><span class="at-chip c-src"><i></i>Free sources</span></div>
+            <div class="joined para">
+              <div class="mini"><p class="mini-h"><svg class="ic sm"><use href="#i-chart"/></svg>Market</p><p class="quiet">Prices, indicators</p></div>
+              <div class="mini"><p class="mini-h"><svg class="ic sm"><use href="#i-chat"/></svg>Sentiment</p><p class="quiet">Headlines, posts</p></div>
+              <div class="mini"><p class="mini-h"><svg class="ic sm"><use href="#i-news"/></svg>News</p><p class="quiet">News, economy, odds</p></div>
+              <div class="mini"><p class="mini-h"><svg class="ic sm"><use href="#i-ledger"/></svg>Fundamentals</p><p class="quiet">Filed accounts</p></div>
+            </div>
+            <p class="why"><b>Why it matters.</b> All four run at the same time. Their reports are the evidence the rest of the desk argues from.</p>
+          </div></li>
+          <li class="step c-desk"><span class="badge">5</span><div class="step-body">
+            <div class="step-h"><p class="step-title">The research debate</p><span class="at-chip c-bull"><i></i>Bull</span><span class="at-chip c-bear"><i></i>Bear</span><span class="at-chip c-desk"><i></i>Research manager</span></div>
+            <div class="turns" id="research-turns" aria-live="polite"></div>
+            <p class="why"><b>Why it matters.</b> Bull speaks first, bear answers, turn by turn. The manager then writes the investment plan.</p>
+          </div></li>
+          <li class="step c-desk"><span class="badge">6</span><div class="step-body">
+            <div class="step-h"><p class="step-title">The trade proposal</p><span class="at-chip c-desk"><i></i>Trader</span></div>
+            <p>Entry, stop and size, from the plan, the checked price table and your holdings.</p>
+            <p class="why"><b>Why it matters.</b> The plan becomes something specific enough to test.</p>
+          </div></li>
+          <li class="step c-desk"><span class="badge">7</span><div class="step-body">
+            <div class="step-h"><p class="step-title">The risk debate</p><span class="at-chip c-warm"><i></i>Aggressive</span><span class="at-chip c-rh"><i></i>Conservative</span><span class="at-chip c-mid"><i></i>Neutral</span></div>
+            <div class="turns" id="risk-turns" aria-live="polite"></div>
+            <p class="why"><b>Why it matters.</b> Three temperaments challenge the trade, in that order, turn by turn.</p>
+          </div></li>
+          <li class="step c-desk"><span class="badge">8</span><div class="step-body">
+            <div class="step-h"><p class="step-title">The call</p><span class="at-chip c-desk"><i></i>Portfolio manager</span></div>
+            <p>A rating on five steps. Under each, what the dashboard's ticket will propose for it.</p>
+            <div class="joined scale">
+              <div class="rate c-bear"><b>Sell</b><span>Sell everything held</span></div>
+              <div class="rate soft c-bear"><b>Underweight</b><span>Sell half of what is held</span></div>
+              <div class="rate mid c-mid"><b>Hold</b><span>No order</span></div>
+              <div class="rate soft c-bull"><b>Overweight</b><span>Buy half a position</span></div>
+              <div class="rate c-bull"><b>Buy</b><span>Buy a full position: 10% of the account</span></div>
+            </div>
+            <p class="why"><b>Why it matters.</b> One clear word that the whole desk stands behind, with its reasons in the report.</p>
+          </div></li>
+          <li class="step c-store"><span class="badge">9</span><div class="step-body">
+            <div class="step-h"><p class="step-title">Recorded</p><span class="at-chip c-desk"><i></i>The lead</span><span class="at-chip c-store"><i></i>Records</span></div>
+            <p>The complete report, a page per agent, and the call in the journal. The dashboard shows it straight away.</p>
+            <p class="why"><b>Why it matters.</b> You can read every step of the reasoning before you decide anything.</p>
+          </div></li>
+        </ol>
+      </div>
+
+      <div class="phase">
+        <div class="phase-h s3"><h3>You decide</h3><span>Steps 10 to 12. On the dashboard, when you choose.</span></div>
+        <ol class="steps" start="10">
+          <li class="step c-you"><span class="badge">10</span><div class="step-body">
+            <div class="step-h"><p class="step-title">You open a ticket</p><span class="at-chip c-you"><i></i>You</span><span class="at-chip c-you"><i></i>Dashboard</span></div>
+            <p><b>Decide…</b> on the call proposes an order for the Agentic account, sized from the rating and checked against your caps.</p>
+            <div class="caps"><span class="at-chip"><b>$500</b> an order at most</span><span class="at-chip"><b>10%</b> of the account in one stock</span><span class="at-chip"><b>3</b> orders a day</span><span class="at-chip">Limit orders, good for the day</span></div>
+            <p class="why"><b>Why it matters.</b> Your own limits, set in the desk's settings, stand between a call and an order.</p>
+          </div></li>
+          <li class="step c-rh"><span class="badge">11</span><div class="step-body">
+            <div class="step-h"><p class="step-title">Robinhood checks it</p><span class="at-chip c-you"><i></i>Dashboard</span><span class="at-chip c-rh"><i></i>Robinhood</span></div>
+            <p><b>Review with Robinhood</b> asks for Robinhood's own dry run of that exact order. Nothing is placed.</p>
+            <p class="why"><b>Why it matters.</b> Robinhood's alerts come back in its own words before any money moves.</p>
+          </div></li>
+          <li class="step c-you"><span class="badge">12</span><div class="step-body">
+            <div class="step-h"><p class="step-title">You confirm</p><span class="at-chip c-you"><i></i>You</span><span class="at-chip c-rh"><i></i>Robinhood</span></div>
+            <p>Only with trading switched on, by you: <b>Place order…</b>, then the button naming the exact order, such as "Confirm: Buy 1 NVDA at $182.40". Robinhood can ask on your phone too. The dashboard logs what it sent and what Robinhood answered.</p>
+            <p class="why"><b>Why it matters.</b> This is the only way an order is ever placed. Seven checks guard it: see the Robinhood chapter.</p>
+          </div></li>
+        </ol>
+      </div>
+
+      <div class="phase">
+        <div class="phase-h s1"><h3>The desk learns</h3><span>Step 13. Five trading days later.</span></div>
+        <ol class="steps" start="13">
+          <li class="step c-desk"><span class="badge">13</span><div class="step-body">
+            <div class="step-h"><p class="step-title">Scored and learned</p><span class="at-chip c-desk"><i></i>The lead</span></div>
+            <p>The call's return is compared with its market's index, such as SPY for a US stock, and a lesson is written. The scorecard on the dashboard updates.</p>
+            <span class="loop"><svg class="ic sm"><use href="#i-loop"/></svg>The lesson goes into step 2 of the next analysis.</span>
+          </div></li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="at-box aside"><svg class="ic"><use href="#i-clock"/></svg><span><b>The routines run this same line for you.</b> The morning routine scores past calls, then analyses what is waiting and your starred stocks (at most five), and lists the new calls to decide on. The evening wrap-up scores what is ready and reports the day's calls and orders. Neither places an order.</span></div>
+  </section>
+
+  <!-- 5 -->
+  <section class="chapter" id="kept">
+    <div class="ch-head">
+      <div class="ch-title"><p class="kicker">How the information is stored</p><h2>Four places, all on this computer</h2></div>
+      <p>The desk keeps nothing in the cloud. The records live in the project folder, your rules in one settings file, your Robinhood sign-in in a private folder of its own, and the agents where Madav / Claude reads them.</p>
+    </div>
+    <div class="computer">
+      <p class="computer-h"><svg class="ic"><use href="#i-screen"/></svg>This computer</p>
+      <div class="joined drawers">
+        <article class="drawer edge c-store">
+          <div class="drawer-h"><span class="icbox lg"><svg class="ic lg"><use href="#i-folder"/></svg></span><div><p class="drawer-name">The desk's records</p><p class="drawer-where">In the project's <code>desk-data</code> folder. Never uploaded to GitHub.</p></div></div>
+          <ul>
+            <li><b>Journal</b><span>Every call and its rating; once scored, its return against the index and its lesson.</span></li>
+            <li><b>Reports</b><span>A folder per analysis: a page per agent and the complete report.</span></li>
+            <li><b>Watchlist</b><span>Your stocks, and which ones you starred.</span></li>
+            <li><b>Waiting list</b><span>Stocks you asked the desk to analyse from the dashboard.</span></li>
+            <li><b>Holdings</b><span>What you hold, as the dashboard last read it from Robinhood.</span></li>
+            <li><b>Orders log</b><span>Each order the dashboard sent, and what Robinhood answered.</span></li>
+            <li><b>Your email</b><span>For the SEC, and only the SEC.</span></li>
+            <li><b>Back-tests</b><span>Kept in journals of their own, apart from your real calls.</span></li>
+          </ul>
+        </article>
+        <article class="drawer edge c-desk">
+          <div class="drawer-h"><span class="icbox lg"><svg class="ic lg"><use href="#i-sliders"/></svg></span><div><p class="drawer-name">Your rules</p><p class="drawer-where">The project's <code>desk-settings.json</code>. Edit it freely.</p></div></div>
+          <ul>
+            <li><b>Analysis</b><span>Which analysts, how many debate turns, the report's language.</span></li>
+            <li><b>Scoring</b><span>Five trading days, against the index of the stock's market.</span></li>
+            <li><b>Trading caps</b><span>$500 an order, 10% of the account in one stock, 3 orders a day; a full position is 10% of the account.</span></li>
+            <li><b>Routines</b><span>At most five analyses a morning.</span></li>
+            <li><b>Safety net</b><span>A value out of range falls back to the shipped one, never to a larger one.</span></li>
+          </ul>
+        </article>
+        <article class="drawer edge c-you">
+          <div class="drawer-h"><span class="icbox lg"><svg class="ic lg"><use href="#i-lock"/></svg></span><div><p class="drawer-name">Your private folder</p><p class="drawer-where">In your home folder, outside the project. Agents are refused it.</p></div></div>
+          <ul>
+            <li><b>Robinhood sign-in</b><span>Kept after you connect on Robinhood's own page. The dashboard never sees your password.</span></li>
+            <li><b>Chosen accounts</b><span>Which accounts to show, by a fingerprint rather than their numbers.</span></li>
+            <li><b>Trading switch</b><span>Off when shipped. Only you turn it on, on the dashboard.</span></li>
+          </ul>
+        </article>
+        <article class="drawer edge c-desk">
+          <div class="drawer-h"><span class="icbox lg"><svg class="ic lg"><use href="#i-grid"/></svg></span><div><p class="drawer-name">Madav / Claude</p><p class="drawer-where">Madav's Agent Studio and scheduler, or Claude in this project.</p></div></div>
+          <ul>
+            <li><b>The agents</b><span>The twelve agents and the lead, read by Madav / Claude from the project's agents folder.</span></li>
+            <li><b>The team</b><span>Its line-up, shipped beside the lead for Madav's Teams tab; if you change it there, yours wins. In Claude, the lead calls the same twelve agents.</span></li>
+            <li><b>Routines</b><span>Madav's scheduler runs the morning routine and the evening wrap-up when you choose. In Claude, you start them with /routine.</span></li>
+          </ul>
+        </article>
+      </div>
+      <p class="never"><svg class="ic"><use href="#i-lock"/></svg><span><b>Never kept anywhere:</b> your full account numbers. The dashboard shows only their last four characters.</span></p>
+    </div>
+    <div class="leaves-wrap">
+      <p class="leaves-h">What leaves this computer</p>
+      <div class="joined leaves">
+        <div class="leave edge c-src"><p class="leave-h"><svg class="ic sm"><use href="#i-globe"/></svg>To the free sources</p><p>Only what the desk asks for, such as a stock's prices or news.</p></div>
+        <div class="leave edge c-src"><p class="leave-h"><svg class="ic sm"><use href="#i-ledger"/></svg>To the SEC</p><p>The same, plus your email, which it asks every reader for.</p></div>
+        <div class="leave edge c-desk"><p class="leave-h"><svg class="ic sm"><use href="#i-spark"/></svg>To Claude</p><p>The agents think with Claude, so what they read and write passes through it while they work.</p></div>
+        <div class="leave edge c-rh"><p class="leave-h"><svg class="ic sm"><use href="#i-bank"/></svg>To Robinhood</p><p>The dashboard's reads, its dry-run checks, and the orders you confirm.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 -->
+  <section class="chapter" id="robinhood">
+    <div class="ch-head">
+      <div class="ch-title"><p class="kicker">How it connects to Robinhood</p><h2>Three narrow doors</h2></div>
+      <p>Robinhood offers an agent connection with many tools. The desk uses it through three doors only, all inside your dashboard. Each door can do one thing, and the agents cannot reach any of them.</p>
+    </div>
+    <div class="doors">
+      <div class="at-box d-agents c-desk">
+        <p class="d-title"><span class="icbox"><svg class="ic"><use href="#i-compass"/></svg></span>The agents</p>
+        <p>Twelve agents and their lead. They read the holdings the dashboard shares, and nothing more.</p>
+        <ul class="refused">
+          <li><svg class="ic sm"><use href="#i-block"/></svg>No broker or order tool</li>
+          <li><svg class="ic sm"><use href="#i-block"/></svg>No Robinhood site</li>
+          <li><svg class="ic sm"><use href="#i-block"/></svg>No sign-in folder</li>
+          <li><svg class="ic sm"><use href="#i-block"/></svg>No dashboard address</li>
+        </ul>
+      </div>
+      <div class="d-x"><span class="wall"></span><span class="xmark"><svg class="ic sm"><use href="#i-x"/></svg></span><span class="lbl">refused by the guard</span><span class="wall"></span></div>
+      <div class="at-box door c-you r1">
+        <span class="icbox"><svg class="ic"><use href="#i-eye"/></svg></span>
+        <p class="door-name">The read door</p>
+        <p>Only reads: your accounts, value, cash, buying power, holdings, live prices, orders and the phone-approval setting. Both accounts.</p>
+      </div>
+      <div class="d-arrow r1"><span class="wire"></span></div>
+      <div class="at-box door c-you r2">
+        <span class="icbox"><svg class="ic"><use href="#i-clip"/></svg></span>
+        <p class="door-name">The check door</p>
+        <p>Only asks for Robinhood's dry run of one order. Nothing is placed.</p>
+      </div>
+      <div class="d-arrow r2"><span class="wire"></span></div>
+      <div class="at-box door c-you r3">
+        <span class="icbox"><svg class="ic"><use href="#i-send"/></svg></span>
+        <p class="door-name">The place door <span class="at-chip c-you"><i></i>your Confirm</span></p>
+        <p>Only places one limit order, in the Agentic account, after every check below.</p>
+      </div>
+      <div class="d-arrow r3"><span class="wire"></span></div>
+      <div class="only-narrow" aria-hidden="true"><span class="wire"></span></div>
+      <div class="at-box d-rh c-rh">
+        <p class="d-title"><span class="icbox"><svg class="ic"><use href="#i-bank"/></svg></span>Robinhood</p>
+        <div class="acct agentic"><b>Agentic account</b><p>The only account the desk can trade, and only on your Confirm. You fund it yourself.</p></div>
+        <div class="acct"><b>Main account</b><p>View only. The desk never trades here.</p></div>
+        <p><svg class="ic sm" style="display:inline-block;vertical-align:-2px;color:var(--accent)"><use href="#i-phone"/></svg> With phone approval on, Robinhood asks you once more before an order reaches the market.</p>
+      </div>
+    </div>
+    <div class="joined door-notes">
+      <p class="signin edge c-you"><svg class="ic"><use href="#i-key"/></svg><span><b>Connecting is yours to do</b>On the dashboard you press Connect Robinhood and sign in on Robinhood's own page. The sign-in is kept in your private folder; the dashboard never sees your password, and Disconnect forgets it.</span></p>
+      <div class="checks-box edge c-rh">
+        <p class="checks-h"><span class="icbox"><svg class="ic"><use href="#i-lock"/></svg></span>Before the place door opens, all of these must hold</p>
+        <ul class="checks">
+          <li><span class="tick"><svg class="ic sm"><use href="#i-check"/></svg></span><span>You switched trading on yourself. It ships off.</span></li>
+          <li><span class="tick"><svg class="ic sm"><use href="#i-check"/></svg></span><span>Robinhood checked this exact order with no alerts, less than five minutes ago.</span></li>
+          <li><span class="tick"><svg class="ic sm"><use href="#i-check"/></svg></span><span>Nothing in the order changed since that check.</span></li>
+          <li><span class="tick"><svg class="ic sm"><use href="#i-check"/></svg></span><span>Every cap passes again, on figures just read from Robinhood.</span></li>
+          <li><span class="tick"><svg class="ic sm"><use href="#i-check"/></svg></span><span>You pressed Confirm on the words of that exact order.</span></li>
+          <li><span class="tick"><svg class="ic sm"><use href="#i-check"/></svg></span><span>One order per ticket, with Robinhood's own guard against a repeat.</span></li>
+          <li><span class="tick"><svg class="ic sm"><use href="#i-check"/></svg></span><span>The order is for the Agentic account, never your main one.</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 -->
+  <section class="chapter" id="dashboard">
+    <div class="ch-head">
+      <div class="ch-title"><p class="kicker">And finally, the dashboard</p><h2>Where you decide</h2></div>
+      <p>A page that runs on your own computer, in the Madav House theme. The team opens it for you when you ask ("open the dashboard"). Its shape is shown here without figures; yours fills it with real ones.</p>
+    </div>
+    <figure class="window" aria-label="The dashboard's layout">
+      <div class="win-top"><i></i><i></i><i></i><span>Trading Agents, on this computer</span></div>
+      <div class="win-body">
+        <ul class="win-side">
+          <li class="on"><svg class="ic sm"><use href="#i-chart"/></svg>Markets</li>
+          <li><svg class="ic sm"><use href="#i-star"/></svg>Watchlist</li>
+          <li><svg class="ic sm"><use href="#i-flag"/></svg>The desk's calls</li>
+          <li><svg class="ic sm"><use href="#i-target"/></svg>How the desk is doing</li>
+          <li><svg class="ic sm"><use href="#i-ledger"/></svg>Stock page</li>
+          <li><svg class="ic sm"><use href="#i-bank"/></svg>Your account</li>
+        </ul>
+        <div class="win-main">
+          <div class="at-box pn markets"><p class="pn-h">Markets <small>Yahoo Finance</small></p>
+            <div class="joined tiles"><span class="tile">S&amp;P 500<span class="sk" style="width:70%"></span></span><span class="tile">Nasdaq<span class="sk" style="width:60%"></span></span><span class="tile">Dow<span class="sk" style="width:66%"></span></span><span class="tile">VIX<span class="sk" style="width:48%"></span></span><span class="tile">10-year yield<span class="sk" style="width:55%"></span></span><span class="tile">Bitcoin<span class="sk" style="width:72%"></span></span></div>
+          </div>
+          <div class="at-box pn chart"><p class="pn-h">Chart <small>area or candles</small></p>
+            <svg viewBox="0 0 400 120" preserveAspectRatio="none" aria-hidden="true">
+              <defs><linearGradient id="g-area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#06AEFE" stop-opacity="0.28"/><stop offset="1" stop-color="#06AEFE" stop-opacity="0"/></linearGradient></defs>
+              <path d="M0 90 L30 84 L60 88 L90 70 L120 74 L150 60 L180 66 L210 50 L240 56 L270 40 L300 46 L330 30 L360 36 L400 22 L400 104 L0 104 Z" fill="url(#g-area)"/>
+              <path d="M0 90 L30 84 L60 88 L90 70 L120 74 L150 60 L180 66 L210 50 L240 56 L270 40 L300 46 L330 30 L360 36 L400 22" fill="none" stroke="#06AEFE" stroke-width="2"/>
+              <path d="M0 92 C100 84 200 66 400 40" fill="none" style="stroke: var(--text-3)" stroke-width="1.4" stroke-dasharray="4 4"/>
+              <g style="fill: var(--line-strong)"><rect x="8" y="108" width="10" height="12"/><rect x="48" y="112" width="10" height="8"/><rect x="88" y="106" width="10" height="14"/><rect x="128" y="111" width="10" height="9"/><rect x="168" y="109" width="10" height="11"/><rect x="208" y="105" width="10" height="15"/><rect x="248" y="110" width="10" height="10"/><rect x="288" y="107" width="10" height="13"/><rect x="328" y="111" width="10" height="9"/><rect x="368" y="106" width="10" height="14"/></g>
+            </svg>
+          </div>
+          <div class="at-box pn watch"><p class="pn-h">Watchlist</p>
+            <ul class="wl">
+              <li><svg class="ic sm star"><use href="#i-star"/></svg><span class="sk"></span><svg class="ic sm bot"><use href="#i-bot"/></svg></li>
+              <li><svg class="ic sm"><use href="#i-star"/></svg><span class="sk" style="max-width:70%"></span><svg class="ic sm bot"><use href="#i-bot"/></svg></li>
+              <li><svg class="ic sm"><use href="#i-star"/></svg><span class="sk" style="max-width:82%"></span><svg class="ic sm bot"><use href="#i-bot"/></svg></li>
+            </ul>
+          </div>
+          <div class="at-box pn calls"><p class="pn-h">The desk's calls</p>
+            <div class="callrow"><span class="sk"></span><span class="rchip c-bull">Buy</span><span class="dec">Decide…</span></div>
+            <div class="callrow"><span class="sk" style="max-width:60%"></span><span class="rchip c-mid">Hold</span><span class="dec">Decide…</span></div>
+            <div class="callrow"><span class="sk" style="max-width:75%"></span><span class="rchip c-bull">Overweight</span><span class="dec">Decide…</span></div>
+          </div>
+          <div class="at-box pn acct-pn"><p class="pn-h">Your account <small>from Robinhood</small></p>
+            <div class="joined acards">
+              <div class="acard edge c-rh"><b>Agentic</b>may trade, on your Confirm<span class="sk"></span><span class="sk" style="width:60%"></span></div>
+              <div class="acard"><b>Main</b>view only<span class="sk"></span><span class="sk" style="width:70%"></span></div>
+            </div>
+          </div>
+          <div class="at-box pn ticket"><p class="pn-h">Decide ticket <small>for the Agentic account</small></p>
+            <div class="tflow"><span class="tbtn">Decide…</span><svg class="ic sm"><use href="#i-arrow"/></svg><span class="tbtn">Caps checked</span><svg class="ic sm"><use href="#i-arrow"/></svg><span class="tbtn">Review with Robinhood</span><svg class="ic sm"><use href="#i-arrow"/></svg><span class="tbtn">Place order…</span><svg class="ic sm"><use href="#i-arrow"/></svg><span class="tbtn primary">Confirm</span></div>
+          </div>
+        </div>
+      </div>
+    </figure>
+    <div class="joined feats">
+      <div class="feat edge c-src"><span class="icbox"><svg class="ic"><use href="#i-chart"/></svg></span><b>Markets</b><p>S&amp;P 500, Nasdaq, Dow, VIX, the 10-year yield and Bitcoin. Press one to chart it.</p></div>
+      <div class="feat edge c-src"><span class="icbox"><svg class="ic"><use href="#i-chart"/></svg></span><b>Chart</b><p>Any stock as area or candles, with 50- and 200-day averages and volume.</p></div>
+      <div class="feat edge c-you"><span class="icbox"><svg class="ic"><use href="#i-star"/></svg></span><b>Watchlist</b><p>Add, star and remove stocks. The robot button puts one on the desk's waiting list.</p></div>
+      <div class="feat edge c-desk"><span class="icbox"><svg class="ic"><use href="#i-flag"/></svg></span><b>The desk's calls</b><p>Every call with its rating and its full reasoning, agent by agent.</p></div>
+      <div class="feat edge c-desk"><span class="icbox"><svg class="ic"><use href="#i-target"/></svg></span><b>How the desk is doing</b><p>The scorecard: calls scored against their index, and those still waiting.</p></div>
+      <div class="feat edge c-you"><span class="icbox"><svg class="ic"><use href="#i-ledger"/></svg></span><b>Stock page</b><p>Everything on one stock: what you hold, each call and its score, Ask the desk and Decide.</p></div>
+      <div class="feat edge c-rh"><span class="icbox"><svg class="ic"><use href="#i-bank"/></svg></span><b>Your account</b><p>Connect, choose accounts, see value, cash, buying power, holdings and orders. Switch trading on or off.</p></div>
+      <div class="feat edge c-you"><span class="icbox"><svg class="ic"><use href="#i-send"/></svg></span><b>Decide ticket</b><p>An order proposed from the call, checked against your caps, reviewed by Robinhood, placed only on your Confirm.</p></div>
+    </div>
+    <div class="joined facts">
+      <span><svg class="ic sm"><use href="#i-lock"/></svg>On this computer only, with a fresh key each time it starts</span>
+      <span><svg class="ic sm"><use href="#i-clock"/></svg>Market prices up to 15 minutes late</span>
+      <span><svg class="ic sm"><use href="#i-sun"/></svg>Light and dark, like this page</span>
+    </div>
+  </section>
+
+  <!-- the notice -->
+  <section class="chapter" id="notice">
+    <div class="ch-head">
+      <div class="ch-title"><p class="kicker">Please read before you use it</p><h2>Not financial advice</h2></div>
+      <p>Trading Agents is a personal, open-source project for learning and research. It is not a financial service, and no one behind it is acting as your licensed adviser. Read this before you rely on anything the desk says, or connect a brokerage account to it.</p>
+    </div>
+    <div class="joined notice-grid">
+      <div class="ntc c-desk"><span class="icbox"><svg class="ic"><use href="#i-alert"/></svg></span><b>Not advice</b><p>Nothing on this page, on the dashboard or in the desk's reports is financial, investment, legal or tax advice. It is information and education only.</p></div>
+      <div class="ntc c-desk"><span class="icbox"><svg class="ic"><use href="#i-flag"/></svg></span><b>Not a recommendation</b><p>A rating such as Buy or Sell is the output of AI agents. It is not a recommendation, an offer or a solicitation to buy or sell any security or coin.</p></div>
+      <div class="ntc c-desk"><span class="icbox"><svg class="ic"><use href="#i-spark"/></svg></span><b>AI can be wrong</b><p>The agents can misread data, miss news or reason badly, and can sound sure when they are wrong. Free data sources can be late, incomplete or wrong.</p></div>
+      <div class="ntc c-desk"><span class="icbox"><svg class="ic"><use href="#i-clock"/></svg></span><b>The past is no promise</b><p>Scores, track records and back-tests describe the past. They do not predict or guarantee future results.</p></div>
+      <div class="ntc c-bear"><span class="icbox"><svg class="ic"><use href="#i-down"/></svg></span><b>You can lose money</b><p>All investing carries risk, including losing some or all of the money you put in. Single stocks and coins can move fast and far.</p></div>
+      <div class="ntc c-desk"><span class="icbox"><svg class="ic"><use href="#i-user"/></svg></span><b>Your decision, your risk</b><p>Every order is yours: you choose it, you confirm it, and you alone are responsible for it, its outcome and its taxes. Anyone who uses the desk does so at their own risk.</p></div>
+      <div class="ntc c-desk"><span class="icbox"><svg class="ic"><use href="#i-shield"/></svg></span><b>No warranty</b><p>The software is provided as is, without warranty of any kind, under its MIT licence. It may contain mistakes, and its authors are not liable for any loss.</p></div>
+      <div class="ntc c-desk"><span class="icbox"><svg class="ic"><use href="#i-bank"/></svg></span><b>No affiliation</b><p>Trading Agents is not affiliated with or endorsed by Robinhood, Tauric Research, or any data source named on this page.</p></div>
+    </div>
+    <div class="at-box careful">
+      <p class="careful-h"><span class="icbox c-desk"><svg class="ic"><use href="#i-check"/></svg></span>If you use it, be careful</p>
+      <ul class="checks">
+        <li><span class="tick"><svg class="ic sm"><use href="#i-check"/></svg></span><span>Keep trading switched off until you have read many of the desk's calls and seen how they scored.</span></li>
+        <li><span class="tick"><svg class="ic sm"><use href="#i-check"/></svg></span><span>Keep Robinhood's phone approval on, so every order waits for your OK.</span></li>
+        <li><span class="tick"><svg class="ic sm"><use href="#i-check"/></svg></span><span>Start with one share, and keep your caps low.</span></li>
+        <li><span class="tick"><svg class="ic sm"><use href="#i-check"/></svg></span><span>Put only money you can afford to lose in the Agentic account.</span></li>
+        <li><span class="tick"><svg class="ic sm"><use href="#i-check"/></svg></span><span>Read the full reasoning, and check prices and facts yourself, before you decide.</span></li>
+        <li><span class="tick"><svg class="ic sm"><use href="#i-check"/></svg></span><span>Speak to a licensed financial adviser before you make investment decisions.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <div class="built">
+      <span class="built-mark">Built for <img src="data:image/png;base64,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" alt="Madav" width="75" height="16"></span>
+      <p>Madav and Claude run the desk's agents. Neither gives investment advice, and neither stands behind the desk's calls.</p>
+    </div>
+    <p>The analysis team's design is adapted from <a href="https://github.com/TauricResearch/TradingAgents" target="_blank" rel="noopener">TradingAgents by Tauric Research</a>, under the Apache License 2.0. This desk is not affiliated with them.</p>
+    <p>Not financial advice, and not a recommendation. Use at your own risk. The desk proposes; only your own Confirm on the dashboard places an order.</p>
+  </footer>
+</div>
+
+<script>
+(function () {
+  // Light and dark, as in Madav: one button, a sun in the dark face and a moon in the light one. The choice is kept in
+  // this browser; without one the page follows the viewer's own setting.
+  var root = document.documentElement;
+  var light = window.matchMedia ? window.matchMedia('(prefers-color-scheme: light)') : null;
+  var btn = document.getElementById('themeBtn');
+  function current() {
+    var t = root.getAttribute('data-theme');
+    if (t === 'light' || t === 'dark') return t;
+    return light && light.matches ? 'light' : 'dark';
+  }
+  function paintTheme() {
+    var c = current(), label = 'Switch to ' + (c === 'dark' ? 'light' : 'dark') + ' mode';
+    btn.querySelector('use').setAttribute('href', c === 'dark' ? '#i-sun' : '#i-moon');
+    btn.setAttribute('aria-label', label); btn.title = label;
+  }
+  var saved = null;
+  try { saved = localStorage.getItem('inside-desk.theme'); } catch (e) {}
+  if (saved === 'light' || saved === 'dark') root.setAttribute('data-theme', saved);
+  btn.addEventListener('click', function () {
+    var to = current() === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', to);
+    try { localStorage.setItem('inside-desk.theme', to); } catch (e) {}
+    paintTheme();
+  });
+  if (light && light.addEventListener) light.addEventListener('change', paintTheme);
+  if (window.MutationObserver) new MutationObserver(paintTheme).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+  paintTheme();
+
+  // The chapter bar marks the chapter on screen.
+  var links = {};
+  document.querySelectorAll('.chapters a').forEach(function (a) { links[a.getAttribute('href').slice(1)] = a; });
+  if (window.IntersectionObserver) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        Object.keys(links).forEach(function (k) { links[k].setAttribute('aria-current', String(k === e.target.id)); });
+      });
+    }, { rootMargin: '-30% 0px -60% 0px' });
+    document.querySelectorAll('.chapter').forEach(function (s) { io.observe(s); });
+  }
+
+  // The depth switch: shows the turns of both debates for 1, 3 or 5 rounds, as the desk runs them.
+  var seg = document.getElementById('depth');
+  var research = document.getElementById('research-turns');
+  var risk = document.getElementById('risk-turns');
+  var note = document.getElementById('depth-note');
+  var NOTES = { 1: '1 turn each. The desk’s setting today.', 3: '3 turns each. Longer, and more model time.', 5: '5 turns each. The longest, and the most model time.' };
+  var chip = function (cls, name, n) { return '<span class="turn ' + cls + '">' + name + ' <b>' + n + '</b></span>'; };
+  var to = function (what) { return '<span class="to"><svg class="ic sm" aria-hidden="true"><use href="#i-arrow"/></svg>' + what + '</span>'; };
+  function render(n) {
+    var r = '', k = '';
+    for (var i = 1; i <= n; i++) {
+      r += chip('c-bull', 'Bull', i) + chip('c-bear', 'Bear', i);
+      k += chip('c-desk', 'Aggressive', i) + chip('c-desk', 'Conservative', i) + chip('c-desk', 'Neutral', i);
+    }
+    research.innerHTML = r + to('Research manager writes the plan');
+    risk.innerHTML = k + to('Portfolio manager');
+    note.textContent = NOTES[n];
+    seg.querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', String(Number(b.dataset.d) === n)); });
+  }
+  seg.addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) render(Number(b.dataset.d)); });
+  render(1);
+})();
+</script>
+</body>
+</html>
