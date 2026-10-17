@@ -10,58 +10,53 @@ import { deskServer } from '../src/tools/server.js';
 import { isOrderTool } from '../src/robinhood/connect.js';
 import { openDashboard } from '../src/terminal/launch.js';
 
-const STUDIO = '.madav/agents';
+const AGENTS = '.claude/agents';
 const header = (f: string) => {
   const m = /^---\n([\s\S]*?)\n---\n/.exec(fs.readFileSync(f, 'utf8').replace(/\r\n/g, '\n'));
   assert.ok(m, `${f} has a header`);
   return Object.fromEntries(m![1]!.split('\n').map((l) => { const i = l.indexOf(':'); return [l.slice(0, i).trim(), l.slice(i + 1).trim()]; }));
 };
+const toolsOf = (f: string) => header(f).tools!.replace(/Agent\(([^)]*)\)/, 'Agent').split(',').map((s) => s.trim());
 
-test('a clone carries the desk for Agent Studio: the twelve agents and the trading-desk team, written from the same source as the chat agents', () => {
+test('a clone carries the desk for Agent Studio: the twelve agents and the trading-desk team with its line-up beside it, all from one source', () => {
   const r = spawnSync(process.execPath, ['scripts/agents.mjs', '--check'], { encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);
-  const chat = fs.readdirSync('.claude/agents').map((f) => f.replace(/\.md$/, '')).sort();
-  const studio = fs.readdirSync(STUDIO).sort();
-  assert.deepEqual(studio, [...chat, 'trading-desk'].sort());
-  for (const name of studio) {
-    assert.ok(fs.existsSync(path.join(STUDIO, name, 'v1.md')) && fs.existsSync(path.join(STUDIO, name, 'record.json')), name);
-    const rec = JSON.parse(fs.readFileSync(path.join(STUDIO, name, 'record.json'), 'utf8')) as { versions: Array<{ n: number; bytes: number }> };
-    assert.equal(rec.versions[0]!.n, 1);
-    assert.equal(rec.versions[0]!.bytes, Buffer.byteLength(fs.readFileSync(path.join(STUDIO, name, 'v1.md'), 'utf8')), `${name}: the record names the file's real size`);
-    assert.equal(header(path.join(STUDIO, name, 'v1.md')).name, name);
-  }
-  const rec = JSON.parse(fs.readFileSync(path.join(STUDIO, 'trading-desk', 'record.json'), 'utf8')) as { team: { kind: string; members: string[] } };
-  assert.equal(rec.team.kind, 'managed');
-  assert.deepEqual([...rec.team.members].sort(), chat);
+  assert.equal(fs.existsSync('.madav'), false, 'Agent Studio reads .claude/agents; there is no second copy to drift');
+  const members = fs.readdirSync(AGENTS).filter((f) => f.endsWith('.md') && f !== 'trading-desk.md').map((f) => f.replace(/\.md$/, '')).sort();
+  assert.equal(members.length, 12);
+  // the line-up, in the shape Madav keeps a team in (its team.ts): members once each, the lead deciding the order
+  const lineUp = JSON.parse(fs.readFileSync(path.join(AGENTS, 'trading-desk.team.json'), 'utf8')) as { members: string[]; steps: boolean; together: string[]; gates: string[]; talk: boolean };
+  assert.deepEqual([...lineUp.members].sort(), members);
+  assert.equal(new Set(lineUp.members).size, lineUp.members.length);
+  assert.ok(lineUp.members.every((m) => /^[a-z0-9][a-z0-9-]*$/i.test(m)));
+  assert.deepEqual([lineUp.steps, lineUp.together, lineUp.gates, lineUp.talk], [false, [], [], false]);
+  assert.ok(lineUp.members.length <= 20, 'Madav holds twenty agents in a team at most');
+  // the team's own file names the same members it may start
+  const named = /Agent\(([^)]*)\)/.exec(header(path.join(AGENTS, 'trading-desk.md')).tools!)![1]!.split(',').map((s) => s.trim());
+  assert.deepEqual(named, lineUp.members);
 });
 
-test('in Agent Studio every member has only its own desk tools, as in chat, and no one on the team has a Robinhood or order tool', async () => {
+test('every agent has only its desk tools; the team gets no shell, no web and no Robinhood or order tool', async () => {
   const [a, b] = InMemoryTransport.createLinkedPair();
   await deskServer(fs.mkdtempSync(path.join(os.tmpdir(), 'ta-studio-'))).connect(a);
   const client = new Client({ name: 'test', version: '0' }); await client.connect(b);
   const desk = new Set((await client.listTools()).tools.map((t) => `mcp__trading-desk__${t.name}`));
   await client.close();
-  for (const name of fs.readdirSync(STUDIO)) {
-    const tools = header(path.join(STUDIO, name, 'v1.md')).tools!.replace(/Agent\([^)]*\)/, 'Agent').split(',').map((s) => s.trim());
-    for (const t of tools) {
-      assert.ok(!isOrderTool(t) && !/robinhood/i.test(t), `${name}: ${t}`);
-      if (t.startsWith('mcp__')) assert.ok(desk.has(t), `${name}: ${t} is one of the desk's own tools`);
-    }
-    if (name !== 'trading-desk') {
-      assert.equal(tools.filter((t) => !t.startsWith('mcp__trading-desk__')).length, 0, `${name} has only desk tools`);
-      const chat = header(`.claude/agents/${name}.md`).tools!.split(',').map((s) => s.trim());
-      assert.deepEqual(tools, chat, `${name}: the same tools in Agent Studio as in chat`);
+  for (const f of fs.readdirSync(AGENTS).filter((x) => x.endsWith('.md'))) {
+    for (const t of toolsOf(path.join(AGENTS, f))) {
+      assert.ok(!isOrderTool(t) && !/robinhood/i.test(t), `${f}: ${t}`);
+      if (t.startsWith('mcp__')) assert.ok(desk.has(t), `${f}: ${t} is one of the desk's own tools`);
     }
   }
-  const team = header(path.join(STUDIO, 'trading-desk', 'v1.md')).tools!;
-  assert.match(team, /mcp__trading-desk__open_dashboard/);
-  assert.ok(!/\bBash\b|PowerShell|WebFetch/.test(team), 'the team gets no shell and no web fetch');
-  const playbook = fs.readFileSync(path.join(STUDIO, 'trading-desk', 'v1.md'), 'utf8');
+  const team = path.join(AGENTS, 'trading-desk.md');
+  assert.ok(toolsOf(team).includes('mcp__trading-desk__open_dashboard'));
+  assert.ok(!toolsOf(team).some((t) => /^(Bash|PowerShell|WebFetch|WebSearch|Write|Edit)$/.test(t)), 'the team gets no shell, web or editing');
+  assert.match(header(team).disallowedTools!, /Bash.*WebFetch/);
+  const playbook = fs.readFileSync(team, 'utf8');
   for (const part of ['## Analyse a stock', '## Score past calls', '## Test the desk over past dates', '## Check this computer', '## Show the dashboard', 'only their own Confirm']) assert.ok(playbook.includes(part), part);
 });
 
 test('the dashboard tool says plainly when the dashboard cannot be started, and never claims it opened', async () => {
   const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'ta-launch-'));
-  const words = await openDashboard(empty, { waitMs: 600, noOpen: true });
-  assert.match(words, /^DATA_UNAVAILABLE: the dashboard did not answer/);
+  assert.match(await openDashboard(empty, { waitMs: 600, noOpen: true }), /^DATA_UNAVAILABLE: the dashboard did not answer/);
 });

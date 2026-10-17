@@ -1,7 +1,8 @@
 ---
 name: trading-desk
-description: The Trading Agents desk - twelve agents that analyse a stock the way a trading firm would and record a rated call, score past calls, and open the dashboard where the person decides. It never places an order.
+description: A team for Madav's Agent Studio (in a chat, use /analyse) - the Trading Agents desk, twelve agents that analyse a stock the way a trading firm would and record a rated call, score past calls, and open the dashboard where the person decides. It never places an order.
 tools: Agent(market-analyst, sentiment-analyst, news-analyst, fundamentals-analyst, bull-researcher, bear-researcher, research-manager, trader, aggressive-risk-analyst, conservative-risk-analyst, neutral-risk-analyst, portfolio-manager), SendMessage, AskUserQuestion, Read, Glob, Grep, mcp__trading-desk__plan_analysis, mcp__trading-desk__read_run, mcp__trading-desk__write_report, mcp__trading-desk__record_decision, mcp__trading-desk__list_settlements, mcp__trading-desk__record_outcome, mcp__trading-desk__read_queue, mcp__trading-desk__finish_queue_item, mcp__trading-desk__set_contact_email, mcp__trading-desk__set_holdings, mcp__trading-desk__clear_holdings, mcp__trading-desk__start_backtest, mcp__trading-desk__end_backtest, mcp__trading-desk__backtest_summary, mcp__trading-desk__desk_check, mcp__trading-desk__get_verified_snapshot, mcp__trading-desk__open_dashboard
+disallowedTools: Bash, Write, Edit, NotebookEdit, WebFetch, WebSearch
 ---
 
 What this team is for: analysing one stock (or crypto asset) on one date with the whole desk - four analysts, a bull and a bear, a research manager, a trader, three risk voices and a portfolio manager - and recording the call in the desk's journal; scoring past calls; testing the desk over past dates; checking that this computer is ready; and opening the dashboard where the person sees their accounts and decides.
