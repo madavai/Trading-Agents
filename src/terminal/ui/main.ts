@@ -876,6 +876,10 @@ document.addEventListener('click', (e) => {
     case 'layer': { const k = el.dataset.layer as keyof typeof S.layers; S.layers[k] = !S.layers[k]; remember({ layers: { ...S.layers } }); renderControls(); renderHero(); break; }
     case 'find-pick': { const r = findRows()[Number(el.dataset.i)]; if (r) pick(r); break; }
     case 'find-clear': remember({ recent: [] }); F.mode = 'closed'; renderFind(); break;
+    case 'restart':
+      if ($<HTMLDialogElement>('#ticketDialog').open) { toast('Finish or close the order ticket first, then restart.', 'bad'); break; }
+      void run(async () => { await api.restart(); await updating(); });
+      break;
     case 'stop-ask': $<HTMLDialogElement>('#stopDialog').showModal(); break;
     case 'stop-cancel': $<HTMLDialogElement>('#stopDialog').close(); break;
     case 'stop-yes': void run(async () => {
@@ -1052,6 +1056,7 @@ async function watchFiles(): Promise<void> {
     const v = await api.version();
     build ||= v.build;
     if (v.restarting) { void updating(); return; }
+    $('#updateBar').hidden = !v.update;   // new code is on disk: Restart is offered, never done without the person
     if (v.version !== seen || S.lost) { seen = v.version; await refreshState(); }
   } catch { S.lost = true; renderSub(); }
 }
@@ -1060,7 +1065,8 @@ async function watchFiles(): Promise<void> {
 async function updating(): Promise<void> {
   if (life.updating) return;
   life.updating = true; renderSub();
-  toast('The desk was updated. The dashboard restarts and this page reloads in a moment.');
+  $('#updateBar').hidden = true;
+  toast('The dashboard is restarting with the new version. This page reloads in a moment.');
   for (const until = Date.now() + 90_000; Date.now() < until; ) {
     await new Promise((r) => setTimeout(r, 1_000));
     try { const p = await api.ping(); if (p.build && p.build !== build) { location.reload(); return; } } catch { /* not back yet */ }

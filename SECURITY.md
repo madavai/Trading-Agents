@@ -35,8 +35,8 @@ call Robinhood, each names only its own tools, and the agents' tool server conta
 - What the dashboard remembers between visits (light or dark, the side list, the page and the stock you were on, the
   chart's settings and the stocks you looked at last) is kept in `desk-data/dashboard.json`. Nothing about an order is
   ever remembered: every ticket starts afresh.
-- After an update the dashboard restarts itself with the new version, but never with a ticket in hand: it waits until no
-  ticket has been touched for five minutes. Stop, at the top right of the page, closes it.
+- After an update the dashboard offers Restart at the top of the page: new code on this computer runs only after your
+  press, and never while an order is being sent. Stop, at the top right of the page, closes it.
 - The search box sends what you type to Yahoo Finance's public search, which suggests matching stocks.
 
 ## Limits

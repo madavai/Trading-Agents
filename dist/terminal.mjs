@@ -20929,7 +20929,7 @@ function fingerprint(files) {
 async function startTerminal(opts) {
   const { root: root2, assets } = opts, dir = deskDataDir(root2), token = crypto5.randomBytes(24).toString("hex"), deskId = deskIdOf(root2);
   const code2 = opts.code ?? [], build = fingerprint(code2);
-  let restarting = false, lastTicket = 0;
+  let updated = false, restarting = false;
   const robinhood = opts.robinhood ?? new Link(robinhoodFile());
   const tickets = /* @__PURE__ */ new Map();
   const TICKET_MS = 15 * 6e4;
@@ -20937,11 +20937,9 @@ async function startTerminal(opts) {
     for (const [k, t3] of tickets) if (Date.now() - t3.at > TICKET_MS) tickets.delete(k);
     const t2 = typeof id === "string" ? tickets.get(id) : void 0;
     if (!t2) throw new Refused2(404, "that ticket has expired: open it again");
-    lastTicket = Date.now();
     return t2;
   };
   const opened = (own2, context, proposal, trading) => {
-    lastTicket = Date.now();
     const t2 = { id: crypto5.randomBytes(12).toString("hex"), at: Date.now(), own: own2, context, proposal, order: proposal.order, checks: proposal.order ? check(proposal.order, context, trading) : [], review: null, reviewedAt: 0, refId: crypto5.randomUUID(), placing: false, placed: null };
     tickets.set(t2.id, t2);
     return t2;
@@ -21007,7 +21005,7 @@ async function startTerminal(opts) {
     const day = today(), sym2 = url2.searchParams.get("symbol") ?? "";
     if (method === "GET") {
       if (p === "/api/state") return json(res, 200, stateOf(root2, day));
-      if (p === "/api/version") return json(res, 200, { version: versionOf(root2), restarting, build });
+      if (p === "/api/version") return json(res, 200, { version: versionOf(root2), build, update: updated, restarting });
       if (p === "/api/prefs") return json(res, 200, readPrefs(dir));
       if (p === "/api/search") {
         const q = (url2.searchParams.get("q") ?? "").trim();
@@ -21063,6 +21061,17 @@ async function startTerminal(opts) {
         setTimeout(stop, 100);
       });
       return json(res, 200, { stopping: true });
+    }
+    if (p === "/api/restart" && method === "POST") {
+      if (!opts.restart) throw new Refused2(404, "not found");
+      if (!updated) throw new Refused2(409, "there is no update to restart into");
+      if ([...tickets.values()].some((t2) => t2.placing)) throw new Refused2(409, "an order is being sent: restart when it is done");
+      restarting = true;
+      const restart2 = opts.restart;
+      res.once("finish", () => {
+        setTimeout(restart2, 100);
+      });
+      return json(res, 200, { restarting: true });
     }
     if (restarting && p.startsWith("/api/ticket")) throw new Refused2(503, "the dashboard is restarting with an update: open the ticket again in a moment");
     if (p === "/api/robinhood/connect" && method === "POST") return json(res, 200, robinhood.startSignIn());
@@ -21184,10 +21193,9 @@ async function startTerminal(opts) {
     clearQuotes();
   }, 6e4);
   sweep.unref();
-  const IDLE_MS = opts.idleMs ?? 5 * 6e4;
   let pending = "";
   const updates = opts.restart && code2.length ? setInterval(() => {
-    if (restarting) return;
+    if (updated) return;
     const now = fingerprint(code2);
     if (now === build) {
       pending = "";
@@ -21197,9 +21205,7 @@ async function startTerminal(opts) {
       pending = now;
       return;
     }
-    if ([...tickets.values()].some((t2) => t2.placing) || Date.now() - lastTicket < IDLE_MS) return;
-    restarting = true;
-    setTimeout(() => opts.restart?.(), opts.restartDelayMs ?? 4e3);
+    updated = true;
   }, opts.updateCheckMs ?? 15e3) : null;
   updates?.unref();
   return { url: `http://127.0.0.1:${port}/`, port, token, deskId, close: () => new Promise((resolve) => {
@@ -21270,7 +21276,7 @@ var restart = () => {
 };
 configure({ spacingMs: 250 });
 var quick = Number(process.env.TRADING_AGENTS_UPDATE_MS) || void 0;
-var base = { root, assets: loadAssets(), code, restart, stop: quit, ...quick ? { updateCheckMs: quick, restartDelayMs: quick } : {} };
+var base = { root, assets: loadAssets(), code, restart, stop: quit, ...quick ? { updateCheckMs: quick } : {} };
 async function start() {
   if (again) for (let i = 0; i < 20; i++) {
     try {

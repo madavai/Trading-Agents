@@ -81,18 +81,18 @@ export function fingerprint(files: readonly string[]): string {
 
 export interface TerminalOptions {
   root: string; assets: Assets; port?: number; robinhood?: Link;
-  /** The files of the dashboard's own code; when they change on disk, `restart` is called (when no ticket is in hand). */
+  /** The files of the dashboard's own code; when they change on disk, the page offers Restart, which calls `restart`. */
   code?: string[]; restart?: () => void;
   /** Stops the dashboard when the person presses Stop on the page. */
   stop?: () => void;
-  /** How long no ticket may have been touched before an update restarts it (five minutes). For the tests: how often to look, how long to wait. */
-  idleMs?: number; updateCheckMs?: number; restartDelayMs?: number;
+  /** How often to look at the code on disk (every 15 seconds). */
+  updateCheckMs?: number;
 }
 
 export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
   const { root, assets } = opts, dir = deskDataDir(root), token = crypto.randomBytes(24).toString('hex'), deskId = deskIdOf(root);
   const code = opts.code ?? [], build = fingerprint(code);
-  let restarting = false, lastTicket = 0;
+  let updated = false, restarting = false;
   const robinhood = opts.robinhood ?? new Link(robinhoodFile());
   // Tickets the person has open: what a call proposed on the real figures (or, for the person's own order, one share of
   // the stock they chose), and Robinhood's check once they press Review. Kept in memory for a quarter of an hour; the page
@@ -104,11 +104,9 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
     for (const [k, t] of tickets) if (Date.now() - t.at > TICKET_MS) tickets.delete(k);
     const t = typeof id === 'string' ? tickets.get(id) : undefined;
     if (!t) throw new Refused(404, 'that ticket has expired: open it again');
-    lastTicket = Date.now();
     return t;
   };
   const opened = (own: boolean, context: TicketContext, proposal: Proposal, trading: ReturnType<typeof readSettings>['trading']): Ticket => {
-    lastTicket = Date.now();
     const t: Ticket = { id: crypto.randomBytes(12).toString('hex'), at: Date.now(), own, context, proposal, order: proposal.order, checks: proposal.order ? check(proposal.order, context, trading) : [], review: null, reviewedAt: 0, refId: crypto.randomUUID(), placing: false, placed: null };
     tickets.set(t.id, t);
     return t;
@@ -167,7 +165,7 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
 
     if (method === 'GET') {
       if (p === '/api/state') return json(res, 200, stateOf(root, day));
-      if (p === '/api/version') return json(res, 200, { version: versionOf(root), restarting, build });
+      if (p === '/api/version') return json(res, 200, { version: versionOf(root), build, update: updated, restarting });
       if (p === '/api/prefs') return json(res, 200, readPrefs(dir));
       if (p === '/api/search') {
         const q = (url.searchParams.get('q') ?? '').trim();
@@ -214,6 +212,16 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
       const stop = opts.stop;
       res.once('finish', () => { setTimeout(stop, 100); });
       return json(res, 200, { stopping: true });
+    }
+    // Restart into an update: only on the person's press, only when new code is on disk, never while an order is being sent.
+    if (p === '/api/restart' && method === 'POST') {
+      if (!opts.restart) throw new Refused(404, 'not found');
+      if (!updated) throw new Refused(409, 'there is no update to restart into');
+      if ([...tickets.values()].some((t) => t.placing)) throw new Refused(409, 'an order is being sent: restart when it is done');
+      restarting = true;
+      const restart = opts.restart;
+      res.once('finish', () => { setTimeout(restart, 100); });
+      return json(res, 200, { restarting: true });
     }
     if (restarting && p.startsWith('/api/ticket')) throw new Refused(503, 'the dashboard is restarting with an update: open the ticket again in a moment');
     // Robinhood: connect (sends the person to Robinhood's own page), check (asks, opens nothing) and disconnect (deletes the saved sign-in).
@@ -325,19 +333,16 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
   const sweep = setInterval(() => { clearCache(); clearQuotes(); }, 60_000);
   sweep.unref();
 
-  // After an update puts new code on disk, the dashboard restarts itself with it, but never with a ticket in hand: it waits
-  // until no ticket has been touched for five minutes. An open page sees "restarting" and reloads once the new one answers,
-  // on the same address, so it opens where the person left it.
-  const IDLE_MS = opts.idleMs ?? 5 * 60_000;
+  // When an update puts new code on disk, the page offers Restart; the dashboard never restarts into new code by itself,
+  // so code changed on this computer runs only after the person's own press. After it, the page reloads once the new one
+  // answers, on the same address, so it opens where the person left it.
   let pending = '';
   const updates = opts.restart && code.length ? setInterval(() => {
-    if (restarting) return;
+    if (updated) return;
     const now = fingerprint(code);
     if (now === build) { pending = ''; return; }
-    if (now !== pending) { pending = now; return; }   // changed: wait one more round, so an update still being written settles
-    if ([...tickets.values()].some((t) => t.placing) || Date.now() - lastTicket < IDLE_MS) return;
-    restarting = true;
-    setTimeout(() => opts.restart?.(), opts.restartDelayMs ?? 4_000);   // long enough for an open page to notice
+    if (now !== pending) { pending = now; return; }   // changed: wait one more look, so an update still being written settles
+    updated = true;
   }, opts.updateCheckMs ?? 15_000) : null;
   updates?.unref();
   return { url: `http://127.0.0.1:${port}/`, port, token, deskId, close: () => new Promise((resolve) => { clearInterval(sweep); if (updates) clearInterval(updates); server.close(() => resolve()); server.closeAllConnections?.(); }) };

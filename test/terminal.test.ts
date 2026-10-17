@@ -274,20 +274,29 @@ test('Stop on the page stops the dashboard, from the page alone; a dashboard giv
   } finally { await t.close(); }
 });
 
-test('after an update changes its code, the dashboard says so and restarts itself; no ticket opens meanwhile', async () => {
+test('after an update changes its code, the page is offered Restart; it restarts only on the person\'s press, and no ticket opens meanwhile', async () => {
   const code = path.join(root, 'code.js');
   fs.writeFileSync(code, 'one');
   let restarts = 0;
-  const t = await startTerminal({ root, assets: ASSETS, port: 0, code: [code], restart: () => { restarts++; }, updateCheckMs: 25, restartDelayMs: 25 });
+  const t = await startTerminal({ root, assets: ASSETS, port: 0, code: [code], restart: () => { restarts++; }, updateCheckMs: 25 });
+  const version = async () => (await call(t, 'GET', '/api/version')).json();
   try {
     const { build } = (await call(t, 'GET', '/api/ping', { token: false })).json();
     assert.match(build, /^[0-9a-f]{12}$/);
     await new Promise((r) => setTimeout(r, 200));
-    assert.deepEqual([restarts, (await call(t, 'GET', '/api/version')).json().restarting], [0, false], 'nothing changed, nothing restarts');
+    assert.equal((await version()).update, false, 'nothing changed, nothing is offered');
+    assert.equal((await call(t, 'POST', '/api/restart', { body: {} })).status, 409, 'no update, no restart');
     fs.writeFileSync(code, 'two');
-    for (const until = Date.now() + 3000; restarts === 0 && Date.now() < until; ) await new Promise((r) => setTimeout(r, 20));
+    for (const until = Date.now() + 3000; !(await version()).update && Date.now() < until; ) await new Promise((r) => setTimeout(r, 20));
+    assert.deepEqual([(await version()).update, (await version()).restarting], [true, false]);
+    await new Promise((r) => setTimeout(r, 300));
+    assert.equal(restarts, 0, 'new code on disk never runs by itself');
+    assert.equal((await call(t, 'POST', '/api/restart', { body: {}, token: false })).status, 403);
+    assert.equal((await call(t, 'POST', '/api/restart', { body: {}, headers: { origin: 'https://evil.example' } })).status, 403);
+    assert.equal((await call(t, 'POST', '/api/restart', { body: {} })).json().restarting, true);
+    await new Promise((r) => setTimeout(r, 300));
     assert.equal(restarts, 1);
-    assert.equal((await call(t, 'GET', '/api/version')).json().restarting, true);
+    assert.equal((await version()).restarting, true);
     assert.equal((await call(t, 'POST', '/api/ticket/own', { body: { symbol: 'NVDA', side: 'buy' } })).status, 503);
   } finally { await t.close(); }
 });

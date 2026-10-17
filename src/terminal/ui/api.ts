@@ -39,7 +39,8 @@ const q = (o: Record<string, string>) => new URLSearchParams(o).toString();
 
 export const api = {
   state: () => call<DeskState>('GET', '/api/state'),
-  version: () => call<{ version: string; restarting: boolean; build: string }>('GET', '/api/version'),
+  version: () => call<{ version: string; build: string; update: boolean; restarting: boolean }>('GET', '/api/version'),
+  restart: () => call<{ restarting: boolean }>('POST', '/api/restart', {}),
   /** Asked without the token: whether a dashboard answers here, and which build of it (after a restart, a new one). */
   ping: async (): Promise<{ build?: string }> => (await fetch('/api/ping', { cache: 'no-store' })).json() as Promise<{ build?: string }>,
   search: (query: string) => call<{ matches: Match[] }>('GET', `/api/search?${q({ q: query })}`),

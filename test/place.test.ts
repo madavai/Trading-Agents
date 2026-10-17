@@ -175,19 +175,20 @@ test('switching off, or disconnecting, stops any order; disconnecting switches t
   } finally { await term.close(); }
 });
 
-test('an update never restarts the dashboard with a ticket in hand: it waits until no ticket has been touched for a while', async () => {
+test('an update never interrupts a ticket: the dashboard keeps running it until the person presses Restart, and then opens no more', async () => {
   const code = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ta-pl-code-')), 'code.js');
   fs.writeFileSync(code, 'one');
   let restarts = 0;
-  const { term, ticket, post } = await desk(undefined, { code: [code], restart: () => { restarts++; }, idleMs: 700, updateCheckMs: 25, restartDelayMs: 10 });
+  const { term, ticket, post } = await desk(undefined, { code: [code], restart: () => { restarts++; }, updateCheckMs: 25 });
   try {
     const t = await ticket();
     fs.writeFileSync(code, 'two');
-    await new Promise((r) => setTimeout(r, 300));
-    assert.equal((await post('/api/ticket/check', { id: t.id, quantity: 1, limitPrice: 182.4 })).status, 200, 'the ticket still works');
     await new Promise((r) => setTimeout(r, 400));
-    assert.equal(restarts, 0, 'the ticket was touched less than the idle time ago');
-    for (const until = Date.now() + 3000; restarts === 0 && Date.now() < until; ) await new Promise((r) => setTimeout(r, 25));
-    assert.equal(restarts, 1, 'once the ticket is left alone, the update goes ahead');
+    assert.equal((await post('/api/ticket/check', { id: t.id, quantity: 1, limitPrice: 182.4 })).status, 200, 'the ticket still works');
+    assert.equal(restarts, 0, 'the update waits for the person');
+    assert.equal((await post('/api/restart', {})).json().restarting, true);
+    await new Promise((r) => setTimeout(r, 300));
+    assert.equal(restarts, 1);
+    assert.equal((await post('/api/ticket/check', { id: t.id, quantity: 1, limitPrice: 182.4 })).status, 503, 'while it restarts, no ticket is worked on');
   } finally { await term.close(); }
 });

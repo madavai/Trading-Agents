@@ -174,8 +174,8 @@ Robinhood's phone approval is on. The side list folds away to give the page the 
 Type a company or a ticker in the search box ("Tesla", "NVDA") and the matches drop down from Yahoo Finance's search:
 the ticker, the name, the market and the kind, with the desk's latest rating. An empty box shows the stocks you looked
 at last. The dashboard opens where you left it (the page, the stock, the chart's settings, light or dark), in any
-browser. After an update it restarts itself with the new version, never while a ticket is in hand; Stop, at the top
-right, closes it.
+browser. After an update it offers Restart at the top of the page, and one press opens the new version where you were;
+Stop, at the top right, closes it.
 
 ## Routines
 The trading-desk team has two routines, which Madav's scheduler can start for you:

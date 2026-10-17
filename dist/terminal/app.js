@@ -24,6 +24,7 @@
   var api = {
     state: () => call("GET", "/api/state"),
     version: () => call("GET", "/api/version"),
+    restart: () => call("POST", "/api/restart", {}),
     /** Asked without the token: whether a dashboard answers here, and which build of it (after a restart, a new one). */
     ping: async () => (await fetch("/api/ping", { cache: "no-store" })).json(),
     search: (query) => call("GET", `/api/search?${q({ q: query })}`),
@@ -1335,6 +1336,16 @@
         F.mode = "closed";
         renderFind();
         break;
+      case "restart":
+        if ($("#ticketDialog").open) {
+          toast("Finish or close the order ticket first, then restart.", "bad");
+          break;
+        }
+        void run(async () => {
+          await api.restart();
+          await updating();
+        });
+        break;
       case "stop-ask":
         $("#stopDialog").showModal();
         break;
@@ -1673,6 +1684,7 @@
         void updating();
         return;
       }
+      $("#updateBar").hidden = !v.update;
       if (v.version !== seen || S.lost) {
         seen = v.version;
         await refreshState();
@@ -1686,7 +1698,8 @@
     if (life.updating) return;
     life.updating = true;
     renderSub();
-    toast("The desk was updated. The dashboard restarts and this page reloads in a moment.");
+    $("#updateBar").hidden = true;
+    toast("The dashboard is restarting with the new version. This page reloads in a moment.");
     for (const until = Date.now() + 9e4; Date.now() < until; ) {
       await new Promise((r) => setTimeout(r, 1e3));
       try {

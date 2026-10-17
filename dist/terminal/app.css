@@ -1013,3 +1013,11 @@ details[open] > .at-input.at-select { border-color: var(--accent); }
 .ta-suggest-foot { flex-shrink: 0; padding: var(--space-1) var(--space-2) 0; border-top: 1px solid var(--line); font-size: var(--size-small); color: var(--text-3); }
 .ta-suggest-foot:empty { display: none; }
 @media (max-width: 640px) { .ta-opt { grid-template-columns: calc(var(--unit) * 18) minmax(0, 1fr); } .ta-opt-tags { display: none; } }
+
+/* an update is on disk: the bar that offers Restart stays at the top of the page until it is pressed */
+.ta-update-wrap { position: sticky; top: 0; z-index: var(--z-menu); max-width: var(--column); margin-inline: auto; padding: var(--space-3) var(--space-5) 0; }
+.ta-update { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-color: var(--accent); box-shadow: var(--shadow); color: var(--text); }
+.ta-update > span { flex: 1 1 calc(var(--unit) * 60); min-width: 0; }
+.ta-update > svg { color: var(--accent); }
+/* a style that sets display would otherwise show an element the page has hidden */
+.ta-suggest[hidden], .ta-update-wrap[hidden] { display: none; }

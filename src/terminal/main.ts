@@ -1,7 +1,7 @@
 // `node dist/terminal.mjs`: starts the dashboard on this computer and opens it in the browser. If this desk's dashboard is
 // already running, it opens that one instead of starting a second. Stop it with Ctrl+C, by closing its window, or with
-// Stop on the page. After an update it restarts itself on the same address (`--port=N`, without opening the browser
-// again), so an open page reloads into the new version where the person left it.
+// Stop on the page. After an update, Restart on the page starts it again on the same address (`--port=N`, without
+// opening the browser again), so the open page reloads into the new version where the person left it.
 import http from 'node:http';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -38,7 +38,7 @@ if (!again) {
   }
 }
 
-// The dashboard's own code: this program and the page's files. When an update changes them, it restarts itself.
+// The dashboard's own code: this program and the page's files. When an update changes them, the page offers Restart.
 const self = fileURLToPath(import.meta.url);
 const code = [self, ...['index.html', 'app.js', 'app.css'].map((f) => path.join(path.dirname(self), 'terminal', f))];
 
@@ -53,9 +53,9 @@ const restart = () => {
 };
 
 configure({ spacingMs: 250 });   // Yahoo is asked politely: one request at a time per host every quarter second
-// For the tests only: how often to look for an update, and how long to wait before restarting (normally 15 s and 4 s).
+// For the tests only: how often to look for an update (normally every 15 seconds).
 const quick = Number(process.env.TRADING_AGENTS_UPDATE_MS) || undefined;
-const base: TerminalOptions = { root, assets: loadAssets(), code, restart, stop: quit, ...(quick ? { updateCheckMs: quick, restartDelayMs: quick } : {}) };
+const base: TerminalOptions = { root, assets: loadAssets(), code, restart, stop: quit, ...(quick ? { updateCheckMs: quick } : {}) };
 /** On a restart the old dashboard has only just let go of its address, so it is asked for a few times before any other. */
 async function start(): Promise<Terminal> {
   if (again) for (let i = 0; i < 20; i++) {
