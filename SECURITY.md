@@ -32,6 +32,12 @@ call Robinhood, each names only its own tools, and the agents' tool server conta
   `desk-data`, which git never commits.
 - Your email goes to the SEC alone, which asks every reader of its filings for one.
 - The dashboard answers on this computer only, to the page it served, with a key made each time it starts.
+- What the dashboard remembers between visits (light or dark, the side list, the page and the stock you were on, the
+  chart's settings and the stocks you looked at last) is kept in `desk-data/dashboard.json`. Nothing about an order is
+  ever remembered: every ticket starts afresh.
+- After an update the dashboard restarts itself with the new version, but never with a ticket in hand: it waits until no
+  ticket has been touched for five minutes. Stop, at the top right of the page, closes it.
+- The search box sends what you type to Yahoo Finance's public search, which suggests matching stocks.
 
 ## Limits
 - A program running on your computer with your permissions could read the dashboard's page like your browser does.

@@ -46,6 +46,8 @@
     <symbol id="i-ledger" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M9 7h6M9 11h6M9 15h3"/></symbol>
     <symbol id="i-pulse" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></symbol>
     <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+    <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></symbol>
   </defs>
 </svg>
 
@@ -94,6 +96,7 @@
         <div class="at-top-end">
           <button class="icon-btn at-press" data-act="view" data-view="account" aria-label="Your account" title="Your account"><svg class="g"><use href="#i-link"/></svg></button>
           <button class="icon-btn at-press" id="themeBtn" data-act="theme" aria-label="Switch to the light face" title="Switch to the light face"><svg class="g"><use href="#i-sun"/></svg></button>
+          <button class="icon-btn at-press" data-act="stop-ask" aria-label="Stop the dashboard" title="Stop the dashboard"><svg class="g"><use href="#i-power"/></svg></button>
         </div>
       </header>
 
@@ -112,7 +115,14 @@
               </div>
             </div>
             <form class="at-row" id="addForm" autocomplete="off">
-              <label class="at-search at-box"><svg class="g"><use href="#i-search"/></svg><input id="addInput" placeholder="Add a stock to watch, e.g. NVDA" aria-label="Add a stock to watch" maxlength="20" spellcheck="false"></label>
+              <div class="ta-find">
+                <label class="at-search at-box"><svg class="g"><use href="#i-search"/></svg><input id="addInput" role="combobox" aria-expanded="false" aria-controls="findList" aria-autocomplete="list" placeholder="Search a company or a ticker, e.g. Tesla or NVDA" aria-label="Search a company or a ticker to watch" maxlength="40" spellcheck="false"></label>
+                <div class="ta-suggest at-box" id="findPanel" hidden>
+                  <div class="ta-suggest-h" id="findHead"></div>
+                  <ul class="ta-suggest-list" id="findList" role="listbox" aria-label="Stocks to pick"></ul>
+                  <p class="ta-suggest-foot" id="findFoot"></p>
+                </div>
+              </div>
               <button class="at-btn at-press primary" type="submit"><svg class="g"><use href="#i-plus"/></svg><span>Add to watchlist</span></button>
             </form>
           </div>
@@ -210,6 +220,11 @@
 
 <dialog class="at-pop l" id="callDialog" aria-label="A call in full"></dialog>
 <dialog class="at-pop" id="ticketDialog" aria-label="Order ticket"><div id="tkHead"></div><div id="tkFields"></div><div id="tkDyn"></div></dialog>
+<dialog class="at-pop s" id="stopDialog" aria-labelledby="stopTitle">
+  <h2 id="stopTitle">Stop the dashboard?</h2>
+  <p class="at-lede">It closes on this computer. Nothing is lost: your watchlist, your choices and the desk's calls all stay. To open it again, ask the trading-desk team to "open the dashboard", or run /terminal.</p>
+  <div class="at-pop-do"><button class="at-btn at-press" data-act="stop-cancel">Keep it running</button><button class="at-btn at-press primary" data-act="stop-yes"><svg class="g"><use href="#i-power"/></svg><span>Stop</span></button></div>
+</dialog>
 <div class="at-toast-host" id="toasts"></div>
 <script src="/app.js"></script>
 </body>

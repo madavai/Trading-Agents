@@ -11,7 +11,7 @@ import { Refused } from '../src/robinhood/reader.js';
 import { Link } from '../src/robinhood/link.js';
 import { openSession } from '../src/robinhood/connect.js';
 import { Journal } from '../src/desk/journal.js';
-import { confirmWords, placedToday, startTerminal, type Assets } from '../src/terminal/server.js';
+import { confirmWords, placedToday, startTerminal, type Assets, type TerminalOptions } from '../src/terminal/server.js';
 import { accountTools, AGENTIC, fakeRobinhood, MAIN, type Fake } from './fake-robinhood.js';
 
 const ORDER = { symbol: 'NVDA', side: 'buy' as const, quantity: 1, limitPrice: 182.4, timeInForce: 'gfd' as const };
@@ -59,7 +59,7 @@ afterEach(async () => { await fake?.close(); fake = undefined; });
 const freePort = () => new Promise<number>((resolve) => { const s = net.createServer().listen(0, '127.0.0.1', () => { const p = (s.address() as net.AddressInfo).port; s.close(() => resolve(p)); }); });
 const approves = (url: URL) => { void (async () => { const r = await fetch(url, { redirect: 'manual' }); await fetch(r.headers.get('location')!); })(); };
 
-async function desk(caps = { perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 3 }) {
+async function desk(caps = { perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 3 }, more: Partial<TerminalOptions> = {}) {
   const o = { placed: [] as Array<Record<string, unknown>>, reviewed: [] as Array<Record<string, unknown>>, agenticBuyingPower: '2500.00' };
   fake = await fakeRobinhood((calls) => accountTools(calls, o));
   const port = await freePort(), file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ta-pl-')), 'sign-in.json');
@@ -70,7 +70,7 @@ async function desk(caps = { perOrderUsd: 500, perStockPercent: 10, ordersPerDay
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ta-pl-term-')), dir = path.join(root, 'desk-data');
   fs.writeFileSync(path.join(root, 'desk-settings.json'), JSON.stringify({ trading: { caps } }));
   new Journal(path.join(dir, 'journal.md')).storeDecision('NVDA', '2026-10-15', '**Rating**: Buy\n\n**Executive Summary**: Buy.');
-  const term = await startTerminal({ root, assets: new Map([['/index.html', { type: 'text/html', body: '<meta name="desk-token" content="__DESK_TOKEN__">' }]]) as Assets, port: 0, robinhood: link });
+  const term = await startTerminal({ root, assets: new Map([['/index.html', { type: 'text/html', body: '<meta name="desk-token" content="__DESK_TOKEN__">' }]]) as Assets, port: 0, robinhood: link, ...more });
   const post = async (p: string, body: unknown) => { const r = await fetch(`${term.url}${p.slice(1)}`, { method: 'POST', headers: { 'x-desk-token': term.token, 'content-type': 'application/json' }, body: JSON.stringify(body) }); const t = await r.text(); return { status: r.status, body: t, json: () => JSON.parse(t) }; };
   const ticket = async () => (await post('/api/ticket', { symbol: 'NVDA', date: '2026-10-15' })).json() as { id: string };
   return { o, link, file, dir, term, post, ticket };
@@ -172,5 +172,22 @@ test('switching off, or disconnecting, stops any order; disconnecting switches t
     link.setTrading(true); link.forget();
     assert.equal(link.trading().on, false);
     assert.deepEqual(o.placed, []);
+  } finally { await term.close(); }
+});
+
+test('an update never restarts the dashboard with a ticket in hand: it waits until no ticket has been touched for a while', async () => {
+  const code = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ta-pl-code-')), 'code.js');
+  fs.writeFileSync(code, 'one');
+  let restarts = 0;
+  const { term, ticket, post } = await desk(undefined, { code: [code], restart: () => { restarts++; }, idleMs: 700, updateCheckMs: 25, restartDelayMs: 10 });
+  try {
+    const t = await ticket();
+    fs.writeFileSync(code, 'two');
+    await new Promise((r) => setTimeout(r, 300));
+    assert.equal((await post('/api/ticket/check', { id: t.id, quantity: 1, limitPrice: 182.4 })).status, 200, 'the ticket still works');
+    await new Promise((r) => setTimeout(r, 400));
+    assert.equal(restarts, 0, 'the ticket was touched less than the idle time ago');
+    for (const until = Date.now() + 3000; restarts === 0 && Date.now() < until; ) await new Promise((r) => setTimeout(r, 25));
+    assert.equal(restarts, 1, 'once the ticket is left alone, the update goes ahead');
   } finally { await term.close(); }
 });
