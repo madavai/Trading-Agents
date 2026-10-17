@@ -4,7 +4,7 @@
 // (Decide…) or the person's own (Trade…) - and is placed only on their Confirm, with trading switched on by them.
 import { api, ApiError, type CallDetail, type DeskState, type History, type LinkInfo, type Market, type QuoteResult, type Account, type AccountView, type Holding, type Order, type Snapshot, type TicketOpen, type Check, type Review, type Placed, type Trading } from './api.js';
 import { heroChart, sparkline } from './chart.js';
-import { clock, dayText, esc, money, num, pct, ratingTone, SECTION_NAMES, shortDay, tone } from './fmt.js';
+import { barOn, clock, dayText, esc, labelled, money, num, opening, pct, plain, ratingTone, SECTION_NAMES, shortDay, tone } from './fmt.js';
 import { markdown } from './md.js';
 import { isCrypto } from '../../data/symbols.js';
 import type { Quote } from '../quotes.js';
@@ -66,6 +66,14 @@ function setTheme(t: 'dark' | 'light'): void {
   btn.setAttribute('aria-label', `Switch to the ${to} face`); btn.title = `Switch to the ${to} face`;
   btn.querySelector('use')!.setAttribute('href', t === 'dark' ? '#i-sun' : '#i-moon');
   keep('theme', t);
+}
+
+/** The side list open, or folded into a slim strip of icons so the page takes the whole width; kept in this browser. */
+function setSide(folded: boolean): void {
+  $('#sideOpen').hidden = folded;
+  $('#sideFolded').hidden = !folded;
+  keep('side', folded ? 'folded' : 'open');
+  if (S.symbol) renderHero();   // the chart redraws to its new width
 }
 
 // ---------- pieces ----------
@@ -136,6 +144,7 @@ function renderSideAccount(): void {
   const r = S.rh, on = view === 'account', row = (dot: string, words: string, small = '') =>
     `<button class="at-li${on ? ' on' : ''}" data-act="view" data-view="account">${dot === 'none' ? '' : `<span class="at-dot ${dot}"></span>`}<span class="at-li-t">${esc(words)}</span>${small ? `<small>${esc(small)}</small>` : ''}</button>`;
   const lines = ['<div class="at-lh"><span>Your account</span></div>'];
+  $('#railDot').className = `at-dot ${r ? RH_WORDS[r.state].dot : ''}`.trim();
   if (!r) lines.push(row('', 'Robinhood · asking'));
   else {
     const w = RH_WORDS[r.state];
@@ -149,6 +158,35 @@ function renderSideAccount(): void {
   $('#sideAccount').innerHTML = lines.join('');
 }
 
+// ---------- your desk today: four tiles at the top of the page, each a press to where it comes from ----------
+function renderToday(): void {
+  const el = document.getElementById('todayDeck');
+  if (!el) return;
+  const views = A.snapshot?.views ?? [], d = S.desk;
+  // your accounts: what they are worth together, and what the holdings gained or lost since bought
+  let accounts: string;
+  if (!signedIn()) accounts = kpi({ tone: '', icon: 'i-wallet', name: 'Your accounts', value: '—', line: 'Connect Robinhood to see them here', act: { act: 'view', view: 'account' } });
+  else if (!views.length) accounts = kpi({ tone: '', icon: 'i-wallet', name: 'Your accounts', value: '—', line: A.chosen.length ? 'Open them to read them from Robinhood' : 'Choose the accounts to show', act: { act: 'view', view: 'account' } });
+  else {
+    const totals = views.map((v) => v.portfolio?.total ?? null), whole = totals.every((t) => t !== null);
+    const sum = totals.reduce<number>((a, t) => a + (t ?? 0), 0), g = gainOf(views.flatMap((v) => v.holdings)), gain = g ? g.value - g.cost : null;
+    const gainWords = g && gain !== null ? `<span class="${gain >= 0 ? 'ta-up' : 'ta-down'}">${signedMoney(gain)} (${pct((gain / g.cost) * 100)})</span> since bought` : 'gain since bought not known';
+    accounts = kpi({ tone: gain === null ? 'accent' : gain >= 0 ? 'ok' : 'bad', icon: 'i-wallet', name: `Your ${views.length} account${views.length === 1 ? '' : 's'}`, value: whole ? money(sum) : '—', line: gainWords, act: { act: 'view', view: 'account' } });
+  }
+  // the Agentic account: what the desk may spend, on the person's Confirm
+  const ag = views.find((v) => v.account.agentic);
+  const agentic = kpi({ tone: 'accent', icon: 'i-bolt', name: 'Agentic buying power', value: ag ? money(ag.portfolio?.buyingPower, ag.portfolio?.currency ?? 'USD') : '—', line: ag ? (tradingOn() ? '<span class="ta-warn">Trading is on</span> · orders only on your Confirm' : 'Trading is off · the dashboard only reads') : 'Show your Agentic account to trade', act: { act: 'view', view: 'account' } });
+  // the market: the S&P 500 today
+  const m = marketOf('^GSPC'), q = m && isQuote(m.quote) ? m.quote : null;
+  const market = kpi({ tone: q ? (q.changePct !== null && q.changePct < 0 ? 'bad' : 'ok') : '', icon: 'i-pulse', name: 'S&P 500 today', value: q ? num(q.price, 0) : '—', line: q ? `<span class="${(q.changePct ?? 0) >= 0 ? 'ta-up' : 'ta-down'}">${pct(q.changePct)}</span> · ${q.open ? 'now' : 'last close'}` : 'Reading the market', act: { act: 'select', symbol: '^GSPC' }, spark: q ? 'gspc' : '' });
+  // the desk: its latest call, what is waiting, what is scored
+  const latest = d?.calls[0];
+  const desk = kpi({ tone: 'merged', icon: 'i-check', name: "The desk's calls", value: d ? String(d.calls.length) : '—', line: d ? `${latest ? `latest <b>${esc(latest.ticker)}</b> ${esc(latest.rating)}` : 'none yet'} · ${d.queue.length} waiting · ${d.record.summary.resolved} scored` : 'Reading the desk', act: { act: 'goto', to: 'sec-calls' } });
+  el.innerHTML = accounts + agentic + market + desk;
+  const sp = el.querySelector<HTMLElement>('[data-kpi="gspc"]');
+  if (sp && q) sparkline(sp, q.points, (q.changePct ?? 0) >= 0 ? 'ok' : 'bad', { dot: true });
+}
+
 // ---------- the accounts the person chose to show ----------
 const A = {
   list: null as Account[] | null, chosen: [] as string[], snapshot: null as Snapshot | null,
@@ -156,17 +194,39 @@ const A = {
 };
 const signedIn = () => S.rh?.state === 'saved' || S.rh?.state === 'connected';
 
-const tile = (name: string, value: string, line = '') => `<div class="at-tile at-box ta-stat"><span class="at-tile-sub">${esc(name)}</span><span class="at-tile-name at-num ta-mid">${value}</span>${line ? `<div class="ta-stat-line"><span class="at-quiet">${esc(line)}</span></div>` : ''}</div>`;
+type KpiTone = 'accent' | 'ok' | 'bad' | 'warn' | 'merged' | '';
+/** A figure tile: a coloured icon, its name, the figure in its colour, a line under it. With `act`, it is a button. */
+function kpi(o: { tone: KpiTone; icon: string; name: string; value: string; line?: string; act?: Record<string, string>; spark?: string }): string {
+  const attrs = o.act ? Object.entries(o.act).map(([k, v]) => ` data-${k}="${esc(v)}"`).join('') : '';
+  const inner = `<span class="ta-kpi-ic"><svg class="g"><use href="#${o.icon}"/></svg></span><span class="at-tile-sub">${esc(o.name)}</span><span class="ta-kpi-v at-num">${o.value}</span>${o.line ? `<span class="ta-kpi-l">${o.line}</span>` : ''}${o.spark ? `<span class="ta-spark ta-kpi-spark" data-kpi="${esc(o.spark)}"></span>` : ''}`;
+  return o.act ? `<button class="at-tile at-box at-press ta-kpi ${o.tone}"${attrs}>${inner}</button>` : `<div class="at-tile at-box ta-kpi ${o.tone}">${inner}</div>`;
+}
+/** What the holdings cost and are worth now, from Robinhood's own figures; null when any holding lacks one. */
+function gainOf(hs: readonly Holding[]): { cost: number; value: number } | null {
+  if (!hs.length) return null;
+  let cost = 0, value = 0;
+  for (const h of hs) { if (h.averageCost === null || h.value === null) return null; cost += h.averageCost * h.quantity; value += h.value; }
+  return cost > 0 ? { cost, value } : null;
+}
+const signedMoney = (n: number, cur = 'USD') => `${n >= 0 ? '+' : ''}${money(n, cur)}`;
 const sideWord = (s: string | null) => (s === 'buy' ? 'Buy' : s === 'sell' ? 'Sell' : s ?? '—');
 
 function viewCard(v: AccountView, at: string): string {
   const a = v.account, cur = v.portfolio?.currency ?? 'USD', p = v.portfolio;
   const stocks = v.holdings.filter((h) => h.kind === 'stock').length, coins = v.holdings.filter((h) => h.kind === 'crypto').length;
   const role = a.agentic ? '<span class="at-chip accent">Agentic · the desk may trade here, only on your Confirm</span>' : '<span class="at-chip">View only · the desk never trades here</span>';
-  const tiles = `<div class="at-deck ta-deck-4">${tile('Total value', money(p?.total, cur))}${tile('Cash', money(p?.cash, cur))}${tile('Buying power', money(p?.buyingPower, cur))}${tile('Holdings', String(v.holdings.length), `${stocks} ${stocks === 1 ? 'stock' : 'stocks'}${coins ? ` · ${coins} crypto` : ''}`)}</div>`;
-  const rows = v.holdings.map((h: Holding) => `<tr><td><b>${esc(h.symbol)}</b>${h.kind === 'crypto' ? ' <small class="at-quiet">crypto</small>' : ''}</td><td class="num">${num(h.quantity, h.quantity % 1 ? 4 : 0)}</td><td class="num">${money(h.averageCost, cur)}</td><td class="num">${money(h.price, cur)}</td><td class="num">${money(h.value, cur)}</td><td class="num">${h.gainPct === null ? '—' : `<span class="at-chip ${tone(h.gainPct)}">${pct(h.gainPct)}</span>`}</td></tr>`).join('');
+  const g = gainOf(v.holdings), gain = g ? g.value - g.cost : null;
+  const tiles = `<div class="at-deck ta-deck-5">
+    ${kpi({ tone: 'accent', icon: 'i-wallet', name: 'Total value', value: money(p?.total, cur) })}
+    ${kpi({ tone: '', icon: 'i-cash', name: 'Cash', value: money(p?.cash, cur) })}
+    ${kpi({ tone: 'ok', icon: 'i-bolt', name: 'Buying power', value: money(p?.buyingPower, cur) })}
+    ${kpi({ tone: gain === null ? '' : gain >= 0 ? 'ok' : 'bad', icon: gain !== null && gain < 0 ? 'i-down' : 'i-up', name: 'Since bought', value: gain === null ? '—' : signedMoney(gain, cur), line: g ? `${pct((gain! / g.cost) * 100)} on ${money(g.cost, cur)} paid` : v.holdings.length ? 'a holding lacks its cost' : 'nothing held' })}
+    ${kpi({ tone: 'merged', icon: 'i-pie', name: 'Holdings', value: String(v.holdings.length), line: `${stocks} ${stocks === 1 ? 'stock' : 'stocks'}${coins ? ` · ${coins} crypto` : ''}` })}</div>`;
+  const total = p?.total ?? null;
+  const share = (h: Holding) => (h.value === null || !total ? null : (h.value / total) * 100);
+  const rows = v.holdings.map((h: Holding) => { const s = share(h); return `<tr><td><b>${esc(h.symbol)}</b>${h.kind === 'crypto' ? ' <small class="at-quiet">crypto</small>' : ''}</td><td class="num">${num(h.quantity, h.quantity % 1 ? 4 : 0)}</td><td class="num">${money(h.averageCost, cur)}</td><td class="num">${money(h.price, cur)}</td><td class="num">${money(h.value, cur)}</td><td><span class="ta-share">${s === null ? '—' : `<progress class="at-bar" max="100" value="${s.toFixed(1)}" aria-label="${s.toFixed(1)}% of the account"></progress><small>${s.toFixed(1)}%</small>`}</span></td><td class="num">${h.gainPct === null ? '—' : `<span class="at-chip ${tone(h.gainPct)}">${pct(h.gainPct)}</span>`}</td></tr>`; }).join('');
   const table = v.holdings.length
-    ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>Holding</th><th class="num">Quantity</th><th class="num">Average cost</th><th class="num">Price now</th><th class="num">Value</th><th class="num">Since bought</th></tr></thead><tbody>${rows}</tbody></table></div>`
+    ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>Holding</th><th class="num">Quantity</th><th class="num">Average cost</th><th class="num">Price now</th><th class="num">Value</th><th>Share of the account</th><th class="num">Since bought</th></tr></thead><tbody>${rows}</tbody></table></div>`
     : '<p class="at-quiet">Nothing is held in this account.</p>';
   let agentic = '';
   if (a.agentic) {
@@ -188,7 +248,7 @@ function viewCard(v: AccountView, at: string): string {
 
 function renderViews(): void {
   const el = $('#accountViews');
-  renderSideAccount();
+  renderSideAccount(); renderToday();
   if (!signedIn()) { el.innerHTML = '<p class="at-quiet">Connect Robinhood above, then choose which of your accounts to show.</p>'; return; }
   if (A.picking) {
     el.innerHTML = `<div class="at-card at-box"><div class="at-card-head"><h3>Which accounts should the dashboard show?</h3></div>
@@ -238,7 +298,7 @@ const tradingOn = () => TR.state?.on === true;
 
 function renderTrading(): void {
   const on = tradingOn();
-  renderSideAccount();
+  renderSideAccount(); renderToday();
   $('#tradeChip').className = `at-chip ${on ? 'warn' : ''}`.trim(); $('#tradeChip').textContent = on ? 'Trading on' : 'Trading off';
   $('#tradeFoot').textContent = on ? 'An order is placed only when you press Confirm on a ticket Robinhood has checked.' : 'This page places no order: trading is switched off.';
 }
@@ -354,11 +414,13 @@ async function reviewTicket(): Promise<void> {
   finally { T.busy = false; renderTicketDyn(); }
 }
 
-let rhTimer = 0;
-/** Asks the desk where Robinhood stands (it asks Robinhood nothing); while a sign-in is under way it asks again every two seconds. */
+let rhTimer = 0, checkedOnce = false;
+/** Asks the desk where Robinhood stands; while a sign-in is under way it asks again every two seconds. A saved sign-in
+ *  is checked once, read-only, when the page opens, so the page says "connected" rather than "not checked yet". */
 async function refreshRobinhood(): Promise<void> {
   const was = S.rh?.state;
   try { S.rh = await api.robinhood(); } catch { return; }
+  if (S.rh.state === 'saved' && !checkedOnce) { checkedOnce = true; try { S.rh = await api.checkRobinhood(); } catch { /* it stays "sign-in saved" */ } }
   renderAccount();
   clearTimeout(rhTimer);
   if (S.rh.state === 'waiting') { rhTimer = window.setTimeout(() => void refreshRobinhood(), 2000); return; }
@@ -380,6 +442,7 @@ function renderMarkets(): void {
     const el = document.querySelector<HTMLElement>(`[data-mk="${i}"]`);
     if (el && isQuote(m.quote)) sparkline(el, m.quote.points, (m.quote.changePct ?? 0) >= 0 ? 'ok' : 'bad', { dot: true });
   });
+  renderToday();
 }
 
 // ---------- the chart ----------
@@ -521,7 +584,19 @@ function renderStock(): void {
     ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>Date</th><th>Rating</th><th>Result</th><th></th></tr></thead><tbody>${calls.map((c) => `<tr class="ta-go" data-act="open-call" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}"><td>${esc(dayText(c.date))}</td><td>${ratingChip(c.rating)}</td><td>${c.pending ? '<span class="at-chip">not scored yet</span>' : `<span class="at-chip ${tone(parseFloat(c.alpha ?? ''))}">alpha ${esc(c.alpha ?? '—')}</span>`}</td><td><span class="at-quiet">Read</span></td></tr>`).join('')}</tbody></table></div>`
     : `<p class="at-quiet">The desk has no call on ${esc(sym)} yet.</p>`;
   const latest = calls[0];
-  $('#stockBody').innerHTML = `<div class="at-card at-box"><div class="at-card-head"><h3>What you hold</h3></div>${held}</div>
+  // your own orders on it, as Robinhood listed them for the Agentic account when the dashboard last read it
+  const ag = A.snapshot?.views.find((v) => v.account.agentic);
+  const mine = (ag?.orders?.orders ?? []).filter((o) => (o.symbol ?? '').toUpperCase() === sym);
+  const orders = !A.snapshot ? '<p class="at-quiet">Read your accounts to see your orders on it.</p>'
+    : !ag ? '<p class="at-quiet">Show your Agentic account to see its orders.</p>'
+    : ag.orders === null ? '<p class="at-quiet">The orders could not be read.</p>'
+    : mine.length ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>When</th><th>Order</th><th class="num">Quantity</th><th class="num">Price</th><th>State</th></tr></thead><tbody>${mine.map((x) => `<tr><td>${esc(x.at ? dayText(x.at) : '—')}</td><td>${esc(sideWord(x.side))}${x.type ? ` <small class="at-quiet">${esc(x.type)}</small>` : ''}</td><td class="num">${num(x.quantity, 0)}</td><td class="num">${money(x.price)}</td><td>${esc(x.state ?? '—')}</td></tr>`).join('')}</tbody></table></div>`
+    : `<p class="at-quiet">No orders on ${esc(sym)} in the Agentic account.</p>`;
+  const trade = isStock(sym) ? `<div class="at-row">${(['buy', 'sell'] as const).map((s) => `<button class="at-btn at-press" data-act="trade" data-side="${s}" data-symbol="${esc(sym)}"><svg class="g"><use href="#${s === 'buy' ? 'i-up' : 'i-down'}"/></svg><span>${s === 'buy' ? 'Buy' : 'Sell'} ${esc(sym)}…</span></button>`).join('')}</div>` : '';
+  $('#stockBody').innerHTML = `<div class="ta-col">
+      <div class="at-card at-box"><div class="at-card-head"><h3>What you hold</h3></div>${held}${trade}</div>
+      <div class="at-card at-box"><div class="at-card-head"><h3>Your orders on it</h3></div>${orders}</div>
+    </div>
     <div class="at-card at-box"><div class="at-card-head"><h3>The desk's calls on it</h3></div>${latest ? `<p class="at-lede">${esc(latest.summary)}</p>` : ''}${list}</div>`;
 
   const queued = d.queue.some((x) => x.symbol === sym);
@@ -579,25 +654,84 @@ function renderScore(): void {
 }
 
 // ---------- the call in full ----------
-const SECTION_ORDER = Object.keys(SECTION_NAMES).filter((k) => k !== 'decision');
+/** Each agent's part of a call: its icon and colour, and the stage of the desk it belongs to. */
+const ROLE: Record<string, { icon: string; tone: KpiTone; who: string }> = {
+  market: { icon: 'i-candle', tone: 'accent', who: 'Market analyst' }, sentiment: { icon: 'i-chat', tone: 'accent', who: 'Sentiment analyst' },
+  news: { icon: 'i-news', tone: 'accent', who: 'News analyst' }, fundamentals: { icon: 'i-ledger', tone: 'accent', who: 'Fundamentals analyst' },
+  bull: { icon: 'i-up', tone: 'ok', who: 'Bull researcher' }, bear: { icon: 'i-down', tone: 'bad', who: 'Bear researcher' },
+  research_plan: { icon: 'i-scale', tone: 'merged', who: 'Research manager' }, trader: { icon: 'i-target', tone: 'accent', who: 'Trader' },
+  aggressive: { icon: 'i-bolt', tone: 'warn', who: 'Aggressive risk analyst' }, conservative: { icon: 'i-shield', tone: 'ok', who: 'Conservative risk analyst' },
+  neutral: { icon: 'i-sliders', tone: '', who: 'Neutral risk analyst' }, decision: { icon: 'i-flag', tone: 'merged', who: 'Portfolio manager' },
+};
+const STAGES: Array<{ name: string; keys: string[] }> = [
+  { name: 'Gathering the facts', keys: ['market', 'sentiment', 'news', 'fundamentals'] },
+  { name: 'The research debate', keys: ['bull', 'bear', 'research_plan'] },
+  { name: 'The trade', keys: ['trader'] },
+  { name: 'The risk debate', keys: ['aggressive', 'conservative', 'neutral'] },
+];
+const verdictClass = (r: string) => { const t = ratingTone(r); return t === 'danger' ? 'bad' : t; };
+
+/** One agent's part as a card: its icon, who wrote it, a one-line opening, and its full words when opened. */
+function stepCard(key: string, parts: string[], open = false): string {
+  const r = ROLE[key] ?? { icon: 'i-file', tone: '' as KpiTone, who: '' };
+  const turns = parts.length > 1 ? `<span class="at-chip">${parts.length} turns</span>` : '';
+  return `<details class="ta-step at-box ${r.tone}"${open ? ' open' : ''}><summary>
+      <span class="ta-kpi-ic"><svg class="g"><use href="#${r.icon}"/></svg></span>
+      <span class="ta-step-w"><span class="ta-step-n">${esc(SECTION_NAMES[key] ?? key)}${r.who ? ` <small>· ${esc(r.who)}</small>` : ''}</span><span class="ta-step-p">${esc(opening(parts[0] ?? ''))}</span></span>
+      ${turns}<svg class="g ta-step-chev"><use href="#i-chev-right"/></svg></summary>
+    <div class="md">${parts.map(markdown).join('<hr>')}</div></details>`;
+}
 
 async function openCall(symbol: string, date: string): Promise<void> {
   const dlg = $<HTMLDialogElement>('#callDialog');
   let c: CallDetail;
   try { c = await api.call(symbol, date); } catch (e) { toast(say(e), 'bad'); return; }
   const meta = S.desk?.calls.find((x) => x.ticker === symbol && x.date === date);
-  const known = SECTION_ORDER.filter((k) => c.sections[k]?.length), extra = Object.keys(c.sections).filter((k) => k !== 'decision' && !SECTION_ORDER.includes(k));
-  dlg.innerHTML = `<div class="ta-pophead"><h2>${esc(symbol)} · ${esc(dayText(date))}</h2>${meta ? ratingChip(meta.rating) : ''}<button class="icon-btn" data-act="close-dialog" aria-label="Close"><svg class="g"><use href="#i-x"/></svg></button></div>
-    ${meta ? `<div class="ta-callbar">${resultChip(meta)}<span class="ta-callbar-t">${esc(meta.summary)}</span><span class="ta-callbar-do">${decideButton(symbol, date)}</span></div>` : ''}
-    <div class="md">${markdown(c.decision)}</div>
-    <div class="ta-detail">${[...known, ...extra].map((k) => `<details class="ta-fold"><summary>${esc(SECTION_NAMES[k] ?? k)}</summary><div class="md">${(c.sections[k] ?? []).map(markdown).join('<hr>')}</div></details>`).join('')}</div>
+  const rating = meta?.rating ?? (labelled(c.decision, 'Rating') || '—');
+  const target = labelled(c.decision, 'Price Target'), horizon = labelled(c.decision, 'Time Horizon');
+  const clip = (s: string, n = 150) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
+  const facts = [['Price target', target], ['Time horizon', horizon], ['Scored', meta ? (meta.pending ? `not yet: ${S.desk?.desk.holdingDays ?? 5} trading days after the call` : `alpha ${meta.alpha ?? '—'} against the index`) : '']]
+    .filter(([, v]) => v).map(([k, v]) => `<div><dt>${esc(k)}</dt><dd title="${esc(v)}">${esc(clip(v!))}</dd></div>`).join('');
+  const shown = new Set(STAGES.flatMap((s) => s.keys)), extra = Object.keys(c.sections).filter((k) => k !== 'decision' && !shown.has(k) && c.sections[k]?.length);
+  const stages = STAGES.map((s) => ({ ...s, keys: s.keys.filter((k) => c.sections[k]?.length) })).filter((s) => s.keys.length);
+  dlg.innerHTML = `<div class="ta-pophead"><div class="ta-pop-id"><h2>${esc(symbol)}</h2><span class="at-quiet">${esc(nameOf(symbol))} · the desk's call of ${esc(dayText(date))}</span></div><button class="icon-btn" data-act="close-dialog" aria-label="Close"><svg class="g"><use href="#i-x"/></svg></button></div>
+    <div class="ta-callhero ${verdictClass(rating)}">
+      <div class="ta-callhero-main">
+        <span class="at-kicker">The portfolio manager's rating</span>
+        <span class="at-verdict ${verdictClass(rating)}">${esc(rating)}</span>
+        <p class="at-lede">${esc(meta?.summary ?? plain(c.decision).slice(0, 320))}</p>
+        <div class="at-row">${meta ? resultChip(meta) : ''}${decideButton(symbol, date)}${isStock(symbol) ? `<button class="at-btn at-press" data-act="trade" data-symbol="${esc(symbol)}"><svg class="g"><use href="#i-trade"/></svg><span>Trade…</span></button>` : ''}</div>
+      </div>
+      <div class="ta-callhero-side"><span class="ta-spark-tall" id="callSpark"></span><p class="at-quiet" id="callSince">Reading the price since the call.</p></div>
+    </div>
+    ${facts ? `<dl class="at-facts row ta-callfacts">${facts}</dl>` : ''}
+    ${stepCard('decision', [c.decision], true)}
+    ${stages.map((s) => `<p class="at-kicker ta-stage">${esc(s.name)}</p><div class="ta-steps">${s.keys.map((k) => stepCard(k, c.sections[k]!)).join('')}</div>`).join('')}
+    ${extra.length ? `<p class="at-kicker ta-stage">More</p><div class="ta-steps">${extra.map((k) => stepCard(k, c.sections[k]!)).join('')}</div>` : ''}
     <p class="at-honest">This is the team's reasoning as it wrote it. It is not investment advice.</p>`;
   dlg.showModal();
+  void sinceCall(symbol, date);
+}
+
+/** How the price has moved since the call, from Yahoo's daily closes: the close on the call's day (or the one before)
+ *  against the latest price, and the closes since as a small chart. */
+async function sinceCall(symbol: string, date: string): Promise<void> {
+  const say2 = (t: string) => { const el = document.getElementById('callSince'); if (el) el.innerHTML = t; };
+  if (isIndex(symbol)) { say2(''); return; }
+  let h: History;
+  try { h = S.history && S.history.symbol === symbol && S.history.range === '6M' ? S.history : await api.history(symbol, '6M'); } catch { say2('The price since the call could not be read.'); return; }
+  const then = barOn(h.bars, date), last = h.bars[h.bars.length - 1];
+  if (!then || !last) { say2('No close on or before the call to compare with.'); return; }
+  const now = quoteOf(symbol)?.price ?? last.close, change = (now / then.close - 1) * 100, cur = h.currency ?? 'USD';
+  say2(`Close on ${esc(shortDay(then.date))}: <b>${money(then.close, cur)}</b> · now <b>${money(now, cur)}</b> <span class="at-chip ${tone(change)}">${pct(change)} since the call</span>`);
+  const from = Math.max(0, h.bars.indexOf(then) - 20), closes = h.bars.slice(from).map((b) => b.close);
+  const el = document.getElementById('callSpark');
+  if (el && closes.length > 1) sparkline(el, closes, change >= 0 ? 'ok' : 'bad', { dot: true });
 }
 
 // ---------- everything ----------
 function renderAll(): void {
-  renderSub(); renderFavs(); renderAccount(); renderControls(); renderHero(); renderCall(); renderStock(); renderQueue(); renderWatch(); renderCalls(); renderScore();
+  renderSub(); renderFavs(); renderAccount(); renderToday(); renderControls(); renderHero(); renderCall(); renderStock(); renderQueue(); renderWatch(); renderCalls(); renderScore();
 }
 
 /** Shows the desk or the account page; the side list marks where the person is. */
@@ -686,6 +820,7 @@ document.addEventListener('click', (e) => {
   switch (el.dataset.act) {
     case 'goto': { showView('overview'); const to = el.dataset.to === 'top' ? $('#page') : document.getElementById(el.dataset.to ?? ''); to?.scrollIntoView({ behavior: 'smooth', block: 'start' }); break; }
     case 'view': showView(el.dataset.view === 'account' ? 'account' : 'overview'); break;
+    case 'side': setSide(el.dataset.side === 'fold'); break;
     case 'theme': setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'); break;
     case 'kind': S.kind = el.dataset.kind === 'candles' ? 'candles' : 'area'; keep('kind', S.kind); renderControls(); renderHero(); break;
     case 'range': { const r = el.dataset.range as Range; if (RANGES.includes(r) && r !== S.range) { S.range = r; keep('range', r); S.history = null; S.historyError = ''; renderControls(); renderHero(); void loadHistory(); } break; }
@@ -697,7 +832,7 @@ document.addEventListener('click', (e) => {
     case 'dequeue': void run(async () => { await api.dequeue(sym); await refreshState(); }); break;
     case 'open-call': void openCall(sym, el.dataset.date ?? ''); break;
     case 'decide': if (dlg.open) dlg.close(); if (ready()) void openTicket(sym, el.dataset.date ?? ''); break;
-    case 'trade': if (ready()) void openTicket(sym, '', 'buy'); break;
+    case 'trade': if (dlg.open) dlg.close(); if (ready()) void openTicket(sym, '', el.dataset.side === 'sell' ? 'sell' : 'buy'); break;
     case 'tk-side': void openTicket(sym, '', el.dataset.side === 'sell' ? 'sell' : 'buy'); break;
     case 'tk-cancel': $<HTMLDialogElement>('#ticketDialog').close(); T.open = null; break;
     case 'tk-review': void reviewTicket(); break;
@@ -735,6 +870,7 @@ const savedRange = keep('range'), savedKind = keep('kind'), savedTheme = keep('t
 if (savedRange && (RANGES as readonly string[]).includes(savedRange)) S.range = savedRange as Range;
 if (savedKind === 'candles') S.kind = 'candles';
 setTheme(savedTheme === 'light' || savedTheme === 'dark' ? savedTheme : matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+setSide(keep('side') === 'folded');
 
 let seen = '';
 async function watchFiles(): Promise<void> {

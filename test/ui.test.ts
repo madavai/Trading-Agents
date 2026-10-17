@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { markdown } from '../src/terminal/ui/md.js';
-import { money, num, pct, shortDay } from '../src/terminal/ui/fmt.js';
+import { barOn, labelled, money, num, opening, pct, plain, shortDay } from '../src/terminal/ui/fmt.js';
 
 const ui = 'src/terminal/ui';
 const read = (f: string) => fs.readFileSync(path.join(ui, f), 'utf8');
@@ -27,6 +27,21 @@ test('lists, tables and rules keep their shape', () => {
   assert.match(markdown('a\n\n---\n\nb'), /<p>a<\/p><hr><p>b<\/p>/);
   assert.equal(markdown('first line\nsecond line'), '<p>first line second line</p>');
   assert.equal(markdown(''), '');
+});
+
+test('a call in full reads the agents\' own words: plain text, its labelled lines, each report\'s opening, the close on a day', () => {
+  const decision = '# NVDA\n\n**Rating**: Hold\n\n**Price Target**: Not provided as a firm target; the **10 EMA** at 224.33 is the first reference.\n**Time Horizon**: A few weeks to 3 months.';
+  assert.equal(labelled(decision, 'Rating'), 'Hold');
+  assert.equal(labelled(decision, 'Price Target'), 'Not provided as a firm target; the 10 EMA at 224.33 is the first reference.');
+  assert.equal(labelled(decision, 'Time Horizon'), 'A few weeks to 3 months.');
+  assert.equal(labelled(decision, 'Stop Loss'), '', 'a line that is not there is empty, never made up');
+  assert.equal(plain('## Head\n- **one** and *two*\n| a | b |\n`code`'), 'Head one and two code');
+  assert.equal(opening('## Market report\nThe trend is down. The 50-day average is falling.'), 'The trend is down.');
+  assert.ok(opening('x '.repeat(200)).length <= 160);
+  const bars = [{ date: '2026-10-14', close: 1 }, { date: '2026-10-15', close: 2 }, { date: '2026-10-19', close: 3 }];
+  assert.equal(barOn(bars, '2026-10-17')?.close, 2, 'a weekend call compares with the Friday close');
+  assert.equal(barOn(bars, '2026-10-19')?.close, 3);
+  assert.equal(barOn(bars, '2026-10-01'), null);
 });
 
 test('a number that is missing is a dash, never a zero', () => {

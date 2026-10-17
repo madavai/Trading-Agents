@@ -91,6 +91,24 @@
     neutral: "Neutral risk voice",
     decision: "Portfolio manager's decision"
   };
+  var plain = (md) => md.replace(/\r\n/g, "\n").replace(/^\s*\|.*$/gm, "").replace(/^\s{0,3}#{1,6}\s*/gm, "").replace(/\*\*([^*]+)\*\*/g, "$1").replace(/(^|\s)[*_]([^*_\n]+)[*_](?=\s|[.,;:!?]|$)/g, "$1$2").replace(/`([^`]+)`/g, "$1").replace(/^\s*(?:[-*+]|\d+\.)\s+/gm, "").replace(/\s+/g, " ").trim();
+  function labelled(md, label) {
+    const m = new RegExp(`\\*\\*${label}:?\\*\\*:?[ \\t]*([^\\n]+)`, "i").exec(md);
+    return m ? plain(m[1]) : "";
+  }
+  function opening(md, n = 160) {
+    const text = plain(md.split("\n").filter((l) => !/^\s{0,3}#/.test(l)).join("\n"));
+    const s = /^(.{12,}?[.!?])(?=\s|$)/.exec(text)?.[1] ?? text;
+    return s.length > n ? `${s.slice(0, n - 1).trimEnd()}\u2026` : s;
+  }
+  function barOn(bars, day) {
+    let hit = null;
+    for (const b of bars) {
+      if (b.date.slice(0, 10) <= day) hit = b;
+      else break;
+    }
+    return hit;
+  }
 
   // src/terminal/ui/chart.ts
   function smooth(pts) {
@@ -362,6 +380,12 @@
     btn.querySelector("use").setAttribute("href", t === "dark" ? "#i-sun" : "#i-moon");
     keep("theme", t);
   }
+  function setSide(folded) {
+    $("#sideOpen").hidden = folded;
+    $("#sideFolded").hidden = !folded;
+    keep("side", folded ? "folded" : "open");
+    if (S.symbol) renderHero();
+  }
   var ratingChip = (r) => `<span class="at-chip ${ratingTone(r)}">${esc(r)}</span>`;
   var changeChip = (q2) => q2 && q2.changePct !== null ? `<span class="at-chip ${tone(q2.changePct)}">${pct(q2.changePct)}</span>` : '<span class="at-chip">\u2014</span>';
   var priceText = (sym, q2) => {
@@ -432,6 +456,7 @@
   function renderSideAccount() {
     const r = S.rh, on = view === "account", row = (dot, words, small = "") => `<button class="at-li${on ? " on" : ""}" data-act="view" data-view="account">${dot === "none" ? "" : `<span class="at-dot ${dot}"></span>`}<span class="at-li-t">${esc(words)}</span>${small ? `<small>${esc(small)}</small>` : ""}</button>`;
     const lines = ['<div class="at-lh"><span>Your account</span></div>'];
+    $("#railDot").className = `at-dot ${r ? RH_WORDS[r.state].dot : ""}`.trim();
     if (!r) lines.push(row("", "Robinhood \xB7 asking"));
     else {
       const w = RH_WORDS[r.state];
@@ -444,6 +469,29 @@
     }
     $("#sideAccount").innerHTML = lines.join("");
   }
+  function renderToday() {
+    const el = document.getElementById("todayDeck");
+    if (!el) return;
+    const views = A.snapshot?.views ?? [], d = S.desk;
+    let accounts;
+    if (!signedIn()) accounts = kpi({ tone: "", icon: "i-wallet", name: "Your accounts", value: "\u2014", line: "Connect Robinhood to see them here", act: { act: "view", view: "account" } });
+    else if (!views.length) accounts = kpi({ tone: "", icon: "i-wallet", name: "Your accounts", value: "\u2014", line: A.chosen.length ? "Open them to read them from Robinhood" : "Choose the accounts to show", act: { act: "view", view: "account" } });
+    else {
+      const totals = views.map((v) => v.portfolio?.total ?? null), whole = totals.every((t) => t !== null);
+      const sum = totals.reduce((a, t) => a + (t ?? 0), 0), g = gainOf(views.flatMap((v) => v.holdings)), gain = g ? g.value - g.cost : null;
+      const gainWords = g && gain !== null ? `<span class="${gain >= 0 ? "ta-up" : "ta-down"}">${signedMoney(gain)} (${pct(gain / g.cost * 100)})</span> since bought` : "gain since bought not known";
+      accounts = kpi({ tone: gain === null ? "accent" : gain >= 0 ? "ok" : "bad", icon: "i-wallet", name: `Your ${views.length} account${views.length === 1 ? "" : "s"}`, value: whole ? money(sum) : "\u2014", line: gainWords, act: { act: "view", view: "account" } });
+    }
+    const ag = views.find((v) => v.account.agentic);
+    const agentic = kpi({ tone: "accent", icon: "i-bolt", name: "Agentic buying power", value: ag ? money(ag.portfolio?.buyingPower, ag.portfolio?.currency ?? "USD") : "\u2014", line: ag ? tradingOn() ? '<span class="ta-warn">Trading is on</span> \xB7 orders only on your Confirm' : "Trading is off \xB7 the dashboard only reads" : "Show your Agentic account to trade", act: { act: "view", view: "account" } });
+    const m = marketOf("^GSPC"), q2 = m && isQuote(m.quote) ? m.quote : null;
+    const market = kpi({ tone: q2 ? q2.changePct !== null && q2.changePct < 0 ? "bad" : "ok" : "", icon: "i-pulse", name: "S&P 500 today", value: q2 ? num(q2.price, 0) : "\u2014", line: q2 ? `<span class="${(q2.changePct ?? 0) >= 0 ? "ta-up" : "ta-down"}">${pct(q2.changePct)}</span> \xB7 ${q2.open ? "now" : "last close"}` : "Reading the market", act: { act: "select", symbol: "^GSPC" }, spark: q2 ? "gspc" : "" });
+    const latest = d?.calls[0];
+    const desk = kpi({ tone: "merged", icon: "i-check", name: "The desk's calls", value: d ? String(d.calls.length) : "\u2014", line: d ? `${latest ? `latest <b>${esc(latest.ticker)}</b> ${esc(latest.rating)}` : "none yet"} \xB7 ${d.queue.length} waiting \xB7 ${d.record.summary.resolved} scored` : "Reading the desk", act: { act: "goto", to: "sec-calls" } });
+    el.innerHTML = accounts + agentic + market + desk;
+    const sp = el.querySelector('[data-kpi="gspc"]');
+    if (sp && q2) sparkline(sp, q2.points, (q2.changePct ?? 0) >= 0 ? "ok" : "bad", { dot: true });
+  }
   var A = {
     list: null,
     chosen: [],
@@ -455,15 +503,41 @@
     shared: null
   };
   var signedIn = () => S.rh?.state === "saved" || S.rh?.state === "connected";
-  var tile = (name, value, line = "") => `<div class="at-tile at-box ta-stat"><span class="at-tile-sub">${esc(name)}</span><span class="at-tile-name at-num ta-mid">${value}</span>${line ? `<div class="ta-stat-line"><span class="at-quiet">${esc(line)}</span></div>` : ""}</div>`;
+  function kpi(o) {
+    const attrs = o.act ? Object.entries(o.act).map(([k, v]) => ` data-${k}="${esc(v)}"`).join("") : "";
+    const inner = `<span class="ta-kpi-ic"><svg class="g"><use href="#${o.icon}"/></svg></span><span class="at-tile-sub">${esc(o.name)}</span><span class="ta-kpi-v at-num">${o.value}</span>${o.line ? `<span class="ta-kpi-l">${o.line}</span>` : ""}${o.spark ? `<span class="ta-spark ta-kpi-spark" data-kpi="${esc(o.spark)}"></span>` : ""}`;
+    return o.act ? `<button class="at-tile at-box at-press ta-kpi ${o.tone}"${attrs}>${inner}</button>` : `<div class="at-tile at-box ta-kpi ${o.tone}">${inner}</div>`;
+  }
+  function gainOf(hs) {
+    if (!hs.length) return null;
+    let cost = 0, value = 0;
+    for (const h of hs) {
+      if (h.averageCost === null || h.value === null) return null;
+      cost += h.averageCost * h.quantity;
+      value += h.value;
+    }
+    return cost > 0 ? { cost, value } : null;
+  }
+  var signedMoney = (n, cur = "USD") => `${n >= 0 ? "+" : ""}${money(n, cur)}`;
   var sideWord = (s) => s === "buy" ? "Buy" : s === "sell" ? "Sell" : s ?? "\u2014";
   function viewCard(v, at) {
     const a = v.account, cur = v.portfolio?.currency ?? "USD", p = v.portfolio;
     const stocks = v.holdings.filter((h) => h.kind === "stock").length, coins = v.holdings.filter((h) => h.kind === "crypto").length;
     const role = a.agentic ? '<span class="at-chip accent">Agentic \xB7 the desk may trade here, only on your Confirm</span>' : '<span class="at-chip">View only \xB7 the desk never trades here</span>';
-    const tiles = `<div class="at-deck ta-deck-4">${tile("Total value", money(p?.total, cur))}${tile("Cash", money(p?.cash, cur))}${tile("Buying power", money(p?.buyingPower, cur))}${tile("Holdings", String(v.holdings.length), `${stocks} ${stocks === 1 ? "stock" : "stocks"}${coins ? ` \xB7 ${coins} crypto` : ""}`)}</div>`;
-    const rows = v.holdings.map((h) => `<tr><td><b>${esc(h.symbol)}</b>${h.kind === "crypto" ? ' <small class="at-quiet">crypto</small>' : ""}</td><td class="num">${num(h.quantity, h.quantity % 1 ? 4 : 0)}</td><td class="num">${money(h.averageCost, cur)}</td><td class="num">${money(h.price, cur)}</td><td class="num">${money(h.value, cur)}</td><td class="num">${h.gainPct === null ? "\u2014" : `<span class="at-chip ${tone(h.gainPct)}">${pct(h.gainPct)}</span>`}</td></tr>`).join("");
-    const table = v.holdings.length ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>Holding</th><th class="num">Quantity</th><th class="num">Average cost</th><th class="num">Price now</th><th class="num">Value</th><th class="num">Since bought</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="at-quiet">Nothing is held in this account.</p>';
+    const g = gainOf(v.holdings), gain = g ? g.value - g.cost : null;
+    const tiles = `<div class="at-deck ta-deck-5">
+    ${kpi({ tone: "accent", icon: "i-wallet", name: "Total value", value: money(p?.total, cur) })}
+    ${kpi({ tone: "", icon: "i-cash", name: "Cash", value: money(p?.cash, cur) })}
+    ${kpi({ tone: "ok", icon: "i-bolt", name: "Buying power", value: money(p?.buyingPower, cur) })}
+    ${kpi({ tone: gain === null ? "" : gain >= 0 ? "ok" : "bad", icon: gain !== null && gain < 0 ? "i-down" : "i-up", name: "Since bought", value: gain === null ? "\u2014" : signedMoney(gain, cur), line: g ? `${pct(gain / g.cost * 100)} on ${money(g.cost, cur)} paid` : v.holdings.length ? "a holding lacks its cost" : "nothing held" })}
+    ${kpi({ tone: "merged", icon: "i-pie", name: "Holdings", value: String(v.holdings.length), line: `${stocks} ${stocks === 1 ? "stock" : "stocks"}${coins ? ` \xB7 ${coins} crypto` : ""}` })}</div>`;
+    const total = p?.total ?? null;
+    const share = (h) => h.value === null || !total ? null : h.value / total * 100;
+    const rows = v.holdings.map((h) => {
+      const s = share(h);
+      return `<tr><td><b>${esc(h.symbol)}</b>${h.kind === "crypto" ? ' <small class="at-quiet">crypto</small>' : ""}</td><td class="num">${num(h.quantity, h.quantity % 1 ? 4 : 0)}</td><td class="num">${money(h.averageCost, cur)}</td><td class="num">${money(h.price, cur)}</td><td class="num">${money(h.value, cur)}</td><td><span class="ta-share">${s === null ? "\u2014" : `<progress class="at-bar" max="100" value="${s.toFixed(1)}" aria-label="${s.toFixed(1)}% of the account"></progress><small>${s.toFixed(1)}%</small>`}</span></td><td class="num">${h.gainPct === null ? "\u2014" : `<span class="at-chip ${tone(h.gainPct)}">${pct(h.gainPct)}</span>`}</td></tr>`;
+    }).join("");
+    const table = v.holdings.length ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>Holding</th><th class="num">Quantity</th><th class="num">Average cost</th><th class="num">Price now</th><th class="num">Value</th><th>Share of the account</th><th class="num">Since bought</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="at-quiet">Nothing is held in this account.</p>';
     let agentic = "";
     if (a.agentic) {
       const ap = v.approvals;
@@ -481,6 +555,7 @@
   function renderViews() {
     const el = $("#accountViews");
     renderSideAccount();
+    renderToday();
     if (!signedIn()) {
       el.innerHTML = '<p class="at-quiet">Connect Robinhood above, then choose which of your accounts to show.</p>';
       return;
@@ -556,6 +631,7 @@
   function renderTrading() {
     const on = tradingOn();
     renderSideAccount();
+    renderToday();
     $("#tradeChip").className = `at-chip ${on ? "warn" : ""}`.trim();
     $("#tradeChip").textContent = on ? "Trading on" : "Trading off";
     $("#tradeFoot").textContent = on ? "An order is placed only when you press Confirm on a ticket Robinhood has checked." : "This page places no order: trading is switched off.";
@@ -704,12 +780,20 @@
     }
   }
   var rhTimer = 0;
+  var checkedOnce = false;
   async function refreshRobinhood() {
     const was = S.rh?.state;
     try {
       S.rh = await api.robinhood();
     } catch {
       return;
+    }
+    if (S.rh.state === "saved" && !checkedOnce) {
+      checkedOnce = true;
+      try {
+        S.rh = await api.checkRobinhood();
+      } catch {
+      }
     }
     renderAccount();
     clearTimeout(rhTimer);
@@ -732,6 +816,7 @@
       const el = document.querySelector(`[data-mk="${i}"]`);
       if (el && isQuote(m.quote)) sparkline(el, m.quote.points, (m.quote.changePct ?? 0) >= 0 ? "ok" : "bad", { dot: true });
     });
+    renderToday();
   }
   function renderControls() {
     $("#rangeSeg").innerHTML = RANGES.map((r) => `<button class="at-seg-b ${r === S.range ? "on" : ""}" data-act="range" data-range="${r}">${r}</button>`).join("");
@@ -869,7 +954,14 @@
     const calls = d.calls.filter((c) => c.ticker === sym);
     const list = calls.length ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>Date</th><th>Rating</th><th>Result</th><th></th></tr></thead><tbody>${calls.map((c) => `<tr class="ta-go" data-act="open-call" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}"><td>${esc(dayText(c.date))}</td><td>${ratingChip(c.rating)}</td><td>${c.pending ? '<span class="at-chip">not scored yet</span>' : `<span class="at-chip ${tone(parseFloat(c.alpha ?? ""))}">alpha ${esc(c.alpha ?? "\u2014")}</span>`}</td><td><span class="at-quiet">Read</span></td></tr>`).join("")}</tbody></table></div>` : `<p class="at-quiet">The desk has no call on ${esc(sym)} yet.</p>`;
     const latest = calls[0];
-    $("#stockBody").innerHTML = `<div class="at-card at-box"><div class="at-card-head"><h3>What you hold</h3></div>${held}</div>
+    const ag = A.snapshot?.views.find((v) => v.account.agentic);
+    const mine = (ag?.orders?.orders ?? []).filter((o) => (o.symbol ?? "").toUpperCase() === sym);
+    const orders = !A.snapshot ? '<p class="at-quiet">Read your accounts to see your orders on it.</p>' : !ag ? '<p class="at-quiet">Show your Agentic account to see its orders.</p>' : ag.orders === null ? '<p class="at-quiet">The orders could not be read.</p>' : mine.length ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>When</th><th>Order</th><th class="num">Quantity</th><th class="num">Price</th><th>State</th></tr></thead><tbody>${mine.map((x) => `<tr><td>${esc(x.at ? dayText(x.at) : "\u2014")}</td><td>${esc(sideWord(x.side))}${x.type ? ` <small class="at-quiet">${esc(x.type)}</small>` : ""}</td><td class="num">${num(x.quantity, 0)}</td><td class="num">${money(x.price)}</td><td>${esc(x.state ?? "\u2014")}</td></tr>`).join("")}</tbody></table></div>` : `<p class="at-quiet">No orders on ${esc(sym)} in the Agentic account.</p>`;
+    const trade = isStock(sym) ? `<div class="at-row">${["buy", "sell"].map((s) => `<button class="at-btn at-press" data-act="trade" data-side="${s}" data-symbol="${esc(sym)}"><svg class="g"><use href="#${s === "buy" ? "i-up" : "i-down"}"/></svg><span>${s === "buy" ? "Buy" : "Sell"} ${esc(sym)}\u2026</span></button>`).join("")}</div>` : "";
+    $("#stockBody").innerHTML = `<div class="ta-col">
+      <div class="at-card at-box"><div class="at-card-head"><h3>What you hold</h3></div>${held}${trade}</div>
+      <div class="at-card at-box"><div class="at-card-head"><h3>Your orders on it</h3></div>${orders}</div>
+    </div>
     <div class="at-card at-box"><div class="at-card-head"><h3>The desk's calls on it</h3></div>${latest ? `<p class="at-lede">${esc(latest.summary)}</p>` : ""}${list}</div>`;
     const queued = d.queue.some((x) => x.symbol === sym);
     $("#stockActions").innerHTML = `${queued ? '<span class="at-chip">waiting to be analysed</span>' : `<button class="at-btn at-press" data-act="analyse" data-symbol="${esc(sym)}"><svg class="g"><use href="#i-bot"/></svg><span>Ask the desk to analyse</span></button>`}${isStock(sym) ? `<button class="at-btn at-press" data-act="trade" data-symbol="${esc(sym)}"><svg class="g"><use href="#i-trade"/></svg><span>Trade\u2026</span></button>` : ""}${latest ? decideButton(sym, latest.date) : ""}`;
@@ -918,7 +1010,39 @@
     const few = r.resolved > 0 && r.resolved < 30 ? " With so few scored calls these figures are noise, not a record." : "";
     $("#score").innerHTML = `${grid}<p class="at-honest">${esc(d.record.benchmarkNote)}${esc(few)}</p>`;
   }
-  var SECTION_ORDER = Object.keys(SECTION_NAMES).filter((k) => k !== "decision");
+  var ROLE = {
+    market: { icon: "i-candle", tone: "accent", who: "Market analyst" },
+    sentiment: { icon: "i-chat", tone: "accent", who: "Sentiment analyst" },
+    news: { icon: "i-news", tone: "accent", who: "News analyst" },
+    fundamentals: { icon: "i-ledger", tone: "accent", who: "Fundamentals analyst" },
+    bull: { icon: "i-up", tone: "ok", who: "Bull researcher" },
+    bear: { icon: "i-down", tone: "bad", who: "Bear researcher" },
+    research_plan: { icon: "i-scale", tone: "merged", who: "Research manager" },
+    trader: { icon: "i-target", tone: "accent", who: "Trader" },
+    aggressive: { icon: "i-bolt", tone: "warn", who: "Aggressive risk analyst" },
+    conservative: { icon: "i-shield", tone: "ok", who: "Conservative risk analyst" },
+    neutral: { icon: "i-sliders", tone: "", who: "Neutral risk analyst" },
+    decision: { icon: "i-flag", tone: "merged", who: "Portfolio manager" }
+  };
+  var STAGES = [
+    { name: "Gathering the facts", keys: ["market", "sentiment", "news", "fundamentals"] },
+    { name: "The research debate", keys: ["bull", "bear", "research_plan"] },
+    { name: "The trade", keys: ["trader"] },
+    { name: "The risk debate", keys: ["aggressive", "conservative", "neutral"] }
+  ];
+  var verdictClass = (r) => {
+    const t = ratingTone(r);
+    return t === "danger" ? "bad" : t;
+  };
+  function stepCard(key, parts, open = false) {
+    const r = ROLE[key] ?? { icon: "i-file", tone: "", who: "" };
+    const turns = parts.length > 1 ? `<span class="at-chip">${parts.length} turns</span>` : "";
+    return `<details class="ta-step at-box ${r.tone}"${open ? " open" : ""}><summary>
+      <span class="ta-kpi-ic"><svg class="g"><use href="#${r.icon}"/></svg></span>
+      <span class="ta-step-w"><span class="ta-step-n">${esc(SECTION_NAMES[key] ?? key)}${r.who ? ` <small>\xB7 ${esc(r.who)}</small>` : ""}</span><span class="ta-step-p">${esc(opening(parts[0] ?? ""))}</span></span>
+      ${turns}<svg class="g ta-step-chev"><use href="#i-chev-right"/></svg></summary>
+    <div class="md">${parts.map(markdown).join("<hr>")}</div></details>`;
+  }
   async function openCall(symbol, date) {
     const dlg = $("#callDialog");
     let c;
@@ -929,18 +1053,62 @@
       return;
     }
     const meta = S.desk?.calls.find((x) => x.ticker === symbol && x.date === date);
-    const known = SECTION_ORDER.filter((k) => c.sections[k]?.length), extra = Object.keys(c.sections).filter((k) => k !== "decision" && !SECTION_ORDER.includes(k));
-    dlg.innerHTML = `<div class="ta-pophead"><h2>${esc(symbol)} \xB7 ${esc(dayText(date))}</h2>${meta ? ratingChip(meta.rating) : ""}<button class="icon-btn" data-act="close-dialog" aria-label="Close"><svg class="g"><use href="#i-x"/></svg></button></div>
-    ${meta ? `<div class="ta-callbar">${resultChip(meta)}<span class="ta-callbar-t">${esc(meta.summary)}</span><span class="ta-callbar-do">${decideButton(symbol, date)}</span></div>` : ""}
-    <div class="md">${markdown(c.decision)}</div>
-    <div class="ta-detail">${[...known, ...extra].map((k) => `<details class="ta-fold"><summary>${esc(SECTION_NAMES[k] ?? k)}</summary><div class="md">${(c.sections[k] ?? []).map(markdown).join("<hr>")}</div></details>`).join("")}</div>
+    const rating = meta?.rating ?? (labelled(c.decision, "Rating") || "\u2014");
+    const target = labelled(c.decision, "Price Target"), horizon = labelled(c.decision, "Time Horizon");
+    const clip = (s, n = 150) => s.length > n ? `${s.slice(0, n - 1).trimEnd()}\u2026` : s;
+    const facts = [["Price target", target], ["Time horizon", horizon], ["Scored", meta ? meta.pending ? `not yet: ${S.desk?.desk.holdingDays ?? 5} trading days after the call` : `alpha ${meta.alpha ?? "\u2014"} against the index` : ""]].filter(([, v]) => v).map(([k, v]) => `<div><dt>${esc(k)}</dt><dd title="${esc(v)}">${esc(clip(v))}</dd></div>`).join("");
+    const shown = new Set(STAGES.flatMap((s) => s.keys)), extra = Object.keys(c.sections).filter((k) => k !== "decision" && !shown.has(k) && c.sections[k]?.length);
+    const stages = STAGES.map((s) => ({ ...s, keys: s.keys.filter((k) => c.sections[k]?.length) })).filter((s) => s.keys.length);
+    dlg.innerHTML = `<div class="ta-pophead"><div class="ta-pop-id"><h2>${esc(symbol)}</h2><span class="at-quiet">${esc(nameOf(symbol))} \xB7 the desk's call of ${esc(dayText(date))}</span></div><button class="icon-btn" data-act="close-dialog" aria-label="Close"><svg class="g"><use href="#i-x"/></svg></button></div>
+    <div class="ta-callhero ${verdictClass(rating)}">
+      <div class="ta-callhero-main">
+        <span class="at-kicker">The portfolio manager's rating</span>
+        <span class="at-verdict ${verdictClass(rating)}">${esc(rating)}</span>
+        <p class="at-lede">${esc(meta?.summary ?? plain(c.decision).slice(0, 320))}</p>
+        <div class="at-row">${meta ? resultChip(meta) : ""}${decideButton(symbol, date)}${isStock(symbol) ? `<button class="at-btn at-press" data-act="trade" data-symbol="${esc(symbol)}"><svg class="g"><use href="#i-trade"/></svg><span>Trade\u2026</span></button>` : ""}</div>
+      </div>
+      <div class="ta-callhero-side"><span class="ta-spark-tall" id="callSpark"></span><p class="at-quiet" id="callSince">Reading the price since the call.</p></div>
+    </div>
+    ${facts ? `<dl class="at-facts row ta-callfacts">${facts}</dl>` : ""}
+    ${stepCard("decision", [c.decision], true)}
+    ${stages.map((s) => `<p class="at-kicker ta-stage">${esc(s.name)}</p><div class="ta-steps">${s.keys.map((k) => stepCard(k, c.sections[k])).join("")}</div>`).join("")}
+    ${extra.length ? `<p class="at-kicker ta-stage">More</p><div class="ta-steps">${extra.map((k) => stepCard(k, c.sections[k])).join("")}</div>` : ""}
     <p class="at-honest">This is the team's reasoning as it wrote it. It is not investment advice.</p>`;
     dlg.showModal();
+    void sinceCall(symbol, date);
+  }
+  async function sinceCall(symbol, date) {
+    const say2 = (t) => {
+      const el2 = document.getElementById("callSince");
+      if (el2) el2.innerHTML = t;
+    };
+    if (isIndex(symbol)) {
+      say2("");
+      return;
+    }
+    let h;
+    try {
+      h = S.history && S.history.symbol === symbol && S.history.range === "6M" ? S.history : await api.history(symbol, "6M");
+    } catch {
+      say2("The price since the call could not be read.");
+      return;
+    }
+    const then = barOn(h.bars, date), last = h.bars[h.bars.length - 1];
+    if (!then || !last) {
+      say2("No close on or before the call to compare with.");
+      return;
+    }
+    const now = quoteOf(symbol)?.price ?? last.close, change = (now / then.close - 1) * 100, cur = h.currency ?? "USD";
+    say2(`Close on ${esc(shortDay(then.date))}: <b>${money(then.close, cur)}</b> \xB7 now <b>${money(now, cur)}</b> <span class="at-chip ${tone(change)}">${pct(change)} since the call</span>`);
+    const from = Math.max(0, h.bars.indexOf(then) - 20), closes = h.bars.slice(from).map((b) => b.close);
+    const el = document.getElementById("callSpark");
+    if (el && closes.length > 1) sparkline(el, closes, change >= 0 ? "ok" : "bad", { dot: true });
   }
   function renderAll() {
     renderSub();
     renderFavs();
     renderAccount();
+    renderToday();
     renderControls();
     renderHero();
     renderCall();
@@ -1061,6 +1229,9 @@
       case "view":
         showView(el.dataset.view === "account" ? "account" : "overview");
         break;
+      case "side":
+        setSide(el.dataset.side === "fold");
+        break;
       case "theme":
         setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
         break;
@@ -1124,7 +1295,8 @@
         if (ready()) void openTicket(sym, el.dataset.date ?? "");
         break;
       case "trade":
-        if (ready()) void openTicket(sym, "", "buy");
+        if (dlg.open) dlg.close();
+        if (ready()) void openTicket(sym, "", el.dataset.side === "sell" ? "sell" : "buy");
         break;
       case "tk-side":
         void openTicket(sym, "", el.dataset.side === "sell" ? "sell" : "buy");
@@ -1252,6 +1424,7 @@
   if (savedRange && RANGES.includes(savedRange)) S.range = savedRange;
   if (savedKind === "candles") S.kind = "candles";
   setTheme(savedTheme === "light" || savedTheme === "dark" ? savedTheme : matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+  setSide(keep("side") === "folded");
   var seen = "";
   async function watchFiles() {
     if (document.hidden) return;
