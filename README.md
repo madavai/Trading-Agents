@@ -1,9 +1,11 @@
 # Trading Agents
 
-<a href="https://madavai.github.io/Trading-Agents/inside-the-trading-desk.html"><picture>
+<a href="https://madavai.github.io/Trading-Agents/inside-the-trading-desk.html">
+<picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/hero-dark.webp">
   <img alt="Inside the Trading Desk. Twelve agents research; you see it beside your accounts; only your Confirm trades. Not financial advice." src="docs/readme/hero-light.webp">
-</picture></a>
+</picture>
+</a>
 
 A trading desk of AI agents for [Madav](https://github.com/madavai) / Claude, built in the open. A team of agents
 analyses a stock the way a trading firm would; you see their call on a dashboard beside your own Robinhood accounts; and
@@ -33,10 +35,12 @@ affiliated with them.
 
 ## The desk on one page
 
-<a href="https://madavai.github.io/Trading-Agents/inside-the-trading-desk.html#glance"><picture>
+<a href="https://madavai.github.io/Trading-Agents/inside-the-trading-desk.html#glance">
+<picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/glance-dark.webp">
   <img alt="The desk on one page: public data goes in, twelve agents turn it into a call, the call is kept on your computer, and you decide on your dashboard, the only part that reaches Robinhood. A guard stands between every agent and your money." src="docs/readme/glance-light.webp">
-</picture></a>
+</picture>
+</a>
 
 ## Start in three steps
 1. In Madav, clone this repository. There is nothing to install.
@@ -54,10 +58,12 @@ exactly as the project ships them.
 
 ## Where the information comes from
 
-<a href="https://madavai.github.io/Trading-Agents/inside-the-trading-desk.html#sources"><picture>
+<a href="https://madavai.github.io/Trading-Agents/inside-the-trading-desk.html#sources">
+<picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/sources-dark.webp">
   <img alt="Seven sources, all public but one: Yahoo Finance, StockTwits, Reddit, FRED, Polymarket and SEC EDGAR, with no keys, and your own Robinhood account, read only by the dashboard." src="docs/readme/sources-light.webp">
-</picture></a>
+</picture>
+</a>
 
 <details>
 <summary>The sources, in words</summary>
@@ -75,19 +81,23 @@ other source sees it.
 
 ## Who does what: twelve agents
 
-<a href="https://madavai.github.io/Trading-Agents/inside-the-trading-desk.html#agents"><picture>
+<a href="https://madavai.github.io/Trading-Agents/inside-the-trading-desk.html#agents">
+<picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/agents-dark.webp">
   <img alt="Twelve agents in five stations: four analysts (market, sentiment, news, fundamentals), a bull and a bear with a research manager, a trader, three risk voices, and a portfolio manager who gives the rating. A lead, trading-desk, runs the line." src="docs/readme/agents-light.webp">
-</picture></a>
+</picture>
+</a>
 
 Choose `shallow`, `medium` or `deep` (1, 3 or 5 rounds of debate), which analysts run, and the report language.
 
 ## One call, from question to order
 
-<a href="https://madavai.github.io/Trading-Agents/inside-the-trading-desk.html#journey"><picture>
+<a href="https://madavai.github.io/Trading-Agents/inside-the-trading-desk.html#journey">
+<picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/journey-dark.webp">
   <img alt="One call, from question to order. The desk researches: you ask, past calls are scored first, the plan, four analysts gather the facts, the research debate, the trade proposal, the risk debate, the call, recorded. You decide: you open a ticket, Robinhood checks it, you confirm. The desk learns: the call is scored and its lesson kept." src="docs/readme/journey-light.webp">
-</picture></a>
+</picture>
+</a>
 
 <details>
 <summary>The same, in words</summary>
@@ -113,17 +123,21 @@ Choose `shallow`, `medium` or `deep` (1, 3 or 5 rounds of debate), which analyst
 
 ## Where everything is kept
 
-<a href="https://madavai.github.io/Trading-Agents/inside-the-trading-desk.html#kept"><picture>
+<a href="https://madavai.github.io/Trading-Agents/inside-the-trading-desk.html#kept">
+<picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/kept-dark.webp">
   <img alt="Four places, all on this computer: the desk's records (journal, reports, watchlist, holdings, orders log), your rules in one settings file, a private folder for your Robinhood sign-in that agents are refused, and the agents and team that Madav / Claude reads. Also what leaves this computer, and to whom." src="docs/readme/kept-light.webp">
-</picture></a>
+</picture>
+</a>
 
 ## How Robinhood fits in
 
-<a href="https://madavai.github.io/Trading-Agents/inside-the-trading-desk.html#robinhood"><picture>
+<a href="https://madavai.github.io/Trading-Agents/inside-the-trading-desk.html#robinhood">
+<picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/robinhood-dark.webp">
   <img alt="Three narrow doors to Robinhood, used only by the dashboard: one that only reads, one that only asks for Robinhood's dry-run check, and one that places a single limit order on your Confirm." src="docs/readme/robinhood-light.webp">
-</picture></a>
+</picture>
+</a>
 
 ### Safety
 - No agent uses a broker connection. A guard refuses every broker tool, every tool that speaks of trading or moving
@@ -145,10 +159,12 @@ Choose `shallow`, `medium` or `deep` (1, 3 or 5 rounds of debate), which analyst
 
 ## Where you decide: the dashboard
 
-<a href="https://madavai.github.io/Trading-Agents/inside-the-trading-desk.html#dashboard"><picture>
+<a href="https://madavai.github.io/Trading-Agents/inside-the-trading-desk.html#dashboard">
+<picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/dashboard-dark.webp">
   <img alt="The dashboard: a side list with your account at the top and the desk's sections below; Your desk today, the markets, a full-width chart, the watchlist, the desk's calls, your accounts, and the order ticket from Decide… or Trade… to your Confirm." src="docs/readme/dashboard-light.webp">
-</picture></a>
+</picture>
+</a>
 
 The dashboard runs on your own computer only and keeps no key. "Your account", at the top of its side list and on a
 page of its own, is where you connect Robinhood yourself (on Robinhood's own sign-in page) and choose which accounts to
