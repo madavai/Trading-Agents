@@ -74,8 +74,9 @@ test('requests to one host are spaced; another host is not held up', async () =>
   await Promise.all([getText('https://y.test/1'), getText('https://y.test/2'), getText('https://y.test/3'), getText('https://other.test/1')]);
   const y = starts.filter(([h]) => h === 'y.test').map(([, t]) => t);
   // Each start waits for the one before it to have really started, then the whole gap: a stall makes gaps longer, never
-  // shorter, and two waiting requests never go together.
-  assert.ok(y[1]! - y[0]! >= 80 && y[2]! - y[1]! >= 80, y.join());
+  // shorter, and two waiting requests never go together. The gap is kept from the moment the wait ends; the test notes the
+  // time a moment later, on a clock that counts whole milliseconds, so 2 ms is allowed (no spacing would be about 0).
+  assert.ok(y[1]! - y[0]! >= 78 && y[2]! - y[1]! >= 78, y.join());
   assert.ok(starts.find(([h]) => h === 'other.test')![1] - y[0]! < 60, 'another host waited');
 });
 
