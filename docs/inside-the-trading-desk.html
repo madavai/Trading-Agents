@@ -375,6 +375,15 @@ p { text-wrap: pretty; }
 .win-side li { position: relative; display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px; border-radius: var(--radius-small); }
 .win-side li.on { color: var(--accent); background: var(--tint); }
 .win-side li.on::before { content: ""; position: absolute; left: 0; top: 7px; bottom: 7px; width: 2px; border-radius: 2px; background: var(--accent); }
+.win-side li.win-lh { height: 26px; margin-top: 6px; font-family: var(--font); font-size: var(--size-tiny); color: var(--text-3); }
+.win-side li.win-lh:first-child { margin-top: 0; }
+.win-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--line-strong); }
+.win-dot.ok { background: var(--up); }
+.win-v { margin-left: auto; width: 34px; flex: none; }
+.pn.today { grid-column: 1 / -1; }
+.kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); border-radius: var(--radius-small); box-shadow: none; }
+.kpi-mini { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; font-size: var(--size-tiny); color: var(--text-2); }
+.kpi-mini b { font-family: var(--font-title); font-size: 12.5px; font-weight: 600; color: var(--c, var(--text)); }
 .win-main { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; padding: 14px; min-width: 0; }
 .pn { display: flex; flex-direction: column; gap: 8px; padding: 12px; min-width: 0; }
 .pn-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-family: var(--font-title); font-weight: 600; font-size: 13.5px; }
@@ -462,8 +471,9 @@ p { text-wrap: pretty; }
   .rate b { flex: 0 0 96px; }
   .drawers, .checks, .facts { grid-template-columns: minmax(0, 1fr); }
   .win-main { grid-template-columns: minmax(0, 1fr); }
-  .pn.markets, .pn.chart, .pn.watch, .pn.calls, .pn.acct-pn, .pn.ticket { grid-column: 1; }
+  .pn.today, .pn.markets, .pn.chart, .pn.watch, .pn.calls, .pn.acct-pn, .pn.ticket { grid-column: 1; }
   .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .hero-words { padding: 24px 20px 20px; }
 }
 @media (max-width: 520px) {
@@ -580,7 +590,7 @@ p { text-wrap: pretty; }
         <div class="link c-you"><span class="lbl">show</span><span class="wire two"><span class="pulse" style="--d:1s"></span></span></div>
         <div class="lane c-you">
           <div class="lane-h"><span class="icbox"><svg class="ic"><use href="#i-screen"/></svg></span><div><p class="lane-name">Your dashboard</p><p class="lane-sub">On this computer only</p></div></div>
-          <ul><li>Markets and charts</li><li>The desk's calls</li><li>Scorecard</li><li>Your accounts</li><li>Decide, then Confirm</li></ul>
+          <ul><li>Your desk today</li><li>Markets and charts</li><li>The desk's calls</li><li>Your accounts</li><li>Decide… or Trade…<small>then your Confirm</small></li></ul>
         </div>
         <div class="link c-rh"><span class="lbl">three doors</span><span class="wire two"><span class="pulse" style="--d:1.5s"></span></span></div>
         <div class="lane c-rh">
@@ -661,7 +671,7 @@ p { text-wrap: pretty; }
   <section class="chapter" id="agents">
     <div class="ch-head">
       <div class="ch-title"><p class="kicker">The role of each agent, and who does what</p><h2>Twelve agents in five stations</h2></div>
-      <p>The desk is laid out like a trading firm. Each station hands its work to the next, and each agent saves its part where the others can read it. A lead runs the line.</p>
+      <p>The desk is laid out like a trading firm. Each station hands its work to the next, each agent saves its part where the others can read it, and the agents may message each other to ask about it. A lead runs the line.</p>
     </div>
     <article class="at-box lead c-desk">
       <span class="icbox lg"><svg class="ic lg"><use href="#i-compass"/></svg></span>
@@ -868,7 +878,7 @@ p { text-wrap: pretty; }
         <ol class="steps" start="10">
           <li class="step c-you"><span class="badge">10</span><div class="step-body">
             <div class="step-h"><p class="step-title">You open a ticket</p><span class="at-chip c-you"><i></i>You</span><span class="at-chip c-you"><i></i>Dashboard</span></div>
-            <p><b>Decide…</b> on the call proposes an order for the Agentic account, sized from the rating and checked against your caps.</p>
+            <p><b>Decide…</b> on the call proposes an order for the Agentic account, sized from the rating and checked against your caps. Or <b>Trade…</b>, beside any stock's price, opens your own ticket: buy or sell, starting at one share, under the very same checks.</p>
             <div class="caps"><span class="at-chip"><b>$500</b> an order at most</span><span class="at-chip"><b>10%</b> of the account in one stock</span><span class="at-chip"><b>3</b> orders a day</span><span class="at-chip">Limit orders, good for the day</span></div>
             <p class="why"><b>Why it matters.</b> Your own limits, set in the desk's settings, stand between a call and an order.</p>
           </div></li>
@@ -917,7 +927,7 @@ p { text-wrap: pretty; }
             <li><b>Watchlist</b><span>Your stocks, and which ones you starred.</span></li>
             <li><b>Waiting list</b><span>Stocks you asked the desk to analyse from the dashboard.</span></li>
             <li><b>Holdings</b><span>What you hold, as the dashboard last read it from Robinhood.</span></li>
-            <li><b>Orders log</b><span>Each order the dashboard sent, and what Robinhood answered.</span></li>
+            <li><b>Orders log</b><span>Each order the dashboard sent, from a call or your own, and what Robinhood answered.</span></li>
             <li><b>Your email</b><span>For the SEC, and only the SEC.</span></li>
             <li><b>Back-tests</b><span>Kept in journals of their own, apart from your real calls.</span></li>
           </ul>
@@ -945,6 +955,7 @@ p { text-wrap: pretty; }
           <ul>
             <li><b>The agents</b><span>The twelve agents and the lead, read by Madav / Claude from the project's agents folder.</span></li>
             <li><b>The team</b><span>Its line-up, shipped beside the lead for Madav's Teams tab; if you change it there, yours wins. In Claude, the lead calls the same twelve agents.</span></li>
+            <li><b>Reset the team</b><span>If a save changes the agents' files, the desk check names them, and "reset the team" puts them back as shipped.</span></li>
             <li><b>Routines</b><span>Madav's scheduler runs the morning routine and the evening wrap-up when you choose. In Claude, you start them with /routine.</span></li>
           </ul>
         </article>
@@ -995,7 +1006,7 @@ p { text-wrap: pretty; }
       <div class="at-box door c-you r3">
         <span class="icbox"><svg class="ic"><use href="#i-send"/></svg></span>
         <p class="door-name">The place door <span class="at-chip c-you"><i></i>your Confirm</span></p>
-        <p>Only places one limit order, in the Agentic account, after every check below.</p>
+        <p>Only places one limit order, in the Agentic account, after every check below, whether the ticket came from a call (Decide…) or is your own (Trade…).</p>
       </div>
       <div class="d-arrow r3"><span class="wire"></span></div>
       <div class="only-narrow" aria-hidden="true"><span class="wire"></span></div>
@@ -1027,24 +1038,33 @@ p { text-wrap: pretty; }
   <section class="chapter" id="dashboard">
     <div class="ch-head">
       <div class="ch-title"><p class="kicker">And finally, the dashboard</p><h2>Where you decide</h2></div>
-      <p>A page that runs on your own computer, in the Madav House theme. The team opens it for you when you ask ("open the dashboard"). Its shape is shown here without figures; yours fills it with real ones.</p>
+      <p>A page that runs on your own computer, in the Madav House theme. The team opens it for you when you ask ("open the dashboard"). Your account sits at the top of its side list, which folds away to give the page the whole width. Its shape is shown here without figures; yours fills it with real ones.</p>
     </div>
     <figure class="window" aria-label="The dashboard's layout">
       <div class="win-top"><i></i><i></i><i></i><span>Trading Agents, on this computer</span></div>
       <div class="win-body">
         <ul class="win-side">
-          <li class="on"><svg class="ic sm"><use href="#i-chart"/></svg>Markets</li>
+          <li class="win-lh">Your account</li>
+          <li><span class="win-dot ok"></span>Robinhood · connected</li>
+          <li><span class="win-dot"></span>Trading is off</li>
+          <li><svg class="ic sm"><use href="#i-bank"/></svg>Agentic<span class="sk win-v"></span></li>
+          <li><svg class="ic sm"><use href="#i-bank"/></svg>Main<span class="sk win-v"></span></li>
+          <li class="win-lh">The desk</li>
+          <li class="on"><svg class="ic sm"><use href="#i-grid"/></svg>Overview</li>
+          <li><svg class="ic sm"><use href="#i-chart"/></svg>Chart</li>
+          <li><svg class="ic sm"><use href="#i-ledger"/></svg>Stock page</li>
           <li><svg class="ic sm"><use href="#i-star"/></svg>Watchlist</li>
           <li><svg class="ic sm"><use href="#i-flag"/></svg>The desk's calls</li>
-          <li><svg class="ic sm"><use href="#i-target"/></svg>How the desk is doing</li>
-          <li><svg class="ic sm"><use href="#i-ledger"/></svg>Stock page</li>
-          <li><svg class="ic sm"><use href="#i-bank"/></svg>Your account</li>
+          <li><svg class="ic sm"><use href="#i-target"/></svg>Scorecard</li>
         </ul>
         <div class="win-main">
+          <div class="at-box pn today"><p class="pn-h">Your desk today <small>a press opens each</small></p>
+            <div class="joined kpis"><span class="kpi-mini c-rh"><b>Your accounts</b><span class="sk" style="width:64%"></span>gain since bought</span><span class="kpi-mini c-desk"><b>Agentic buying power</b><span class="sk" style="width:52%"></span>trading on or off</span><span class="kpi-mini c-src"><b>S&amp;P 500 today</b><span class="sk" style="width:58%"></span>with a small chart</span><span class="kpi-mini c-you"><b>The desk's calls</b><span class="sk" style="width:40%"></span>latest, waiting, scored</span></div>
+          </div>
           <div class="at-box pn markets"><p class="pn-h">Markets <small>Yahoo Finance</small></p>
             <div class="joined tiles"><span class="tile">S&amp;P 500<span class="sk" style="width:70%"></span></span><span class="tile">Nasdaq<span class="sk" style="width:60%"></span></span><span class="tile">Dow<span class="sk" style="width:66%"></span></span><span class="tile">VIX<span class="sk" style="width:48%"></span></span><span class="tile">10-year yield<span class="sk" style="width:55%"></span></span><span class="tile">Bitcoin<span class="sk" style="width:72%"></span></span></div>
           </div>
-          <div class="at-box pn chart"><p class="pn-h">Chart <small>area or candles</small></p>
+          <div class="at-box pn chart"><p class="pn-h">Chart <small>full width · Analyse · Trade…</small></p>
             <svg viewBox="0 0 400 120" preserveAspectRatio="none" aria-hidden="true">
               <defs><linearGradient id="g-area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#06AEFE" stop-opacity="0.28"/><stop offset="1" stop-color="#06AEFE" stop-opacity="0"/></linearGradient></defs>
               <path d="M0 90 L30 84 L60 88 L90 70 L120 74 L150 60 L180 66 L210 50 L240 56 L270 40 L300 46 L330 30 L360 36 L400 22 L400 104 L0 104 Z" fill="url(#g-area)"/>
@@ -1071,26 +1091,26 @@ p { text-wrap: pretty; }
               <div class="acard"><b>Main</b>view only<span class="sk"></span><span class="sk" style="width:70%"></span></div>
             </div>
           </div>
-          <div class="at-box pn ticket"><p class="pn-h">Decide ticket <small>for the Agentic account</small></p>
-            <div class="tflow"><span class="tbtn">Decide…</span><svg class="ic sm"><use href="#i-arrow"/></svg><span class="tbtn">Caps checked</span><svg class="ic sm"><use href="#i-arrow"/></svg><span class="tbtn">Review with Robinhood</span><svg class="ic sm"><use href="#i-arrow"/></svg><span class="tbtn">Place order…</span><svg class="ic sm"><use href="#i-arrow"/></svg><span class="tbtn primary">Confirm</span></div>
+          <div class="at-box pn ticket"><p class="pn-h">Order ticket <small>for the Agentic account</small></p>
+            <div class="tflow"><span class="tbtn">Decide… or Trade…</span><svg class="ic sm"><use href="#i-arrow"/></svg><span class="tbtn">Caps checked</span><svg class="ic sm"><use href="#i-arrow"/></svg><span class="tbtn">Review with Robinhood</span><svg class="ic sm"><use href="#i-arrow"/></svg><span class="tbtn">Place order…</span><svg class="ic sm"><use href="#i-arrow"/></svg><span class="tbtn primary">Confirm</span></div>
           </div>
         </div>
       </div>
     </figure>
     <div class="joined feats">
-      <div class="feat edge c-src"><span class="icbox"><svg class="ic"><use href="#i-chart"/></svg></span><b>Markets</b><p>S&amp;P 500, Nasdaq, Dow, VIX, the 10-year yield and Bitcoin. Press one to chart it.</p></div>
-      <div class="feat edge c-src"><span class="icbox"><svg class="ic"><use href="#i-chart"/></svg></span><b>Chart</b><p>Any stock as area or candles, with 50- and 200-day averages and volume.</p></div>
+      <div class="feat edge c-desk"><span class="icbox"><svg class="ic"><use href="#i-grid"/></svg></span><b>Your desk today</b><p>Four tiles at the top: your accounts with their gain since bought, Agentic buying power, the S&amp;P 500 today, and the desk's calls.</p></div>
+      <div class="feat edge c-src"><span class="icbox"><svg class="ic"><use href="#i-chart"/></svg></span><b>Markets and chart</b><p>Six market tiles, and any stock across the whole width: area or candles, averages, volume and its key figures underneath.</p></div>
       <div class="feat edge c-you"><span class="icbox"><svg class="ic"><use href="#i-star"/></svg></span><b>Watchlist</b><p>Add, star and remove stocks. The robot button puts one on the desk's waiting list.</p></div>
-      <div class="feat edge c-desk"><span class="icbox"><svg class="ic"><use href="#i-flag"/></svg></span><b>The desk's calls</b><p>Every call with its rating and its full reasoning, agent by agent.</p></div>
+      <div class="feat edge c-desk"><span class="icbox"><svg class="ic"><use href="#i-flag"/></svg></span><b>The desk's calls</b><p>Each call in two lines; in full, a coloured summary, the price since the call and every agent's part as a card.</p></div>
       <div class="feat edge c-desk"><span class="icbox"><svg class="ic"><use href="#i-target"/></svg></span><b>How the desk is doing</b><p>The scorecard: calls scored against their index, and those still waiting.</p></div>
-      <div class="feat edge c-you"><span class="icbox"><svg class="ic"><use href="#i-ledger"/></svg></span><b>Stock page</b><p>Everything on one stock: what you hold, each call and its score, Ask the desk and Decide.</p></div>
-      <div class="feat edge c-rh"><span class="icbox"><svg class="ic"><use href="#i-bank"/></svg></span><b>Your account</b><p>Connect, choose accounts, see value, cash, buying power, holdings and orders. Switch trading on or off.</p></div>
-      <div class="feat edge c-you"><span class="icbox"><svg class="ic"><use href="#i-send"/></svg></span><b>Decide ticket</b><p>An order proposed from the call, checked against your caps, reviewed by Robinhood, placed only on your Confirm.</p></div>
+      <div class="feat edge c-you"><span class="icbox"><svg class="ic"><use href="#i-ledger"/></svg></span><b>Stock page</b><p>Everything on one stock: what you hold with Buy… and Sell…, your orders on it, and each call with its score.</p></div>
+      <div class="feat edge c-rh"><span class="icbox"><svg class="ic"><use href="#i-bank"/></svg></span><b>Your account</b><p>In the side list and on its own page: value, cash, buying power and gain in colour, each holding's share, orders, and the trading switch.</p></div>
+      <div class="feat edge c-you"><span class="icbox"><svg class="ic"><use href="#i-send"/></svg></span><b>Order tickets</b><p>Decide… from a call, or Trade… for your own: checked against your caps, reviewed by Robinhood, placed only on your Confirm.</p></div>
     </div>
     <div class="joined facts">
       <span><svg class="ic sm"><use href="#i-lock"/></svg>On this computer only, with a fresh key each time it starts</span>
       <span><svg class="ic sm"><use href="#i-clock"/></svg>Market prices up to 15 minutes late</span>
-      <span><svg class="ic sm"><use href="#i-sun"/></svg>Light and dark, like this page</span>
+      <span><svg class="ic sm"><use href="#i-sun"/></svg>Light and dark · the side list folds away</span>
     </div>
   </section>
 
