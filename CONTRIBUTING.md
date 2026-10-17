@@ -22,9 +22,10 @@
 - `.claude/` - what Madav and Claude Code load in this folder: settings, the guard hook, skills, and the agents.
   The twelve agent files in `.claude/agents/` are written from `scripts/agents-src.mjs` (`npm run agents`); edit the
   source, not the files, and a test fails if they differ.
-- `.madav/agents/` - the same twelve agents and the trading-desk team in Madav's Agent Studio layout (`<name>/v1.md`
-  and `record.json`), so a clone has them in Agent Studio with nothing to install. Also written by `npm run agents`, from
-  `scripts/madav-src.mjs`: the team's playbook is the /analyse, /settle and /backtest skills, so after editing a skill run
+  Madav's Agent Studio lists the same files. Beside them, `trading-desk.md` is the team's own file and
+  `trading-desk.team.json` its line-up in the shape Madav keeps a team in (members, steps, together, gates, talk), for
+  Agent Studio to take as the team until the person changes it there. Both are written by `npm run agents` from
+  `scripts/team-src.mjs`: the team's playbook is the /analyse, /settle and /backtest skills, so after editing a skill run
   `npm run agents` again. The team gets no shell: it opens the dashboard with the desk tool `open_dashboard`.
 - `src/terminal/` - the dashboard: `server.ts` (loopback only, host and origin checks, a per-start token, strict CSP),
   `quotes.ts` (Yahoo prices), `state.ts` and `store.ts` (the desk's files, the watchlist and the queue), and `ui/` (the

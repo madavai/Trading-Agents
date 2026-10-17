@@ -22,7 +22,8 @@ const front = (file: string) => {
 test('the agent files are the ones written from their source', () => {
   const r = spawnSync(process.execPath, ['scripts/agents.mjs', '--check'], { encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);
-  assert.deepEqual(fs.readdirSync('.claude/agents').sort(), src.AGENTS.map((a) => `${a.file}.md`).sort());
+  // the twelve, and the trading-desk team for Madav's Agent Studio with its line-up (agent-studio.test.ts)
+  assert.deepEqual(fs.readdirSync('.claude/agents').sort(), [...src.AGENTS.map((a) => `${a.file}.md`), 'trading-desk.md', 'trading-desk.team.json'].sort());
 });
 
 test('the team is the original\'s twelve, one agent for each step the plan can ask for', () => {

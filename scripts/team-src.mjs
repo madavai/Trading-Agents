@@ -1,20 +1,18 @@
-// The desk in Madav's Agent Studio: the same twelve agents as .claude/agents, in Madav's own layout (.madav/agents/<name>/
-// v1.md and record.json), and one team, "trading-desk", that runs them. A person who clones the repository finds them in
-// Agent Studio with nothing to install. Everything is written from scripts/agents-src.mjs and the desk's skills, so the
-// agents, the team's playbook and the chat commands can never drift apart; a test fails if the files differ.
+// The desk as a team in Madav's Agent Studio. Agent Studio lists the agent files in .claude/agents (Claude Code's own
+// format), and keeps what makes one of them a team - its line-up - beside the file in its own store, never in the file.
+// So the repository ships the team's file, .claude/agents/trading-desk.md, and its line-up beside it,
+// .claude/agents/trading-desk.team.json, in the shape Madav keeps a team in (members, steps, together, gates, talk), for
+// Agent Studio to use until the person changes the team there. Both are written from scripts/agents-src.mjs and the
+// desk's skills, so the twelve agents, the team's playbook and the chat commands can never drift apart.
 import fs from 'node:fs';
-import { AGENTS, COMMON } from './agents-src.mjs';
+import { AGENTS } from './agents-src.mjs';
 
 const D = (t) => `mcp__trading-desk__${t}`;
-/** Fixed, so the files are the same on every computer that writes them. */
-const SHIPPED = Date.parse('2026-10-16T00:00:00Z');
 
 /** What the team itself may call: its members, questions to the person, reading this folder, and the desk's own records.
  *  No Robinhood tool and no order tool: those exist only behind the person's own presses on the dashboard. */
 export const TEAM_TOOLS = ['plan_analysis', 'read_run', 'write_report', 'record_decision', 'list_settlements', 'record_outcome', 'read_queue', 'finish_queue_item',
   'set_contact_email', 'set_holdings', 'clear_holdings', 'start_backtest', 'end_backtest', 'backtest_summary', 'desk_check', 'get_verified_snapshot', 'open_dashboard'];
-
-const record = (text, team) => JSON.stringify({ versions: [{ n: 1, at: SHIPPED, cause: 'Shipped with the Trading Agents repository', bytes: Buffer.byteLength(text) }], ...(team ? { team } : {}) }, null, 1) + '\n';
 
 /** A skill's playbook without its header and its "The person asked" line. */
 const playbook = (name) => {
@@ -22,26 +20,13 @@ const playbook = (name) => {
   return text.replace(/^---\n[\s\S]*?\n---\n/, '').replace(/^\s*# .*\n/, '').replace(/^The person asked: \$ARGUMENTS\n/m, '').replace(/^## /gm, '### ').trim();
 };
 
-export function member(a) {
-  const text = `---
-name: ${a.file}
-description: ${a.description.replace(/ Used by \/analyse( for companies)?\.$/, ' A member of the trading-desk team.')}
-tools: ${a.tools.map(D).join(', ')}
----
-
-${COMMON}
-
-${a.body}
-`;
-  return { name: a.file, text, record: record(text) };
-}
-
 export function team() {
   const members = AGENTS.map((a) => a.file);
   const text = `---
 name: trading-desk
-description: The Trading Agents desk - twelve agents that analyse a stock the way a trading firm would and record a rated call, score past calls, and open the dashboard where the person decides. It never places an order.
+description: A team for Madav's Agent Studio (in a chat, use /analyse) - the Trading Agents desk, twelve agents that analyse a stock the way a trading firm would and record a rated call, score past calls, and open the dashboard where the person decides. It never places an order.
 tools: Agent(${members.join(', ')}), SendMessage, AskUserQuestion, Read, Glob, Grep, ${TEAM_TOOLS.map(D).join(', ')}
+disallowedTools: Bash, Write, Edit, NotebookEdit, WebFetch, WebSearch
 ---
 
 What this team is for: analysing one stock (or crypto asset) on one date with the whole desk - four analysts, a bull and a bear, a research manager, a trader, three risk voices and a portfolio manager - and recording the call in the desk's journal; scoring past calls; testing the desk over past dates; checking that this computer is ready; and opening the dashboard where the person sees their accounts and decides.
@@ -78,12 +63,13 @@ When the person asks to see the dashboard, their accounts, the markets or the de
 - Never open, search, read, print or copy anything in the person's private Trading Agents folder in their home folder: it holds their Robinhood sign-in.
 - Never invent a number, an email address or a holding. Every exact figure comes from a desk tool; a source that could not be reached is "unavailable", never "nothing happened".
 `;
-  return { name: 'trading-desk', text, record: record(text, { kind: 'managed', members, gates: [], talk: true }) };
+  // The lead decides who works when (the playbook's order); the members save their work on the desk and do not message each other.
+  const lineUp = { members, steps: false, together: [], gates: [], talk: false };
+  return { text, lineUp: JSON.stringify(lineUp, null, 1) + '\n' };
 }
 
-/** Every file of .madav/agents, by path relative to the repository. */
-export function madavFiles() {
-  const out = new Map();
-  for (const x of [...AGENTS.map(member), team()]) { out.set(`.madav/agents/${x.name}/v1.md`, x.text); out.set(`.madav/agents/${x.name}/record.json`, x.record); }
-  return out;
+/** The team's two files, by path relative to the repository. */
+export function teamFiles() {
+  const t = team();
+  return new Map([['.claude/agents/trading-desk.md', t.text], ['.claude/agents/trading-desk.team.json', t.lineUp]]);
 }
