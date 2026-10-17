@@ -37,3 +37,29 @@ export const SECTION_NAMES: Record<string, string> = {
   bull: 'Bull case', bear: 'Bear case', research_plan: 'Research plan', trader: "Trader's proposal",
   aggressive: 'Aggressive risk voice', conservative: 'Conservative risk voice', neutral: 'Neutral risk voice', decision: "Portfolio manager's decision",
 };
+
+/** The agents' markdown as plain words: headings, bold, slanting, code, list marks and table rows taken out, lines joined. */
+export const plain = (md: string): string => md.replace(/\r\n/g, '\n')
+  .replace(/^\s*\|.*$/gm, '').replace(/^\s{0,3}#{1,6}\s*/gm, '').replace(/\*\*([^*]+)\*\*/g, '$1')
+  .replace(/(^|\s)[*_]([^*_\n]+)[*_](?=\s|[.,;:!?]|$)/g, '$1$2').replace(/`([^`]+)`/g, '$1')
+  .replace(/^\s*(?:[-*+]|\d+\.)\s+/gm, '').replace(/\s+/g, ' ').trim();
+
+/** A labelled line of the portfolio manager's decision ("**Price Target**: ..."), in plain words; '' when it is not there. */
+export function labelled(md: string, label: string): string {
+  const m = new RegExp(`\\*\\*${label}:?\\*\\*:?[ \\t]*([^\\n]+)`, 'i').exec(md);
+  return m ? plain(m[1]!) : '';
+}
+
+/** A report's opening, as a preview: its first sentence in plain words (headings left out), at most n characters. */
+export function opening(md: string, n = 160): string {
+  const text = plain(md.split('\n').filter((l) => !/^\s{0,3}#/.test(l)).join('\n'));
+  const s = /^(.{12,}?[.!?])(?=\s|$)/.exec(text)?.[1] ?? text;
+  return s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s;
+}
+
+/** The last daily bar on or before a day (YYYY-MM-DD), from bars in date order; null when the bars start after it. */
+export function barOn<T extends { date: string }>(bars: readonly T[], day: string): T | null {
+  let hit: T | null = null;
+  for (const b of bars) { if (b.date.slice(0, 10) <= day) hit = b; else break; }
+  return hit;
+}
