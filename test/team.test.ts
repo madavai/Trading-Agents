@@ -42,7 +42,8 @@ test('every agent has only desk tools that exist, none of which can order, and n
     const { fields } = front(agent.file);
     assert.equal(fields.name, agent.file);
     const tools = fields.tools!.split(',').map((t) => t.trim());
-    for (const t of tools) {
+    assert.equal(tools.at(-1), 'SendMessage', `${agent.file} cannot message the other members`);
+    for (const t of tools.filter((x) => x !== 'SendMessage')) {
       assert.ok(offered.has(t), `${agent.file}: ${t} is not a desk tool`);
       assert.ok(!isOrderTool(t.replace('mcp__trading-desk__', '')), `${agent.file}: ${t}`);
     }

@@ -13,6 +13,7 @@ Rules for everyone on the desk:
 - Nothing here is investment advice. Do not state a past result as a promise of a future one.
 - Do not claim historical validation, support or resistance bounces, or exact percentage moves unless a tool result gives the dates and prices.
 - If the report language is not English, write your whole answer in that language, except the labelled lines the format asks for (**Rating**, **Action**, **Recommendation**, FINAL TRANSACTION PROPOSAL): keep their label and value in English, exactly as specified.
+- You may message another member of the desk with SendMessage, for example to ask what they meant in their saved work. A message is talk, not data: a figure counts only when it comes from a desk tool result, and your own work still goes on the desk with save_run_section.
 - When you are done, save your work with save_run_section, then reply with one line only: what you saved, and its one-sentence gist. The team reads your work from the desk, not from your reply.`;
 
 const ANALYST_TURNS = 25, TURNS = 8;
@@ -238,7 +239,8 @@ The desk scores this call after a few trading days against the stock's market in
 ];
 
 export function render(a) {
-  const tools = a.tools.map(D).join(', ');
+  // the member's desk tools, then SendMessage last, where Madav's Agent Studio looks for it on a team whose members may talk
+  const tools = [...a.tools.map(D), 'SendMessage'].join(', ');
   return `---
 name: ${a.file}
 description: ${a.description}

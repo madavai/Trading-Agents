@@ -67,8 +67,9 @@ When the person asks to see the dashboard, their accounts, the markets or the de
 - Never open, search, read, print or copy anything in the person's private Trading Agents folder in their home folder: it holds their Robinhood sign-in.
 - Never invent a number, an email address or a holding. Every exact figure comes from a desk tool; a source that could not be reached is "unavailable", never "nothing happened".
 `;
-  // The lead decides who works when (the playbook's order); the members save their work on the desk and do not message each other.
-  const lineUp = { members, steps: false, together: [], gates: [], talk: false };
+  // The lead decides who works when (the playbook's order); the members save their work on the desk and may message each
+  // other (each member's file lists SendMessage, so Madav never has to add it).
+  const lineUp = { members, steps: false, together: [], gates: [], talk: true };
   return { text, lineUp: JSON.stringify(lineUp, null, 1) + '\n' };
 }
 
