@@ -2,12 +2,10 @@
 // folder and listed by Madav's Agent Studio, and the trading-desk team's file with its line-up beside it (team-src.mjs).
 // `npm run agents` writes; with --check it only compares, and a test runs that check.
 import fs from 'node:fs';
-import { AGENTS, render } from './agents-src.mjs';
-import { teamFiles } from './team-src.mjs';
+import { deskAgentFiles } from './team-files.mjs';
 
 const root = new URL('../', import.meta.url), check = process.argv.includes('--check');
-const files = new Map(AGENTS.map((a) => [`.claude/agents/${a.file}.md`, render(a)]));
-for (const [p, text] of teamFiles()) files.set(p, text);
+const files = deskAgentFiles();
 
 let stale = 0;
 for (const [p, text] of files) {

@@ -23,6 +23,10 @@ affiliated with them. **Nothing here is investment advice.**
    check looks at your computer and the free data sources and asks for your email (once). In a chat in this folder the
    same desk answers to `/desk-check`, `/analyse NVDA` and `/terminal`.
 
+**If the team was changed by mistake:** saving the trading-desk team in Agent Studio can rewrite the project's agent
+files. The desk check notices and names them; ask the team to "reset the team" and, on your yes, it puts them back
+exactly as the project ships them.
+
 You need Node 22 or later (Madav needs it too). No keys and no installs; only your email, once.
 
 **Why your email:** the SEC asks everyone who reads its filings for a contact address, so the desk needs yours before

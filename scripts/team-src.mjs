@@ -12,7 +12,8 @@ const D = (t) => `mcp__trading-desk__${t}`;
 /** What the team itself may call: its members, questions to the person, reading this folder, and the desk's own records.
  *  No Robinhood tool and no order tool: those exist only behind the person's own presses on the dashboard. */
 export const TEAM_TOOLS = ['plan_analysis', 'read_run', 'write_report', 'record_decision', 'list_settlements', 'record_outcome', 'read_queue', 'finish_queue_item',
-  'set_contact_email', 'set_holdings', 'clear_holdings', 'start_backtest', 'end_backtest', 'backtest_summary', 'desk_check', 'get_verified_snapshot', 'open_dashboard', 'routine_brief'];
+  'set_contact_email', 'set_holdings', 'clear_holdings', 'start_backtest', 'end_backtest', 'backtest_summary', 'desk_check', 'get_verified_snapshot', 'open_dashboard', 'routine_brief',
+  'reset_team'];
 
 /** A skill's playbook without its header and its "The person asked" line. */
 const playbook = (name) => {
@@ -54,8 +55,15 @@ ${playbook('backtest')}
 1. Call \`desk_check\`. If the tool is missing, this folder's tools did not start: tell the person to check that Madav may use this folder's tools and that Node 22 or later is installed, then stop.
 2. Call \`get_verified_snapshot\` for SPY with today's date, to prove the price data works end to end; if it answers DATA_UNAVAILABLE or NO_DATA_AVAILABLE, say so and give its reason.
 3. If no contact email is saved, ask the person for their own (the SEC asks every reader of its filings for one; it stays in this folder and only the SEC sees it) and save exactly what they give with \`set_contact_email\`. Never invent, guess or reuse an address.
-4. Tell the person in a short plain list what is ready, what is not, and what to do about each.
+4. Tell the person in a short plain list what is ready, what is not, and what to do about each. If the check says the desk's agent files differ from the project's version, say which, and offer to reset the team (below).
 5. Robinhood is connected by the person themselves: on the dashboard (open it with \`open_dashboard\`), "Your account", Connect. Never test or use the connection yourself.
+
+## Reset the team
+
+When the person asks to reset the team, or accepts your offer after the desk check:
+1. Ask with AskUserQuestion whether to put the desk's twelve agents, this team's file and its line-up back exactly as the project ships them. Say in one line what that undoes: any change saved to them, for example from Madav's Agent Studio.
+2. Only on their yes, call \`reset_team\` with confirmed set to true, and pass on its answer in plain words: which files it put back, that they take effect from the next conversation or run, and what it says about Madav's own saved settings.
+3. On a no, change nothing.
 
 ## Show the dashboard
 

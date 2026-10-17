@@ -16,6 +16,7 @@ import { predictionMarkets } from '../data/odds.js';
 import { companyOverview, financialStatement, insiderTransactions } from '../data/company.js';
 import { registerDeskTools } from './desk.js';
 import { VERSION } from '../version.js';
+import { listed, plainName, resetAgentFiles, shippedAgentFiles } from '../desk/agent-files.js';
 
 const text = (t: string) => ({ content: [{ type: 'text' as const, text: t }] });
 
@@ -32,7 +33,8 @@ const symbol = z.string().min(1).max(20).describe('The ticker as the instrument 
 const analysis = z.string().describe('The analysis date, YYYY-MM-DD. Nothing dated after it is ever returned.');
 const READ = { readOnlyHint: true, openWorldHint: true } as const;
 
-export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetch): McpServer {
+/** `root` is the folder the desk works in; `source` is where the project's own source is (the same folder, except in tests). */
+export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetch, source: string = root): McpServer {
   const settings = readSettings(root), a0 = settings.analysis;
   configure({ contact: settings.sources.contact, secEmail: () => readContactEmail(root) });
   if (fetchImpl) configure({ fetch: fetchImpl });
@@ -40,9 +42,26 @@ export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetc
 
   server.registerTool('desk_check', {
     title: 'Desk check',
-    description: 'Check that this computer is ready for the Trading Agents desk: Node, the desk data folder, whether a Robinhood sign-in is saved, and whether each free data source answers. Read-only; it sends no order and reads no secret.',
+    description: 'Check that this computer is ready for the Trading Agents desk: Node, the desk data folder, whether a Robinhood sign-in is saved, whether the desk\'s agents and team are as the project ships them, and whether each free data source answers. Read-only; it sends no order and reads no secret.',
     annotations: READ,
-  }, async () => text(await deskCheck(root, fetchImpl)));
+  }, async () => text(await deskCheck(root, fetchImpl, source)));
+
+  server.registerTool('reset_team', {
+    title: 'Reset the team',
+    description: 'Put the desk\'s twelve agents, the trading-desk team\'s file and its line-up back exactly as the project ships them, when they were changed (a save in Madav\'s Agent Studio can do it). Only after the person asked for it and confirmed it in this conversation. It writes only those files in this folder and cannot change Madav\'s own saved settings for the team.',
+    inputSchema: { confirmed: z.literal(true).describe('true: the person confirmed this reset in this conversation') },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  }, async () => {
+    let wrote: string[];
+    try { wrote = resetAgentFiles(root, await shippedAgentFiles(source)); } catch (e) {
+      return text(`The team could not be reset: ${(e as Error).message}. Nothing was changed.`);
+    }
+    if (!wrote.length) return text('The desk\'s agents and the trading-desk team already match the project\'s version. Nothing was changed.');
+    return text([
+      `Put back as the project ships them: ${listed(wrote.map(plainName))}.`,
+      'They take effect from the next conversation or run. Madav keeps its own saved settings for the team, which this cannot change: until Madav can reset them itself, do not press Save on the trading-desk team in Agent Studio, or it may write its settings into these files again.',
+    ].join('\n'));
+  });
 
   server.registerTool('set_contact_email', {
     title: 'Save the contact email',

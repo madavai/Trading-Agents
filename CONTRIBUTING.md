@@ -27,6 +27,9 @@
   Agent Studio to take as the team until the person changes it there. Both are written by `npm run agents` from
   `scripts/team-src.mjs`: the team's playbook is the /analyse, /settle and /backtest skills, so after editing a skill run
   `npm run agents` again. The team gets no shell: it opens the dashboard with the desk tool `open_dashboard`.
+  `scripts/team-files.mjs` is the one list of these files and their text: `npm run agents` writes it, the desk check
+  compares the folder with it (a save in Agent Studio can rewrite the files), and the desk tool `reset_team` writes it
+  back on the person's confirmed yes (`src/desk/agent-files.ts`), touching no other file.
 - `src/terminal/` - the dashboard: `server.ts` (loopback only, host and origin checks, a per-start token, strict CSP),
   `quotes.ts` (Yahoo prices), `state.ts` and `store.ts` (the desk's files, the watchlist and the queue), and `ui/` (the
   page: `house.css` is the Madav House theme, `dashboard.css` only places its objects with tokens, `main.ts` and the

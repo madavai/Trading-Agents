@@ -55,7 +55,8 @@ test('every agent has only its desk tools; the team gets no shell, no web and no
   assert.ok(!toolsOf(team).some((t) => /^(Bash|PowerShell|WebFetch|WebSearch|Write|Edit)$/.test(t)), 'the team gets no shell, web or editing');
   assert.match(header(team).disallowedTools!, /Bash.*WebFetch/);
   const playbook = fs.readFileSync(team, 'utf8');
-  for (const part of ['## Analyse a stock', '## Score past calls', '## Test the desk over past dates', '## Check this computer', '## Show the dashboard', 'only their own Confirm']) assert.ok(playbook.includes(part), part);
+  for (const part of ['## Analyse a stock', '## Score past calls', '## Test the desk over past dates', '## Check this computer', '## Reset the team', '## Show the dashboard', 'only their own Confirm']) assert.ok(playbook.includes(part), part);
+  assert.ok(toolsOf(team).includes('mcp__trading-desk__reset_team'), 'the team can put its own files back, on the person\'s yes');
 });
 
 test('the dashboard tool says plainly when the dashboard cannot be started, and never claims it opened', async () => {
