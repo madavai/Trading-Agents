@@ -36696,7 +36696,7 @@ async function probeAll(contact2, secEmail2, fetchImpl2 = fetch, timeoutMs = 8e3
 }
 
 // src/version.ts
-var VERSION = true ? "0.0.1" : "dev";
+var VERSION = true ? "0.9.0" : "dev";
 
 // src/settings.ts
 import fs2 from "node:fs";

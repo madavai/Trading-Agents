@@ -19236,7 +19236,7 @@ var Placer = class {
 };
 
 // src/version.ts
-var VERSION = true ? "0.0.1" : "dev";
+var VERSION = true ? "0.9.0" : "dev";
 
 // src/robinhood/connect.ts
 var ROBINHOOD_MCP = "https://agent.robinhood.com/mcp/trading";
