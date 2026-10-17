@@ -29,7 +29,9 @@ test('a clone carries the desk for Agent Studio: the twelve agents and the tradi
   assert.deepEqual([...lineUp.members].sort(), members);
   assert.equal(new Set(lineUp.members).size, lineUp.members.length);
   assert.ok(lineUp.members.every((m) => /^[a-z0-9][a-z0-9-]*$/i.test(m)));
-  assert.deepEqual([lineUp.steps, lineUp.together, lineUp.gates, lineUp.talk], [false, [], [], false]);
+  assert.deepEqual([lineUp.steps, lineUp.together, lineUp.gates, lineUp.talk], [false, [], [], true]);
+  // members may talk: each lists SendMessage itself, so saving the team in Madav has nothing to add to the project's files
+  for (const m of members) assert.ok(toolsOf(path.join(AGENTS, `${m}.md`)).includes('SendMessage'), `${m} cannot message the others`);
   assert.ok(lineUp.members.length <= 20, 'Madav holds twenty agents in a team at most');
   // the team's own file names the same members it may start
   const named = /Agent\(([^)]*)\)/.exec(header(path.join(AGENTS, 'trading-desk.md')).tools!)![1]!.split(',').map((s) => s.trim());
