@@ -8,6 +8,11 @@ never trade. You do.
 Adapted from [TradingAgents](https://github.com/TauricResearch/TradingAgents) by Tauric Research (see `NOTICE`); not
 affiliated with them. **Nothing here is investment advice.**
 
+**See how it works:** [Inside the Trading Desk](docs/inside-the-trading-desk.html) is a visual guide to the whole desk:
+where its data comes from, what each of the twelve agents does, one call from question to order, where everything is
+kept, and how Robinhood and the dashboard fit in. It is one file: download it and open it in your browser (GitHub shows
+it as code).
+
 > **Status: every part is built** - the desk check, the free data tools, the twelve-agent team with its scoring and
 > lessons, back-testing, the dashboard with your Robinhood accounts, order tickets with Robinhood's own check, placing
 > an order on your Confirm, the morning and evening routines, and the trading-desk team in Madav's Agent Studio.
@@ -96,6 +101,7 @@ The dashboard wears the Madav House theme in a light and a dark face (the button
 design reference (open it in a browser; the prices in it are made up).
 
 ## More
+- `docs/inside-the-trading-desk.html`: the visual guide, in light and dark, with the full "not financial advice" notice.
 - `SECURITY.md`: who can place an order, what agents can and cannot do, where your data stays, and how to report a
   problem.
 - `CONTRIBUTING.md`: building, testing and the project's own rules.
