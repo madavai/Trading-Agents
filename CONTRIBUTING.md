@@ -40,6 +40,9 @@
   `/routine`, the team's playbook); `src/desk/orders.ts` - the dashboard's log of the orders it sent.
 - `src/desk/ticket.ts` - the order ticket: sizing from the person's settings and every cap check, on real figures only.
 - `desk-settings.json` - the desk's settings (read and checked by `src/settings.ts`, trading part included); `docs/design/` - the dashboard's design reference.
+- `docs/inside-the-trading-desk.html` - the visual guide (GitHub Pages serves `docs/` from `main`). The README shows it
+  as pictures in `docs/readme/`, light and dark: after the guide changes, `node scripts/readme-pictures.mjs` takes
+  them again with a hidden Chrome or Edge (it downloads and installs nothing).
 - `test/fake-robinhood.ts` - a pretend Robinhood for the tests: an MCP door that wants a sign-in, with read tools and
   order tools, recording every call. Its sign-in is the MCP library's own demo server (`test/fake-sign-in-server.ts`,
   a side process). The guard refuses any file that spells out the sign-in's token field names, so tests reach the
