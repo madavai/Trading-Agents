@@ -3263,8 +3263,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path13) {
-      let input = path13;
+    function removeDotSegments(path14) {
+      let input = path14;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3673,8 +3673,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path13 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path13 && path13 !== "/" ? path13 : void 0;
+        const path14 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path14 && path14 !== "/" ? path14 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -7517,10 +7517,10 @@ async function getJson(url2, opts = {}) {
 }
 
 // src/terminal/server.ts
-import crypto4 from "node:crypto";
+import crypto5 from "node:crypto";
 import fs12 from "node:fs";
 import http2 from "node:http";
-import path12 from "node:path";
+import path13 from "node:path";
 import { fileURLToPath } from "node:url";
 
 // src/data/dates.ts
@@ -7759,8 +7759,8 @@ async function readAccount(reader, account, ids) {
   const p = await read2("the value and buying power", "get_portfolio", { account_number: ids.accountNumber });
   const stocks = await read2("the stocks held", "get_equity_positions", { account_number: ids.accountNumber });
   const coins = ids.rhsAccountNumber ? await read2("the crypto held", "get_crypto_positions", { rhs_account_number: ids.rhsAccountNumber }) : null;
-  const crypto5 = coins === null ? { holdings: [], unread: 0 } : parseCrypto(coins);
-  const base = [...parsePositions(stocks).map((h) => ({ ...h, kind: "stock" })), ...crypto5.holdings.map((h) => ({ ...h, kind: "crypto" }))];
+  const crypto6 = coins === null ? { holdings: [], unread: 0 } : parseCrypto(coins);
+  const base = [...parsePositions(stocks).map((h) => ({ ...h, kind: "stock" })), ...crypto6.holdings.map((h) => ({ ...h, kind: "crypto" }))];
   const prices = /* @__PURE__ */ new Map(), symbols = base.filter((h) => h.kind === "stock").map((h) => h.symbol);
   for (let i = 0; i < symbols.length; i += QUOTES_PER_CALL) {
     const q = await read2("live prices", "get_equity_quotes", { symbols: symbols.slice(i, i + QUOTES_PER_CALL) });
@@ -7778,7 +7778,7 @@ async function readAccount(reader, account, ids) {
     const pending = await read2("the approvals waiting", "get_trade_approvals", { account_number: ids.accountNumber });
     approvals = setting === null && pending === null ? null : parseApprovals(setting, pending);
   }
-  return { account, portfolio: p === null ? null : parsePortfolio(p), holdings, unread: crypto5.unread, orders, approvals, problems };
+  return { account, portfolio: p === null ? null : parsePortfolio(p), holdings, unread: crypto6.unread, orders, approvals, problems };
 }
 
 // src/robinhood/connect.ts
@@ -8022,10 +8022,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj4, path13) {
-  if (!path13)
+function getElementAtPath(obj4, path14) {
+  if (!path14)
     return obj4;
-  return path13.reduce((acc, key) => acc?.[key], obj4);
+  return path14.reduce((acc, key) => acc?.[key], obj4);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -8365,11 +8365,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path13, issues) {
+function prefixIssues(path14, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path13);
+    iss.path.unshift(path14);
     return iss;
   });
 }
@@ -8830,16 +8830,16 @@ function flattenError(error2, mapper = (issue2) => issue2.message) {
 }
 function formatError(error2, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error3, path13 = []) => {
+  const processError = (error3, path14 = []) => {
     for (const issue2 of error3.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path13, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path14, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path13, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path14, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path13, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path14, ...issue2.path]);
       } else {
-        const fullpath = [...path13, ...issue2.path];
+        const fullpath = [...path14, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -20716,14 +20716,20 @@ var MARKETS = [
   { symbol: "BTC-USD", name: "Bitcoin" }
 ];
 
+// src/terminal/launch.ts
+import crypto4 from "node:crypto";
+import path12 from "node:path";
+var PORTS = [47615, 47625];
+var deskIdOf = (root2) => crypto4.createHash("sha256").update(path12.resolve(root2)).digest("hex").slice(0, 12);
+
 // src/terminal/server.ts
 var TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".woff2": "font/woff2", ".svg": "image/svg+xml" };
-function loadAssets(dir = path12.join(path12.dirname(fileURLToPath(import.meta.url)), "terminal")) {
+function loadAssets(dir = path13.join(path13.dirname(fileURLToPath(import.meta.url)), "terminal")) {
   const out = /* @__PURE__ */ new Map();
-  const add = (rel) => out.set(`/${rel.replace(/\\/g, "/")}`, { type: TYPES[path12.extname(rel)] ?? "application/octet-stream", body: fs12.readFileSync(path12.join(dir, rel)) });
+  const add = (rel) => out.set(`/${rel.replace(/\\/g, "/")}`, { type: TYPES[path13.extname(rel)] ?? "application/octet-stream", body: fs12.readFileSync(path13.join(dir, rel)) });
   for (const f of ["index.html", "app.js", "app.css"]) add(f);
   try {
-    for (const f of fs12.readdirSync(path12.join(dir, "fonts"))) if (f.endsWith(".woff2")) add(`fonts/${f}`);
+    for (const f of fs12.readdirSync(path13.join(dir, "fonts"))) if (f.endsWith(".woff2")) add(`fonts/${f}`);
   } catch {
   }
   return out;
@@ -20742,7 +20748,7 @@ function shareHoldings(dir, snap, day) {
 }
 var REVIEW_MS = 5 * 6e4;
 var confirmWords = (o) => `${o.side === "buy" ? "Buy" : "Sell"} ${o.quantity} ${o.symbol} at $${o.limitPrice.toFixed(2)}`;
-var ordersFile = (dir) => path12.join(dir, "orders.jsonl");
+var ordersFile = (dir) => path13.join(dir, "orders.jsonl");
 function logOrder(dir, line) {
   fs12.mkdirSync(dir, { recursive: true });
   fs12.appendFileSync(ordersFile(dir), JSON.stringify(line) + "\n");
@@ -20762,8 +20768,6 @@ function placedToday(dir, now) {
     return 0;
   }
 }
-var deskIdOf = (root2) => crypto4.createHash("sha256").update(path12.resolve(root2)).digest("hex").slice(0, 12);
-var PORTS = [47615, 47625];
 var SECURITY = {
   "Content-Security-Policy": "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
   "X-Content-Type-Options": "nosniff",
@@ -20779,7 +20783,7 @@ var Refused2 = class extends Error {
   status;
 };
 async function startTerminal(opts) {
-  const { root: root2, assets } = opts, dir = deskDataDir(root2), token = crypto4.randomBytes(24).toString("hex"), deskId = deskIdOf(root2);
+  const { root: root2, assets } = opts, dir = deskDataDir(root2), token = crypto5.randomBytes(24).toString("hex"), deskId = deskIdOf(root2);
   const robinhood = opts.robinhood ?? new Link(robinhoodFile());
   const tickets = /* @__PURE__ */ new Map();
   const TICKET_MS = 15 * 6e4;
@@ -20797,7 +20801,7 @@ async function startTerminal(opts) {
   let port = 0;
   const hosts = () => /* @__PURE__ */ new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
   const origins = () => /* @__PURE__ */ new Set([`http://127.0.0.1:${port}`, `http://localhost:${port}`]);
-  const same = (a, b) => a.length === b.length && crypto4.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+  const same = (a, b) => a.length === b.length && crypto5.timingSafeEqual(Buffer.from(a), Buffer.from(b));
   const send = (res, status, body2, type, extra = {}) => {
     res.writeHead(status, { "Content-Type": type, "Content-Length": Buffer.byteLength(body2), ...SECURITY, ...extra });
     res.end(body2);
@@ -20898,12 +20902,12 @@ async function startTerminal(opts) {
     }
     if (p === "/api/ticket" && method === "POST") {
       const symbol = safeSymbol(typeof b.symbol === "string" ? b.symbol : ""), date4 = typeof b.date === "string" ? b.date : "";
-      const call = new Journal(path12.join(dir, "journal.md")).load().find((e) => e.ticker === symbol && e.date === date4);
+      const call = new Journal(path13.join(dir, "journal.md")).load().find((e) => e.ticker === symbol && e.date === date4);
       if (!call) throw new Refused2(404, "no such call");
       const trading = readSettings(root2).trading;
       const context = { ...await askRobinhood(() => robinhood.ticketContext(symbol)), rating: call.rating, callDate: call.date };
-      const proposal = propose(context, trading), id = crypto4.randomBytes(12).toString("hex");
-      const t2 = { id, at: Date.now(), context, proposal, order: proposal.order, checks: proposal.order ? check(proposal.order, context, trading) : [], review: null, reviewedAt: 0, refId: crypto4.randomUUID(), placing: false, placed: null };
+      const proposal = propose(context, trading), id = crypto5.randomBytes(12).toString("hex");
+      const t2 = { id, at: Date.now(), context, proposal, order: proposal.order, checks: proposal.order ? check(proposal.order, context, trading) : [], review: null, reviewedAt: 0, refId: crypto5.randomUUID(), placing: false, placed: null };
       tickets.set(id, t2);
       return json(res, 200, { id, context, proposal, checks: t2.checks, caps: trading.caps });
     }

@@ -3263,8 +3263,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path13) {
-      let input2 = path13;
+    function removeDotSegments(path14) {
+      let input2 = path14;
       const output2 = [];
       let nextSlash = -1;
       let len = 0;
@@ -3673,8 +3673,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path13 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path13 && path13 !== "/" ? path13 : void 0;
+        const path14 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path14 && path14 !== "/" ? path14 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -3733,7 +3733,7 @@ var require_schemes = __commonJS({
       urnComponent.nss = (uuidComponent.uuid || "").toLowerCase();
       return urnComponent;
     }
-    var http = (
+    var http2 = (
       /** @type {SchemeHandler} */
       {
         scheme: "http",
@@ -3746,7 +3746,7 @@ var require_schemes = __commonJS({
       /** @type {SchemeHandler} */
       {
         scheme: "https",
-        domainHost: http.domainHost,
+        domainHost: http2.domainHost,
         parse: httpParse,
         serialize: httpSerialize
       }
@@ -3790,7 +3790,7 @@ var require_schemes = __commonJS({
     var SCHEMES = (
       /** @type {Record<SchemeName, SchemeHandler>} */
       {
-        http,
+        http: http2,
         https,
         ws,
         wss,
@@ -7201,7 +7201,7 @@ var require_dist = __commonJS({
 });
 
 // src/tools/main.ts
-import path12 from "node:path";
+import path13 from "node:path";
 
 // node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
 import process2 from "node:process";
@@ -8023,10 +8023,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path13) {
-  if (!path13)
+function getElementAtPath(obj, path14) {
+  if (!path14)
     return obj;
-  return path13.reduce((acc, key) => acc?.[key], obj);
+  return path14.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -8366,11 +8366,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path13, issues) {
+function prefixIssues(path14, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path13);
+    iss.path.unshift(path14);
     return iss;
   });
 }
@@ -8832,16 +8832,16 @@ function flattenError(error62, mapper = (issue2) => issue2.message) {
 }
 function formatError(error62, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error63, path13 = []) => {
+  const processError = (error63, path14 = []) => {
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path13, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path14, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path13, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path14, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path13, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path14, ...issue2.path]);
       } else {
-        const fullpath = [...path13, ...issue2.path];
+        const fullpath = [...path14, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -8880,17 +8880,17 @@ function formatError(error62, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error62, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error63, path13 = []) => {
+  const processError = (error63, path14 = []) => {
     var _a3;
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path13, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path14, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path13, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path14, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path13, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path14, ...issue2.path]);
       } else {
-        const fullpath = [...path13, ...issue2.path];
+        const fullpath = [...path14, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -8929,8 +8929,8 @@ function treeifyError(error62, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path13 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path13) {
+  const path14 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path14) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -26068,13 +26068,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path13 = ref.slice(1).split("/").filter(Boolean);
-  if (path13.length === 0) {
+  const path14 = ref.slice(1).split("/").filter(Boolean);
+  if (path14.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path13[0] === defsKey) {
-    const key = path13[1] === void 0 ? void 0 : decodeJSONPointerSegment(path13[1]);
+  if (path14[0] === defsKey) {
+    const key = path14[1] === void 0 ? void 0 : decodeJSONPointerSegment(path14[1]);
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -28932,8 +28932,8 @@ function getErrorMap2() {
 
 // node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path13, errorMaps, issueData } = params;
-  const fullPath = [...path13, ...issueData.path || []];
+  const { data, path: path14, errorMaps, issueData } = params;
+  const fullPath = [...path14, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -29048,11 +29048,11 @@ var errorUtil;
 
 // node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path13, key) {
+  constructor(parent, value, path14, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path13;
+    this._path = path14;
     this._key = key;
   }
   get path() {
@@ -32603,11 +32603,11 @@ function normalizeObjectSchema(schema) {
   }
   return void 0;
 }
-function getDotPath(path13) {
-  if (path13.length === 0) {
+function getDotPath(path14) {
+  if (path14.length === 0) {
     return "object root";
   }
-  return path13.reduce((acc, seg, index) => {
+  return path14.reduce((acc, seg, index) => {
     if (index === 0) {
       return String(seg);
     }
@@ -37467,11 +37467,11 @@ async function reddit(raw, from, to, subs) {
   const url2 = `https://www.reddit.com/r/${subs.map(encodeURIComponent).join("+")}/search.rss?q=${encodeURIComponent(q)}&restrict_sr=on&sort=new&t=week&limit=100`;
   return parseAtom(await getText(url2, { headers: { Accept: "application/atom+xml" } })).filter((p) => p.time.slice(0, 10) >= from && p.time.slice(0, 10) <= to);
 }
-function subredditsFor(raw, stock, crypto) {
+function subredditsFor(raw, stock, crypto2) {
   const base = cryptoBase(raw);
   if (!base) return stock;
   const own2 = { BTC: "Bitcoin", ETH: "ethereum", SOL: "solana" };
-  return own2[base] ? [own2[base], ...crypto] : crypto;
+  return own2[base] ? [own2[base], ...crypto2] : crypto2;
 }
 async function socialPosts(raw, analysis2, opts) {
   const day2 = analysisDate(analysis2), from = addDays(day2, -opts.lookBackDays), sym = normalizeSymbol(raw);
@@ -37706,11 +37706,11 @@ function yahooSession() {
   });
   return session;
 }
-async function yahooJson(path13) {
+async function yahooJson(path14) {
   for (let attempt = 0; ; attempt++) {
     const s = await yahooSession();
     try {
-      return await getJson(`${HOSTS[1]}${path13}&crumb=${encodeURIComponent(s.crumb)}`, { headers: { Cookie: s.cookie } });
+      return await getJson(`${HOSTS[1]}${path14}&crumb=${encodeURIComponent(s.crumb)}`, { headers: { Cookie: s.cookie } });
     } catch (e) {
       if (attempt === 0 && /HTTP 401/.test(e.message)) {
         session = null;
@@ -37861,7 +37861,7 @@ async function financialStatement(raw, kind, freq, analysis2) {
 
 // src/tools/desk.ts
 import fs10 from "node:fs";
-import path11 from "node:path";
+import path12 from "node:path";
 
 // src/desk/holdings.ts
 import fs6 from "node:fs";
@@ -38413,6 +38413,59 @@ async function settleOne(journal, scoring, ticker, date5, reflection) {
   return journal.recordOutcome(ticker, date5, o.raw, o.alpha, o.holdingDays, text3, o.exit) ? `Settled: ${line(o, e)}. The lesson is kept and will be read by later analyses from ${o.exit} on.` : `${ticker} on ${date5} was settled by another run already.`;
 }
 
+// src/terminal/launch.ts
+import crypto from "node:crypto";
+import http from "node:http";
+import path11 from "node:path";
+import { spawn } from "node:child_process";
+var PORTS = [47615, 47625];
+var deskIdOf = (root) => crypto.createHash("sha256").update(path11.resolve(root)).digest("hex").slice(0, 12);
+async function runningOn(root, timeoutMs = 700) {
+  const ask = (port) => new Promise((resolve) => {
+    const req = http.get({ host: "127.0.0.1", port, path: "/api/ping", timeout: timeoutMs }, (res) => {
+      let b = "";
+      res.on("data", (c) => {
+        b += c;
+      });
+      res.on("end", () => {
+        try {
+          const j = JSON.parse(b);
+          resolve(j.app === "trading-agents" && j.desk === deskIdOf(root));
+        } catch {
+          resolve(false);
+        }
+      });
+    });
+    req.on("timeout", () => {
+      req.destroy();
+      resolve(false);
+    });
+    req.on("error", () => resolve(false));
+  });
+  for (let p = PORTS[0]; p <= PORTS[1]; p++) if (await ask(p)) return p;
+  return null;
+}
+async function openDashboard(root, opts = {}) {
+  const already = await runningOn(root);
+  const words = (port, started) => `The dashboard ${started ? "has started and opened" : "was already running and has opened"} in the person's browser: http://127.0.0.1:${port}/ . It works on this computer only and stays open while that program runs. Everything on it - connecting Robinhood, choosing accounts, the trading switch and every order's Review, Place and Confirm - is the person's own to press: never press it for them or reach the page yourself.`;
+  if (already) {
+    if (!opts.noOpen) spawn(process.execPath, [path11.join(root, "dist", "terminal.mjs")], { cwd: root, detached: true, stdio: "ignore", windowsHide: true }).on("error", () => {
+    }).unref();
+    return words(already, false);
+  }
+  const child = spawn(process.execPath, [path11.join(root, "dist", "terminal.mjs"), ...opts.noOpen ? ["--no-open"] : []], { cwd: root, detached: true, stdio: "ignore", windowsHide: true });
+  child.on("error", () => {
+  });
+  child.unref();
+  const end = Date.now() + (opts.waitMs ?? 15e3);
+  while (Date.now() < end) {
+    const port = await runningOn(root, 400);
+    if (port) return words(port, true);
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  return "DATA_UNAVAILABLE: the dashboard did not answer within 15 seconds. Ask the person to run /terminal, or `node dist/terminal.mjs` in this folder, and to tell you what it prints.";
+}
+
 // src/tools/desk.ts
 var text = (t) => ({ content: [{ type: "text", text: t }] });
 var symbol2 = external_exports.string().min(1).max(20).describe("The ticker as the plan gives it");
@@ -38430,7 +38483,7 @@ async function act(run) {
 function registerDeskTools(server, root) {
   const dir = deskDataDir(root);
   const write = { readOnlyHint: false, openWorldHint: false };
-  const activeFile = path11.join(dir, "backtest", "active.json"), IDLE_MS = 2 * 36e5;
+  const activeFile = path12.join(dir, "backtest", "active.json"), IDLE_MS = 2 * 36e5;
   const getSweep = () => {
     try {
       const a = JSON.parse(fs10.readFileSync(activeFile, "utf8"));
@@ -38444,7 +38497,7 @@ function registerDeskTools(server, root) {
       fs10.rmSync(activeFile, { force: true });
       return;
     }
-    fs10.mkdirSync(path11.dirname(activeFile), { recursive: true });
+    fs10.mkdirSync(path12.dirname(activeFile), { recursive: true });
     writeWhole(activeFile, JSON.stringify({ sweep: id, at: Date.now() }));
   };
   const ws = () => {
@@ -38546,7 +38599,7 @@ Rating: ${rating}`;
     fs10.mkdirSync(w.dir, { recursive: true });
     const recorded = new Set(journalOf(root, w).load().map((e) => `${e.ticker}|${e.date}`));
     const todo = grid.filter((c) => !recorded.has(`${c.symbol}|${c.date}`));
-    writeWhole(path11.join(w.dir, "sweep.json"), JSON.stringify({ symbols: [...new Set(grid.map((c) => c.symbol))], dates, every, cells: grid.length }));
+    writeWhole(path12.join(w.dir, "sweep.json"), JSON.stringify({ symbols: [...new Set(grid.map((c) => c.symbol))], dates, every, cells: grid.length }));
     setSweep(id);
     const symbols = new Set(grid.map((c) => c.symbol)).size;
     return [
@@ -38578,10 +38631,10 @@ Rating: ${rating}`;
     const id = a.sweep_id ?? getSweep();
     if (!id) throw new Error("no backtest is running: name the sweep to score");
     const w = workspaceOf(root, id);
-    if (!fs10.existsSync(path11.join(w.dir, "journal.md"))) throw new Error(`sweep ${id} has no recorded calls yet`);
+    if (!fs10.existsSync(path12.join(w.dir, "journal.md"))) throw new Error(`sweep ${id} has no recorded calls yet`);
     let meta3 = "";
     try {
-      const m2 = JSON.parse(fs10.readFileSync(path11.join(w.dir, "sweep.json"), "utf8"));
+      const m2 = JSON.parse(fs10.readFileSync(path12.join(w.dir, "sweep.json"), "utf8"));
       meta3 = ` of ${m2.cells} planned`;
     } catch {
     }
@@ -38590,6 +38643,11 @@ Rating: ${rating}`;
 
 ${renderSummary(summarize(entries))}`;
   }));
+  server.registerTool("open_dashboard", {
+    title: "Open the dashboard",
+    description: "Start the Trading Agents dashboard on this computer and open it in the person's browser, or open the one already running. Use when the person asks to see the dashboard, their accounts, the markets or the desk's calls. It only starts the page; everything on it, Robinhood and any order included, is the person's own to press.",
+    annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false }
+  }, async () => act(() => openDashboard(root)));
   server.registerTool("read_queue", {
     title: "Analyses waiting",
     description: "The stocks the person asked the desk to analyse from the dashboard, oldest first. /analyse with no ticker runs these. Read-only.",
@@ -38750,6 +38808,6 @@ function deskServer(root = process.cwd(), fetchImpl2) {
 // src/tools/main.ts
 if (process.argv.includes("--check")) console.log(await deskCheck());
 else {
-  configure({ spacingMs: 250, cacheDir: path12.join(deskDataDir(process.cwd()), "cache") });
+  configure({ spacingMs: 250, cacheDir: path13.join(deskDataDir(process.cwd()), "cache") });
   await deskServer().connect(new StdioServerTransport());
 }

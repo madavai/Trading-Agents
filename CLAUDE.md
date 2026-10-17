@@ -8,6 +8,7 @@ team and the dashboard are in (not yet proven on real data); the dashboard shows
 Robinhood checks (a dry run) and, with trading switched on by the person, places on their own Confirm.
 
 ## What the person can run here
+In Madav's Agent Studio the trading-desk team (`.madav/agents`) does all of this when asked in words. In a chat here:
 - `/desk-check`: checks this computer (Node, the desk's tools, the free data sources) and, on their yes, tests the
   Robinhood sign-in read-only.
 - `/analyse TICKER [date] [shallow|medium|deep]`: the desk's twelve agents analyse a stock and record their call in the

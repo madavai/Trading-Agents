@@ -67,8 +67,8 @@ export function placedToday(dir: string, now: Date): number {
 
 export interface Terminal { url: string; port: number; token: string; deskId: string; close: () => Promise<void> }
 
-export const deskIdOf = (root: string): string => crypto.createHash('sha256').update(path.resolve(root)).digest('hex').slice(0, 12);
-export const PORTS = [47615, 47625] as const;
+import { deskIdOf, PORTS } from './launch.js';
+export { deskIdOf, PORTS };
 
 const SECURITY = {
   'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
