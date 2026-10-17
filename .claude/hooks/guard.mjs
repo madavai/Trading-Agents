@@ -12,6 +12,10 @@
 // agents are given only the desk's tools. TRADE_WORDS is the same rule as isOrderTool in src/robinhood/connect.ts (a
 // test keeps them in step).
 
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
 export const OWN_SERVERS = new Set(['trading-desk']);
 export const BROKER_SERVER = /robinhood|broker|trading|alpaca|schwab|ibkr|interactive.?brokers|e-?trade|fidelity|webull|tradier|tastytrade|tastyworks|coinbase|kraken|binance|public-?com/i;
 /** A broker connection known by its tools, whatever the person named it: equities, positions, a portfolio, buying power. */
@@ -30,9 +34,41 @@ export const DASHBOARD = /(?:127\.0\.0\.1|localhost|\[::1\]|0\.0\.0\.0):476(?:1[
 export const REACHES_WEB = /^(?:Bash|PowerShell|WebFetch|WebSearch)$|^mcp__/;
 const NO_DASHBOARD = 'Agents never use the Trading Agents dashboard\'s address, its order ticket or its trading switch. Only the person uses the dashboard, and only their Confirm sends an order.';
 
+/** A path as the computer knows it: a link or a short Windows name (like TRADIN~1) is followed to the real, long one, so a
+ *  disguised name is seen for what it is. A part that does not exist yet is kept as written. */
+export function realPath(p, cwd = process.cwd()) {
+  const abs = path.resolve(cwd, String(p));
+  for (let at = abs; ; at = path.dirname(at)) {
+    try { return path.join(fs.realpathSync.native(at), path.relative(at, abs)); } catch { /* not there: try the folder above */ }
+    if (path.dirname(at) === at) return abs;
+  }
+}
+const folded = (p) => (process.platform === 'win32' ? p.toLowerCase() : p);
+/** Whether `child` is `parent` or inside it. */
+export const within = (child, parent) => { const rel = path.relative(folded(parent), folded(child)); return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel)); };
+const FILE_TOOLS = /^(?:Read|Write|Edit|MultiEdit|NotebookEdit|Glob|Grep|LS)$/;
+const WILD = /[*?[\]{}]/;
+/** Where a file search starts: its path, else the fixed part of an absolute pattern, else the folder it runs in. */
+function searchRoot(input, cwd) {
+  if (input.path) return realPath(input.path, cwd);
+  const pattern = String(input.pattern ?? '');
+  if (path.isAbsolute(pattern)) { const fixed = pattern.split(/[\\/]/); const cut = fixed.findIndex((s) => WILD.test(s)); return realPath(cut < 0 ? pattern : fixed.slice(0, cut).join(path.sep) || path.sep, cwd); }
+  return realPath(cwd, cwd);
+}
+const NO_HOME_SEARCH = 'Agents never search the whole home folder or above it: the person\'s private sign-in folder is there. Search inside the project instead.';
+
+/** The refusal for a file tool: a path that is really the private folder (however it is spelled), or a search that
+ *  starts at the home folder or above it, where a wildcard could reach the private folder. */
+function fileVerdict(name, input, cwd) {
+  for (const key of ['file_path', 'notebook_path', 'path']) if (typeof input[key] === 'string' && PRIVATE.test(realPath(input[key], cwd))) return NO_PRIVATE;
+  if ((name === 'Glob' || name === 'Grep' || name === 'LS') && within(realPath(os.homedir(), cwd), searchRoot(input, cwd))) return NO_HOME_SEARCH;
+  return null;
+}
+
 /** The refusal for one tool call, or null to let it pass. */
 export function verdict(call) {
   const name = String(call?.tool_name ?? '');
+  if (FILE_TOOLS.test(name)) { const r = fileVerdict(name, call?.tool_input ?? {}, String(call?.cwd ?? process.cwd())); if (r) return r; }
   let own = false;
   if (name.startsWith('mcp__')) {
     const [, server = '', ...rest] = name.split('__');

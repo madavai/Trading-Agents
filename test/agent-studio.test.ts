@@ -24,7 +24,7 @@ test('a clone carries the desk for Agent Studio: the twelve agents and the tradi
   assert.equal(fs.existsSync('.madav'), false, 'Agent Studio reads .claude/agents; there is no second copy to drift');
   const members = fs.readdirSync(AGENTS).filter((f) => f.endsWith('.md') && f !== 'trading-desk.md').map((f) => f.replace(/\.md$/, '')).sort();
   assert.equal(members.length, 12);
-  // the line-up, in the shape Madav keeps a team in (its team.ts): members once each, the lead deciding the order
+  // the line-up, in the shape Madav's Agent Studio reads a team: members once each, the lead deciding the order
   const lineUp = JSON.parse(fs.readFileSync(path.join(AGENTS, 'trading-desk.team.json'), 'utf8')) as { members: string[]; steps: boolean; together: string[]; gates: string[]; talk: boolean };
   assert.deepEqual([...lineUp.members].sort(), members);
   assert.equal(new Set(lineUp.members).size, lineUp.members.length);

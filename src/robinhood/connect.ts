@@ -46,7 +46,7 @@ export function waitForCode(port: number, expectedState: () => string | undefine
       const error = url.searchParams.get('error'), got = url.searchParams.get('code'), state = url.searchParams.get('state');
       const want = expectedState();
       if (error) { answer(res, 200, 'Robinhood did not sign you in. You can close this tab.'); finish(); reject(new Error(`Robinhood refused the sign-in: ${error}`)); return; }
-      if (!got || (want && state !== want)) { answer(res, 400, 'This sign-in link does not match. Start again from Madav.'); return; }
+      if (!got || !want || state !== want) { answer(res, 400, 'This sign-in link does not match. Start again from Madav.'); return; }
       answer(res, 200, 'Signed in to Robinhood. You can close this tab and go back to Madav.');
       finish(); resolve(got);
     });

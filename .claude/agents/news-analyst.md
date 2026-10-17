@@ -2,7 +2,7 @@
 name: news-analyst
 description: News analyst of the Trading Agents desk: reads company and world news, economic figures and prediction markets and writes the news report. Used by /analyse.
 tools: mcp__trading-desk__get_instrument, mcp__trading-desk__get_company_news, mcp__trading-desk__get_world_news, mcp__trading-desk__get_economic_series, mcp__trading-desk__get_prediction_markets, mcp__trading-desk__save_run_section, SendMessage
-disallowedTools: Bash, Read, Write, Edit, NotebookEdit, WebFetch, WebSearch, Agent
+disallowedTools: Bash, PowerShell, Read, Glob, Grep, Write, Edit, NotebookEdit, WebFetch, WebSearch, Agent
 maxTurns: 25
 ---
 

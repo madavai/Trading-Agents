@@ -5,3 +5,8 @@ desk-data/
 .env.*
 .DS_Store
 Thumbs.db
+
+# this computer only: personal Claude Code settings, worktrees and notes
+.claude/settings.local.json
+.claude/worktrees/
+CLAUDE.local.md

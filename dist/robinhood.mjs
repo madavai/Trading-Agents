@@ -19274,7 +19274,7 @@ function waitForCode(port, expectedState, timeoutMs = 5 * 6e4) {
         reject(new Error(`Robinhood refused the sign-in: ${error2}`));
         return;
       }
-      if (!got || want && state !== want) {
+      if (!got || !want || state !== want) {
         answer(res, 400, "This sign-in link does not match. Start again from Madav.");
         return;
       }
@@ -19481,7 +19481,7 @@ ${c.positions ?? "No positions tool without inputs was found, so nothing was rea
     say("Nothing was ordered, changed or cancelled.");
     return 0;
   } catch (e) {
-    say(`The Robinhood connection did not work: ${e.message}`);
+    say(`The Robinhood connection did not work: ${masked(e.message)}`);
     say("Nothing was ordered. Tell the desk what this says; if Robinhood refuses this program, the desk switches to plan B.");
     return 1;
   }

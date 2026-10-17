@@ -48,11 +48,19 @@ test('every agent has only desk tools that exist, none of which can order, and n
       assert.ok(!isOrderTool(t.replace('mcp__trading-desk__', '')), `${agent.file}: ${t}`);
     }
     assert.ok(tools.includes('mcp__trading-desk__save_run_section'), `${agent.file} cannot save its work`);
-    for (const banned of ['Bash', 'Read', 'Write', 'Edit', 'WebFetch', 'WebSearch', 'Agent']) assert.ok(fields.disallowedTools!.split(',').map((s) => s.trim()).includes(banned), `${agent.file} may use ${banned}`);
+    for (const banned of ['Bash', 'PowerShell', 'Read', 'Glob', 'Grep', 'Write', 'Edit', 'WebFetch', 'WebSearch', 'Agent']) assert.ok(fields.disallowedTools!.split(',').map((s) => s.trim()).includes(banned), `${agent.file} may use ${banned}`);
     assert.ok(Number(fields.maxTurns) > 0);
     assert.ok(!tools.includes('mcp__trading-desk__set_contact_email') && !tools.includes('mcp__trading-desk__set_holdings') && !tools.includes('mcp__trading-desk__record_outcome'), `${agent.file} can change the person's records`);
   }
   await client.close();
+});
+
+test('the lead has no shell and no free file access: only its members, its questions and the desk\'s own tools', () => {
+  const { fields } = front('trading-desk');
+  const tools = fields.tools!.split(/,(?![^(]*\))/).map((t) => t.trim());
+  assert.deepEqual(tools.filter((t) => !t.startsWith('mcp__trading-desk__') && !t.startsWith('Agent(')), ['SendMessage', 'AskUserQuestion']);
+  const banned = fields.disallowedTools!.split(',').map((s) => s.trim());
+  for (const t of ['Bash', 'PowerShell', 'Read', 'Glob', 'Grep', 'Write', 'Edit', 'NotebookEdit', 'WebFetch', 'WebSearch']) assert.ok(banned.includes(t), `the lead may use ${t}`);
 });
 
 test('every agent carries the desk\'s rules and saves the section the plan expects', () => {

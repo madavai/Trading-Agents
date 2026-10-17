@@ -26,8 +26,8 @@ export function team() {
   const text = `---
 name: trading-desk
 description: A team for Madav's Agent Studio (in a chat, use /analyse) - the Trading Agents desk, twelve agents that analyse a stock the way a trading firm would and record a rated call, score past calls, and open the dashboard where the person decides. It never places an order.
-tools: Agent(${members.join(', ')}), SendMessage, AskUserQuestion, Read, Glob, Grep, ${TEAM_TOOLS.map(D).join(', ')}
-disallowedTools: Bash, Write, Edit, NotebookEdit, WebFetch, WebSearch
+tools: Agent(${members.join(', ')}), SendMessage, AskUserQuestion, ${TEAM_TOOLS.map(D).join(', ')}
+disallowedTools: Bash, PowerShell, Read, Glob, Grep, Write, Edit, NotebookEdit, WebFetch, WebSearch
 ---
 
 What this team is for: analysing one stock (or crypto asset) on one date with the whole desk - four analysts, a bull and a bear, a research manager, a trader, three risk voices and a portfolio manager - and recording the call in the desk's journal; scoring past calls; testing the desk over past dates; running the morning routine and the evening wrap-up (Madav's scheduler can start them); checking that this computer is ready; and opening the dashboard where the person sees their accounts and decides.

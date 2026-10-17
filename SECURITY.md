@@ -24,14 +24,21 @@ tool, every tool that speaks of trading or moving money, Robinhood's site, the d
 folder, whatever an agent was told. Tests keep all of this true: no file but the dashboard's three Robinhood doors can
 call Robinhood, each names only its own tools, and the agents' tool server contains none of them.
 
+No one on the team has a shell or a general file tool: every agent's file says so (`disallowedTools`), and a test keeps
+it so. The guard reads the words of each tool call and follows links and short Windows names to the real path, and it
+refuses any file search that starts at your home folder or above it. It cannot see what a shell command builds from
+pieces, which is why the real protection is that the desk's agents get no shell at all, and any other session in this
+folder asks you before it runs one.
+
 ## Your data
 - Your Robinhood sign-in, the accounts you chose to show and the trading switch stay in your private folder, never in
-  this repository and never on the page. Account numbers never reach the page or the desk's files (the page shows the
-  last four characters).
+  this repository and never on the page. Full account numbers never reach the page or the desk's files: the page shows
+  the last four characters and tells accounts apart by a short fingerprint.
 - The desk's own records (journal, reports, watchlist, holdings, the log of orders sent) stay in this folder's
   `desk-data`, which git never commits.
 - Your email goes to the SEC alone, which asks every reader of its filings for one.
-- The dashboard answers on this computer only, to the page it served, with a key made each time it starts.
+- The dashboard answers on this computer's own address only, so nothing on the internet can reach it, and every request
+  for data needs a key made each time it starts.
 - What the dashboard remembers between visits (light or dark, the side list, the page and the stock you were on, the
   chart's settings and the stocks you looked at last) is kept in `desk-data/dashboard.json`. Nothing about an order is
   ever remembered: every ticket starts afresh.
@@ -40,10 +47,16 @@ call Robinhood, each names only its own tools, and the agents' tool server conta
 - The search box sends what you type to Yahoo Finance's public search, which suggests matching stocks.
 
 ## Limits
-- A program running on your computer with your permissions could read the dashboard's page like your browser does.
-  Keep your computer free of software you do not trust, and never run this folder with permission checks bypassed.
+- Any program on this computer, under any user account on it, can reach the dashboard's address and read its page and
+  key the way your browser does. With trading switched on, such a program could send an order within your caps
+  (Robinhood's phone approval, if you keep it on, would still ask you). Keep software you do not trust, and other
+  people's accounts, off this computer; switch trading off when you are not using it; and never run this folder with
+  permission checks bypassed.
+- Your Robinhood sign-in is a file in your private folder, protected by your computer account like your other files.
+  Disconnect deletes it from this computer; to end the access on Robinhood's side too, remove it in Robinhood.
 - Nothing here is investment advice.
 
 ## Reporting a problem
-If you find a way around any of this, open an issue on GitHub without the details of the exploit and ask for a private
-contact, or write to the maintainers through Madav.
+If you find a way around any of this, please report it privately: on GitHub, open this repository's Security tab and
+choose "Report a vulnerability". Please do not put the details in a public issue. You can also write to the
+maintainers through Madav.
