@@ -3263,8 +3263,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path14) {
-      let input = path14;
+    function removeDotSegments(path15) {
+      let input = path15;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3673,8 +3673,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path14 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path14 && path14 !== "/" ? path14 : void 0;
+        const path15 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path15 && path15 !== "/" ? path15 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -7187,12 +7187,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list2, fs13, exportName) {
+    function addFormats(ajv, list2, fs14, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list2)
-        ajv.addFormat(f, fs13[f]);
+        ajv.addFormat(f, fs14[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -7357,8 +7357,8 @@ function userAgentFor(url2, contact2, email2) {
 import fs2 from "node:fs";
 var STALE_MS = 6e4;
 var nap = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-function withLock(file3, run, waitMs = 15e3) {
-  const lock = `${file3}.lock`, until = Date.now() + waitMs;
+function withLock(file4, run, waitMs = 15e3) {
+  const lock = `${file4}.lock`, until = Date.now() + waitMs;
   for (; ; ) {
     try {
       fs2.mkdirSync(lock);
@@ -7373,7 +7373,7 @@ function withLock(file3, run, waitMs = 15e3) {
       } catch {
         continue;
       }
-      if (Date.now() > until) throw new Error(`${file3} is in use by another run; try again in a moment`);
+      if (Date.now() > until) throw new Error(`${file4} is in use by another run; try again in a moment`);
       nap(40);
     }
   }
@@ -7386,11 +7386,11 @@ function withLock(file3, run, waitMs = 15e3) {
     }
   }
 }
-function writeWhole(file3, text2) {
-  const temp = `${file3}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
+function writeWhole(file4, text2) {
+  const temp = `${file4}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
   try {
     fs2.writeFileSync(temp, text2);
-    fs2.renameSync(temp, file3);
+    fs2.renameSync(temp, file4);
   } catch (e) {
     try {
       fs2.rmSync(temp, { force: true });
@@ -7449,8 +7449,8 @@ var keyOf = (url2) => {
 function readCache(url2) {
   if (!cacheDir) return null;
   try {
-    const file3 = path3.join(cacheDir, `${keyOf(url2)}.txt`);
-    return Date.now() - fs3.statSync(file3).mtimeMs < ttlFor(new URL(url2).hostname) ? fs3.readFileSync(file3, "utf8") : null;
+    const file4 = path3.join(cacheDir, `${keyOf(url2)}.txt`);
+    return Date.now() - fs3.statSync(file4).mtimeMs < ttlFor(new URL(url2).hostname) ? fs3.readFileSync(file4, "utf8") : null;
   } catch {
     return null;
   }
@@ -7466,8 +7466,8 @@ function writeCache(url2, text2) {
 function pruneCache(dir) {
   try {
     for (const f of fs3.readdirSync(dir)) {
-      const file3 = path3.join(dir, f);
-      if (Date.now() - fs3.statSync(file3).mtimeMs > 3 * 24 * 60 * MINUTE) fs3.rmSync(file3, { force: true });
+      const file4 = path3.join(dir, f);
+      if (Date.now() - fs3.statSync(file4).mtimeMs > 3 * 24 * 60 * MINUTE) fs3.rmSync(file4, { force: true });
     }
   } catch {
   }
@@ -7518,9 +7518,9 @@ async function getJson(url2, opts = {}) {
 
 // src/terminal/server.ts
 import crypto5 from "node:crypto";
-import fs12 from "node:fs";
+import fs13 from "node:fs";
 import http2 from "node:http";
-import path13 from "node:path";
+import path14 from "node:path";
 import { fileURLToPath } from "node:url";
 
 // src/data/dates.ts
@@ -8022,10 +8022,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj4, path14) {
-  if (!path14)
+function getElementAtPath(obj4, path15) {
+  if (!path15)
     return obj4;
-  return path14.reduce((acc, key) => acc?.[key], obj4);
+  return path15.reduce((acc, key) => acc?.[key], obj4);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -8365,11 +8365,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path14, issues) {
+function prefixIssues(path15, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path14);
+    iss.path.unshift(path15);
     return iss;
   });
 }
@@ -8830,16 +8830,16 @@ function flattenError(error2, mapper = (issue2) => issue2.message) {
 }
 function formatError(error2, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error3, path14 = []) => {
+  const processError = (error3, path15 = []) => {
     for (const issue2 of error3.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path14, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path15, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path14, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path15, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path14, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path15, ...issue2.path]);
       } else {
-        const fullpath = [...path14, ...issue2.path];
+        const fullpath = [...path15, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -19387,26 +19387,26 @@ var StreamableHTTPClientTransport = class {
 import crypto3 from "node:crypto";
 import fs4 from "node:fs";
 import path4 from "node:path";
-function readSaved(file3) {
+function readSaved(file4) {
   try {
-    return JSON.parse(fs4.readFileSync(file3, "utf8"));
+    return JSON.parse(fs4.readFileSync(file4, "utf8"));
   } catch {
     return {};
   }
 }
-function writeSaved(file3, saved) {
-  fs4.mkdirSync(path4.dirname(file3), { recursive: true, mode: 448 });
-  const tmp = `${file3}.${process.pid}.tmp`;
+function writeSaved(file4, saved) {
+  fs4.mkdirSync(path4.dirname(file4), { recursive: true, mode: 448 });
+  const tmp = `${file4}.${process.pid}.tmp`;
   fs4.writeFileSync(tmp, JSON.stringify({ ...saved, savedAt: (/* @__PURE__ */ new Date()).toISOString() }, null, 2), { mode: 384 });
-  fs4.renameSync(tmp, file3);
+  fs4.renameSync(tmp, file4);
   try {
-    fs4.chmodSync(file3, 384);
+    fs4.chmodSync(file4, 384);
   } catch {
   }
 }
 var FileAuth = class {
-  constructor(file3, redirectUrl, openBrowser2) {
-    this.file = file3;
+  constructor(file4, redirectUrl, openBrowser2) {
+    this.file = file4;
     this.redirectUrl = redirectUrl;
     this.openBrowser = openBrowser2;
   }
@@ -19709,11 +19709,11 @@ var NotSignedIn = class extends Error {
     this.name = "NotSignedIn";
   }
 };
-async function openSession(file3, opts) {
+async function openSession(file4, opts) {
   const port = opts.port ?? CALLBACK_PORT, say = opts.say ?? (() => {
   }), endpoint = new URL(opts.url ?? ROBINHOOD_MCP);
-  if (!opts.signIn && !readSaved(file3).tokens) throw new NotSignedIn("No Robinhood sign-in is saved.");
-  const auth2 = new FileAuth(file3, redirectFor(port), (url2) => {
+  if (!opts.signIn && !readSaved(file4).tokens) throw new NotSignedIn("No Robinhood sign-in is saved.");
+  const auth2 = new FileAuth(file4, redirectFor(port), (url2) => {
     if (!opts.signIn) return;
     say(`Opening Robinhood's sign-in page. If no browser opens, visit:
 ${url2}`);
@@ -19754,8 +19754,8 @@ ${url2}`);
 // src/robinhood/link.ts
 var plainFailure = (e) => e instanceof NotSignedIn ? "Robinhood asks you to sign in again: press Connect." : `Robinhood did not answer as expected: ${masked(e instanceof Error ? e.message : String(e))}`;
 var Link = class {
-  constructor(file3, opts = {}) {
-    this.file = file3;
+  constructor(file4, opts = {}) {
+    this.file = file4;
     this.opts = opts;
   }
   file;
@@ -20019,6 +20019,32 @@ function saveAccountHoldings(dir, accounts, today2) {
   return { saved, leftOut };
 }
 
+// src/desk/orders.ts
+import fs7 from "node:fs";
+import path7 from "node:path";
+var file3 = (dir) => path7.join(dir, "orders.jsonl");
+var marketDay = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(d);
+function logOrder(dir, line) {
+  fs7.mkdirSync(dir, { recursive: true });
+  fs7.appendFileSync(file3(dir), JSON.stringify(line) + "\n");
+}
+function readOrders(dir) {
+  try {
+    return fs7.readFileSync(file3(dir), "utf8").split("\n").flatMap((l) => {
+      try {
+        const v = JSON.parse(l);
+        return v && typeof v.at === "string" && typeof v.symbol === "string" && v.robinhood ? [v] : [];
+      } catch {
+        return [];
+      }
+    });
+  } catch {
+    return [];
+  }
+}
+var ordersOn = (dir, now) => readOrders(dir).filter((o) => marketDay(new Date(o.at)) === marketDay(now));
+var placedToday = (dir, now) => ordersOn(dir, now).length;
+
 // src/desk/ticket.ts
 var money = (n) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 var cents = (n) => Math.round(n * 100) / 100;
@@ -20084,8 +20110,8 @@ function check(o, c, t2) {
 var passes = (checks) => checks.length > 0 && checks.every((x) => x.ok);
 
 // src/desk/journal.ts
-import fs7 from "node:fs";
-import path7 from "node:path";
+import fs8 from "node:fs";
+import path8 from "node:path";
 
 // src/desk/rating.ts
 var RATINGS = ["Buy", "Overweight", "Hold", "Underweight", "Sell"];
@@ -20143,21 +20169,21 @@ function parse3(block) {
 }
 var Journal = class {
   /** @param maxResolved keep at most this many settled entries (the oldest go first); pending ones are never dropped */
-  constructor(file3, maxResolved = null) {
-    this.file = file3;
+  constructor(file4, maxResolved = null) {
+    this.file = file4;
     this.maxResolved = maxResolved;
   }
   file;
   maxResolved;
   read() {
     try {
-      return fs7.readFileSync(this.file, "utf8");
+      return fs8.readFileSync(this.file, "utf8");
     } catch {
       return "";
     }
   }
   write(text2) {
-    fs7.mkdirSync(path7.dirname(this.file), { recursive: true });
+    fs8.mkdirSync(path8.dirname(this.file), { recursive: true });
     writeWhole(this.file, text2);
   }
   blocks() {
@@ -20172,7 +20198,7 @@ var Journal = class {
   /** Adds a pending entry. One entry per stock and day, settled or not: a re-run must not count the same call twice. */
   storeDecision(ticker, date4, decision, rating) {
     checkTag(ticker, date4);
-    fs7.mkdirSync(path7.dirname(this.file), { recursive: true });
+    fs8.mkdirSync(path8.dirname(this.file), { recursive: true });
     return withLock(this.file, () => {
       if (this.load().some((e) => e.date === date4 && e.ticker === ticker)) return "exists";
       const r = rating && RATINGS.includes(rating) ? rating : parseRating(decision);
@@ -20246,8 +20272,8 @@ ${e.reflection || e.decision.slice(0, 300) + (e.decision.length > 300 ? "..." : 
 };
 
 // src/settings.ts
-import fs8 from "node:fs";
-import path8 from "node:path";
+import fs9 from "node:fs";
+import path9 from "node:path";
 var ANALYSTS = ["market", "sentiment", "news", "fundamentals"];
 var ACTIONS = ["buy a full position", "buy half a position", "no order", "sell half of what is held", "sell everything held"];
 var DEFAULTS = {
@@ -20278,7 +20304,8 @@ var DEFAULTS = {
     ratingToOrder: { Buy: "buy a full position", Overweight: "buy half a position", Hold: "no order", Underweight: "sell half of what is held", Sell: "sell everything held", "Needs review": "no order" },
     caps: { perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 3 },
     orderDefaults: { type: "limit", timeInForce: "gfd" }
-  }
+  },
+  routines: { maxAnalyses: 5 }
 };
 var within = (v, lo, hi, fallback) => typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi ? v : fallback;
 function tradingOf(raw) {
@@ -20306,7 +20333,7 @@ function languageName(v, fallback = "English") {
 function readSettings(root2) {
   let raw = {};
   try {
-    raw = JSON.parse(fs8.readFileSync(path8.join(root2, "desk-settings.json"), "utf8"));
+    raw = JSON.parse(fs9.readFileSync(path9.join(root2, "desk-settings.json"), "utf8"));
   } catch {
   }
   const a = { ...DEFAULTS.analysis, ...raw.analysis }, s = { ...DEFAULTS.scoring, ...raw.scoring }, j = { ...DEFAULTS.journal, ...raw.journal };
@@ -20328,24 +20355,25 @@ function readSettings(root2) {
     },
     journal: { maxResolvedEntries: Number.isInteger(j.maxResolvedEntries) && j.maxResolvedEntries > 0 ? j.maxResolvedEntries : null },
     sources: { ...DEFAULTS.sources, ...raw.sources },
-    trading: tradingOf(raw.trading)
+    trading: tradingOf(raw.trading),
+    routines: { maxAnalyses: int2(raw.routines?.maxAnalyses, 1, 20, DEFAULTS.routines.maxAnalyses) }
   };
 }
 
 // src/terminal/state.ts
-import fs11 from "node:fs";
-import path11 from "node:path";
+import fs12 from "node:fs";
+import path12 from "node:path";
 
 // src/desk/runs.ts
-import fs9 from "node:fs";
-import path9 from "node:path";
+import fs10 from "node:fs";
+import path10 from "node:path";
 var DEBATES = { investment_debate: ["bull", "bear"], risk_debate: ["aggressive", "conservative", "neutral"] };
 var TURNS = new Set(Object.values(DEBATES).flat());
-var folder = (dir, ticker, date4) => path9.join(dir, "runs", `${safeSymbol(ticker).replace(/\^/g, "IDX_").replace(/=/g, "_EQ_")}_${date4}`);
-var runFile = (dir, ticker, date4) => path9.join(folder(dir, ticker, date4), "run.json");
+var folder = (dir, ticker, date4) => path10.join(dir, "runs", `${safeSymbol(ticker).replace(/\^/g, "IDX_").replace(/=/g, "_EQ_")}_${date4}`);
+var runFile = (dir, ticker, date4) => path10.join(folder(dir, ticker, date4), "run.json");
 function load(dir, ticker, date4) {
   try {
-    return JSON.parse(fs9.readFileSync(runFile(dir, ticker, date4), "utf8"));
+    return JSON.parse(fs10.readFileSync(runFile(dir, ticker, date4), "utf8"));
   } catch {
     return { ticker: safeSymbol(ticker), date: date4, startedAt: (/* @__PURE__ */ new Date()).toISOString(), log: [] };
   }
@@ -20355,7 +20383,7 @@ function sectionsOf(dir, ticker, date4) {
   for (const e of load(dir, ticker, date4).log) (out[e.section] ??= []).push(e.text);
   return out;
 }
-var hasReport = (dir, ticker, date4) => fs9.existsSync(path9.join(folder(dir, ticker, date4), "complete_report.md"));
+var hasReport = (dir, ticker, date4) => fs10.existsSync(path10.join(folder(dir, ticker, date4), "complete_report.md"));
 
 // src/desk/backtest.ts
 var DIRECTION = { Buy: 1, Overweight: 1, Hold: 0, Underweight: -1, Sell: -1 };
@@ -20389,30 +20417,30 @@ function renderSummary(s) {
 }
 
 // src/terminal/store.ts
-import fs10 from "node:fs";
-import path10 from "node:path";
+import fs11 from "node:fs";
+import path11 from "node:path";
 var MAX_WATCH = 50;
 var MAX_QUEUE = 20;
-var read = (file3, ok) => {
+var read = (file4, ok) => {
   try {
-    const v = JSON.parse(fs10.readFileSync(file3, "utf8"));
+    const v = JSON.parse(fs11.readFileSync(file4, "utf8"));
     return Array.isArray(v) ? v.filter(ok) : [];
   } catch {
     return [];
   }
 };
-function change(file3, edit, ok) {
-  fs10.mkdirSync(path10.dirname(file3), { recursive: true });
-  return withLock(file3, () => {
-    const next = edit(read(file3, ok));
-    writeWhole(file3, JSON.stringify(next, null, 2) + "\n");
+function change(file4, edit, ok) {
+  fs11.mkdirSync(path11.dirname(file4), { recursive: true });
+  return withLock(file4, () => {
+    const next = edit(read(file4, ok));
+    writeWhole(file4, JSON.stringify(next, null, 2) + "\n");
     return next;
   });
 }
 var isWatch = (v) => !!v && typeof v.symbol === "string" && typeof v.favourite === "boolean";
 var isQueued = (v) => !!v && typeof v.symbol === "string" && typeof v.requestedAt === "string";
-var watchFile = (dir) => path10.join(dir, "watchlist.json");
-var queueFile = (dir) => path10.join(dir, "queue.json");
+var watchFile = (dir) => path11.join(dir, "watchlist.json");
+var queueFile = (dir) => path11.join(dir, "queue.json");
 var readWatchlist = (dir) => read(watchFile(dir), isWatch);
 function addWatch(dir, raw, onDay) {
   const symbol = safeSymbol(raw);
@@ -20453,25 +20481,25 @@ function summaryOf(decision) {
   const text2 = (m?.[1] ?? decision).replace(/\s+/g, " ").trim();
   return text2.length > 320 ? `${text2.slice(0, 317).trimEnd()}...` : text2;
 }
-var stamp = (file3) => {
+var stamp = (file4) => {
   try {
-    return String(fs11.statSync(file3).mtimeMs);
+    return String(fs12.statSync(file4).mtimeMs);
   } catch {
     return "0";
   }
 };
 function versionOf(root2) {
-  const dir = deskDataDir(root2), runs = path11.join(dir, "runs");
+  const dir = deskDataDir(root2), runs = path12.join(dir, "runs");
   let latest = 0;
   try {
-    for (const d of fs11.readdirSync(runs)) latest = Math.max(latest, Number(stamp(path11.join(runs, d, "run.json"))));
+    for (const d of fs12.readdirSync(runs)) latest = Math.max(latest, Number(stamp(path12.join(runs, d, "run.json"))));
   } catch {
   }
-  return [stamp(path11.join(dir, "journal.md")), stamp(path11.join(dir, "watchlist.json")), stamp(path11.join(dir, "queue.json")), latest, stamp(path11.join(dir, "contact.json"))].join("-");
+  return [stamp(path12.join(dir, "journal.md")), stamp(path12.join(dir, "watchlist.json")), stamp(path12.join(dir, "queue.json")), latest, stamp(path12.join(dir, "contact.json"))].join("-");
 }
 function stateOf(root2, day) {
   const dir = deskDataDir(root2), s = readSettings(root2);
-  const entries = new Journal(path11.join(dir, "journal.md")).load();
+  const entries = new Journal(path12.join(dir, "journal.md")).load();
   const calls = entries.map((e) => ({
     date: e.date,
     ticker: e.ticker,
@@ -20495,7 +20523,7 @@ function stateOf(root2, day) {
   };
 }
 function callOf(root2, ticker, date4) {
-  const dir = deskDataDir(root2), e = new Journal(path11.join(dir, "journal.md")).load().find((x) => x.ticker === ticker && x.date === date4);
+  const dir = deskDataDir(root2), e = new Journal(path12.join(dir, "journal.md")).load().find((x) => x.ticker === ticker && x.date === date4);
   if (!e) return null;
   return { decision: e.decision, sections: sectionsOf(dir, ticker, date4), hasReport: hasReport(dir, ticker, date4) };
 }
@@ -20718,18 +20746,18 @@ var MARKETS = [
 
 // src/terminal/launch.ts
 import crypto4 from "node:crypto";
-import path12 from "node:path";
+import path13 from "node:path";
 var PORTS = [47615, 47625];
-var deskIdOf = (root2) => crypto4.createHash("sha256").update(path12.resolve(root2)).digest("hex").slice(0, 12);
+var deskIdOf = (root2) => crypto4.createHash("sha256").update(path13.resolve(root2)).digest("hex").slice(0, 12);
 
 // src/terminal/server.ts
 var TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".woff2": "font/woff2", ".svg": "image/svg+xml" };
-function loadAssets(dir = path13.join(path13.dirname(fileURLToPath(import.meta.url)), "terminal")) {
+function loadAssets(dir = path14.join(path14.dirname(fileURLToPath(import.meta.url)), "terminal")) {
   const out = /* @__PURE__ */ new Map();
-  const add = (rel) => out.set(`/${rel.replace(/\\/g, "/")}`, { type: TYPES[path13.extname(rel)] ?? "application/octet-stream", body: fs12.readFileSync(path13.join(dir, rel)) });
+  const add = (rel) => out.set(`/${rel.replace(/\\/g, "/")}`, { type: TYPES[path14.extname(rel)] ?? "application/octet-stream", body: fs13.readFileSync(path14.join(dir, rel)) });
   for (const f of ["index.html", "app.js", "app.css"]) add(f);
   try {
-    for (const f of fs12.readdirSync(path13.join(dir, "fonts"))) if (f.endsWith(".woff2")) add(`fonts/${f}`);
+    for (const f of fs13.readdirSync(path14.join(dir, "fonts"))) if (f.endsWith(".woff2")) add(`fonts/${f}`);
   } catch {
   }
   return out;
@@ -20748,26 +20776,6 @@ function shareHoldings(dir, snap, day) {
 }
 var REVIEW_MS = 5 * 6e4;
 var confirmWords = (o) => `${o.side === "buy" ? "Buy" : "Sell"} ${o.quantity} ${o.symbol} at $${o.limitPrice.toFixed(2)}`;
-var ordersFile = (dir) => path13.join(dir, "orders.jsonl");
-function logOrder(dir, line) {
-  fs12.mkdirSync(dir, { recursive: true });
-  fs12.appendFileSync(ordersFile(dir), JSON.stringify(line) + "\n");
-}
-function placedToday(dir, now) {
-  const day = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(d);
-  try {
-    return fs12.readFileSync(ordersFile(dir), "utf8").split("\n").filter((l) => {
-      try {
-        const v = JSON.parse(l);
-        return !!v.at && day(new Date(v.at)) === day(now);
-      } catch {
-        return false;
-      }
-    }).length;
-  } catch {
-    return 0;
-  }
-}
 var SECURITY = {
   "Content-Security-Policy": "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
   "X-Content-Type-Options": "nosniff",
@@ -20902,7 +20910,7 @@ async function startTerminal(opts) {
     }
     if (p === "/api/ticket" && method === "POST") {
       const symbol = safeSymbol(typeof b.symbol === "string" ? b.symbol : ""), date4 = typeof b.date === "string" ? b.date : "";
-      const call = new Journal(path13.join(dir, "journal.md")).load().find((e) => e.ticker === symbol && e.date === date4);
+      const call = new Journal(path14.join(dir, "journal.md")).load().find((e) => e.ticker === symbol && e.date === date4);
       if (!call) throw new Refused2(404, "no such call");
       const trading = readSettings(root2).trading;
       const context = { ...await askRobinhood(() => robinhood.ticketContext(symbol)), rating: call.rating, callDate: call.date };

@@ -12,7 +12,7 @@ const D = (t) => `mcp__trading-desk__${t}`;
 /** What the team itself may call: its members, questions to the person, reading this folder, and the desk's own records.
  *  No Robinhood tool and no order tool: those exist only behind the person's own presses on the dashboard. */
 export const TEAM_TOOLS = ['plan_analysis', 'read_run', 'write_report', 'record_decision', 'list_settlements', 'record_outcome', 'read_queue', 'finish_queue_item',
-  'set_contact_email', 'set_holdings', 'clear_holdings', 'start_backtest', 'end_backtest', 'backtest_summary', 'desk_check', 'get_verified_snapshot', 'open_dashboard'];
+  'set_contact_email', 'set_holdings', 'clear_holdings', 'start_backtest', 'end_backtest', 'backtest_summary', 'desk_check', 'get_verified_snapshot', 'open_dashboard', 'routine_brief'];
 
 /** A skill's playbook without its header and its "The person asked" line. */
 const playbook = (name) => {
@@ -29,9 +29,13 @@ tools: Agent(${members.join(', ')}), SendMessage, AskUserQuestion, Read, Glob, G
 disallowedTools: Bash, Write, Edit, NotebookEdit, WebFetch, WebSearch
 ---
 
-What this team is for: analysing one stock (or crypto asset) on one date with the whole desk - four analysts, a bull and a bear, a research manager, a trader, three risk voices and a portfolio manager - and recording the call in the desk's journal; scoring past calls; testing the desk over past dates; checking that this computer is ready; and opening the dashboard where the person sees their accounts and decides.
+What this team is for: analysing one stock (or crypto asset) on one date with the whole desk - four analysts, a bull and a bear, a research manager, a trader, three risk voices and a portfolio manager - and recording the call in the desk's journal; scoring past calls; testing the desk over past dates; running the morning routine and the evening wrap-up (Madav's scheduler can start them); checking that this computer is ready; and opening the dashboard where the person sees their accounts and decides.
 
-You coordinate: you start the members in order, keep the work moving and talk to the person. You never analyse yourself, and nothing you or any member does places, changes or cancels an order: no one on this team has a Robinhood tool or an order tool. The person decides on the dashboard, and only their own Confirm there places an order. Where the playbooks below say /analyse, /settle or /backtest, the person may simply ask in words ("analyse NVDA", "score my past calls"). When you write to the person, use plain words and call each member by its name. Nothing here is investment advice: say so when a call is treated as a certainty.
+You coordinate: you start the members in order, keep the work moving and talk to the person. You never analyse yourself, and nothing you or any member does places, changes or cancels an order: no one on this team has a Robinhood tool or an order tool. The person decides on the dashboard, and only their own Confirm there places an order. Where the playbooks below say /analyse, /settle, /backtest or /routine, the person may simply ask in words ("analyse NVDA", "score my past calls"). When you write to the person, use plain words and call each member by its name. Nothing here is investment advice: say so when a call is treated as a certainty.
+
+## Run a routine
+
+${playbook('routine')}
 
 ## Analyse a stock
 

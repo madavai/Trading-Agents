@@ -188,7 +188,7 @@ async function readAccounts(): Promise<void> {
   if (A.reading) return;
   A.reading = true; renderViews();
   try { const r = await api.readAccounts(); A.snapshot = r.snapshot; A.chosen = r.chosen; A.shared = r.holdingsShared; } catch (e) { toast(say(e), 'bad'); }
-  finally { A.reading = false; renderViews(); renderCall(); }
+  finally { A.reading = false; renderViews(); renderCall(); renderStock(); }
 }
 
 async function openPicker(): Promise<void> {
@@ -427,6 +427,40 @@ function renderQueue(): void {
       : '<p class="at-quiet">Nothing is waiting. Ask the desk to analyse a stock and it is listed here until Madav runs it.</p>');
 }
 
+// ---------- the stock page: everything on the stock being charted ----------
+function renderStock(): void {
+  const sym = S.symbol, d = S.desk;
+  $('#sec-stock').classList.toggle('hide', !sym || isIndex(sym) || !d);
+  if (!sym || isIndex(sym) || !d) return;
+  const q = quoteOf(sym);
+  $('#stockTitle').textContent = `Everything on ${sym}`;
+  $('#stockSub').textContent = `${nameOf(sym)}${q ? ` · ${priceText(sym, q)}${q.changePct === null ? '' : ` (${pct(q.changePct)} today)`} on Yahoo Finance, up to 15 min late` : ''} · the chart is above`;
+
+  // what the person holds of it, account by account, as the dashboard last read Robinhood
+  let held: string;
+  if (!signedIn()) held = '<p class="at-quiet">Connect Robinhood in Your account to see what you hold of it.</p>';
+  else if (!A.snapshot) held = '<p class="at-quiet">Read your accounts (Your account, Refresh from Robinhood) to see what you hold of it.</p>';
+  else {
+    const rows = A.snapshot.views.flatMap((v) => v.holdings.filter((h) => h.symbol === sym).map((h) => {
+      const cur = v.portfolio?.currency ?? 'USD';
+      return `<div><dt>${esc(v.account.label)} · ${v.account.agentic ? 'Agentic' : 'view only'}</dt><dd>${num(h.quantity, h.quantity % 1 ? 4 : 0)} at ${money(h.averageCost, cur)} average · now ${money(h.value, cur)}${h.gainPct === null ? '' : ` <span class="at-chip ${tone(h.gainPct)}">${pct(h.gainPct)}</span>`}</dd></div>`;
+    }));
+    held = rows.length ? `<dl class="at-facts ruled at-box">${rows.join('')}</dl><p class="at-quiet">Valued at Robinhood's live price, read at ${esc(clock(A.snapshot.at))}.</p>` : `<p class="at-quiet">Not held in the accounts you show.</p>`;
+  }
+
+  // every call the desk made on it, newest first, with how it scored
+  const calls = d.calls.filter((c) => c.ticker === sym);
+  const list = calls.length
+    ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>Date</th><th>Rating</th><th>Result</th><th></th></tr></thead><tbody>${calls.map((c) => `<tr class="ta-go" data-act="open-call" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}"><td>${esc(dayText(c.date))}</td><td>${ratingChip(c.rating)}</td><td>${c.pending ? '<span class="at-chip">not scored yet</span>' : `<span class="at-chip ${tone(parseFloat(c.alpha ?? ''))}">alpha ${esc(c.alpha ?? '—')}</span>`}</td><td><span class="at-quiet">Read</span></td></tr>`).join('')}</tbody></table></div>`
+    : `<p class="at-quiet">The desk has no call on ${esc(sym)} yet.</p>`;
+  const latest = calls[0];
+  $('#stockBody').innerHTML = `<div class="at-card at-box"><div class="at-card-head"><h3>What you hold</h3></div>${held}</div>
+    <div class="at-card at-box"><div class="at-card-head"><h3>The desk's calls on it</h3></div>${latest ? `<p class="at-lede">${esc(latest.summary)}</p>` : ''}${list}</div>`;
+
+  const queued = d.queue.some((x) => x.symbol === sym);
+  $('#stockActions').innerHTML = `${queued ? '<span class="at-chip">waiting to be analysed</span>' : `<button class="at-btn at-press" data-act="analyse" data-symbol="${esc(sym)}"><svg class="g"><use href="#i-bot"/></svg><span>Ask the desk to analyse</span></button>`}${latest && signedIn() && hasAgentic() ? `<button class="at-btn at-press primary" data-act="decide" data-symbol="${esc(sym)}" data-date="${esc(latest.date)}"><span>Decide…</span></button>` : ''}`;
+}
+
 // ---------- watchlist, calls, scorecard ----------
 function renderWatch(): void {
   const list = S.desk?.watchlist ?? [];
@@ -494,13 +528,13 @@ async function openCall(symbol: string, date: string): Promise<void> {
 
 // ---------- everything ----------
 function renderAll(): void {
-  renderSub(); renderFavs(); renderAccount(); renderControls(); renderHero(); renderCall(); renderQueue(); renderWatch(); renderCalls(); renderScore();
+  renderSub(); renderFavs(); renderAccount(); renderControls(); renderHero(); renderCall(); renderStock(); renderQueue(); renderWatch(); renderCalls(); renderScore();
 }
 
 function select(sym: string): void {
   if (!sym) return;
   S.symbol = sym; S.history = null; S.historyError = '';
-  renderFavs(); renderControls(); renderHero(); renderCall(); renderWatch();
+  renderFavs(); renderControls(); renderHero(); renderCall(); renderStock(); renderWatch();
   void loadHistory();
   void refreshQuotes();
 }
@@ -522,7 +556,7 @@ async function refreshQuotes(): Promise<void> {
   if (!want.length) return;
   try {
     for (const q of (await api.quotes(want)).quotes) S.quotes.set(q.symbol, q);
-    renderFavs(); renderHero(); renderWatch();
+    renderFavs(); renderHero(); renderWatch(); renderStock();
   } catch { /* the next round asks again */ }
 }
 

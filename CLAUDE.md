@@ -18,9 +18,12 @@ In a chat here:
 - `/backtest TICKERS START END`: runs the team over past dates in a journal of its own and scores the calls by rating.
   Slow and costly: every date is a full team run.
 - `/terminal`: opens the dashboard on this computer (`node dist/terminal.mjs`): markets, charts, watchlist, the desk's
-  calls and scorecard, a list of stocks to analyse, and the person's own Connect to Robinhood. `/analyse` with no
-  stock runs that list. No order button.
-- Coming in later milestones: `/schedule`.
+  calls and scorecard, a list of stocks to analyse, a page per stock, and the person's own Connect to Robinhood.
+  `/analyse` with no stock runs that list. An order is placed only by the person's own Confirm there, with trading
+  switched on by them.
+- `/routine morning|evening`: the morning routine (score past calls, analyse what is waiting and the starred
+  watchlist stocks, list the new calls to decide on) or the evening wrap-up (score what is ready, report the day's
+  calls and orders). Madav's scheduler can start them as the trading-desk team. They never place an order.
 
 ## Rules for every agent in this folder
 - Never place, change or cancel an order, and never use a broker connection or Robinhood's site. Orders come only from

@@ -3263,8 +3263,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path14) {
-      let input2 = path14;
+    function removeDotSegments(path16) {
+      let input2 = path16;
       const output2 = [];
       let nextSlash = -1;
       let len = 0;
@@ -3673,8 +3673,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path14 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path14 && path14 !== "/" ? path14 : void 0;
+        const path16 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path16 && path16 !== "/" ? path16 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -6959,7 +6959,7 @@ var require_formats = __commonJS({
       return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
     }
     var DATE2 = /^(\d\d\d\d)-(\d\d)-(\d\d)$/;
-    var DAYS = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    var DAYS2 = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
     function date5(str) {
       const matches = DATE2.exec(str);
       if (!matches)
@@ -6967,7 +6967,7 @@ var require_formats = __commonJS({
       const year = +matches[1];
       const month = +matches[2];
       const day2 = +matches[3];
-      return month >= 1 && month <= 12 && day2 >= 1 && day2 <= (month === 2 && isLeapYear(year) ? 29 : DAYS[month]);
+      return month >= 1 && month <= 12 && day2 >= 1 && day2 <= (month === 2 && isLeapYear(year) ? 29 : DAYS2[month]);
     }
     function compareDate(d1, d2) {
       if (!(d1 && d2))
@@ -7187,12 +7187,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list2, fs11, exportName) {
+    function addFormats(ajv, list2, fs12, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list2)
-        ajv.addFormat(f, fs11[f]);
+        ajv.addFormat(f, fs12[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -7201,7 +7201,7 @@ var require_dist = __commonJS({
 });
 
 // src/tools/main.ts
-import path13 from "node:path";
+import path15 from "node:path";
 
 // node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
 import process2 from "node:process";
@@ -8023,10 +8023,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path14) {
-  if (!path14)
+function getElementAtPath(obj, path16) {
+  if (!path16)
     return obj;
-  return path14.reduce((acc, key) => acc?.[key], obj);
+  return path16.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -8366,11 +8366,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path14, issues) {
+function prefixIssues(path16, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path14);
+    iss.path.unshift(path16);
     return iss;
   });
 }
@@ -8832,16 +8832,16 @@ function flattenError(error62, mapper = (issue2) => issue2.message) {
 }
 function formatError(error62, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error63, path14 = []) => {
+  const processError = (error63, path16 = []) => {
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path14, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path16, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path14, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path16, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path14, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path16, ...issue2.path]);
       } else {
-        const fullpath = [...path14, ...issue2.path];
+        const fullpath = [...path16, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -8880,17 +8880,17 @@ function formatError(error62, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error62, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error63, path14 = []) => {
+  const processError = (error63, path16 = []) => {
     var _a3;
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path14, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path16, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path14, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path16, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path14, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path16, ...issue2.path]);
       } else {
-        const fullpath = [...path14, ...issue2.path];
+        const fullpath = [...path16, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -8929,8 +8929,8 @@ function treeifyError(error62, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path14 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path14) {
+  const path16 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path16) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -26068,13 +26068,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path14 = ref.slice(1).split("/").filter(Boolean);
-  if (path14.length === 0) {
+  const path16 = ref.slice(1).split("/").filter(Boolean);
+  if (path16.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path14[0] === defsKey) {
-    const key = path14[1] === void 0 ? void 0 : decodeJSONPointerSegment(path14[1]);
+  if (path16[0] === defsKey) {
+    const key = path16[1] === void 0 ? void 0 : decodeJSONPointerSegment(path16[1]);
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -28932,8 +28932,8 @@ function getErrorMap2() {
 
 // node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path14, errorMaps, issueData } = params;
-  const fullPath = [...path14, ...issueData.path || []];
+  const { data, path: path16, errorMaps, issueData } = params;
+  const fullPath = [...path16, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -29048,11 +29048,11 @@ var errorUtil;
 
 // node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path14, key) {
+  constructor(parent, value, path16, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path14;
+    this._path = path16;
     this._key = key;
   }
   get path() {
@@ -32603,11 +32603,11 @@ function normalizeObjectSchema(schema) {
   }
   return void 0;
 }
-function getDotPath(path14) {
-  if (path14.length === 0) {
+function getDotPath(path16) {
+  if (path16.length === 0) {
     return "object root";
   }
-  return path14.reduce((acc, seg, index) => {
+  return path16.reduce((acc, seg, index) => {
     if (index === 0) {
       return String(seg);
     }
@@ -36731,7 +36731,8 @@ var DEFAULTS = {
     ratingToOrder: { Buy: "buy a full position", Overweight: "buy half a position", Hold: "no order", Underweight: "sell half of what is held", Sell: "sell everything held", "Needs review": "no order" },
     caps: { perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 3 },
     orderDefaults: { type: "limit", timeInForce: "gfd" }
-  }
+  },
+  routines: { maxAnalyses: 5 }
 };
 var within = (v, lo, hi, fallback) => typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi ? v : fallback;
 function tradingOf(raw) {
@@ -36781,7 +36782,8 @@ function readSettings(root) {
     },
     journal: { maxResolvedEntries: Number.isInteger(j.maxResolvedEntries) && j.maxResolvedEntries > 0 ? j.maxResolvedEntries : null },
     sources: { ...DEFAULTS.sources, ...raw.sources },
-    trading: tradingOf(raw.trading)
+    trading: tradingOf(raw.trading),
+    routines: { maxAnalyses: int2(raw.routines?.maxAnalyses, 1, 20, DEFAULTS.routines.maxAnalyses) }
   };
 }
 
@@ -36802,9 +36804,9 @@ function dataLine(root) {
     return { ok: false, text: `Desk data folder ${dir} cannot be written: ${e.message}` };
   }
 }
-function robinhoodLine(file4 = robinhoodFile()) {
-  if (!fs3.existsSync(file4)) return { ok: true, text: "Robinhood: not connected yet (only needed for trading; analysis works without it)" };
-  const when = fs3.statSync(file4).mtime;
+function robinhoodLine(file5 = robinhoodFile()) {
+  if (!fs3.existsSync(file5)) return { ok: true, text: "Robinhood: not connected yet (only needed for trading; analysis works without it)" };
+  const when = fs3.statSync(file5).mtime;
   return { ok: true, text: `Robinhood: a sign-in is saved (last refreshed ${when.toISOString().slice(0, 16).replace("T", " ")} UTC)` };
 }
 function contactLine(email3) {
@@ -36835,8 +36837,8 @@ import { createHash } from "node:crypto";
 import fs4 from "node:fs";
 var STALE_MS = 6e4;
 var nap = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-function withLock(file4, run, waitMs = 15e3) {
-  const lock = `${file4}.lock`, until = Date.now() + waitMs;
+function withLock(file5, run, waitMs = 15e3) {
+  const lock = `${file5}.lock`, until = Date.now() + waitMs;
   for (; ; ) {
     try {
       fs4.mkdirSync(lock);
@@ -36851,7 +36853,7 @@ function withLock(file4, run, waitMs = 15e3) {
       } catch {
         continue;
       }
-      if (Date.now() > until) throw new Error(`${file4} is in use by another run; try again in a moment`);
+      if (Date.now() > until) throw new Error(`${file5} is in use by another run; try again in a moment`);
       nap(40);
     }
   }
@@ -36864,11 +36866,11 @@ function withLock(file4, run, waitMs = 15e3) {
     }
   }
 }
-function writeWhole(file4, text3) {
-  const temp = `${file4}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
+function writeWhole(file5, text3) {
+  const temp = `${file5}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
   try {
     fs4.writeFileSync(temp, text3);
-    fs4.renameSync(temp, file4);
+    fs4.renameSync(temp, file5);
   } catch (e) {
     try {
       fs4.rmSync(temp, { force: true });
@@ -36927,8 +36929,8 @@ var keyOf = (url2) => {
 function readCache(url2) {
   if (!cacheDir) return null;
   try {
-    const file4 = path5.join(cacheDir, `${keyOf(url2)}.txt`);
-    return Date.now() - fs5.statSync(file4).mtimeMs < ttlFor(new URL(url2).hostname) ? fs5.readFileSync(file4, "utf8") : null;
+    const file5 = path5.join(cacheDir, `${keyOf(url2)}.txt`);
+    return Date.now() - fs5.statSync(file5).mtimeMs < ttlFor(new URL(url2).hostname) ? fs5.readFileSync(file5, "utf8") : null;
   } catch {
     return null;
   }
@@ -36944,8 +36946,8 @@ function writeCache(url2, text3) {
 function pruneCache(dir) {
   try {
     for (const f of fs5.readdirSync(dir)) {
-      const file4 = path5.join(dir, f);
-      if (Date.now() - fs5.statSync(file4).mtimeMs > 3 * 24 * 60 * MINUTE) fs5.rmSync(file4, { force: true });
+      const file5 = path5.join(dir, f);
+      if (Date.now() - fs5.statSync(file5).mtimeMs > 3 * 24 * 60 * MINUTE) fs5.rmSync(file5, { force: true });
     }
   } catch {
   }
@@ -37706,11 +37708,11 @@ function yahooSession() {
   });
   return session;
 }
-async function yahooJson(path14) {
+async function yahooJson(path16) {
   for (let attempt = 0; ; attempt++) {
     const s = await yahooSession();
     try {
-      return await getJson(`${HOSTS[1]}${path14}&crumb=${encodeURIComponent(s.crumb)}`, { headers: { Cookie: s.cookie } });
+      return await getJson(`${HOSTS[1]}${path16}&crumb=${encodeURIComponent(s.crumb)}`, { headers: { Cookie: s.cookie } });
     } catch (e) {
       if (attempt === 0 && /HTTP 401/.test(e.message)) {
         session = null;
@@ -37860,8 +37862,8 @@ async function financialStatement(raw, kind, freq, analysis2) {
 }
 
 // src/tools/desk.ts
-import fs10 from "node:fs";
-import path12 from "node:path";
+import fs11 from "node:fs";
+import path14 from "node:path";
 
 // src/desk/holdings.ts
 import fs6 from "node:fs";
@@ -38046,8 +38048,8 @@ function parse3(block) {
 }
 var Journal = class {
   /** @param maxResolved keep at most this many settled entries (the oldest go first); pending ones are never dropped */
-  constructor(file4, maxResolved = null) {
-    this.file = file4;
+  constructor(file5, maxResolved = null) {
+    this.file = file5;
     this.maxResolved = maxResolved;
   }
   file;
@@ -38183,12 +38185,12 @@ function load(dir, ticker, date5) {
   }
 }
 function change(dir, ticker, date5, edit) {
-  const file4 = runFile(dir, ticker, date5);
-  fs8.mkdirSync(path9.dirname(file4), { recursive: true });
-  return withLock(file4, () => {
+  const file5 = runFile(dir, ticker, date5);
+  fs8.mkdirSync(path9.dirname(file5), { recursive: true });
+  return withLock(file5, () => {
     const r = load(dir, ticker, date5);
     edit(r);
-    writeWhole(file4, JSON.stringify(r));
+    writeWhole(file5, JSON.stringify(r));
     return r;
   });
 }
@@ -38351,24 +38353,27 @@ ${lessons}` : "Lessons from past calls: none yet (no earlier call has been settl
 // src/terminal/store.ts
 import fs9 from "node:fs";
 import path10 from "node:path";
-var read = (file4, ok) => {
+var read = (file5, ok) => {
   try {
-    const v = JSON.parse(fs9.readFileSync(file4, "utf8"));
+    const v = JSON.parse(fs9.readFileSync(file5, "utf8"));
     return Array.isArray(v) ? v.filter(ok) : [];
   } catch {
     return [];
   }
 };
-function change2(file4, edit, ok) {
-  fs9.mkdirSync(path10.dirname(file4), { recursive: true });
-  return withLock(file4, () => {
-    const next = edit(read(file4, ok));
-    writeWhole(file4, JSON.stringify(next, null, 2) + "\n");
+function change2(file5, edit, ok) {
+  fs9.mkdirSync(path10.dirname(file5), { recursive: true });
+  return withLock(file5, () => {
+    const next = edit(read(file5, ok));
+    writeWhole(file5, JSON.stringify(next, null, 2) + "\n");
     return next;
   });
 }
+var isWatch = (v) => !!v && typeof v.symbol === "string" && typeof v.favourite === "boolean";
 var isQueued = (v) => !!v && typeof v.symbol === "string" && typeof v.requestedAt === "string";
+var watchFile = (dir) => path10.join(dir, "watchlist.json");
 var queueFile = (dir) => path10.join(dir, "queue.json");
+var readWatchlist = (dir) => read(watchFile(dir), isWatch);
 var readQueue = (dir) => read(queueFile(dir), isQueued);
 function dequeue(dir, raw) {
   const symbol4 = safeSymbol(raw);
@@ -38466,6 +38471,91 @@ async function openDashboard(root, opts = {}) {
   return "DATA_UNAVAILABLE: the dashboard did not answer within 15 seconds. Ask the person to run /terminal, or `node dist/terminal.mjs` in this folder, and to tell you what it prints.";
 }
 
+// src/desk/routine.ts
+import path13 from "node:path";
+
+// src/desk/orders.ts
+import fs10 from "node:fs";
+import path12 from "node:path";
+var file4 = (dir) => path12.join(dir, "orders.jsonl");
+var marketDay = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(d);
+function readOrders(dir) {
+  try {
+    return fs10.readFileSync(file4(dir), "utf8").split("\n").flatMap((l) => {
+      try {
+        const v = JSON.parse(l);
+        return v && typeof v.at === "string" && typeof v.symbol === "string" && v.robinhood ? [v] : [];
+      } catch {
+        return [];
+      }
+    });
+  } catch {
+    return [];
+  }
+}
+var ordersOn = (dir, now) => readOrders(dir).filter((o) => marketDay(new Date(o.at)) === marketDay(now));
+
+// src/desk/routine.ts
+var DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+var weekday = (day2) => DAYS[(/* @__PURE__ */ new Date(`${day2}T12:00:00Z`)).getUTCDay()];
+function morningList(dir, today2, max) {
+  const called = new Set(new Journal(path13.join(dir, "journal.md")).load().filter((e) => e.date === today2).map((e) => e.ticker));
+  const wanted = [], seen = /* @__PURE__ */ new Set();
+  const add = (symbol4, why) => {
+    if (!seen.has(symbol4) && !called.has(symbol4)) {
+      seen.add(symbol4);
+      wanted.push({ symbol: symbol4, why });
+    }
+  };
+  for (const q of readQueue(dir)) add(q.symbol, "asked for on the dashboard");
+  for (const w of readWatchlist(dir)) if (w.favourite && !w.symbol.startsWith("^")) add(w.symbol, "a starred watchlist stock");
+  return { analyse: wanted.slice(0, max), later: wanted.slice(max).map((w) => w.symbol), calledToday: [...called] };
+}
+var holdingsLine = (dir) => {
+  const h = readHoldings(dir);
+  if (!h) return "Holdings: not provided. The analyses say so; they do not assume a flat book.";
+  return h.source === "robinhood" ? `Holdings: as the dashboard last read them from Robinhood, on ${h.savedOn}. The team never reads Robinhood itself; for fresher figures the person presses "Refresh from Robinhood" on the dashboard.` : `Holdings: as the person gave them, on ${h.savedOn}.`;
+};
+function morningBrief(dir, today2, max) {
+  const day2 = weekday(today2), weekend = day2 === "Saturday" || day2 === "Sunday";
+  const m2 = morningList(dir, today2, max);
+  const lines = [`MORNING ROUTINE for ${day2} ${today2}.`];
+  if (weekend) lines.push(`US markets do not open on a ${day2}: score past calls (step 1), then stop and say so. Analyse nothing unless the person asked for it in words.`);
+  lines.push("", "1. Score past calls first: list_settlements, then record_outcome with a lesson for each READY call (the /settle playbook).");
+  if (!m2.analyse.length) lines.push("", "2. Nothing to analyse: no stock is waiting on the dashboard and no starred watchlist stock is without a call today. Say so.");
+  else {
+    lines.push("", `2. Analyse, one after another, in this order (${m2.analyse.length} of at most ${max} a morning), each by the /analyse playbook with today's date and the settings' depth:`);
+    m2.analyse.forEach((a, i) => lines.push(`   ${i + 1}. ${a.symbol} (${a.why})`));
+    lines.push("   For a stock asked for on the dashboard, call finish_queue_item once its call is recorded.");
+  }
+  if (m2.later.length) lines.push(`   Left for another morning, over the limit of ${max}: ${m2.later.join(", ")}.`);
+  if (m2.calledToday.length) lines.push(`   Already called today, so not analysed again: ${m2.calledToday.join(", ")}.`);
+  lines.push("", `3. ${holdingsLine(dir)}`);
+  lines.push("", `4. Finish with a short plain list: each new call (stock, rating, one sentence of its executive summary), anything skipped and why, and any data that was unavailable. Then: decide on the dashboard ("Decide\u2026" on a call); only the person's own Confirm there places an order. Not investment advice.`);
+  lines.push("", "No one may be watching: do not wait for an answer. If a step needs the person (for example no contact email is saved), skip what depends on it and say so at the end.");
+  return lines.join("\n");
+}
+function eveningBrief(dir, today2, now) {
+  const calls = new Journal(path13.join(dir, "journal.md")).load();
+  const todays = calls.filter((e) => e.date === today2), pending = calls.filter((e) => e.pending).length;
+  const orders = ordersOn(dir, now);
+  const lines = [`EVENING WRAP-UP for ${weekday(today2)} ${today2}.`, "", "1. Score what is ready: list_settlements, then record_outcome with a lesson for each READY call (the /settle playbook).", ""];
+  lines.push(todays.length ? `2. The desk's calls today (${todays.length}): ${todays.map((e) => `${e.ticker} ${e.rating}`).join(", ")}. Read each one's executive summary with read_run (section decision) for one sentence each.` : "2. The desk made no call today.");
+  lines.push("");
+  if (!orders.length) lines.push("3. The dashboard sent no order today.");
+  else {
+    lines.push(`3. Orders the dashboard sent today (${orders.length}), with what Robinhood answered when each was sent:`);
+    for (const o of orders) {
+      const r = o.robinhood, answer2 = !r.answered ? `refused${r.error ? `: ${r.error}` : ""}` : r.approvalRequired === true ? "taken, waiting for the person's approval on their phone" : r.approvalRequired === false ? "taken and sent to the market" : "taken";
+      lines.push(`   - ${o.side === "buy" ? "Buy" : "Sell"} ${o.quantity} ${o.symbol} at limit ${o.limitPrice.toFixed(2)}, ${o.at.slice(11, 16)} UTC${o.call ? `, from the ${o.call.rating} call of ${o.call.date}` : ""}: ${answer2}${r.state ? ` (state then: ${r.state})` : ""}.`);
+    }
+    lines.push("   What happened since (filled, approved, cancelled) is on the dashboard and in the Robinhood app: the team does not read Robinhood. Say so; do not guess.");
+  }
+  lines.push("", `4. Calls still waiting to be scored: ${pending}.`);
+  lines.push("", "Tell the person in a short plain list, using only these facts and what the tools return. Not investment advice.");
+  return lines.join("\n");
+}
+
 // src/tools/desk.ts
 var text = (t) => ({ content: [{ type: "text", text: t }] });
 var symbol2 = external_exports.string().min(1).max(20).describe("The ticker as the plan gives it");
@@ -38483,10 +38573,10 @@ async function act(run) {
 function registerDeskTools(server, root) {
   const dir = deskDataDir(root);
   const write = { readOnlyHint: false, openWorldHint: false };
-  const activeFile = path12.join(dir, "backtest", "active.json"), IDLE_MS = 2 * 36e5;
+  const activeFile = path14.join(dir, "backtest", "active.json"), IDLE_MS = 2 * 36e5;
   const getSweep = () => {
     try {
-      const a = JSON.parse(fs10.readFileSync(activeFile, "utf8"));
+      const a = JSON.parse(fs11.readFileSync(activeFile, "utf8"));
       if (typeof a.sweep === "string" && SWEEP_ID.test(a.sweep) && typeof a.at === "number" && Date.now() - a.at < IDLE_MS) return a.sweep;
     } catch {
     }
@@ -38494,10 +38584,10 @@ function registerDeskTools(server, root) {
   };
   const setSweep = (id) => {
     if (id === null) {
-      fs10.rmSync(activeFile, { force: true });
+      fs11.rmSync(activeFile, { force: true });
       return;
     }
-    fs10.mkdirSync(path12.dirname(activeFile), { recursive: true });
+    fs11.mkdirSync(path14.dirname(activeFile), { recursive: true });
     writeWhole(activeFile, JSON.stringify({ sweep: id, at: Date.now() }));
   };
   const ws = () => {
@@ -38551,8 +38641,8 @@ function registerDeskTools(server, root) {
     const rating = parseRating(readSections(ws().dir, sym, d, ["decision"]));
     const header = [`Rating: ${rating}`, `Generated: ${(/* @__PURE__ */ new Date()).toISOString().slice(0, 16).replace("T", " ")} UTC`];
     if (plan?.analysts) header.push(`Analysts: ${plan.analysts.join(", ")}; research debate rounds ${plan.debateRounds}, risk debate rounds ${plan.riskRounds}; language ${plan.language}`, `Judged after ${plan.holdingDays} trading days against ${plan.benchmark}`);
-    const file4 = writeReport(ws().dir, sym, d, header);
-    return `Report written: ${file4}
+    const file5 = writeReport(ws().dir, sym, d, header);
+    return `Report written: ${file5}
 Rating: ${rating}`;
   }));
   server.registerTool("record_decision", {
@@ -38596,10 +38686,10 @@ Rating: ${rating}`;
     if (!readContactEmail(root)) throw new NeedsEmail(ASK_FOR_EMAIL);
     const every = a.every_days ?? 7, dates = iterGrid(a.start_date, a.end_date, every), grid = cells(a.symbols, dates);
     const id = a.sweep_id ?? (/* @__PURE__ */ new Date()).toISOString().replace(/\D/g, "").slice(0, 14), w = workspaceOf(root, id);
-    fs10.mkdirSync(w.dir, { recursive: true });
+    fs11.mkdirSync(w.dir, { recursive: true });
     const recorded = new Set(journalOf(root, w).load().map((e) => `${e.ticker}|${e.date}`));
     const todo = grid.filter((c) => !recorded.has(`${c.symbol}|${c.date}`));
-    writeWhole(path12.join(w.dir, "sweep.json"), JSON.stringify({ symbols: [...new Set(grid.map((c) => c.symbol))], dates, every, cells: grid.length }));
+    writeWhole(path14.join(w.dir, "sweep.json"), JSON.stringify({ symbols: [...new Set(grid.map((c) => c.symbol))], dates, every, cells: grid.length }));
     setSweep(id);
     const symbols = new Set(grid.map((c) => c.symbol)).size;
     return [
@@ -38631,10 +38721,10 @@ Rating: ${rating}`;
     const id = a.sweep_id ?? getSweep();
     if (!id) throw new Error("no backtest is running: name the sweep to score");
     const w = workspaceOf(root, id);
-    if (!fs10.existsSync(path12.join(w.dir, "journal.md"))) throw new Error(`sweep ${id} has no recorded calls yet`);
+    if (!fs11.existsSync(path14.join(w.dir, "journal.md"))) throw new Error(`sweep ${id} has no recorded calls yet`);
     let meta3 = "";
     try {
-      const m2 = JSON.parse(fs10.readFileSync(path12.join(w.dir, "sweep.json"), "utf8"));
+      const m2 = JSON.parse(fs11.readFileSync(path14.join(w.dir, "sweep.json"), "utf8"));
       meta3 = ` of ${m2.cells} planned`;
     } catch {
     }
@@ -38642,6 +38732,15 @@ Rating: ${rating}`;
     return `Backtest sweep ${id}: ${entries.length} call(s) recorded${meta3}
 
 ${renderSummary(summarize(entries))}`;
+  }));
+  server.registerTool("routine_brief", {
+    title: "Today's routine",
+    description: "What the morning routine should do today (score past calls, then the stocks to analyse in order, within the person's limit) or what the evening wrap-up has to report (today's calls, the orders the dashboard sent and Robinhood's answer, what is still to be scored). Read-only; read from the desk's own files. Call it first when asked to run the morning routine or the evening wrap-up.",
+    inputSchema: { kind: external_exports.enum(["morning", "evening"]).describe("morning: before the open; evening: after the close") },
+    annotations: { readOnlyHint: true, openWorldHint: false }
+  }, async (a) => act(() => {
+    const day2 = today();
+    return a.kind === "morning" ? morningBrief(dir, day2, readSettings(root).routines.maxAnalyses) : eveningBrief(dir, day2, /* @__PURE__ */ new Date());
   }));
   server.registerTool("open_dashboard", {
     title: "Open the dashboard",
@@ -38808,6 +38907,6 @@ function deskServer(root = process.cwd(), fetchImpl2) {
 // src/tools/main.ts
 if (process.argv.includes("--check")) console.log(await deskCheck());
 else {
-  configure({ spacingMs: 250, cacheDir: path13.join(deskDataDir(process.cwd()), "cache") });
+  configure({ spacingMs: 250, cacheDir: path15.join(deskDataDir(process.cwd()), "cache") });
   await deskServer().connect(new StdioServerTransport());
 }

@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { analysisDate } from '../data/dates.js';
+import { analysisDate, today } from '../data/dates.js';
 import { safeSymbol } from '../data/symbols.js';
 import { deskDataDir } from '../paths.js';
 import { readSettings } from '../settings.js';
@@ -21,6 +21,7 @@ import { progress, readSections, savedPlan, saveSection, SECTIONS, writeReport }
 import { dueSettlements, settleOne } from '../desk/settle.js';
 import { failureText, NoData, Unavailable } from '../data/http.js';
 import { openDashboard } from '../terminal/launch.js';
+import { eveningBrief, morningBrief } from '../desk/routine.js';
 
 const text = (t: string) => ({ content: [{ type: 'text' as const, text: t }] });
 const symbol = z.string().min(1).max(20).describe('The ticker as the plan gives it');
@@ -182,6 +183,16 @@ export function registerDeskTools(server: McpServer, root: string): void {
     try { const m = JSON.parse(fs.readFileSync(path.join(w.dir, 'sweep.json'), 'utf8')) as { cells: number }; meta = ` of ${m.cells} planned`; } catch { /* no plan file */ }
     const entries = journalOf(root, w).load();
     return `Backtest sweep ${id}: ${entries.length} call(s) recorded${meta}\n\n${renderSummary(summarize(entries))}`;
+  }));
+
+  server.registerTool('routine_brief', {
+    title: "Today's routine",
+    description: "What the morning routine should do today (score past calls, then the stocks to analyse in order, within the person's limit) or what the evening wrap-up has to report (today's calls, the orders the dashboard sent and Robinhood's answer, what is still to be scored). Read-only; read from the desk's own files. Call it first when asked to run the morning routine or the evening wrap-up.",
+    inputSchema: { kind: z.enum(['morning', 'evening']).describe('morning: before the open; evening: after the close') },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  }, async (a) => act(() => {
+    const day = today();
+    return a.kind === 'morning' ? morningBrief(dir, day, readSettings(root).routines.maxAnalyses) : eveningBrief(dir, day, new Date());
   }));
 
   server.registerTool('open_dashboard', {
