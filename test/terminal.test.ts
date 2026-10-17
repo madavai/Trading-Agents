@@ -161,6 +161,11 @@ test('the page asks "did anything change?" cheaply, and the answer changes when 
 test('a call\'s summary is the decision\'s own, else its first words', () => {
   assert.equal(summaryOf(BUY), 'Add gradually on a close above 229.');
   assert.equal(summaryOf('No labels here, only a plain sentence.'), 'No labels here, only a plain sentence.');
+  // the summary written as a heading, as the portfolio manager sometimes does: plain words, no marks
+  const heading = '# TSLA Final Decision — Portfolio Manager, analysis date 2026-10-17\n\n**Rating**: Underweight\n\n## Executive Summary\nTrim **TSLA** into strength; the trend is *down*.\n\n## Investment Thesis\nThe 50-day average is falling.';
+  assert.equal(summaryOf(heading), 'Trim TSLA into strength; the trend is down.');
+  assert.equal(summaryOf('**Executive Summary:** Stay flat.\n\n**Rating**: Hold'), 'Stay flat.');
+  assert.equal(summaryOf('# NVDA\n\n**Rating**: Hold\n\nKeep the position at its size. No new buying.'), 'Keep the position at its size. No new buying.', 'without a summary: the first plain sentences, no heading or rating line');
   assert.ok(summaryOf('x'.repeat(900)).length <= 320);
 });
 

@@ -28,6 +28,7 @@
     <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
     <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
     <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></symbol>
+    <symbol id="i-trade" viewBox="0 0 24 24"><path d="M7 20V4M3 8l4-4 4 4M17 4v16M13 16l4 4 4-4"/></symbol>
   </defs>
 </svg>
 
@@ -37,8 +38,7 @@
       <div class="at-side-head"><span class="ta-word">Trading <em>Agents</em></span></div>
       <div class="at-side-body fixed">
         <nav class="at-list" aria-label="Sections">
-          <button class="at-li" data-act="goto" data-to="top" aria-current="page"><svg class="g"><use href="#i-grid"/></svg><span class="at-li-t">Overview</span></button>
-          <button class="at-li" data-act="goto" data-to="sec-account"><svg class="g"><use href="#i-link"/></svg><span class="at-li-t">Your account</span></button>
+          <button class="at-li" data-act="goto" data-to="top" id="navOverview" aria-current="page"><svg class="g"><use href="#i-grid"/></svg><span class="at-li-t">Overview</span></button>
           <button class="at-li" data-act="goto" data-to="sec-chart"><svg class="g"><use href="#i-candle"/></svg><span class="at-li-t">Chart</span></button>
           <button class="at-li" data-act="goto" data-to="sec-stock"><svg class="g"><use href="#i-file"/></svg><span class="at-li-t">Stock page</span></button>
           <button class="at-li" data-act="goto" data-to="sec-watch"><svg class="g"><use href="#i-star"/></svg><span class="at-li-t">Watchlist</span></button>
@@ -50,10 +50,7 @@
         <div class="at-list small" id="favs"></div>
       </div>
       <div class="at-side-foot">
-        <div class="at-list">
-          <div class="at-li at-inert"><span class="at-dot" id="rhDot"></span><span class="at-li-t" id="rhText">Robinhood</span></div>
-          <div class="at-li at-inert"><span class="at-dot" id="tradeDot"></span><span class="at-li-t" id="tradeText">Trading is switched off</span></div>
-        </div>
+        <div class="at-list" id="sideAccount"></div>
         <p class="at-quiet">Prices up to 15 min late · not advice</p>
       </div>
     </aside>
@@ -63,12 +60,13 @@
         <div class="at-top-back"></div>
         <div class="at-tabs-box"></div>
         <div class="at-top-end">
+          <button class="icon-btn at-press" data-act="view" data-view="account" aria-label="Your account" title="Your account"><svg class="g"><use href="#i-link"/></svg></button>
           <button class="icon-btn at-press" id="themeBtn" data-act="theme" aria-label="Switch to the light face" title="Switch to the light face"><svg class="g"><use href="#i-sun"/></svg></button>
         </div>
       </header>
 
       <main class="app-page" id="page">
-        <div class="at-page-col">
+        <div class="at-page-col" id="view-overview">
 
           <div class="at-page-top" id="top">
             <div class="at-page-head">
@@ -87,49 +85,42 @@
             </form>
           </div>
 
-          <section class="at-section" id="sec-account">
-            <div class="at-sect-head"><div class="at-head-words"><h2>Your account</h2><p id="accountSub">Robinhood · the desk only reads, it cannot place an order</p></div></div>
-            <div class="at-card at-box" id="accountCard"></div>
-            <div class="ta-col" id="accountViews"></div>
-          </section>
-
           <section class="at-section" id="sec-markets">
             <div class="at-sect-head"><div class="at-head-words"><h2>Markets</h2><p>Press one to chart it · from Yahoo Finance</p></div></div>
             <div class="at-deck ta-deck-6" id="marketDeck"></div>
           </section>
 
           <section class="at-section" id="sec-chart">
-            <div class="ta-main">
-              <div class="at-card at-box">
-                <div class="at-card-head">
-                  <h3 id="heroName">Chart</h3>
-                  <span class="at-chip" id="heroTicker"></span>
-                  <div class="at-card-tail">
-                    <div class="at-seg" id="kindSeg" role="tablist" aria-label="Chart kind">
-                      <button class="at-seg-b on" data-act="kind" data-kind="area">Area</button>
-                      <button class="at-seg-b" data-act="kind" data-kind="candles">Candles</button>
-                    </div>
-                    <div class="at-seg" id="rangeSeg" role="tablist" aria-label="Time range"></div>
+            <div class="at-card at-box ta-quote">
+              <div class="ta-quote-head">
+                <div class="ta-quote-id">
+                  <div class="ta-quote-title"><h2 class="ta-quote-name" id="heroName">Chart</h2><span class="at-chip" id="heroTicker"></span></div>
+                  <div class="ta-price-line">
+                    <span class="at-num ta-big" id="heroPrice">—</span>
+                    <span class="at-chip" id="heroChange"></span>
+                    <span class="at-quiet" id="heroAsOf"></span>
                   </div>
                 </div>
-                <div class="ta-price-line">
-                  <span class="at-num ta-big" id="heroPrice">—</span>
-                  <span class="at-chip" id="heroChange"></span>
-                  <span class="at-quiet" id="heroAsOf"></span>
-                </div>
-                <div class="ta-chart" id="heroChart"><div class="ta-fill" id="heroSvg"></div><div class="ta-tip at-box" id="heroTip"></div></div>
-                <div class="ta-legend" id="heroLegend">
-                  <button class="at-chip at-press on" data-act="layer" data-layer="ma50"><span class="ta-swatch ma50-sw"></span>50-day average</button>
-                  <button class="at-chip at-press on" data-act="layer" data-layer="ma200"><span class="ta-swatch dash ma200-sw"></span>200-day average</button>
-                  <button class="at-chip at-press on" data-act="layer" data-layer="vol">Volume</button>
-                  <span class="at-quiet" id="heroNote"></span>
+                <div class="ta-quote-do" id="heroActions"></div>
+              </div>
+              <div class="ta-toolbar">
+                <div class="at-seg" id="rangeSeg" role="tablist" aria-label="Time range"></div>
+                <div class="ta-toolbar-end">
+                  <div class="ta-legend" id="heroLegend">
+                    <button class="at-chip at-press on" data-act="layer" data-layer="ma50"><span class="ta-swatch ma50-sw"></span>50-day average</button>
+                    <button class="at-chip at-press on" data-act="layer" data-layer="ma200"><span class="ta-swatch dash ma200-sw"></span>200-day average</button>
+                    <button class="at-chip at-press on" data-act="layer" data-layer="vol">Volume</button>
+                  </div>
+                  <div class="at-seg" id="kindSeg" role="tablist" aria-label="Chart kind">
+                    <button class="at-seg-b on" data-act="kind" data-kind="area">Area</button>
+                    <button class="at-seg-b" data-act="kind" data-kind="candles">Candles</button>
+                  </div>
                 </div>
               </div>
-
-              <div class="ta-col">
-                <div class="at-card at-box" id="callCard"></div>
-                <div class="at-card at-box" id="queueCard"></div>
-              </div>
+              <div class="ta-chart" id="heroChart"><div class="ta-fill" id="heroSvg"></div><div class="ta-tip at-box" id="heroTip"></div></div>
+              <p class="at-quiet" id="heroNote"></p>
+              <dl class="at-facts row ta-stats" id="heroStats"></dl>
+              <div class="ta-callbar" id="callCard"></div>
             </div>
           </section>
 
@@ -139,7 +130,7 @@
           </section>
 
           <section class="at-section" id="sec-watch">
-            <div class="at-sect-head"><div class="at-head-words"><h2>Watchlist</h2><p>Press a row to chart it · the star keeps it in the side list</p></div></div>
+            <div class="at-sect-head"><div class="at-head-words"><h2>Watchlist</h2><p id="watchSub">Press a row to chart it · the star keeps it in the side list</p></div><div class="at-head-tail" id="queueBox"></div></div>
             <div class="at-box at-tablewrap" id="watchWrap"><table class="at-table fill" id="watchTable"></table></div>
           </section>
 
@@ -154,6 +145,27 @@
           </section>
 
           <p class="at-honest">Prices come from Yahoo Finance and may be up to 15 minutes late. Nothing here is investment advice. <span id="tradeFoot">This page places no order: trading is switched off.</span></p>
+        </div>
+
+        <div class="at-page-col" id="view-account" hidden>
+          <div class="at-page-top">
+            <div class="at-page-head">
+              <div class="at-head-words">
+                <h1 class="page-title">Your <em>account.</em></h1>
+                <p class="page-sub" id="accountSub">Robinhood, as the dashboard reads it.</p>
+              </div>
+              <div class="at-head-tail"><button class="at-btn at-press" data-act="view" data-view="overview"><svg class="g"><use href="#i-grid"/></svg><span>Back to the desk</span></button></div>
+            </div>
+          </div>
+          <div class="ta-two">
+            <div class="at-card at-box" id="accountCard"></div>
+            <div class="at-card at-box" id="tradingCard" hidden></div>
+          </div>
+          <section class="at-section">
+            <div class="at-sect-head"><div class="at-head-words"><h2>Accounts</h2><p>The accounts you chose to show · only the Agentic one can ever be traded</p></div></div>
+            <div class="ta-col" id="accountViews"></div>
+          </section>
+          <p class="at-honest">Your Robinhood sign-in is kept on this computer only and is never shown on this page. Nothing here is investment advice.</p>
         </div>
       </main>
     </div>

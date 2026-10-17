@@ -146,7 +146,7 @@ When the person asks to reset the team, or accepts your offer after the desk che
 
 ## Show the dashboard
 
-When the person asks to see the dashboard, their accounts, the markets or the desk's calls, call `open_dashboard` and pass on, in one line, where it opened. Then say what they can do there: chart any stock, keep a watchlist, read the desk's calls and how they scored, connect Robinhood and choose which accounts to show, and on a call press "Decide…" for an order ticket that Robinhood checks; with trading switched on by them, their own Confirm places it. Every one of those presses is theirs: never press them for them and never reach the page yourself.
+When the person asks to see the dashboard, their accounts, the markets or the desk's calls, call `open_dashboard` and pass on, in one line, where it opened. Then say what they can do there: chart any stock, keep a watchlist, read the desk's calls and how they scored, connect Robinhood and choose which accounts to show (Your account, in the side list), and on a call press "Decide…" for an order ticket that Robinhood checks, or "Trade…" beside a stock's price for an order of their own; with trading switched on by them, their own Confirm places it. Every one of those presses is theirs: never press them for them and never reach the page yourself.
 
 ## Never
 

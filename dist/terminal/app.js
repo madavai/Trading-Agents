@@ -41,6 +41,7 @@
     chooseAccounts: (show) => call("POST", "/api/robinhood/accounts", { show }),
     snapshot: () => call("GET", "/api/robinhood/snapshot"),
     openTicket: (symbol, date) => call("POST", "/api/ticket", { symbol, date }),
+    openOwnTicket: (symbol, side) => call("POST", "/api/ticket/own", { symbol, side }),
     checkTicket: (id, quantity, limitPrice) => call("POST", "/api/ticket/check", { id, quantity, limitPrice }),
     reviewTicket: (id, quantity, limitPrice) => call("POST", "/api/ticket/review", { id, quantity, limitPrice }),
     placeTicket: (id, confirm) => call("POST", "/api/ticket/place", { id, confirm }),
@@ -285,6 +286,21 @@
     return out.join("");
   }
 
+  // src/data/symbols.ts
+  var CRYPTO_BASES = /* @__PURE__ */ new Set(["BTC", "ETH", "SOL", "XRP", "ADA", "DOGE", "LTC", "BCH", "DOT", "AVAX", "LINK"]);
+  var CRYPTO_QUOTES = ["USDT", "USDC", "USD"];
+  function cryptoBase(raw) {
+    const compact2 = raw.trim().toUpperCase().replace(/\+$/, "").replaceAll("-", "");
+    for (const q2 of CRYPTO_QUOTES) {
+      if (compact2.endsWith(q2)) {
+        const base = compact2.slice(0, -q2.length);
+        return CRYPTO_BASES.has(base) ? base : null;
+      }
+    }
+    return null;
+  }
+  var isCrypto = (raw) => cryptoBase(raw) !== null;
+
   // src/terminal/ui/main.ts
   var RANGES = ["1M", "3M", "6M", "1Y", "5Y"];
   var OVER = { "1M": "the month", "3M": "three months", "6M": "six months", "1Y": "the year", "5Y": "five years" };
@@ -303,9 +319,11 @@
     historyError: "",
     lost: false
   };
+  var view = "overview";
   var $ = (sel) => document.querySelector(sel);
   var isQuote = (q2) => !!q2 && !("error" in q2);
   var isIndex = (sym) => sym.startsWith("^");
+  var isStock = (sym) => !!sym && !/[\^=]/.test(sym) && !isCrypto(sym);
   var quoteOf = (sym) => {
     const q2 = S.quotes.get(sym) ?? S.markets.find((m) => m.symbol === sym)?.quote;
     return isQuote(q2) ? q2 : null;
@@ -345,7 +363,6 @@
     keep("theme", t);
   }
   var ratingChip = (r) => `<span class="at-chip ${ratingTone(r)}">${esc(r)}</span>`;
-  var verdictTone = (r) => r === "Buy" || r === "Overweight" ? "ok" : r === "Underweight" || r === "Sell" ? "bad" : r === "Hold" ? "" : "warn";
   var changeChip = (q2) => q2 && q2.changePct !== null ? `<span class="at-chip ${tone(q2.changePct)}">${pct(q2.changePct)}</span>` : '<span class="at-chip">\u2014</span>';
   var priceText = (sym, q2) => {
     const unit = marketOf(sym)?.unit;
@@ -385,30 +402,47 @@
   var rhButton = (act, words, o = {}) => `<button class="at-btn at-press${o.primary ? " primary" : ""}" data-act="${act}"${o.title ? ` title="${esc(o.title)}"` : ""}>${o.icon ? `<svg class="g"><use href="#${o.icon}"/></svg>` : ""}<span>${esc(words)}</span></button>`;
   function renderAccount() {
     const r = S.rh;
+    renderSideAccount();
     if (!r) {
       $("#accountCard").innerHTML = '<p class="at-quiet">Asking whether Robinhood is connected.</p>';
       return;
     }
     const w = RH_WORDS[r.state];
-    $("#rhDot").className = `at-dot ${w.dot}`.trim();
-    $("#rhText").textContent = `Robinhood \xB7 ${w.label.toLowerCase()}`;
     const connect = (words, primary) => rhButton("rh-connect", words, { primary, icon: "i-link" });
     const check = (words, primary) => rhButton("rh-check", words, { primary });
     const leave = rhButton("rh-forget", "Disconnect", { icon: "i-trash", title: "Deletes the Robinhood sign-in saved on this computer" });
     let lede = r.message, actions = "", facts = "";
     if (r.state === "none") {
-      lede = "Connect Robinhood to bring your account here. Connecting opens Robinhood's own sign-in page in your browser. The desk only reads: it cannot place an order.";
+      lede = "Connect Robinhood to bring your accounts here. Connecting opens Robinhood's own sign-in page in your browser. Until you switch trading on, the dashboard only reads.";
       actions = connect("Connect Robinhood", true);
     } else if (r.state === "saved") actions = check("Check the connection", true) + leave;
     else if (r.state === "connected") {
       const when = r.checkedAt ? clock(r.checkedAt) : "";
-      lede = "The sign-in works and Robinhood answered. The desk only reads here: it cannot place an order.";
+      lede = "The sign-in works and Robinhood answered.";
       facts = `<p class="at-quiet">${esc(r.message)}${when ? ` Checked at ${esc(when)}.` : ""}</p>`;
       actions = check("Check again", false) + leave;
     } else if (r.state === "failed") actions = connect("Connect again", true) + check("Check again", false);
     $("#accountCard").innerHTML = `<div class="at-card-head"><h3>Robinhood</h3><span class="at-chip ${w.chip}">${esc(w.label)}</span></div>
-    <p class="at-lede">${esc(lede)}</p>${facts}${actions ? `<div class="at-row">${actions}</div>` : ""}
-    <p class="at-honest">Your Robinhood sign-in is kept on this computer only and is never shown on this page.</p>${tradingBlock()}`;
+    <p class="at-lede">${esc(lede)}</p>${facts}${actions ? `<div class="at-row">${actions}</div>` : ""}`;
+    const card = $("#tradingCard");
+    card.hidden = !signedIn();
+    card.innerHTML = tradingBlock();
+    $("#accountSub").textContent = !signedIn() ? "Connect Robinhood to show your accounts here." : tradingOn() ? "Trading is on: an order is placed only from a ticket, on your own Confirm." : "Trading is off: the dashboard only reads your accounts.";
+  }
+  function renderSideAccount() {
+    const r = S.rh, on = view === "account", row = (dot, words, small = "") => `<button class="at-li${on ? " on" : ""}" data-act="view" data-view="account">${dot === "none" ? "" : `<span class="at-dot ${dot}"></span>`}<span class="at-li-t">${esc(words)}</span>${small ? `<small>${esc(small)}</small>` : ""}</button>`;
+    const lines = ['<div class="at-lh"><span>Your account</span></div>'];
+    if (!r) lines.push(row("", "Robinhood \xB7 asking"));
+    else {
+      const w = RH_WORDS[r.state];
+      lines.push(row(w.dot, `Robinhood \xB7 ${w.label.toLowerCase()}`));
+      if (signedIn()) {
+        lines.push(row(tradingOn() ? "warn" : "", tradingOn() ? "Trading is on" : "Trading is off"));
+        if (A.snapshot) for (const v of A.snapshot.views) lines.push(row("none", `${v.account.label}${v.account.agentic ? " \xB7 Agentic" : ""}`, money(v.portfolio?.total, v.portfolio?.currency ?? "USD")));
+        else lines.push(row("none", A.chosen.length ? "Read your accounts" : "Choose accounts to show"));
+      }
+    }
+    $("#sideAccount").innerHTML = lines.join("");
   }
   var A = {
     list: null,
@@ -446,8 +480,9 @@
   }
   function renderViews() {
     const el = $("#accountViews");
+    renderSideAccount();
     if (!signedIn()) {
-      el.innerHTML = "";
+      el.innerHTML = '<p class="at-quiet">Connect Robinhood above, then choose which of your accounts to show.</p>';
       return;
     }
     if (A.picking) {
@@ -520,22 +555,21 @@
   var tradingOn = () => TR.state?.on === true;
   function renderTrading() {
     const on = tradingOn();
-    $("#tradeDot").className = `at-dot ${on ? "warn" : ""}`.trim();
-    $("#tradeText").textContent = on ? "Trading is switched on" : "Trading is switched off";
+    renderSideAccount();
     $("#tradeChip").className = `at-chip ${on ? "warn" : ""}`.trim();
     $("#tradeChip").textContent = on ? "Trading on" : "Trading off";
     $("#tradeFoot").textContent = on ? "An order is placed only when you press Confirm on a ticket Robinhood has checked." : "This page places no order: trading is switched off.";
   }
   function tradingBlock() {
     if (!signedIn()) return "";
-    if (tradingOn()) return `<div class="at-card at-box"><div class="at-card-head"><h3>Trading</h3><span class="at-chip warn">On${TR.state?.since ? ` since ${esc(dayText(TR.state.since))}` : ""}</span></div>
-    <p class="at-lede">You can place an order from a ticket, in the Agentic account only, within your caps, after Robinhood's check and your Confirm.</p>
-    <div class="at-row">${rhButton("tr-off", "Switch trading off")}</div></div>`;
-    if (!TR.asking) return `<div class="at-card at-box"><div class="at-card-head"><h3>Trading</h3><span class="at-chip">Off</span></div>
-    <p class="at-lede">With trading off, a ticket can be checked by Robinhood but never placed.</p><div class="at-row">${rhButton("tr-ask", "Switch trading on\u2026")}</div></div>`;
-    return `<div class="at-card at-box"><div class="at-card-head"><h3>Switch trading on?</h3></div>
-    <p class="at-lede">From then on, a ticket you open from one of the desk's calls can place a real order with real money in your Agentic account. Every order still needs Robinhood's check with no alerts, your caps, and your own Confirm naming the exact order. Keep Robinhood's approval on your phone switched on until you trust the desk. This is not investment advice.</p>
-    <div class="at-row">${rhButton("tr-on", "Yes, switch trading on", { primary: true })}${rhButton("tr-cancel", "Cancel")}</div></div>`;
+    if (tradingOn()) return `<div class="at-card-head"><h3>Trading</h3><span class="at-chip warn">On${TR.state?.since ? ` since ${esc(dayText(TR.state.since))}` : ""}</span></div>
+    <p class="at-lede">You can place an order from a ticket, from one of the desk's calls (Decide\u2026) or your own (Trade\u2026), in the Agentic account only, within your caps, after Robinhood's check and your Confirm.</p>
+    <div class="at-row">${rhButton("tr-off", "Switch trading off")}</div>`;
+    if (!TR.asking) return `<div class="at-card-head"><h3>Trading</h3><span class="at-chip">Off</span></div>
+    <p class="at-lede">With trading off, a ticket can be checked by Robinhood but never placed.</p><div class="at-row">${rhButton("tr-ask", "Switch trading on\u2026")}</div>`;
+    return `<div class="at-card-head"><h3>Switch trading on?</h3></div>
+    <p class="at-lede">From then on, a ticket you open, from one of the desk's calls or your own, can place a real order with real money in your Agentic account. Every order still needs Robinhood's check with no alerts, your caps, and your own Confirm naming the exact order. Keep Robinhood's approval on your phone switched on until you trust the desk. This is not investment advice.</p>
+    <div class="at-row">${rhButton("tr-on", "Yes, switch trading on", { primary: true })}${rhButton("tr-cancel", "Cancel")}</div>`;
   }
   async function loadTrading() {
     try {
@@ -596,10 +630,12 @@
   function renderTicket() {
     const t = T.open;
     if (!t) return;
-    const o = t.proposal.order, c = t.context;
-    const title = o ? `${o.side === "buy" ? "Buy" : "Sell"} ${c.symbol}` : `No order for ${c.symbol}`;
-    $("#tkHead").innerHTML = `<div class="ta-pophead"><h2>${esc(title)}</h2>${ratingChip(c.rating)}<button class="icon-btn" data-act="tk-cancel" aria-label="Close"><svg class="g"><use href="#i-x"/></svg></button></div>
-    <p class="at-lede">The desk rated ${esc(c.symbol)} ${esc(c.rating)} on ${esc(dayText(c.callDate))}: ${esc(t.proposal.action)}. In the Agentic account only.</p>
+    const o = t.proposal.order, c = t.context, side = t.proposal.action === "your own sell" ? "sell" : "buy";
+    const close = '<button class="icon-btn" data-act="tk-cancel" aria-label="Close"><svg class="g"><use href="#i-x"/></svg></button>';
+    const head = t.own ? `<div class="ta-pophead"><h2>${esc(`${side === "buy" ? "Buy" : "Sell"} ${c.symbol}`)}</h2><div class="at-seg" role="tablist" aria-label="Buy or sell">${["buy", "sell"].map((s) => `<button class="at-seg-b${s === side ? " on" : ""}" data-act="tk-side" data-side="${s}" data-symbol="${esc(c.symbol)}">${s === "buy" ? "Buy" : "Sell"}</button>`).join("")}</div>${close}</div>
+    <p class="at-lede">Your own order, not one of the desk's calls: in the Agentic account only, within your caps, after Robinhood's check and your Confirm.</p>` : `<div class="ta-pophead"><h2>${esc(o ? `${o.side === "buy" ? "Buy" : "Sell"} ${c.symbol}` : `No order for ${c.symbol}`)}</h2>${ratingChip(c.rating)}${close}</div>
+    <p class="at-lede">The desk rated ${esc(c.symbol)} ${esc(c.rating)} on ${esc(dayText(c.callDate))}: ${esc(t.proposal.action)}. In the Agentic account only.</p>`;
+    $("#tkHead").innerHTML = `${head}
     <dl class="at-facts ruled at-box"><div><dt>Account value</dt><dd>${money(c.accountValue)}</dd></div><div><dt>Buying power</dt><dd>${money(c.buyingPower)}</dd></div><div><dt>Held now</dt><dd>${esc(String(c.held))} share(s)</dd></div><div><dt>Live price</dt><dd>${money(c.price)}</dd></div><div><dt>Orders today</dt><dd>${c.ordersToday} of ${t.caps.ordersPerDay}</dd></div></dl>
     ${t.proposal.why.map((w) => `<p class="at-quiet">${esc(w)}</p>`).join("")}`;
     $("#tkFields").innerHTML = o ? `<div class="at-row">
@@ -607,7 +643,7 @@
       <label class="at-field"><span class="at-field-l">Limit price, $ \xB7 good for the ${o.timeInForce === "gtc" ? "next 90 days" : "day"}</span><input class="at-input at-box" id="tkLimit" type="text" inputmode="decimal" value="${o.limitPrice.toFixed(2)}"></label></div>` : "";
     renderTicketDyn();
   }
-  async function openTicket(symbol, date) {
+  async function openTicket(symbol, date, side) {
     const dlg = $("#ticketDialog");
     T.open = null;
     T.review = null;
@@ -618,9 +654,9 @@
     $("#tkHead").innerHTML = `<p class="at-quiet">Reading the Agentic account and the live price from Robinhood.</p>`;
     $("#tkFields").innerHTML = "";
     $("#tkDyn").innerHTML = "";
-    dlg.showModal();
+    if (!dlg.open) dlg.showModal();
     try {
-      const t = await api.openTicket(symbol, date);
+      const t = side ? await api.openOwnTicket(symbol, side) : await api.openTicket(symbol, date);
       T.open = t;
       T.checks = t.checks;
       T.quantity = t.proposal.order?.quantity ?? 0;
@@ -688,8 +724,9 @@
   function renderMarkets() {
     $("#marketDeck").innerHTML = S.markets.length ? S.markets.map((m, i) => {
       const q2 = isQuote(m.quote) ? m.quote : null;
-      const body = q2 ? `<span class="at-tile-name at-num ta-mid">${m.unit ? `${num(q2.price)}${m.unit}` : num(q2.price, q2.price >= 1e3 ? 0 : 2)}</span><div class="ta-stat-line">${changeChip(q2)}<span class="at-quiet">${q2.open ? "now" : "last close"}</span></div><div class="ta-spark" data-mk="${i}"></div>` : `<span class="at-tile-name ta-mid">\u2014</span><div class="ta-stat-line"><span class="at-quiet" title="${esc("message" in m.quote ? m.quote.message : "")}">${"error" in m.quote && m.quote.error === "no-data" ? "No data" : "Could not be reached"}</span></div>`;
-      return `<button class="at-tile at-box ta-stat at-press" data-act="select" data-symbol="${esc(m.symbol)}"><span class="at-tile-sub">${esc(m.name)}</span>${body}</button>`;
+      const top = `<div class="ta-mk-top"><span class="at-tile-sub" title="${esc(m.name)}">${esc(m.name)}</span>${q2 ? `<small class="at-quiet" title="${q2.open ? "The market is open: the latest price" : "The last close"}">${q2.open ? "now" : "close"}</small>` : ""}</div>`;
+      const body = q2 ? `<div class="ta-mk-price"><span class="at-num ta-mid">${m.unit ? `${num(q2.price)}${m.unit}` : num(q2.price, q2.price >= 1e3 ? 0 : 2)}</span>${changeChip(q2)}</div><div class="ta-spark" data-mk="${i}"></div>` : `<div class="ta-mk-price"><span class="at-num ta-mid">\u2014</span></div><span class="at-quiet" title="${esc("message" in m.quote ? m.quote.message : "")}">${"error" in m.quote && m.quote.error === "no-data" ? "No data" : "Could not be reached"}</span>`;
+      return `<button class="at-tile at-box ta-mk at-press${m.symbol === S.symbol ? " on" : ""}" data-act="select" data-symbol="${esc(m.symbol)}">${top}${body}</button>`;
     }).join("") : '<p class="at-quiet">Reading the markets.</p>';
     S.markets.forEach((m, i) => {
       const el = document.querySelector(`[data-mk="${i}"]`);
@@ -724,6 +761,8 @@
       change.textContent = "";
       asOf.textContent = "";
     }
+    renderHeroActions();
+    renderStats(sym, h);
     const svg = $("#heroSvg"), tip = $("#heroTip");
     tip.classList.remove("on");
     if (!h) {
@@ -733,6 +772,38 @@
     }
     const info = heroChart(svg, tip, h, { kind: S.kind, layers: S.layers });
     $("#heroNote").textContent = info === null ? "Not enough prices to draw this range." : info.hasAverages ? "" : "Too few days of history for the averages.";
+  }
+  var compact = (n) => n === null || !Number.isFinite(n) || n <= 0 ? "\u2014" : new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(n);
+  function renderStats(sym, h) {
+    const el = $("#heroStats"), bars = h?.bars ?? [];
+    const last = bars[bars.length - 1];
+    if (!h || !last) {
+      el.innerHTML = "";
+      return;
+    }
+    const unit = marketOf(sym)?.unit, cur = h.currency ?? "USD";
+    const p = (n) => unit ? `${num(n)}${unit}` : isIndex(sym) ? num(n) : money(n, cur);
+    const hi = Math.max(...bars.map((b) => b.high)), lo = Math.min(...bars.map((b) => b.low));
+    const vols = bars.map((b) => b.volume).filter((v) => v > 0), avg = vols.length ? vols.reduce((a, b) => a + b, 0) / vols.length : null;
+    const fact = (k, v) => `<div><dt>${esc(k)}</dt><dd>${v}</dd></div>`;
+    el.innerHTML = [
+      fact(`Open \xB7 ${shortDay(last.date)}`, p(last.open)),
+      fact("Day's range", `${p(last.low)} \u2013 ${p(last.high)}`),
+      fact(`${S.range} range`, `${p(lo)} \u2013 ${p(hi)}`),
+      fact("Volume", compact(last.volume)),
+      fact(`Average volume \xB7 ${S.range}`, compact(avg))
+    ].join("");
+  }
+  function renderHeroActions() {
+    const sym = S.symbol, d = S.desk, el = $("#heroActions");
+    if (!sym || !d || isIndex(sym)) {
+      el.innerHTML = "";
+      return;
+    }
+    const queued = d.queue.some((x) => x.symbol === sym), c = latestCall(sym);
+    const ask2 = queued ? '<span class="at-chip">waiting to be analysed</span>' : `<button class="at-btn at-press" data-act="analyse" data-symbol="${esc(sym)}"><svg class="g"><use href="#i-bot"/></svg><span>${c ? "Analyse again" : "Ask the desk to analyse"}</span></button>`;
+    const trade = isStock(sym) ? `<button class="at-btn at-press" data-act="trade" data-symbol="${esc(sym)}" title="Your own order for ${esc(sym)}, in the Agentic account"><svg class="g"><use href="#i-trade"/></svg><span>Trade\u2026</span></button>` : "";
+    el.innerHTML = ask2 + trade;
   }
   async function loadHistory() {
     const sym = S.symbol, range = S.range, key = `${sym}|${range}`;
@@ -750,37 +821,33 @@
     }
     renderHero();
   }
+  var resultChip = (c) => c.pending ? '<span class="at-chip">not scored yet</span>' : `<span class="at-chip ${tone(parseFloat(c.alpha ?? ""))}">alpha ${esc(c.alpha ?? "\u2014")}</span>`;
+  var readButton = (ticker, date, words = "Read") => `<button class="at-btn at-press" data-act="open-call" data-symbol="${esc(ticker)}" data-date="${esc(date)}"><svg class="g"><use href="#i-file"/></svg><span>${esc(words)}</span></button>`;
+  var decideButton = (ticker, date) => `<button class="at-btn at-press primary" data-act="decide" data-symbol="${esc(ticker)}" data-date="${esc(date)}" title="An order ticket from this call, checked against your caps and by Robinhood"><span>Decide\u2026</span></button>`;
   function renderCall() {
-    const sym = S.symbol, c = latestCall(sym), d = S.desk;
-    if (!d) {
-      $("#callCard").innerHTML = "";
+    const sym = S.symbol, c = latestCall(sym), d = S.desk, el = $("#callCard");
+    if (!d || !sym) {
+      el.innerHTML = "";
       return;
     }
-    const canAsk = !isIndex(sym) && !d.queue.some((x) => x.symbol === sym);
-    const ask2 = canAsk ? `<button class="at-btn at-press" data-act="analyse" data-symbol="${esc(sym)}"><svg class="g"><use href="#i-bot"/></svg><span>${c ? "Analyse again" : "Ask the desk to analyse"}</span></button>` : "";
+    const label = `<span class="ta-callbar-l">The desk's call</span>`;
+    if (isIndex(sym)) {
+      el.innerHTML = `${label}<span class="at-quiet ta-callbar-t">The desk analyses stocks, not indices.</span>`;
+      return;
+    }
     if (!c) {
-      $("#callCard").innerHTML = `<div class="at-card-head"><h3>The desk's call</h3></div>
-      <p class="at-lede">${isIndex(sym) ? "The desk analyses stocks, not indices, so there is no call here." : `The desk has no call on ${esc(sym)} yet.`}</p>
-      ${ask2 ? `<div class="at-row">${ask2}</div>` : ""}`;
+      const queued = d.queue.some((x) => x.symbol === sym);
+      el.innerHTML = `${label}<span class="at-quiet ta-callbar-t">No call on ${esc(sym)} yet${queued ? ": it is waiting to be analysed" : ". Ask the desk to analyse it, above"}.</span>`;
       return;
     }
-    const result = c.pending ? `Not scored yet: a call is scored ${d.desk.holdingDays} trading days after its date, against its market's index.` : `Scored: ${esc(c.alpha ?? "\u2014")} against the index${c.raw ? ` (the stock itself ${esc(c.raw)})` : ""} over ${esc(c.holding ?? `${d.desk.holdingDays} days`)}.`;
-    $("#callCard").innerHTML = `
-    <div class="at-card-head"><h3>The desk's call</h3><div class="at-card-tail"><span class="at-quiet">${dayText(c.date)}</span></div></div>
-    <div class="ta-price-line"><span class="at-verdict ${verdictTone(c.rating)}">${esc(c.rating)}</span>${c.pending ? '<span class="at-chip">not scored yet</span>' : `<span class="at-chip ${tone(parseFloat(c.alpha ?? ""))}">alpha ${esc(c.alpha ?? "\u2014")}</span>`}</div>
-    <p class="at-lede">${esc(c.summary)}</p>
-    <p class="at-quiet">${result}</p>
-    <div class="at-row">
-      <button class="at-dial" data-act="open-call" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}"><span class="at-dial-t"><svg class="g"><use href="#i-file"/></svg><span class="at-dial-w">Read the reasoning</span></span></button>
-      ${ask2}
-      ${signedIn() && hasAgentic() ? `<button class="at-btn at-press primary" data-act="decide" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}"><span>Decide\u2026</span></button>` : ""}
-    </div>
-    <p class="at-honest">The desk proposes; it does not place orders.${signedIn() && !hasAgentic() ? " Show your Agentic account above to decide on this call." : ""}</p>`;
+    el.innerHTML = `${label}${ratingChip(c.rating)}<span class="at-quiet">${esc(dayText(c.date))}</span>${resultChip(c)}
+    <span class="ta-callbar-t ta-clamp" title="${esc(c.summary)}">${esc(c.summary)}</span>
+    <span class="ta-callbar-do">${readButton(c.ticker, c.date, "Read the reasoning")}${decideButton(c.ticker, c.date)}</span>`;
   }
   function renderQueue() {
     const q2 = S.desk?.queue ?? [];
-    $("#queueCard").innerHTML = `<div class="at-card-head"><h3>Waiting to be analysed</h3></div>` + (q2.length ? `<div class="ta-queue">${q2.map((x) => `<div class="ta-queue-row"><b>${esc(x.symbol)}</b><span class="at-quiet">asked ${esc(dayText(x.requestedAt))}</span><button class="icon-btn" data-act="dequeue" data-symbol="${esc(x.symbol)}" aria-label="Take ${esc(x.symbol)} off the list" title="Take off the list"><svg class="g"><use href="#i-x"/></svg></button></div>`).join("")}</div>
-         <p class="at-honest">Analyses run in Madav, not here. Open this folder in Madav and type /analyse with no stock to run these.</p>` : '<p class="at-quiet">Nothing is waiting. Ask the desk to analyse a stock and it is listed here until Madav runs it.</p>');
+    $("#queueBox").innerHTML = q2.length ? `<span class="at-quiet">Waiting to be analysed</span>${q2.map((x) => `<span class="at-chip" title="Asked ${esc(dayText(x.requestedAt))}">${esc(x.symbol)}<button class="at-chip-x" data-act="dequeue" data-symbol="${esc(x.symbol)}" aria-label="Take ${esc(x.symbol)} off the list" title="Take off the list"><svg class="g"><use href="#i-x"/></svg></button></span>`).join("")}` : "";
+    $("#watchSub").textContent = q2.length ? 'Press a row to chart it \xB7 ask the team to "analyse what is waiting" in Madav / Claude' : "Press a row to chart it \xB7 the star keeps it in the side list";
   }
   function renderStock() {
     const sym = S.symbol, d = S.desk;
@@ -805,7 +872,7 @@
     $("#stockBody").innerHTML = `<div class="at-card at-box"><div class="at-card-head"><h3>What you hold</h3></div>${held}</div>
     <div class="at-card at-box"><div class="at-card-head"><h3>The desk's calls on it</h3></div>${latest ? `<p class="at-lede">${esc(latest.summary)}</p>` : ""}${list}</div>`;
     const queued = d.queue.some((x) => x.symbol === sym);
-    $("#stockActions").innerHTML = `${queued ? '<span class="at-chip">waiting to be analysed</span>' : `<button class="at-btn at-press" data-act="analyse" data-symbol="${esc(sym)}"><svg class="g"><use href="#i-bot"/></svg><span>Ask the desk to analyse</span></button>`}${latest && signedIn() && hasAgentic() ? `<button class="at-btn at-press primary" data-act="decide" data-symbol="${esc(sym)}" data-date="${esc(latest.date)}"><span>Decide\u2026</span></button>` : ""}`;
+    $("#stockActions").innerHTML = `${queued ? '<span class="at-chip">waiting to be analysed</span>' : `<button class="at-btn at-press" data-act="analyse" data-symbol="${esc(sym)}"><svg class="g"><use href="#i-bot"/></svg><span>Ask the desk to analyse</span></button>`}${isStock(sym) ? `<button class="at-btn at-press" data-act="trade" data-symbol="${esc(sym)}"><svg class="g"><use href="#i-trade"/></svg><span>Trade\u2026</span></button>` : ""}${latest ? decideButton(sym, latest.date) : ""}`;
   }
   function renderWatch() {
     const list = S.desk?.watchlist ?? [];
@@ -831,11 +898,12 @@
     const d = S.desk;
     if (!d) return;
     $("#callsSub").textContent = d.calls.length ? `${d.calls.length} recorded \xB7 each is scored ${d.desk.holdingDays} trading days later against its market's index` : "Every analysis the team records appears here";
-    const rows = d.calls.map((c) => `<tr class="ta-go" data-act="open-call" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}">
+    const rows = d.calls.map((c) => `<tr class="ta-go" data-act="open-call" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}" title="Press to read the call in full">
     <td>${esc(dayText(c.date))}</td><td><b>${esc(c.ticker)}</b></td><td>${ratingChip(c.rating)}</td>
-    <td>${c.pending ? '<span class="at-chip">not scored yet</span>' : `<span class="at-chip ${tone(parseFloat(c.alpha ?? ""))}">alpha ${esc(c.alpha ?? "\u2014")}</span>`}</td>
-    <td class="ta-sum">${esc(c.summary)}</td></tr>`).join("");
-    $("#callsTable").innerHTML = `<thead><tr><th>Date</th><th>Stock</th><th>Rating</th><th>Result</th><th>In a few words</th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="ta-empty">No calls yet. Run /analyse followed by a stock in Madav and the team\u2019s call appears here.</td></tr>'}</tbody>`;
+    <td>${resultChip(c)}</td>
+    <td class="wrap"><span class="ta-clamp">${esc(c.summary)}</span></td>
+    <td><span class="at-row compact ta-row-do">${readButton(c.ticker, c.date)}${decideButton(c.ticker, c.date)}</span></td></tr>`).join("");
+    $("#callsTable").innerHTML = `<thead><tr><th>Date</th><th>Stock</th><th>Rating</th><th>Result</th><th class="wrap">In a few words</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="ta-empty">No calls yet. Ask the team to analyse a stock in Madav / Claude, and its call appears here.</td></tr>'}</tbody>`;
   }
   function renderScore() {
     const d = S.desk;
@@ -863,6 +931,7 @@
     const meta = S.desk?.calls.find((x) => x.ticker === symbol && x.date === date);
     const known = SECTION_ORDER.filter((k) => c.sections[k]?.length), extra = Object.keys(c.sections).filter((k) => k !== "decision" && !SECTION_ORDER.includes(k));
     dlg.innerHTML = `<div class="ta-pophead"><h2>${esc(symbol)} \xB7 ${esc(dayText(date))}</h2>${meta ? ratingChip(meta.rating) : ""}<button class="icon-btn" data-act="close-dialog" aria-label="Close"><svg class="g"><use href="#i-x"/></svg></button></div>
+    ${meta ? `<div class="ta-callbar">${resultChip(meta)}<span class="ta-callbar-t">${esc(meta.summary)}</span><span class="ta-callbar-do">${decideButton(symbol, date)}</span></div>` : ""}
     <div class="md">${markdown(c.decision)}</div>
     <div class="ta-detail">${[...known, ...extra].map((k) => `<details class="ta-fold"><summary>${esc(SECTION_NAMES[k] ?? k)}</summary><div class="md">${(c.sections[k] ?? []).map(markdown).join("<hr>")}</div></details>`).join("")}</div>
     <p class="at-honest">This is the team's reasoning as it wrote it. It is not investment advice.</p>`;
@@ -881,6 +950,24 @@
     renderCalls();
     renderScore();
   }
+  function showView(v) {
+    const was = view;
+    view = v;
+    $("#view-overview").hidden = v !== "overview";
+    $("#view-account").hidden = v !== "account";
+    const nav = $("#navOverview");
+    if (v === "overview") nav.setAttribute("aria-current", "page");
+    else nav.removeAttribute("aria-current");
+    renderSideAccount();
+    if (was !== v) $("#page").scrollTo({ top: 0 });
+    if (v === "account" && signedIn() && A.chosen.length && !A.snapshot && !A.reading) void readAccounts();
+  }
+  function ready() {
+    if (signedIn() && hasAgentic()) return true;
+    showView("account");
+    toast(!signedIn() ? "Connect Robinhood first, then show your Agentic account: orders go to it alone." : "Show your Agentic account (Choose accounts) to open an order ticket: orders go to it alone.", "bad");
+    return false;
+  }
   function select(sym) {
     if (!sym) return;
     S.symbol = sym;
@@ -892,6 +979,7 @@
     renderCall();
     renderStock();
     renderWatch();
+    renderMarkets();
     void loadHistory();
     void refreshQuotes();
   }
@@ -965,10 +1053,14 @@
     const sym = el.dataset.symbol ?? "";
     switch (el.dataset.act) {
       case "goto": {
+        showView("overview");
         const to = el.dataset.to === "top" ? $("#page") : document.getElementById(el.dataset.to ?? "");
         to?.scrollIntoView({ behavior: "smooth", block: "start" });
         break;
       }
+      case "view":
+        showView(el.dataset.view === "account" ? "account" : "overview");
+        break;
       case "theme":
         setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
         break;
@@ -1028,7 +1120,14 @@
         void openCall(sym, el.dataset.date ?? "");
         break;
       case "decide":
-        void openTicket(sym, el.dataset.date ?? "");
+        if (dlg.open) dlg.close();
+        if (ready()) void openTicket(sym, el.dataset.date ?? "");
+        break;
+      case "trade":
+        if (ready()) void openTicket(sym, "", "buy");
+        break;
+      case "tk-side":
+        void openTicket(sym, "", el.dataset.side === "sell" ? "sell" : "buy");
         break;
       case "tk-cancel":
         $("#ticketDialog").close();

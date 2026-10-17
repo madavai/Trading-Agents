@@ -38592,7 +38592,7 @@ function eveningBrief(dir, today2, now) {
     lines.push(`3. Orders the dashboard sent today (${orders.length}), with what Robinhood answered when each was sent:`);
     for (const o of orders) {
       const r = o.robinhood, answer2 = !r.answered ? `refused${r.error ? `: ${r.error}` : ""}` : r.approvalRequired === true ? "taken, waiting for the person's approval on their phone" : r.approvalRequired === false ? "taken and sent to the market" : "taken";
-      lines.push(`   - ${o.side === "buy" ? "Buy" : "Sell"} ${o.quantity} ${o.symbol} at limit ${o.limitPrice.toFixed(2)}, ${o.at.slice(11, 16)} UTC${o.call ? `, from the ${o.call.rating} call of ${o.call.date}` : ""}: ${answer2}${r.state ? ` (state then: ${r.state})` : ""}.`);
+      lines.push(`   - ${o.side === "buy" ? "Buy" : "Sell"} ${o.quantity} ${o.symbol} at limit ${o.limitPrice.toFixed(2)}, ${o.at.slice(11, 16)} UTC${o.call ? `, from the ${o.call.rating} call of ${o.call.date}` : o.own ? ", your own order" : ""}: ${answer2}${r.state ? ` (state then: ${r.state})` : ""}.`);
     }
     lines.push("   What happened since (filled, approved, cancelled) is on the dashboard and in the Robinhood app: the team does not read Robinhood. Say so; do not guess.");
   }

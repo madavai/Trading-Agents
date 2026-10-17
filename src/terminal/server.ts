@@ -10,13 +10,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { today } from '../data/dates.js';
 import { clearCache } from '../data/yahoo.js';
-import { safeSymbol } from '../data/symbols.js';
+import { isCrypto, safeSymbol } from '../data/symbols.js';
 import { deskDataDir, robinhoodFile } from '../paths.js';
 import { Link, plainFailure, type Snapshot } from '../robinhood/link.js';
 import { saveAccountHoldings } from '../desk/holdings.js';
 import { logOrder, placedToday } from '../desk/orders.js';
 export { placedToday };
-import { check, passes, propose, type Check, type Order, type Proposal, type TicketContext } from '../desk/ticket.js';
+import { check, passes, propose, proposeOwn, type Check, type Order, type Proposal, type TicketContext } from '../desk/ticket.js';
 import type { Review } from '../robinhood/review.js';
 import type { Placed } from '../robinhood/order.js';
 import { Journal } from '../desk/journal.js';
@@ -72,19 +72,25 @@ class Refused extends Error { constructor(readonly status: number, message: stri
 export async function startTerminal(opts: { root: string; assets: Assets; port?: number; robinhood?: Link }): Promise<Terminal> {
   const { root, assets } = opts, dir = deskDataDir(root), token = crypto.randomBytes(24).toString('hex'), deskId = deskIdOf(root);
   const robinhood = opts.robinhood ?? new Link(robinhoodFile());
-  // Tickets the person has open: what the call proposed on the real figures, and Robinhood's check once they press Review.
-  // Kept in memory for a quarter of an hour; the page names a ticket by its id and can change only its quantity and price.
-  interface Ticket { id: string; at: number; context: TicketContext; proposal: Proposal; order: Order | null; checks: Check[]; review: Review | null; reviewedAt: number; refId: string; placing: boolean; placed: Placed | null }
+  // Tickets the person has open: what a call proposed on the real figures (or, for the person's own order, one share of
+  // the stock they chose), and Robinhood's check once they press Review. Kept in memory for a quarter of an hour; the page
+  // names a ticket by its id and can change only its quantity and price.
+  interface Ticket { id: string; at: number; own: boolean; context: TicketContext; proposal: Proposal; order: Order | null; checks: Check[]; review: Review | null; reviewedAt: number; refId: string; placing: boolean; placed: Placed | null }
   const tickets = new Map<string, Ticket>();
   const TICKET_MS = 15 * 60_000;
   const ticketOf = (id: unknown): Ticket => {
     for (const [k, t] of tickets) if (Date.now() - t.at > TICKET_MS) tickets.delete(k);
     const t = typeof id === 'string' ? tickets.get(id) : undefined;
-    if (!t) throw new Refused(404, 'that ticket has expired: open it again from the call');
+    if (!t) throw new Refused(404, 'that ticket has expired: open it again');
+    return t;
+  };
+  const opened = (own: boolean, context: TicketContext, proposal: Proposal, trading: ReturnType<typeof readSettings>['trading']): Ticket => {
+    const t: Ticket = { id: crypto.randomBytes(12).toString('hex'), at: Date.now(), own, context, proposal, order: proposal.order, checks: proposal.order ? check(proposal.order, context, trading) : [], review: null, reviewedAt: 0, refId: crypto.randomUUID(), placing: false, placed: null };
+    tickets.set(t.id, t);
     return t;
   };
   const edited = (t: Ticket, b: Record<string, unknown>): Order => {
-    if (!t.proposal.order) throw new Refused(400, 'this call proposes no order');
+    if (!t.proposal.order) throw new Refused(400, 'this ticket proposes no order');
     const quantity = typeof b.quantity === 'number' ? b.quantity : NaN, limitPrice = typeof b.limitPrice === 'number' ? b.limitPrice : NaN;
     return { ...t.proposal.order, quantity, limitPrice };   // the person can change how many and the price; never the stock, the side or the account
   };
@@ -187,10 +193,21 @@ export async function startTerminal(opts: { root: string; assets: Assets; port?:
       if (!call) throw new Refused(404, 'no such call');
       const trading = readSettings(root).trading;
       const context: TicketContext = { ...(await askRobinhood(() => robinhood.ticketContext(symbol))), rating: call.rating, callDate: call.date };
-      const proposal = propose(context, trading), id = crypto.randomBytes(12).toString('hex');
-      const t: Ticket = { id, at: Date.now(), context, proposal, order: proposal.order, checks: proposal.order ? check(proposal.order, context, trading) : [], review: null, reviewedAt: 0, refId: crypto.randomUUID(), placing: false, placed: null };
-      tickets.set(id, t);
-      return json(res, 200, { id, context, proposal, checks: t.checks, caps: trading.caps });
+      const t = opened(false, context, propose(context, trading), trading);
+      return json(res, 200, { id: t.id, own: false, context, proposal: t.proposal, checks: t.checks, caps: trading.caps });
+    }
+    // The person's own order: a stock they chose and a side, not one of the desk's calls. It starts at one share and then
+    // takes exactly the road a call's ticket takes: the same checks, Robinhood's dry run, the switch and their Confirm.
+    if (p === '/api/ticket/own' && method === 'POST') {
+      let symbol: string;
+      try { symbol = safeSymbol(typeof b.symbol === 'string' ? b.symbol : ''); } catch (e) { throw new Refused(400, (e as Error).message); }
+      if (/[\^=]/.test(symbol) || isCrypto(symbol)) throw new Refused(400, 'the order ticket trades stocks only, not indices, currencies or crypto');
+      const side = b.side === 'buy' || b.side === 'sell' ? b.side : null;
+      if (!side) throw new Refused(400, 'say whether to buy or to sell');
+      const trading = readSettings(root).trading;
+      const context: TicketContext = { ...(await askRobinhood(() => robinhood.ticketContext(symbol))), rating: '', callDate: '' };
+      const t = opened(true, context, proposeOwn(context, side, trading), trading);
+      return json(res, 200, { id: t.id, own: true, context, proposal: t.proposal, checks: t.checks, caps: trading.caps });
     }
     if (p === '/api/ticket/check' && method === 'POST') {
       const t = ticketOf(b.id);
@@ -225,7 +242,7 @@ export async function startTerminal(opts: { root: string; assets: Assets; port?:
       try {
         const { placed } = await askRobinhood(() => robinhood.placeChecked(order, t.refId, (fresh) => check(order, { ...fresh, rating: t.context.rating, callDate: t.context.callDate, ordersToday: Math.max(fresh.ordersToday, sentToday) }, trading)));
         t.placed = placed;
-        logOrder(dir, { at: new Date().toISOString(), symbol: order.symbol, side: order.side, quantity: order.quantity, limitPrice: order.limitPrice, timeInForce: order.timeInForce, call: { date: t.context.callDate, rating: t.context.rating }, ticket: t.id, robinhood: { answered: placed.answered, approvalRequired: placed.approvalRequired, orderId: placed.orderId, state: placed.state, error: placed.error } });
+        logOrder(dir, { at: new Date().toISOString(), symbol: order.symbol, side: order.side, quantity: order.quantity, limitPrice: order.limitPrice, timeInForce: order.timeInForce, ...(t.own ? { own: true as const } : { call: { date: t.context.callDate, rating: t.context.rating } }), ticket: t.id, robinhood: { answered: placed.answered, approvalRequired: placed.approvalRequired, orderId: placed.orderId, state: placed.state, error: placed.error } });
         return json(res, 200, { placed });
       } finally { t.placing = false; }
     }

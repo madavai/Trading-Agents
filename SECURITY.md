@@ -11,6 +11,9 @@ Only you, on the dashboard, and only when all of these hold:
 - every one of your caps passes, checked again on figures read from Robinhood just before sending;
 - you pressed Confirm on the words of that exact order ("Confirm: Buy 1 NVDA at $182.40").
 
+The same holds whether the ticket comes from one of the desk's calls ("Decide…") or is your own ("Trade…", a stock you
+chose, starting at one share): your own order gets no way around any of it, and the desk's log records it as yours.
+
 A ticket sends at most one order, with Robinhood's own protection against a repeat. Keep Robinhood's phone approval on
 until you trust the desk: then Robinhood also asks you on your phone before the order reaches the market.
 

@@ -110,6 +110,33 @@ test('an order is placed only with trading switched on, after Robinhood\'s clean
   } finally { await term.close(); }
 });
 
+test('the person\'s own order takes the same road: one share to start, stocks only, Robinhood\'s clean check, the switch, their exact Confirm', async () => {
+  const { o, dir, term, post, link } = await desk();
+  try {
+    assert.match((await post('/api/ticket/own', { symbol: 'BTC-USD', side: 'buy' })).json().error, /stocks only/);
+    assert.match((await post('/api/ticket/own', { symbol: '^GSPC', side: 'buy' })).json().error, /stocks only/);
+    assert.match((await post('/api/ticket/own', { symbol: 'NVDA' })).json().error, /buy or to sell/);
+    const sell = (await post('/api/ticket/own', { symbol: 'NVDA', side: 'sell' })).json();
+    assert.deepEqual([sell.own, sell.proposal.order], [true, null], 'nothing held to sell, so nothing is proposed');
+
+    const t = (await post('/api/ticket/own', { symbol: 'NVDA', side: 'buy' })).json();
+    assert.deepEqual([t.own, t.proposal.action, t.proposal.order.quantity, t.proposal.order.limitPrice], [true, 'your own buy', 1, 182.4]);
+    assert.equal((await post('/api/ticket/review', { id: t.id, quantity: 3, limitPrice: 182.4 })).status, 400, 'three shares are over the $500 cap: not even sent to Robinhood for its check');
+    assert.equal(o.reviewed.length, 0);
+    assert.equal((await post('/api/ticket/place', { id: t.id, confirm: 'Buy 1 NVDA at $182.40' })).status, 403, 'trading is off');
+    link.setTrading(true);
+    assert.match((await post('/api/ticket/place', { id: t.id, confirm: 'Buy 1 NVDA at $182.40' })).json().error, /have Robinhood check this order first/);
+    assert.equal((await post('/api/ticket/review', { id: t.id, quantity: 1, limitPrice: 182.4 })).json().confirm, 'Buy 1 NVDA at $182.40');
+    assert.match((await post('/api/ticket/place', { id: t.id, confirm: 'Buy 1 NVDA' })).json().error, /does not name this order/);
+    const ok = await post('/api/ticket/place', { id: t.id, confirm: 'Buy 1 NVDA at $182.40' });
+    assert.equal(ok.status, 200, ok.body);
+    assert.equal(o.placed.length, 1);
+    assert.equal((await post('/api/ticket/place', { id: t.id, confirm: 'Buy 1 NVDA at $182.40' })).status, 409, 'a ticket sends one order');
+    const line = JSON.parse(fs.readFileSync(path.join(dir, 'orders.jsonl'), 'utf8').trim()) as Record<string, unknown>;
+    assert.deepEqual([line.own, line.call, line.symbol, line.side, line.quantity], [true, undefined, 'NVDA', 'buy', 1], 'logged as the person\'s own order, not a call\'s');
+  } finally { await term.close(); }
+});
+
 test('every cap is checked again on Robinhood\'s latest figures just before sending; the desk\'s own log counts toward orders a day', async () => {
   const { o, term, post, ticket, link } = await desk({ perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 1 });
   try {

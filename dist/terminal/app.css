@@ -812,12 +812,10 @@ details[open] > .at-input.at-select { border-color: var(--accent); }
 .ta-spark-tall { height: calc(var(--space-6) * 3.5); margin-top: var(--space-2); }
 .ta-deck-4 { grid-template-columns: repeat(auto-fit, minmax(min(calc(var(--card-min) * 0.85), 100%), 1fr)); }
 .ta-mini { display: flex; flex-direction: column; gap: var(--space-1); margin-top: auto; }
-.ta-deck-6 { grid-template-columns: repeat(auto-fill, minmax(min(calc(var(--card-min) * 0.6), 100%), 1fr)); }
-.ta-main { display: grid; grid-template-columns: minmax(0, 2.1fr) minmax(0, 1fr); gap: var(--grid-gap); align-items: start; }
 .ta-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--grid-gap); align-items: start; }
 .ta-col { display: flex; flex-direction: column; gap: var(--grid-gap); min-width: 0; }
 .ta-price-line { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--space-2) var(--space-3); }
-.ta-chart { position: relative; height: calc(var(--chart-height) * 2); }
+.ta-chart { position: relative; height: calc(var(--chart-height) * 2.6); }
 .ta-chart svg, .ta-spark svg, .ta-spark-tall svg, .ta-fill svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .ta-legend { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
 .ta-swatch { display: inline-block; width: var(--space-4); height: 0; border-top: 2px solid currentColor; }
@@ -832,7 +830,7 @@ details[open] > .at-input.at-select { border-color: var(--accent); }
 .ta-fav.on { color: var(--accent); }
 .ta-fav.on svg { fill: currentColor; }
 .ta-tabs-row { display: flex; align-items: flex-end; gap: var(--space-1); flex: 1; min-width: 0; align-self: stretch; }
-@media (max-width: 1180px) { .ta-main, .ta-two { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 1180px) { .ta-two { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 860px) { .sb-rail { display: none; } }
 .g { width: var(--icon); height: var(--icon); fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 .ta-sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
@@ -845,12 +843,7 @@ details[open] > .at-input.at-select { border-color: var(--accent); }
 .ta-score > .head { color: var(--text-3); font-size: var(--size-small); }
 .at-verdict.bad { color: var(--bad); }
 .ta-go { cursor: pointer; }
-.ta-sum { white-space: normal; min-width: calc(var(--card-min) * 1.2); max-width: calc(var(--card-min) * 2); color: var(--text-2); }
 .ta-empty { padding: var(--space-5); text-align: center; color: var(--text-2); }
-.ta-queue { display: flex; flex-direction: column; gap: var(--space-2); }
-.ta-queue-row { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
-.ta-queue-row > b { font-family: var(--font-title); font-weight: var(--weight-medium); }
-.ta-queue-row > .at-quiet { flex: 1; min-width: 0; }
 .ta-detail { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
 .ta-detail > .at-card-head, .ta-pophead { display: flex; align-items: center; gap: var(--space-3); }
 .ta-pophead > h2 { flex: 1; min-width: 0; }
@@ -891,3 +884,39 @@ details[open] > .at-input.at-select { border-color: var(--accent); }
 .md-table :is(th, td) { padding: var(--space-1) var(--space-3); text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
 .md-table th { color: var(--text-3); font-weight: var(--weight-medium); white-space: nowrap; }
 .md-table tr:last-child td { border-bottom: 0; }
+
+/* two pages in one column, one shown at a time: the desk and the person's account */
+.app-page > .at-page-col[hidden], .at-card[hidden] { display: none; }
+
+/* markets: equal tiles across the whole row */
+.ta-deck-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+@media (max-width: 1280px) { .ta-deck-6 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .ta-deck-6 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.ta-mk { gap: var(--space-1); }
+.ta-mk-top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-width: 0; }
+.ta-mk-top > .at-tile-sub { flex: 1 1 auto; min-width: 0; -webkit-line-clamp: 1; }
+.ta-mk-price { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; white-space: nowrap; }
+
+/* the quote: name and price with what to do, one toolbar, the chart across the card, its figures, the desk's call */
+.ta-quote { gap: var(--space-4); }
+.ta-quote-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--space-3) var(--space-5); }
+.ta-quote-id { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.ta-quote-title { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.ta-quote-name { font-family: var(--font-title); font-weight: var(--weight-medium); font-size: var(--size-heading); line-height: var(--line-tight); color: var(--text); }
+.ta-quote-do { display: flex; flex-wrap: wrap; align-items: center; gap: var(--control-gap); }
+.ta-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-3); padding-block: var(--space-2); border-block: 1px solid var(--line); }
+.ta-toolbar-end { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.ta-stats { padding-top: var(--space-3); border-top: 1px solid var(--line); gap: var(--space-3) var(--space-6); }
+.ta-stats dd { white-space: nowrap; }
+.ta-stats:empty, #heroNote:empty { display: none; }
+
+/* the desk's call in one bar, under the chart and at the top of a call in full */
+.ta-callbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); padding: var(--space-3) var(--space-4); border-radius: var(--radius); background: var(--tint); }
+.ta-callbar-l { font-family: var(--font-title); font-weight: var(--weight-medium); color: var(--text); }
+.ta-callbar-t { flex: 1 1 calc(var(--card-min) * 1.2); min-width: 0; color: var(--text-2); }
+.ta-callbar-do { display: flex; flex-wrap: wrap; gap: var(--control-gap); margin-left: auto; }
+.ta-clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+
+/* the calls list: the words wrap in two lines at most, the buttons sit at the end of the row */
+.at-table td.wrap .ta-clamp { color: var(--text-2); }
+.ta-row-do { flex-wrap: nowrap; justify-content: flex-end; }
