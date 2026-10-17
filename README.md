@@ -1,22 +1,19 @@
 # Trading Agents
 
-A trading desk of AI agents for [Madav](https://github.com/madavai), being built in the open. When it is finished, a
-team of agents analyses a stock the way a trading firm would; you see their call on a dashboard; and if you decide to
-act, you place the order through Robinhood's agent connection with one review and one confirm. The agents never trade.
-You do. What works today is listed under Status; everything else is marked as coming.
+A trading desk of AI agents for [Madav](https://github.com/madavai), built in the open. A team of agents analyses a
+stock the way a trading firm would; you see their call on a dashboard beside your own Robinhood accounts; and if you
+decide to act, you place the order through Robinhood's agent connection with one review and one confirm. The agents
+never trade. You do.
 
 Adapted from [TradingAgents](https://github.com/TauricResearch/TradingAgents) by Tauric Research (see `NOTICE`); not
 affiliated with them. **Nothing here is investment advice.**
 
-> **Status: milestone 4, second part.** Built: the desk check, a read-only Robinhood connection test, the data tools, the desk's
-> records (plan, journal, scoring, lessons, holdings), the analysis team with `/analyse` and `/settle`, `/backtest`, and
-> the dashboard with `/terminal` (markets, charts, watchlist, the desk's calls and scorecard). The dashboard connects
-> to Robinhood (you press Connect, sign in on Robinhood's own page) and shows the accounts you choose: value, cash,
-> buying power, holdings at Robinhood's live prices, and for the Agentic account its orders and whether Robinhood's
-> phone approval is on. The agents see those holdings when they analyse. A call's "Decide…" opens an order ticket
-> sized by your settings and checked against your caps, which Robinhood can check in a dry run. With trading switched on (you do that on the
-> dashboard), a checked ticket can place a real limit order, only on your own Confirm naming the exact order.
-> **Not yet proven on a real computer:** the dashboard, and a full analysis with company accounts.
+> **Status: every part is built** - the desk check, the free data tools, the twelve-agent team with its scoring and
+> lessons, back-testing, the dashboard with your Robinhood accounts, order tickets with Robinhood's own check, placing
+> an order on your Confirm, the morning and evening routines, and the trading-desk team in Madav's Agent Studio.
+> **Being proven now, on a real computer:** a full analysis with company accounts, the dashboard with a real Robinhood
+> account, and a first real order. Until that is done, keep trading switched off, or keep orders to one share with
+> Robinhood's phone approval on.
 
 ## Start in three steps
 1. In Madav, clone this repository. There is nothing to install.
@@ -32,8 +29,8 @@ You need Node 22 or later (Madav needs it too). No keys and no installs; only yo
 its first analysis. It is kept in this folder's `desk-data` (which git never commits) and sent to the SEC alone; no
 other source sees it.
 
-## How it will work
-1. **Agents analyse** (built, awaiting its first real run). Type `/analyse NVDA`. Four analysts (price and indicators,
+## How it works
+1. **Agents analyse.** Ask the trading-desk team in Agent Studio ("analyse NVDA"), or type `/analyse NVDA` in a chat. Four analysts (price and indicators,
    mood, news, company accounts), a bull and a bear, a research manager, a trader, three risk voices and a portfolio
    manager work in turn, from free public data, and give a rating. Choose `shallow`, `medium` or `deep` (1, 3 or 5
    rounds of debate), which analysts run, and the report language. Each call is scored a few trading days later against
@@ -41,15 +38,17 @@ other source sees it.
    runs the team over past dates in a journal of its own and reports, by rating, how often the direction was right and
    the mean alpha. It is slow and uses a lot of model time, and for past dates only prices, indicators, economic figures
    and SEC accounts are as known then: news, posts, odds and insider trades are recent-only, so they are thin.
-2. **You decide** (the dashboard is built; your account and the Decide step come later). Type `/terminal`: a page on
-   your own computer shows the markets, a chart of any stock (area or candles, 50- and 200-day averages, volume), your
-   watchlist, the desk's calls with their full reasoning, and how the desk has scored. Its "Analyse" buttons list a
-   request; the analysis itself runs in Madav when you type `/analyse` with no stock. Prices are Yahoo Finance's and may
-   be up to 15 minutes late. The page works on this computer only, keeps no key, and cannot place an order. Its
-   "Your account" card connects to Robinhood on your press of Connect and only reads.
-3. **You trade** (coming later, and only after a real order has been proven end to end). Decide, Review (Robinhood's own
-   dry run), Place, Confirm. Only that confirm sends an order, only the exact order you confirmed, within your caps.
-   Trading ships switched off.
+2. **You see.** Ask the team to open the dashboard, or type `/terminal`: a page on your own computer with the markets,
+   a chart of any stock (area or candles, 50- and 200-day averages, volume), your watchlist, a page per stock, the
+   desk's calls with their full reasoning, and how the desk has scored. Under "Your account" you connect Robinhood
+   yourself (on Robinhood's own sign-in page) and choose which accounts to show: value, cash, buying power and
+   holdings at Robinhood's live prices; for the Agentic account its orders and whether Robinhood's phone approval is
+   on. The agents see those holdings when they analyse. Market prices are Yahoo Finance's and may be up to 15 minutes
+   late. The page works on this computer only and keeps no key.
+3. **You decide and trade.** On a call, "Decide…" opens a ticket for the Agentic account, sized by your settings and
+   checked against your caps; "Review with Robinhood" is Robinhood's own dry run. With trading switched on (by you,
+   on the dashboard), "Place order…" then "Confirm: Buy 1 NVDA at $182.40" sends exactly that order. Trading ships
+   switched off.
 
 ## Routines
 The trading-desk team has two routines, which Madav's scheduler can start for you:
@@ -71,7 +70,15 @@ that does not answer is reported as unavailable, never as "nothing happened".
 
 ## Safety
 - No agent uses a broker connection. A guard refuses every broker tool, every tool that speaks of trading or moving
-  money, and Robinhood's site, whatever an agent was told.
+  money, Robinhood's site, and the dashboard's own address, whatever an agent was told. No agent, and no one on the
+  trading-desk team, has a Robinhood tool or an order tool.
+- Only the dashboard talks to Robinhood, through three narrow doors: one that only reads, one that only asks for
+  Robinhood's dry-run check, and one that places a single limit order. The last is used only when trading is switched
+  on (by you), on a ticket Robinhood checked with no alerts in the last five minutes and unchanged since, after your
+  Confirm naming the exact order, and after every cap is checked again on fresh figures. A ticket sends one order.
+- Your caps are in `desk-settings.json` under `trading`: $500 an order, 10% of the account in one stock, 3 orders a
+  day, a full position being 10% of the account. A setting out of range falls back to the shipped value, never to a
+  larger one.
 - Robinhood only lets agents trade in its separate Agentic account, which you fund yourself. Keep Robinhood's own
   "trade approvals" on until you trust the desk: then every order also waits for your OK on your phone.
 - Your Robinhood sign-in stays in `~/.trading-agents` on your computer, never in this repository. Agents are refused
@@ -83,6 +90,11 @@ that does not answer is reported as unavailable, never as "nothing happened".
 The dashboard wears the Madav House theme in a light and a dark face (the button at the top right). Its look is in
 `src/terminal/ui/house.css`; the dashboard's own sheet only places those objects. `docs/design/desk-mock.html` is the
 design reference (open it in a browser; the prices in it are made up).
+
+## More
+- `SECURITY.md`: who can place an order, what agents can and cannot do, where your data stays, and how to report a
+  problem.
+- `CONTRIBUTING.md`: building, testing and the project's own rules.
 
 ## Licence
 MIT (see `LICENSE`). Files adapted from TradingAgents say so at their top and stay under the Apache License 2.0
