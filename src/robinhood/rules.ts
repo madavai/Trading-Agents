@@ -14,7 +14,13 @@ const READ_NAME = /^(get|list|search|find|view|fetch|read)_/i;
  *  its label says. other: anything else (not labelled read-only, or named like something that changes). Only "read" is ever called. */
 export type Kind = 'read' | 'order' | 'other';
 
+/** Reads whose names speak of orders or trades, each checked by hand against Robinhood's own description of it
+ *  (`discover`, 14 Oct 2026): order history, pending phone approvals, whether approvals are on, realised trades. Each is
+ *  a read only while Robinhood also labels it read-only; a name not on this list that speaks of orders never is. */
+export const NAMED_READS: ReadonlySet<string> = new Set(['get_equity_orders', 'get_option_orders', 'get_crypto_orders', 'get_trade_approvals', 'get_trade_approval_setting', 'get_pnl_trade_history']);
+
 export function kindOf(tool: Pick<Tool, 'name' | 'annotations'>): Kind {
+  if (NAMED_READS.has(tool.name)) return tool.annotations?.readOnlyHint === true ? 'read' : 'order';
   if (isOrderTool(tool.name)) return 'order';
   return tool.annotations?.readOnlyHint === true && READ_NAME.test(tool.name) ? 'read' : 'other';
 }

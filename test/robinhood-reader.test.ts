@@ -27,7 +27,13 @@ test('a tool is a read only when Robinhood labels it read-only and its name is a
   assert.equal(kindOf(t('get_equity_positions', false)), 'other');
   assert.equal(kindOf(t('set_account_nickname', true)), 'other');      // labelled, but not named like a read
   for (const name of ['place_equity_order', 'cancel_equity_order', 'review_equity_order', 'close_position', 'withdraw_funds', 'transfer_cash']) assert.equal(kindOf(t(name, true)), 'order', `${name}, even labelled read-only`);
-  assert.equal(kindOf(t('list_orders', true)), 'order', 'the order list is refused until a named exception is made for it');
+  assert.equal(kindOf(t('list_orders', true)), 'order', 'a name that speaks of orders is not a read unless it is on the named list');
+  for (const name of ['get_equity_orders', 'get_trade_approvals', 'get_trade_approval_setting', 'get_pnl_trade_history']) {
+    assert.equal(kindOf(t(name, true)), 'read', `${name}: on the named list and labelled read-only`);
+    assert.equal(kindOf(t(name, false)), 'order', `${name}: on the list, but not labelled read-only, so never called`);
+    assert.equal(kindOf(t(name)), 'order', `${name}: no label`);
+  }
+  for (const name of ['place_equity_order', 'review_equity_order', 'decline_trade_approval', 'get_politician_trades']) assert.equal(kindOf(t(name, true)), 'order', `${name} is not on the list`);
 });
 
 test('the reader reaches only the read tools: every order or changing tool is refused before Robinhood is asked', async () => {
@@ -89,6 +95,8 @@ test('only the reader calls a Robinhood tool: no other file in src does', () => 
   const files = (fs.readdirSync('src', { recursive: true }) as string[]).filter((f) => f.endsWith('.ts')).map((f) => f.replace(/\\/g, '/'));
   assert.ok(files.includes('robinhood/reader.ts'));
   const callers = files.filter((f) => /\.callTool\(/.test(fs.readFileSync(path.join('src', f), 'utf8')));
-  assert.deepEqual(callers, ['robinhood/reader.ts']);
+  assert.deepEqual(callers.sort(), ['robinhood/reader.ts', 'robinhood/review.ts'], "reads go through the reader, and Robinhood's order check through the reviewer alone");
+  const review = fs.readFileSync('src/robinhood/review.ts', 'utf8');
+  assert.deepEqual([...new Set(review.match(/\b(?:get|list|place|cancel|review|preview|replace|decline|submit|create)_[a-z_]+/g))], ['review_equity_order'], "the reviewer names one tool: Robinhood's check");
   assert.deepEqual(argsOf({ inputSchema: { type: 'object', properties: { side: { enum: ['buy', 'sell'] }, n: { type: 'integer', description: 'How many' } }, required: ['n'] } }).map((a) => [a.name, a.type, a.required]), [['side', 'one of "buy" | "sell"', false], ['n', 'integer', true]]);
 });

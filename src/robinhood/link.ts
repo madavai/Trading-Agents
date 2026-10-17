@@ -2,10 +2,14 @@
 // what the last check found. It holds no sign-in itself (that stays in the person's own folder, store.ts) and opens a
 // session only when asked: a check never opens a browser, and only "Connect" sends the person to Robinhood's page.
 import fs from 'node:fs';
+import path from 'node:path';
+import { parseAccounts, parseOrders, parsePortfolio, parsePositions, parseQuotes, readAccount, sortAccounts, type Account, type AccountIds, type AccountView } from './account.js';
+import type { Order, TicketContext } from '../desk/ticket.js';
+import type { Review } from './review.js';
 import { NotSignedIn, openSession, type SessionOptions } from './connect.js';
 import type { Reader } from './reader.js';
 import { readSaved } from './store.js';
-import { oneLine } from './rules.js';
+import { masked, oneLine } from './rules.js';
 
 export type LinkState = 'none' | 'saved' | 'waiting' | 'connected' | 'failed';
 export interface LinkInfo {
@@ -17,6 +21,12 @@ export interface LinkInfo {
   tools: { read: number; order: number; other: number } | null;
 }
 
+/** What the dashboard shows of the accounts: the ones the person ticked, read whole, and when. */
+export interface Snapshot { at: string; views: AccountView[] }
+
+/** A failure of Robinhood's, in plain words for the page. */
+export const plainFailure = (e: unknown): string => e instanceof NotSignedIn ? 'Robinhood asks you to sign in again: press Connect.' : `Robinhood did not answer as expected: ${masked(e instanceof Error ? e.message : String(e))}`;
+
 type Last = { state: 'connected' | 'failed'; message: string; checkedAt: string; tools: LinkInfo['tools'] };
 
 export class Link {
@@ -25,6 +35,103 @@ export class Link {
   private checking: Promise<LinkInfo> | null = null;
 
   constructor(private readonly file: string, private readonly opts: Pick<SessionOptions, 'url' | 'port' | 'open'> & { now?: () => Date } = {}) {}
+
+  private ids = new Map<string, AccountIds>();
+  private known: Account[] | null = null;
+  private last_snapshot: Snapshot | null = null;
+  private refreshing: Promise<Snapshot> | null = null;
+
+  /** Which accounts the person ticked, kept beside the sign-in as keys (never account numbers). */
+  private get choiceFile(): string { return path.join(path.dirname(this.file), 'accounts.json'); }
+  chosen(): string[] {
+    try { const v = JSON.parse(fs.readFileSync(this.choiceFile, 'utf8')) as { show?: unknown }; return Array.isArray(v.show) ? v.show.filter((k): k is string => typeof k === 'string') : []; } catch { return []; }
+  }
+
+  private async withReader<T>(job: (r: Reader) => Promise<T>): Promise<T> {
+    const session = await openSession(this.file, { ...this.opts, signIn: false });
+    try { return await job(session.reader); } finally { await session.close(); }
+  }
+
+  private learn(answer: unknown): Account[] {
+    const found = parseAccounts(answer);
+    this.ids = new Map(found.map((a) => [a.key, a.ids]));
+    this.known = sortAccounts(found.map(({ ids: _ids, ...a }) => a));
+    return this.known;
+  }
+
+  /** The person's accounts, for them to tick the ones to show. Asks Robinhood. */
+  async accounts(): Promise<{ accounts: Account[]; chosen: string[] }> {
+    const accounts = await this.withReader(async (r) => { const a = await r.read('get_accounts'); if (a.failed) throw new Error('Robinhood could not list the accounts'); return this.learn(a.data); });
+    return { accounts, chosen: this.chosen().filter((k) => accounts.some((a) => a.key === k)) };
+  }
+
+  /** Keeps the person's choice. Only accounts Robinhood listed can be chosen. */
+  async choose(keys: string[]): Promise<string[]> {
+    if (!this.known) await this.accounts();
+    const show = [...new Set(keys)].filter((k) => this.known!.some((a) => a.key === k && !a.deactivated));
+    if (show.length !== new Set(keys).size) throw new Error('that is not one of your Robinhood accounts');
+    fs.mkdirSync(path.dirname(this.choiceFile), { recursive: true });
+    fs.writeFileSync(this.choiceFile, JSON.stringify({ show }, null, 2) + '\n', { mode: 0o600 });
+    this.last_snapshot = null;
+    return show;
+  }
+
+  /** The Agentic account's numbers, when the person chose to show it. A ticket is only ever for that account. */
+  private agenticIds(): AccountIds {
+    const a = this.known?.find((x) => x.agentic && !x.deactivated);
+    if (!a || !this.chosen().includes(a.key)) throw new Error('show your Agentic account on the dashboard first: an order can only ever be for that account');
+    return this.ids.get(a.key)!;
+  }
+
+  /** The real figures a ticket for one stock is sized and checked on: the Agentic account's value, buying power and
+   *  holding of the stock, Robinhood's live price, and how many orders the account has had today (New York's day). */
+  async ticketContext(symbol: string, now: Date = new Date()): Promise<Omit<TicketContext, 'rating' | 'callDate'>> {
+    return this.withReader(async (r) => {
+      const a = await r.read('get_accounts');
+      if (a.failed) throw new Error('Robinhood could not list the accounts');
+      this.learn(a.data);
+      const ids = this.agenticIds();
+      const data = async (name: string, args: Record<string, unknown>) => { const x = await r.read(name, args); if (x.failed) throw new Error(`Robinhood could not give ${name.replace(/^get_|_/g, ' ').trim()}`); return x.data; };
+      const p = parsePortfolio(await data('get_portfolio', { account_number: ids.accountNumber }));
+      const held = parsePositions(await data('get_equity_positions', { account_number: ids.accountNumber })).find((x) => x.symbol === symbol)?.quantity ?? 0;
+      const price = parseQuotes(await data('get_equity_quotes', { symbols: [symbol] })).get(symbol) ?? null;
+      const day = (iso: string) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date(iso));
+      const ordersToday = parseOrders(await data('get_equity_orders', { account_number: ids.accountNumber })).orders.filter((o) => o.at && day(o.at) === day(now.toISOString())).length;
+      return { symbol, accountValue: p.total, buyingPower: p.buyingPower, held, price, ordersToday };
+    });
+  }
+
+  /** Robinhood's own check of an order on the Agentic account. Nothing is placed. */
+  async review(order: Order): Promise<Review> {
+    const session = await openSession(this.file, { ...this.opts, signIn: false });
+    try {
+      const a = await session.reader.read('get_accounts');
+      if (a.failed) throw new Error('Robinhood could not list the accounts');
+      this.learn(a.data);
+      return await session.reviewer.review({ accountNumber: this.agenticIds().accountNumber, agentic: true }, order);
+    } finally { await session.close(); }
+  }
+
+  /** The last read of the chosen accounts, without asking Robinhood again. */
+  snapshot(): Snapshot | null { return this.last_snapshot; }
+
+  /** Reads the chosen accounts afresh: value, holdings at Robinhood's live prices, and the Agentic account's orders. */
+  refresh(): Promise<Snapshot> {
+    this.refreshing ??= (async () => {
+      try {
+        return await this.withReader(async (r) => {
+          const a = await r.read('get_accounts');
+          if (a.failed) throw new Error('Robinhood could not list the accounts');
+          const accounts = this.learn(a.data), show = this.chosen();
+          const views: AccountView[] = [];
+          for (const account of accounts.filter((x) => show.includes(x.key))) views.push(await readAccount(r, account, this.ids.get(account.key)!));
+          this.last_snapshot = { at: this.now(), views };
+          return this.last_snapshot;
+        });
+      } finally { this.refreshing = null; }
+    })();
+    return this.refreshing;
+  }
 
   private now = (): string => (this.opts.now?.() ?? new Date()).toISOString();
   private saved = (): boolean => !!readSaved(this.file).tokens;
@@ -86,7 +193,8 @@ export class Link {
   /** Deletes the saved sign-in. Robinhood is not told; the person can also end the access on Robinhood's side. */
   forget(): LinkInfo {
     fs.rmSync(this.file, { force: true });
-    this.last = null;
+    fs.rmSync(this.choiceFile, { force: true });
+    this.last = null; this.last_snapshot = null; this.known = null; this.ids.clear();
     return this.info();
   }
 }

@@ -25,6 +25,20 @@ export interface Settings {
   scoring: { holdingPeriodDays: number; benchmark: string; benchmarks: Record<string, string> };
   journal: { maxResolvedEntries: number | null };
   sources: { contact: string };
+  trading: Trading;
+}
+
+/** What a rating asks of the Agentic account. */
+export const ACTIONS = ['buy a full position', 'buy half a position', 'no order', 'sell half of what is held', 'sell everything held'] as const;
+export type Action = (typeof ACTIONS)[number];
+export interface Trading {
+  /** Whether the person has let the dashboard place orders at all (milestone 5). Ships off. */
+  enabled: boolean;
+  /** A full position is this share of the Agentic account's total value. */
+  fullPositionPercent: number;
+  ratingToOrder: Record<string, Action>;
+  caps: { perOrderUsd: number; perStockPercent: number; ordersPerDay: number };
+  orderDefaults: { type: 'limit'; timeInForce: 'gfd' | 'gtc' };
 }
 
 export const DEFAULTS: Settings = {
@@ -49,7 +63,34 @@ export const DEFAULTS: Settings = {
   },
   journal: { maxResolvedEntries: null },
   sources: { contact: 'trading-agents (+https://github.com/madavai/trading-agents)' },
+  trading: {
+    enabled: false, fullPositionPercent: 10,
+    ratingToOrder: { Buy: 'buy a full position', Overweight: 'buy half a position', Hold: 'no order', Underweight: 'sell half of what is held', Sell: 'sell everything held', 'Needs review': 'no order' },
+    caps: { perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 3 },
+    orderDefaults: { type: 'limit', timeInForce: 'gfd' },
+  },
 };
+
+const within = (v: unknown, lo: number, hi: number, fallback: number): number => (typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi ? v : fallback);
+
+/** The trading part, checked: a value out of range falls back to the shipped one, never to something larger. */
+export function tradingOf(raw: unknown): Trading {
+  const t = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>, d = DEFAULTS.trading;
+  const caps = (t.caps && typeof t.caps === 'object' ? t.caps : {}) as Record<string, unknown>;
+  const od = (t.orderDefaults && typeof t.orderDefaults === 'object' ? t.orderDefaults : {}) as Record<string, unknown>;
+  const map = (t.ratingToOrder && typeof t.ratingToOrder === 'object' ? t.ratingToOrder : {}) as Record<string, unknown>;
+  const ratingToOrder: Record<string, Action> = { ...d.ratingToOrder };
+  for (const [k, v] of Object.entries(map)) if (k.length <= 20 && (ACTIONS as readonly unknown[]).includes(v)) ratingToOrder[k] = v as Action;
+  ratingToOrder['Needs review'] = 'no order';   // an unreadable call never trades
+  const tif = od.timeInForce === 'gtc' ? 'gtc' : 'gfd';   // "day" in the shipped file is Robinhood's gfd (good for the day)
+  return {
+    enabled: t.enabled === true,
+    fullPositionPercent: within(t.fullPositionPercent, 1, 100, d.fullPositionPercent),
+    ratingToOrder,
+    caps: { perOrderUsd: within(caps.perOrderUsd, 1, 100_000, d.caps.perOrderUsd), perStockPercent: within(caps.perStockPercent, 1, 100, d.caps.perStockPercent), ordersPerDay: int(caps.ordersPerDay, 1, 50, d.caps.ordersPerDay) },
+    orderDefaults: { type: 'limit', timeInForce: tif },
+  };
+}
 
 const int = (v: unknown, lo: number, hi: number, fallback: number): number => (Number.isInteger(v) && (v as number) >= lo && (v as number) <= hi ? (v as number) : fallback);
 
@@ -81,5 +122,6 @@ export function readSettings(root: string): Settings {
     },
     journal: { maxResolvedEntries: Number.isInteger(j.maxResolvedEntries) && (j.maxResolvedEntries as number) > 0 ? (j.maxResolvedEntries as number) : null },
     sources: { ...DEFAULTS.sources, ...raw.sources } as Settings['sources'],
+    trading: tradingOf(raw.trading),
   };
 }

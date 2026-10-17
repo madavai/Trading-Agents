@@ -870,12 +870,12 @@ var require_codegen = __commonJS({
       }
       // `for-in` statement.
       // With option `ownProperties` replaced with a `for-of` loop for object keys
-      forIn(nameOrPrefix, obj, forBody, varKind = this.opts.es5 ? scope_1.varKinds.var : scope_1.varKinds.const) {
+      forIn(nameOrPrefix, obj3, forBody, varKind = this.opts.es5 ? scope_1.varKinds.var : scope_1.varKinds.const) {
         if (this.opts.ownProperties) {
-          return this.forOf(nameOrPrefix, (0, code_1._)`Object.keys(${obj})`, forBody);
+          return this.forOf(nameOrPrefix, (0, code_1._)`Object.keys(${obj3})`, forBody);
         }
         const name = this._scope.toName(nameOrPrefix);
-        return this._for(new ForIter("in", varKind, name, obj), () => forBody(name));
+        return this._for(new ForIter("in", varKind, name, obj3), () => forBody(name));
       }
       // end `for` loop
       endFor() {
@@ -2695,11 +2695,11 @@ var require_validate = __commonJS({
         if (!this.allErrors)
           this.gen.if(cond);
       }
-      setParams(obj, assign) {
+      setParams(obj3, assign) {
         if (assign)
-          Object.assign(this.params, obj);
+          Object.assign(this.params, obj3);
         else
-          this.params = obj;
+          this.params = obj3;
       }
       block$data(valid, codeBlock, $dataValid = codegen_1.nil) {
         this.gen.block(() => {
@@ -3263,8 +3263,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path11) {
-      let input = path11;
+    function removeDotSegments(path13) {
+      let input = path13;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3673,8 +3673,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path11 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path11 && path11 !== "/" ? path11 : void 0;
+        const path13 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path13 && path13 !== "/" ? path13 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -4626,7 +4626,7 @@ var require_core = __commonJS({
       errorsText(errors = this.errors, { separator = ", ", dataVar = "data" } = {}) {
         if (!errors || errors.length === 0)
           return "No errors";
-        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text, msg) => text + separator + msg);
+        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text2, msg) => text2 + separator + msg);
       }
       $dataMetaSchema(metaSchema, keywordsJsonPointers) {
         const rules = this.RULES.all;
@@ -7174,8 +7174,8 @@ var require_dist = __commonJS({
         return ajv;
       }
       const [formats, exportName] = opts.mode === "fast" ? [formats_1.fastFormats, fastName] : [formats_1.fullFormats, fullName];
-      const list = opts.formats || formats_1.formatNames;
-      addFormats(ajv, list, formats, exportName);
+      const list2 = opts.formats || formats_1.formatNames;
+      addFormats(ajv, list2, formats, exportName);
       if (opts.keywords)
         (0, limit_1.default)(ajv);
       return ajv;
@@ -7187,12 +7187,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list, fs12, exportName) {
+    function addFormats(ajv, list2, fs13, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
-      for (const f of list)
-        ajv.addFormat(f, fs12[f]);
+      for (const f of list2)
+        ajv.addFormat(f, fs13[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -7212,12 +7212,12 @@ var require_content_type = __commonJS({
     var TYPE_REGEXP = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+\/[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
     exports.format = format;
     exports.parse = parse4;
-    function format(obj) {
-      if (!obj || typeof obj !== "object") {
+    function format(obj3) {
+      if (!obj3 || typeof obj3 !== "object") {
         throw new TypeError("argument obj is required");
       }
-      var parameters = obj.parameters;
-      var type = obj.type;
+      var parameters = obj3.parameters;
+      var type = obj3.type;
       if (!type || !TYPE_REGEXP.test(type)) {
         throw new TypeError("invalid type");
       }
@@ -7248,7 +7248,7 @@ var require_content_type = __commonJS({
       if (!TYPE_REGEXP.test(type)) {
         throw new TypeError("invalid media type");
       }
-      var obj = new ContentType(type.toLowerCase());
+      var obj3 = new ContentType(type.toLowerCase());
       if (index !== -1) {
         var key;
         var match;
@@ -7267,20 +7267,20 @@ var require_content_type = __commonJS({
               value = value.replace(QESC_REGEXP, "$1");
             }
           }
-          obj.parameters[key] = value;
+          obj3.parameters[key] = value;
         }
         if (index !== header.length) {
           throw new TypeError("invalid parameter format");
         }
       }
-      return obj;
+      return obj3;
     }
-    function getcontenttype(obj) {
+    function getcontenttype(obj3) {
       var header;
-      if (typeof obj.getHeader === "function") {
-        header = obj.getHeader("content-type");
-      } else if (typeof obj.headers === "object") {
-        header = obj.headers && obj.headers["content-type"];
+      if (typeof obj3.getHeader === "function") {
+        header = obj3.getHeader("content-type");
+      } else if (typeof obj3.headers === "object") {
+        header = obj3.headers && obj3.headers["content-type"];
       }
       if (typeof header !== "string") {
         throw new TypeError("content-type header is missing from object");
@@ -7357,8 +7357,8 @@ function userAgentFor(url2, contact2, email2) {
 import fs2 from "node:fs";
 var STALE_MS = 6e4;
 var nap = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-function withLock(file2, run, waitMs = 15e3) {
-  const lock = `${file2}.lock`, until = Date.now() + waitMs;
+function withLock(file3, run, waitMs = 15e3) {
+  const lock = `${file3}.lock`, until = Date.now() + waitMs;
   for (; ; ) {
     try {
       fs2.mkdirSync(lock);
@@ -7373,7 +7373,7 @@ function withLock(file2, run, waitMs = 15e3) {
       } catch {
         continue;
       }
-      if (Date.now() > until) throw new Error(`${file2} is in use by another run; try again in a moment`);
+      if (Date.now() > until) throw new Error(`${file3} is in use by another run; try again in a moment`);
       nap(40);
     }
   }
@@ -7386,11 +7386,11 @@ function withLock(file2, run, waitMs = 15e3) {
     }
   }
 }
-function writeWhole(file2, text) {
-  const temp = `${file2}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
+function writeWhole(file3, text2) {
+  const temp = `${file3}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
   try {
-    fs2.writeFileSync(temp, text);
-    fs2.renameSync(temp, file2);
+    fs2.writeFileSync(temp, text2);
+    fs2.renameSync(temp, file3);
   } catch (e) {
     try {
       fs2.rmSync(temp, { force: true });
@@ -7441,25 +7441,25 @@ var keyOf = (url2) => {
 function readCache(url2) {
   if (!cacheDir) return null;
   try {
-    const file2 = path3.join(cacheDir, `${keyOf(url2)}.txt`);
-    return Date.now() - fs3.statSync(file2).mtimeMs < ttlFor(new URL(url2).hostname) ? fs3.readFileSync(file2, "utf8") : null;
+    const file3 = path3.join(cacheDir, `${keyOf(url2)}.txt`);
+    return Date.now() - fs3.statSync(file3).mtimeMs < ttlFor(new URL(url2).hostname) ? fs3.readFileSync(file3, "utf8") : null;
   } catch {
     return null;
   }
 }
-function writeCache(url2, text) {
+function writeCache(url2, text2) {
   if (!cacheDir) return;
   try {
     fs3.mkdirSync(cacheDir, { recursive: true });
-    writeWhole(path3.join(cacheDir, `${keyOf(url2)}.txt`), text);
+    writeWhole(path3.join(cacheDir, `${keyOf(url2)}.txt`), text2);
   } catch {
   }
 }
 function pruneCache(dir) {
   try {
     for (const f of fs3.readdirSync(dir)) {
-      const file2 = path3.join(dir, f);
-      if (Date.now() - fs3.statSync(file2).mtimeMs > 3 * 24 * 60 * MINUTE) fs3.rmSync(file2, { force: true });
+      const file3 = path3.join(dir, f);
+      if (Date.now() - fs3.statSync(file3).mtimeMs > 3 * 24 * 60 * MINUTE) fs3.rmSync(file3, { force: true });
     }
   } catch {
   }
@@ -7488,31 +7488,31 @@ async function getText(url2, opts = {}) {
       await sleep(Math.min(2e4, wait));
       continue;
     }
-    const text = await res.text();
+    const text2 = await res.text();
     if (res.status === 404) throw new NoData(`${host} has nothing at that address (HTTP 404)`);
     if (!res.ok) {
       const sec = /(^|\.)sec\.gov$/.test(new URL(url2).hostname);
-      const said = res.status === 403 || res.status === 429 ? excerpt(text) : "";
+      const said = res.status === 403 || res.status === 429 ? excerpt(text2) : "";
       throw new Unavailable(`${host} refused (HTTP ${res.status})${said ? `, saying "${said}"` : ""}${res.status === 429 ? "; it is rate-limiting this computer, so try again in a few minutes" : ""}${sec ? emailNow().trim() ? " [a contact email was sent]" : " [no contact email was sent]" : ""}`);
     }
-    writeCache(url2, text);
-    return text;
+    writeCache(url2, text2);
+    return text2;
   }
 }
 async function getJson(url2, opts = {}) {
-  const text = await getText(url2, opts);
+  const text2 = await getText(url2, opts);
   try {
-    return JSON.parse(text);
+    return JSON.parse(text2);
   } catch {
     throw new Unavailable(`${new URL(url2).host} answered with something that is not data`);
   }
 }
 
 // src/terminal/server.ts
-import crypto3 from "node:crypto";
-import fs11 from "node:fs";
+import crypto4 from "node:crypto";
+import fs12 from "node:fs";
 import http2 from "node:http";
-import path10 from "node:path";
+import path12 from "node:path";
 import { fileURLToPath } from "node:url";
 
 // src/data/dates.ts
@@ -7644,6 +7644,134 @@ var clearCache = () => cache.clear();
 
 // src/robinhood/link.ts
 import fs5 from "node:fs";
+import path5 from "node:path";
+
+// src/robinhood/account.ts
+import crypto from "node:crypto";
+var obj = (v) => v && typeof v === "object" && !Array.isArray(v) ? v : {};
+var list = (v) => Array.isArray(v) ? v : [];
+var text = (v) => typeof v === "string" && v.trim() ? v.trim() : null;
+var figure = (v) => {
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  if (typeof v !== "string" || !/^-?\d+(\.\d+)?$/.test(v.trim())) return null;
+  return Number(v.trim());
+};
+var dataOf = (answer) => obj(obj(answer).data);
+var keyOf2 = (accountNumber) => crypto.createHash("sha256").update(`trading-agents|${accountNumber}`).digest("hex").slice(0, 16);
+var TYPE_WORDS = { individual: "Individual", ira_traditional: "Traditional IRA", ira_roth: "Roth IRA", joint: "Joint", custodial: "Custodial" };
+var titleOf = (raw) => TYPE_WORDS[raw] ?? raw.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+function parseAccounts(answer) {
+  return list(dataOf(answer).accounts).flatMap((v) => {
+    const a = obj(v), number4 = text(a.account_number);
+    if (!number4) return [];
+    const kind = text(a.brokerage_account_type) ?? text(a.type);
+    const key = keyOf2(number4), agentic = a.agentic_allowed === true;
+    const label = text(a.nickname) ?? (agentic ? "Agentic account" : kind ? `${titleOf(kind)} account` : "Account");
+    return [{
+      key,
+      last4: number4.slice(-4),
+      label,
+      agentic,
+      isDefault: a.is_default === true,
+      deactivated: a.deactivated === true || a.permanently_deactivated === true,
+      ids: { key, accountNumber: number4, rhsAccountNumber: text(a.rhs_account_number) }
+    }];
+  });
+}
+var sortAccounts = (accounts) => [...accounts].sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || Number(b.agentic) - Number(a.agentic));
+function parsePortfolio(answer) {
+  const d = dataOf(answer);
+  return {
+    total: figure(d.total_value),
+    equities: figure(d.equity_value),
+    crypto: figure(d.crypto_value),
+    options: figure(d.options_value),
+    cash: figure(d.cash),
+    buyingPower: figure(obj(d.buying_power).buying_power),
+    currency: text(d.currency) ?? "USD"
+  };
+}
+function parsePositions(answer) {
+  return list(dataOf(answer).positions).flatMap((v) => {
+    const p = obj(v), symbol = text(p.symbol), quantity = figure(p.quantity);
+    return symbol && quantity !== null && quantity !== 0 ? [{ symbol: symbol.toUpperCase(), quantity, averageCost: figure(p.average_buy_price) }] : [];
+  });
+}
+function parseCrypto(answer) {
+  const rows = list(dataOf(answer).results);
+  const holdings = rows.flatMap((v) => {
+    const p = obj(v), symbol = text(p.symbol) ?? text(obj(p.currency).code) ?? text(p.asset_code), quantity = figure(p.quantity) ?? figure(p.quantity_available);
+    return symbol && quantity !== null && quantity !== 0 ? [{ symbol: symbol.toUpperCase(), quantity, averageCost: figure(p.average_cost) ?? figure(p.average_buy_price) }] : [];
+  });
+  return { holdings, unread: rows.length - holdings.length };
+}
+function parseQuotes(answer) {
+  const out = /* @__PURE__ */ new Map();
+  for (const v of list(dataOf(answer).results)) {
+    const q = obj(obj(v).quote), symbol = text(q.symbol), price = figure(q.last_trade_price);
+    if (symbol && price !== null) out.set(symbol.toUpperCase(), price);
+  }
+  return out;
+}
+function parseOrders(answer) {
+  const rows = list(dataOf(answer).orders);
+  return {
+    count: rows.length,
+    orders: rows.slice(0, 20).map((v) => {
+      const o = obj(v);
+      return {
+        symbol: text(o.symbol)?.toUpperCase() ?? null,
+        side: text(o.side),
+        type: text(o.type),
+        state: text(o.state),
+        quantity: figure(o.quantity) ?? figure(o.cumulative_quantity),
+        price: figure(o.average_price) ?? figure(o.price) ?? figure(o.limit_price),
+        at: text(o.created_at) ?? text(o.updated_at)
+      };
+    })
+  };
+}
+function parseApprovals(setting, approvals) {
+  const s = obj(dataOf(setting).setting);
+  return { required: typeof s.human_must_approve_trades === "boolean" ? s.human_must_approve_trades : null, pending: list(dataOf(approvals).approvals).length };
+}
+var QUOTES_PER_CALL = 20;
+async function readAccount(reader, account, ids) {
+  const problems = [];
+  const read2 = async (what, name, args) => {
+    try {
+      const r = await reader.read(name, args);
+      if (!r.failed) return r.data;
+      problems.push(`${what}: Robinhood reported an error`);
+    } catch (e) {
+      problems.push(`${what}: ${e.message.replace(/\d{5,}/g, "#####").slice(0, 160)}`);
+    }
+    return null;
+  };
+  const p = await read2("the value and buying power", "get_portfolio", { account_number: ids.accountNumber });
+  const stocks = await read2("the stocks held", "get_equity_positions", { account_number: ids.accountNumber });
+  const coins = ids.rhsAccountNumber ? await read2("the crypto held", "get_crypto_positions", { rhs_account_number: ids.rhsAccountNumber }) : null;
+  const crypto5 = coins === null ? { holdings: [], unread: 0 } : parseCrypto(coins);
+  const base = [...parsePositions(stocks).map((h) => ({ ...h, kind: "stock" })), ...crypto5.holdings.map((h) => ({ ...h, kind: "crypto" }))];
+  const prices = /* @__PURE__ */ new Map(), symbols = base.filter((h) => h.kind === "stock").map((h) => h.symbol);
+  for (let i = 0; i < symbols.length; i += QUOTES_PER_CALL) {
+    const q = await read2("live prices", "get_equity_quotes", { symbols: symbols.slice(i, i + QUOTES_PER_CALL) });
+    for (const [s, v] of parseQuotes(q)) prices.set(s, v);
+  }
+  const holdings = base.map((h) => {
+    const price = prices.get(h.symbol) ?? null;
+    return { ...h, price, value: price === null ? null : price * h.quantity, gainPct: price !== null && h.averageCost ? (price / h.averageCost - 1) * 100 : null };
+  }).sort((a, b) => (b.value ?? -1) - (a.value ?? -1));
+  let orders = null, approvals = null;
+  if (account.agentic) {
+    const o = await read2("the orders", "get_equity_orders", { account_number: ids.accountNumber });
+    orders = o === null ? null : parseOrders(o);
+    const setting = await read2("the phone approval setting", "get_trade_approval_setting", { account_number: ids.accountNumber });
+    const pending = await read2("the approvals waiting", "get_trade_approvals", { account_number: ids.accountNumber });
+    approvals = setting === null && pending === null ? null : parseApprovals(setting, pending);
+  }
+  return { account, portfolio: p === null ? null : parsePortfolio(p), holdings, unread: crypto5.unread, orders, approvals, problems };
+}
 
 // src/robinhood/connect.ts
 import http from "node:http";
@@ -7814,8 +7942,8 @@ function defineLazy(object3, key, getter) {
     configurable: true
   });
 }
-function objectClone(obj) {
-  return Object.create(Object.getPrototypeOf(obj), Object.getOwnPropertyDescriptors(obj));
+function objectClone(obj3) {
+  return Object.create(Object.getPrototypeOf(obj3), Object.getOwnPropertyDescriptors(obj3));
 }
 function assignProp(target, prop, value) {
   Object.defineProperty(target, prop, {
@@ -7886,10 +8014,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path11) {
-  if (!path11)
-    return obj;
-  return path11.reduce((acc, key) => acc?.[key], obj);
+function getElementAtPath(obj3, path13) {
+  if (!path13)
+    return obj3;
+  return path13.reduce((acc, key) => acc?.[key], obj3);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -8229,11 +8357,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path11, issues) {
+function prefixIssues(path13, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path11);
+    iss.path.unshift(path13);
     return iss;
   });
 }
@@ -8325,9 +8453,9 @@ function parsedType(data) {
       if (Array.isArray(data)) {
         return "array";
       }
-      const obj = data;
-      if (obj && Object.getPrototypeOf(obj) !== Object.prototype && "constructor" in obj && obj.constructor) {
-        return obj.constructor.name;
+      const obj3 = data;
+      if (obj3 && Object.getPrototypeOf(obj3) !== Object.prototype && "constructor" in obj3 && obj3.constructor) {
+        return obj3.constructor.name;
       }
     }
   }
@@ -8345,8 +8473,8 @@ function issue(...args) {
   }
   return { ...iss };
 }
-function cleanEnum(obj) {
-  return Object.entries(obj).filter(([k, _]) => {
+function cleanEnum(obj3) {
+  return Object.entries(obj3).filter(([k, _]) => {
     return Number.isNaN(Number.parseInt(k, 10));
   }).map((el) => el[1]);
 }
@@ -8670,15 +8798,15 @@ var $ZodError = $constructor("$ZodError", initializer);
 var $ZodRealError = $constructor("$ZodError", initializer, void 0, {
   Parent: Error
 });
-function node(obj, key, make) {
-  if (!Object.prototype.hasOwnProperty.call(obj, key)) {
+function node(obj3, key, make) {
+  if (!Object.prototype.hasOwnProperty.call(obj3, key)) {
     if (key === "__proto__") {
-      Object.defineProperty(obj, key, { value: make(), writable: true, enumerable: true, configurable: true });
+      Object.defineProperty(obj3, key, { value: make(), writable: true, enumerable: true, configurable: true });
     } else {
-      obj[key] = make();
+      obj3[key] = make();
     }
   }
-  return obj[key];
+  return obj3[key];
 }
 function flattenError(error2, mapper = (issue2) => issue2.message) {
   const fieldErrors = {};
@@ -8694,16 +8822,16 @@ function flattenError(error2, mapper = (issue2) => issue2.message) {
 }
 function formatError(error2, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error3, path11 = []) => {
+  const processError = (error3, path13 = []) => {
     for (const issue2 of error3.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path11, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path13, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path11, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path13, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path11, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path13, ...issue2.path]);
       } else {
-        const fullpath = [...path11, ...issue2.path];
+        const fullpath = [...path13, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -11060,7 +11188,7 @@ function isRecursive(inst, stack, resolve) {
     return PROVEN;
   stack.add(inst);
   let result = NONE;
-  const check = (child) => {
+  const check2 = (child) => {
     if (result !== PROVEN && child?._zod) {
       const answer = isRecursive(child, stack, resolve);
       if (answer > result)
@@ -11089,32 +11217,32 @@ function isRecursive(inst, stack, resolve) {
     case "object": {
       const raw = rawShape(def);
       merge2(raw ? shape(raw, true) : ASSUMED);
-      check(def.catchall);
+      check2(def.catchall);
       break;
     }
     case "array":
-      check(def.element);
+      check2(def.element);
       break;
     case "tuple":
       for (const el of def.items)
-        check(el);
-      check(def.rest);
+        check2(el);
+      check2(def.rest);
       break;
     case "record":
     case "map":
-      check(def.keyType);
-      check(def.valueType);
+      check2(def.keyType);
+      check2(def.valueType);
       break;
     case "set":
-      check(def.valueType);
+      check2(def.valueType);
       break;
     case "union":
       for (const el of def.options)
-        check(el);
+        check2(el);
       break;
     case "intersection":
-      check(def.left);
-      check(def.right);
+      check2(def.left);
+      check2(def.right);
       break;
     case "optional":
     case "nullable":
@@ -11125,15 +11253,15 @@ function isRecursive(inst, stack, resolve) {
     case "nonoptional":
     case "promise":
     case "success":
-      check(def.innerType);
+      check2(def.innerType);
       break;
     case "pipe":
-      check(def.in);
-      check(def.out);
+      check2(def.in);
+      check2(def.out);
       break;
     case "function":
-      check(def.input);
-      check(def.output);
+      check2(def.input);
+      check2(def.output);
       break;
     // `$ZodLazy` caches its inner on the def, so a resolved edge is followed exactly
     case "lazy": {
@@ -11174,10 +11302,10 @@ function isRecursive(inst, stack, resolve) {
         if (!value || typeof value !== "object")
           continue;
         if (value._zod)
-          check(value);
+          check2(value);
         else if (Array.isArray(value))
           for (const el of value)
-            check(el);
+            check2(el);
       }
     }
   }
@@ -12639,8 +12767,8 @@ var contributors = {
 function aggregateChecks(schema) {
   const agg = {};
   const def = schema._zod.def;
-  const list = schema._zod.traits.has("$ZodCheck") ? [schema, ...def.checks ?? []] : def.checks ?? [];
-  for (const ch of list)
+  const list2 = schema._zod.traits.has("$ZodCheck") ? [schema, ...def.checks ?? []] : def.checks ?? [];
+  for (const ch of list2)
     contributors[ch._zod.def.check]?.(agg, ch._zod.def);
   const bag = schema._zod.bag;
   if (bag.minimum !== void 0)
@@ -13281,8 +13409,8 @@ var ZodType = /* @__PURE__ */ $constructor("ZodType", (inst, def) => {
     reg.add(this, meta2);
     return this;
   },
-  refine(check, params) {
-    return this.check(refine(check, params));
+  refine(check2, params) {
+    return this.check(refine(check2, params));
   },
   superRefine(refinement, params) {
     return this.check(superRefine(refinement, params));
@@ -17121,15 +17249,15 @@ function applyElicitationDefaults(schema, data) {
   if (!schema || data === null || typeof data !== "object")
     return;
   if (schema.type === "object" && schema.properties && typeof schema.properties === "object") {
-    const obj = data;
+    const obj3 = data;
     const props = schema.properties;
     for (const key of Object.keys(props)) {
       const propSchema = props[key];
-      if (obj[key] === void 0 && Object.prototype.hasOwnProperty.call(propSchema, "default")) {
-        obj[key] = propSchema.default;
+      if (obj3[key] === void 0 && Object.prototype.hasOwnProperty.call(propSchema, "default")) {
+        obj3[key] = propSchema.default;
       }
-      if (obj[key] !== void 0) {
-        applyElicitationDefaults(propSchema, obj[key]);
+      if (obj3[key] !== void 0) {
+        applyElicitationDefaults(propSchema, obj3[key]);
       }
     }
   }
@@ -17734,12 +17862,12 @@ function unfollowedRedirect(response, requestUrl) {
 }
 
 // node_modules/pkce-challenge/dist/index.node.js
-var crypto;
-crypto = globalThis.crypto?.webcrypto ?? // Node.js [18-16] REPL
+var crypto2;
+crypto2 = globalThis.crypto?.webcrypto ?? // Node.js [18-16] REPL
 globalThis.crypto ?? // Node.js >18
 import("node:crypto").then((m) => m.webcrypto);
 async function getRandomValues(size) {
-  return (await crypto).getRandomValues(new Uint8Array(size));
+  return (await crypto2).getRandomValues(new Uint8Array(size));
 }
 async function random(size) {
   const mask = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~";
@@ -17759,7 +17887,7 @@ async function generateVerifier(length) {
   return await random(length);
 }
 async function generateChallenge(code_verifier) {
-  const buffer = await (await crypto).subtle.digest("SHA-256", new TextEncoder().encode(code_verifier));
+  const buffer = await (await crypto2).subtle.digest("SHA-256", new TextEncoder().encode(code_verifier));
   return btoa(String.fromCharCode(...new Uint8Array(buffer))).replace(/\//g, "_").replace(/\+/g, "-").replace(/=/g, "");
 }
 async function pkceChallenge(length) {
@@ -18871,8 +18999,8 @@ var StreamableHTTPClientTransport = class {
   }
   /** Error text for a redirect `response` that was not followed, or `undefined` for any other response. */
   _unfollowedRedirect(response, url2) {
-    const text = unfollowedRedirect(response, url2);
-    return text && !this._followRedirects ? `${text} (redirectPolicy: 'same-origin')` : text;
+    const text2 = unfollowedRedirect(response, url2);
+    return text2 && !this._followRedirects ? `${text2} (redirectPolicy: 'same-origin')` : text2;
   }
   async _authThenStart() {
     if (!this._authProvider) {
@@ -19107,7 +19235,7 @@ var StreamableHTTPClientTransport = class {
         this._sessionId = sessionId;
       }
       if (!response.ok) {
-        const text = await response.text().catch(() => null);
+        const text2 = await response.text().catch(() => null);
         if (response.status === 401 && this._authProvider) {
           if (this._hasCompletedAuthFlow) {
             throw new StreamableHTTPError(401, "Server returned 401 after successful authentication");
@@ -19153,7 +19281,7 @@ var StreamableHTTPClientTransport = class {
             return this.send(message);
           }
         }
-        throw new StreamableHTTPError(response.status, `Error POSTing to endpoint: ${this._unfollowedRedirect(response, this._url) ?? text}`);
+        throw new StreamableHTTPError(response.status, `Error POSTing to endpoint: ${this._unfollowedRedirect(response, this._url) ?? text2}`);
       }
       this._hasCompletedAuthFlow = false;
       this._lastUpscopingHeader = void 0;
@@ -19248,29 +19376,29 @@ var StreamableHTTPClientTransport = class {
 };
 
 // src/robinhood/store.ts
-import crypto2 from "node:crypto";
+import crypto3 from "node:crypto";
 import fs4 from "node:fs";
 import path4 from "node:path";
-function readSaved(file2) {
+function readSaved(file3) {
   try {
-    return JSON.parse(fs4.readFileSync(file2, "utf8"));
+    return JSON.parse(fs4.readFileSync(file3, "utf8"));
   } catch {
     return {};
   }
 }
-function writeSaved(file2, saved) {
-  fs4.mkdirSync(path4.dirname(file2), { recursive: true, mode: 448 });
-  const tmp = `${file2}.${process.pid}.tmp`;
+function writeSaved(file3, saved) {
+  fs4.mkdirSync(path4.dirname(file3), { recursive: true, mode: 448 });
+  const tmp = `${file3}.${process.pid}.tmp`;
   fs4.writeFileSync(tmp, JSON.stringify({ ...saved, savedAt: (/* @__PURE__ */ new Date()).toISOString() }, null, 2), { mode: 384 });
-  fs4.renameSync(tmp, file2);
+  fs4.renameSync(tmp, file3);
   try {
-    fs4.chmodSync(file2, 384);
+    fs4.chmodSync(file3, 384);
   } catch {
   }
 }
 var FileAuth = class {
-  constructor(file2, redirectUrl, openBrowser2) {
-    this.file = file2;
+  constructor(file3, redirectUrl, openBrowser2) {
+    this.file = file3;
     this.redirectUrl = redirectUrl;
     this.openBrowser = openBrowser2;
   }
@@ -19290,7 +19418,7 @@ var FileAuth = class {
     writeSaved(this.file, { ...readSaved(this.file), ...change2 });
   }
   state() {
-    const state = crypto2.randomBytes(16).toString("hex");
+    const state = crypto3.randomBytes(16).toString("hex");
     this.update({ state });
     return state;
   }
@@ -19337,7 +19465,9 @@ var FileAuth = class {
 var TRADE_WORDS = /order|trade|buy|sell|liquidat|close.?position|transfer|withdraw|deposit|payment/i;
 var isOrderTool = (name) => TRADE_WORDS.test(name);
 var READ_NAME = /^(get|list|search|find|view|fetch|read)_/i;
+var NAMED_READS = /* @__PURE__ */ new Set(["get_equity_orders", "get_option_orders", "get_crypto_orders", "get_trade_approvals", "get_trade_approval_setting", "get_pnl_trade_history"]);
 function kindOf(tool) {
+  if (NAMED_READS.has(tool.name)) return tool.annotations?.readOnlyHint === true ? "read" : "order";
   if (isOrderTool(tool.name)) return "order";
   return tool.annotations?.readOnlyHint === true && READ_NAME.test(tool.name) ? "read" : "other";
 }
@@ -19345,6 +19475,7 @@ var oneLine = (s, max) => {
   const t2 = s.replace(/\s+/g, " ").trim();
   return t2.length > max ? `${t2.slice(0, max - 3)}...` : t2;
 };
+var masked = (s) => oneLine(s, 300).replace(/\d{5,}/g, "#####");
 
 // src/robinhood/reader.ts
 var Refused = class extends Error {
@@ -19373,15 +19504,75 @@ var Reader = class {
     if (kind === "order") throw new Refused(`${name} orders or moves money, or reviews an order, so this part of the desk never calls it.`);
     if (kind !== "read") throw new Refused(`${name} is not labelled read-only by Robinhood, so this part of the desk never calls it.`);
     const r = await this.client.callTool({ name, arguments: args });
-    const text = (r.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
+    const text2 = (r.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
     let data = r.structuredContent ?? null;
     if (data === null) {
       try {
-        data = JSON.parse(text);
+        data = JSON.parse(text2);
       } catch {
       }
     }
-    return { data, text, failed: r.isError === true };
+    return { data, text: text2, failed: r.isError === true };
+  }
+};
+
+// src/robinhood/review.ts
+var REVIEW = "review_equity_order";
+var obj2 = (v) => v && typeof v === "object" && !Array.isArray(v) ? v : {};
+var words = (v) => {
+  if (typeof v === "string") return v.trim() ? [v.trim()] : [];
+  if (Array.isArray(v)) return v.flatMap(words);
+  const o = obj2(v);
+  const own2 = ["message", "detail", "description", "title", "reason", "text"].map((k) => o[k]).find((x) => typeof x === "string" && x.trim());
+  return own2 ? [own2.trim()] : Object.values(o).flatMap(words);
+};
+function parseReview(answer) {
+  if (answer.failed) return { answered: false, alerts: [], approvalRequired: null, facts: [], error: answer.text.replace(/\d{5,}/g, "#####").slice(0, 300) };
+  const d = obj2(obj2(answer.data).data);
+  const alerts = [.../* @__PURE__ */ new Set([...words(d.order_checks), ...words(d.alerts), ...words(d.warnings)])].slice(0, 12).map((x) => x.slice(0, 300));
+  const facts = [];
+  const walk = (o, prefix, depth) => {
+    for (const [k, v] of Object.entries(o)) {
+      if (facts.length >= 24 || ["order_checks", "alerts", "warnings", "customer_approval_required", "account_number", "rhs_account_number"].includes(k)) continue;
+      const name = `${prefix}${k.replace(/_/g, " ")}`;
+      if (v === null || typeof v === "string" || typeof v === "number" || typeof v === "boolean") facts.push([name, String(v).replace(/\d{7,}/g, "#####").slice(0, 120)]);
+      else if (!Array.isArray(v) && depth < 2) walk(obj2(v), `${name} \xB7 `, depth + 1);
+    }
+  };
+  walk(d, "", 0);
+  return { answered: true, alerts, approvalRequired: typeof d.customer_approval_required === "boolean" ? d.customer_approval_required : null, facts, error: null };
+}
+var Reviewer = class {
+  constructor(client, tools) {
+    this.client = client;
+    this.tools = tools;
+  }
+  client;
+  tools;
+  /** Asks Robinhood to check the order on the Agentic account. Nothing is placed. */
+  async review(account, o) {
+    if (!account.agentic) throw new Refused("Only the Agentic account can have an order checked, and this is not it.");
+    if (!this.tools.some((t2) => t2.name === REVIEW)) throw new Refused("Robinhood's connection no longer offers its order check, so nothing was sent.");
+    if (!Number.isInteger(o.quantity) || o.quantity < 1 || !(o.limitPrice > 0) || o.side !== "buy" && o.side !== "sell") throw new Refused("That order is not complete, so it was not sent for checking.");
+    const r = await this.client.callTool({ name: REVIEW, arguments: {
+      account_number: account.accountNumber,
+      symbol: o.symbol,
+      side: o.side,
+      type: "limit",
+      quantity: String(o.quantity),
+      limit_price: o.limitPrice.toFixed(2),
+      time_in_force: o.timeInForce,
+      market_hours: "regular_hours"
+    } });
+    const text2 = (r.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
+    let data = r.structuredContent ?? null;
+    if (data === null) {
+      try {
+        data = JSON.parse(text2);
+      } catch {
+      }
+    }
+    return parseReview({ data, text: text2, failed: r.isError === true });
   }
 };
 
@@ -19405,9 +19596,9 @@ function waitForCode(port, expectedState, timeoutMs = 5 * 6e4) {
   let close = () => {
   };
   const code = new Promise((resolve, reject) => {
-    const page = (words) => `<!doctype html><meta charset="utf-8"><title>Trading Agents</title><body style="font:16px system-ui;padding:40px">${words}</body>`;
-    const answer = (res, status, words) => {
-      res.writeHead(status, { connection: "close", ...words ? { "content-type": "text/html" } : {} }).end(words ? page(words) : void 0);
+    const page = (words2) => `<!doctype html><meta charset="utf-8"><title>Trading Agents</title><body style="font:16px system-ui;padding:40px">${words2}</body>`;
+    const answer = (res, status, words2) => {
+      res.writeHead(status, { connection: "close", ...words2 ? { "content-type": "text/html" } : {} }).end(words2 ? page(words2) : void 0);
     };
     const server = http.createServer((req, res) => {
       const url2 = new URL(req.url ?? "/", `http://127.0.0.1:${port}`);
@@ -19455,11 +19646,11 @@ var NotSignedIn = class extends Error {
     this.name = "NotSignedIn";
   }
 };
-async function openSession(file2, opts) {
+async function openSession(file3, opts) {
   const port = opts.port ?? CALLBACK_PORT, say = opts.say ?? (() => {
   }), endpoint = new URL(opts.url ?? ROBINHOOD_MCP);
-  if (!opts.signIn && !readSaved(file2).tokens) throw new NotSignedIn("No Robinhood sign-in is saved.");
-  const auth2 = new FileAuth(file2, redirectFor(port), (url2) => {
+  if (!opts.signIn && !readSaved(file3).tokens) throw new NotSignedIn("No Robinhood sign-in is saved.");
+  const auth2 = new FileAuth(file3, redirectFor(port), (url2) => {
     if (!opts.signIn) return;
     say(`Opening Robinhood's sign-in page. If no browser opens, visit:
 ${url2}`);
@@ -19487,7 +19678,8 @@ ${url2}`);
     await c.connect(t2);
   }
   try {
-    return { reader: new Reader(c, (await c.listTools()).tools), close: () => c.close().catch(() => {
+    const { tools } = await c.listTools();
+    return { reader: new Reader(c, tools), reviewer: new Reviewer(c, tools), close: () => c.close().catch(() => {
     }) };
   } catch (e) {
     await c.close().catch(() => {
@@ -19497,9 +19689,10 @@ ${url2}`);
 }
 
 // src/robinhood/link.ts
+var plainFailure = (e) => e instanceof NotSignedIn ? "Robinhood asks you to sign in again: press Connect." : `Robinhood did not answer as expected: ${masked(e instanceof Error ? e.message : String(e))}`;
 var Link = class {
-  constructor(file2, opts = {}) {
-    this.file = file2;
+  constructor(file3, opts = {}) {
+    this.file = file3;
     this.opts = opts;
   }
   file;
@@ -19507,6 +19700,117 @@ var Link = class {
   last = null;
   signing = null;
   checking = null;
+  ids = /* @__PURE__ */ new Map();
+  known = null;
+  last_snapshot = null;
+  refreshing = null;
+  /** Which accounts the person ticked, kept beside the sign-in as keys (never account numbers). */
+  get choiceFile() {
+    return path5.join(path5.dirname(this.file), "accounts.json");
+  }
+  chosen() {
+    try {
+      const v = JSON.parse(fs5.readFileSync(this.choiceFile, "utf8"));
+      return Array.isArray(v.show) ? v.show.filter((k) => typeof k === "string") : [];
+    } catch {
+      return [];
+    }
+  }
+  async withReader(job) {
+    const session = await openSession(this.file, { ...this.opts, signIn: false });
+    try {
+      return await job(session.reader);
+    } finally {
+      await session.close();
+    }
+  }
+  learn(answer) {
+    const found = parseAccounts(answer);
+    this.ids = new Map(found.map((a) => [a.key, a.ids]));
+    this.known = sortAccounts(found.map(({ ids: _ids, ...a }) => a));
+    return this.known;
+  }
+  /** The person's accounts, for them to tick the ones to show. Asks Robinhood. */
+  async accounts() {
+    const accounts = await this.withReader(async (r) => {
+      const a = await r.read("get_accounts");
+      if (a.failed) throw new Error("Robinhood could not list the accounts");
+      return this.learn(a.data);
+    });
+    return { accounts, chosen: this.chosen().filter((k) => accounts.some((a) => a.key === k)) };
+  }
+  /** Keeps the person's choice. Only accounts Robinhood listed can be chosen. */
+  async choose(keys) {
+    if (!this.known) await this.accounts();
+    const show = [...new Set(keys)].filter((k) => this.known.some((a) => a.key === k && !a.deactivated));
+    if (show.length !== new Set(keys).size) throw new Error("that is not one of your Robinhood accounts");
+    fs5.mkdirSync(path5.dirname(this.choiceFile), { recursive: true });
+    fs5.writeFileSync(this.choiceFile, JSON.stringify({ show }, null, 2) + "\n", { mode: 384 });
+    this.last_snapshot = null;
+    return show;
+  }
+  /** The Agentic account's numbers, when the person chose to show it. A ticket is only ever for that account. */
+  agenticIds() {
+    const a = this.known?.find((x) => x.agentic && !x.deactivated);
+    if (!a || !this.chosen().includes(a.key)) throw new Error("show your Agentic account on the dashboard first: an order can only ever be for that account");
+    return this.ids.get(a.key);
+  }
+  /** The real figures a ticket for one stock is sized and checked on: the Agentic account's value, buying power and
+   *  holding of the stock, Robinhood's live price, and how many orders the account has had today (New York's day). */
+  async ticketContext(symbol, now = /* @__PURE__ */ new Date()) {
+    return this.withReader(async (r) => {
+      const a = await r.read("get_accounts");
+      if (a.failed) throw new Error("Robinhood could not list the accounts");
+      this.learn(a.data);
+      const ids = this.agenticIds();
+      const data = async (name, args) => {
+        const x = await r.read(name, args);
+        if (x.failed) throw new Error(`Robinhood could not give ${name.replace(/^get_|_/g, " ").trim()}`);
+        return x.data;
+      };
+      const p = parsePortfolio(await data("get_portfolio", { account_number: ids.accountNumber }));
+      const held = parsePositions(await data("get_equity_positions", { account_number: ids.accountNumber })).find((x) => x.symbol === symbol)?.quantity ?? 0;
+      const price = parseQuotes(await data("get_equity_quotes", { symbols: [symbol] })).get(symbol) ?? null;
+      const day = (iso) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date(iso));
+      const ordersToday = parseOrders(await data("get_equity_orders", { account_number: ids.accountNumber })).orders.filter((o) => o.at && day(o.at) === day(now.toISOString())).length;
+      return { symbol, accountValue: p.total, buyingPower: p.buyingPower, held, price, ordersToday };
+    });
+  }
+  /** Robinhood's own check of an order on the Agentic account. Nothing is placed. */
+  async review(order) {
+    const session = await openSession(this.file, { ...this.opts, signIn: false });
+    try {
+      const a = await session.reader.read("get_accounts");
+      if (a.failed) throw new Error("Robinhood could not list the accounts");
+      this.learn(a.data);
+      return await session.reviewer.review({ accountNumber: this.agenticIds().accountNumber, agentic: true }, order);
+    } finally {
+      await session.close();
+    }
+  }
+  /** The last read of the chosen accounts, without asking Robinhood again. */
+  snapshot() {
+    return this.last_snapshot;
+  }
+  /** Reads the chosen accounts afresh: value, holdings at Robinhood's live prices, and the Agentic account's orders. */
+  refresh() {
+    this.refreshing ??= (async () => {
+      try {
+        return await this.withReader(async (r) => {
+          const a = await r.read("get_accounts");
+          if (a.failed) throw new Error("Robinhood could not list the accounts");
+          const accounts = this.learn(a.data), show = this.chosen();
+          const views = [];
+          for (const account of accounts.filter((x) => show.includes(x.key))) views.push(await readAccount(r, account, this.ids.get(account.key)));
+          this.last_snapshot = { at: this.now(), views };
+          return this.last_snapshot;
+        });
+      } finally {
+        this.refreshing = null;
+      }
+    })();
+    return this.refreshing;
+  }
   now = () => (this.opts.now?.() ?? /* @__PURE__ */ new Date()).toISOString();
   saved = () => !!readSaved(this.file).tokens;
   info() {
@@ -19526,8 +19830,8 @@ var Link = class {
     };
   }
   bad(e) {
-    const words = oneLine(e instanceof Error ? e.message : String(e), 200);
-    const why = e instanceof NotSignedIn ? "Robinhood asks you to sign in again." : /^Robinhood refused/.test(words) ? words : `Robinhood did not answer as expected: ${words}`;
+    const words2 = oneLine(e instanceof Error ? e.message : String(e), 200);
+    const why = e instanceof NotSignedIn ? "Robinhood asks you to sign in again." : /^Robinhood refused/.test(words2) ? words2 : `Robinhood did not answer as expected: ${words2}`;
     return { state: "failed", checkedAt: this.now(), tools: null, message: why };
   }
   /** Sends the person to Robinhood's sign-in page and waits for them to come back, in the background. */
@@ -19573,31 +19877,129 @@ var Link = class {
   /** Deletes the saved sign-in. Robinhood is not told; the person can also end the access on Robinhood's side. */
   forget() {
     fs5.rmSync(this.file, { force: true });
+    fs5.rmSync(this.choiceFile, { force: true });
     this.last = null;
+    this.last_snapshot = null;
+    this.known = null;
+    this.ids.clear();
     return this.info();
   }
 };
 
-// src/terminal/state.ts
-import fs10 from "node:fs";
-import path9 from "node:path";
+// src/desk/holdings.ts
+import fs6 from "node:fs";
+import path6 from "node:path";
+var file2 = (dir) => path6.join(dir, "holdings.json");
+var finite = (v) => typeof v === "number" && Number.isFinite(v) ? v : void 0;
+function saveAccountHoldings(dir, accounts, today2) {
+  let leftOut = 0;
+  const clean = accounts.slice(0, 10).map((a) => ({
+    label: a.label.slice(0, 60),
+    tradable: a.tradable,
+    ...finite(a.cash) === void 0 ? {} : { cash: finite(a.cash) },
+    ...finite(a.buyingPower) === void 0 ? {} : { buyingPower: finite(a.buyingPower) },
+    ...a.currency ? { currency: a.currency } : {},
+    positions: a.positions.flatMap((p) => {
+      try {
+        const ticker = safeSymbol(p.ticker), quantity = finite(p.quantity), averagePrice = finite(p.averagePrice);
+        if (!quantity) {
+          leftOut++;
+          return [];
+        }
+        return [{ ticker, quantity, ...averagePrice && averagePrice > 0 ? { averagePrice } : {} }];
+      } catch {
+        leftOut++;
+        return [];
+      }
+    })
+  }));
+  const tradable = clean.find((a) => a.tradable);
+  const saved = { positions: tradable?.positions ?? [], ...tradable?.cash === void 0 ? {} : { cash: tradable.cash }, ...tradable?.currency ? { currency: tradable.currency } : {}, source: "robinhood", savedOn: today2, accounts: clean };
+  fs6.mkdirSync(dir, { recursive: true });
+  writeWhole(file2(dir), JSON.stringify(saved, null, 2) + "\n");
+  return { saved, leftOut };
+}
+
+// src/desk/ticket.ts
+var money = (n) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+var cents = (n) => Math.round(n * 100) / 100;
+var actionOf = (rating, t2) => t2.ratingToOrder[rating] ?? "no order";
+function propose(c, t2) {
+  const action = actionOf(c.rating, t2), why = [];
+  const none = (reason) => ({ action, order: null, why: [...why, reason] });
+  if (action === "no order") return none(`The desk rated ${c.symbol} ${c.rating}: your settings place no order for that rating.`);
+  if (c.price === null || c.price <= 0) return none(`Robinhood gave no live price for ${c.symbol}, so no order can be sized.`);
+  const limitPrice = cents(c.price);
+  why.push(`Limit price: Robinhood's live price, ${money(limitPrice)}. You can change it.`);
+  if (action === "sell half of what is held" || action === "sell everything held") {
+    if (c.held <= 0) return none(`The desk rated ${c.symbol} ${c.rating}, but the Agentic account holds none to sell.`);
+    const quantity2 = Math.floor(action === "sell everything held" ? c.held : c.held / 2);
+    if (quantity2 < 1) return none(`The Agentic account holds ${c.held} share(s); half of that is less than one whole share, and a limit order sells whole shares only.`);
+    why.push(`${action === "sell everything held" ? "Everything held" : "Half of what is held"}: ${quantity2} of ${c.held} share(s), whole shares only.`);
+    return { action, order: { symbol: c.symbol, side: "sell", quantity: quantity2, limitPrice, timeInForce: t2.orderDefaults.timeInForce }, why };
+  }
+  if (c.accountValue === null || c.accountValue <= 0) return none("Robinhood gave no total value for the Agentic account, so a position cannot be sized.");
+  if (c.buyingPower === null) return none("Robinhood gave no buying power for the Agentic account, so a buy cannot be sized.");
+  const share = action === "buy a full position" ? t2.fullPositionPercent : t2.fullPositionPercent / 2;
+  const target = c.accountValue * share / 100;
+  why.push(`${action === "buy a full position" ? "A full position" : "Half a position"}: ${share}% of the account's ${money(c.accountValue)} is ${money(target)}.`);
+  let amount = target;
+  if (amount > t2.caps.perOrderUsd) {
+    amount = t2.caps.perOrderUsd;
+    why.push(`Your cap of ${money(t2.caps.perOrderUsd)} an order makes it ${money(amount)}.`);
+  }
+  if (amount > c.buyingPower) {
+    amount = c.buyingPower;
+    why.push(`Buying power is ${money(c.buyingPower)}, so at most that.`);
+  }
+  const quantity = Math.floor(amount / limitPrice);
+  if (quantity < 1) return none(`${money(amount)} buys less than one share at ${money(limitPrice)}, and a limit order buys whole shares only.`);
+  why.push(`${money(amount)} \xF7 ${money(limitPrice)}, rounded down: ${quantity} share(s).`);
+  return { action, order: { symbol: c.symbol, side: "buy", quantity, limitPrice, timeInForce: t2.orderDefaults.timeInForce }, why };
+}
+function check(o, c, t2) {
+  const out = [];
+  const add = (ok, words2) => out.push({ ok, words: words2 });
+  add(Number.isInteger(o.quantity) && o.quantity >= 1 && o.quantity <= 1e5, Number.isInteger(o.quantity) && o.quantity >= 1 ? `${o.quantity} whole share(s)` : "The quantity must be a whole number of shares, at least one");
+  const priceOk = Number.isFinite(o.limitPrice) && o.limitPrice > 0 && cents(o.limitPrice) === o.limitPrice;
+  add(priceOk, priceOk ? `Limit price ${money(o.limitPrice)}` : "The limit price must be above zero, in dollars and cents");
+  if (!out.every((x) => x.ok)) return out;
+  if (c.price !== null && c.price > 0) {
+    const off = Math.abs(o.limitPrice / c.price - 1) * 100;
+    add(off <= 10, off <= 10 ? `${off.toFixed(1)}% from Robinhood's live price` : `${off.toFixed(1)}% from Robinhood's live price of ${money(c.price)}: more than 10% away, which looks like a typing slip`);
+  } else add(false, `Robinhood gave no live price for ${o.symbol} to check the limit against`);
+  const cost = cents(o.quantity * o.limitPrice);
+  if (o.side === "buy") {
+    add(cost <= t2.caps.perOrderUsd, cost <= t2.caps.perOrderUsd ? `${money(cost)} is within your cap of ${money(t2.caps.perOrderUsd)} an order` : `${money(cost)} is over your cap of ${money(t2.caps.perOrderUsd)} an order`);
+    if (c.buyingPower === null) add(false, "Robinhood gave no buying power for the Agentic account");
+    else add(cost <= c.buyingPower, cost <= c.buyingPower ? `Buying power ${money(c.buyingPower)} covers it` : `Buying power is ${money(c.buyingPower)}: not enough`);
+    if (c.accountValue === null || c.accountValue <= 0) add(false, "Robinhood gave no total value for the Agentic account to check your per-stock cap");
+    else {
+      const after = (c.held + o.quantity) * o.limitPrice / c.accountValue * 100;
+      add(after <= t2.caps.perStockPercent, `${o.symbol} would be ${after.toFixed(1)}% of the account; your cap is ${t2.caps.perStockPercent}%`);
+    }
+  } else add(o.quantity <= c.held, o.quantity <= c.held ? `Selling ${o.quantity} of the ${c.held} held` : `Only ${c.held} share(s) are held in the Agentic account`);
+  add(c.ordersToday < t2.caps.ordersPerDay, `${c.ordersToday} of your ${t2.caps.ordersPerDay} orders a day used`);
+  return out;
+}
+var passes = (checks) => checks.length > 0 && checks.every((x) => x.ok);
 
 // src/desk/journal.ts
-import fs6 from "node:fs";
-import path5 from "node:path";
+import fs7 from "node:fs";
+import path7 from "node:path";
 
 // src/desk/rating.ts
 var RATINGS = ["Buy", "Overweight", "Hold", "Underweight", "Sell"];
-var REVIEW = "Needs review";
+var REVIEW2 = "Needs review";
 var SET = new Set(RATINGS.map((r) => r.toLowerCase()));
 var cap = (s) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
 var LABEL = /(?<![a-z])rating\b[^:\-\u2010-\u2015]*[:\-\u2010-\u2015][\s*]*(\w+)/gi;
 var OWN = "(?:(?:final|our|overall|my|recommended|updated|revised|new|current)\\s+)*";
 var LINE = new RegExp(`^\\s*(?<item>(?:[-+*\\u2022]|\\d+[.)])\\s+)?[\\s*_#]*${OWN}rating[^\\w:\\-\\u2010-\\u2015]*[:\\-\\u2010-\\u2015][\\s*]*(?<value>\\w+)`, "i");
 var SCALE = /rating\s*(scale|options|legend)/i;
-function extractRating(text) {
-  if (!text) return null;
-  const lines = text.normalize("NFKC").split(/\r?\n/).filter((l) => l.trim() && !SCALE.test(l));
+function extractRating(text2) {
+  if (!text2) return null;
+  const lines = text2.normalize("NFKC").split(/\r?\n/).filter((l) => l.trim() && !SCALE.test(l));
   const first = lines.find((l) => !l.trimStart().startsWith("#") || LINE.test(l)) ?? "";
   const m = LINE.exec(first);
   const opening = m && SET.has(m.groups.value.toLowerCase()) ? m : null;
@@ -19611,14 +20013,14 @@ function extractRating(text) {
   const found = own2.length ? own2 : labels;
   return found.length && new Set(found).size === 1 ? found[0] : null;
 }
-var parseRating = (text) => extractRating(text) ?? REVIEW;
+var parseRating = (text2) => extractRating(text2) ?? REVIEW2;
 
 // src/desk/journal.ts
 var SEPARATOR = "\n\n<!-- ENTRY_END -->\n\n";
 var pct = (v) => `${v >= 0 ? "+" : "-"}${(Math.abs(v) * 100).toFixed(1)}%`;
 var MARK = /<!--\s*ENTRY_END\s*-->/i;
-function keep(text) {
-  let s = text;
+function keep(text2) {
+  let s = text2;
   while (MARK.test(s)) s = s.replace(MARK, "");
   return s.replace(/^([ \t]*)(DECISION|REFLECTION):/gim, "$1$2 -").trim();
 }
@@ -19642,22 +20044,22 @@ function parse3(block) {
 }
 var Journal = class {
   /** @param maxResolved keep at most this many settled entries (the oldest go first); pending ones are never dropped */
-  constructor(file2, maxResolved = null) {
-    this.file = file2;
+  constructor(file3, maxResolved = null) {
+    this.file = file3;
     this.maxResolved = maxResolved;
   }
   file;
   maxResolved;
   read() {
     try {
-      return fs6.readFileSync(this.file, "utf8");
+      return fs7.readFileSync(this.file, "utf8");
     } catch {
       return "";
     }
   }
-  write(text) {
-    fs6.mkdirSync(path5.dirname(this.file), { recursive: true });
-    writeWhole(this.file, text);
+  write(text2) {
+    fs7.mkdirSync(path7.dirname(this.file), { recursive: true });
+    writeWhole(this.file, text2);
   }
   blocks() {
     return this.read().split(SEPARATOR).filter((b) => b.trim());
@@ -19671,7 +20073,7 @@ var Journal = class {
   /** Adds a pending entry. One entry per stock and day, settled or not: a re-run must not count the same call twice. */
   storeDecision(ticker, date4, decision, rating) {
     checkTag(ticker, date4);
-    fs6.mkdirSync(path5.dirname(this.file), { recursive: true });
+    fs7.mkdirSync(path7.dirname(this.file), { recursive: true });
     return withLock(this.file, () => {
       if (this.load().some((e) => e.date === date4 && e.ticker === ticker)) return "exists";
       const r = rating && RATINGS.includes(rating) ? rating : parseRating(decision);
@@ -19744,62 +20146,11 @@ ${e.reflection || e.decision.slice(0, 300) + (e.decision.length > 300 ? "..." : 
   }
 };
 
-// src/desk/runs.ts
-import fs7 from "node:fs";
-import path6 from "node:path";
-var DEBATES = { investment_debate: ["bull", "bear"], risk_debate: ["aggressive", "conservative", "neutral"] };
-var TURNS = new Set(Object.values(DEBATES).flat());
-var folder = (dir, ticker, date4) => path6.join(dir, "runs", `${safeSymbol(ticker).replace(/\^/g, "IDX_").replace(/=/g, "_EQ_")}_${date4}`);
-var runFile = (dir, ticker, date4) => path6.join(folder(dir, ticker, date4), "run.json");
-function load(dir, ticker, date4) {
-  try {
-    return JSON.parse(fs7.readFileSync(runFile(dir, ticker, date4), "utf8"));
-  } catch {
-    return { ticker: safeSymbol(ticker), date: date4, startedAt: (/* @__PURE__ */ new Date()).toISOString(), log: [] };
-  }
-}
-function sectionsOf(dir, ticker, date4) {
-  const out = {};
-  for (const e of load(dir, ticker, date4).log) (out[e.section] ??= []).push(e.text);
-  return out;
-}
-var hasReport = (dir, ticker, date4) => fs7.existsSync(path6.join(folder(dir, ticker, date4), "complete_report.md"));
-
-// src/desk/backtest.ts
-var DIRECTION = { Buy: 1, Overweight: 1, Hold: 0, Underweight: -1, Sell: -1 };
-var alphaOf = (e) => {
-  const t2 = (e.alpha ?? "").trim().replace(/%$/, "");
-  const v = /^[+-]?\d+(\.\d+)?$/.test(t2) ? Number(t2) : NaN;
-  return Number.isFinite(v) ? v / 100 : null;
-};
-function summarize(entries) {
-  const resolved = entries.filter((e) => !e.pending && e.rating !== REVIEW).map((e) => ({ e, a: alphaOf(e) })).filter((x) => x.a !== null);
-  const byRating = {};
-  for (const rating of new Set(resolved.map((x) => x.e.rating))) {
-    const alphas = resolved.filter((x) => x.e.rating === rating).map((x) => x.a), dir = DIRECTION[rating] ?? 0;
-    byRating[rating] = { count: alphas.length, hitRate: dir ? alphas.filter((a) => a * dir > 0).length / alphas.length : null, meanAlpha: alphas.reduce((s, a) => s + a, 0) / alphas.length };
-  }
-  const unscored = entries.filter((e) => e.rating === REVIEW).length;
-  const windows = [...new Set(resolved.map((x) => x.e.holding).filter((h) => !!h && h.endsWith("d")).map((h) => `${h.slice(0, -1)} trading days`))].sort();
-  return { resolved: resolved.length, pending: entries.length - resolved.length - unscored, unscored, byRating, holding: windows.join(", ") || "the configured window" };
-}
-var pctText = (v) => `${v >= 0 ? "+" : "-"}${(Math.abs(v) * 100).toFixed(2)}%`;
-function renderSummary(s) {
-  const lines = [`Resolved cells: ${s.resolved} \xB7 pending: ${s.pending}${s.unscored ? ` \xB7 unscored: ${s.unscored}` : ""}`];
-  for (const [rating, sc] of Object.entries(s.byRating)) {
-    lines.push(`- ${rating}: n=${sc.count}, ${sc.hitRate !== null ? `called the direction ${Math.round(sc.hitRate * 100)}%` : "no direction claimed"}, mean alpha ${pctText(sc.meanAlpha)} vs the benchmark`);
-  }
-  lines.push("");
-  if (s.pending) lines.push("Pending cells are not scored above; settle them when their window has traded.");
-  if (s.unscored) lines.push("Unscored cells had no readable rating (Needs review): they count neither for nor against the desk.");
-  lines.push(`Alpha is measured over ${s.holding} after each analysis date. One model sampling per cell, and text feeds are not archived, so these figures are indicative rather than repeatable. A handful of cells proves nothing: a hit rate over fewer than about 30 calls per rating is noise.`);
-  return lines.join("\n");
-}
-
 // src/settings.ts
 import fs8 from "node:fs";
-import path7 from "node:path";
+import path8 from "node:path";
 var ANALYSTS = ["market", "sentiment", "news", "fundamentals"];
+var ACTIONS = ["buy a full position", "buy half a position", "no order", "sell half of what is held", "sell everything held"];
 var DEFAULTS = {
   analysis: {
     outputLanguage: "English",
@@ -19821,8 +20172,33 @@ var DEFAULTS = {
     benchmarks: { "": "SPY", ".NS": "^NSEI", ".BO": "^BSESN", ".T": "^N225", ".TW": "^TWII", ".TWO": "^TWII", ".KS": "^KS11", ".KQ": "^KQ11", ".HK": "^HSI", ".SI": "^STI", ".L": "^FTSE", ".DE": "^GDAXI", ".PA": "^FCHI", ".AS": "^AEX", ".SW": "^SSMI", ".MI": "FTSEMIB.MI", ".TO": "^GSPTSE", ".AX": "^AXJO", ".SS": "000001.SS", ".SZ": "399001.SZ", ".SA": "^BVSP" }
   },
   journal: { maxResolvedEntries: null },
-  sources: { contact: "trading-agents (+https://github.com/madavai/trading-agents)" }
+  sources: { contact: "trading-agents (+https://github.com/madavai/trading-agents)" },
+  trading: {
+    enabled: false,
+    fullPositionPercent: 10,
+    ratingToOrder: { Buy: "buy a full position", Overweight: "buy half a position", Hold: "no order", Underweight: "sell half of what is held", Sell: "sell everything held", "Needs review": "no order" },
+    caps: { perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 3 },
+    orderDefaults: { type: "limit", timeInForce: "gfd" }
+  }
 };
+var within = (v, lo, hi, fallback) => typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi ? v : fallback;
+function tradingOf(raw) {
+  const t2 = raw && typeof raw === "object" ? raw : {}, d = DEFAULTS.trading;
+  const caps = t2.caps && typeof t2.caps === "object" ? t2.caps : {};
+  const od = t2.orderDefaults && typeof t2.orderDefaults === "object" ? t2.orderDefaults : {};
+  const map = t2.ratingToOrder && typeof t2.ratingToOrder === "object" ? t2.ratingToOrder : {};
+  const ratingToOrder = { ...d.ratingToOrder };
+  for (const [k, v] of Object.entries(map)) if (k.length <= 20 && ACTIONS.includes(v)) ratingToOrder[k] = v;
+  ratingToOrder["Needs review"] = "no order";
+  const tif = od.timeInForce === "gtc" ? "gtc" : "gfd";
+  return {
+    enabled: t2.enabled === true,
+    fullPositionPercent: within(t2.fullPositionPercent, 1, 100, d.fullPositionPercent),
+    ratingToOrder,
+    caps: { perOrderUsd: within(caps.perOrderUsd, 1, 1e5, d.caps.perOrderUsd), perStockPercent: within(caps.perStockPercent, 1, 100, d.caps.perStockPercent), ordersPerDay: int2(caps.ordersPerDay, 1, 50, d.caps.ordersPerDay) },
+    orderDefaults: { type: "limit", timeInForce: tif }
+  };
+}
 var int2 = (v, lo, hi, fallback) => Number.isInteger(v) && v >= lo && v <= hi ? v : fallback;
 function languageName(v, fallback = "English") {
   const s = typeof v === "string" ? v.trim() : "";
@@ -19831,7 +20207,7 @@ function languageName(v, fallback = "English") {
 function readSettings(root2) {
   let raw = {};
   try {
-    raw = JSON.parse(fs8.readFileSync(path7.join(root2, "desk-settings.json"), "utf8"));
+    raw = JSON.parse(fs8.readFileSync(path8.join(root2, "desk-settings.json"), "utf8"));
   } catch {
   }
   const a = { ...DEFAULTS.analysis, ...raw.analysis }, s = { ...DEFAULTS.scoring, ...raw.scoring }, j = { ...DEFAULTS.journal, ...raw.journal };
@@ -19852,94 +20228,151 @@ function readSettings(root2) {
       benchmarks: { ...DEFAULTS.scoring.benchmarks, ...benchmarks }
     },
     journal: { maxResolvedEntries: Number.isInteger(j.maxResolvedEntries) && j.maxResolvedEntries > 0 ? j.maxResolvedEntries : null },
-    sources: { ...DEFAULTS.sources, ...raw.sources }
+    sources: { ...DEFAULTS.sources, ...raw.sources },
+    trading: tradingOf(raw.trading)
   };
 }
 
-// src/terminal/store.ts
+// src/terminal/state.ts
+import fs11 from "node:fs";
+import path11 from "node:path";
+
+// src/desk/runs.ts
 import fs9 from "node:fs";
-import path8 from "node:path";
+import path9 from "node:path";
+var DEBATES = { investment_debate: ["bull", "bear"], risk_debate: ["aggressive", "conservative", "neutral"] };
+var TURNS = new Set(Object.values(DEBATES).flat());
+var folder = (dir, ticker, date4) => path9.join(dir, "runs", `${safeSymbol(ticker).replace(/\^/g, "IDX_").replace(/=/g, "_EQ_")}_${date4}`);
+var runFile = (dir, ticker, date4) => path9.join(folder(dir, ticker, date4), "run.json");
+function load(dir, ticker, date4) {
+  try {
+    return JSON.parse(fs9.readFileSync(runFile(dir, ticker, date4), "utf8"));
+  } catch {
+    return { ticker: safeSymbol(ticker), date: date4, startedAt: (/* @__PURE__ */ new Date()).toISOString(), log: [] };
+  }
+}
+function sectionsOf(dir, ticker, date4) {
+  const out = {};
+  for (const e of load(dir, ticker, date4).log) (out[e.section] ??= []).push(e.text);
+  return out;
+}
+var hasReport = (dir, ticker, date4) => fs9.existsSync(path9.join(folder(dir, ticker, date4), "complete_report.md"));
+
+// src/desk/backtest.ts
+var DIRECTION = { Buy: 1, Overweight: 1, Hold: 0, Underweight: -1, Sell: -1 };
+var alphaOf = (e) => {
+  const t2 = (e.alpha ?? "").trim().replace(/%$/, "");
+  const v = /^[+-]?\d+(\.\d+)?$/.test(t2) ? Number(t2) : NaN;
+  return Number.isFinite(v) ? v / 100 : null;
+};
+function summarize(entries) {
+  const resolved = entries.filter((e) => !e.pending && e.rating !== REVIEW2).map((e) => ({ e, a: alphaOf(e) })).filter((x) => x.a !== null);
+  const byRating = {};
+  for (const rating of new Set(resolved.map((x) => x.e.rating))) {
+    const alphas = resolved.filter((x) => x.e.rating === rating).map((x) => x.a), dir = DIRECTION[rating] ?? 0;
+    byRating[rating] = { count: alphas.length, hitRate: dir ? alphas.filter((a) => a * dir > 0).length / alphas.length : null, meanAlpha: alphas.reduce((s, a) => s + a, 0) / alphas.length };
+  }
+  const unscored = entries.filter((e) => e.rating === REVIEW2).length;
+  const windows = [...new Set(resolved.map((x) => x.e.holding).filter((h) => !!h && h.endsWith("d")).map((h) => `${h.slice(0, -1)} trading days`))].sort();
+  return { resolved: resolved.length, pending: entries.length - resolved.length - unscored, unscored, byRating, holding: windows.join(", ") || "the configured window" };
+}
+var pctText = (v) => `${v >= 0 ? "+" : "-"}${(Math.abs(v) * 100).toFixed(2)}%`;
+function renderSummary(s) {
+  const lines = [`Resolved cells: ${s.resolved} \xB7 pending: ${s.pending}${s.unscored ? ` \xB7 unscored: ${s.unscored}` : ""}`];
+  for (const [rating, sc] of Object.entries(s.byRating)) {
+    lines.push(`- ${rating}: n=${sc.count}, ${sc.hitRate !== null ? `called the direction ${Math.round(sc.hitRate * 100)}%` : "no direction claimed"}, mean alpha ${pctText(sc.meanAlpha)} vs the benchmark`);
+  }
+  lines.push("");
+  if (s.pending) lines.push("Pending cells are not scored above; settle them when their window has traded.");
+  if (s.unscored) lines.push("Unscored cells had no readable rating (Needs review): they count neither for nor against the desk.");
+  lines.push(`Alpha is measured over ${s.holding} after each analysis date. One model sampling per cell, and text feeds are not archived, so these figures are indicative rather than repeatable. A handful of cells proves nothing: a hit rate over fewer than about 30 calls per rating is noise.`);
+  return lines.join("\n");
+}
+
+// src/terminal/store.ts
+import fs10 from "node:fs";
+import path10 from "node:path";
 var MAX_WATCH = 50;
 var MAX_QUEUE = 20;
-var read = (file2, ok) => {
+var read = (file3, ok) => {
   try {
-    const v = JSON.parse(fs9.readFileSync(file2, "utf8"));
+    const v = JSON.parse(fs10.readFileSync(file3, "utf8"));
     return Array.isArray(v) ? v.filter(ok) : [];
   } catch {
     return [];
   }
 };
-function change(file2, edit, ok) {
-  fs9.mkdirSync(path8.dirname(file2), { recursive: true });
-  return withLock(file2, () => {
-    const next = edit(read(file2, ok));
-    writeWhole(file2, JSON.stringify(next, null, 2) + "\n");
+function change(file3, edit, ok) {
+  fs10.mkdirSync(path10.dirname(file3), { recursive: true });
+  return withLock(file3, () => {
+    const next = edit(read(file3, ok));
+    writeWhole(file3, JSON.stringify(next, null, 2) + "\n");
     return next;
   });
 }
 var isWatch = (v) => !!v && typeof v.symbol === "string" && typeof v.favourite === "boolean";
 var isQueued = (v) => !!v && typeof v.symbol === "string" && typeof v.requestedAt === "string";
-var watchFile = (dir) => path8.join(dir, "watchlist.json");
-var queueFile = (dir) => path8.join(dir, "queue.json");
+var watchFile = (dir) => path10.join(dir, "watchlist.json");
+var queueFile = (dir) => path10.join(dir, "queue.json");
 var readWatchlist = (dir) => read(watchFile(dir), isWatch);
 function addWatch(dir, raw, onDay) {
   const symbol = safeSymbol(raw);
-  return change(watchFile(dir), (list) => {
-    if (list.some((w) => w.symbol === symbol)) return list;
-    if (list.length >= MAX_WATCH) throw new Error(`the watchlist holds ${MAX_WATCH} stocks: remove one first`);
-    return [...list, { symbol, favourite: false, addedOn: onDay }];
+  return change(watchFile(dir), (list2) => {
+    if (list2.some((w) => w.symbol === symbol)) return list2;
+    if (list2.length >= MAX_WATCH) throw new Error(`the watchlist holds ${MAX_WATCH} stocks: remove one first`);
+    return [...list2, { symbol, favourite: false, addedOn: onDay }];
   }, isWatch);
 }
 function setFavourite(dir, raw, favourite) {
   const symbol = safeSymbol(raw);
-  return change(watchFile(dir), (list) => {
-    if (!list.some((w) => w.symbol === symbol)) throw new Error(`${symbol} is not on the watchlist`);
-    return list.map((w) => w.symbol === symbol ? { ...w, favourite } : w);
+  return change(watchFile(dir), (list2) => {
+    if (!list2.some((w) => w.symbol === symbol)) throw new Error(`${symbol} is not on the watchlist`);
+    return list2.map((w) => w.symbol === symbol ? { ...w, favourite } : w);
   }, isWatch);
 }
 function removeWatch(dir, raw) {
   const symbol = safeSymbol(raw);
-  return change(watchFile(dir), (list) => list.filter((w) => w.symbol !== symbol), isWatch);
+  return change(watchFile(dir), (list2) => list2.filter((w) => w.symbol !== symbol), isWatch);
 }
 var readQueue = (dir) => read(queueFile(dir), isQueued);
 function enqueue(dir, raw, at) {
   const symbol = safeSymbol(raw);
-  return change(queueFile(dir), (list) => {
-    if (list.some((q) => q.symbol === symbol)) return list;
-    if (list.length >= MAX_QUEUE) throw new Error(`${MAX_QUEUE} analyses are already waiting: run them first`);
-    return [...list, { symbol, requestedAt: at }];
+  return change(queueFile(dir), (list2) => {
+    if (list2.some((q) => q.symbol === symbol)) return list2;
+    if (list2.length >= MAX_QUEUE) throw new Error(`${MAX_QUEUE} analyses are already waiting: run them first`);
+    return [...list2, { symbol, requestedAt: at }];
   }, isQueued);
 }
 function dequeue(dir, raw) {
   const symbol = safeSymbol(raw);
-  return change(queueFile(dir), (list) => list.filter((q) => q.symbol !== symbol), isQueued);
+  return change(queueFile(dir), (list2) => list2.filter((q) => q.symbol !== symbol), isQueued);
 }
 
 // src/terminal/state.ts
 function summaryOf(decision) {
   const m = /\*\*Executive Summary\*\*:?\s*([\s\S]*?)(?=\n\s*\n\*\*|\n\*\*|$)/i.exec(decision);
-  const text = (m?.[1] ?? decision).replace(/\s+/g, " ").trim();
-  return text.length > 320 ? `${text.slice(0, 317).trimEnd()}...` : text;
+  const text2 = (m?.[1] ?? decision).replace(/\s+/g, " ").trim();
+  return text2.length > 320 ? `${text2.slice(0, 317).trimEnd()}...` : text2;
 }
-var stamp = (file2) => {
+var stamp = (file3) => {
   try {
-    return String(fs10.statSync(file2).mtimeMs);
+    return String(fs11.statSync(file3).mtimeMs);
   } catch {
     return "0";
   }
 };
 function versionOf(root2) {
-  const dir = deskDataDir(root2), runs = path9.join(dir, "runs");
+  const dir = deskDataDir(root2), runs = path11.join(dir, "runs");
   let latest = 0;
   try {
-    for (const d of fs10.readdirSync(runs)) latest = Math.max(latest, Number(stamp(path9.join(runs, d, "run.json"))));
+    for (const d of fs11.readdirSync(runs)) latest = Math.max(latest, Number(stamp(path11.join(runs, d, "run.json"))));
   } catch {
   }
-  return [stamp(path9.join(dir, "journal.md")), stamp(path9.join(dir, "watchlist.json")), stamp(path9.join(dir, "queue.json")), latest, stamp(path9.join(dir, "contact.json"))].join("-");
+  return [stamp(path11.join(dir, "journal.md")), stamp(path11.join(dir, "watchlist.json")), stamp(path11.join(dir, "queue.json")), latest, stamp(path11.join(dir, "contact.json"))].join("-");
 }
 function stateOf(root2, day) {
   const dir = deskDataDir(root2), s = readSettings(root2);
-  const entries = new Journal(path9.join(dir, "journal.md")).load();
+  const entries = new Journal(path11.join(dir, "journal.md")).load();
   const calls = entries.map((e) => ({
     date: e.date,
     ticker: e.ticker,
@@ -19963,7 +20396,7 @@ function stateOf(root2, day) {
   };
 }
 function callOf(root2, ticker, date4) {
-  const dir = deskDataDir(root2), e = new Journal(path9.join(dir, "journal.md")).load().find((x) => x.ticker === ticker && x.date === date4);
+  const dir = deskDataDir(root2), e = new Journal(path11.join(dir, "journal.md")).load().find((x) => x.ticker === ticker && x.date === date4);
   if (!e) return null;
   return { decision: e.decision, sections: sectionsOf(dir, ticker, date4), hasReport: hasReport(dir, ticker, date4) };
 }
@@ -20105,17 +20538,17 @@ function compute(name, bars) {
 }
 
 // src/terminal/quotes.ts
-var finite = (v) => typeof v === "number" && Number.isFinite(v);
+var finite2 = (v) => typeof v === "number" && Number.isFinite(v);
 function parseQuote(json, symbol, nowSec = Date.now() / 1e3) {
   const r = json.chart?.result?.[0];
   if (!r?.meta) throw new NoData(`Yahoo Finance has no price for ${symbol}${json.chart?.error?.description ? ` (${json.chart.error.description})` : ""}`);
-  const m = r.meta, points = (r.indicators?.quote?.[0]?.close ?? []).filter(finite);
-  const price = finite(m.regularMarketPrice) ? m.regularMarketPrice : points[points.length - 1];
-  if (!finite(price) || price <= 0) throw new NoData(`Yahoo Finance has no price for ${symbol}`);
-  const previousClose = finite(m.chartPreviousClose) && m.chartPreviousClose > 0 ? m.chartPreviousClose : finite(m.previousClose) && m.previousClose > 0 ? m.previousClose : null;
+  const m = r.meta, points = (r.indicators?.quote?.[0]?.close ?? []).filter(finite2);
+  const price = finite2(m.regularMarketPrice) ? m.regularMarketPrice : points[points.length - 1];
+  if (!finite2(price) || price <= 0) throw new NoData(`Yahoo Finance has no price for ${symbol}`);
+  const previousClose = finite2(m.chartPreviousClose) && m.chartPreviousClose > 0 ? m.chartPreviousClose : finite2(m.previousClose) && m.previousClose > 0 ? m.previousClose : null;
   const reg = m.currentTradingPeriod?.regular;
-  const open3 = m.instrumentType === "CRYPTOCURRENCY" || finite(reg?.start) && finite(reg?.end) && nowSec >= reg.start && nowSec <= reg.end;
-  const t2 = finite(m.regularMarketTime) ? m.regularMarketTime : (r.timestamp ?? [])[Math.max(0, (r.timestamp ?? []).length - 1)];
+  const open3 = m.instrumentType === "CRYPTOCURRENCY" || finite2(reg?.start) && finite2(reg?.end) && nowSec >= reg.start && nowSec <= reg.end;
+  const t2 = finite2(m.regularMarketTime) ? m.regularMarketTime : (r.timestamp ?? [])[Math.max(0, (r.timestamp ?? []).length - 1)];
   return {
     symbol,
     name: m.longName ?? m.shortName,
@@ -20125,7 +20558,7 @@ function parseQuote(json, symbol, nowSec = Date.now() / 1e3) {
     change: previousClose === null ? null : price - previousClose,
     changePct: previousClose === null ? null : (price / previousClose - 1) * 100,
     open: open3,
-    asOf: finite(t2) ? new Date(t2 * 1e3).toISOString() : new Date(nowSec * 1e3).toISOString(),
+    asOf: finite2(t2) ? new Date(t2 * 1e3).toISOString() : new Date(nowSec * 1e3).toISOString(),
     points: points.length ? points : [price]
   };
 }
@@ -20186,17 +20619,29 @@ var MARKETS = [
 
 // src/terminal/server.ts
 var TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".woff2": "font/woff2", ".svg": "image/svg+xml" };
-function loadAssets(dir = path10.join(path10.dirname(fileURLToPath(import.meta.url)), "terminal")) {
+function loadAssets(dir = path12.join(path12.dirname(fileURLToPath(import.meta.url)), "terminal")) {
   const out = /* @__PURE__ */ new Map();
-  const add = (rel) => out.set(`/${rel.replace(/\\/g, "/")}`, { type: TYPES[path10.extname(rel)] ?? "application/octet-stream", body: fs11.readFileSync(path10.join(dir, rel)) });
+  const add = (rel) => out.set(`/${rel.replace(/\\/g, "/")}`, { type: TYPES[path12.extname(rel)] ?? "application/octet-stream", body: fs12.readFileSync(path12.join(dir, rel)) });
   for (const f of ["index.html", "app.js", "app.css"]) add(f);
   try {
-    for (const f of fs11.readdirSync(path10.join(dir, "fonts"))) if (f.endsWith(".woff2")) add(`fonts/${f}`);
+    for (const f of fs12.readdirSync(path12.join(dir, "fonts"))) if (f.endsWith(".woff2")) add(`fonts/${f}`);
   } catch {
   }
   return out;
 }
-var deskIdOf = (root2) => crypto3.createHash("sha256").update(path10.resolve(root2)).digest("hex").slice(0, 12);
+function shareHoldings(dir, snap, day) {
+  if (!snap.views.length || snap.views.some((v) => v.problems.some((x) => /held/.test(x)) || v.unread > 0)) return false;
+  saveAccountHoldings(dir, snap.views.map((v) => ({
+    label: v.account.label,
+    tradable: v.account.agentic,
+    currency: v.portfolio?.currency,
+    ...v.portfolio?.cash == null ? {} : { cash: v.portfolio.cash },
+    ...v.portfolio?.buyingPower == null ? {} : { buyingPower: v.portfolio.buyingPower },
+    positions: v.holdings.map((h) => ({ ticker: h.symbol, quantity: h.quantity, ...h.averageCost == null ? {} : { averagePrice: h.averageCost } }))
+  })), day);
+  return true;
+}
+var deskIdOf = (root2) => crypto4.createHash("sha256").update(path12.resolve(root2)).digest("hex").slice(0, 12);
 var PORTS = [47615, 47625];
 var SECURITY = {
   "Content-Security-Policy": "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
@@ -20213,12 +20658,25 @@ var Refused2 = class extends Error {
   status;
 };
 async function startTerminal(opts) {
-  const { root: root2, assets } = opts, dir = deskDataDir(root2), token = crypto3.randomBytes(24).toString("hex"), deskId = deskIdOf(root2);
+  const { root: root2, assets } = opts, dir = deskDataDir(root2), token = crypto4.randomBytes(24).toString("hex"), deskId = deskIdOf(root2);
   const robinhood = opts.robinhood ?? new Link(robinhoodFile());
+  const tickets = /* @__PURE__ */ new Map();
+  const TICKET_MS = 15 * 6e4;
+  const ticketOf = (id) => {
+    for (const [k, t3] of tickets) if (Date.now() - t3.at > TICKET_MS) tickets.delete(k);
+    const t2 = typeof id === "string" ? tickets.get(id) : void 0;
+    if (!t2) throw new Refused2(404, "that ticket has expired: open it again from the call");
+    return t2;
+  };
+  const edited = (t2, b) => {
+    if (!t2.proposal.order) throw new Refused2(400, "this call proposes no order");
+    const quantity = typeof b.quantity === "number" ? b.quantity : NaN, limitPrice = typeof b.limitPrice === "number" ? b.limitPrice : NaN;
+    return { ...t2.proposal.order, quantity, limitPrice };
+  };
   let port = 0;
   const hosts = () => /* @__PURE__ */ new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
   const origins = () => /* @__PURE__ */ new Set([`http://127.0.0.1:${port}`, `http://localhost:${port}`]);
-  const same = (a, b) => a.length === b.length && crypto3.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+  const same = (a, b) => a.length === b.length && crypto4.timingSafeEqual(Buffer.from(a), Buffer.from(b));
   const send = (res, status, body2, type, extra = {}) => {
     res.writeHead(status, { "Content-Type": type, "Content-Length": Buffer.byteLength(body2), ...SECURITY, ...extra });
     res.end(body2);
@@ -20243,6 +20701,14 @@ async function startTerminal(opts) {
     });
     req.on("error", reject);
   });
+  const askRobinhood = async (job) => {
+    try {
+      return await job();
+    } catch (e) {
+      const m = e instanceof Error ? e.message : "", own2 = /not one of your Robinhood accounts|show your Agentic account|not the Agentic account|not complete, so it was not sent/.test(m);
+      throw new Refused2(own2 ? 400 : 502, own2 ? m : plainFailure(e));
+    }
+  };
   const handle = async (req, res) => {
     if (!hosts().has(String(req.headers.host ?? "").toLowerCase())) throw new Refused2(421, "wrong address");
     const url2 = new URL(req.url ?? "/", `http://127.0.0.1:${port}`), method = req.method ?? "GET", p = url2.pathname;
@@ -20250,8 +20716,8 @@ async function startTerminal(opts) {
     if (method === "GET" && !p.startsWith("/api/")) {
       const a = assets.get(p === "/" ? "/index.html" : p);
       if (!a) throw new Refused2(404, "not found");
-      const text = p === "/" ? String(a.body).replace("__DESK_TOKEN__", token) : a.body;
-      return send(res, 200, text, a.type, { "Cache-Control": "no-cache" });
+      const text2 = p === "/" ? String(a.body).replace("__DESK_TOKEN__", token) : a.body;
+      return send(res, 200, text2, a.type, { "Cache-Control": "no-cache" });
     }
     if (method === "GET" && p === "/api/ping") return json(res, 200, { app: "trading-agents", version: VERSION, desk: deskId });
     if (!p.startsWith("/api/")) throw new Refused2(404, "not found");
@@ -20265,9 +20731,11 @@ async function startTerminal(opts) {
       if (p === "/api/state") return json(res, 200, stateOf(root2, day));
       if (p === "/api/version") return json(res, 200, { version: versionOf(root2) });
       if (p === "/api/robinhood") return json(res, 200, robinhood.info());
+      if (p === "/api/robinhood/accounts") return json(res, 200, await askRobinhood(() => robinhood.accounts()));
+      if (p === "/api/robinhood/snapshot") return json(res, 200, { snapshot: robinhood.snapshot(), chosen: robinhood.chosen() });
       if (p === "/api/quotes") {
-        const list = [...new Set((url2.searchParams.get("symbols") ?? "").split(",").map((s) => s.trim()).filter(Boolean))].slice(0, 30);
-        return json(res, 200, { quotes: await Promise.all(list.map(quote)) });
+        const list2 = [...new Set((url2.searchParams.get("symbols") ?? "").split(",").map((s) => s.trim()).filter(Boolean))].slice(0, 30);
+        return json(res, 200, { quotes: await Promise.all(list2.map(quote)) });
       }
       if (p === "/api/markets") return json(res, 200, { markets: await Promise.all(MARKETS.map(async (m) => ({ ...m, quote: await quote(m.symbol) }))) });
       if (p === "/api/history") {
@@ -20301,6 +20769,42 @@ async function startTerminal(opts) {
     if (p === "/api/robinhood/connect" && method === "POST") return json(res, 200, robinhood.startSignIn());
     if (p === "/api/robinhood/check" && method === "POST") return json(res, 200, await robinhood.check());
     if (p === "/api/robinhood" && method === "DELETE") return json(res, 200, robinhood.forget());
+    if (p === "/api/robinhood/accounts" && method === "POST") {
+      const keys = b.show;
+      if (!Array.isArray(keys) || keys.length > 10 || !keys.every((k) => typeof k === "string" && /^[0-9a-f]{16}$/.test(k))) throw new Refused2(400, "choose up to ten of your accounts");
+      return json(res, 200, { chosen: await askRobinhood(() => robinhood.choose(keys)) });
+    }
+    if (p === "/api/ticket" && method === "POST") {
+      const symbol = safeSymbol(typeof b.symbol === "string" ? b.symbol : ""), date4 = typeof b.date === "string" ? b.date : "";
+      const call = new Journal(path12.join(dir, "journal.md")).load().find((e) => e.ticker === symbol && e.date === date4);
+      if (!call) throw new Refused2(404, "no such call");
+      const trading = readSettings(root2).trading;
+      const context = { ...await askRobinhood(() => robinhood.ticketContext(symbol)), rating: call.rating, callDate: call.date };
+      const proposal = propose(context, trading), id = crypto4.randomBytes(12).toString("hex");
+      const t2 = { id, at: Date.now(), context, proposal, order: proposal.order, checks: proposal.order ? check(proposal.order, context, trading) : [], review: null };
+      tickets.set(id, t2);
+      return json(res, 200, { id, context, proposal, checks: t2.checks, caps: trading.caps });
+    }
+    if (p === "/api/ticket/check" && method === "POST") {
+      const t2 = ticketOf(b.id), o = edited(t2, b);
+      t2.order = o;
+      t2.review = null;
+      t2.checks = check(o, t2.context, readSettings(root2).trading);
+      return json(res, 200, { checks: t2.checks });
+    }
+    if (p === "/api/ticket/review" && method === "POST") {
+      const t2 = ticketOf(b.id), o = edited(t2, b), checks = check(o, t2.context, readSettings(root2).trading);
+      t2.order = o;
+      t2.checks = checks;
+      t2.review = null;
+      if (!passes(checks)) throw new Refused2(400, "the order does not pass every check, so it was not sent to Robinhood");
+      t2.review = await askRobinhood(() => robinhood.review(o));
+      return json(res, 200, { checks, review: t2.review });
+    }
+    if (p === "/api/robinhood/refresh" && method === "POST") {
+      const snapshot = await askRobinhood(() => robinhood.refresh());
+      return json(res, 200, { snapshot, chosen: robinhood.chosen(), holdingsShared: shareHoldings(dir, snapshot, day) });
+    }
     throw new Refused2(404, "not found");
   };
   const server = http2.createServer((req, res) => {

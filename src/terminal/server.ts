@@ -12,7 +12,12 @@ import { today } from '../data/dates.js';
 import { clearCache } from '../data/yahoo.js';
 import { safeSymbol } from '../data/symbols.js';
 import { deskDataDir, robinhoodFile } from '../paths.js';
-import { Link } from '../robinhood/link.js';
+import { Link, plainFailure, type Snapshot } from '../robinhood/link.js';
+import { saveAccountHoldings } from '../desk/holdings.js';
+import { check, passes, propose, type Check, type Order, type Proposal, type TicketContext } from '../desk/ticket.js';
+import type { Review } from '../robinhood/review.js';
+import { Journal } from '../desk/journal.js';
+import { readSettings } from '../settings.js';
 import { VERSION } from '../version.js';
 import { callOf, stateOf, versionOf } from './state.js';
 import { clearQuotes, history, isRange, MARKETS, quote } from './quotes.js';
@@ -32,6 +37,19 @@ export function loadAssets(dir: string = path.join(path.dirname(fileURLToPath(im
   return out;
 }
 
+/** Gives the desk's agents what the dashboard read, so their analyses size trades to the real accounts. Only a read in
+ *  which every account's holdings came back whole is kept: a half-read account would tell the agents "no position" where
+ *  there may be one. */
+export function shareHoldings(dir: string, snap: Snapshot, day: string): boolean {
+  if (!snap.views.length || snap.views.some((v) => v.problems.some((x) => /held/.test(x)) || v.unread > 0)) return false;
+  saveAccountHoldings(dir, snap.views.map((v) => ({
+    label: v.account.label, tradable: v.account.agentic, currency: v.portfolio?.currency,
+    ...(v.portfolio?.cash == null ? {} : { cash: v.portfolio.cash }), ...(v.portfolio?.buyingPower == null ? {} : { buyingPower: v.portfolio.buyingPower }),
+    positions: v.holdings.map((h) => ({ ticker: h.symbol, quantity: h.quantity, ...(h.averageCost == null ? {} : { averagePrice: h.averageCost }) })),
+  })), day);
+  return true;
+}
+
 export interface Terminal { url: string; port: number; token: string; deskId: string; close: () => Promise<void> }
 
 export const deskIdOf = (root: string): string => crypto.createHash('sha256').update(path.resolve(root)).digest('hex').slice(0, 12);
@@ -47,6 +65,22 @@ class Refused extends Error { constructor(readonly status: number, message: stri
 export async function startTerminal(opts: { root: string; assets: Assets; port?: number; robinhood?: Link }): Promise<Terminal> {
   const { root, assets } = opts, dir = deskDataDir(root), token = crypto.randomBytes(24).toString('hex'), deskId = deskIdOf(root);
   const robinhood = opts.robinhood ?? new Link(robinhoodFile());
+  // Tickets the person has open: what the call proposed on the real figures, and Robinhood's check once they press Review.
+  // Kept in memory for a quarter of an hour; the page names a ticket by its id and can change only its quantity and price.
+  interface Ticket { id: string; at: number; context: TicketContext; proposal: Proposal; order: Order | null; checks: Check[]; review: Review | null }
+  const tickets = new Map<string, Ticket>();
+  const TICKET_MS = 15 * 60_000;
+  const ticketOf = (id: unknown): Ticket => {
+    for (const [k, t] of tickets) if (Date.now() - t.at > TICKET_MS) tickets.delete(k);
+    const t = typeof id === 'string' ? tickets.get(id) : undefined;
+    if (!t) throw new Refused(404, 'that ticket has expired: open it again from the call');
+    return t;
+  };
+  const edited = (t: Ticket, b: Record<string, unknown>): Order => {
+    if (!t.proposal.order) throw new Refused(400, 'this call proposes no order');
+    const quantity = typeof b.quantity === 'number' ? b.quantity : NaN, limitPrice = typeof b.limitPrice === 'number' ? b.limitPrice : NaN;
+    return { ...t.proposal.order, quantity, limitPrice };   // the person can change how many and the price; never the stock, the side or the account
+  };
   let port = 0;
   const hosts = () => new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
   const origins = () => new Set([`http://127.0.0.1:${port}`, `http://localhost:${port}`]);
@@ -65,6 +99,14 @@ export async function startTerminal(opts: { root: string; assets: Assets; port?:
     req.on('end', () => { try { const v = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}') as unknown; v && typeof v === 'object' && !Array.isArray(v) ? resolve(v as Record<string, unknown>) : reject(new Refused(400, 'send a JSON object')); } catch { reject(new Refused(400, 'that is not JSON')); } });
     req.on('error', reject);
   });
+
+  // Robinhood's failures are told in plain words; one of the person's own choices that is refused says why.
+  const askRobinhood = async <T>(job: () => Promise<T>): Promise<T> => {
+    try { return await job(); } catch (e) {
+      const m = e instanceof Error ? e.message : '', own = /not one of your Robinhood accounts|show your Agentic account|not the Agentic account|not complete, so it was not sent/.test(m);
+      throw new Refused(own ? 400 : 502, own ? m : plainFailure(e));
+    }
+  };
 
   const handle = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
     // Only this computer, by its own name and port: a page that has pointed another name at this address cannot reach it.
@@ -90,6 +132,8 @@ export async function startTerminal(opts: { root: string; assets: Assets; port?:
       if (p === '/api/state') return json(res, 200, stateOf(root, day));
       if (p === '/api/version') return json(res, 200, { version: versionOf(root) });
       if (p === '/api/robinhood') return json(res, 200, robinhood.info());
+      if (p === '/api/robinhood/accounts') return json(res, 200, await askRobinhood(() => robinhood.accounts()));
+      if (p === '/api/robinhood/snapshot') return json(res, 200, { snapshot: robinhood.snapshot(), chosen: robinhood.chosen() });
       if (p === '/api/quotes') {
         const list = [...new Set((url.searchParams.get('symbols') ?? '').split(',').map((s) => s.trim()).filter(Boolean))].slice(0, 30);
         return json(res, 200, { quotes: await Promise.all(list.map(quote)) });
@@ -124,6 +168,38 @@ export async function startTerminal(opts: { root: string; assets: Assets; port?:
     if (p === '/api/robinhood/connect' && method === 'POST') return json(res, 200, robinhood.startSignIn());
     if (p === '/api/robinhood/check' && method === 'POST') return json(res, 200, await robinhood.check());
     if (p === '/api/robinhood' && method === 'DELETE') return json(res, 200, robinhood.forget());
+    if (p === '/api/robinhood/accounts' && method === 'POST') {
+      const keys = b.show;
+      if (!Array.isArray(keys) || keys.length > 10 || !keys.every((k) => typeof k === 'string' && /^[0-9a-f]{16}$/.test(k))) throw new Refused(400, 'choose up to ten of your accounts');
+      return json(res, 200, { chosen: await askRobinhood(() => robinhood.choose(keys as string[])) });
+    }
+    if (p === '/api/ticket' && method === 'POST') {
+      const symbol = safeSymbol(typeof b.symbol === 'string' ? b.symbol : ''), date = typeof b.date === 'string' ? b.date : '';
+      const call = new Journal(path.join(dir, 'journal.md')).load().find((e) => e.ticker === symbol && e.date === date);
+      if (!call) throw new Refused(404, 'no such call');
+      const trading = readSettings(root).trading;
+      const context: TicketContext = { ...(await askRobinhood(() => robinhood.ticketContext(symbol))), rating: call.rating, callDate: call.date };
+      const proposal = propose(context, trading), id = crypto.randomBytes(12).toString('hex');
+      const t: Ticket = { id, at: Date.now(), context, proposal, order: proposal.order, checks: proposal.order ? check(proposal.order, context, trading) : [], review: null };
+      tickets.set(id, t);
+      return json(res, 200, { id, context, proposal, checks: t.checks, caps: trading.caps });
+    }
+    if (p === '/api/ticket/check' && method === 'POST') {
+      const t = ticketOf(b.id), o = edited(t, b);
+      t.order = o; t.review = null; t.checks = check(o, t.context, readSettings(root).trading);
+      return json(res, 200, { checks: t.checks });
+    }
+    if (p === '/api/ticket/review' && method === 'POST') {
+      const t = ticketOf(b.id), o = edited(t, b), checks = check(o, t.context, readSettings(root).trading);
+      t.order = o; t.checks = checks; t.review = null;
+      if (!passes(checks)) throw new Refused(400, 'the order does not pass every check, so it was not sent to Robinhood');
+      t.review = await askRobinhood(() => robinhood.review(o));
+      return json(res, 200, { checks, review: t.review });
+    }
+    if (p === '/api/robinhood/refresh' && method === 'POST') {
+      const snapshot = await askRobinhood(() => robinhood.refresh());
+      return json(res, 200, { snapshot, chosen: robinhood.chosen(), holdingsShared: shareHoldings(dir, snapshot, day) });
+    }
     throw new Refused(404, 'not found');
   };
 
