@@ -19678,7 +19678,7 @@ function waitForCode(port, expectedState, timeoutMs = 5 * 6e4) {
         reject(new Error(`Robinhood refused the sign-in: ${error2}`));
         return;
       }
-      if (!got || want && state !== want) {
+      if (!got || !want || state !== want) {
         answer(res, 400, "This sign-in link does not match. Start again from Madav.");
         return;
       }
@@ -19929,7 +19929,7 @@ var Link = class {
     };
   }
   bad(e) {
-    const words2 = oneLine(e instanceof Error ? e.message : String(e), 200);
+    const words2 = oneLine(masked(e instanceof Error ? e.message : String(e)), 200);
     const why = e instanceof NotSignedIn ? "Robinhood asks you to sign in again." : /^Robinhood refused/.test(words2) ? words2 : `Robinhood did not answer as expected: ${words2}`;
     return { state: "failed", checkedAt: this.now(), tools: null, message: why };
   }

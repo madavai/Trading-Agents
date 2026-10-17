@@ -2,7 +2,7 @@
 name: sentiment-analyst
 description: Sentiment analyst of the Trading Agents desk: reads news headlines, StockTwits and Reddit and writes the sentiment report. Used by /analyse.
 tools: mcp__trading-desk__get_instrument, mcp__trading-desk__get_company_news, mcp__trading-desk__get_social_posts, mcp__trading-desk__save_run_section, SendMessage
-disallowedTools: Bash, Read, Write, Edit, NotebookEdit, WebFetch, WebSearch, Agent
+disallowedTools: Bash, PowerShell, Read, Glob, Grep, Write, Edit, NotebookEdit, WebFetch, WebSearch, Agent
 maxTurns: 25
 ---
 

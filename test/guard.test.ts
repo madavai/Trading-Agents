@@ -1,12 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { isOrderTool, isPositionsRead } from '../src/robinhood/connect.js';
 
 const GUARD = path.resolve('.claude/hooks/guard.mjs');
-const guard = await import(pathToFileURL(GUARD).href) as { verdict: (call: unknown) => string | null; TRADE_WORDS: RegExp };
+const guard = await import(pathToFileURL(GUARD).href) as { verdict: (call: unknown) => string | null; TRADE_WORDS: RegExp; realPath: (p: string, cwd?: string) => string; within: (child: string, parent: string) => boolean };
 const mcp = (server: string, tool: string, input: unknown = {}) => ({ tool_name: `mcp__${server}__${tool}`, tool_input: input });
 
 test('every tool of a broker connection is refused, reads included (fail closed)', () => {
@@ -60,6 +62,38 @@ test('the private sign-in folder, its file and its contents are refused to every
     { tool_name: 'Glob', tool_input: { pattern: '**/.trading-agents/*' } },
   ];
   for (const call of refused) assert.match(guard.verdict(call) ?? '', /private to them/, JSON.stringify(call));
+});
+
+test('a search may not start at the home folder or above it, however it is written; inside the project, and below home, it may', () => {
+  const home = os.homedir(), cwd = process.cwd();
+  const refused = [
+    { tool_name: 'Glob', tool_input: { path: home, pattern: '.t*/*' } },
+    { tool_name: 'Grep', tool_input: { path: home, pattern: 'x', glob: '*', output_mode: 'content' } },
+    { tool_name: 'Glob', tool_input: { path: path.dirname(home), pattern: '*/.t*/*' } },
+    { tool_name: 'Glob', tool_input: { pattern: `${home}/.t*/*` } },
+    { tool_name: 'Grep', tool_input: { path: path.join(cwd, path.relative(cwd, home)), pattern: 'x' } },
+    { tool_name: 'LS', tool_input: { path: home } },
+  ];
+  for (const call of refused) assert.match(guard.verdict(call) ?? '', /never search the whole home folder/, JSON.stringify(call));
+  const passing = [
+    { tool_name: 'Glob', tool_input: { pattern: 'src/**/*.ts' }, cwd },
+    { tool_name: 'Grep', tool_input: { pattern: 'verdict', path: cwd } },
+    { tool_name: 'Grep', tool_input: { pattern: 'x', path: path.join(home, 'Documents') } },
+    { tool_name: 'Read', tool_input: { file_path: path.join(cwd, 'README.md') } },
+  ];
+  for (const call of passing) assert.equal(guard.verdict(call), null, JSON.stringify(call));
+});
+
+test('a path is checked as the computer knows it: a link is followed to the real folder', () => {
+  const base = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'ta-guard-')));
+  const real = path.join(base, 'the-real-folder'), link = path.join(base, 'a-link');
+  fs.mkdirSync(real);
+  fs.symlinkSync(real, link, process.platform === 'win32' ? 'junction' : 'dir');
+  const seen = guard.realPath(path.join(link, 'file.json'));
+  assert.equal(seen.toLowerCase(), path.join(real, 'file.json').toLowerCase());
+  assert.equal(guard.realPath('not/there/yet.txt', base), path.join(base, 'not', 'there', 'yet.txt'), 'a path that does not exist yet is kept as written');
+  assert.equal(guard.within(path.join(base, 'x'), base), true);
+  assert.equal(guard.within(base, path.join(base, 'x')), false);
 });
 
 test('agents never open Robinhood\'s site', () => {

@@ -181,7 +181,7 @@ export class Link {
   }
 
   private bad(e: unknown): Last {
-    const words = oneLine(e instanceof Error ? e.message : String(e), 200);
+    const words = oneLine(masked(e instanceof Error ? e.message : String(e)), 200);
     const why = e instanceof NotSignedIn ? 'Robinhood asks you to sign in again.' : /^Robinhood refused/.test(words) ? words : `Robinhood did not answer as expected: ${words}`;
     return { state: 'failed', checkedAt: this.now(), tools: null, message: why };
   }

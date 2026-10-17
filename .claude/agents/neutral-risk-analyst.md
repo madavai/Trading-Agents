@@ -2,7 +2,7 @@
 name: neutral-risk-analyst
 description: Neutral risk analyst of the Trading Agents desk: weighs both sides and argues for a balanced approach in the risk debate. Used by /analyse.
 tools: mcp__trading-desk__read_run, mcp__trading-desk__save_run_section, SendMessage
-disallowedTools: Bash, Read, Write, Edit, NotebookEdit, WebFetch, WebSearch, Agent
+disallowedTools: Bash, PowerShell, Read, Glob, Grep, Write, Edit, NotebookEdit, WebFetch, WebSearch, Agent
 maxTurns: 8
 ---
 

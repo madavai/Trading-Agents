@@ -1,6 +1,7 @@
 import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import http from 'node:http';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
@@ -118,6 +119,15 @@ test('a refusal on Robinhood\'s page, or Robinhood not answering, is reported in
   assert.equal(down.state, 'failed');
   assert.match(down.message, /^Robinhood did not answer as expected: /);
   assert.ok(down.message.length < 260);
+  // Robinhood's own words can carry an account number: the message keeps the words and hides the number.
+  const loud = http.createServer((_req, res) => { res.writeHead(500, { 'content-type': 'text/plain' }); res.end('account 5RH88004321 is locked'); });
+  await new Promise<void>((resolve) => loud.listen(0, '127.0.0.1', resolve));
+  try {
+    const said = await new Link(file, { url: `http://127.0.0.1:${(loud.address() as { port: number }).port}/mcp`, port }).check();
+    assert.equal(said.state, 'failed');
+    assert.match(said.message, /locked/);
+    assert.ok(!said.message.includes('88004321'), said.message);
+  } finally { loud.close(); }
 });
 
 // ---------- through the dashboard's server ----------

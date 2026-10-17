@@ -245,7 +245,7 @@ export function render(a) {
 name: ${a.file}
 description: ${a.description}
 tools: ${tools}
-disallowedTools: Bash, Read, Write, Edit, NotebookEdit, WebFetch, WebSearch, Agent
+disallowedTools: Bash, PowerShell, Read, Glob, Grep, Write, Edit, NotebookEdit, WebFetch, WebSearch, Agent
 maxTurns: ${a.turns}
 ---
 

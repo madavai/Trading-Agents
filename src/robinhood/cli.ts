@@ -60,7 +60,7 @@ async function main(args: string[]): Promise<number> {
     say('Nothing was ordered, changed or cancelled.');
     return 0;
   } catch (e) {
-    say(`The Robinhood connection did not work: ${(e as Error).message}`);
+    say(`The Robinhood connection did not work: ${masked((e as Error).message)}`);
     say('Nothing was ordered. Tell the desk what this says; if Robinhood refuses this program, the desk switches to plan B.');
     return 1;
   }

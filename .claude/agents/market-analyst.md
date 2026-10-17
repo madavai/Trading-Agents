@@ -2,7 +2,7 @@
 name: market-analyst
 description: Technical analyst of the Trading Agents desk: reads prices and indicators and writes the market report. Used by /analyse.
 tools: mcp__trading-desk__get_instrument, mcp__trading-desk__get_price_history, mcp__trading-desk__get_indicators, mcp__trading-desk__get_verified_snapshot, mcp__trading-desk__save_run_section, SendMessage
-disallowedTools: Bash, Read, Write, Edit, NotebookEdit, WebFetch, WebSearch, Agent
+disallowedTools: Bash, PowerShell, Read, Glob, Grep, Write, Edit, NotebookEdit, WebFetch, WebSearch, Agent
 maxTurns: 25
 ---
 

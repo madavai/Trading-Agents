@@ -2,7 +2,7 @@
 name: research-manager
 description: Research manager of the Trading Agents desk: weighs the bull and bear debate and writes the investment plan. Used by /analyse.
 tools: mcp__trading-desk__read_run, mcp__trading-desk__save_run_section, SendMessage
-disallowedTools: Bash, Read, Write, Edit, NotebookEdit, WebFetch, WebSearch, Agent
+disallowedTools: Bash, PowerShell, Read, Glob, Grep, Write, Edit, NotebookEdit, WebFetch, WebSearch, Agent
 maxTurns: 8
 ---
 

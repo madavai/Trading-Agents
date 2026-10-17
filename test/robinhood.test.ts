@@ -50,6 +50,16 @@ test('the way back from Robinhood takes the code only with the right state', asy
   assert.equal(await w.code, 'the-code');
 });
 
+test('with no state kept for the sign-in, no way back is accepted at all (it fails closed)', async () => {
+  const port = await freePort();
+  const w = waitForCode(port, () => undefined, 10_000);
+  await new Promise((r) => setTimeout(r, 50));
+  assert.equal((await fetch(`http://127.0.0.1:${port}/callback?code=x`)).status, 400);
+  assert.equal((await fetch(`http://127.0.0.1:${port}/callback?code=x&state=anything`)).status, 400);
+  assert.equal((await fetch(`http://127.0.0.1:${port}/callback?code=x&state=`)).status, 400);
+  w.close();
+});
+
 test('a refusal on Robinhood\'s page ends the wait with its reason', async () => {
   const port = await freePort();
   const w = waitForCode(port, () => 's', 10_000);

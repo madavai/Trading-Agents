@@ -2,7 +2,7 @@
 name: fundamentals-analyst
 description: Fundamentals analyst of the Trading Agents desk: reads company accounts, profile and insider trades and writes the fundamentals report. Used by /analyse for companies.
 tools: mcp__trading-desk__get_instrument, mcp__trading-desk__get_company_overview, mcp__trading-desk__get_financial_statement, mcp__trading-desk__get_insider_transactions, mcp__trading-desk__save_run_section, SendMessage
-disallowedTools: Bash, Read, Write, Edit, NotebookEdit, WebFetch, WebSearch, Agent
+disallowedTools: Bash, PowerShell, Read, Glob, Grep, Write, Edit, NotebookEdit, WebFetch, WebSearch, Agent
 maxTurns: 25
 ---
 

@@ -1,9 +1,9 @@
-/* The Madav House theme, copied unchanged from Madav's own design sheets (packages/ui/src/design and components/shell.css)
+/* The Madav House theme, copied from Madav's own design sheets (their styles unchanged, their comments shortened)
    on 2026-10-14. (c) Madavai. The dashboard places these objects and adds no design of its own except dashboard.css, which
    only sets sizes from these tokens. Fonts: Source Serif 4, Fraunces and Inter, each under the SIL Open Font License 1.1
    (docs/design/fonts). */
-/* ---- Madav House theme: design/tokens.css ---- */
-/* tokens.css - generated from tokens.json by scripts/tokens.mjs; never edited by hand. */
+/* ---- Madav House theme: tokens ---- */
+/* the tokens: every colour, size and space the objects below use */
 :root, [data-theme="dark"] {
   --canvas: rgb(23, 21, 18);
   --panel: rgb(32, 31, 28);
@@ -170,7 +170,7 @@
   --code-fn: #0b69a3;
 }
 
-/* ---- Madav House theme: design/base.css ---- */
+/* ---- Madav House theme: base ---- */
 /* base.css - the floor under every object: the fonts (reading and title, roman and italic; Inter kept behind the reading font),
    the reset, the two faces, focus, selection, the scrollbar and the reduced-motion switch. The reading font reads and presses
    (--font); the title and code fonts are opted into by their objects only (rule 1). Nothing here has a class of its own. */
@@ -230,7 +230,7 @@ em, i { font-style: normal; }
   :root { --fast: 0ms; --normal: 0ms; --spin: 0ms; --breath: 0ms; }
 }
 
-/* ---- Madav House theme: design/objects/surface.css ---- */
+/* ---- Madav House theme: surface ---- */
 /* surface.css - the box every boxed object stands on. Written once: the panel, the one hairline, the one corner, the
    resting shadow.
    .at-box    a box that shows.
@@ -247,7 +247,7 @@ em, i { font-style: normal; }
 .at-press:is(:disabled, [aria-disabled="true"]) { opacity: var(--faded); cursor: default; }
 .at-press.at-inert { cursor: default; }
 
-/* ---- Madav House theme: design/objects/frame.css ---- */
+/* ---- Madav House theme: frame ---- */
 /* frame.css - the window's frame. The sidebar floats in the title font: a box off the window's edges, its head (the
    wordmark, its controls), its rows, its foot over a hairline, and its round ‹ on the top bar's line. Folded, a column:
    the M in its circle, the +. The top bar: the back seat, the tabs, the controls at the right, a hairline under it. */
@@ -271,7 +271,7 @@ em, i { font-style: normal; }
 .at-top-back > button { width: var(--list-row); min-width: 0; padding: 0; }
 .at-top > .at-top-end { margin-left: auto; flex: none; display: flex; align-items: center; gap: var(--space-1); }
 
-/* ---- Madav House theme: design/objects/button.css ---- */
+/* ---- Madav House theme: button ---- */
 /* button.css - one button shape at one height (--control): the button (outlined, on .at-press, in the font of where
    it stands, rule 1), the main one (primary: the accent, once per page), the dial (plain, the accent tint under the
    pointer; its name ends in "…", whole in its title), and send (round, the accent, in the ask box). */
@@ -310,7 +310,7 @@ em, i { font-style: normal; }
 .at-send > svg { width: var(--icon); height: var(--icon); }
 .at-send:disabled { opacity: var(--faded); cursor: default; }   /* faded until typed */
 
-/* ---- Madav House theme: design/objects/chip.css ---- */
+/* ---- Madav House theme: chip ---- */
 /* chip.css - the chip: a short label on the tint, the small corner, no edge. A choice (a chip you press: a filter, an
    answer, a chip that opens a menu) stands on the box at the press height, and the chosen one takes the accent edge. Colour says one of four meanings. */
 .at-chip {
@@ -334,7 +334,7 @@ em, i { font-style: normal; }
 .at-chip.danger { color: var(--bad); }
 .at-chip.accent { color: var(--accent); }
 
-/* ---- Madav House theme: design/objects/field.css ---- */
+/* ---- Madav House theme: field ---- */
 /* field.css - what a person types into, at the control height, on the Surface: the input, the select's shut face, the
    search (a glass in the box), the textarea; the label over a field (its ? beside it), its hint under it; the ask bar (the words,
    send at the right, its dials under it). Focus turns the edge the accent. */
@@ -381,7 +381,7 @@ details[open] > .at-input.at-select { border-color: var(--accent); }
 .at-ask-row > .at-ask-tail { margin-left: auto; min-width: 0; max-width: 100%; display: inline-flex; align-items: center; gap: var(--space-half); }
 .at-ask-row .at-dial { padding-inline: var(--space-2); }
 
-/* ---- Madav House theme: design/objects/switch.css ---- */
+/* ---- Madav House theme: switch ---- */
 /* switch.css - the switch (on/off: the accent track with the white knob), the tick (a checkbox, the small corner; it
    presses as a list row square around the box, rule 4), and the toggle that puts words beside either. */
 .at-switch {
@@ -415,7 +415,7 @@ details[open] > .at-input.at-select { border-color: var(--accent); }
 
 .at-toggle { display: inline-flex; align-items: center; gap: var(--control-gap); cursor: pointer; user-select: none; font-weight: var(--weight-medium); font-size: var(--size-text); color: var(--text-2); }
 
-/* ---- Madav House theme: design/objects/dot.css ---- */
+/* ---- Madav House theme: dot ---- */
 /* dot.css - the status dot: a small circle in one of the four meanings, or the muted "off"; still. The swatch: a
    colour as a small square over the check; pressed, it opens the picker. */
 .at-dot { display: inline-block; flex: none; width: var(--dot); height: var(--dot); border-radius: 50%; background: currentColor; vertical-align: middle; color: var(--text-3); }
@@ -429,7 +429,7 @@ details[open] > .at-input.at-select { border-color: var(--accent); }
 .at-swatch { display: inline-block; flex: none; width: var(--icon-box); height: var(--icon-box); border: 1px solid var(--line); border-radius: var(--radius-small); vertical-align: middle; overflow: hidden; padding: 0; }
 .at-swatch > i { display: block; width: 100%; height: 100%; }
 
-/* ---- Madav House theme: design/objects/icon.css ---- */
+/* ---- Madav House theme: icon ---- */
 /* icon.css - the icon button (a glyph with no box: the accent tint under the pointer, at the control height), the glyph sizes,
    the avatar (a round picture or an initial), the M (Madav's mark), a provider's logo in its square, and a file's kind:
    a PDF, a Word document, a spreadsheet and a presentation filled in their colours, a page and a picture quieter on the box. */
@@ -479,7 +479,7 @@ details[open] > .at-input.at-select { border-color: var(--accent); }
 .at-file.pdf { background-color: var(--file-pdf); } .at-file.word { background-color: var(--file-word); } .at-file.sheet { background-color: var(--file-sheet); } .at-file.slides { background-color: var(--file-slides); }
 .at-file.page { color: var(--file-page); } .at-file.picture { color: var(--file-picture); }
 
-/* ---- Madav House theme: design/objects/tile.css ---- */
+/* ---- Madav House theme: tile ---- */
 /* tile.css - the card (rule 7: every card in a grid the same size): head (glyph, name; a team's name under its faces),
    two lines at most, chips, a foot; the deck (equal columns) and the band (equal tiles that wrap into columns). A deck as
    a list: the same cards one to a row in one box, ruled as rows are, sharing its columns - mark, name and its one line,
@@ -516,7 +516,7 @@ details[open] > .at-input.at-select { border-color: var(--accent); }
 .at-deck.list > .at-tile > :not(.at-tile-head, .at-tile-name, .at-tile-sub, .at-tile-chips, .at-tile-foot) { grid-column: 2 / -1; }
 .at-deck.list > .at-tile > :first-child:not(.at-tile-head, .at-tile-name, .at-tile-sub, .at-tile-chips, .at-tile-foot) { grid-area: mark; margin-right: var(--space-3); }
 
-/* ---- Madav House theme: design/objects/panel.css ---- */
+/* ---- Madav House theme: panel ---- */
 /* panel.css - the page (one centred column, the chat's width: the head, under it tabs, a search or both, then sections), the
    section, the card (a box with a head; the empty card says what will fill it), the strip, and the row and tail that
    place things. Every gap is a shared one. */
@@ -557,7 +557,7 @@ details[open] > .at-input.at-select { border-color: var(--accent); }
 .at-row.compact svg:not(:is([role=menu], dialog) *) { width: var(--space-3); height: var(--space-3); }
 .at-tail { display: inline-flex; align-items: center; gap: var(--control-gap); }
 
-/* ---- Madav House theme: design/objects/table.css ---- */
+/* ---- Madav House theme: table ---- */
 /* table.css - records in columns, in the box: the head in the small medium words over a hairline, rows with a hairline
    between them that take the accent tint under the pointer, the chosen one the tint. Cells: .num (right; its figures are Num), .wrap (may break), .trunc (cut with
    …), .name (a machine name, in the code font). */
@@ -584,7 +584,7 @@ details[open] > .at-input.at-select { border-color: var(--accent); }
 .at-table tr.open td { border-bottom: 0; background: var(--tint); }
 .at-table tr.drawer td { padding: var(--space-4); white-space: normal; background: var(--tint); }
 
-/* ---- Madav House theme: design/objects/heading.css ---- */
+/* ---- Madav House theme: heading ---- */
 /* heading.css - the words. The page's head (the title in the title font, its last word in the accent italic; one line
    under it; the main button at the right) and the section's (a heading, one line, its controls at the right). The
    number that stands alone. Then the small words: kicker, quiet, honest, lede, a verdict's. No capitals for show. */
@@ -620,7 +620,7 @@ details[open] > .at-input.at-select { border-color: var(--accent); }
 .at-cost { font-weight: var(--weight-medium); font-size: var(--size-small); color: var(--ok); }
 .at-cost.paid { color: var(--warn); }
 
-/* ---- Madav House theme: design/objects/tabs.css ---- */
+/* ---- Madav House theme: tabs ---- */
 /* tabs.css - the segmented choice (a few on the tint, the chosen one on the box); the top bar's tabs, folder tabs on
    its line, sharing it the Chrome way (names cut, then glyphs, then slivers; never a scroll), the open one's accent edge. */
 .at-seg { display: inline-flex; align-items: center; gap: var(--space-half); width: fit-content; max-width: 100%; padding: 2px; border-radius: var(--radius); background: var(--tint); }
@@ -659,7 +659,7 @@ details[open] > .at-input.at-select { border-color: var(--accent); }
 .at-ptab:hover { color: var(--text); }
 .at-ptab.on { color: var(--text); border-bottom-color: var(--accent); }
 
-/* ---- Madav House theme: design/objects/progress.css ---- */
+/* ---- Madav House theme: progress ---- */
 /* progress.css - how much, how full: the bar (a thin track with the accent fill, or a meaning's colour), the meter
    (the bar with its number), the line beside a bar, and the ring (a percent as an arc; the small one at the end of the
    ask bar has no number). */
@@ -691,7 +691,7 @@ details[open] > .at-input.at-select { border-color: var(--accent); }
 .at-ring.sm > svg .tr { stroke: var(--line-strong); }
 .at-ring > i { position: relative; font-weight: var(--weight-semibold); font-size: var(--size-small); font-variant-numeric: tabular-nums; color: var(--text); }
 
-/* ---- Madav House theme: design/objects/row.css ---- */
+/* ---- Madav House theme: row ---- */
 /* row.css - rows. The list (rule 7): one box, rows ruled by hairlines; a row is an icon in its box, the name and a line,
    at the right a status, a button, a switch or a time; a faint row (set aside, not found) in the faint ink, its mark
    faded. The sidebar's list: rows at the list row's height, the page you
@@ -748,7 +748,7 @@ details[open] > .at-input.at-select { border-color: var(--accent); }
 .at-list > .at-lh > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .at-list > .at-lh { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-4) var(--space-3) var(--space-1); font-weight: var(--weight-medium); font-size: var(--size-small); color: var(--text-3); }
 
-/* ---- Madav House theme: design/objects/dialog.css ---- */
+/* ---- Madav House theme: dialog ---- */
 /* dialog.css - the pop-up: a native <dialog> in three widths over the scrim, the box with the float shadow, its title
    at the heading size and its buttons at the bottom right. It fades in once. */
 .at-pop { position: fixed; inset: 0; margin: auto; z-index: var(--z-dialog); width: min(var(--dialog), var(--dialog-cap)); max-width: var(--dialog-cap); max-height: var(--dialog-cap-height); overflow: auto; padding: var(--dialog-padding); border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); color: var(--text); box-shadow: var(--shadow); display: flex; flex-direction: column; gap: var(--block-gap); }
@@ -762,7 +762,7 @@ details[open] > .at-input.at-select { border-color: var(--accent); }
 .at-pop > h2 { font-family: var(--font-title); font-weight: var(--weight-semibold); font-size: var(--size-heading); line-height: var(--line-tight); }
 .at-pop > .at-pop-do { display: flex; justify-content: flex-end; gap: var(--control-gap); padding-top: var(--space-2); }
 
-/* ---- Madav House theme: design/objects/toast.css ---- */
+/* ---- Madav House theme: toast ---- */
 /* toast.css - a short word from the app, bottom right, that goes away: the box with the float shadow; a good or bad
    one takes the colour of its meaning on its edge. */
 .at-toast-host { position: fixed; right: var(--space-4); bottom: var(--space-4); z-index: var(--z-toast); display: flex; flex-direction: column; gap: var(--space-2); max-width: var(--toast); pointer-events: none; }
@@ -772,7 +772,7 @@ details[open] > .at-input.at-select { border-color: var(--accent); }
 .at-toast.gone { opacity: 0; }
 .at-toast-host.inline { position: static; }
 
-/* ---- Madav House theme: design/objects/facts.css ---- */
+/* ---- Madav House theme: facts ---- */
 /* facts.css - a short list of facts, each a Fact: term, value. In a grid (the terms in one column, the values in the
    next), side by side (row: the term over the value), or ruled one under another with the term in a fixed column. */
 .at-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--space-1) var(--space-3); font-size: var(--size-small); }
@@ -787,7 +787,7 @@ details[open] > .at-input.at-select { border-color: var(--accent); }
 .at-facts.ruled > div:last-child { border-bottom: 0; }
 .at-facts.ruled dd { font-weight: var(--weight-medium); color: var(--text); font-variant-numeric: tabular-nums; }
 
-/* ---- Madav House theme: components/shell.css ---- */
+/* ---- Madav House theme: shell ---- */
 /* shell.css - where the frame stands: the floating sidebar held off the window's edges beside the main column, the
    folded sidebar's width, the profile row's words. Every look is the objects' (frame.css). */
 .app-v { display: flex; flex-direction: column; height: 100vh; }
