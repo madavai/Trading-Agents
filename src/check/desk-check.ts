@@ -7,6 +7,7 @@ import { probeAll, type ProbeResult } from './probes.js';
 import { VERSION } from '../version.js';
 import { readSettings } from '../settings.js';
 import { readContactEmail } from '../contact.js';
+import { driftOf, listed, plainName, shippedAgentFiles, type Drift } from '../desk/agent-files.js';
 
 export interface Line { ok: boolean; text: string }
 
@@ -40,6 +41,14 @@ export function contactLine(email: string): Line {
     : { ok: false, text: 'Contact email for the SEC: not given yet. The desk needs it before the first analysis: the SEC asks everyone who reads its filings for one. Ask the person for their own email and save it with set_contact_email' };
 }
 
+/** Whether the desk's agents and the team are as the project ships them; a string when they could not be compared. */
+export function agentsLine(drift: Drift | string): Line {
+  if (typeof drift === 'string') return { ok: false, text: `The desk's agents could not be compared with the project's version: ${drift}` };
+  const off = [...drift.changed, ...drift.missing].map(plainName);
+  if (!off.length) return { ok: true, text: "The desk's agents and the trading-desk team are as the project ships them" };
+  return { ok: false, text: `${off.length === 1 ? 'One of the desk\'s agent files differs' : `${off.length} of the desk's agent files differ`} from the project's version (${listed(off)}). A save in Madav's Agent Studio can do this. Ask the desk to reset the team to put them back` };
+}
+
 export function render(lines: Line[], sources: ProbeResult[]): string {
   const mark = (ok: boolean) => (ok ? 'OK ' : 'NO ');
   const out = [`Trading Agents desk check (version ${VERSION})`, '', 'This computer:'];
@@ -51,8 +60,13 @@ export function render(lines: Line[], sources: ProbeResult[]): string {
   return out.join('\n');
 }
 
-export async function deskCheck(root: string = process.cwd(), fetchImpl: typeof fetch = fetch): Promise<string> {
+/** The desk's agent files under `root` against the project's version from the source under `source`. */
+export async function agentDrift(root: string, source: string = root): Promise<Drift | string> {
+  try { return driftOf(root, await shippedAgentFiles(source)); } catch (e) { return (e as Error).message; }
+}
+
+export async function deskCheck(root: string = process.cwd(), fetchImpl: typeof fetch = fetch, source: string = root): Promise<string> {
   const settings = readSettings(root), email = readContactEmail(root);
   const sources = await probeAll(settings.sources.contact, email, fetchImpl);
-  return render([nodeLine(), dataLine(root), contactLine(email), robinhoodLine()], sources);
+  return render([nodeLine(), dataLine(root), contactLine(email), robinhoodLine(), agentsLine(await agentDrift(root, source))], sources);
 }
