@@ -19,10 +19,12 @@ affiliated with them. **Nothing here is investment advice.**
 > **Not yet proven on a real computer:** the dashboard, and a full analysis with company accounts.
 
 ## Start in three steps
-1. In Madav, clone this repository and open its folder.
-2. If Madav asks whether to use this folder's tools, say yes.
-3. Type `/desk-check`. It checks your computer and the free data sources, asks for your email (once), and can test
-   your Robinhood sign-in (read-only).
+1. In Madav, clone this repository. There is nothing to install.
+2. Open **Agent Studio**: the **trading-desk** team and its twelve agents are there, ready. If Madav asks whether to use
+   this folder's tools, say yes.
+3. Ask the team to check this computer, then to analyse a stock ("analyse NVDA") or to open the dashboard. The first
+   check looks at your computer and the free data sources and asks for your email (once). In a chat in this folder the
+   same desk answers to `/desk-check`, `/analyse NVDA` and `/terminal`.
 
 You need Node 22 or later (Madav needs it too). No keys and no installs; only your email, once.
 

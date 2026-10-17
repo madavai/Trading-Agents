@@ -20,6 +20,7 @@ import { parseRating, RATINGS } from '../desk/rating.js';
 import { progress, readSections, savedPlan, saveSection, SECTIONS, writeReport } from '../desk/runs.js';
 import { dueSettlements, settleOne } from '../desk/settle.js';
 import { failureText, NoData, Unavailable } from '../data/http.js';
+import { openDashboard } from '../terminal/launch.js';
 
 const text = (t: string) => ({ content: [{ type: 'text' as const, text: t }] });
 const symbol = z.string().min(1).max(20).describe('The ticker as the plan gives it');
@@ -182,6 +183,12 @@ export function registerDeskTools(server: McpServer, root: string): void {
     const entries = journalOf(root, w).load();
     return `Backtest sweep ${id}: ${entries.length} call(s) recorded${meta}\n\n${renderSummary(summarize(entries))}`;
   }));
+
+  server.registerTool('open_dashboard', {
+    title: 'Open the dashboard',
+    description: "Start the Trading Agents dashboard on this computer and open it in the person's browser, or open the one already running. Use when the person asks to see the dashboard, their accounts, the markets or the desk's calls. It only starts the page; everything on it, Robinhood and any order included, is the person's own to press.",
+    annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false },
+  }, async () => act(() => openDashboard(root)));
 
   server.registerTool('read_queue', {
     title: 'Analyses waiting',

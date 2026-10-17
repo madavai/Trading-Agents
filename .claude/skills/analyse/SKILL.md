@@ -57,7 +57,7 @@ After each step, check it was saved: call `read_run` without sections and see th
    - where the full report is;
    - that the call is now in the journal and will be scored against its market index after the holding window.
 
-   Do not add numbers of your own. Say that this is not investment advice, and that the desk proposes but never trades: deciding and placing an order come in a later milestone, through the person's own confirmation.
+   Do not add numbers of your own. Say that this is not investment advice, and that the desk proposes but never trades: the person decides on the dashboard ("Decide…" on the call), and only their own Confirm there places an order.
 
 ## Never
 - Never call a broker connection, open Robinhood's site, or call a tool that trades or moves money. Agents in this folder have no such tool, and the guard refuses one.
