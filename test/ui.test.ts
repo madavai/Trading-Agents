@@ -73,6 +73,22 @@ test('the dashboard\'s own sheet only places House tokens: no colours or fonts o
   assert.deepEqual([...used].filter((t) => !defined.has(t)), []);
 });
 
+test('what the page hides stays hidden: a class that sets display has a [hidden] rule beside it', () => {
+  const html = read('index.html'), css = read('house.css') + read('dashboard.css');
+  const missing: string[] = [];
+  for (const m of html.matchAll(/<(\w+)\s([^>]*)>/g)) {
+    const tag = m[1]!, attrs = ` ${m[2]!}`;
+    if (!/\shidden(?=[\s/]|$)/.test(attrs)) continue;   // the hidden attribute itself, not aria-hidden
+    const id = /\sid="([^"]+)"/.exec(attrs)?.[1];
+    const ruled = (cls: string) => new RegExp(`(?:\\.${cls}|#${id ?? '-'}|(?:^|[\\s>])${tag})\\[hidden\\]`, 'm').test(css);
+    for (const cls of /\sclass="([^"]+)"/.exec(attrs)?.[1]?.split(/\s+/) ?? []) {
+      const sets = new RegExp(`\\.${cls}(?![\\w-])[^{},]*\\{[^}]*\\bdisplay\\s*:\\s*(?!none)`).test(css);
+      if (sets && !ruled(cls)) missing.push(`.${cls}${id ? ` (#${id})` : ''}`);
+    }
+  }
+  assert.deepEqual(missing, []);
+});
+
 test('every House object the page names is defined in the House sheet', () => {
   const house = read('house.css'), mine = read('dashboard.css');
   const names = new Set<string>();

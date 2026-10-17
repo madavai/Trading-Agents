@@ -2,7 +2,7 @@
 // scorecard worked out from them, the watchlist, the analyses waiting, and the person's Robinhood accounts on a page of
 // their own. A number that cannot be had is a dash. An order starts only from a ticket - one of the desk's calls
 // (Decide…) or the person's own (Trade…) - and is placed only on their Confirm, with trading switched on by them.
-import { api, ApiError, type CallDetail, type DeskState, type History, type LinkInfo, type Market, type QuoteResult, type Account, type AccountView, type Holding, type Order, type Snapshot, type TicketOpen, type Check, type Review, type Placed, type Trading } from './api.js';
+import { api, ApiError, type CallDetail, type DeskState, type History, type LinkInfo, type Market, type Match, type Prefs, type QuoteResult, type Account, type AccountView, type Holding, type Order, type Recent, type Snapshot, type TicketOpen, type Check, type Review, type Placed, type Trading } from './api.js';
 import { heroChart, sparkline } from './chart.js';
 import { barOn, clock, dayText, esc, labelled, money, num, opening, pct, plain, ratingTone, SECTION_NAMES, shortDay, tone } from './fmt.js';
 import { markdown } from './md.js';
@@ -41,10 +41,27 @@ const quoteOf = (sym: string): Quote | null => { const q = S.quotes.get(sym) ?? 
 const marketOf = (sym: string): Market | undefined => S.markets.find((m) => m.symbol === sym);
 const say = (e: unknown): string => (e instanceof ApiError ? e.message : 'The dashboard could not reach the desk.');
 
-// What the viewer likes (the face, the range) is kept in this browser only; the page works without it.
-const keep = (k: string, v?: string): string | null => {
-  try { if (v !== undefined) localStorage.setItem(`ta.${k}`, v); return localStorage.getItem(`ta.${k}`); } catch { return null; }
-};
+// What the person chose (the face, the side list, the page, the stock and its chart, the stocks looked at last) is
+// remembered in the desk's own folder, so the dashboard opens as they left it in any browser and after a restart. A copy
+// in this browser paints the face at once. Nothing about an order is ever remembered.
+const P: Prefs = {};
+let saving: ReturnType<typeof setTimeout> | null = null;
+function remember(change: Prefs): void {
+  Object.assign(P, change);
+  try { localStorage.setItem('ta.prefs', JSON.stringify(P)); } catch { /* the page works without it */ }
+  if (saving) clearTimeout(saving);
+  saving = setTimeout(() => { saving = null; void api.savePrefs(P).catch(() => { /* kept in this browser; the next change tries again */ }); }, 400);
+}
+/** This browser's copy, and before it the single choices older dashboards kept here. */
+function browserPrefs(): Prefs {
+  try {
+    const kept = JSON.parse(localStorage.getItem('ta.prefs') ?? 'null') as Prefs | null;
+    if (kept && typeof kept === 'object') return kept;
+    const old = (k: string) => localStorage.getItem(`ta.${k}`) ?? undefined;
+    return { theme: old('theme'), side: old('side'), range: old('range'), kind: old('kind') } as Prefs;
+  } catch { return {}; }
+}
+const RECENT_MAX = 6;
 
 function toast(text: string, kind: 'ok' | 'bad' = 'ok'): void {
   const el = document.createElement('div');
@@ -60,20 +77,33 @@ async function run(job: () => Promise<void>): Promise<void> {
 }
 
 // ---------- the face ----------
-function setTheme(t: 'dark' | 'light'): void {
+function setTheme(t: 'dark' | 'light', save = true): void {
   document.documentElement.dataset.theme = t;
   const btn = $('#themeBtn'), to = t === 'dark' ? 'light' : 'dark';
   btn.setAttribute('aria-label', `Switch to the ${to} face`); btn.title = `Switch to the ${to} face`;
   btn.querySelector('use')!.setAttribute('href', t === 'dark' ? '#i-sun' : '#i-moon');
-  keep('theme', t);
+  if (save) remember({ theme: t });
 }
 
-/** The side list open, or folded into a slim strip of icons so the page takes the whole width; kept in this browser. */
-function setSide(folded: boolean): void {
+/** The side list open, or folded into a slim strip of icons so the page takes the whole width. */
+function setSide(folded: boolean, save = true): void {
   $('#sideOpen').hidden = folded;
   $('#sideFolded').hidden = !folded;
-  keep('side', folded ? 'folded' : 'open');
+  if (save) remember({ side: folded ? 'folded' : 'open' });
   if (S.symbol) renderHero();   // the chart redraws to its new width
+}
+
+/** Takes on what was remembered: each value only if it is one the page knows. */
+function adopt(p: Prefs): void {
+  if (p.theme === 'light' || p.theme === 'dark') setTheme(p.theme, false);
+  if (p.side === 'open' || p.side === 'folded') setSide(p.side === 'folded', false);
+  if (p.range && (RANGES as readonly string[]).includes(p.range)) S.range = p.range;
+  if (p.kind === 'area' || p.kind === 'candles') S.kind = p.kind;
+  if (p.layers && ['ma50', 'ma200', 'vol'].every((k) => typeof (p.layers as Record<string, unknown>)[k] === 'boolean')) S.layers = { ...p.layers };
+  Object.assign(P, {
+    ...(p.theme ? { theme: p.theme } : {}), ...(p.side ? { side: p.side } : {}), ...(p.view ? { view: p.view } : {}), ...(p.symbol ? { symbol: p.symbol } : {}),
+    range: S.range, kind: S.kind, layers: { ...S.layers }, recent: Array.isArray(p.recent) ? p.recent.slice(0, RECENT_MAX) : P.recent ?? [],
+  });
 }
 
 // ---------- pieces ----------
@@ -87,8 +117,13 @@ const latestCall = (sym: string) => S.desk?.calls.find((c) => c.ticker === sym) 
 const nameOf = (sym: string): string => quoteOf(sym)?.name ?? S.history?.name ?? marketOf(sym)?.name ?? sym;
 
 // ---------- header, side list ----------
+/** The dashboard was stopped from this page, or is restarting into an update. */
+const life = { stopped: false, updating: false };
+
 function renderSub(): void {
   const d = S.desk;
+  if (life.stopped) { $('#subline').textContent = 'The dashboard is stopped. To open it again, ask the trading-desk team to "open the dashboard", or run /terminal.'; return; }
+  if (life.updating) { $('#subline').textContent = 'The desk was updated: the dashboard is restarting with the new version, and this page reloads by itself.'; return; }
   if (S.lost) { $('#subline').textContent = 'The dashboard has lost the desk. Run /terminal in Madav to start it again.'; return; }
   if (!d) { $('#subline').textContent = "Reading the desk's files."; return; }
   const w = d.watchlist.length, c = d.calls.length, q = d.queue.length;
@@ -735,9 +770,10 @@ function renderAll(): void {
 }
 
 /** Shows the desk or the account page; the side list marks where the person is. */
-function showView(v: 'overview' | 'account'): void {
+function showView(v: 'overview' | 'account', save = true): void {
   const was = view;
   view = v;
+  if (save) remember({ view: v });
   $('#view-overview').hidden = v !== 'overview';
   $('#view-account').hidden = v !== 'account';
   const nav = $('#navOverview');
@@ -755,21 +791,33 @@ function ready(): boolean {
   return false;
 }
 
-function select(sym: string): void {
+/** Puts a stock on the chart and the stock page. One the person chose is remembered, and joins their recent stocks. */
+function select(sym: string, chosen = true, name = ''): void {
   if (!sym) return;
   S.symbol = sym; S.history = null; S.historyError = '';
+  if (chosen) remember({ symbol: sym, recent: withRecent(sym, name) });
   renderFavs(); renderControls(); renderHero(); renderCall(); renderStock(); renderWatch(); renderMarkets();
   void loadHistory();
   void refreshQuotes();
+}
+
+/** The recent stocks with this one first: its name as given, else as last known. */
+function withRecent(sym: string, name = ''): Recent[] {
+  const before = (P.recent ?? []).find((r) => r.symbol === sym)?.name ?? '';
+  const known = name || nameOf(sym);
+  const named = known && known !== sym ? known : before || sym;
+  return [{ symbol: sym, name: named }, ...(P.recent ?? []).filter((r) => r.symbol !== sym)].slice(0, RECENT_MAX);
 }
 
 async function refreshState(): Promise<void> {
   try {
     S.desk = await api.state(); S.lost = false;
     const watch = S.desk.watchlist.map((w) => w.symbol);
-    if (!S.symbol || (!watch.includes(S.symbol) && !isIndex(S.symbol))) {
-      const first = S.desk.watchlist.find((w) => w.favourite)?.symbol ?? watch[0] ?? '^GSPC';
-      select(first);
+    const shown = (s: string | undefined): s is string => !!s && (watch.includes(s) || isIndex(s));
+    if (!shown(S.symbol)) {
+      // The stock the person had on the chart last time, if it is still there; else the first starred, else the first.
+      const first = shown(P.symbol) ? P.symbol : S.desk.watchlist.find((w) => w.favourite)?.symbol ?? watch[0] ?? '^GSPC';
+      select(first, false);
     }
     renderAll();
   } catch { S.lost = true; renderSub(); }
@@ -814,6 +862,7 @@ document.addEventListener('click', (e) => {
   const dlg = $<HTMLDialogElement>('#callDialog');
   if (e.target === dlg) { dlg.close(); return; }
   if (e.target === $('#ticketDialog')) { $<HTMLDialogElement>('#ticketDialog').close(); T.open = null; return; }
+  if (e.target === $('#stopDialog')) { $<HTMLDialogElement>('#stopDialog').close(); return; }
   const el = (e.target as Element).closest<HTMLElement>('[data-act]');
   if (!el) return;
   const sym = el.dataset.symbol ?? '';
@@ -822,9 +871,22 @@ document.addEventListener('click', (e) => {
     case 'view': showView(el.dataset.view === 'account' ? 'account' : 'overview'); break;
     case 'side': setSide(el.dataset.side === 'fold'); break;
     case 'theme': setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'); break;
-    case 'kind': S.kind = el.dataset.kind === 'candles' ? 'candles' : 'area'; keep('kind', S.kind); renderControls(); renderHero(); break;
-    case 'range': { const r = el.dataset.range as Range; if (RANGES.includes(r) && r !== S.range) { S.range = r; keep('range', r); S.history = null; S.historyError = ''; renderControls(); renderHero(); void loadHistory(); } break; }
-    case 'layer': { const k = el.dataset.layer as keyof typeof S.layers; S.layers[k] = !S.layers[k]; renderControls(); renderHero(); break; }
+    case 'kind': S.kind = el.dataset.kind === 'candles' ? 'candles' : 'area'; remember({ kind: S.kind }); renderControls(); renderHero(); break;
+    case 'range': { const r = el.dataset.range as Range; if (RANGES.includes(r) && r !== S.range) { S.range = r; remember({ range: r }); S.history = null; S.historyError = ''; renderControls(); renderHero(); void loadHistory(); } break; }
+    case 'layer': { const k = el.dataset.layer as keyof typeof S.layers; S.layers[k] = !S.layers[k]; remember({ layers: { ...S.layers } }); renderControls(); renderHero(); break; }
+    case 'find-pick': { const r = findRows()[Number(el.dataset.i)]; if (r) pick(r); break; }
+    case 'find-clear': remember({ recent: [] }); F.mode = 'closed'; renderFind(); break;
+    case 'restart':
+      if ($<HTMLDialogElement>('#ticketDialog').open) { toast('Finish or close the order ticket first, then restart.', 'bad'); break; }
+      void run(async () => { await api.restart(); await updating(); });
+      break;
+    case 'stop-ask': $<HTMLDialogElement>('#stopDialog').showModal(); break;
+    case 'stop-cancel': $<HTMLDialogElement>('#stopDialog').close(); break;
+    case 'stop-yes': void run(async () => {
+      await api.stop();
+      life.stopped = true; $<HTMLDialogElement>('#stopDialog').close(); renderSub();
+      toast('The dashboard is stopped. Ask the team to open it again any time.');
+    }); break;
     case 'select': select(sym); break;
     case 'fav': void run(async () => { const on = !S.desk?.watchlist.find((w) => w.symbol === sym)?.favourite; await api.favourite(sym, on); await refreshState(); }); break;
     case 'remove': void run(async () => { await api.removeWatch(sym); await refreshState(); toast(`${sym} is off the watchlist.`); }); break;
@@ -858,27 +920,159 @@ void loadTrading(); }); break;
 
 document.addEventListener('input', (e) => { const id = (e.target as Element).id; if (id === 'tkQty' || id === 'tkLimit') ticketEdited(); });
 
+// ---------- finding a stock ----------
+// As the person types a name or a ticker, Yahoo Finance's matches drop down under the box: the ticker, the name, the
+// market and the kind, with the desk's latest rating and a mark when it is already watched. An empty box shows the
+// stocks they looked at last. Arrow keys move, Enter picks (the first match when none is marked), Esc closes.
+type FindRow = { symbol: string; name: string; exchange?: string; kind?: string };
+const F = { mode: 'closed' as 'closed' | 'recent' | 'loading' | 'matches' | 'failed', query: '', matches: [] as Match[], active: -1, seq: 0, timer: null as ReturnType<typeof setTimeout> | null };
+const FIND_QUERY = /^[\p{L}\p{N} .&'\-^=,]{1,40}$/u;
+const findInput = $<HTMLInputElement>('#addInput');
+
+const findRows = (): FindRow[] => (F.mode === 'recent' ? P.recent ?? [] : F.mode === 'matches' || F.mode === 'loading' ? F.matches : []);
+
+function findRow(r: FindRow, i: number): string {
+  const watched = S.desk?.watchlist.some((w) => w.symbol === r.symbol), call = latestCall(r.symbol);
+  const where = [r.exchange, r.kind].filter(Boolean).join(' · ');
+  const name = r.name && r.name !== r.symbol ? r.name : '';
+  return `<li class="ta-opt${i === F.active ? ' on' : ''}" role="option" id="find-${i}" aria-selected="${i === F.active}" data-act="find-pick" data-i="${i}">
+    <b class="ta-opt-sym">${esc(r.symbol)}</b>
+    <span class="ta-opt-name"><span>${esc(name)}</span>${where ? `<small>${esc(where)}</small>` : ''}</span>
+    <span class="ta-opt-tags">${call ? ratingChip(call.rating) : ''}${watched ? '<span class="at-chip">Watched</span>' : ''}</span>
+  </li>`;
+}
+
+function renderFind(): void {
+  const rows = findRows(), panel = $('#findPanel');
+  const open = F.mode !== 'closed' && (rows.length > 0 || F.mode !== 'recent');
+  panel.hidden = !open;
+  findInput.setAttribute('aria-expanded', String(open));
+  if (F.active >= 0 && rows[F.active]) findInput.setAttribute('aria-activedescendant', `find-${F.active}`); else findInput.removeAttribute('aria-activedescendant');
+  if (!open) return;
+  const q = esc(F.query);
+  $('#findHead').innerHTML = F.mode === 'recent'
+    ? '<span><svg class="g"><use href="#i-history"/></svg>Recent</span><button type="button" class="at-btn at-press" data-act="find-clear">Clear</button>'
+    : `<span><svg class="g"><use href="#i-search"/></svg>${F.mode === 'loading' ? `Looking for “${q}”…` : `Matches for “${q}”`}</span>`;
+  $('#findList').innerHTML = rows.map(findRow).join('');
+  $('#findFoot').textContent = F.mode === 'failed' ? `Yahoo Finance's search did not answer. Press Enter to add “${F.query}” as a ticker.`
+    : F.mode === 'matches' && !rows.length ? `Nothing matches “${F.query}” at Yahoo Finance. Check the spelling, or type the ticker.`
+    : F.mode === 'recent' ? 'The stocks you looked at last. Type to search.' : 'From Yahoo Finance · ↑ ↓ to move · Enter to add · Esc to close';
+  document.getElementById(`find-${F.active}`)?.scrollIntoView({ block: 'nearest' });
+}
+
+/** Asks for the matches and shows them; gives back the one marked (the exact ticker, else the first), or null. */
+async function findNow(q: string): Promise<Match | null> {
+  const seq = ++F.seq;
+  try {
+    const { matches } = await api.search(q);
+    if (seq !== F.seq) return null;
+    F.matches = matches; F.mode = 'matches';
+    const exact = matches.findIndex((m) => m.symbol === q.toUpperCase());
+    F.active = matches.length ? Math.max(0, exact) : -1;
+  } catch {
+    if (seq !== F.seq) return null;
+    F.matches = []; F.mode = 'failed'; F.active = -1;
+  }
+  renderFind();
+  return F.matches[F.active] ?? null;
+}
+
+function closeFind(clear = false): void {
+  if (F.timer) { clearTimeout(F.timer); F.timer = null; }
+  F.seq++; F.mode = 'closed'; F.active = -1;
+  if (clear) { findInput.value = ''; F.matches = []; F.query = ''; }
+  renderFind();
+}
+
+/** A stock picked from the list: charted when it is already watched (or an index), added to the watchlist when not. */
+function pick(r: FindRow): void {
+  closeFind(true);
+  findInput.blur();
+  if (S.desk?.watchlist.some((w) => w.symbol === r.symbol) || isIndex(r.symbol)) select(r.symbol, true, r.name);
+  else { remember({ recent: withRecent(r.symbol, r.name) }); void addStock(r.symbol); }
+}
+
+findInput.addEventListener('input', () => {
+  const q = findInput.value.trim();
+  if (F.timer) { clearTimeout(F.timer); F.timer = null; }
+  F.active = -1;
+  if (!q) { F.seq++; F.query = ''; F.matches = []; F.mode = P.recent?.length ? 'recent' : 'closed'; renderFind(); return; }
+  if (!FIND_QUERY.test(q)) { closeFind(); return; }
+  F.query = q; F.mode = 'loading'; renderFind();
+  F.timer = setTimeout(() => { F.timer = null; void findNow(q); }, 250);   // Yahoo is asked once the typing pauses
+});
+findInput.addEventListener('focus', () => { if (!findInput.value.trim() && P.recent?.length) { F.mode = 'recent'; F.active = -1; renderFind(); } });
+findInput.addEventListener('blur', () => closeFind());
+findInput.addEventListener('keydown', (e) => {
+  const rows = findRows();
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    if (F.mode === 'closed' && !findInput.value.trim() && P.recent?.length) { F.mode = 'recent'; renderFind(); }
+    const n = findRows().length;
+    if (!n) return;
+    e.preventDefault();
+    F.active = e.key === 'ArrowDown' ? (F.active + 1) % n : (F.active - 1 + n) % n;
+    renderFind();
+  } else if (e.key === 'Escape' && F.mode !== 'closed') { e.preventDefault(); closeFind(); }
+  else if (e.key === 'Enter' && F.active >= 0 && rows[F.active]) { e.preventDefault(); pick(rows[F.active]!); }
+});
+// A press on the list must not take the focus from the box first, or the list would close before the press lands.
+$('#findPanel').addEventListener('mousedown', (e) => e.preventDefault());
+
 $('#addForm').addEventListener('submit', (e) => {
   e.preventDefault();
-  const input = $<HTMLInputElement>('#addInput');
-  const raw = input.value; input.value = '';
-  void addStock(raw);
+  void (async () => {
+    const q = findInput.value.trim();
+    if (!q) return;
+    if (F.mode === 'loading' && FIND_QUERY.test(q)) {   // Enter before the matches came: wait for them, then take the best
+      if (F.timer) { clearTimeout(F.timer); F.timer = null; }
+      const best = await findNow(q);
+      if (best) { pick(best); return; }
+    }
+    closeFind(true);
+    void addStock(q);
+  })();
 });
 
 // ---------- start ----------
-const savedRange = keep('range'), savedKind = keep('kind'), savedTheme = keep('theme');
-if (savedRange && (RANGES as readonly string[]).includes(savedRange)) S.range = savedRange as Range;
-if (savedKind === 'candles') S.kind = 'candles';
-setTheme(savedTheme === 'light' || savedTheme === 'dark' ? savedTheme : matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
-setSide(keep('side') === 'folded');
-
-let seen = '';
-async function watchFiles(): Promise<void> {
-  if (document.hidden) return;
+// The face from this browser's copy at once; then what the desk's folder remembers, which wins. On the first visit after
+// this update, this browser's older choices are kept in the desk's folder.
+const here = browserPrefs();
+adopt(here);
+if (here.theme !== 'light' && here.theme !== 'dark') setTheme(matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark', false);
+async function loadPrefs(): Promise<void> {
   try {
-    const { version } = await api.version();
-    if (version !== seen || S.lost) { seen = version; await refreshState(); }
+    const kept = await api.prefs();
+    if (Object.keys(kept).length) adopt(kept);
+    else if (Object.values(here).some((v) => v !== undefined)) remember({});
+    try { localStorage.setItem('ta.prefs', JSON.stringify(P)); } catch { /* the page works without it */ }
+  } catch { /* this browser's copy stands */ }
+  if (P.view === 'account') showView('account', false);
+}
+
+let seen = '', build = '';
+async function watchFiles(): Promise<void> {
+  if (document.hidden || life.stopped || life.updating) return;
+  try {
+    const v = await api.version();
+    build ||= v.build;
+    if (v.restarting) { void updating(); return; }
+    $('#updateBar').hidden = !v.update;   // new code is on disk: Restart is offered, never done without the person
+    if (v.version !== seen || S.lost) { seen = v.version; await refreshState(); }
   } catch { S.lost = true; renderSub(); }
+}
+
+/** The dashboard is restarting into an update: wait until the new one answers here, then reload into it. */
+async function updating(): Promise<void> {
+  if (life.updating) return;
+  life.updating = true; renderSub();
+  $('#updateBar').hidden = true;
+  toast('The dashboard is restarting with the new version. This page reloads in a moment.');
+  for (const until = Date.now() + 90_000; Date.now() < until; ) {
+    await new Promise((r) => setTimeout(r, 1_000));
+    try { const p = await api.ping(); if (p.build && p.build !== build) { location.reload(); return; } } catch { /* not back yet */ }
+  }
+  life.updating = false; S.lost = true;
+  $('#subline').textContent = 'The dashboard did not come back after its update. Ask the trading-desk team to open the dashboard, or run /terminal.';
 }
 
 // Prices are asked for every 30 seconds while a market is open and every 2 minutes after: Yahoo is a free service and is not hammered.
@@ -890,6 +1084,6 @@ async function prices(): Promise<void> {
 
 window.addEventListener('resize', () => { renderHero(); });
 renderControls();
-void refreshState().then(() => void prices());
+void loadPrefs().then(() => refreshState()).then(() => void prices());
 void refreshRobinhood();
 setInterval(() => void watchFiles(), 3_000);

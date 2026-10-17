@@ -1,5 +1,6 @@
 // The dashboard's local server: one page and its data, on this computer only. It reads the desk's own files and Yahoo
-// Finance's public prices, keeps the person's watchlist and the analyses they ask for, and can connect to Robinhood to
+// Finance's public prices and search, keeps the person's watchlist, the analyses they ask for and what the page should
+// remember (never anything about an order), and can connect to Robinhood to
 // read (robinhood/link.ts); it holds no order and never hands the page a key. Everything it accepts is checked: the
 // address it was reached by, where a change came from, and a token made at start-up that only the page it served knows,
 // so another web page open in the same browser cannot use it.
@@ -24,6 +25,8 @@ import { readSettings } from '../settings.js';
 import { VERSION } from '../version.js';
 import { callOf, stateOf, versionOf } from './state.js';
 import { clearQuotes, history, isRange, MARKETS, quote } from './quotes.js';
+import { findSymbols, QUERY } from './search.js';
+import { readPrefs, savePrefs } from './prefs.js';
 import { addWatch, dequeue, enqueue, removeWatch, setFavourite } from './store.js';
 
 export interface Asset { type: string; body: Buffer | string }
@@ -69,8 +72,27 @@ const SECURITY = {
 
 class Refused extends Error { constructor(readonly status: number, message: string) { super(message); } }
 
-export async function startTerminal(opts: { root: string; assets: Assets; port?: number; robinhood?: Link }): Promise<Terminal> {
+/** A short fingerprint of the dashboard's own code on disk. When an update changes it, the running dashboard is old. */
+export function fingerprint(files: readonly string[]): string {
+  const h = crypto.createHash('sha256');
+  for (const f of files) { try { h.update(fs.readFileSync(f)); } catch { h.update(`missing ${f}`); } }
+  return h.digest('hex').slice(0, 12);
+}
+
+export interface TerminalOptions {
+  root: string; assets: Assets; port?: number; robinhood?: Link;
+  /** The files of the dashboard's own code; when they change on disk, the page offers Restart, which calls `restart`. */
+  code?: string[]; restart?: () => void;
+  /** Stops the dashboard when the person presses Stop on the page. */
+  stop?: () => void;
+  /** How often to look at the code on disk (every 15 seconds). */
+  updateCheckMs?: number;
+}
+
+export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
   const { root, assets } = opts, dir = deskDataDir(root), token = crypto.randomBytes(24).toString('hex'), deskId = deskIdOf(root);
+  const code = opts.code ?? [], build = fingerprint(code);
+  let updated = false, restarting = false;
   const robinhood = opts.robinhood ?? new Link(robinhoodFile());
   // Tickets the person has open: what a call proposed on the real figures (or, for the person's own order, one share of
   // the stock they chose), and Robinhood's check once they press Review. Kept in memory for a quarter of an hour; the page
@@ -133,7 +155,7 @@ export async function startTerminal(opts: { root: string; assets: Assets; port?:
       const text = p === '/' ? String(a.body).replace('__DESK_TOKEN__', token) : a.body;
       return send(res, 200, text, a.type, { 'Cache-Control': 'no-cache' });
     }
-    if (method === 'GET' && p === '/api/ping') return json(res, 200, { app: 'trading-agents', version: VERSION, desk: deskId });
+    if (method === 'GET' && p === '/api/ping') return json(res, 200, { app: 'trading-agents', version: VERSION, desk: deskId, build });
     if (!p.startsWith('/api/')) throw new Refused(404, 'not found');
 
     // Every call to the data needs the token the page was given; a change must also come from this page's own address.
@@ -143,7 +165,13 @@ export async function startTerminal(opts: { root: string; assets: Assets; port?:
 
     if (method === 'GET') {
       if (p === '/api/state') return json(res, 200, stateOf(root, day));
-      if (p === '/api/version') return json(res, 200, { version: versionOf(root) });
+      if (p === '/api/version') return json(res, 200, { version: versionOf(root), build, update: updated, restarting });
+      if (p === '/api/prefs') return json(res, 200, readPrefs(dir));
+      if (p === '/api/search') {
+        const q = (url.searchParams.get('q') ?? '').trim();
+        if (!QUERY.test(q)) throw new Refused(400, 'type a name or a ticker, in at most 40 letters');
+        try { return json(res, 200, { matches: await findSymbols(q) }); } catch { throw new Refused(502, "Yahoo Finance's search did not answer: type the ticker instead"); }
+      }
       if (p === '/api/robinhood') return json(res, 200, robinhood.info());
       if (p === '/api/trading') return json(res, 200, { ...robinhood.trading(), placedToday: placedToday(dir, new Date()) });
       if (p === '/api/robinhood/accounts') return json(res, 200, await askRobinhood(() => robinhood.accounts()));
@@ -178,6 +206,24 @@ export async function startTerminal(opts: { root: string; assets: Assets; port?:
     if (p === '/api/favourite' && method === 'POST') return json(res, 200, { watchlist: setFavourite(dir, name, b.favourite === true) });
     if (p === '/api/queue' && method === 'POST') return json(res, 200, { queue: enqueue(dir, name, new Date().toISOString()) });
     if (p === '/api/queue' && method === 'DELETE') return json(res, 200, { queue: dequeue(dir, name) });
+    if (p === '/api/prefs' && method === 'POST') return json(res, 200, savePrefs(dir, b));
+    if (p === '/api/stop' && method === 'POST') {
+      if (!opts.stop) throw new Refused(404, 'not found');
+      const stop = opts.stop;
+      res.once('finish', () => { setTimeout(stop, 100); });
+      return json(res, 200, { stopping: true });
+    }
+    // Restart into an update: only on the person's press, only when new code is on disk, never while an order is being sent.
+    if (p === '/api/restart' && method === 'POST') {
+      if (!opts.restart) throw new Refused(404, 'not found');
+      if (!updated) throw new Refused(409, 'there is no update to restart into');
+      if ([...tickets.values()].some((t) => t.placing)) throw new Refused(409, 'an order is being sent: restart when it is done');
+      restarting = true;
+      const restart = opts.restart;
+      res.once('finish', () => { setTimeout(restart, 100); });
+      return json(res, 200, { restarting: true });
+    }
+    if (restarting && p.startsWith('/api/ticket')) throw new Refused(503, 'the dashboard is restarting with an update: open the ticket again in a moment');
     // Robinhood: connect (sends the person to Robinhood's own page), check (asks, opens nothing) and disconnect (deletes the saved sign-in).
     if (p === '/api/robinhood/connect' && method === 'POST') return json(res, 200, robinhood.startSignIn());
     if (p === '/api/robinhood/check' && method === 'POST') return json(res, 200, await robinhood.check());
@@ -286,5 +332,18 @@ export async function startTerminal(opts: { root: string; assets: Assets; port?:
   // Yahoo's prices are held in memory for a short while; clear them now and then so a dashboard left open stays current.
   const sweep = setInterval(() => { clearCache(); clearQuotes(); }, 60_000);
   sweep.unref();
-  return { url: `http://127.0.0.1:${port}/`, port, token, deskId, close: () => new Promise((resolve) => { clearInterval(sweep); server.close(() => resolve()); server.closeAllConnections?.(); }) };
+
+  // When an update puts new code on disk, the page offers Restart; the dashboard never restarts into new code by itself,
+  // so code changed on this computer runs only after the person's own press. After it, the page reloads once the new one
+  // answers, on the same address, so it opens where the person left it.
+  let pending = '';
+  const updates = opts.restart && code.length ? setInterval(() => {
+    if (updated) return;
+    const now = fingerprint(code);
+    if (now === build) { pending = ''; return; }
+    if (now !== pending) { pending = now; return; }   // changed: wait one more look, so an update still being written settles
+    updated = true;
+  }, opts.updateCheckMs ?? 15_000) : null;
+  updates?.unref();
+  return { url: `http://127.0.0.1:${port}/`, port, token, deskId, close: () => new Promise((resolve) => { clearInterval(sweep); if (updates) clearInterval(updates); server.close(() => resolve()); server.closeAllConnections?.(); }) };
 }

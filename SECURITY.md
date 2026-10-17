@@ -39,6 +39,12 @@ folder asks you before it runs one.
 - Your email goes to the SEC alone, which asks every reader of its filings for one.
 - The dashboard answers on this computer's own address only, so nothing on the internet can reach it, and every request
   for data needs a key made each time it starts.
+- What the dashboard remembers between visits (light or dark, the side list, the page and the stock you were on, the
+  chart's settings and the stocks you looked at last) is kept in `desk-data/dashboard.json`. Nothing about an order is
+  ever remembered: every ticket starts afresh.
+- After an update the dashboard offers Restart at the top of the page: new code on this computer runs only after your
+  press, and never while an order is being sent. Stop, at the top right of the page, closes it.
+- The search box sends what you type to Yahoo Finance's public search, which suggests matching stocks.
 
 ## Limits
 - Any program on this computer, under any user account on it, can reach the dashboard's address and read its page and

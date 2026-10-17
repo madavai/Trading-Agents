@@ -31,7 +31,10 @@
   compares the folder with it (a save in Agent Studio can rewrite the files), and the desk tool `reset_team` writes it
   back on the person's confirmed yes (`src/desk/agent-files.ts`), touching no other file.
 - `src/terminal/` - the dashboard: `server.ts` (loopback only, host and origin checks, a per-start token, strict CSP),
-  `quotes.ts` (Yahoo prices), `state.ts` and `store.ts` (the desk's files, the watchlist and the queue), and `ui/` (the
+  `quotes.ts` (Yahoo prices), `search.ts` (Yahoo's matches for what is typed), `prefs.ts` (what the page remembers, in
+  `desk-data/dashboard.json`, each value checked), `state.ts` and `store.ts` (the desk's files, the watchlist and the
+  queue), `main.ts` (the program: Stop, and Restart into an update on the person's press only, on the same address
+  with `--port=N`), and `ui/` (the
   page: `house.css` is the Madav House theme, `dashboard.css` only places its objects with tokens, `main.ts` and the
   rest are the page). The page has no inline script or style (the policy refuses them): colours in charts come from
   classes, and anything an agent wrote goes through `md.ts`, which escapes first. `npm run build` bundles the page into

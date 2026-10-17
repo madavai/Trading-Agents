@@ -21,7 +21,8 @@ In a chat here:
 - `/terminal`: opens the dashboard on this computer (`node dist/terminal.mjs`): markets, charts, watchlist, the desk's
   calls and scorecard, a list of stocks to analyse, a page per stock, and the person's own Connect to Robinhood.
   `/analyse` with no stock runs that list. An order is placed only by the person's own Confirm there, with trading
-  switched on by them.
+  switched on by them. It remembers where the person left it, offers Restart after an update (new code runs only on
+  the person's press) and has its own Stop.
 - `/routine morning|evening`: the morning routine (score past calls, analyse what is waiting and the starred
   watchlist stocks, list the new calls to decide on) or the evening wrap-up (score what is ready, report the day's
   calls and orders). Madav's scheduler can start them as the trading-desk team. They never place an order.

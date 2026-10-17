@@ -13,6 +13,8 @@ import { saveSection } from '../src/desk/runs.js';
 import { saveContactEmail } from '../src/contact.js';
 import { deskServer } from '../src/tools/server.js';
 import { clearQuotes, parseQuote } from '../src/terminal/quotes.js';
+import { clearSearches, parseSearch } from '../src/terminal/search.js';
+import { MAX_RECENT } from '../src/terminal/prefs.js';
 import { summaryOf } from '../src/terminal/state.js';
 import { startTerminal, type Assets, type Terminal } from '../src/terminal/server.js';
 import { enqueue, MAX_QUEUE, MAX_WATCH, addWatch } from '../src/terminal/store.js';
@@ -203,4 +205,98 @@ test('history comes with 50- and 200-day averages that are whole at the left edg
   assert.ok(Math.abs(h.ma50[h.ma50.length - 1] - h.bars.slice(-1)[0].close) < 30);
   assert.equal((await call(term, 'GET', '/api/history?symbol=NVDA&range=10Y')).status, 400);
   assert.equal((await call(term, 'GET', '/api/history?symbol=ZZZZ&range=1M')).status, 404);
+});
+
+const TESLA = { quotes: [
+  { symbol: 'TSLA', shortname: 'Tesla, Inc.', longname: 'Tesla, Inc.', exchDisp: 'NASDAQ', quoteType: 'EQUITY', isYahooFinance: true },
+  { symbol: 'STSLA=F', shortname: 'Tesla Inc Single Stock futures', exchDisp: 'Chicago Mercantile Exchange', quoteType: 'FUTURE', isYahooFinance: true },
+  { symbol: 'TSLA.TO', shortname: 'TESLA CDR (CAD HEDGED)', longname: 'Tesla, Inc.', exchDisp: 'Toronto', quoteType: 'EQUITY', isYahooFinance: true },
+  { symbol: 'TSLT', shortname: 'T-REX 2X Long Tesla Daily Targe', longname: 'T-REX 2X Long Tesla Daily Target ETF', exchDisp: 'BATS Trading', quoteType: 'ETF', isYahooFinance: true },
+  { symbol: 'TSLA261218C00400000', quoteType: 'OPTION', isYahooFinance: true },
+  { shortname: 'Tesla Energy (private)', quoteType: 'EQUITY', isYahooFinance: false },
+  { symbol: '<img src=x>', shortname: 'bad', quoteType: 'EQUITY', isYahooFinance: true },
+] };
+
+test('a name or a ticker finds what Yahoo lists: ticker, name, market and kind, and never futures, options or a bad ticker', async () => {
+  assert.deepEqual(parseSearch(TESLA).map((m) => [m.symbol, m.name, m.exchange, m.kind]), [
+    ['TSLA', 'Tesla, Inc.', 'NASDAQ', 'Stock'], ['TSLA.TO', 'Tesla, Inc.', 'Toronto', 'Stock'], ['TSLT', 'T-REX 2X Long Tesla Daily Target ETF', 'BATS Trading', 'ETF'],
+  ]);
+  const asked: string[] = [];
+  configure({ fetch: async (u, i) => { const url = String(u); if (url.includes('/v1/finance/search')) { asked.push(url); return new Response(JSON.stringify(TESLA)); } return yahoo(u, i); } });
+  clearSearches();
+  const r = await call(term, 'GET', '/api/search?q=Tesla');
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.json().matches.map((m: any) => m.symbol), ['TSLA', 'TSLA.TO', 'TSLT']);
+  assert.match(asked[0]!, /\/v1\/finance\/search\?q=Tesla&quotesCount=12&newsCount=0/);
+  await call(term, 'GET', '/api/search?q=tesla');
+  assert.equal(asked.length, 1, 'the same words are asked of Yahoo once');
+  for (const q of ['', '%20', 'a'.repeat(41), '%3Cb%3E', 'x%22y']) assert.equal((await call(term, 'GET', `/api/search?q=${q}`)).status, 400, q);
+  assert.equal((await call(term, 'GET', '/api/search?q=Tesla', { token: false })).status, 403);
+  configure({ fetch: async () => new Response('down', { status: 503, headers: { 'retry-after': '0' } }) });
+  clearSearches();
+  const down = await call(term, 'GET', '/api/search?q=Apple');
+  assert.equal(down.status, 502);
+  assert.match(down.json().error, /search did not answer: type the ticker instead/);
+});
+
+test('what the person chose is remembered in desk-data, each in its own shape, and nothing about an order', async () => {
+  assert.deepEqual((await call(term, 'GET', '/api/prefs')).json(), {});
+  const saved = (await call(term, 'POST', '/api/prefs', { body: {
+    theme: 'dark', side: 'folded', view: 'account', symbol: 'nvda', range: '1Y', kind: 'candles', layers: { ma50: false, ma200: true, vol: true },
+    recent: [{ symbol: 'tsla', name: 'Tesla, <b>Inc.</b>' }, { symbol: 'TSLA', name: 'again' }, { symbol: '../x', name: 'bad' }, { symbol: 'AAPL' }],
+    ticket: { quantity: 5 }, confirm: 'Buy 5 NVDA at $1.00', trading: true,
+  } })).json();
+  assert.deepEqual(saved, { theme: 'dark', side: 'folded', view: 'account', symbol: 'NVDA', range: '1Y', kind: 'candles', layers: { ma50: false, ma200: true, vol: true }, recent: [{ symbol: 'TSLA', name: 'Tesla, Inc.' }, { symbol: 'AAPL', name: 'AAPL' }] });
+  const next = (await call(term, 'POST', '/api/prefs', { body: { theme: 'purple', range: '10Y', side: 'open', layers: { ma50: 'yes' } } })).json();
+  assert.deepEqual([next.theme, next.range, next.side, next.layers.ma50], ['dark', '1Y', 'open', false], 'a value it does not know leaves the one before');
+  const file = JSON.parse(fs.readFileSync(path.join(dir(), 'dashboard.json'), 'utf8'));
+  assert.deepEqual(Object.keys(file).sort(), ['kind', 'layers', 'range', 'recent', 'side', 'symbol', 'theme', 'view']);
+  const again = await startTerminal({ root, assets: ASSETS, port: 0 });   // another start, or another browser, finds it as it was left
+  try { assert.equal((await call(again, 'GET', '/api/prefs')).json().symbol, 'NVDA'); } finally { await again.close(); }
+  const many = Array.from({ length: 9 }, (_, i) => ({ symbol: `S${i}`, name: '' }));
+  assert.equal((await call(term, 'POST', '/api/prefs', { body: { recent: many } })).json().recent.length, MAX_RECENT);
+  assert.equal((await call(term, 'POST', '/api/prefs', { body: { theme: 'light' }, headers: { origin: 'https://evil.example' } })).status, 403);
+  assert.equal((await call(term, 'POST', '/api/prefs', { body: { theme: 'light' }, token: false })).status, 403);
+});
+
+test('Stop on the page stops the dashboard, from the page alone; a dashboard given no way to stop has no such door', async () => {
+  assert.equal((await call(term, 'POST', '/api/stop', { body: {} })).status, 404);
+  let stopped = 0;
+  const t = await startTerminal({ root, assets: ASSETS, port: 0, stop: () => { stopped++; } });
+  try {
+    assert.equal((await call(t, 'POST', '/api/stop', { body: {}, token: false })).status, 403);
+    assert.equal((await call(t, 'POST', '/api/stop', { body: {}, headers: { origin: 'https://evil.example' } })).status, 403);
+    assert.equal((await call(t, 'GET', '/api/stop')).status, 404);
+    assert.equal(stopped, 0);
+    assert.equal((await call(t, 'POST', '/api/stop', { body: {} })).json().stopping, true);
+    await new Promise((r) => setTimeout(r, 300));
+    assert.equal(stopped, 1);
+  } finally { await t.close(); }
+});
+
+test('after an update changes its code, the page is offered Restart; it restarts only on the person\'s press, and no ticket opens meanwhile', async () => {
+  const code = path.join(root, 'code.js');
+  fs.writeFileSync(code, 'one');
+  let restarts = 0;
+  const t = await startTerminal({ root, assets: ASSETS, port: 0, code: [code], restart: () => { restarts++; }, updateCheckMs: 25 });
+  const version = async () => (await call(t, 'GET', '/api/version')).json();
+  try {
+    const { build } = (await call(t, 'GET', '/api/ping', { token: false })).json();
+    assert.match(build, /^[0-9a-f]{12}$/);
+    await new Promise((r) => setTimeout(r, 200));
+    assert.equal((await version()).update, false, 'nothing changed, nothing is offered');
+    assert.equal((await call(t, 'POST', '/api/restart', { body: {} })).status, 409, 'no update, no restart');
+    fs.writeFileSync(code, 'two');
+    for (const until = Date.now() + 3000; !(await version()).update && Date.now() < until; ) await new Promise((r) => setTimeout(r, 20));
+    assert.deepEqual([(await version()).update, (await version()).restarting], [true, false]);
+    await new Promise((r) => setTimeout(r, 300));
+    assert.equal(restarts, 0, 'new code on disk never runs by itself');
+    assert.equal((await call(t, 'POST', '/api/restart', { body: {}, token: false })).status, 403);
+    assert.equal((await call(t, 'POST', '/api/restart', { body: {}, headers: { origin: 'https://evil.example' } })).status, 403);
+    assert.equal((await call(t, 'POST', '/api/restart', { body: {} })).json().restarting, true);
+    await new Promise((r) => setTimeout(r, 300));
+    assert.equal(restarts, 1);
+    assert.equal((await version()).restarting, true);
+    assert.equal((await call(t, 'POST', '/api/ticket/own', { body: { symbol: 'NVDA', side: 'buy' } })).status, 503);
+  } finally { await t.close(); }
 });

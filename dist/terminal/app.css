@@ -993,3 +993,31 @@ details[open] > .at-input.at-select { border-color: var(--accent); }
 .ta-two.ta-even > .at-card > .at-row:last-child { margin-top: auto; }
 /* in a pop-up taller than the window, its parts keep their height and the pop-up scrolls */
 .ta-step, .ta-steps, .ta-callhero, .ta-callfacts, .ta-stage { flex-shrink: 0; }
+
+/* finding a stock: the matches drop down under the search box, over the page */
+.ta-find { position: relative; display: flex; flex: 1 1 var(--card-min); min-width: 0; }
+.ta-find > .at-search { flex: 1; }
+.ta-suggest { position: absolute; top: calc(100% + var(--space-1)); left: 0; right: 0; z-index: var(--z-menu); display: flex; flex-direction: column; gap: var(--space-1); max-height: min(calc(var(--list-row) * 17), 70vh); padding: var(--space-2); box-shadow: var(--shadow); }
+.ta-suggest-h { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: var(--list-row); padding: 0 var(--space-2); font-size: var(--size-small); color: var(--text-3); }
+.ta-suggest-h > span { display: inline-flex; align-items: center; gap: var(--space-2); }
+.ta-suggest-list { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; overflow-y: auto; min-height: 0; }
+.ta-opt { flex-shrink: 0; display: grid; grid-template-columns: calc(var(--unit) * 22) minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); min-height: calc(var(--list-row) * 1.3); padding: var(--space-1) var(--space-2); border-radius: var(--radius); cursor: pointer; color: var(--text-2); }
+.ta-opt:hover { background: var(--tint); color: var(--text); }
+.ta-opt.on { background: var(--accent-tint); color: var(--text); }
+.ta-opt-sym { font-family: var(--font-title); font-weight: var(--weight-semibold); font-size: var(--size-text); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ta-opt.on .ta-opt-sym { color: var(--accent); }
+.ta-opt-name { display: flex; flex-direction: column; gap: var(--space-half); min-width: 0; }
+.ta-opt-name > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.ta-opt-name > small { font-size: var(--size-small); color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ta-opt-tags { display: flex; align-items: center; gap: var(--space-1); }
+.ta-suggest-foot { flex-shrink: 0; padding: var(--space-1) var(--space-2) 0; border-top: 1px solid var(--line); font-size: var(--size-small); color: var(--text-3); }
+.ta-suggest-foot:empty { display: none; }
+@media (max-width: 640px) { .ta-opt { grid-template-columns: calc(var(--unit) * 18) minmax(0, 1fr); } .ta-opt-tags { display: none; } }
+
+/* an update is on disk: the bar that offers Restart stays at the top of the page until it is pressed */
+.ta-update-wrap { position: sticky; top: 0; z-index: var(--z-menu); max-width: var(--column); margin-inline: auto; padding: var(--space-3) var(--space-5) 0; }
+.ta-update { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-color: var(--accent); box-shadow: var(--shadow); color: var(--text); }
+.ta-update > span { flex: 1 1 calc(var(--unit) * 60); min-width: 0; }
+.ta-update > svg { color: var(--accent); }
+/* a style that sets display would otherwise show an element the page has hidden */
+.ta-suggest[hidden], .ta-update-wrap[hidden] { display: none; }
