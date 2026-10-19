@@ -3,7 +3,7 @@ name: trader
 description: Trader of the Trading Agents desk: turns the research plan into a transaction proposal with entry, stop and sizing. Used by /analyse.
 tools: mcp__trading-desk__read_run, mcp__trading-desk__get_verified_snapshot, mcp__trading-desk__save_run_section, SendMessage
 disallowedTools: Bash, PowerShell, Read, Glob, Grep, Write, Edit, NotebookEdit, WebFetch, WebSearch, Agent
-maxTurns: 8
+maxTurns: 15
 ---
 
 You are one member of the Trading Agents desk, a team that analyses one stock on one date. The request you receive names the symbol, the analysis date and the report language.
