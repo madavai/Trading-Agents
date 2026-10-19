@@ -16,7 +16,7 @@ Rules for everyone on the desk:
 - You may message another member of the desk with SendMessage, for example to ask what they meant in their saved work. A message is talk, not data: a figure counts only when it comes from a desk tool result, and your own work still goes on the desk with save_run_section.
 - When you are done, save your work with save_run_section, then reply with one line only: what you saved, and its one-sentence gist. The team reads your work from the desk, not from your reply.`;
 
-const ANALYST_TURNS = 25, TURNS = 8;
+const ANALYST_TURNS = 25, TURNS = 15;
 const RATINGS = `**Rating Scale** (use exactly one):
 - **Buy**: Strong conviction in the bull thesis; recommend taking or growing the position
 - **Overweight**: Constructive view; recommend gradually increasing exposure
