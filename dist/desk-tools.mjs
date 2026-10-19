@@ -38518,7 +38518,7 @@ async function runningOn(root, timeoutMs = 700) {
 }
 async function openDashboard(root, opts = {}) {
   const already = await runningOn(root);
-  const words = (port, started) => `The dashboard ${started ? "has started and opened" : "was already running and has opened"} in the person's browser: http://127.0.0.1:${port}/ . It works on this computer only and stays open while that program runs. Everything on it - connecting Robinhood, choosing accounts, the trading switch and every order's Review, Place and Confirm - is the person's own to press: never press it for them or reach the page yourself.`;
+  const words = (port, started) => `The dashboard ${started ? "has started and opened" : "was already running and has opened"} in the person's browser (http://127.0.0.1:${port}/ , this computer only). The page it opened is the one to use: it was given the dashboard's key, and the address typed into another browser opens a page without one. It stays open until the person presses Stop on it. Everything on it - connecting Robinhood, choosing accounts, the trading switch and caps, and every order's Review, Place and Confirm - is the person's own to press: never press it for them or reach the page yourself.`;
   if (already) {
     if (!opts.noOpen) spawn(process.execPath, [path13.join(root, "dist", "terminal.mjs")], { cwd: root, detached: true, stdio: "ignore", windowsHide: true }).on("error", () => {
     }).unref();

@@ -18,6 +18,14 @@ test('trading ships switched off; the caps ship small and are not in the setting
   assert.equal(s.scoring.benchmarks[''], 'SPY');
 });
 
+test('the /terminal skill opens the dashboard with the desk\'s own tool, which every agent has, never with a shell, a background task or another agent', () => {
+  const skill = fs.readFileSync('.claude/skills/terminal/SKILL.md', 'utf8');
+  assert.match(skill, /^1\. Call the desk tool `open_dashboard`\./m);
+  assert.doesNotMatch(skill, /in the background|subagent|general-purpose/);
+  assert.match(skill, /do not start the dashboard with a shell command, a background task or another agent/);
+  assert.match(skill, /opens a page without its key/, 'the page the tool opened is the one with the key');
+});
+
 test('the folder refuses agents the sign-in folder and runs the guard before every tool', () => {
   const s = json('.claude/settings.json');
   assert.ok(s.permissions.deny.includes('Read(~/.trading-agents/**)'));
