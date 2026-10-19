@@ -3263,8 +3263,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path17) {
-      let input2 = path17;
+    function removeDotSegments(path18) {
+      let input2 = path18;
       const output2 = [];
       let nextSlash = -1;
       let len = 0;
@@ -3673,8 +3673,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path17 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path17 && path17 !== "/" ? path17 : void 0;
+        const path18 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path18 && path18 !== "/" ? path18 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -7187,12 +7187,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list2, fs13, exportName) {
+    function addFormats(ajv, list2, fs14, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list2)
-        ajv.addFormat(f, fs13[f]);
+        ajv.addFormat(f, fs14[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -7201,7 +7201,7 @@ var require_dist = __commonJS({
 });
 
 // src/tools/main.ts
-import path16 from "node:path";
+import path17 from "node:path";
 
 // node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
 import process2 from "node:process";
@@ -8023,10 +8023,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path17) {
-  if (!path17)
+function getElementAtPath(obj, path18) {
+  if (!path18)
     return obj;
-  return path17.reduce((acc, key) => acc?.[key], obj);
+  return path18.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -8366,11 +8366,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path17, issues) {
+function prefixIssues(path18, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path17);
+    iss.path.unshift(path18);
     return iss;
   });
 }
@@ -8832,16 +8832,16 @@ function flattenError(error62, mapper = (issue2) => issue2.message) {
 }
 function formatError(error62, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error63, path17 = []) => {
+  const processError = (error63, path18 = []) => {
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path17, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path18, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path17, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path18, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path17, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path18, ...issue2.path]);
       } else {
-        const fullpath = [...path17, ...issue2.path];
+        const fullpath = [...path18, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -8880,17 +8880,17 @@ function formatError(error62, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error62, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error63, path17 = []) => {
+  const processError = (error63, path18 = []) => {
     var _a3;
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path17, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path18, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path17, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path18, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path17, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path18, ...issue2.path]);
       } else {
-        const fullpath = [...path17, ...issue2.path];
+        const fullpath = [...path18, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -8929,8 +8929,8 @@ function treeifyError(error62, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path17 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path17) {
+  const path18 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path18) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -26068,13 +26068,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path17 = ref.slice(1).split("/").filter(Boolean);
-  if (path17.length === 0) {
+  const path18 = ref.slice(1).split("/").filter(Boolean);
+  if (path18.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path17[0] === defsKey) {
-    const key = path17[1] === void 0 ? void 0 : decodeJSONPointerSegment(path17[1]);
+  if (path18[0] === defsKey) {
+    const key = path18[1] === void 0 ? void 0 : decodeJSONPointerSegment(path18[1]);
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -28932,8 +28932,8 @@ function getErrorMap2() {
 
 // node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path17, errorMaps, issueData } = params;
-  const fullPath = [...path17, ...issueData.path || []];
+  const { data, path: path18, errorMaps, issueData } = params;
+  const fullPath = [...path18, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -29048,11 +29048,11 @@ var errorUtil;
 
 // node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path17, key) {
+  constructor(parent, value, path18, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path17;
+    this._path = path18;
     this._key = key;
   }
   get path() {
@@ -32603,11 +32603,11 @@ function normalizeObjectSchema(schema) {
   }
   return void 0;
 }
-function getDotPath(path17) {
-  if (path17.length === 0) {
+function getDotPath(path18) {
+  if (path18.length === 0) {
     return "object root";
   }
-  return path17.reduce((acc, seg, index) => {
+  return path18.reduce((acc, seg, index) => {
     if (index === 0) {
       return String(seg);
     }
@@ -36594,8 +36594,8 @@ var EMPTY_COMPLETION_RESULT = {
 };
 
 // src/check/desk-check.ts
-import fs4 from "node:fs";
-import path5 from "node:path";
+import fs5 from "node:fs";
+import path6 from "node:path";
 
 // src/paths.ts
 import os from "node:os";
@@ -36604,10 +36604,27 @@ var homeDir = () => process.env.TRADING_AGENTS_HOME || path.join(os.homedir(), "
 var deskDataDir = (root = process.cwd()) => path.join(root, "desk-data");
 var robinhoodFile = () => path.join(homeDir(), "robinhood.json");
 
-// src/contact.ts
+// src/private.ts
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path2 from "node:path";
-var file2 = (root) => path2.join(deskDataDir(root), "contact.json");
+var windowsTool = (exe) => path2.join(process.env.SystemRoot ?? process.env.windir ?? "C:\\Windows", "System32", exe);
+function lockState(target) {
+  try {
+    if (process.platform !== "win32") return (fs.statSync(target).mode & 63) === 0 ? "locked" : "open";
+    const r = spawnSync(windowsTool("icacls.exe"), [target], { encoding: "utf8", windowsHide: true, timeout: 15e3 });
+    if (r.status !== 0) return "unknown";
+    const aces = r.stdout.split(/\r?\n/).filter((l) => /:\(/.test(l));
+    return aces.length === 2 && aces.every((l) => !/\(I\)/.test(l)) ? "locked" : "open";
+  } catch {
+    return "unknown";
+  }
+}
+
+// src/contact.ts
+import fs2 from "node:fs";
+import path3 from "node:path";
+var file2 = (root) => path3.join(deskDataDir(root), "contact.json");
 var EMAIL = /^[^\s@<>()",;:]+@[^\s@<>()",;:]+\.[a-z]{2,}$/i;
 var RESERVED = /@(?:[^@]*\.)?(?:example\.(?:com|net|org)|example|test|invalid|localhost)$/i;
 function checkEmail(raw) {
@@ -36618,7 +36635,7 @@ function checkEmail(raw) {
 }
 function readContactEmail(root) {
   try {
-    const saved = JSON.parse(fs.readFileSync(file2(root), "utf8"));
+    const saved = JSON.parse(fs2.readFileSync(file2(root), "utf8"));
     return typeof saved.email === "string" ? checkEmail(saved.email) : "";
   } catch {
     return "";
@@ -36626,8 +36643,8 @@ function readContactEmail(root) {
 }
 function saveContactEmail(root, raw) {
   const email3 = checkEmail(raw);
-  fs.mkdirSync(deskDataDir(root), { recursive: true });
-  fs.writeFileSync(file2(root), JSON.stringify({ email: email3 }, null, 2) + "\n");
+  fs2.mkdirSync(deskDataDir(root), { recursive: true });
+  fs2.writeFileSync(file2(root), JSON.stringify({ email: email3 }, null, 2) + "\n");
   return email3;
 }
 var ASK_FOR_EMAIL = "the SEC asks everyone who reads its filings for a contact email, and none is saved yet: ask the person for their own email (never invent one) and save it with set_contact_email";
@@ -36699,8 +36716,8 @@ async function probeAll(contact2, secEmail2, fetchImpl2 = fetch, timeoutMs = 8e3
 var VERSION = true ? "0.9.0" : "dev";
 
 // src/settings.ts
-import fs2 from "node:fs";
-import path3 from "node:path";
+import fs3 from "node:fs";
+import path4 from "node:path";
 var ANALYSTS = ["market", "sentiment", "news", "fundamentals"];
 var ACTIONS = ["buy a full position", "buy half a position", "no order", "sell half of what is held", "sell everything held"];
 var DEFAULTS = {
@@ -36729,15 +36746,14 @@ var DEFAULTS = {
     enabled: false,
     fullPositionPercent: 10,
     ratingToOrder: { Buy: "buy a full position", Overweight: "buy half a position", Hold: "no order", Underweight: "sell half of what is held", Sell: "sell everything held", "Needs review": "no order" },
-    caps: { perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 3 },
     orderDefaults: { type: "limit", timeInForce: "gfd" }
   },
   routines: { maxAnalyses: 5 }
 };
 var within = (v, lo, hi, fallback) => typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi ? v : fallback;
+var int2 = (v, lo, hi, fallback) => Number.isInteger(v) && v >= lo && v <= hi ? v : fallback;
 function tradingOf(raw) {
   const t = raw && typeof raw === "object" ? raw : {}, d = DEFAULTS.trading;
-  const caps = t.caps && typeof t.caps === "object" ? t.caps : {};
   const od = t.orderDefaults && typeof t.orderDefaults === "object" ? t.orderDefaults : {};
   const map2 = t.ratingToOrder && typeof t.ratingToOrder === "object" ? t.ratingToOrder : {};
   const ratingToOrder = { ...d.ratingToOrder };
@@ -36748,11 +36764,9 @@ function tradingOf(raw) {
     enabled: t.enabled === true,
     fullPositionPercent: within(t.fullPositionPercent, 1, 100, d.fullPositionPercent),
     ratingToOrder,
-    caps: { perOrderUsd: within(caps.perOrderUsd, 1, 1e5, d.caps.perOrderUsd), perStockPercent: within(caps.perStockPercent, 1, 100, d.caps.perStockPercent), ordersPerDay: int2(caps.ordersPerDay, 1, 50, d.caps.ordersPerDay) },
     orderDefaults: { type: "limit", timeInForce: tif }
   };
 }
-var int2 = (v, lo, hi, fallback) => Number.isInteger(v) && v >= lo && v <= hi ? v : fallback;
 function languageName(v, fallback = "English") {
   const s = typeof v === "string" ? v.trim() : "";
   return new RegExp("^\\p{L}[\\p{L} ()\\-]{0,38}$", "u").test(s) ? s : fallback;
@@ -36760,7 +36774,7 @@ function languageName(v, fallback = "English") {
 function readSettings(root) {
   let raw = {};
   try {
-    raw = JSON.parse(fs2.readFileSync(path3.join(root, "desk-settings.json"), "utf8"));
+    raw = JSON.parse(fs3.readFileSync(path4.join(root, "desk-settings.json"), "utf8"));
   } catch {
   }
   const a = { ...DEFAULTS.analysis, ...raw.analysis }, s = { ...DEFAULTS.scoring, ...raw.scoring }, j = { ...DEFAULTS.journal, ...raw.journal };
@@ -36788,33 +36802,33 @@ function readSettings(root) {
 }
 
 // src/desk/agent-files.ts
-import fs3 from "node:fs";
-import path4 from "node:path";
+import fs4 from "node:fs";
+import path5 from "node:path";
 import { pathToFileURL } from "node:url";
 async function shippedAgentFiles(source) {
-  const mod = await import(pathToFileURL(path4.join(source, "scripts", "team-files.mjs")).href);
+  const mod = await import(pathToFileURL(path5.join(source, "scripts", "team-files.mjs")).href);
   return mod.deskAgentFiles();
 }
 function driftOf(root, shipped) {
   const changed = [], missing = [];
   for (const [p, text3] of shipped) {
-    const file5 = path4.join(root, p);
-    if (!fs3.existsSync(file5)) missing.push(p);
-    else if (fs3.readFileSync(file5, "utf8").replace(/\r\n/g, "\n") !== text3) changed.push(p);
+    const file5 = path5.join(root, p);
+    if (!fs4.existsSync(file5)) missing.push(p);
+    else if (fs4.readFileSync(file5, "utf8").replace(/\r\n/g, "\n") !== text3) changed.push(p);
   }
   return { changed, missing };
 }
 function resetAgentFiles(root, shipped) {
   const { changed, missing } = driftOf(root, shipped), wrote = [...changed, ...missing];
   for (const p of wrote) {
-    const file5 = path4.join(root, p);
-    fs3.mkdirSync(path4.dirname(file5), { recursive: true });
-    fs3.writeFileSync(file5, shipped.get(p));
+    const file5 = path5.join(root, p);
+    fs4.mkdirSync(path5.dirname(file5), { recursive: true });
+    fs4.writeFileSync(file5, shipped.get(p));
   }
   return wrote;
 }
 function plainName(p) {
-  const base = path4.basename(p);
+  const base = path5.basename(p);
   return base.endsWith(".team.json") ? "the team's line-up" : base.replace(/\.md$/, "");
 }
 var listed = (names) => names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
@@ -36827,19 +36841,26 @@ function nodeLine(version2 = process.versions.node) {
 function dataLine(root) {
   const dir = deskDataDir(root);
   try {
-    fs4.mkdirSync(dir, { recursive: true });
-    const probe2 = path5.join(dir, ".write-check");
-    fs4.writeFileSync(probe2, "ok");
-    fs4.rmSync(probe2);
+    fs5.mkdirSync(dir, { recursive: true });
+    const probe2 = path6.join(dir, ".write-check");
+    fs5.writeFileSync(probe2, "ok");
+    fs5.rmSync(probe2);
     return { ok: true, text: `Desk data folder ${dir} (writable)` };
   } catch (e) {
     return { ok: false, text: `Desk data folder ${dir} cannot be written: ${e.message}` };
   }
 }
 function robinhoodLine(file5 = robinhoodFile()) {
-  if (!fs4.existsSync(file5)) return { ok: true, text: "Robinhood: not connected yet (only needed for trading; analysis works without it)" };
-  const when = fs4.statSync(file5).mtime;
+  if (!fs5.existsSync(file5)) return { ok: true, text: "Robinhood: not connected yet (only needed for trading; analysis works without it)" };
+  const when = fs5.statSync(file5).mtime;
   return { ok: true, text: `Robinhood: a sign-in is saved (last refreshed ${when.toISOString().slice(0, 16).replace("T", " ")} UTC)` };
+}
+function privateFolderLine(dir = homeDir()) {
+  if (!fs5.existsSync(dir)) return { ok: true, text: "Your private folder: not made yet. It is made, locked to your own account, when you connect Robinhood or open the dashboard" };
+  const state = lockState(dir);
+  if (state === "locked") return { ok: true, text: `Your private folder: locked to your own account${process.platform === "win32" ? " and the system" : ""}. No other account on this computer can open it` };
+  if (state === "open") return { ok: false, text: "Your private folder: other accounts on this computer may be able to open it. Open the dashboard once: that locks it to your own account" };
+  return { ok: true, text: "Your private folder: who can open it could not be told (a drive without access lists?). It is as protected as your other files" };
 }
 function contactLine(email3) {
   return email3 ? { ok: true, text: `Contact email for the SEC: ${email3} (sent to sec.gov alone, kept in desk-data)` } : { ok: false, text: "Contact email for the SEC: not given yet. The desk needs it before the first analysis: the SEC asks everyone who reads its filings for one. Ask the person for their own email and save it with set_contact_email" };
@@ -36870,29 +36891,29 @@ async function agentDrift(root, source = root) {
 async function deskCheck(root = process.cwd(), fetchImpl2 = fetch, source = root) {
   const settings = readSettings(root), email3 = readContactEmail(root);
   const sources = await probeAll(settings.sources.contact, email3, fetchImpl2);
-  return render([nodeLine(), dataLine(root), contactLine(email3), robinhoodLine(), agentsLine(await agentDrift(root, source))], sources);
+  return render([nodeLine(), dataLine(root), contactLine(email3), robinhoodLine(), privateFolderLine(), agentsLine(await agentDrift(root, source))], sources);
 }
 
 // src/data/http.ts
-import fs6 from "node:fs";
-import path6 from "node:path";
+import fs7 from "node:fs";
+import path7 from "node:path";
 import { createHash } from "node:crypto";
 
 // src/desk/lock.ts
-import fs5 from "node:fs";
+import fs6 from "node:fs";
 var STALE_MS = 6e4;
 var nap = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 function withLock(file5, run, waitMs = 15e3) {
   const lock = `${file5}.lock`, until = Date.now() + waitMs;
   for (; ; ) {
     try {
-      fs5.mkdirSync(lock);
+      fs6.mkdirSync(lock);
       break;
     } catch (e) {
       if (e.code !== "EEXIST") throw e;
       try {
-        if (Date.now() - fs5.statSync(lock).mtimeMs > STALE_MS) {
-          fs5.rmdirSync(lock);
+        if (Date.now() - fs6.statSync(lock).mtimeMs > STALE_MS) {
+          fs6.rmdirSync(lock);
           continue;
         }
       } catch {
@@ -36906,7 +36927,7 @@ function withLock(file5, run, waitMs = 15e3) {
     return run();
   } finally {
     try {
-      fs5.rmdirSync(lock);
+      fs6.rmdirSync(lock);
     } catch {
     }
   }
@@ -36914,11 +36935,11 @@ function withLock(file5, run, waitMs = 15e3) {
 function writeWhole(file5, text3) {
   const temp = `${file5}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
   try {
-    fs5.writeFileSync(temp, text3);
-    fs5.renameSync(temp, file5);
+    fs6.writeFileSync(temp, text3);
+    fs6.renameSync(temp, file5);
   } catch (e) {
     try {
-      fs5.rmSync(temp, { force: true });
+      fs6.rmSync(temp, { force: true });
     } catch {
     }
     throw e;
@@ -36974,8 +36995,8 @@ var keyOf = (url2) => {
 function readCache(url2) {
   if (!cacheDir) return null;
   try {
-    const file5 = path6.join(cacheDir, `${keyOf(url2)}.txt`);
-    return Date.now() - fs6.statSync(file5).mtimeMs < ttlFor(new URL(url2).hostname) ? fs6.readFileSync(file5, "utf8") : null;
+    const file5 = path7.join(cacheDir, `${keyOf(url2)}.txt`);
+    return Date.now() - fs7.statSync(file5).mtimeMs < ttlFor(new URL(url2).hostname) ? fs7.readFileSync(file5, "utf8") : null;
   } catch {
     return null;
   }
@@ -36983,16 +37004,16 @@ function readCache(url2) {
 function writeCache(url2, text3) {
   if (!cacheDir) return;
   try {
-    fs6.mkdirSync(cacheDir, { recursive: true });
-    writeWhole(path6.join(cacheDir, `${keyOf(url2)}.txt`), text3);
+    fs7.mkdirSync(cacheDir, { recursive: true });
+    writeWhole(path7.join(cacheDir, `${keyOf(url2)}.txt`), text3);
   } catch {
   }
 }
 function pruneCache(dir) {
   try {
-    for (const f of fs6.readdirSync(dir)) {
-      const file5 = path6.join(dir, f);
-      if (Date.now() - fs6.statSync(file5).mtimeMs > 3 * 24 * 60 * MINUTE) fs6.rmSync(file5, { force: true });
+    for (const f of fs7.readdirSync(dir)) {
+      const file5 = path7.join(dir, f);
+      if (Date.now() - fs7.statSync(file5).mtimeMs > 3 * 24 * 60 * MINUTE) fs7.rmSync(file5, { force: true });
     }
   } catch {
   }
@@ -37753,11 +37774,11 @@ function yahooSession() {
   });
   return session;
 }
-async function yahooJson(path17) {
+async function yahooJson(path18) {
   for (let attempt = 0; ; attempt++) {
     const s = await yahooSession();
     try {
-      return await getJson(`${HOSTS[1]}${path17}&crumb=${encodeURIComponent(s.crumb)}`, { headers: { Cookie: s.cookie } });
+      return await getJson(`${HOSTS[1]}${path18}&crumb=${encodeURIComponent(s.crumb)}`, { headers: { Cookie: s.cookie } });
     } catch (e) {
       if (attempt === 0 && /HTTP 401/.test(e.message)) {
         session = null;
@@ -37907,13 +37928,13 @@ async function financialStatement(raw, kind, freq, analysis2) {
 }
 
 // src/tools/desk.ts
-import fs12 from "node:fs";
-import path15 from "node:path";
+import fs13 from "node:fs";
+import path16 from "node:path";
 
 // src/desk/holdings.ts
-import fs7 from "node:fs";
-import path7 from "node:path";
-var file3 = (dir) => path7.join(dir, "holdings.json");
+import fs8 from "node:fs";
+import path8 from "node:path";
+var file3 = (dir) => path8.join(dir, "holdings.json");
 var num2 = (v, what) => {
   if (typeof v !== "number" || !Number.isFinite(v)) throw new Error(`${what} must be a number`);
   return v;
@@ -37936,13 +37957,13 @@ function saveHoldings(dir, input2, today2, source = "person") {
   const currency = input2.currency?.trim().toUpperCase();
   if (currency !== void 0 && !/^[A-Z]{3}$/.test(currency)) throw new Error(`"${input2.currency}" is not a three-letter currency such as USD`);
   const h = { ...cash === void 0 ? {} : { cash }, ...currency ? { currency } : {}, positions, source, savedOn: today2 };
-  fs7.mkdirSync(dir, { recursive: true });
+  fs8.mkdirSync(dir, { recursive: true });
   writeWhole(file3(dir), JSON.stringify(h, null, 2) + "\n");
   return h;
 }
 function readHoldings(dir) {
   try {
-    const h = JSON.parse(fs7.readFileSync(file3(dir), "utf8"));
+    const h = JSON.parse(fs8.readFileSync(file3(dir), "utf8"));
     return Array.isArray(h.positions) ? h : null;
   } catch {
     return null;
@@ -37950,7 +37971,7 @@ function readHoldings(dir) {
 }
 function forgetHoldings(dir) {
   try {
-    fs7.rmSync(file3(dir));
+    fs8.rmSync(file3(dir));
     return true;
   } catch {
     return false;
@@ -38060,11 +38081,11 @@ function renderSummary(s) {
 }
 
 // src/desk/workspace.ts
-import path9 from "node:path";
+import path10 from "node:path";
 
 // src/desk/journal.ts
-import fs8 from "node:fs";
-import path8 from "node:path";
+import fs9 from "node:fs";
+import path9 from "node:path";
 var SEPARATOR = "\n\n<!-- ENTRY_END -->\n\n";
 var pct = (v) => `${v >= 0 ? "+" : "-"}${(Math.abs(v) * 100).toFixed(1)}%`;
 var MARK = /<!--\s*ENTRY_END\s*-->/i;
@@ -38101,13 +38122,13 @@ var Journal = class {
   maxResolved;
   read() {
     try {
-      return fs8.readFileSync(this.file, "utf8");
+      return fs9.readFileSync(this.file, "utf8");
     } catch {
       return "";
     }
   }
   write(text3) {
-    fs8.mkdirSync(path8.dirname(this.file), { recursive: true });
+    fs9.mkdirSync(path9.dirname(this.file), { recursive: true });
     writeWhole(this.file, text3);
   }
   blocks() {
@@ -38122,7 +38143,7 @@ var Journal = class {
   /** Adds a pending entry. One entry per stock and day, settled or not: a re-run must not count the same call twice. */
   storeDecision(ticker, date5, decision, rating) {
     checkTag(ticker, date5);
-    fs8.mkdirSync(path8.dirname(this.file), { recursive: true });
+    fs9.mkdirSync(path9.dirname(this.file), { recursive: true });
     return withLock(this.file, () => {
       if (this.load().some((e) => e.date === date5 && e.ticker === ticker)) return "exists";
       const r = rating && RATINGS.includes(rating) ? rating : parseRating(decision);
@@ -38201,13 +38222,13 @@ function workspaceOf(root, sweep = null) {
   const live = deskDataDir(root);
   if (sweep === null) return { dir: live, sweep: null };
   if (!SWEEP_ID.test(sweep)) throw new Error(`"${sweep}" is not a sweep name: use up to 40 letters, digits, dashes or underscores`);
-  return { dir: path9.join(live, "backtest", sweep), sweep };
+  return { dir: path10.join(live, "backtest", sweep), sweep };
 }
-var journalIn = (root, ws) => new Journal(path9.join(ws.dir, "journal.md"), readSettings(root).journal.maxResolvedEntries);
+var journalIn = (root, ws) => new Journal(path10.join(ws.dir, "journal.md"), readSettings(root).journal.maxResolvedEntries);
 
 // src/desk/runs.ts
-import fs9 from "node:fs";
-import path10 from "node:path";
+import fs10 from "node:fs";
+import path11 from "node:path";
 var SECTIONS = ["market", "sentiment", "news", "fundamentals", "bull", "bear", "research_plan", "trader", "aggressive", "conservative", "neutral", "decision"];
 var DEBATES = { investment_debate: ["bull", "bear"], risk_debate: ["aggressive", "conservative", "neutral"] };
 var TURNS = new Set(Object.values(DEBATES).flat());
@@ -38220,18 +38241,18 @@ var PARTS = [
   ["IV. Risk Management Team Decision", ["aggressive", "conservative", "neutral"]],
   ["V. Portfolio Manager Decision", ["decision"]]
 ];
-var folder = (dir, ticker, date5) => path10.join(dir, "runs", `${safeSymbol(ticker).replace(/\^/g, "IDX_").replace(/=/g, "_EQ_")}_${date5}`);
-var runFile = (dir, ticker, date5) => path10.join(folder(dir, ticker, date5), "run.json");
+var folder = (dir, ticker, date5) => path11.join(dir, "runs", `${safeSymbol(ticker).replace(/\^/g, "IDX_").replace(/=/g, "_EQ_")}_${date5}`);
+var runFile = (dir, ticker, date5) => path11.join(folder(dir, ticker, date5), "run.json");
 function load(dir, ticker, date5) {
   try {
-    return JSON.parse(fs9.readFileSync(runFile(dir, ticker, date5), "utf8"));
+    return JSON.parse(fs10.readFileSync(runFile(dir, ticker, date5), "utf8"));
   } catch {
     return { ticker: safeSymbol(ticker), date: date5, startedAt: (/* @__PURE__ */ new Date()).toISOString(), log: [] };
   }
 }
 function change(dir, ticker, date5, edit) {
   const file5 = runFile(dir, ticker, date5);
-  fs9.mkdirSync(path10.dirname(file5), { recursive: true });
+  fs10.mkdirSync(path11.dirname(file5), { recursive: true });
   return withLock(file5, () => {
     const r = load(dir, ticker, date5);
     edit(r);
@@ -38286,14 +38307,14 @@ ${written.map(({ s, texts }) => `### ${LABELS[s]}
 ${texts.join("\n\n")}`).join("\n\n")}`];
   });
   const title = [`# Trading Analysis Report: ${safeSymbol(ticker)}`, "", `- Analysis date: ${date5}`, ...header.map((h) => `- ${h}`), ""].join("\n");
-  const out = path10.join(root, "complete_report.md");
+  const out = path11.join(root, "complete_report.md");
   writeWhole(out, `${title}
 ${body.join("\n\n")}
 `);
   return out;
 }
 function deleteRun(dir, ticker, date5) {
-  fs9.rmSync(folder(dir, ticker, date5), { recursive: true, force: true });
+  fs10.rmSync(folder(dir, ticker, date5), { recursive: true, force: true });
 }
 
 // src/desk/scoring.ts
@@ -38396,18 +38417,18 @@ ${lessons}` : "Lessons from past calls: none yet (no earlier call has been settl
 }
 
 // src/terminal/store.ts
-import fs10 from "node:fs";
-import path11 from "node:path";
+import fs11 from "node:fs";
+import path12 from "node:path";
 var read = (file5, ok) => {
   try {
-    const v = JSON.parse(fs10.readFileSync(file5, "utf8"));
+    const v = JSON.parse(fs11.readFileSync(file5, "utf8"));
     return Array.isArray(v) ? v.filter(ok) : [];
   } catch {
     return [];
   }
 };
 function change2(file5, edit, ok) {
-  fs10.mkdirSync(path11.dirname(file5), { recursive: true });
+  fs11.mkdirSync(path12.dirname(file5), { recursive: true });
   return withLock(file5, () => {
     const next = edit(read(file5, ok));
     writeWhole(file5, JSON.stringify(next, null, 2) + "\n");
@@ -38416,8 +38437,8 @@ function change2(file5, edit, ok) {
 }
 var isWatch = (v) => !!v && typeof v.symbol === "string" && typeof v.favourite === "boolean";
 var isQueued = (v) => !!v && typeof v.symbol === "string" && typeof v.requestedAt === "string";
-var watchFile = (dir) => path11.join(dir, "watchlist.json");
-var queueFile = (dir) => path11.join(dir, "queue.json");
+var watchFile = (dir) => path12.join(dir, "watchlist.json");
+var queueFile = (dir) => path12.join(dir, "queue.json");
 var readWatchlist = (dir) => read(watchFile(dir), isWatch);
 var readQueue = (dir) => read(queueFile(dir), isQueued);
 function dequeue(dir, raw) {
@@ -38466,10 +38487,10 @@ async function settleOne(journal, scoring, ticker, date5, reflection) {
 // src/terminal/launch.ts
 import crypto from "node:crypto";
 import http from "node:http";
-import path12 from "node:path";
+import path13 from "node:path";
 import { spawn } from "node:child_process";
 var PORTS = [47615, 47625];
-var deskIdOf = (root) => crypto.createHash("sha256").update(path12.resolve(root)).digest("hex").slice(0, 12);
+var deskIdOf = (root) => crypto.createHash("sha256").update(path13.resolve(root)).digest("hex").slice(0, 12);
 async function runningOn(root, timeoutMs = 700) {
   const ask = (port) => new Promise((resolve) => {
     const req = http.get({ host: "127.0.0.1", port, path: "/api/ping", timeout: timeoutMs }, (res) => {
@@ -38499,11 +38520,11 @@ async function openDashboard(root, opts = {}) {
   const already = await runningOn(root);
   const words = (port, started) => `The dashboard ${started ? "has started and opened" : "was already running and has opened"} in the person's browser: http://127.0.0.1:${port}/ . It works on this computer only and stays open while that program runs. Everything on it - connecting Robinhood, choosing accounts, the trading switch and every order's Review, Place and Confirm - is the person's own to press: never press it for them or reach the page yourself.`;
   if (already) {
-    if (!opts.noOpen) spawn(process.execPath, [path12.join(root, "dist", "terminal.mjs")], { cwd: root, detached: true, stdio: "ignore", windowsHide: true }).on("error", () => {
+    if (!opts.noOpen) spawn(process.execPath, [path13.join(root, "dist", "terminal.mjs")], { cwd: root, detached: true, stdio: "ignore", windowsHide: true }).on("error", () => {
     }).unref();
     return words(already, false);
   }
-  const child = spawn(process.execPath, [path12.join(root, "dist", "terminal.mjs"), ...opts.noOpen ? ["--no-open"] : []], { cwd: root, detached: true, stdio: "ignore", windowsHide: true });
+  const child = spawn(process.execPath, [path13.join(root, "dist", "terminal.mjs"), ...opts.noOpen ? ["--no-open"] : []], { cwd: root, detached: true, stdio: "ignore", windowsHide: true });
   child.on("error", () => {
   });
   child.unref();
@@ -38517,16 +38538,16 @@ async function openDashboard(root, opts = {}) {
 }
 
 // src/desk/routine.ts
-import path14 from "node:path";
+import path15 from "node:path";
 
 // src/desk/orders.ts
-import fs11 from "node:fs";
-import path13 from "node:path";
-var file4 = (dir) => path13.join(dir, "orders.jsonl");
+import fs12 from "node:fs";
+import path14 from "node:path";
+var file4 = (dir) => path14.join(dir, "orders.jsonl");
 var marketDay = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(d);
 function readOrders(dir) {
   try {
-    return fs11.readFileSync(file4(dir), "utf8").split("\n").flatMap((l) => {
+    return fs12.readFileSync(file4(dir), "utf8").split("\n").flatMap((l) => {
       try {
         const v = JSON.parse(l);
         return v && typeof v.at === "string" && typeof v.symbol === "string" && v.robinhood ? [v] : [];
@@ -38544,7 +38565,7 @@ var ordersOn = (dir, now) => readOrders(dir).filter((o) => marketDay(new Date(o.
 var DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 var weekday = (day2) => DAYS[(/* @__PURE__ */ new Date(`${day2}T12:00:00Z`)).getUTCDay()];
 function morningList(dir, today2, max) {
-  const called = new Set(new Journal(path14.join(dir, "journal.md")).load().filter((e) => e.date === today2).map((e) => e.ticker));
+  const called = new Set(new Journal(path15.join(dir, "journal.md")).load().filter((e) => e.date === today2).map((e) => e.ticker));
   const wanted = [], seen = /* @__PURE__ */ new Set();
   const add = (symbol4, why) => {
     if (!seen.has(symbol4) && !called.has(symbol4)) {
@@ -38581,7 +38602,7 @@ function morningBrief(dir, today2, max) {
   return lines.join("\n");
 }
 function eveningBrief(dir, today2, now) {
-  const calls = new Journal(path14.join(dir, "journal.md")).load();
+  const calls = new Journal(path15.join(dir, "journal.md")).load();
   const todays = calls.filter((e) => e.date === today2), pending = calls.filter((e) => e.pending).length;
   const orders = ordersOn(dir, now);
   const lines = [`EVENING WRAP-UP for ${weekday(today2)} ${today2}.`, "", "1. Score what is ready: list_settlements, then record_outcome with a lesson for each READY call (the /settle playbook).", ""];
@@ -38618,10 +38639,10 @@ async function act(run) {
 function registerDeskTools(server, root) {
   const dir = deskDataDir(root);
   const write = { readOnlyHint: false, openWorldHint: false };
-  const activeFile = path15.join(dir, "backtest", "active.json"), IDLE_MS = 2 * 36e5;
+  const activeFile = path16.join(dir, "backtest", "active.json"), IDLE_MS = 2 * 36e5;
   const getSweep = () => {
     try {
-      const a = JSON.parse(fs12.readFileSync(activeFile, "utf8"));
+      const a = JSON.parse(fs13.readFileSync(activeFile, "utf8"));
       if (typeof a.sweep === "string" && SWEEP_ID.test(a.sweep) && typeof a.at === "number" && Date.now() - a.at < IDLE_MS) return a.sweep;
     } catch {
     }
@@ -38629,10 +38650,10 @@ function registerDeskTools(server, root) {
   };
   const setSweep = (id) => {
     if (id === null) {
-      fs12.rmSync(activeFile, { force: true });
+      fs13.rmSync(activeFile, { force: true });
       return;
     }
-    fs12.mkdirSync(path15.dirname(activeFile), { recursive: true });
+    fs13.mkdirSync(path16.dirname(activeFile), { recursive: true });
     writeWhole(activeFile, JSON.stringify({ sweep: id, at: Date.now() }));
   };
   const ws = () => {
@@ -38731,10 +38752,10 @@ Rating: ${rating}`;
     if (!readContactEmail(root)) throw new NeedsEmail(ASK_FOR_EMAIL);
     const every = a.every_days ?? 7, dates = iterGrid(a.start_date, a.end_date, every), grid = cells(a.symbols, dates);
     const id = a.sweep_id ?? (/* @__PURE__ */ new Date()).toISOString().replace(/\D/g, "").slice(0, 14), w = workspaceOf(root, id);
-    fs12.mkdirSync(w.dir, { recursive: true });
+    fs13.mkdirSync(w.dir, { recursive: true });
     const recorded = new Set(journalOf(root, w).load().map((e) => `${e.ticker}|${e.date}`));
     const todo = grid.filter((c) => !recorded.has(`${c.symbol}|${c.date}`));
-    writeWhole(path15.join(w.dir, "sweep.json"), JSON.stringify({ symbols: [...new Set(grid.map((c) => c.symbol))], dates, every, cells: grid.length }));
+    writeWhole(path16.join(w.dir, "sweep.json"), JSON.stringify({ symbols: [...new Set(grid.map((c) => c.symbol))], dates, every, cells: grid.length }));
     setSweep(id);
     const symbols = new Set(grid.map((c) => c.symbol)).size;
     return [
@@ -38766,10 +38787,10 @@ Rating: ${rating}`;
     const id = a.sweep_id ?? getSweep();
     if (!id) throw new Error("no backtest is running: name the sweep to score");
     const w = workspaceOf(root, id);
-    if (!fs12.existsSync(path15.join(w.dir, "journal.md"))) throw new Error(`sweep ${id} has no recorded calls yet`);
+    if (!fs13.existsSync(path16.join(w.dir, "journal.md"))) throw new Error(`sweep ${id} has no recorded calls yet`);
     let meta3 = "";
     try {
-      const m2 = JSON.parse(fs12.readFileSync(path15.join(w.dir, "sweep.json"), "utf8"));
+      const m2 = JSON.parse(fs13.readFileSync(path16.join(w.dir, "sweep.json"), "utf8"));
       meta3 = ` of ${m2.cells} planned`;
     } catch {
     }
@@ -38970,6 +38991,6 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root) {
 // src/tools/main.ts
 if (process.argv.includes("--check")) console.log(await deskCheck());
 else {
-  configure({ spacingMs: 250, cacheDir: path16.join(deskDataDir(process.cwd()), "cache") });
+  configure({ spacingMs: 250, cacheDir: path17.join(deskDataDir(process.cwd()), "cache") });
   await deskServer().connect(new StdioServerTransport());
 }

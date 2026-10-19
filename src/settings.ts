@@ -39,9 +39,17 @@ export interface Trading {
   /** A full position is this share of the Agentic account's total value. */
   fullPositionPercent: number;
   ratingToOrder: Record<string, Action>;
-  caps: { perOrderUsd: number; perStockPercent: number; ordersPerDay: number };
   orderDefaults: { type: 'limit'; timeInForce: 'gfd' | 'gtc' };
 }
+
+/** The person's caps: the most an order may cost, the most of the account one stock may be after a buy, and the most
+ *  orders in a day. They are not in the project's settings file, which anything working in this folder could edit: the
+ *  dashboard keeps them beside the trading switch in the person's private folder (robinhood/link.ts), and only the
+ *  person changes them, on the page. */
+export interface Caps { perOrderUsd: number; perStockPercent: number; ordersPerDay: number }
+export const DEFAULT_CAPS: Caps = { perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 3 };
+/** What a cap may be: $1 to $100,000 an order, 1% to 100% of the account, 1 to 50 orders a day. */
+export const CAP_RANGES = { perOrderUsd: [1, 100_000], perStockPercent: [1, 100], ordersPerDay: [1, 50] } as const;
 
 export const DEFAULTS: Settings = {
   analysis: {
@@ -68,7 +76,6 @@ export const DEFAULTS: Settings = {
   trading: {
     enabled: false, fullPositionPercent: 10,
     ratingToOrder: { Buy: 'buy a full position', Overweight: 'buy half a position', Hold: 'no order', Underweight: 'sell half of what is held', Sell: 'sell everything held', 'Needs review': 'no order' },
-    caps: { perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 3 },
     orderDefaults: { type: 'limit', timeInForce: 'gfd' },
   },
   routines: { maxAnalyses: 5 },
@@ -76,10 +83,25 @@ export const DEFAULTS: Settings = {
 
 const within = (v: unknown, lo: number, hi: number, fallback: number): number => (typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi ? v : fallback);
 
+const int = (v: unknown, lo: number, hi: number, fallback: number): number => (Number.isInteger(v) && (v as number) >= lo && (v as number) <= hi ? (v as number) : fallback);
+
+/** The caps as kept, checked: a value out of range falls back to the shipped one, never to something larger. */
+export function capsOf(raw: unknown): Caps {
+  const c = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>, d = DEFAULT_CAPS, r = CAP_RANGES;
+  return { perOrderUsd: within(c.perOrderUsd, r.perOrderUsd[0], r.perOrderUsd[1], d.perOrderUsd), perStockPercent: within(c.perStockPercent, r.perStockPercent[0], r.perStockPercent[1], d.perStockPercent), ordersPerDay: int(c.ordersPerDay, r.ordersPerDay[0], r.ordersPerDay[1], d.ordersPerDay) };
+}
+
+/** Caps as the person typed them on the page: all three, each within its range (whole orders a day), or null. */
+export function capsFrom(raw: unknown): Caps | null {
+  const c = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>, r = CAP_RANGES;
+  const n = (v: unknown, [lo, hi]: readonly [number, number], whole = false) => (typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi && (!whole || Number.isInteger(v)) ? v : null);
+  const perOrderUsd = n(c.perOrderUsd, r.perOrderUsd), perStockPercent = n(c.perStockPercent, r.perStockPercent), ordersPerDay = n(c.ordersPerDay, r.ordersPerDay, true);
+  return perOrderUsd === null || perStockPercent === null || ordersPerDay === null ? null : { perOrderUsd: Math.round(perOrderUsd * 100) / 100, perStockPercent: Math.round(perStockPercent * 10) / 10, ordersPerDay };
+}
+
 /** The trading part, checked: a value out of range falls back to the shipped one, never to something larger. */
 export function tradingOf(raw: unknown): Trading {
   const t = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>, d = DEFAULTS.trading;
-  const caps = (t.caps && typeof t.caps === 'object' ? t.caps : {}) as Record<string, unknown>;
   const od = (t.orderDefaults && typeof t.orderDefaults === 'object' ? t.orderDefaults : {}) as Record<string, unknown>;
   const map = (t.ratingToOrder && typeof t.ratingToOrder === 'object' ? t.ratingToOrder : {}) as Record<string, unknown>;
   const ratingToOrder: Record<string, Action> = { ...d.ratingToOrder };
@@ -90,12 +112,9 @@ export function tradingOf(raw: unknown): Trading {
     enabled: t.enabled === true,
     fullPositionPercent: within(t.fullPositionPercent, 1, 100, d.fullPositionPercent),
     ratingToOrder,
-    caps: { perOrderUsd: within(caps.perOrderUsd, 1, 100_000, d.caps.perOrderUsd), perStockPercent: within(caps.perStockPercent, 1, 100, d.caps.perStockPercent), ordersPerDay: int(caps.ordersPerDay, 1, 50, d.caps.ordersPerDay) },
     orderDefaults: { type: 'limit', timeInForce: tif },
   };
 }
-
-const int = (v: unknown, lo: number, hi: number, fallback: number): number => (Number.isInteger(v) && (v as number) >= lo && (v as number) <= hi ? (v as number) : fallback);
 
 /** A language name that is safe to put in an agent's instructions: letters, spaces, brackets and hyphens, nothing else. */
 export function languageName(v: unknown, fallback = 'English'): string {

@@ -5,13 +5,15 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { deskServer } from '../src/tools/server.js';
 import { isOrderTool } from '../src/robinhood/connect.js';
+import { DEFAULT_CAPS } from '../src/settings.js';
 
 const json = (f: string) => JSON.parse(fs.readFileSync(f, 'utf8'));
 
-test('trading ships switched off, with small caps', () => {
+test('trading ships switched off; the caps ship small and are not in the settings file, which anything in this folder could edit', () => {
   const s = json('desk-settings.json');
   assert.equal(s.trading.enabled, false);
-  assert.deepEqual(s.trading.caps, { perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 3 });
+  assert.equal(s.trading.caps, undefined, 'the caps are the person\'s own, kept beside the trading switch in their private folder');
+  assert.deepEqual(DEFAULT_CAPS, { perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 3 });
   assert.equal(s.scoring.holdingPeriodDays, 5);
   assert.equal(s.scoring.benchmarks[''], 'SPY');
 });

@@ -1,7 +1,30 @@
 "use strict";
 (() => {
   // src/terminal/ui/api.ts
-  var token = document.querySelector('meta[name="desk-token"]')?.content ?? "";
+  var KEPT = "ta.key";
+  var key = "";
+  try {
+    key = localStorage.getItem(KEPT) ?? "";
+  } catch {
+  }
+  var hasKey = () => key !== "";
+  async function claimKey() {
+    const m = /^#open=([0-9a-f]{36})$/.exec(location.hash);
+    if (!m) return;
+    history.replaceState(null, "", location.pathname + location.search);
+    try {
+      const res = await fetch("/api/claim", { method: "POST", cache: "no-store", headers: { "content-type": "application/json" }, body: JSON.stringify({ claim: m[1] }) });
+      const got = await res.json().catch(() => ({}));
+      if (!res.ok || typeof got.key !== "string" || !got.key) return;
+      key = got.key;
+      try {
+        localStorage.setItem(KEPT, key);
+      } catch {
+      }
+    } catch {
+    }
+  }
+  var KEY_LOST = "desk-key-lost";
   var ApiError = class extends Error {
     constructor(status, message) {
       super(message);
@@ -13,10 +36,18 @@
     const res = await fetch(path, {
       method,
       cache: "no-store",
-      headers: { "x-desk-token": token, ...body !== void 0 ? { "content-type": "application/json" } : {} },
+      headers: { "x-desk-token": key, ...body !== void 0 ? { "content-type": "application/json" } : {} },
       body: body !== void 0 ? JSON.stringify(body) : void 0
     });
     const data = await res.json().catch(() => ({}));
+    if (res.status === 401) {
+      key = "";
+      try {
+        localStorage.removeItem(KEPT);
+      } catch {
+      }
+      document.dispatchEvent(new Event(KEY_LOST));
+    }
     if (!res.ok) throw new ApiError(res.status, data.error ?? `the desk answered ${res.status}`);
     return data;
   }
@@ -25,7 +56,7 @@
     state: () => call("GET", "/api/state"),
     version: () => call("GET", "/api/version"),
     restart: () => call("POST", "/api/restart", {}),
-    /** Asked without the token: whether a dashboard answers here, and which build of it (after a restart, a new one). */
+    /** Asked without the key: whether a dashboard answers here, and which build of it (after a restart, a new one). */
     ping: async () => (await fetch("/api/ping", { cache: "no-store" })).json(),
     search: (query) => call("GET", `/api/search?${q({ q: query })}`),
     prefs: () => call("GET", "/api/prefs"),
@@ -54,6 +85,8 @@
     placeTicket: (id, confirm) => call("POST", "/api/ticket/place", { id, confirm }),
     trading: () => call("GET", "/api/trading"),
     setTrading: (on) => call("POST", "/api/trading", on ? { on, confirm: "switch trading on" } : { on }),
+    /** The person's caps, kept beside the trading switch; the desk checks them before keeping them. */
+    setCaps: (caps) => call("POST", "/api/trading", { caps }),
     readAccounts: () => call("POST", "/api/robinhood/refresh", {})
   };
 
@@ -436,9 +469,13 @@
   };
   var latestCall = (sym) => S.desk?.calls.find((c) => c.ticker === sym) ?? null;
   var nameOf = (sym) => quoteOf(sym)?.name ?? S.history?.name ?? marketOf(sym)?.name ?? sym;
-  var life = { stopped: false, updating: false };
+  var life = { stopped: false, updating: false, noKey: false };
   function renderSub() {
     const d = S.desk;
+    if (life.noKey) {
+      $("#subline").textContent = "This page has no key to the dashboard: it was opened by hand, or the dashboard was started afresh since. Open the dashboard again (run /terminal, or ask the trading-desk team to open it) and use the page that opens.";
+      return;
+    }
     if (life.stopped) {
       $("#subline").textContent = 'The dashboard is stopped. To open it again, ask the trading-desk team to "open the dashboard", or run /terminal.';
       return;
@@ -688,7 +725,28 @@
     $("#tradeFoot").textContent = on ? "An order is placed only when you press Confirm on a ticket Robinhood has checked." : "This page places no order: trading is switched off.";
   }
   function tradingBlock() {
-    if (!signedIn()) return "";
+    return signedIn() ? switchBlock() + capsBlock() : "";
+  }
+  var CAPS = { editing: false };
+  function capsBlock() {
+    const c = TR.state?.caps;
+    if (!c) return "";
+    if (CAPS.editing) return `<div class="at-card-head"><h3>Your caps</h3></div>
+    <p class="at-lede">The most an order may cost, the most of the account one stock may be after a buy, and the most orders in a day. Every ticket is checked against them, and again just before an order is sent. They are kept beside the trading switch, where agents are refused.</p>
+    <div class="at-row">
+      <label class="at-field"><span class="at-field-l">An order at most, $</span><input class="at-input at-box" id="capOrder" type="text" inputmode="decimal" value="${c.perOrderUsd}"></label>
+      <label class="at-field"><span class="at-field-l">One stock, % of the account</span><input class="at-input at-box" id="capStock" type="text" inputmode="decimal" value="${c.perStockPercent}"></label>
+      <label class="at-field"><span class="at-field-l">Orders a day</span><input class="at-input at-box" id="capDay" type="number" min="1" max="50" step="1" inputmode="numeric" value="${c.ordersPerDay}"></label></div>
+    <div class="at-row">${rhButton("caps-save", "Save the caps", { primary: true })}${rhButton("caps-cancel", "Cancel")}</div>`;
+    return `<div class="at-card-head"><h3>Your caps</h3></div>
+    <div class="at-row"><span class="at-chip">${esc(money(c.perOrderUsd))} an order at most</span><span class="at-chip">${esc(String(c.perStockPercent))}% of the account in one stock</span><span class="at-chip">${esc(String(c.ordersPerDay))} ${c.ordersPerDay === 1 ? "order" : "orders"} a day</span></div>
+    <div class="at-row">${rhButton("caps-edit", "Change the caps\u2026")}</div>`;
+  }
+  var capsTyped = () => {
+    const n = (id) => Number($(id).value.replace(/[$,%\s]/g, ""));
+    return { perOrderUsd: n("#capOrder"), perStockPercent: n("#capStock"), ordersPerDay: n("#capDay") };
+  };
+  function switchBlock() {
     if (tradingOn()) return `<div class="at-card-head"><h3>Trading</h3><span class="at-chip warn">On${TR.state?.since ? ` since ${esc(dayText(TR.state.since))}` : ""}</span></div>
     <p class="at-lede">You can place an order from a ticket, from one of the desk's calls (Decide\u2026) or your own (Trade\u2026), in the Agentic account only, within your caps, after Robinhood's check and your Confirm.</p>
     <div class="at-row">${rhButton("tr-off", "Switch trading off")}</div>`;
@@ -942,16 +1000,16 @@
     el.innerHTML = ask2 + trade;
   }
   async function loadHistory() {
-    const sym = S.symbol, range = S.range, key = `${sym}|${range}`;
+    const sym = S.symbol, range = S.range, key2 = `${sym}|${range}`;
     if (!sym) return;
-    S.historyKey = key;
+    S.historyKey = key2;
     try {
       const h = await api.history(sym, range);
-      if (S.historyKey !== key) return;
+      if (S.historyKey !== key2) return;
       S.history = h;
       S.historyError = "";
     } catch (e) {
-      if (S.historyKey !== key) return;
+      if (S.historyKey !== key2) return;
       S.history = null;
       S.historyError = say(e);
     }
@@ -1085,12 +1143,12 @@
     const t = ratingTone(r);
     return t === "danger" ? "bad" : t;
   };
-  function stepCard(key, parts, open = false) {
-    const r = ROLE[key] ?? { icon: "i-file", tone: "", who: "" };
+  function stepCard(key2, parts, open = false) {
+    const r = ROLE[key2] ?? { icon: "i-file", tone: "", who: "" };
     const turns = parts.length > 1 ? `<span class="at-chip">${parts.length} turns</span>` : "";
     return `<details class="ta-step at-box ${r.tone}"${open ? " open" : ""}><summary>
       <span class="ta-kpi-ic"><svg class="g"><use href="#${r.icon}"/></svg></span>
-      <span class="ta-step-w"><span class="ta-step-n">${esc(SECTION_NAMES[key] ?? key)}${r.who ? ` <small>\xB7 ${esc(r.who)}</small>` : ""}</span><span class="ta-step-p">${esc(opening(parts[0] ?? ""))}</span></span>
+      <span class="ta-step-w"><span class="ta-step-n">${esc(SECTION_NAMES[key2] ?? key2)}${r.who ? ` <small>\xB7 ${esc(r.who)}</small>` : ""}</span><span class="ta-step-p">${esc(opening(parts[0] ?? ""))}</span></span>
       ${turns}<svg class="g ta-step-chev"><use href="#i-chev-right"/></svg></summary>
     <div class="md">${parts.map(markdown).join("<hr>")}</div></details>`;
   }
@@ -1445,6 +1503,23 @@
           toast("Trading is switched off.");
         });
         break;
+      case "caps-edit":
+        CAPS.editing = true;
+        renderAccount();
+        break;
+      case "caps-cancel":
+        CAPS.editing = false;
+        renderAccount();
+        break;
+      case "caps-save":
+        void run(async () => {
+          TR.state = { ...TR.state, ...await api.setCaps(capsTyped()) };
+          CAPS.editing = false;
+          renderTrading();
+          renderAccount();
+          toast("Your caps are saved. Every ticket is checked against them.");
+        });
+        break;
       case "rh-connect":
         void run(async () => {
           S.rh = await api.connectRobinhood();
@@ -1676,7 +1751,7 @@
   var seen = "";
   var build = "";
   async function watchFiles() {
-    if (document.hidden || life.stopped || life.updating) return;
+    if (document.hidden || life.stopped || life.updating || life.noKey) return;
     try {
       const v = await api.version();
       build ||= v.build;
@@ -1716,6 +1791,7 @@
     $("#subline").textContent = "The dashboard did not come back after its update. Ask the trading-desk team to open the dashboard, or run /terminal.";
   }
   async function prices() {
+    if (life.noKey) return;
     if (!document.hidden) await Promise.all([refreshQuotes(), refreshMarkets()]);
     const open = isQuote(marketOf("^GSPC")?.quote) && marketOf("^GSPC").quote.open || [...S.quotes.values()].some((q2) => isQuote(q2) && q2.open && !q2.symbol.includes("-"));
     setTimeout(() => void prices(), open ? 3e4 : 12e4);
@@ -1724,7 +1800,23 @@
     renderHero();
   });
   renderControls();
-  void loadPrefs().then(() => refreshState()).then(() => void prices());
-  void refreshRobinhood();
-  setInterval(() => void watchFiles(), 3e3);
+  function noKey() {
+    if (life.noKey) return;
+    life.noKey = true;
+    renderSub();
+    $("#updateBar").hidden = true;
+    const dlg = $("#ticketDialog");
+    if (dlg.open) dlg.close();
+    T.open = null;
+  }
+  document.addEventListener(KEY_LOST, noKey);
+  void claimKey().then(() => {
+    if (!hasKey()) {
+      noKey();
+      return;
+    }
+    void loadPrefs().then(() => refreshState()).then(() => void prices());
+    void refreshRobinhood();
+    setInterval(() => void watchFiles(), 3e3);
+  });
 })();

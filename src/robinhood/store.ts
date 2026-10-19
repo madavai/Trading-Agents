@@ -3,9 +3,9 @@
 // printed from it. Agents are refused this folder (.claude/settings.json, .claude/hooks/guard.mjs).
 import crypto from 'node:crypto';
 import fs from 'node:fs';
-import path from 'node:path';
 import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
 import type { OAuthClientInformationMixed, OAuthClientMetadata, OAuthTokens } from '@modelcontextprotocol/sdk/shared/auth.js';
+import { writePrivate } from '../private.js';
 
 interface Saved { client?: OAuthClientInformationMixed; tokens?: OAuthTokens; verifier?: string; state?: string; savedAt?: string }
 
@@ -13,12 +13,9 @@ export function readSaved(file: string): Saved {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')) as Saved; } catch { return {}; }
 }
 
+/** Written whole, and locked to the person's own account on every system (private.ts). */
 export function writeSaved(file: string, saved: Saved): void {
-  fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
-  const tmp = `${file}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify({ ...saved, savedAt: new Date().toISOString() }, null, 2), { mode: 0o600 });
-  fs.renameSync(tmp, file);
-  try { fs.chmodSync(file, 0o600); } catch { /* Windows keeps its own permissions */ }
+  writePrivate(file, JSON.stringify({ ...saved, savedAt: new Date().toISOString() }, null, 2));
 }
 
 /** The sign-in as the MCP library asks for it: where Robinhood sends the person back, who we are, and the saved pieces. */

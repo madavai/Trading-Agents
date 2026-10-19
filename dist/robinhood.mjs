@@ -7187,12 +7187,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list, fs3, exportName) {
+    function addFormats(ajv, list, fs4, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list)
-        ajv.addFormat(f, fs3[f]);
+        ajv.addFormat(f, fs4[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -7305,7 +7305,7 @@ var require_content_type = __commonJS({
 });
 
 // src/robinhood/cli.ts
-import fs2 from "node:fs";
+import fs3 from "node:fs";
 
 // src/paths.ts
 import os from "node:os";
@@ -18917,24 +18917,69 @@ var StreamableHTTPClientTransport = class {
 
 // src/robinhood/store.ts
 import crypto2 from "node:crypto";
+import fs2 from "node:fs";
+
+// src/private.ts
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import os2 from "node:os";
 import path2 from "node:path";
+var SYSTEM = "*S-1-5-18";
+var owner = null;
+var windowsTool = (exe) => path2.join(process.env.SystemRoot ?? process.env.windir ?? "C:\\Windows", "System32", exe);
+function ownerOnWindows() {
+  if (owner) return owner;
+  const r = spawnSync(windowsTool("whoami.exe"), ["/user", "/fo", "csv", "/nh"], { encoding: "utf8", windowsHide: true, timeout: 5e3 });
+  const sid = /"(S-1-[0-9-]+)"\s*$/m.exec(r.stdout ?? "")?.[1];
+  owner = sid ? `*${sid}` : os2.userInfo().username;
+  return owner;
+}
+var lockArgs = (target, folder, who) => {
+  const rights = folder ? "(OI)(CI)F" : "F";
+  return [target, "/inheritance:r", "/grant:r", `${who}:${rights}`, `${SYSTEM}:${rights}`];
+};
+function lockDown(target) {
+  let folder;
+  try {
+    folder = fs.statSync(target).isDirectory();
+  } catch {
+    return false;
+  }
+  if (process.platform !== "win32") {
+    try {
+      fs.chmodSync(target, folder ? 448 : 384);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  const icacls = (args) => spawnSync(windowsTool("icacls.exe"), args, { stdio: "ignore", windowsHide: true, timeout: 15e3 }).status === 0;
+  return icacls([target, "/reset"]) && icacls(lockArgs(target, folder, ownerOnWindows()));
+}
+var lockedFolders = /* @__PURE__ */ new Set();
+function writePrivate(file, text) {
+  const folder = path2.dirname(file);
+  fs.mkdirSync(folder, { recursive: true, mode: 448 });
+  if (!lockedFolders.has(folder)) {
+    lockDown(folder);
+    lockedFolders.add(folder);
+  }
+  const tmp = `${file}.${process.pid}.tmp`;
+  fs.writeFileSync(tmp, text, { mode: 384 });
+  fs.renameSync(tmp, file);
+  lockDown(file);
+}
+
+// src/robinhood/store.ts
 function readSaved(file) {
   try {
-    return JSON.parse(fs.readFileSync(file, "utf8"));
+    return JSON.parse(fs2.readFileSync(file, "utf8"));
   } catch {
     return {};
   }
 }
 function writeSaved(file, saved) {
-  fs.mkdirSync(path2.dirname(file), { recursive: true, mode: 448 });
-  const tmp = `${file}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify({ ...saved, savedAt: (/* @__PURE__ */ new Date()).toISOString() }, null, 2), { mode: 384 });
-  fs.renameSync(tmp, file);
-  try {
-    fs.chmodSync(file, 384);
-  } catch {
-  }
+  writePrivate(file, JSON.stringify({ ...saved, savedAt: (/* @__PURE__ */ new Date()).toISOString() }, null, 2));
 }
 var FileAuth = class {
   constructor(file, redirectUrl, openBrowser2) {
@@ -19421,11 +19466,11 @@ async function main(args) {
   const words2 = args.includes("--words"), [command, ...rest] = args.filter((a) => a !== "--words");
   const file = robinhoodFile();
   if (command === "status") {
-    say(fs2.existsSync(file) ? `A Robinhood sign-in is saved (last refreshed ${fs2.statSync(file).mtime.toISOString().slice(0, 16).replace("T", " ")} UTC).` : "No Robinhood sign-in is saved yet.");
+    say(fs3.existsSync(file) ? `A Robinhood sign-in is saved (last refreshed ${fs3.statSync(file).mtime.toISOString().slice(0, 16).replace("T", " ")} UTC).` : "No Robinhood sign-in is saved yet.");
     return 0;
   }
   if (command === "forget") {
-    fs2.rmSync(file, { force: true });
+    fs3.rmSync(file, { force: true });
     say("The saved Robinhood sign-in is deleted. Connect again whenever you like.");
     return 0;
   }

@@ -2,7 +2,7 @@
 // against their caps, before anything is sent to Robinhood. Pure arithmetic on real figures (the account's value, buying
 // power and holdings as Robinhood gave them, Robinhood's live price): when a figure is missing the ticket says so and
 // proposes nothing, it never guesses. Limit orders of whole shares only: Robinhood takes fractions on market orders alone.
-import type { Action, Trading } from '../settings.js';
+import type { Action, Caps, Trading } from '../settings.js';
 
 export interface TicketContext {
   symbol: string;
@@ -33,7 +33,8 @@ const cents = (n: number) => Math.round(n * 100) / 100;
 /** What the rating asks, in the person's own settings. */
 export const actionOf = (rating: string, t: Trading): Action => t.ratingToOrder[rating] ?? 'no order';
 
-export function propose(c: TicketContext, t: Trading): Proposal {
+/** `caps` are the person's own, read beside the trading switch (never from the project's settings file). */
+export function propose(c: TicketContext, t: Trading, caps: Caps): Proposal {
   const action = actionOf(c.rating, t), why: string[] = [];
   const none = (reason: string): Proposal => ({ action, order: null, why: [...why, reason] });
   if (action === 'no order') return none(`The desk rated ${c.symbol} ${c.rating}: your settings place no order for that rating.`);
@@ -55,7 +56,7 @@ export function propose(c: TicketContext, t: Trading): Proposal {
   const target = (c.accountValue * share) / 100;
   why.push(`${action === 'buy a full position' ? 'A full position' : 'Half a position'}: ${share}% of the account's ${money(c.accountValue)} is ${money(target)}.`);
   let amount = target;
-  if (amount > t.caps.perOrderUsd) { amount = t.caps.perOrderUsd; why.push(`Your cap of ${money(t.caps.perOrderUsd)} an order makes it ${money(amount)}.`); }
+  if (amount > caps.perOrderUsd) { amount = caps.perOrderUsd; why.push(`Your cap of ${money(caps.perOrderUsd)} an order makes it ${money(amount)}.`); }
   if (amount > c.buyingPower) { amount = c.buyingPower; why.push(`Buying power is ${money(c.buyingPower)}, so at most that.`); }
   const quantity = Math.floor(amount / limitPrice);
   if (quantity < 1) return none(`${money(amount)} buys less than one share at ${money(limitPrice)}, and a limit order buys whole shares only.`);
@@ -79,7 +80,7 @@ export function proposeOwn(c: TicketContext, side: Side, t: Trading): Proposal {
 }
 
 /** Every check an order must pass before it may be reviewed (and, later, placed). The page shows each one. */
-export function check(o: Order, c: TicketContext, t: Trading): Check[] {
+export function check(o: Order, c: TicketContext, t: Trading, caps: Caps): Check[] {
   const out: Check[] = [];
   const add = (ok: boolean, words: string) => out.push({ ok, words });
   add(Number.isInteger(o.quantity) && o.quantity >= 1 && o.quantity <= 100_000, Number.isInteger(o.quantity) && o.quantity >= 1 ? `${o.quantity} whole share(s)` : 'The quantity must be a whole number of shares, at least one');
@@ -92,16 +93,16 @@ export function check(o: Order, c: TicketContext, t: Trading): Check[] {
   } else add(false, `Robinhood gave no live price for ${o.symbol} to check the limit against`);
   const cost = cents(o.quantity * o.limitPrice);
   if (o.side === 'buy') {
-    add(cost <= t.caps.perOrderUsd, cost <= t.caps.perOrderUsd ? `${money(cost)} is within your cap of ${money(t.caps.perOrderUsd)} an order` : `${money(cost)} is over your cap of ${money(t.caps.perOrderUsd)} an order`);
+    add(cost <= caps.perOrderUsd, cost <= caps.perOrderUsd ? `${money(cost)} is within your cap of ${money(caps.perOrderUsd)} an order` : `${money(cost)} is over your cap of ${money(caps.perOrderUsd)} an order`);
     if (c.buyingPower === null) add(false, 'Robinhood gave no buying power for the Agentic account');
     else add(cost <= c.buyingPower, cost <= c.buyingPower ? `Buying power ${money(c.buyingPower)} covers it` : `Buying power is ${money(c.buyingPower)}: not enough`);
     if (c.accountValue === null || c.accountValue <= 0) add(false, 'Robinhood gave no total value for the Agentic account to check your per-stock cap');
     else {
       const after = ((c.held + o.quantity) * o.limitPrice / c.accountValue) * 100;
-      add(after <= t.caps.perStockPercent, `${o.symbol} would be ${after.toFixed(1)}% of the account; your cap is ${t.caps.perStockPercent}%`);
+      add(after <= caps.perStockPercent, `${o.symbol} would be ${after.toFixed(1)}% of the account; your cap is ${caps.perStockPercent}%`);
     }
   } else add(o.quantity <= c.held, o.quantity <= c.held ? `Selling ${o.quantity} of the ${c.held} held` : `Only ${c.held} share(s) are held in the Agentic account`);
-  add(c.ordersToday < t.caps.ordersPerDay, `${c.ordersToday} of your ${t.caps.ordersPerDay} orders a day used`);
+  add(c.ordersToday < caps.ordersPerDay, `${c.ordersToday} of your ${caps.ordersPerDay} orders a day used`);
   return out;
 }
 

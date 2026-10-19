@@ -880,7 +880,7 @@ p { text-wrap: pretty; }
             <div class="step-h"><p class="step-title">You open a ticket</p><span class="at-chip c-you"><i></i>You</span><span class="at-chip c-you"><i></i>Dashboard</span></div>
             <p><b>Decide…</b> on the call proposes an order for the Agentic account, sized from the rating and checked against your caps. Or <b>Trade…</b>, beside any stock's price, opens your own ticket: buy or sell, starting at one share, under the very same checks.</p>
             <div class="caps"><span class="at-chip"><b>$500</b> an order at most</span><span class="at-chip"><b>10%</b> of the account in one stock</span><span class="at-chip"><b>3</b> orders a day</span><span class="at-chip">Limit orders, good for the day</span></div>
-            <p class="why"><b>Why it matters.</b> Your own limits, set in the desk's settings, stand between a call and an order.</p>
+            <p class="why"><b>Why it matters.</b> Your own limits stand between a call and an order. You set them on the dashboard, beside the trading switch, and they are kept in your private folder, where no agent can change them.</p>
           </div></li>
           <li class="step c-rh"><span class="badge">11</span><div class="step-body">
             <div class="step-h"><p class="step-title">Robinhood checks it</p><span class="at-chip c-you"><i></i>Dashboard</span><span class="at-chip c-rh"><i></i>Robinhood</span></div>
@@ -914,7 +914,7 @@ p { text-wrap: pretty; }
   <section class="chapter" id="kept">
     <div class="ch-head">
       <div class="ch-title"><p class="kicker">How the information is stored</p><h2>Four places, all on this computer</h2></div>
-      <p>The desk keeps nothing in the cloud. The records live in the project folder, your rules in one settings file, your Robinhood sign-in in a private folder of its own, and the agents where Madav / Claude reads them.</p>
+      <p>The desk keeps nothing in the cloud. The records live in the project folder, your rules in one settings file, your Robinhood sign-in, trading switch and caps in a private folder of your own, and the agents where Madav / Claude reads them.</p>
     </div>
     <div class="computer">
       <p class="computer-h"><svg class="ic"><use href="#i-screen"/></svg>This computer</p>
@@ -938,17 +938,18 @@ p { text-wrap: pretty; }
           <ul>
             <li><b>Analysis</b><span>Which analysts, how many debate turns, the report's language.</span></li>
             <li><b>Scoring</b><span>Five trading days, against the index of the stock's market.</span></li>
-            <li><b>Trading caps</b><span>$500 an order, 10% of the account in one stock, 3 orders a day; a full position is 10% of the account.</span></li>
+            <li><b>Position size</b><span>A full position is 10% of the account. Your caps are not here: they are in your private folder, beside the trading switch.</span></li>
             <li><b>Routines</b><span>At most five analyses a morning.</span></li>
             <li><b>Safety net</b><span>A value out of range falls back to the shipped one, never to a larger one.</span></li>
           </ul>
         </article>
         <article class="drawer edge c-you">
-          <div class="drawer-h"><span class="icbox lg"><svg class="ic lg"><use href="#i-lock"/></svg></span><div><p class="drawer-name">Your private folder</p><p class="drawer-where">In your home folder, outside the project. Agents are refused it.</p></div></div>
+          <div class="drawer-h"><span class="icbox lg"><svg class="ic lg"><use href="#i-lock"/></svg></span><div><p class="drawer-name">Your private folder</p><p class="drawer-where">In your home folder, outside the project. Agents are refused it; on Windows it is locked to your own account.</p></div></div>
           <ul>
             <li><b>Robinhood sign-in</b><span>Kept after you connect on Robinhood's own page. The dashboard never sees your password.</span></li>
-            <li><b>Chosen accounts</b><span>Which accounts to show, by a fingerprint rather than their numbers.</span></li>
-            <li><b>Trading switch</b><span>Off when shipped. Only you turn it on, on the dashboard.</span></li>
+            <li><b>Chosen accounts</b><span>Which accounts to show, by a fingerprint rather than their numbers, made with a secret kept here.</span></li>
+            <li><b>Trading switch and caps</b><span>Off when shipped. Only you turn it on, on the dashboard; your caps ($500 an order, 10% of the account in one stock, 3 orders a day as shipped) sit beside it.</span></li>
+            <li><b>Dashboard key</b><span>While the dashboard runs, so that opening it again opens a page that works.</span></li>
           </ul>
         </article>
         <article class="drawer edge c-desk">
@@ -1105,11 +1106,11 @@ p { text-wrap: pretty; }
       <div class="feat edge c-desk"><span class="icbox"><svg class="ic"><use href="#i-flag"/></svg></span><b>The desk's calls</b><p>Each call in two lines; in full, a coloured summary, the price since the call and every agent's part as a card.</p></div>
       <div class="feat edge c-desk"><span class="icbox"><svg class="ic"><use href="#i-target"/></svg></span><b>How the desk is doing</b><p>The scorecard: calls scored against their index, and those still waiting.</p></div>
       <div class="feat edge c-you"><span class="icbox"><svg class="ic"><use href="#i-ledger"/></svg></span><b>Stock page</b><p>Everything on one stock: what you hold with Buy… and Sell…, your orders on it, and each call with its score.</p></div>
-      <div class="feat edge c-rh"><span class="icbox"><svg class="ic"><use href="#i-bank"/></svg></span><b>Your account</b><p>In the side list and on its own page: value, cash, buying power and gain in colour, each holding's share, orders, and the trading switch.</p></div>
+      <div class="feat edge c-rh"><span class="icbox"><svg class="ic"><use href="#i-bank"/></svg></span><b>Your account</b><p>In the side list and on its own page: value, cash, buying power and gain in colour, each holding's share, orders, the trading switch and your caps.</p></div>
       <div class="feat edge c-you"><span class="icbox"><svg class="ic"><use href="#i-send"/></svg></span><b>Order tickets</b><p>Decide… from a call, or Trade… for your own: checked against your caps, reviewed by Robinhood, placed only on your Confirm.</p></div>
     </div>
     <div class="joined facts">
-      <span><svg class="ic sm"><use href="#i-lock"/></svg>On this computer only, with a fresh key each time it starts</span>
+      <span><svg class="ic sm"><use href="#i-lock"/></svg>On this computer only; a fresh key each start, given only to the browser it opens</span>
       <span><svg class="ic sm"><use href="#i-clock"/></svg>Market prices up to 15 minutes late</span>
       <span><svg class="ic sm"><use href="#i-sun"/></svg>Light and dark · opens where you left it</span>
     </div>

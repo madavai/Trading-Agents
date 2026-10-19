@@ -126,7 +126,7 @@ Choose `shallow`, `medium` or `deep` (1, 3 or 5 rounds of debate), which analyst
 <a href="https://madavai.github.io/Trading-Agents/inside-the-trading-desk.html#kept">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/kept-dark.webp">
-  <img alt="Four places, all on this computer: the desk's records (journal, reports, watchlist, holdings, orders log), your rules in one settings file, a private folder for your Robinhood sign-in that agents are refused, and the agents and team that Madav / Claude reads. Also what leaves this computer, and to whom." src="docs/readme/kept-light.webp">
+  <img alt="Four places, all on this computer: the desk's records (journal, reports, watchlist, holdings, orders log), your rules in one settings file, a private folder locked to your account for your Robinhood sign-in, trading switch and caps, and the agents and team that Madav / Claude reads. Also what leaves this computer, and to whom." src="docs/readme/kept-light.webp">
 </picture>
 </a>
 
@@ -147,13 +147,15 @@ Choose `shallow`, `medium` or `deep` (1, 3 or 5 rounds of debate), which analyst
   Robinhood's dry-run check, and one that places a single limit order. The last is used only when trading is switched
   on (by you), on a ticket Robinhood checked with no alerts in the last five minutes and unchanged since, after your
   Confirm naming the exact order, and after every cap is checked again on fresh figures. A ticket sends one order.
-- Your caps are in `desk-settings.json` under `trading`: $500 an order, 10% of the account in one stock, 3 orders a
-  day, a full position being 10% of the account. A setting out of range falls back to the shipped value, never to a
-  larger one.
+- Your caps are yours alone: $500 an order, 10% of the account in one stock and 3 orders a day as shipped. You change
+  them on the dashboard's "Your account" page, beside the trading switch, and they are kept with it in your private
+  folder, where agents are refused, never in the project's files. A cap out of range falls back to the shipped value,
+  never to a larger one. A full position is 10% of the account (`desk-settings.json` under `trading`).
 - Robinhood only lets agents trade in its separate Agentic account, which you fund yourself. Keep Robinhood's own
   "trade approvals" on until you trust the desk: then every order also waits for your OK on your phone.
 - Your Robinhood sign-in stays in `~/.trading-agents` on your computer, never in this repository. Agents are refused
-  that folder; the real protection is that they get no free shell or file access outside this folder without your
+  that folder, and on Windows the dashboard locks it to your own account, so no other account on this computer can
+  open it; the real protection is that agents get no free shell or file access outside this folder without your
   approval, so **never run this folder with permission checks bypassed**.
 - A source that cannot be reached is reported as unavailable, never as "no news". No number is invented.
 
@@ -166,7 +168,9 @@ Choose `shallow`, `medium` or `deep` (1, 3 or 5 rounds of debate), which analyst
 </picture>
 </a>
 
-The dashboard runs on your own computer only and keeps no key. "Your account", at the top of its side list and on a
+The dashboard runs on your own computer only. It opens your browser on a one-time link that gives the page its key, so
+the key is in no page it serves; a page opened by hand says it has none, and running /terminal again opens one that
+works. "Your account", at the top of its side list and on a
 page of its own, is where you connect Robinhood yourself (on Robinhood's own sign-in page) and choose which accounts to
 show: value, cash, buying power and holdings at Robinhood's live prices; for the Agentic account its orders and whether
 Robinhood's phone approval is on. The side list folds away to give the page the whole width.
