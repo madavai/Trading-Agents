@@ -1,5 +1,5 @@
 {
-  "about": "The desk's settings, read by the desk tool server and the dashboard. Edit freely; the dashboard's Settings page will change the trading part for you.",
+  "about": "The desk's settings, read by the desk tool server and the dashboard. Edit freely. Your trading caps are not here: the dashboard keeps them beside the trading switch in your private folder, and you change them on its Your account page.",
   "analysis": {
     "outputLanguage": "English",
     "debateRounds": 1,
@@ -72,11 +72,6 @@
       "Underweight": "sell half of what is held",
       "Sell": "sell everything held",
       "Needs review": "no order"
-    },
-    "caps": {
-      "perOrderUsd": 500,
-      "perStockPercent": 10,
-      "ordersPerDay": 3
     },
     "orderDefaults": {
       "type": "limit",

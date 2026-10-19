@@ -8,7 +8,9 @@ Only you, on the dashboard, and only when all of these hold:
   Trading Agents folder in your home folder, which agents are refused);
 - the order is for the Agentic account, Robinhood's separate account for agent trading, which you fund yourself;
 - Robinhood checked that exact order (its own dry run) with no alerts, in the last five minutes, and nothing changed since;
-- every one of your caps passes, checked again on figures read from Robinhood just before sending;
+- every one of your caps passes, checked again on figures read from Robinhood just before sending. The caps are yours
+  alone: you set them on the dashboard, beside the trading switch, and they are kept with it in your private folder,
+  never in the project's files, which anything working in this folder could edit;
 - you pressed Confirm on the words of that exact order ("Confirm: Buy 1 NVDA at $182.40").
 
 The same holds whether the ticket comes from one of the desk's calls ("Decide…") or is your own ("Trade…", a stock you
@@ -31,14 +33,21 @@ pieces, which is why the real protection is that the desk's agents get no shell 
 folder asks you before it runs one.
 
 ## Your data
-- Your Robinhood sign-in, the accounts you chose to show and the trading switch stay in your private folder, never in
-  this repository and never on the page. Full account numbers never reach the page or the desk's files: the page shows
-  the last four characters and tells accounts apart by a short fingerprint.
+- Your Robinhood sign-in, the accounts you chose to show, the trading switch with your caps, the secret your account
+  fingerprints are made with and the running dashboard's key stay in your private folder, never in this repository and
+  never on the page. On Windows the dashboard locks that folder to your own account (and the system) with an access
+  list of its own, so no other account on this computer can open it; on Linux and macOS the file mode does the same.
+  The desk check says who can open it.
+- Full account numbers never reach the page or the desk's files: the page shows the last four characters and tells
+  accounts apart by a short fingerprint, made with a secret kept in your private folder, so the fingerprint says
+  nothing about the number even to someone who knows the number.
 - The desk's own records (journal, reports, watchlist, holdings, the log of orders sent) stay in this folder's
   `desk-data`, which git never commits.
 - Your email goes to the SEC alone, which asks every reader of its filings for one.
 - The dashboard answers on this computer's own address only, so nothing on the internet can reach it, and every request
-  for data needs a key made each time it starts.
+  for data needs a key made each time it starts. The key is in no page it serves: the dashboard opens your browser on a
+  one-time link, which the page swaps for the key once, within two minutes, and then keeps for itself. A page opened by
+  hand has no key and says so; opening the dashboard again (run /terminal) opens a page that has one.
 - What the dashboard remembers between visits (light or dark, the side list, the page and the stock you were on, the
   chart's settings and the stocks you looked at last) is kept in `desk-data/dashboard.json`. Nothing about an order is
   ever remembered: every ticket starts afresh.
@@ -47,11 +56,12 @@ folder asks you before it runs one.
 - The search box sends what you type to Yahoo Finance's public search, which suggests matching stocks.
 
 ## Limits
-- Any program on this computer, under any user account on it, can reach the dashboard's address and read its page and
-  key the way your browser does. With trading switched on, such a program could send an order within your caps
-  (Robinhood's phone approval, if you keep it on, would still ask you). Keep software you do not trust, and other
-  people's accounts, off this computer; switch trading off when you are not using it; and never run this folder with
-  permission checks bypassed.
+- Any program on this computer, under any user account on it, can reach the dashboard's address and read its page the
+  way your browser does, but no longer finds the key there. A program running under your own account can read the key
+  from your private folder, exactly as it could read your sign-in; a program under another account on this computer
+  cannot. With trading switched on, a program under your own account could therefore still send an order within your
+  caps (Robinhood's phone approval, if you keep it on, would still ask you). Keep software you do not trust off this
+  computer; switch trading off when you are not using it; and never run this folder with permission checks bypassed.
 - Your Robinhood sign-in is a file in your private folder, protected by your computer account like your other files.
   Disconnect deletes it from this computer; to end the access on Robinhood's side too, remove it in Robinhood.
 - Nothing here is investment advice.

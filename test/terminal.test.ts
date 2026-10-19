@@ -16,6 +16,7 @@ import { clearQuotes, parseQuote } from '../src/terminal/quotes.js';
 import { clearSearches, parseSearch } from '../src/terminal/search.js';
 import { MAX_RECENT } from '../src/terminal/prefs.js';
 import { summaryOf } from '../src/terminal/state.js';
+import { lockState } from '../src/private.js';
 import { startTerminal, type Assets, type Terminal } from '../src/terminal/server.js';
 import { enqueue, MAX_QUEUE, MAX_WATCH, addWatch } from '../src/terminal/store.js';
 import { chartJson, series } from './chart.js';
@@ -37,7 +38,7 @@ const yahoo: typeof fetch = async (input) => {
 };
 
 const ASSETS: Assets = new Map([
-  ['/index.html', { type: 'text/html; charset=utf-8', body: '<!doctype html><meta name="desk-token" content="__DESK_TOKEN__"><p>page</p>' }],
+  ['/index.html', { type: 'text/html; charset=utf-8', body: '<!doctype html><p>page</p>' }],
   ['/app.js', { type: 'text/javascript; charset=utf-8', body: 'console.log(1)' }],
 ]);
 
@@ -54,19 +55,21 @@ const call = (t: Terminal, method: string, p: string, o: { headers?: Record<stri
 
 let root = '', term: Terminal;
 const dir = () => path.join(root, 'desk-data');
+/** A stand-in for the person's private folder, where a running dashboard keeps its key. */
+const KEYS = () => path.join(root, 'private', 'dashboard.json');
 beforeEach(async () => {
   process.env.TRADING_AGENTS_TODAY = '2026-10-12';
   clearCache(); clearQuotes(); configure({ fetch: yahoo, secEmail: '' });
   root = fs.mkdtempSync(path.join(os.tmpdir(), 'ta-term-'));
   fs.copyFileSync('desk-settings.json', path.join(root, 'desk-settings.json'));
-  term = await startTerminal({ root, assets: ASSETS, port: 0 });
+  term = await startTerminal({ root, assets: ASSETS, port: 0, keyFile: KEYS() });
 });
 afterEach(async () => { await term.close(); });
 
-test('the page is served with the token and strict headers, and only the files it has', async () => {
+test('the page is served without any key, with strict headers, and only the files it has', async () => {
   const r = await call(term, 'GET', '/', { token: false });
   assert.equal(r.status, 200);
-  assert.ok(r.body.includes(`content="${term.token}"`) && !r.body.includes('__DESK_TOKEN__'));
+  assert.ok(r.body.includes('<p>page</p>') && !r.body.includes(term.token), 'a program that reads the page gets no key');
   assert.match(String(r.headers['content-security-policy']), /default-src 'none'; script-src 'self'; style-src 'self'/);
   assert.equal(r.headers['x-content-type-options'], 'nosniff');
   assert.equal((await call(term, 'GET', '/app.js', { token: false })).status, 200);
@@ -78,12 +81,13 @@ test('it answers only to this computer\'s own name and port', async () => {
   assert.equal((await call(term, 'GET', '/', { headers: { host: `localhost:${term.port}` }, token: false })).status, 200);
 });
 
-test('every call to the data needs the token the page was given; a change must come from the page\'s own address and be JSON', async () => {
-  assert.equal((await call(term, 'GET', '/api/state', { token: false })).status, 403);
-  assert.equal((await call(term, 'GET', '/api/state', { headers: { 'x-desk-token': 'nope' } })).status, 403);
+test('every call to the data needs the key; a change must come from the page\'s own address and be JSON', async () => {
+  assert.equal((await call(term, 'GET', '/api/state', { token: false })).status, 401);
+  const refused = await call(term, 'GET', '/api/state', { headers: { 'x-desk-token': 'nope' } });
+  assert.deepEqual([refused.status, refused.json().error], [401, 'this page has no key to the dashboard: open the dashboard again']);
   assert.equal((await call(term, 'GET', '/api/state')).status, 200);
   const add = { body: { symbol: 'NVDA' } };
-  assert.equal((await call(term, 'POST', '/api/watchlist', { ...add, token: false })).status, 403);
+  assert.equal((await call(term, 'POST', '/api/watchlist', { ...add, token: false })).status, 401);
   assert.equal((await call(term, 'POST', '/api/watchlist', { ...add, headers: { origin: 'https://evil.example' } })).status, 403);
   assert.equal((await call(term, 'POST', '/api/watchlist', { headers: { 'content-type': 'text/plain' }, body: 'x' })).status, 415);
   assert.equal((await call(term, 'POST', '/api/watchlist', { ...add, headers: { origin: `http://127.0.0.1:${term.port}` } })).status, 200);
@@ -92,6 +96,46 @@ test('every call to the data needs the token the page was given; a change must c
   assert.equal((await call(term, 'GET', '/api/ping', { token: false })).json().app, 'trading-agents');
   const big = await call(term, 'POST', '/api/queue', { body: { symbol: 'A'.repeat(6000) } });
   assert.equal(big.status, 413);
+});
+
+test('the key reaches the page by a one-time link: swapped once, within its time, from the page\'s own address; a program with the key can ask for a fresh link', async () => {
+  const t = await startTerminal({ root, assets: ASSETS, port: 0, keyFile: KEYS(), claimMs: 300 });
+  try {
+    const link = `${t.url}#open=${t.claim()}`, claim = link.split('#open=')[1]!;
+    assert.match(claim, /^[0-9a-f]{36}$/);
+    assert.ok(!link.includes(t.token), 'the link carries a claim, never the key');
+    assert.equal((await call(t, 'POST', '/api/claim', { body: { claim: 'nope' }, token: false })).status, 403);
+    assert.equal((await call(t, 'POST', '/api/claim', { body: { claim: t.claim() }, headers: { origin: 'https://evil.example' }, token: false })).status, 403, 'another web page cannot claim it');
+    const got = await call(t, 'POST', '/api/claim', { body: { claim }, token: false });
+    assert.deepEqual([got.status, got.json().key], [200, t.token]);
+    assert.equal((await call(t, 'POST', '/api/claim', { body: { claim }, token: false })).status, 403, 'once');
+    const late = t.claim();
+    await new Promise((r) => setTimeout(r, 400));
+    assert.equal((await call(t, 'POST', '/api/claim', { body: { claim: late }, token: false })).status, 403, 'expired');
+    assert.equal((await call(t, 'POST', '/api/claim/new', { body: {}, token: false })).status, 401, 'a fresh link needs the key');
+    const fresh = (await call(t, 'POST', '/api/claim/new', { body: {} })).json().claim;
+    assert.equal((await call(t, 'POST', '/api/claim', { body: { claim: fresh }, token: false })).json().key, t.token);
+  } finally { await t.close(); }
+});
+
+test('while it runs, the key is kept in the private folder for opening the page again, one entry per desk, and taken out when it stops; a restart keeps the key it is handed', async () => {
+  const file = KEYS(), keys = () => JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, { port: number; key: string }>;
+  assert.deepEqual(keys(), { [term.deskId]: { port: term.port, key: term.token } });
+  assert.equal(lockState(file), 'locked');
+  const elsewhere = fs.mkdtempSync(path.join(os.tmpdir(), 'ta-term2-')), other = await startTerminal({ root: elsewhere, assets: ASSETS, port: 0, keyFile: file });
+  try { assert.deepEqual(Object.keys(keys()).sort(), [term.deskId, other.deskId].sort(), 'one entry per desk'); } finally { await other.close(); }
+  assert.deepEqual(Object.keys(keys()), [term.deskId]);
+  const key = term.token;
+  await term.close();
+  assert.equal(fs.existsSync(file), false, 'nothing is left when no dashboard runs');
+  const again = await startTerminal({ root, assets: ASSETS, port: 0, keyFile: file, key });
+  try {
+    assert.equal(again.token, key, 'the restarted dashboard answers to the key the page already holds');
+    assert.equal((await call(again, 'GET', '/api/state')).status, 200);
+  } finally { await again.close(); }
+  term = await startTerminal({ root, assets: ASSETS, port: 0, keyFile: file, key: 'short' });
+  assert.match(term.token, /^[0-9a-f]{48}$/, 'anything but a whole key is ignored: a fresh one is made');
+  assert.notEqual(term.token, 'short');
 });
 
 test('a stock is added only if it has a price, can be starred and removed, and the list is kept in desk-data', async () => {
@@ -231,7 +275,7 @@ test('a name or a ticker finds what Yahoo lists: ticker, name, market and kind, 
   await call(term, 'GET', '/api/search?q=tesla');
   assert.equal(asked.length, 1, 'the same words are asked of Yahoo once');
   for (const q of ['', '%20', 'a'.repeat(41), '%3Cb%3E', 'x%22y']) assert.equal((await call(term, 'GET', `/api/search?q=${q}`)).status, 400, q);
-  assert.equal((await call(term, 'GET', '/api/search?q=Tesla', { token: false })).status, 403);
+  assert.equal((await call(term, 'GET', '/api/search?q=Tesla', { token: false })).status, 401);
   configure({ fetch: async () => new Response('down', { status: 503, headers: { 'retry-after': '0' } }) });
   clearSearches();
   const down = await call(term, 'GET', '/api/search?q=Apple');
@@ -251,20 +295,20 @@ test('what the person chose is remembered in desk-data, each in its own shape, a
   assert.deepEqual([next.theme, next.range, next.side, next.layers.ma50], ['dark', '1Y', 'open', false], 'a value it does not know leaves the one before');
   const file = JSON.parse(fs.readFileSync(path.join(dir(), 'dashboard.json'), 'utf8'));
   assert.deepEqual(Object.keys(file).sort(), ['kind', 'layers', 'range', 'recent', 'side', 'symbol', 'theme', 'view']);
-  const again = await startTerminal({ root, assets: ASSETS, port: 0 });   // another start, or another browser, finds it as it was left
+  const again = await startTerminal({ root, assets: ASSETS, port: 0, keyFile: KEYS() });   // another start, or another browser, finds it as it was left
   try { assert.equal((await call(again, 'GET', '/api/prefs')).json().symbol, 'NVDA'); } finally { await again.close(); }
   const many = Array.from({ length: 9 }, (_, i) => ({ symbol: `S${i}`, name: '' }));
   assert.equal((await call(term, 'POST', '/api/prefs', { body: { recent: many } })).json().recent.length, MAX_RECENT);
   assert.equal((await call(term, 'POST', '/api/prefs', { body: { theme: 'light' }, headers: { origin: 'https://evil.example' } })).status, 403);
-  assert.equal((await call(term, 'POST', '/api/prefs', { body: { theme: 'light' }, token: false })).status, 403);
+  assert.equal((await call(term, 'POST', '/api/prefs', { body: { theme: 'light' }, token: false })).status, 401);
 });
 
 test('Stop on the page stops the dashboard, from the page alone; a dashboard given no way to stop has no such door', async () => {
   assert.equal((await call(term, 'POST', '/api/stop', { body: {} })).status, 404);
   let stopped = 0;
-  const t = await startTerminal({ root, assets: ASSETS, port: 0, stop: () => { stopped++; } });
+  const t = await startTerminal({ root, assets: ASSETS, port: 0, keyFile: KEYS(), stop: () => { stopped++; } });
   try {
-    assert.equal((await call(t, 'POST', '/api/stop', { body: {}, token: false })).status, 403);
+    assert.equal((await call(t, 'POST', '/api/stop', { body: {}, token: false })).status, 401);
     assert.equal((await call(t, 'POST', '/api/stop', { body: {}, headers: { origin: 'https://evil.example' } })).status, 403);
     assert.equal((await call(t, 'GET', '/api/stop')).status, 404);
     assert.equal(stopped, 0);
@@ -278,7 +322,7 @@ test('after an update changes its code, the page is offered Restart; it restarts
   const code = path.join(root, 'code.js');
   fs.writeFileSync(code, 'one');
   let restarts = 0;
-  const t = await startTerminal({ root, assets: ASSETS, port: 0, code: [code], restart: () => { restarts++; }, updateCheckMs: 25 });
+  const t = await startTerminal({ root, assets: ASSETS, port: 0, keyFile: KEYS(), code: [code], restart: () => { restarts++; }, updateCheckMs: 25 });
   const version = async () => (await call(t, 'GET', '/api/version')).json();
   try {
     const { build } = (await call(t, 'GET', '/api/ping', { token: false })).json();
@@ -291,7 +335,7 @@ test('after an update changes its code, the page is offered Restart; it restarts
     assert.deepEqual([(await version()).update, (await version()).restarting], [true, false]);
     await new Promise((r) => setTimeout(r, 300));
     assert.equal(restarts, 0, 'new code on disk never runs by itself');
-    assert.equal((await call(t, 'POST', '/api/restart', { body: {}, token: false })).status, 403);
+    assert.equal((await call(t, 'POST', '/api/restart', { body: {}, token: false })).status, 401);
     assert.equal((await call(t, 'POST', '/api/restart', { body: {}, headers: { origin: 'https://evil.example' } })).status, 403);
     assert.equal((await call(t, 'POST', '/api/restart', { body: {} })).json().restarting, true);
     await new Promise((r) => setTimeout(r, 300));

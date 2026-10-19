@@ -35,17 +35,18 @@ test('a figure is read only when Robinhood gave a number; anything else is a das
 });
 
 test('accounts are known by a key and the last four characters, the default first and the Agentic one second', () => {
-  const found = parseAccounts({ data: { accounts: [{ account_number: 'B2', agentic_allowed: true, nickname: 'Desk' }, { account_number: 'A1', is_default: true, brokerage_account_type: 'ira_roth' }, { account_number: 'C3', type: 'margin' }, { nickname: 'no number' }] } });
+  const found = parseAccounts({ data: { accounts: [{ account_number: 'B2', agentic_allowed: true, nickname: 'Desk' }, { account_number: 'A1', is_default: true, brokerage_account_type: 'ira_roth' }, { account_number: 'C3', type: 'margin' }, { nickname: 'no number' }] } }, 'one secret');
   const sorted = sortAccounts(found);
   assert.deepEqual(sorted.map((a) => [a.label, a.last4, a.agentic, a.isDefault]), [['Roth IRA account', 'A1', false, true], ['Desk', 'B2', true, false], ['Margin account', 'C3', false, false]]);
-  assert.equal(found[0]!.key, keyOf('B2'));
+  assert.equal(found[0]!.key, keyOf('B2', 'one secret'));
   assert.match(found[0]!.key, /^[0-9a-f]{16}$/);
   assert.ok(!found[0]!.key.includes('B2'));
+  assert.notEqual(keyOf('B2', 'one secret'), keyOf('B2', 'another'), 'the key is made with a secret of this computer\'s: the number alone does not give it');
 });
 
 test('an account is read whole: priced at Robinhood\'s live quotes, a missing price left as a dash, and orders and phone approvals for the Agentic account only', async () => {
   const calls: string[] = [], { reader, close } = await inMemory(calls);
-  const accounts = parseAccounts((await reader.read('get_accounts')).data), main = accounts.find((a) => a.isDefault)!, agentic = accounts.find((a) => a.agentic)!;
+  const accounts = parseAccounts((await reader.read('get_accounts')).data, 'secret'), main = accounts.find((a) => a.isDefault)!, agentic = accounts.find((a) => a.agentic)!;
   const m = await readAccount(reader, main, main.ids);
   assert.deepEqual([m.portfolio?.total, m.portfolio?.cash, m.portfolio?.buyingPower], [9112.5, 3103, 3103]);
   assert.deepEqual(m.holdings.map((h) => [h.symbol, h.quantity, h.price, h.value]), [['NVDA', 20, 182.4, 3648], ['AAPL', 10, null, null]]);
@@ -79,6 +80,11 @@ test('the person ticks which accounts to show; only a live account Robinhood lis
   const kept = fs.readFileSync(path.join(path.dirname(file), 'accounts.json'), 'utf8');
   assert.deepEqual(JSON.parse(kept), { show: [main.key, agentic.key] });
   for (const n of NUMBERS) assert.ok(!kept.includes(n), 'no account number is written');
+  // the keys are made with a secret of this computer's, made once and kept beside the sign-in
+  const secret = (JSON.parse(fs.readFileSync(path.join(path.dirname(file), 'secrets.json'), 'utf8')) as { fingerprint: string }).fingerprint;
+  assert.match(secret, /^[0-9a-f]{64}$/);
+  assert.deepEqual([main.key, agentic.key], [keyOf(MAIN, secret), keyOf(AGENTIC, secret)]);
+  assert.deepEqual((await link.accounts()).accounts.map((a) => a.key), accounts.map((a) => a.key), 'the same keys on every read');
 
   const snap = await link.refresh();
   assert.deepEqual(snap.views.map((v) => v.account.label), ['Individual account', 'Desk']);
@@ -93,14 +99,14 @@ test('the person ticks which accounts to show; only a live account Robinhood lis
 test('the dashboard lists, keeps and reads the accounts on the page\'s token, and never shows an account number', async () => {
   const link = await signedIn();
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ta-acct-term-')), dir = path.join(root, 'desk-data');
-  const term = await startTerminal({ root, assets: new Map([['/index.html', { type: 'text/html', body: '<meta name="desk-token" content="__DESK_TOKEN__">' }]]) as Assets, port: 0, robinhood: link });
+  const term = await startTerminal({ root, assets: new Map([['/index.html', { type: 'text/html', body: '<p>page</p>' }]]) as Assets, port: 0, robinhood: link, keyFile: path.join(root, 'private', 'dashboard.json') });
   const bodies: string[] = [];
   const ask = async (method: string, p: string, body?: unknown, token = true) => {
     const res = await fetch(`${term.url.slice(0, -1)}${p}`, { method, headers: { ...(token ? { 'x-desk-token': term.token } : {}), ...(body !== undefined ? { 'content-type': 'application/json' } : {}) }, body: body !== undefined ? JSON.stringify(body) : undefined });
     const t = await res.text(); bodies.push(t); return { status: res.status, json: () => JSON.parse(t) };
   };
   try {
-    assert.equal((await ask('GET', '/api/robinhood/accounts', undefined, false)).status, 403);
+    assert.equal((await ask('GET', '/api/robinhood/accounts', undefined, false)).status, 401);
     const listed = (await ask('GET', '/api/robinhood/accounts')).json();
     assert.equal(listed.accounts.length, 3);
     assert.deepEqual((await ask('GET', '/api/robinhood/snapshot')).json(), { snapshot: null, chosen: [] });

@@ -136,7 +136,7 @@ const ASSETS: Assets = new Map([['/index.html', { type: 'text/html; charset=utf-
 test('the dashboard connects, checks and disconnects Robinhood on the page\'s own token, and shows nothing of the sign-in or the account', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ta-term-rh-'));
   const link = new Link(file, at('approve'));
-  const term: Terminal = await startTerminal({ root, assets: ASSETS, port: 0, robinhood: link });
+  const term: Terminal = await startTerminal({ root, assets: ASSETS, port: 0, robinhood: link, keyFile: path.join(dir, 'dashboard.json') });
   const bodies: string[] = [];
   const ask = async (method: string, p: string, o: { token?: boolean; headers?: Record<string, string> } = {}) => {
     const res = await fetch(`${term.url.slice(0, -1)}${p}`, { method, headers: { ...(o.token === false ? {} : { 'x-desk-token': term.token }), ...(method === 'POST' ? { 'content-type': 'application/json' } : {}), ...o.headers }, body: method === 'POST' ? '{}' : undefined });
@@ -144,8 +144,8 @@ test('the dashboard connects, checks and disconnects Robinhood on the page\'s ow
     return { status: res.status, json: () => JSON.parse(text) as { state: string; tools: { read: number; order: number; other: number } | null; message: string } };
   };
   try {
-    assert.equal((await ask('GET', '/api/robinhood', { token: false })).status, 403);
-    assert.equal((await ask('POST', '/api/robinhood/connect', { token: false })).status, 403);
+    assert.equal((await ask('GET', '/api/robinhood', { token: false })).status, 401);
+    assert.equal((await ask('POST', '/api/robinhood/connect', { token: false })).status, 401);
     assert.equal((await ask('POST', '/api/robinhood/connect', { headers: { origin: 'https://evil.example' } })).status, 403);
     assert.equal(opened.length, 0, 'a refused call sends nobody to Robinhood');
     assert.equal((await ask('GET', '/api/robinhood')).json().state, 'none');

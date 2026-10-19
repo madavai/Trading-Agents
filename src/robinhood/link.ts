@@ -1,10 +1,13 @@
 // What the dashboard knows of Robinhood: whether a sign-in is saved, whether the person is in the middle of signing in, and
 // what the last check found. It holds no sign-in itself (that stays in the person's own folder, store.ts) and opens a
 // session only when asked: a check never opens a browser, and only "Connect" sends the person to Robinhood's page.
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseAccounts, parseOrders, parsePortfolio, parsePositions, parseQuotes, readAccount, sortAccounts, type Account, type AccountIds, type AccountView } from './account.js';
 import type { Check, Order, TicketContext } from '../desk/ticket.js';
+import { writePrivate } from '../private.js';
+import { capsOf, type Caps } from '../settings.js';
 import type { Placed } from './order.js';
 import type { Reader } from './reader.js';
 import type { Review } from './review.js';
@@ -24,6 +27,9 @@ export interface LinkInfo {
 
 /** What the dashboard shows of the accounts: the ones the person ticked, read whole, and when. */
 export interface Snapshot { at: string; views: AccountView[] }
+
+/** The trading switch and the person's caps, as kept beside the sign-in. */
+export interface TradingState { on: boolean; since: string | null; caps: Caps }
 
 /** A failure of Robinhood's, in plain words for the page. */
 export const plainFailure = (e: unknown): string => e instanceof NotSignedIn ? 'Robinhood asks you to sign in again: press Connect.' : `Robinhood did not answer as expected: ${masked(e instanceof Error ? e.message : String(e))}`;
@@ -53,8 +59,21 @@ export class Link {
     try { return await job(session.reader); } finally { await session.close(); }
   }
 
+  /** The secret the account fingerprints are made with: random, made once on this computer and kept beside the sign-in.
+   *  Without it a fingerprint says nothing about the account number, even to someone who knows the number. */
+  private get secretFile(): string { return path.join(path.dirname(this.file), 'secrets.json'); }
+  private secret(): string {
+    try {
+      const v = JSON.parse(fs.readFileSync(this.secretFile, 'utf8')) as { fingerprint?: unknown };
+      if (typeof v.fingerprint === 'string' && /^[0-9a-f]{64}$/.test(v.fingerprint)) return v.fingerprint;
+    } catch { /* none yet */ }
+    const fingerprint = crypto.randomBytes(32).toString('hex');
+    writePrivate(this.secretFile, JSON.stringify({ fingerprint }, null, 2) + '\n');
+    return fingerprint;
+  }
+
   private learn(answer: unknown): Account[] {
-    const found = parseAccounts(answer);
+    const found = parseAccounts(answer, this.secret());
     this.ids = new Map(found.map((a) => [a.key, a.ids]));
     this.known = sortAccounts(found.map(({ ids: _ids, ...a }) => a));
     return this.known;
@@ -71,8 +90,7 @@ export class Link {
     if (!this.known) await this.accounts();
     const show = [...new Set(keys)].filter((k) => this.known!.some((a) => a.key === k && !a.deactivated));
     if (show.length !== new Set(keys).size) throw new Error('that is not one of your Robinhood accounts');
-    fs.mkdirSync(path.dirname(this.choiceFile), { recursive: true });
-    fs.writeFileSync(this.choiceFile, JSON.stringify({ show }, null, 2) + '\n', { mode: 0o600 });
+    writePrivate(this.choiceFile, JSON.stringify({ show }, null, 2) + '\n');
     this.last_snapshot = null;
     return show;
   }
@@ -106,14 +124,27 @@ export class Link {
     }
   }
 
-  /** Whether the person has switched trading on, on the dashboard. Kept beside the sign-in, where agents are refused. */
+  /** Whether the person has switched trading on, on the dashboard, and their caps. Kept together beside the sign-in, where
+   *  agents are refused: a cap missing or out of range is the shipped one, never a larger one. */
   private get switchFile(): string { return path.join(path.dirname(this.file), 'trading.json'); }
-  trading(): { on: boolean; since: string | null } {
-    try { const v = JSON.parse(fs.readFileSync(this.switchFile, 'utf8')) as { on?: unknown; since?: unknown }; return v.on === true ? { on: true, since: typeof v.since === 'string' ? v.since : null } : { on: false, since: null }; } catch { return { on: false, since: null }; }
+  trading(): TradingState {
+    let v: { on?: unknown; since?: unknown; caps?: unknown } = {};
+    try { v = JSON.parse(fs.readFileSync(this.switchFile, 'utf8')) as typeof v; } catch { /* off, with the shipped caps */ }
+    return { on: v.on === true, since: v.on === true && typeof v.since === 'string' ? v.since : null, caps: capsOf(v.caps) };
   }
-  setTrading(on: boolean): { on: boolean; since: string | null } {
-    fs.mkdirSync(path.dirname(this.switchFile), { recursive: true });
-    fs.writeFileSync(this.switchFile, JSON.stringify(on ? { on: true, since: this.now() } : { on: false }, null, 2) + '\n', { mode: 0o600 });
+  private keepTrading(on: boolean, caps: Caps): TradingState {
+    writePrivate(this.switchFile, JSON.stringify(on ? { on: true, since: this.now(), caps } : { on: false, caps }, null, 2) + '\n');
+    return this.trading();
+  }
+  setTrading(on: boolean): TradingState {
+    const was = this.trading();
+    if (on && was.on) return was;   // already on: the day it was switched on stands
+    return this.keepTrading(on, was.caps);
+  }
+  /** The person's caps, as the dashboard's server checked them (settings.ts capsFrom). The switch is left as it is. */
+  setCaps(caps: Caps): TradingState {
+    const was = this.trading();
+    writePrivate(this.switchFile, JSON.stringify({ ...(was.on ? { on: true, since: was.since } : { on: false }), caps }, null, 2) + '\n');
     return this.trading();
   }
 
@@ -224,7 +255,7 @@ export class Link {
   forget(): LinkInfo {
     fs.rmSync(this.file, { force: true });
     fs.rmSync(this.choiceFile, { force: true });
-    fs.rmSync(this.switchFile, { force: true });   // disconnecting switches trading off too
+    if (fs.existsSync(this.switchFile)) this.setTrading(false);   // disconnecting switches trading off too; the caps are the person's rules and stay
     this.last = null; this.last_snapshot = null; this.known = null; this.ids.clear();
     return this.info();
   }

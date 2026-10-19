@@ -7,7 +7,7 @@ import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { check, passes, propose, proposeOwn, type Order, type TicketContext } from '../src/desk/ticket.js';
-import { DEFAULTS, readSettings, tradingOf } from '../src/settings.js';
+import { capsFrom, capsOf, DEFAULT_CAPS, DEFAULTS, readSettings, tradingOf } from '../src/settings.js';
 import { parseReview, Reviewer } from '../src/robinhood/review.js';
 import { Refused } from '../src/robinhood/reader.js';
 import { Link } from '../src/robinhood/link.js';
@@ -16,15 +16,25 @@ import { Journal } from '../src/desk/journal.js';
 import { startTerminal, type Assets } from '../src/terminal/server.js';
 import { accountTools, AGENTIC, fakeRobinhood, MAIN, type Fake } from './fake-robinhood.js';
 
-const T = DEFAULTS.trading;   // full position 10%, caps $500 an order, 10% a stock, 3 orders a day
+const T = DEFAULTS.trading, C = DEFAULT_CAPS;   // full position 10%; caps $500 an order, 10% a stock, 3 orders a day
 const ctx = (o: Partial<TicketContext> = {}): TicketContext => ({ symbol: 'NVDA', rating: 'Buy', callDate: '2026-10-15', accountValue: 2500, buyingPower: 2500, held: 0, price: 182.4, ordersToday: 0, ...o });
 
 test('the trading settings are read and checked: out of range falls back to what ships, and an unreadable call never trades', () => {
-  const t = tradingOf({ enabled: true, fullPositionPercent: 500, caps: { perOrderUsd: -5, perStockPercent: 20, ordersPerDay: 2.5 }, ratingToOrder: { Hold: 'buy a full position', 'Needs review': 'sell everything held', Buy: 'yolo' }, orderDefaults: { timeInForce: 'day' } });
-  assert.deepEqual([t.enabled, t.fullPositionPercent, t.caps, t.orderDefaults.timeInForce], [true, 10, { perOrderUsd: 500, perStockPercent: 20, ordersPerDay: 3 }, 'gfd']);
+  const t = tradingOf({ enabled: true, fullPositionPercent: 500, caps: { perOrderUsd: 100_000 }, ratingToOrder: { Hold: 'buy a full position', 'Needs review': 'sell everything held', Buy: 'yolo' }, orderDefaults: { timeInForce: 'day' } });
+  assert.deepEqual([t.enabled, t.fullPositionPercent, t.orderDefaults.timeInForce], [true, 10, 'gfd']);
+  assert.ok(!('caps' in t), 'the caps are not in the settings file: the dashboard keeps them beside the trading switch');
   assert.deepEqual([t.ratingToOrder.Hold, t.ratingToOrder['Needs review'], t.ratingToOrder.Buy], ['buy a full position', 'no order', 'buy a full position']);
   assert.deepEqual(readSettings(fs.mkdtempSync(path.join(os.tmpdir(), 'ta-set-'))).trading, T);
   assert.equal(readSettings('.').trading.enabled, false, 'trading ships switched off');
+  assert.ok(!('caps' in (JSON.parse(fs.readFileSync('desk-settings.json', 'utf8')) as { trading: object }).trading), 'the shipped settings file carries no caps');
+});
+
+test('the caps as kept fall back to the shipped ones, never larger; as typed they are all three taken or refused', () => {
+  assert.deepEqual(capsOf({ perOrderUsd: -5, perStockPercent: 20, ordersPerDay: 2.5 }), { perOrderUsd: 500, perStockPercent: 20, ordersPerDay: 3 });
+  assert.deepEqual(capsOf(undefined), C);
+  assert.deepEqual(capsOf({ perOrderUsd: 100_001, perStockPercent: 101, ordersPerDay: 51 }), C);
+  assert.deepEqual(capsFrom({ perOrderUsd: 300.456, perStockPercent: 7.25, ordersPerDay: 2 }), { perOrderUsd: 300.46, perStockPercent: 7.3, ordersPerDay: 2 });
+  for (const bad of [{ perOrderUsd: 300, perStockPercent: 10 }, { perOrderUsd: 0, perStockPercent: 10, ordersPerDay: 3 }, { perOrderUsd: 300, perStockPercent: 10, ordersPerDay: 2.5 }, { perOrderUsd: '300', perStockPercent: 10, ordersPerDay: 3 }, { perOrderUsd: 100_001, perStockPercent: 10, ordersPerDay: 3 }, null]) assert.equal(capsFrom(bad), null, JSON.stringify(bad));
 });
 
 test('the person\'s own ticket starts at one whole share at the live price, sells only what is held, and is held to every check', () => {
@@ -40,39 +50,39 @@ test('the person\'s own ticket starts at one whole share at the live price, sell
   assert.deepEqual([sell.action, sell.order?.side, sell.order?.quantity], ['your own sell', 'sell', 1]);
   // the same checks as a call's ticket: a person's own order is no way around the caps
   const c = ctx({ rating: '', callDate: '' });
-  assert.equal(passes(check(buy.order!, c, T)), true);
-  assert.equal(passes(check({ ...buy.order!, quantity: 3 }, c, T)), false, '$547.20 is over the $500 cap');
-  assert.equal(passes(check({ ...sell.order!, quantity: 4 }, ctx({ held: 3 }), T)), false, 'only three are held');
-  assert.equal(passes(check(buy.order!, ctx({ ordersToday: 3 }), T)), false, 'three orders a day');
+  assert.equal(passes(check(buy.order!, c, T, C)), true);
+  assert.equal(passes(check({ ...buy.order!, quantity: 3 }, c, T, C)), false, '$547.20 is over the $500 cap');
+  assert.equal(passes(check({ ...sell.order!, quantity: 4 }, ctx({ held: 3 }), T, C)), false, 'only three are held');
+  assert.equal(passes(check(buy.order!, ctx({ ordersToday: 3 }), T, C)), false, 'three orders a day');
 });
 
 test('a buy is sized from the account, then held to the caps and buying power, in whole shares', () => {
-  const full = propose(ctx(), T);
+  const full = propose(ctx(), T, C);
   assert.deepEqual(full.order, { symbol: 'NVDA', side: 'buy', quantity: 1, limitPrice: 182.4, timeInForce: 'gfd' });   // 10% of $2,500 is $250: one share at $182.40
   assert.match(full.why.join(' '), /A full position: 10% of the account's \$2,500\.00 is \$250\.00\..*\$250\.00 ÷ \$182\.40, rounded down: 1 share/);
-  assert.equal(propose(ctx({ accountValue: 20_000 }), T).order?.quantity, 2, '10% is $2,000, the $500 cap makes it $500: two shares');
-  assert.match(propose(ctx({ accountValue: 20_000 }), T).why.join(' '), /Your cap of \$500\.00 an order makes it \$500\.00/);
-  assert.equal(propose(ctx({ accountValue: 20_000, buyingPower: 200 }), T).order?.quantity, 1);
-  const half = propose(ctx({ rating: 'Overweight' }), T);
+  assert.equal(propose(ctx({ accountValue: 20_000 }), T, C).order?.quantity, 2, '10% is $2,000, the $500 cap makes it $500: two shares');
+  assert.match(propose(ctx({ accountValue: 20_000 }), T, C).why.join(' '), /Your cap of \$500\.00 an order makes it \$500\.00/);
+  assert.equal(propose(ctx({ accountValue: 20_000, buyingPower: 200 }), T, C).order?.quantity, 1);
+  const half = propose(ctx({ rating: 'Overweight' }), T, C);
   assert.equal(half.order, null, '5% of $2,500 is $125, less than one share');
   assert.match(half.why.at(-1)!, /buys less than one share at \$182\.40/);
-  assert.equal(propose(ctx({ price: null }), T).order, null);
-  assert.match(propose(ctx({ accountValue: null }), T).why.at(-1)!, /no total value/);
-  assert.match(propose(ctx({ rating: 'Hold' }), T).why[0]!, /place no order for that rating/);
-  assert.equal(propose(ctx({ rating: 'Needs review' }), T).order, null);
+  assert.equal(propose(ctx({ price: null }), T, C).order, null);
+  assert.match(propose(ctx({ accountValue: null }), T, C).why.at(-1)!, /no total value/);
+  assert.match(propose(ctx({ rating: 'Hold' }), T, C).why[0]!, /place no order for that rating/);
+  assert.equal(propose(ctx({ rating: 'Needs review' }), T, C).order, null);
 });
 
 test('a sell is what is held, halved or whole, never more, in whole shares', () => {
-  assert.equal(propose(ctx({ rating: 'Sell' }), T).order, null, 'nothing held, nothing to sell');
-  assert.deepEqual(propose(ctx({ rating: 'Sell', held: 7.5 }), T).order, { symbol: 'NVDA', side: 'sell', quantity: 7, limitPrice: 182.4, timeInForce: 'gfd' });
-  assert.equal(propose(ctx({ rating: 'Underweight', held: 7 }), T).order?.quantity, 3);
-  assert.equal(propose(ctx({ rating: 'Underweight', held: 1 }), T).order, null);
+  assert.equal(propose(ctx({ rating: 'Sell' }), T, C).order, null, 'nothing held, nothing to sell');
+  assert.deepEqual(propose(ctx({ rating: 'Sell', held: 7.5 }), T, C).order, { symbol: 'NVDA', side: 'sell', quantity: 7, limitPrice: 182.4, timeInForce: 'gfd' });
+  assert.equal(propose(ctx({ rating: 'Underweight', held: 7 }), T, C).order?.quantity, 3);
+  assert.equal(propose(ctx({ rating: 'Underweight', held: 1 }), T, C).order, null);
 });
 
 test('every check an order must pass, each said in plain words', () => {
   const buy: Order = { symbol: 'NVDA', side: 'buy', quantity: 1, limitPrice: 182.4, timeInForce: 'gfd' };
-  assert.equal(passes(check(buy, ctx(), T)), true);
-  const failing = (o: Partial<Order>, c: Partial<TicketContext> = {}) => check({ ...buy, ...o }, ctx(c), T).filter((x) => !x.ok).map((x) => x.words).join(' | ');
+  assert.equal(passes(check(buy, ctx(), T, C)), true);
+  const failing = (o: Partial<Order>, c: Partial<TicketContext> = {}) => check({ ...buy, ...o }, ctx(c), T, C).filter((x) => !x.ok).map((x) => x.words).join(' | ');
   assert.match(failing({ quantity: 3 }), /\$547\.20 is over your cap of \$500\.00 an order/);
   assert.match(failing({ quantity: 1.5 }), /whole number of shares/);
   assert.match(failing({ quantity: 0 }), /whole number of shares, at least one/);
@@ -84,7 +94,7 @@ test('every check an order must pass, each said in plain words', () => {
   assert.match(failing({}, { ordersToday: 3 }), /3 of your 3 orders a day used/);
   assert.match(failing({}, { price: null }), /no live price/);
   assert.match(failing({ side: 'sell', quantity: 2 }, { held: 1 }), /Only 1 share\(s\) are held/);
-  assert.equal(passes(check({ ...buy, side: 'sell', quantity: 1 }, ctx({ held: 1 }), T)), true);
+  assert.equal(passes(check({ ...buy, side: 'sell', quantity: 1 }, ctx({ held: 1 }), T, C)), true);
   assert.equal(passes([]), false);
 });
 
@@ -127,7 +137,7 @@ async function desk(buyingPower: string) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ta-tk-term-'));
   fs.copyFileSync('desk-settings.json', path.join(root, 'desk-settings.json'));
   new Journal(path.join(root, 'desk-data', 'journal.md')).storeDecision('NVDA', '2026-10-15', '**Rating**: Buy\n\n**Executive Summary**: Buy on strength.');
-  const term = await startTerminal({ root, assets: new Map([['/index.html', { type: 'text/html', body: '<meta name="desk-token" content="__DESK_TOKEN__">' }]]) as Assets, port: 0, robinhood: link });
+  const term = await startTerminal({ root, assets: new Map([['/index.html', { type: 'text/html', body: '<p>page</p>' }]]) as Assets, port: 0, robinhood: link, keyFile: path.join(path.dirname(file), 'dashboard.json') });
   const ask = async (p: string, body: unknown) => { const r = await fetch(`${term.url}${p.slice(1)}`, { method: 'POST', headers: { 'x-desk-token': term.token, 'content-type': 'application/json' }, body: JSON.stringify(body) }); const t = await r.text(); return { status: r.status, body: t, json: () => JSON.parse(t) }; };
   const show = async () => { const { accounts } = await link.accounts(); await link.choose(accounts.filter((a) => !a.deactivated).map((a) => a.key)); };
   return { term, ask, show };

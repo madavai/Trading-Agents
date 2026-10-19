@@ -50,14 +50,14 @@ test('a number that is missing is a dash, never a zero', () => {
   assert.equal(shortDay('2026-10-09'), '9 Oct');
 });
 
-test('the page is one policy-clean file: no inline script, style or event attribute, and one token slot', () => {
+test('the page is one policy-clean file: no inline script, style or event attribute, and no key in it', () => {
   const html = read('index.html');
   assert.doesNotMatch(html, /<script(?![^>]*\bsrc=)/i, 'no inline script');
   assert.doesNotMatch(html, /\sstyle\s*=/i, 'no inline style attribute');
   assert.doesNotMatch(html, /\son[a-z]+\s*=/i, 'no event attribute');
   assert.doesNotMatch(html, /<style/i);
-  assert.equal(html.split('__DESK_TOKEN__').length - 1, 1);
-  assert.match(html, /<meta name="desk-token" content="__DESK_TOKEN__">/);
+  assert.ok(!html.includes('__DESK_TOKEN__') && !html.includes('desk-token'), 'the key is in no page: the page swaps the one-time link it was opened with for it');
+  assert.match(read('api.ts'), /\/api\/claim/, 'the page claims its key from the one-time link');
   assert.deepEqual([...html.matchAll(/(?:src|href)="([^"#]+)"/g)].map((m) => m[1]).filter((u) => !u!.startsWith('data:')), ['/app.css', '/app.js']);
   for (const f of sources.filter((x) => x.endsWith('.ts'))) assert.doesNotMatch(read(f), /\bstyle\s*=\s*\\?["']|setAttribute\(\s*['"]style['"]|cssText/, `${f} sets a style the page's policy refuses`);
 });

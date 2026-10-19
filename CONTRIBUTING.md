@@ -12,8 +12,10 @@
   `rules.ts` says what a Robinhood tool is (read, order or other) by its name and Robinhood's own read-only label;
   `reader.ts` is the ONLY place in `src/` that calls a Robinhood tool, and it refuses everything but reads (a test
   scans the source to keep it so); `connect.ts` signs in and opens sessions; `link.ts` is what the dashboard knows
-  (none, waiting, connected, failed), which accounts the person chose (kept beside the sign-in as keys, never numbers)
-  and the last read of them; `review.ts` is the only other door: Robinhood's own
+  (none, waiting, connected, failed), which accounts the person chose (kept beside the sign-in as keys, never numbers;
+  a key is a keyed hash with a secret made once and kept there too, `secrets.json`), the trading switch with the
+  person's caps (`trading.json`, beside the sign-in, never in `desk-settings.json`) and the last read of the accounts;
+  `review.ts` is the only other door: Robinhood's own
   order check (`review_equity_order`) and nothing else, for the Agentic account only; `order.ts` is the third and last:
   one limit order (`place_equity_order`), reached only from the dashboard's server after the person's Confirm, with
   trading switched on (kept beside the sign-in) and every cap checked again on fresh figures; `account.ts` reads Robinhood's answers into figures (a dash, never a zero, for what it
@@ -30,11 +32,17 @@
   `scripts/team-files.mjs` is the one list of these files and their text: `npm run agents` writes it, the desk check
   compares the folder with it (a save in Agent Studio can rewrite the files), and the desk tool `reset_team` writes it
   back on the person's confirmed yes (`src/desk/agent-files.ts`), touching no other file.
-- `src/terminal/` - the dashboard: `server.ts` (loopback only, host and origin checks, a per-start token, strict CSP),
+- `src/private.ts` - the one way anything is written into the person's private folder (`paths.ts` `homeDir`): whole,
+  and locked to their own account on every system (the file mode on Linux and macOS; on Windows an access list naming
+  their account and the system alone, by `icacls`). The desk check reports who can open the folder (`lockState`).
+- `src/terminal/` - the dashboard: `server.ts` (loopback only, host and origin checks, a per-start key that is in no
+  page it serves: the browser is opened on a one-time link, `#open=<claim>`, which the page swaps for the key once at
+  `/api/claim`; while it runs the key is kept in the private folder, `dashboard.json`, so `main.ts` can open the page
+  again with a fresh link from `/api/claim/new`; strict CSP),
   `quotes.ts` (Yahoo prices), `search.ts` (Yahoo's matches for what is typed), `prefs.ts` (what the page remembers, in
   `desk-data/dashboard.json`, each value checked), `state.ts` and `store.ts` (the desk's files, the watchlist and the
   queue), `main.ts` (the program: Stop, and Restart into an update on the person's press only, on the same address
-  with `--port=N`), and `ui/` (the
+  with `--port=N` and the same key, handed over in the new program's environment, never on a command line), and `ui/` (the
   page: `house.css` is the Madav House theme, `dashboard.css` only places its objects with tokens, `main.ts` and the
   rest are the page). The page has no inline script or style (the policy refuses them): colours in charts come from
   classes, and anything an agent wrote goes through `md.ts`, which escapes first. `npm run build` bundles the page into
@@ -42,7 +50,8 @@
 - `src/desk/routine.ts` - the morning and evening briefs the routines run from (desk tool `routine_brief`, skill
   `/routine`, the team's playbook); `src/desk/orders.ts` - the dashboard's log of the orders it sent.
 - `src/desk/ticket.ts` - the order ticket: sizing from the person's settings and every cap check, on real figures only.
-- `desk-settings.json` - the desk's settings (read and checked by `src/settings.ts`, trading part included); `docs/design/` - the dashboard's design reference.
+- `desk-settings.json` - the desk's settings (read and checked by `src/settings.ts`, trading part included, but never
+  the caps: those are the person's own, beside the trading switch); `docs/design/` - the dashboard's design reference.
 - `docs/inside-the-trading-desk.html` - the visual guide (GitHub Pages serves `docs/` from `main`). The README shows it
   as pictures in `docs/readme/`, light and dark: after the guide changes, `node scripts/readme-pictures.mjs` takes
   them again with a hidden Chrome or Edge (it downloads and installs nothing).
@@ -56,6 +65,8 @@
 - No agent ever gets an order tool. Orders come only from the person's Confirm in the dashboard, checked against the
   ticket they confirmed and their caps. The guard hook and its test keep this true.
 - The Robinhood sign-in never leaves `~/.trading-agents`, is never printed, and is never given to an agent.
+- Everything in the person's private folder is written through `src/private.ts`, which locks it to their own account.
+  The trading caps live there beside the switch and are read from nowhere else; the dashboard's key is in no page.
 - Every exact number an agent states comes from a desk tool; a source that fails is reported as unavailable.
 - A fix comes with a test that fails without it.
 - The page shows only what the desk really has. A number that cannot be had is a dash; a control for something that

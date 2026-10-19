@@ -1,7 +1,9 @@
 // The person's Robinhood accounts as the dashboard shows them, read only through the Reader. Robinhood's answers are read
 // field by field into plain figures: a figure Robinhood did not give, or gave in a form that is not a number, is null (a
 // dash on the page), never a zero. Shapes as Robinhood answered on 16 Oct 2026 (`discover` and a read-only look).
-// An account is known to the page and to desk-data by a key made from its number, never by the number itself.
+// An account is known to the page and to desk-data by a key made from its number, never by the number itself: a keyed
+// hash with a secret kept on this computer alone (link.ts), so the key says nothing about the number even to someone
+// who knows the number and the recipe.
 import crypto from 'node:crypto';
 import type { Reader } from './reader.js';
 
@@ -17,7 +19,7 @@ export const figure = (v: unknown): number | null => {
 /** What every read answers: { data, guide }. Only data is used; guide is Robinhood's advice to chat agents, not facts. */
 const dataOf = (answer: unknown): Record<string, unknown> => obj(obj(answer).data);
 
-export const keyOf = (accountNumber: string): string => crypto.createHash('sha256').update(`trading-agents|${accountNumber}`).digest('hex').slice(0, 16);
+export const keyOf = (accountNumber: string, secret: string): string => crypto.createHmac('sha256', secret).update(accountNumber).digest('hex').slice(0, 16);
 
 export interface Account {
   key: string;
@@ -34,12 +36,12 @@ export interface AccountIds { key: string; accountNumber: string; rhsAccountNumb
 const TYPE_WORDS: Record<string, string> = { individual: 'Individual', ira_traditional: 'Traditional IRA', ira_roth: 'Roth IRA', joint: 'Joint', custodial: 'Custodial' };
 const titleOf = (raw: string): string => TYPE_WORDS[raw] ?? raw.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
 
-export function parseAccounts(answer: unknown): Array<Account & { ids: AccountIds }> {
+export function parseAccounts(answer: unknown, secret: string): Array<Account & { ids: AccountIds }> {
   return list(dataOf(answer).accounts).flatMap((v) => {
     const a = obj(v), number = text(a.account_number);
     if (!number) return [];
     const kind = text(a.brokerage_account_type) ?? text(a.type);
-    const key = keyOf(number), agentic = a.agentic_allowed === true;
+    const key = keyOf(number, secret), agentic = a.agentic_allowed === true;
     const label = text(a.nickname) ?? (agentic ? 'Agentic account' : kind ? `${titleOf(kind)} account` : 'Account');
     return [{ key, last4: number.slice(-4), label, agentic, isDefault: a.is_default === true, deactivated: a.deactivated === true || a.permanently_deactivated === true,
       ids: { key, accountNumber: number, rhsAccountNumber: text(a.rhs_account_number) } }];

@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { probe, probeAll, SOURCES, userAgentFor } from '../src/check/probes.js';
-import { dataLine, deskCheck, nodeLine, robinhoodLine } from '../src/check/desk-check.js';
+import { dataLine, deskCheck, nodeLine, privateFolderLine, robinhoodLine } from '../src/check/desk-check.js';
+import { writePrivate } from '../src/private.js';
 
 const answer = (status: number, body: string): typeof fetch => async () => new Response(body, { status });
 const source = SOURCES.find((s) => s.name === 'SEC EDGAR')!;
@@ -75,6 +76,11 @@ test('the machine lines say what is missing in plain words', () => {
   assert.match(robinhoodLine(path.join(root, 'none.json')).text, /not connected yet/);
   fs.writeFileSync(path.join(root, 'rh.json'), '{}');
   assert.match(robinhoodLine(path.join(root, 'rh.json')).text, /a sign-in is saved/);
+  assert.match(privateFolderLine(path.join(root, 'nowhere')).text, /not made yet/);
+  writePrivate(path.join(root, 'private', 'kept.json'), '{}');
+  const locked = privateFolderLine(path.join(root, 'private'));
+  assert.deepEqual([locked.ok, /locked to your own account/.test(locked.text)], [true, true], locked.text);
+  if (process.platform !== 'win32') { fs.chmodSync(path.join(root, 'private'), 0o755); assert.match(privateFolderLine(path.join(root, 'private')).text, /other accounts on this computer may be able to open it/); }
 });
 
 test('the desk check reads the settings and reports every source', async () => {

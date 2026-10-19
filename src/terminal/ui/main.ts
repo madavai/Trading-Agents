@@ -2,7 +2,7 @@
 // scorecard worked out from them, the watchlist, the analyses waiting, and the person's Robinhood accounts on a page of
 // their own. A number that cannot be had is a dash. An order starts only from a ticket - one of the desk's calls
 // (Decide…) or the person's own (Trade…) - and is placed only on their Confirm, with trading switched on by them.
-import { api, ApiError, type CallDetail, type DeskState, type History, type LinkInfo, type Market, type Match, type Prefs, type QuoteResult, type Account, type AccountView, type Holding, type Order, type Recent, type Snapshot, type TicketOpen, type Check, type Review, type Placed, type Trading } from './api.js';
+import { api, ApiError, claimKey, hasKey, KEY_LOST, type CallDetail, type DeskState, type History, type LinkInfo, type Market, type Match, type Prefs, type QuoteResult, type Account, type AccountView, type Holding, type Order, type Recent, type Snapshot, type TicketOpen, type Check, type Review, type Placed, type Trading } from './api.js';
 import { heroChart, sparkline } from './chart.js';
 import { barOn, clock, dayText, esc, labelled, money, num, opening, pct, plain, ratingTone, SECTION_NAMES, shortDay, tone } from './fmt.js';
 import { markdown } from './md.js';
@@ -117,11 +117,12 @@ const latestCall = (sym: string) => S.desk?.calls.find((c) => c.ticker === sym) 
 const nameOf = (sym: string): string => quoteOf(sym)?.name ?? S.history?.name ?? marketOf(sym)?.name ?? sym;
 
 // ---------- header, side list ----------
-/** The dashboard was stopped from this page, or is restarting into an update. */
-const life = { stopped: false, updating: false };
+/** The dashboard was stopped from this page, is restarting into an update, or this page holds no key to it. */
+const life = { stopped: false, updating: false, noKey: false };
 
 function renderSub(): void {
   const d = S.desk;
+  if (life.noKey) { $('#subline').textContent = 'This page has no key to the dashboard: it was opened by hand, or the dashboard was started afresh since. Open the dashboard again (run /terminal, or ask the trading-desk team to open it) and use the page that opens.'; return; }
   if (life.stopped) { $('#subline').textContent = 'The dashboard is stopped. To open it again, ask the trading-desk team to "open the dashboard", or run /terminal.'; return; }
   if (life.updating) { $('#subline').textContent = 'The desk was updated: the dashboard is restarting with the new version, and this page reloads by itself.'; return; }
   if (S.lost) { $('#subline').textContent = 'The dashboard has lost the desk. Run /terminal in Madav to start it again.'; return; }
@@ -338,9 +339,35 @@ function renderTrading(): void {
   $('#tradeFoot').textContent = on ? 'An order is placed only when you press Confirm on a ticket Robinhood has checked.' : 'This page places no order: trading is switched off.';
 }
 
-/** The trading card's inside: the switch, the person's alone. */
+/** The trading card's inside: the switch and the caps, the person's alone. */
 function tradingBlock(): string {
-  if (!signedIn()) return '';
+  return signedIn() ? switchBlock() + capsBlock() : '';
+}
+
+/** The person's caps, kept beside the switch: shown as chips, and changed in three fields on their press. */
+const CAPS = { editing: false };
+function capsBlock(): string {
+  const c = TR.state?.caps;
+  if (!c) return '';
+  if (CAPS.editing) return `<div class="at-card-head"><h3>Your caps</h3></div>
+    <p class="at-lede">The most an order may cost, the most of the account one stock may be after a buy, and the most orders in a day. Every ticket is checked against them, and again just before an order is sent. They are kept beside the trading switch, where agents are refused.</p>
+    <div class="at-row">
+      <label class="at-field"><span class="at-field-l">An order at most, $</span><input class="at-input at-box" id="capOrder" type="text" inputmode="decimal" value="${c.perOrderUsd}"></label>
+      <label class="at-field"><span class="at-field-l">One stock, % of the account</span><input class="at-input at-box" id="capStock" type="text" inputmode="decimal" value="${c.perStockPercent}"></label>
+      <label class="at-field"><span class="at-field-l">Orders a day</span><input class="at-input at-box" id="capDay" type="number" min="1" max="50" step="1" inputmode="numeric" value="${c.ordersPerDay}"></label></div>
+    <div class="at-row">${rhButton('caps-save', 'Save the caps', { primary: true })}${rhButton('caps-cancel', 'Cancel')}</div>`;
+  return `<div class="at-card-head"><h3>Your caps</h3></div>
+    <div class="at-row"><span class="at-chip">${esc(money(c.perOrderUsd))} an order at most</span><span class="at-chip">${esc(String(c.perStockPercent))}% of the account in one stock</span><span class="at-chip">${esc(String(c.ordersPerDay))} ${c.ordersPerDay === 1 ? 'order' : 'orders'} a day</span></div>
+    <div class="at-row">${rhButton('caps-edit', 'Change the caps…')}</div>`;
+}
+
+/** What the person typed for the caps: numbers, as the desk will check them. */
+const capsTyped = (): { perOrderUsd: number; perStockPercent: number; ordersPerDay: number } => {
+  const n = (id: string) => Number($<HTMLInputElement>(id).value.replace(/[$,%\s]/g, ''));
+  return { perOrderUsd: n('#capOrder'), perStockPercent: n('#capStock'), ordersPerDay: n('#capDay') };
+};
+
+function switchBlock(): string {
   if (tradingOn()) return `<div class="at-card-head"><h3>Trading</h3><span class="at-chip warn">On${TR.state?.since ? ` since ${esc(dayText(TR.state.since))}` : ''}</span></div>
     <p class="at-lede">You can place an order from a ticket, from one of the desk's calls (Decide…) or your own (Trade…), in the Agentic account only, within your caps, after Robinhood's check and your Confirm.</p>
     <div class="at-row">${rhButton('tr-off', 'Switch trading off')}</div>`;
@@ -905,6 +932,9 @@ document.addEventListener('click', (e) => {
     case 'tr-cancel': TR.asking = false; renderAccount(); break;
     case 'tr-on': void run(async () => { TR.state = await api.setTrading(true); TR.asking = false; renderTrading(); renderAccount(); toast('Trading is switched on. Every order still needs your Confirm.'); }); break;
     case 'tr-off': void run(async () => { TR.state = await api.setTrading(false); renderTrading(); renderAccount(); renderTicketDyn(); toast('Trading is switched off.'); }); break;
+    case 'caps-edit': CAPS.editing = true; renderAccount(); break;
+    case 'caps-cancel': CAPS.editing = false; renderAccount(); break;
+    case 'caps-save': void run(async () => { TR.state = { ...TR.state, ...(await api.setCaps(capsTyped())) }; CAPS.editing = false; renderTrading(); renderAccount(); toast('Your caps are saved. Every ticket is checked against them.'); }); break;
     case 'rh-connect': void run(async () => { S.rh = await api.connectRobinhood(); renderAccount(); toast("Robinhood's sign-in page is opening in your browser."); void refreshRobinhood();
 void loadTrading(); }); break;
     case 'rh-check': void run(async () => { S.rh = await api.checkRobinhood(); renderAccount(); void loadSnapshot(); toast(S.rh.state === 'connected' ? 'Robinhood answered: the connection works.' : S.rh.message, S.rh.state === 'connected' ? 'ok' : 'bad'); }); break;
@@ -1051,7 +1081,7 @@ async function loadPrefs(): Promise<void> {
 
 let seen = '', build = '';
 async function watchFiles(): Promise<void> {
-  if (document.hidden || life.stopped || life.updating) return;
+  if (document.hidden || life.stopped || life.updating || life.noKey) return;
   try {
     const v = await api.version();
     build ||= v.build;
@@ -1077,6 +1107,7 @@ async function updating(): Promise<void> {
 
 // Prices are asked for every 30 seconds while a market is open and every 2 minutes after: Yahoo is a free service and is not hammered.
 async function prices(): Promise<void> {
+  if (life.noKey) return;
   if (!document.hidden) await Promise.all([refreshQuotes(), refreshMarkets()]);
   const open = isQuote(marketOf('^GSPC')?.quote) && (marketOf('^GSPC')!.quote as Quote).open || [...S.quotes.values()].some((q) => isQuote(q) && q.open && !q.symbol.includes('-'));
   setTimeout(() => void prices(), open ? 30_000 : 120_000);
@@ -1084,6 +1115,18 @@ async function prices(): Promise<void> {
 
 window.addEventListener('resize', () => { renderHero(); });
 renderControls();
-void loadPrefs().then(() => refreshState()).then(() => void prices());
-void refreshRobinhood();
-setInterval(() => void watchFiles(), 3_000);
+/** The page holds no key to the dashboard (or the desk refused the one it held): it says so and asks for nothing more. */
+function noKey(): void {
+  if (life.noKey) return;
+  life.noKey = true; renderSub();
+  $('#updateBar').hidden = true;
+  const dlg = $<HTMLDialogElement>('#ticketDialog'); if (dlg.open) dlg.close(); T.open = null;
+}
+document.addEventListener(KEY_LOST, noKey);
+// First the one-time link the dashboard opened this page with, swapped for the key; then the desk's files, the prices and Robinhood.
+void claimKey().then(() => {
+  if (!hasKey()) { noKey(); return; }
+  void loadPrefs().then(() => refreshState()).then(() => void prices());
+  void refreshRobinhood();
+  setInterval(() => void watchFiles(), 3_000);
+});

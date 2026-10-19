@@ -2,7 +2,8 @@
 // sign-in it only says whether one is saved and when.
 import fs from 'node:fs';
 import path from 'node:path';
-import { deskDataDir, robinhoodFile } from '../paths.js';
+import { deskDataDir, homeDir, robinhoodFile } from '../paths.js';
+import { lockState } from '../private.js';
 import { probeAll, type ProbeResult } from './probes.js';
 import { VERSION } from '../version.js';
 import { readSettings } from '../settings.js';
@@ -33,6 +34,16 @@ export function robinhoodLine(file = robinhoodFile()): Line {
   if (!fs.existsSync(file)) return { ok: true, text: 'Robinhood: not connected yet (only needed for trading; analysis works without it)' };
   const when = fs.statSync(file).mtime;
   return { ok: true, text: `Robinhood: a sign-in is saved (last refreshed ${when.toISOString().slice(0, 16).replace('T', ' ')} UTC)` };
+}
+
+/** Who can open the person's private folder (the sign-in, the trading switch and caps, the dashboard's key). It is locked to
+ *  their own account whenever the dashboard or the sign-in writes there; this only looks, and reads nothing in it. */
+export function privateFolderLine(dir = homeDir()): Line {
+  if (!fs.existsSync(dir)) return { ok: true, text: 'Your private folder: not made yet. It is made, locked to your own account, when you connect Robinhood or open the dashboard' };
+  const state = lockState(dir);
+  if (state === 'locked') return { ok: true, text: `Your private folder: locked to your own account${process.platform === 'win32' ? ' and the system' : ''}. No other account on this computer can open it` };
+  if (state === 'open') return { ok: false, text: 'Your private folder: other accounts on this computer may be able to open it. Open the dashboard once: that locks it to your own account' };
+  return { ok: true, text: 'Your private folder: who can open it could not be told (a drive without access lists?). It is as protected as your other files' };
 }
 
 export function contactLine(email: string): Line {
@@ -68,5 +79,5 @@ export async function agentDrift(root: string, source: string = root): Promise<D
 export async function deskCheck(root: string = process.cwd(), fetchImpl: typeof fetch = fetch, source: string = root): Promise<string> {
   const settings = readSettings(root), email = readContactEmail(root);
   const sources = await probeAll(settings.sources.contact, email, fetchImpl);
-  return render([nodeLine(), dataLine(root), contactLine(email), robinhoodLine(), agentsLine(await agentDrift(root, source))], sources);
+  return render([nodeLine(), dataLine(root), contactLine(email), robinhoodLine(), privateFolderLine(), agentsLine(await agentDrift(root, source))], sources);
 }
