@@ -65,6 +65,7 @@
           <button class="at-li" data-act="goto" data-to="sec-chart"><svg class="g"><use href="#i-candle"/></svg><span class="at-li-t">Chart</span></button>
           <button class="at-li" data-act="goto" data-to="sec-stock"><svg class="g"><use href="#i-file"/></svg><span class="at-li-t">Stock page</span></button>
           <button class="at-li" data-act="goto" data-to="sec-watch"><svg class="g"><use href="#i-star"/></svg><span class="at-li-t">Watchlist</span></button>
+          <button class="at-li" data-act="goto" data-to="sec-analyses"><svg class="g"><use href="#i-bot"/></svg><span class="at-li-t">Analyses</span></button>
           <button class="at-li" data-act="goto" data-to="sec-calls"><svg class="g"><use href="#i-check"/></svg><span class="at-li-t">The desk's calls</span></button>
           <button class="at-li" data-act="goto" data-to="sec-score"><svg class="g"><use href="#i-target"/></svg><span class="at-li-t">Scorecard</span></button>
         </nav>
@@ -84,6 +85,7 @@
       <button class="icon-btn" data-act="goto" data-to="sec-chart" aria-label="Chart" title="Chart"><svg class="g"><use href="#i-candle"/></svg></button>
       <button class="icon-btn" data-act="goto" data-to="sec-stock" aria-label="Stock page" title="Stock page"><svg class="g"><use href="#i-file"/></svg></button>
       <button class="icon-btn" data-act="goto" data-to="sec-watch" aria-label="Watchlist" title="Watchlist"><svg class="g"><use href="#i-star"/></svg></button>
+      <button class="icon-btn" data-act="goto" data-to="sec-analyses" aria-label="Analyses" title="Analyses"><svg class="g"><use href="#i-bot"/></svg></button>
       <button class="icon-btn" data-act="goto" data-to="sec-calls" aria-label="The desk's calls" title="The desk's calls"><svg class="g"><use href="#i-check"/></svg></button>
       <button class="icon-btn" data-act="goto" data-to="sec-score" aria-label="Scorecard" title="Scorecard"><svg class="g"><use href="#i-target"/></svg></button>
     </aside>
@@ -178,8 +180,13 @@
           </section>
 
           <section class="at-section" id="sec-watch">
-            <div class="at-sect-head"><div class="at-head-words"><h2>Watchlist</h2><p id="watchSub">Press a row to chart it · the star keeps it in the side list</p></div><div class="at-head-tail" id="queueBox"></div></div>
+            <div class="at-sect-head"><div class="at-head-words"><h2>Watchlist</h2><p>Press a row to chart it · the star keeps it in the side list · the robot asks the desk to analyse it</p></div></div>
             <div class="at-box at-tablewrap" id="watchWrap"><table class="at-table fill" id="watchTable"></table></div>
+          </section>
+
+          <section class="at-section" id="sec-analyses">
+            <div class="at-sect-head"><div class="at-head-words"><h2>Analyses you asked for</h2><p id="analysesSub">Reading the desk's waiting list.</p></div><div class="at-head-tail" id="analysesDo"></div></div>
+            <div class="at-box at-tablewrap" id="analysesWrap"><table class="at-table fill" id="analysesTable"></table></div>
           </section>
 
           <section class="at-section" id="sec-calls">
@@ -222,6 +229,7 @@
 
 <dialog class="at-pop l" id="callDialog" aria-label="A call in full"></dialog>
 <dialog class="at-pop" id="ticketDialog" aria-label="Order ticket"><div id="tkHead"></div><div id="tkFields"></div><div id="tkDyn"></div></dialog>
+<dialog class="at-pop s" id="askDialog" aria-labelledby="askTitle"></dialog>
 <dialog class="at-pop s" id="stopDialog" aria-labelledby="stopTitle">
   <h2 id="stopTitle">Stop the dashboard?</h2>
   <p class="at-lede">It closes on this computer. Nothing is lost: your watchlist, your choices and the desk's calls all stay. To open it again, ask the trading-desk team to "open the dashboard", or run /terminal.</p>

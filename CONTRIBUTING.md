@@ -40,13 +40,29 @@
   `/api/claim`; while it runs the key is kept in the private folder, `dashboard.json`, so `main.ts` can open the page
   again with a fresh link from `/api/claim/new`; strict CSP),
   `quotes.ts` (Yahoo prices), `search.ts` (Yahoo's matches for what is typed), `prefs.ts` (what the page remembers, in
-  `desk-data/dashboard.json`, each value checked), `state.ts` and `store.ts` (the desk's files, the watchlist and the
-  queue), `main.ts` (the program: Stop, and Restart into an update on the person's press only, on the same address
+  `desk-data/dashboard.json`, each value checked), `state.ts` and `store.ts` (the desk's files and the watchlist; the
+  waiting list for the page, with each running stock's step), `main.ts` (the program: Stop, and Restart into an update on the person's press only, on the same address
   with `--port=N` and the same key, handed over in the new program's environment, never on a command line), and `ui/` (the
   page: `house.css` is the Madav House theme, `dashboard.css` only places its objects with tokens, `main.ts` and the
   rest are the page). The page has no inline script or style (the policy refuses them): colours in charts come from
   classes, and anything an agent wrote goes through `md.ts`, which escapes first. `npm run build` bundles the page into
   `dist/terminal/`. `ui/` has its own `tsconfig.json` (it needs the browser's types).
+- `src/desk/queue.ts` - the analyses asked for on the dashboard, and the contract with whatever runs the agents. Three
+  files in `desk-data`, each read field by field as data from another program:
+  - `queue.json`: `[{ symbol, requestedAt, depth?: "shallow"|"medium"|"deep", state: "waiting"|"running"|"done"|"failed",
+    date?, startedAt?, endedAt?, rating?, reason? }]`. The dashboard adds (and takes off what is not running); the desk
+    tools `start_queue_item`, `finish_queue_item` and `end_queue_run` mark the rest. One stock runs at a time; one left
+    running for two hours reads as failed.
+  - `doorbell.json`: `{ at, waiting, why: "press"|"more" }`, written when the person presses Analyse, Retry or Run now,
+    and by `end_queue_run` when stocks still wait. A runner starts a run when `at` changes, and never because the
+    waiting list changed.
+  - `listener.json`: `{ listener, since, beat, pid?, lastRun?: { at, result } }`, kept by whoever listens, its `beat`
+    renewed at least once a minute (older than three minutes: not believed). The dashboard says who listens from it.
+- `src/watch/` - the desk's own listener for Claude Code (`node dist/watch.mjs`): `watcher.ts` keeps the contract above
+  (a short wait so several presses make one run, one run at a time with at most one owed, no run when nothing waits,
+  stopping when its note is taken away, and making way for an update between runs); `claude.ts` finds Claude Code
+  without a shell and runs it with the fixed words and options in `RUN_ARGS`, never from a project file;
+  `main.ts` is the program, logging to `desk-data/watcher.log`.
 - `src/desk/routine.ts` - the morning and evening briefs the routines run from (desk tool `routine_brief`, skill
   `/routine`, the team's playbook); `src/desk/orders.ts` - the dashboard's log of the orders it sent.
 - `src/desk/ticket.ts` - the order ticket: sizing from the person's settings and every cap check, on real figures only.

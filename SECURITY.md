@@ -32,6 +32,22 @@ refuses any file search that starts at your home folder or above it. It cannot s
 pieces, which is why the real protection is that the desk's agents get no shell at all, and any other session in this
 folder asks you before it runs one.
 
+## Analyses that run by themselves
+When you ask for an analysis on the dashboard, it waits on a list in `desk-data` and the dashboard rings a "doorbell"
+(a small file there). Whatever listens for it (Madav's routine, or the desk's own listener for Claude Code) runs the
+trading-desk team, which proposes only, exactly as when you ask in a chat: the same agents, tools and guard, and no
+order tool.
+- The desk's own listener (`node dist/watch.mjs`, started by "Run automatically with Claude Code") runs one fixed
+  thing, written in its code: Claude Code as the trading-desk team, with the words "Analyse what is waiting on the
+  dashboard", in a mode that refuses anything this folder's settings do not already allow instead of asking. Nothing
+  in the project's files can change that command, so a file an agent could write never chooses what it runs. It never
+  runs with permission checks bypassed.
+- The files it shares with the dashboard (the waiting list, the doorbell, the note that says who is listening) are
+  read as data: every field is checked, and a bad one is dropped. They hold no secret and no key.
+- One stock runs at a time, at most five a run, and a run starts only when something is waiting. Each run uses your
+  own Claude Code plan or Madav's model, like a chat; switch it off when you do not want analyses to run by
+  themselves.
+
 ## Your data
 - Your Robinhood sign-in, the accounts you chose to show, the trading switch with your caps, the secret your account
   fingerprints are made with and the running dashboard's key stay in your private folder, never in this repository and

@@ -4,20 +4,28 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { readContactEmail } from '../contact.js';
 import { Journal, type Entry } from '../desk/journal.js';
-import { hasReport, sectionsOf } from '../desk/runs.js';
+import { hasReport, sectionsOf, stepWords } from '../desk/runs.js';
 import { renderSummary, summarize, type Summary } from '../desk/backtest.js';
+import { depthOfRounds, readListener, readQueue, type Depth, type QueueItem } from '../desk/queue.js';
 import { readSettings } from '../settings.js';
 import { deskDataDir } from '../paths.js';
-import { readQueue, readWatchlist, type QueueItem, type WatchItem } from './store.js';
+import { readWatchlist, type WatchItem } from './store.js';
+
+/** A stock on the waiting list as the page shows it: a running one says where its run stands. */
+export type QueueView = QueueItem & { progress?: string };
+/** Who listens for the doorbell, when its heartbeat is recent. */
+export interface ListenerView { listener: string; since: string; lastRun?: { at: string; result: string } }
 
 export interface Call {
   date: string; ticker: string; rating: string; pending: boolean; raw: string | null; alpha: string | null; holding: string | null;
   summary: string; hasReport: boolean;
 }
 export interface DeskState {
-  version: string; today: string; watchlist: WatchItem[]; queue: QueueItem[]; calls: Call[];
+  version: string; today: string; watchlist: WatchItem[]; queue: QueueView[]; calls: Call[];
   record: { summary: Summary; text: string; benchmarkNote: string };
   desk: { emailSaved: boolean; tradingEnabled: boolean; holdingDays: number };
+  /** The depth the page offers first (the settings'), how many one run analyses, and who listens for the doorbell. */
+  analyses: { depth: Depth; perRun: number; listener: ListenerView | null };
 }
 
 /** Markdown's marks taken out, so a few words read as words: bold, slanted, code, headings, list marks, table bars. */
@@ -46,7 +54,23 @@ export function versionOf(root: string): string {
   const dir = deskDataDir(root), runs = path.join(dir, 'runs');
   let latest = 0;
   try { for (const d of fs.readdirSync(runs)) latest = Math.max(latest, Number(stamp(path.join(runs, d, 'run.json')))); } catch { /* no runs yet */ }
-  return [stamp(path.join(dir, 'journal.md')), stamp(path.join(dir, 'watchlist.json')), stamp(path.join(dir, 'queue.json')), latest, stamp(path.join(dir, 'contact.json'))].join('-');
+  // Two things change with time alone, not with a file: a listener whose heartbeat stopped, and a run that died. Both are
+  // part of the fingerprint, so the page hears of them too.
+  const timely = `${listenerOf(dir) ? 'L' : 'n'}${readQueue(dir).map((i) => i.state[0]).join('')}`;
+  return [stamp(path.join(dir, 'journal.md')), stamp(path.join(dir, 'watchlist.json')), stamp(path.join(dir, 'queue.json')), latest, stamp(path.join(dir, 'contact.json')), stamp(path.join(dir, 'listener.json')), timely].join('-');
+}
+
+/** The waiting list for the page: running first, then waiting in order, then finished, newest first. */
+export function queueOf(dir: string, now: Date = new Date()): QueueView[] {
+  const rank = { running: 0, waiting: 1, done: 2, failed: 2 } as const;
+  return readQueue(dir, now)
+    .map((i): QueueView => (i.state === 'running' && i.date ? { ...i, progress: stepWords(dir, i.symbol, i.date) } : i))
+    .sort((a, b) => rank[a.state] - rank[b.state] || (rank[a.state] === 2 ? (b.endedAt ?? '').localeCompare(a.endedAt ?? '') : 0));
+}
+
+export function listenerOf(dir: string, now: Date = new Date()): ListenerView | null {
+  const n = readListener(dir, now);
+  return n?.fresh ? { listener: n.listener, since: n.since, ...(n.lastRun ? { lastRun: n.lastRun } : {}) } : null;
 }
 
 export function stateOf(root: string, day: string): DeskState {
@@ -58,9 +82,10 @@ export function stateOf(root: string, day: string): DeskState {
   })).reverse().sort((a, b) => b.date.localeCompare(a.date));
   const summary = summarize(entries);
   return {
-    version: versionOf(root), today: day, watchlist: readWatchlist(dir), queue: readQueue(dir), calls,
+    version: versionOf(root), today: day, watchlist: readWatchlist(dir), queue: queueOf(dir), calls,
     record: { summary, text: renderSummary(summary), benchmarkNote: `Each call is judged after ${s.scoring.holdingPeriodDays} trading days against its market's index.` },
     desk: { emailSaved: !!readContactEmail(root), tradingEnabled: false, holdingDays: s.scoring.holdingPeriodDays },
+    analyses: { depth: depthOfRounds(s.analysis.debateRounds), perRun: s.routines.maxAnalyses, listener: listenerOf(dir) },
   };
 }
 

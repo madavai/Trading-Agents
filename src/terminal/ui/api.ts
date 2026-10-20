@@ -4,7 +4,9 @@
 // since stopped and started afresh, has no key, and says so rather than guessing.
 import type { DeskState } from '../state.js';
 import type { History, QuoteResult } from '../quotes.js';
-import type { WatchItem, QueueItem } from '../store.js';
+import type { WatchItem } from '../store.js';
+import type { ListenerView, QueueView } from '../state.js';
+import type { Depth } from '../../desk/queue.js';
 import type { LinkInfo, Snapshot, TradingState } from '../../robinhood/link.js';
 import type { Account, AccountView, Holding, Order } from '../../robinhood/account.js';
 import type { Check, Proposal, TicketContext } from '../../desk/ticket.js';
@@ -20,7 +22,7 @@ export type { Placed };
 export interface TicketOpen { id: string; own: boolean; context: TicketContext; proposal: Proposal; checks: Check[]; caps: Caps }
 
 export type { Check, Proposal, Review, TicketContext };
-export type { DeskState, History, QuoteResult, WatchItem, QueueItem, LinkInfo, Snapshot, Account, AccountView, Holding, Order };
+export type { DeskState, History, QuoteResult, WatchItem, QueueView, ListenerView, Depth, LinkInfo, Snapshot, Account, AccountView, Holding, Order };
 export interface Market { symbol: string; name: string; unit?: '%'; quote: QuoteResult }
 export interface CallDetail { decision: string; sections: Record<string, string[]>; hasReport: boolean }
 
@@ -84,8 +86,13 @@ export const api = {
   addWatch: (symbol: string) => call<{ watchlist: WatchItem[] }>('POST', '/api/watchlist', { symbol }),
   removeWatch: (symbol: string) => call<{ watchlist: WatchItem[] }>('DELETE', `/api/watchlist?${q({ symbol })}`),
   favourite: (symbol: string, favourite: boolean) => call<{ watchlist: WatchItem[] }>('POST', '/api/favourite', { symbol, favourite }),
-  enqueue: (symbol: string) => call<{ queue: QueueItem[] }>('POST', '/api/queue', { symbol }),
-  dequeue: (symbol: string) => call<{ queue: QueueItem[] }>('DELETE', `/api/queue?${q({ symbol })}`),
+  /** Asks the desk to analyse a stock at a depth (Analyse, Retry); rings for whoever listens. */
+  enqueue: (symbol: string, depth: Depth) => call<{ queue: QueueView[] }>('POST', '/api/queue', { symbol, depth }),
+  dequeue: (symbol: string) => call<{ queue: QueueView[] }>('DELETE', `/api/queue?${q({ symbol })}`),
+  /** Rings again for what is waiting (Run now). */
+  runQueue: () => call<{ queue: QueueView[] }>('POST', '/api/queue/run', {}),
+  /** "Run automatically with Claude Code": the desk's own listener, on or off. */
+  listen: (on: boolean) => call<{ listener: ListenerView | null }>('POST', '/api/listen', { on }),
   robinhood: () => call<LinkInfo>('GET', '/api/robinhood'),
   connectRobinhood: () => call<LinkInfo>('POST', '/api/robinhood/connect', {}),
   checkRobinhood: () => call<LinkInfo>('POST', '/api/robinhood/check', {}),

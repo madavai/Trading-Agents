@@ -19,8 +19,10 @@ In a chat here:
 - `/backtest TICKERS START END`: runs the team over past dates in a journal of its own and scores the calls by rating.
   Slow and costly: every date is a full team run.
 - `/terminal`: opens the dashboard on this computer (`node dist/terminal.mjs`): markets, charts, watchlist, the desk's
-  calls and scorecard, a list of stocks to analyse, a page per stock, and the person's own Connect to Robinhood.
-  `/analyse` with no stock runs that list. An order is placed only by the person's own Confirm there, with trading
+  calls and scorecard, the analyses the person asked for (waiting, running, done or failed), a page per stock, and the
+  person's own Connect to Robinhood. `/analyse` with no stock runs that list, one stock at a time and never asking the
+  person anything; Madav's "Run automatically" routine or the dashboard's "Run automatically with Claude Code" (the
+  desk's own listener, `node dist/watch.mjs`) run it by themselves. An order is placed only by the person's own Confirm there, with trading
   switched on by them. It remembers where the person left it, offers Restart after an update (new code runs only on
   the person's press) and has its own Stop.
 - `/routine morning|evening`: the morning routine (score past calls, analyse what is waiting and the starred

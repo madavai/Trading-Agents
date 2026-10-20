@@ -102,7 +102,8 @@ Choose `shallow`, `medium` or `deep` (1, 3 or 5 rounds of debate), which analyst
 <details>
 <summary>The same, in words</summary>
 
-1. **Agents analyse.** Ask the trading-desk team in Agent Studio ("analyse NVDA"), or type `/analyse NVDA` in a chat.
+1. **Agents analyse.** Ask the trading-desk team in Agent Studio ("analyse NVDA"), type `/analyse NVDA` in a chat, or
+   press the robot beside a stock on the dashboard (see "Analyses that run by themselves" below).
    Four analysts (price and indicators, mood, news, company accounts), a bull and a bear, a research manager, a trader,
    three risk voices and a portfolio manager work in turn, from free public data, and give a rating. Each call is scored
    a few trading days later against its market's index (`/settle`), and the lessons go into later analyses.
@@ -180,6 +181,24 @@ the ticker, the name, the market and the kind, with the desk's latest rating. An
 at last. The dashboard opens where you left it (the page, the stock, the chart's settings, light or dark), in any
 browser. After an update it offers Restart at the top of the page, and one press opens the new version where you were;
 Stop, at the top right, closes it.
+
+### Analyses that run by themselves
+Press the robot beside any stock, choose how deep (shallow, medium or deep; your settings' depth is chosen first) and
+press "Ask the desk". The stock joins **Analyses you asked for**, where each one shows where it stands: waiting, being
+analysed (with the step it is on), done with its rating, or failed with the reason and a Retry. When one finishes, a
+notice says so wherever you are on the page. One stock is analysed at a time, at most five a run (the routines' limit
+in `desk-settings.json`); the rest wait for the next run, which is asked for by itself.
+
+Something has to run them. The page says who is listening:
+- **Madav**: switch on its "Run automatically when the dashboard asks" routine, once.
+- **Claude Code**: press "Run automatically with Claude Code" on the dashboard. It starts the desk's own listener
+  (`node dist/watch.mjs`), which runs the trading-desk team with Claude Code on this computer whenever you ask for an
+  analysis, and keeps a log in `desk-data/watcher.log`. It stays on until you switch it off, and starts again with
+  the dashboard. Each run uses your own Claude Code plan, like a chat.
+- **By hand**: ask the desk to "analyse what is waiting" in a chat, or type `/analyse` with no stock.
+
+A run of the waiting list never asks you anything: what it cannot do (for example, no email saved for the SEC yet) is
+marked failed with the reason, for you to fix and Retry.
 
 ## Routines
 The trading-desk team has two routines, which Madav's scheduler can start for you:
