@@ -26,11 +26,13 @@ import type { Placed } from '../robinhood/order.js';
 import { Journal } from '../desk/journal.js';
 import { capsFrom, readSettings, type Caps } from '../settings.js';
 import { VERSION } from '../version.js';
-import { callOf, stateOf, versionOf } from './state.js';
+import { callOf, listenerOf, queueOf, stateOf, versionOf } from './state.js';
 import { clearQuotes, history, isRange, MARKETS, quote } from './quotes.js';
 import { findSymbols, QUERY } from './search.js';
 import { readPrefs, savePrefs } from './prefs.js';
-import { addWatch, dequeue, enqueue, removeWatch, setFavourite } from './store.js';
+import { addWatch, removeWatch, setFavourite } from './store.js';
+import { dequeue, depthOfRounds, enqueue, isDepth, QueueRefusal, readQueue, removeListener, ringDoorbell, waitingIn } from '../desk/queue.js';
+import { findClaude } from '../watch/claude.js';
 
 export interface Asset { type: string; body: Buffer | string }
 export type Assets = Map<string, Asset>;
@@ -102,7 +104,13 @@ export interface TerminalOptions {
   keyFile?: string;
   /** How long a one-time link stays good (two minutes). */
   claimMs?: number;
+  /** Starts the desk's own listener (`node dist/watch.mjs`) for "Run automatically with Claude Code"; `claude` says
+   *  whether Claude Code is on this computer. Without it the page offers no such switch. */
+  listen?: { start: () => void; claude?: () => boolean };
 }
+
+/** The listener the switch starts calls itself this, in its note. */
+const OWN_LISTENER = 'Claude Code';
 
 const KEY = /^[0-9a-f]{48}$/, CLAIM = /^[0-9a-f]{36}$/;
 
@@ -160,6 +168,9 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
     req.on('end', () => { try { const v = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}') as unknown; v && typeof v === 'object' && !Array.isArray(v) ? resolve(v as Record<string, unknown>) : reject(new Refused(400, 'send a JSON object')); } catch { reject(new Refused(400, 'that is not JSON')); } });
     req.on('error', reject);
   });
+
+  /** A change to the waiting list; what the list refuses (full, or a stock being analysed now) is said in its own words. */
+  const queued = <T>(job: () => T): T => { try { return job(); } catch (e) { if (e instanceof QueueRefusal) throw new Refused(409, e.message); throw e; } };
 
   // Robinhood's failures are told in plain words; one of the person's own choices that is refused says why.
   const askRobinhood = async <T>(job: () => Promise<T>): Promise<T> => {
@@ -239,9 +250,41 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
     }
     if (p === '/api/watchlist' && method === 'DELETE') return json(res, 200, { watchlist: removeWatch(dir, name) });
     if (p === '/api/favourite' && method === 'POST') return json(res, 200, { watchlist: setFavourite(dir, name, b.favourite === true) });
-    if (p === '/api/queue' && method === 'POST') return json(res, 200, { queue: enqueue(dir, name, new Date().toISOString()) });
-    if (p === '/api/queue' && method === 'DELETE') return json(res, 200, { queue: dequeue(dir, name) });
-    if (p === '/api/prefs' && method === 'POST') return json(res, 200, savePrefs(dir, b));
+    // The waiting list. Asking (Analyse, Retry) and Run now ring the doorbell for whoever listens; taking a stock off does not.
+    if (p === '/api/queue' && method === 'POST') {
+      const symbol = safeSymbol(name), d = b.depth === undefined ? depthOfRounds(readSettings(root).analysis.debateRounds) : b.depth;
+      if (!isDepth(d)) throw new Refused(400, 'the depth is shallow, medium or deep');
+      const call = new Journal(path.join(dir, 'journal.md')).load().find((e) => e.ticker === symbol && e.date === day);
+      if (call) throw new Refused(409, `${symbol} was already analysed today (${call.rating}): its call is in the journal. Ask again tomorrow`);
+      queued(() => enqueue(dir, symbol, new Date().toISOString(), d));
+      ringDoorbell(dir, 'press');
+      return json(res, 200, { queue: queueOf(dir) });
+    }
+    if (p === '/api/queue' && method === 'DELETE') { queued(() => dequeue(dir, name)); return json(res, 200, { queue: queueOf(dir) }); }
+    if (p === '/api/queue/run' && method === 'POST') {
+      if (!waitingIn(readQueue(dir)).length) throw new Refused(409, 'nothing is waiting to be analysed');
+      ringDoorbell(dir, 'press');
+      return json(res, 200, { queue: queueOf(dir) });
+    }
+    // "Run automatically with Claude Code": the desk's own listener, started and stopped from here, remembered across starts.
+    if (p === '/api/listen' && method === 'POST') {
+      if (!opts.listen) throw new Refused(404, 'not found');
+      const now = listenerOf(dir);
+      if (b.on === false) {
+        if (now && now.listener !== OWN_LISTENER) throw new Refused(409, `${now.listener} is listening, not Claude Code: switch it off there`);
+        savePrefs(dir, { autorun: false });
+        if (now) removeListener(dir);   // the listener ends after the run in hand
+        return json(res, 200, { listener: null });
+      }
+      if (b.on !== true) throw new Refused(400, 'say on or off');
+      if (now) { if (now.listener === OWN_LISTENER) return json(res, 200, { listener: now }); throw new Refused(409, `${now.listener} is already listening: analyses already run by themselves`); }
+      if (!(opts.listen.claude ?? (() => !!findClaude()))()) throw new Refused(400, 'Claude Code is not installed on this computer: install it from claude.com/claude-code, or switch on "Run automatically" in Madav');
+      savePrefs(dir, { autorun: true });
+      opts.listen.start();
+      for (const until = Date.now() + 8_000; Date.now() < until; await new Promise((r) => setTimeout(r, 200))) { const l = listenerOf(dir); if (l) return json(res, 200, { listener: l }); }
+      throw new Refused(502, 'the listener did not start: see desk-data/watcher.log, or start it yourself with node dist/watch.mjs');
+    }
+    if (p === '/api/prefs' && method === 'POST') { delete b.autorun; return json(res, 200, savePrefs(dir, b)); }   // only the switch sets autorun
     if (p === '/api/stop' && method === 'POST') {
       if (!opts.stop) throw new Refused(404, 'not found');
       const stop = opts.stop;
@@ -383,6 +426,11 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
     } catch { /* a folder that cannot be written: the page opened later says it has no key */ }
   };
   keep((keys) => { keys[deskId] = { port, key: token }; });
+
+  // "Run automatically with Claude Code" was left on: start the listener again, unless someone already listens.
+  if (opts.listen && readPrefs(dir).autorun && !listenerOf(dir) && (opts.listen.claude ?? (() => !!findClaude()))()) {
+    try { opts.listen.start(); } catch { /* the page then says nothing is listening */ }
+  }
 
   // Yahoo's prices are held in memory for a short while; clear them now and then so a dashboard left open stays current.
   const sweep = setInterval(() => { clearCache(); clearQuotes(); }, 60_000);

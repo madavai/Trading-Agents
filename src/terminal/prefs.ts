@@ -13,6 +13,9 @@ export interface Prefs {
   symbol?: string; range?: '1M' | '3M' | '6M' | '1Y' | '5Y'; kind?: 'area' | 'candles';
   layers?: { ma50: boolean; ma200: boolean; vol: boolean };
   recent?: Recent[];
+  /** "Run automatically with Claude Code" is on: the dashboard starts the desk's listener again when it starts. Set only
+   *  by that switch, never by the page's other choices. */
+  autorun?: boolean;
 }
 
 export const MAX_RECENT = 6;
@@ -43,6 +46,7 @@ export function cleanPrefs(raw: unknown): Prefs {
     }
     out.recent = recent;
   }
+  if (typeof r.autorun === 'boolean') out.autorun = r.autorun;
   return out;
 }
 

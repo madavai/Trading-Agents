@@ -65,6 +65,26 @@ export function progress(dir: string, ticker: string, date: string): Record<stri
 
 export const savedPlan = (dir: string, ticker: string, date: string): unknown => load(dir, ticker, date).plan;
 
+/** Where a run stands, in a few plain words for the dashboard: its next unfinished step, from its plan and what is saved. */
+export function stepWords(dir: string, ticker: string, date: string): string {
+  const plan = savedPlan(dir, ticker, date) as { steps?: Array<{ section?: unknown; turn?: unknown }>; debateRounds?: unknown; riskRounds?: unknown } | undefined;
+  const steps = Array.isArray(plan?.steps) ? plan.steps.filter((s): s is { section: Section; turn: number } => isSection(String(s.section)) && Number.isInteger(s.turn)) : [];
+  if (!steps.length) return 'starting';
+  const done = progress(dir, ticker, date), next = steps.find((s) => (done[s.section] ?? 0) < s.turn);
+  if (!next) return 'recording the call';
+  const analysts = steps.filter((s) => ['market', 'sentiment', 'news', 'fundamentals'].includes(s.section));
+  const of = (n: unknown) => (Number.isInteger(n) ? ` of ${n as number}` : '');
+  switch (next.section) {
+    case 'market': case 'sentiment': case 'news': case 'fundamentals':
+      return `analysts reading: ${analysts.filter((s) => (done[s.section] ?? 0) >= 1).length} of ${analysts.length} done`;
+    case 'bull': case 'bear': return `debate round ${next.turn}${of(plan?.debateRounds)}`;
+    case 'research_plan': return 'the research manager is weighing the debate';
+    case 'trader': return 'the trader is drafting the plan';
+    case 'aggressive': case 'conservative': case 'neutral': return `risk round ${next.turn}${of(plan?.riskRounds)}`;
+    default: return 'the portfolio manager is deciding';
+  }
+}
+
 /** The text of the named sections, in the order asked. A debate name (investment_debate, risk_debate) gives its turns in
  *  the order they were spoken. */
 export function readSections(dir: string, ticker: string, date: string, names: string[]): string {

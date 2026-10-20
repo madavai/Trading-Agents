@@ -3263,8 +3263,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path18) {
-      let input2 = path18;
+    function removeDotSegments(path19) {
+      let input2 = path19;
       const output2 = [];
       let nextSlash = -1;
       let len = 0;
@@ -3673,8 +3673,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path18 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path18 && path18 !== "/" ? path18 : void 0;
+        const path19 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path19 && path19 !== "/" ? path19 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -6966,8 +6966,8 @@ var require_formats = __commonJS({
         return false;
       const year = +matches[1];
       const month = +matches[2];
-      const day2 = +matches[3];
-      return month >= 1 && month <= 12 && day2 >= 1 && day2 <= (month === 2 && isLeapYear(year) ? 29 : DAYS2[month]);
+      const day3 = +matches[3];
+      return month >= 1 && month <= 12 && day3 >= 1 && day3 <= (month === 2 && isLeapYear(year) ? 29 : DAYS2[month]);
     }
     function compareDate(d1, d2) {
       if (!(d1 && d2))
@@ -7187,12 +7187,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list2, fs14, exportName) {
+    function addFormats(ajv, list2, fs15, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list2)
-        ajv.addFormat(f, fs14[f]);
+        ajv.addFormat(f, fs15[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -7201,7 +7201,7 @@ var require_dist = __commonJS({
 });
 
 // src/tools/main.ts
-import path17 from "node:path";
+import path18 from "node:path";
 
 // node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
 import process2 from "node:process";
@@ -8023,10 +8023,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path18) {
-  if (!path18)
+function getElementAtPath(obj, path19) {
+  if (!path19)
     return obj;
-  return path18.reduce((acc, key) => acc?.[key], obj);
+  return path19.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -8366,11 +8366,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path18, issues) {
+function prefixIssues(path19, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path18);
+    iss.path.unshift(path19);
     return iss;
   });
 }
@@ -8832,16 +8832,16 @@ function flattenError(error62, mapper = (issue2) => issue2.message) {
 }
 function formatError(error62, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error63, path18 = []) => {
+  const processError = (error63, path19 = []) => {
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path18, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path19, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path18, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path19, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path18, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path19, ...issue2.path]);
       } else {
-        const fullpath = [...path18, ...issue2.path];
+        const fullpath = [...path19, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -8880,17 +8880,17 @@ function formatError(error62, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error62, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error63, path18 = []) => {
+  const processError = (error63, path19 = []) => {
     var _a3;
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path18, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path19, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path18, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path19, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path18, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path19, ...issue2.path]);
       } else {
-        const fullpath = [...path18, ...issue2.path];
+        const fullpath = [...path19, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -8929,8 +8929,8 @@ function treeifyError(error62, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path18 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path18) {
+  const path19 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path19) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -10007,23 +10007,23 @@ function canParseURL(input2) {
     return false;
   }
 }
-function validateURL(trimmed, def) {
+function validateURL(trimmed2, def) {
   if (!("normalize" in def) && !("hostname" in def) && !("protocol" in def)) {
-    return canParseURL(trimmed) || URL_UNPARSEABLE;
+    return canParseURL(trimmed2) || URL_UNPARSEABLE;
   }
-  return parseURLObject(trimmed, def);
+  return parseURLObject(trimmed2, def);
 }
-function parseURLObject(trimmed, def) {
-  if (!def.normalize && def.protocol?.source === httpProtocol.source && !/^https?:\/\//i.test(trimmed)) {
+function parseURLObject(trimmed2, def) {
+  if (!def.normalize && def.protocol?.source === httpProtocol.source && !/^https?:\/\//i.test(trimmed2)) {
     return URL_BAD_FORMAT;
   }
   try {
     if (typeof URL !== "undefined") {
       const URLStatic = URL;
       if (typeof URLStatic.parse === "function")
-        return URLStatic.parse(trimmed) ?? URL_UNPARSEABLE;
+        return URLStatic.parse(trimmed2) ?? URL_UNPARSEABLE;
     }
-    return new URL(trimmed);
+    return new URL(trimmed2);
   } catch {
     return URL_UNPARSEABLE;
   }
@@ -10044,8 +10044,8 @@ var $ZodURL = /* @__PURE__ */ $constructor("$ZodURL", (inst, def) => {
   $ZodStringFormat.init(inst, def);
   inst._zod.check = (payload) => {
     try {
-      const trimmed = payload.value.trim();
-      const url2 = validateURL(trimmed, def);
+      const trimmed2 = payload.value.trim();
+      const url2 = validateURL(trimmed2, def);
       if (url2 === URL_BAD_FORMAT) {
         payload.issues.push({
           code: "invalid_format",
@@ -10068,7 +10068,7 @@ var $ZodURL = /* @__PURE__ */ $constructor("$ZodURL", (inst, def) => {
         return;
       }
       if (url2 === true) {
-        payload.value = stripTabAndNewline(trimmed);
+        payload.value = stripTabAndNewline(trimmed2);
         return;
       }
       if (def.hostname && !urlHostnameOk(url2, def.hostname)) {
@@ -10093,7 +10093,7 @@ var $ZodURL = /* @__PURE__ */ $constructor("$ZodURL", (inst, def) => {
           continue: !def.abort
         });
       }
-      payload.value = def.normalize ? url2.href : stripTabAndNewline(trimmed);
+      payload.value = def.normalize ? url2.href : stripTabAndNewline(trimmed2);
       return;
     } catch (_) {
       payload.issues.push({
@@ -26068,13 +26068,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path18 = ref.slice(1).split("/").filter(Boolean);
-  if (path18.length === 0) {
+  const path19 = ref.slice(1).split("/").filter(Boolean);
+  if (path19.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path18[0] === defsKey) {
-    const key = path18[1] === void 0 ? void 0 : decodeJSONPointerSegment(path18[1]);
+  if (path19[0] === defsKey) {
+    const key = path19[1] === void 0 ? void 0 : decodeJSONPointerSegment(path19[1]);
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -28932,8 +28932,8 @@ function getErrorMap2() {
 
 // node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path18, errorMaps, issueData } = params;
-  const fullPath = [...path18, ...issueData.path || []];
+  const { data, path: path19, errorMaps, issueData } = params;
+  const fullPath = [...path19, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -29048,11 +29048,11 @@ var errorUtil;
 
 // node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path18, key) {
+  constructor(parent, value, path19, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path18;
+    this._path = path19;
     this._key = key;
   }
   get path() {
@@ -32603,11 +32603,11 @@ function normalizeObjectSchema(schema) {
   }
   return void 0;
 }
-function getDotPath(path18) {
-  if (path18.length === 0) {
+function getDotPath(path19) {
+  if (path19.length === 0) {
     return "object root";
   }
-  return path18.reduce((acc, seg, index) => {
+  return path19.reduce((acc, seg, index) => {
     if (index === 0) {
       return String(seg);
     }
@@ -37330,10 +37330,10 @@ function parseChart(json2, symbol4) {
   const offset = m2.gmtoffset ?? 0;
   const bars = [];
   (r.timestamp ?? []).forEach((ts, i) => {
-    const open2 = num(q.open?.[i]), high = num(q.high?.[i]), low = num(q.low?.[i]), close = num(q.close?.[i]);
-    if (open2 === null || high === null || low === null || close === null || close <= 0) return;
+    const open3 = num(q.open?.[i]), high = num(q.high?.[i]), low = num(q.low?.[i]), close = num(q.close?.[i]);
+    if (open3 === null || high === null || low === null || close === null || close <= 0) return;
     const a = num(adj?.[i]), k = a !== null ? a / close : 1;
-    bars.push({ date: new Date((ts + offset) * 1e3).toISOString().slice(0, 10), open: open2 * k, high: high * k, low: low * k, close: close * k, volume: num(q.volume?.[i]) ?? 0 });
+    bars.push({ date: new Date((ts + offset) * 1e3).toISOString().slice(0, 10), open: open3 * k, high: high * k, low: low * k, close: close * k, volume: num(q.volume?.[i]) ?? 0 });
   });
   const seen = /* @__PURE__ */ new Set();
   const unique = bars.filter((b) => seen.has(b.date) ? false : (seen.add(b.date), true));
@@ -37382,20 +37382,20 @@ var resolved = (raw) => {
   return s === raw.trim().toUpperCase() ? s : `${s} (from ${raw.trim()})`;
 };
 async function instrument(raw, analysis2) {
-  const day2 = analysisDate(analysis2), s = await history(raw, day2, 30), last = s.bars[s.bars.length - 1];
-  const kind = typeWord(s.meta.type, raw), old = isHistorical(day2);
+  const day3 = analysisDate(analysis2), s = await history(raw, day3, 30), last = s.bars[s.bars.length - 1];
+  const kind = typeWord(s.meta.type, raw), old = isHistorical(day3);
   const lines = [`Instrument: ${resolved(raw)}`, `Kind: ${kind}`];
-  if (s.meta.name) lines.push(old ? `Name: ${s.meta.name} (its current name, given only to identify it; on ${day2} it may have been named differently)` : `Name: ${s.meta.name}`);
+  if (s.meta.name) lines.push(old ? `Name: ${s.meta.name} (its current name, given only to identify it; on ${day3} it may have been named differently)` : `Name: ${s.meta.name}`);
   if (!old && s.meta.exchange) lines.push(`Exchange: ${s.meta.exchange}`);
   if (s.meta.currency) lines.push(`Quote currency: ${s.meta.currency}`);
-  lines.push(`Analysis date: ${day2}${old ? " (a past day: use only what was known by then)" : ""}`);
+  lines.push(`Analysis date: ${day3}${old ? " (a past day: use only what was known by then)" : ""}`);
   lines.push(`Latest trading day on or before it: ${last.date}, close ${f2(last.close)}`);
   lines.push("", `Refer to it by this exact ticker in every report, keeping any exchange suffix. Do not substitute a different company or ticker unless a tool result disproves this identity.${kind === "crypto asset" ? " It is a crypto asset, not a company: do not assume company fundamentals exist." : ""}`);
   return lines.join("\n");
 }
 var MAX_ROWS = 260;
 async function priceHistory(raw, analysis2, start, end) {
-  const day2 = analysisDate(analysis2), [s, e] = window(start, end, day2);
+  const day3 = analysisDate(analysis2), [s, e] = window(start, end, day3);
   const series = await daily(raw, s, e);
   if (!series.bars.length) return `No trading rows for ${resolved(raw)} from ${s} to ${e}.`;
   const rows = series.bars.slice(-MAX_ROWS);
@@ -37407,26 +37407,26 @@ function indicatorList(input2) {
   return { ok: [...new Set(parts.filter(isIndicator))], unknown: parts.filter((p) => !isIndicator(p)) };
 }
 async function indicatorWindow(raw, analysis2, names, lookBackDays = 30) {
-  const day2 = analysisDate(analysis2), { ok, unknown: unknown2 } = indicatorList(names);
+  const day3 = analysisDate(analysis2), { ok, unknown: unknown2 } = indicatorList(names);
   if (!ok.length) return `None of "${[names].flat().join(", ")}" is an indicator this desk computes. Use: ${INDICATOR_NAMES.join(", ")}.`;
-  const days = Math.max(5, Math.min(120, Math.round(lookBackDays))), from = addDays(day2, -days);
-  const s = await history(raw, day2), out = [];
+  const days = Math.max(5, Math.min(120, Math.round(lookBackDays))), from = addDays(day3, -days);
+  const s = await history(raw, day3), out = [];
   for (const name of ok) {
     const values = compute(name, s.bars);
     const rows = s.bars.map((b, i) => [b, values[i]]).filter(([b]) => b.date >= from);
-    out.push(`## ${name} for ${resolved(raw)}, ${from} to ${day2} (trading days only)`, ...rows.map(([b, v]) => `${b.date}: ${f2(v)}`), "", INDICATORS[name], "");
+    out.push(`## ${name} for ${resolved(raw)}, ${from} to ${day3} (trading days only)`, ...rows.map(([b, v]) => `${b.date}: ${f2(v)}`), "", INDICATORS[name], "");
   }
   if (unknown2.length) out.push(`Not computed (unknown names): ${unknown2.join(", ")}. Use: ${INDICATOR_NAMES.join(", ")}.`);
   return out.join("\n").trim();
 }
 var SNAPSHOT_INDICATORS = ["close_10_ema", "close_50_sma", "close_200_sma", "rsi", "boll", "boll_ub", "boll_lb", "macd", "macds", "macdh", "atr"];
 async function verifiedSnapshot(raw, analysis2, lookBack = 30) {
-  const day2 = analysisDate(analysis2), s = await history(raw, day2), bars = s.bars, last = bars[bars.length - 1];
+  const day3 = analysisDate(analysis2), s = await history(raw, day3), bars = s.bars, last = bars[bars.length - 1];
   const recent = bars.slice(-Math.max(1, Math.min(30, Math.round(lookBack))));
   const lines = [
     `## Checked price table for ${resolved(raw)}`,
     "",
-    `- Analysis date: ${day2}`,
+    `- Analysis date: ${day3}`,
     `- Latest trading row used: ${last.date}`,
     "- Rows after the analysis date are excluded.",
     ...last.date === today() ? ["- **The latest row is today's session. If the market is still open it is partial: its close, high, low and volume are the latest so far, and every indicator on it will change by the close. Do not treat a level as broken or held on this row alone.**"] : [],
@@ -37483,18 +37483,18 @@ function gap(found, from, to, subject) {
   return `No ${subject} between ${from} and ${to} in Yahoo Finance's search results. Search returns a sample, so this is not proof that nothing happened.`;
 }
 async function companyNews(raw, analysis2, lookBackDays, limit) {
-  const day2 = analysisDate(analysis2), sym = normalizeSymbol(raw), from = addDays(day2, -lookBackDays);
+  const day3 = analysisDate(analysis2), sym = normalizeSymbol(raw), from = addDays(day3, -lookBackDays);
   const all = await search(sym, Math.max(limit * 2, 20));
   const untagged = all.length > 0 && all.every((a) => a.tickers.length === 0);
   const found = untagged ? all : all.filter((a) => a.tickers.includes(sym));
   if (!found.length) throw new Unavailable(`Yahoo Finance's search has no articles tagged ${sym} (it tags few listings outside the US)`);
-  const list2 = found.filter((a) => inWindow(a, from, day2)).sort((a, b) => b.time.localeCompare(a.time)).slice(0, limit);
-  if (!list2.length) return gap(found, from, day2, `news about ${sym}`);
+  const list2 = found.filter((a) => inWindow(a, from, day3)).sort((a, b) => b.time.localeCompare(a.time)).slice(0, limit);
+  if (!list2.length) return gap(found, from, day3, `news about ${sym}`);
   const how = untagged ? `matched by Yahoo's search for "${sym}", not tagged: check each is about this company` : `tagged ${sym}`;
-  return [`News about ${sym}, ${from} to ${day2} (${list2.length} article${list2.length === 1 ? "" : "s"} ${how}; headlines only)`, "", render2(list2)].join("\n");
+  return [`News about ${sym}, ${from} to ${day3} (${list2.length} article${list2.length === 1 ? "" : "s"} ${how}; headlines only)`, "", render2(list2)].join("\n");
 }
 async function worldNews(analysis2, lookBackDays, limit, queries) {
-  const day2 = analysisDate(analysis2), from = addDays(day2, -lookBackDays);
+  const day3 = analysisDate(analysis2), from = addDays(day3, -lookBackDays);
   const results = await Promise.allSettled(queries.map((q) => search(q, 10)));
   const failed = results.filter((r) => r.status === "rejected").length;
   if (failed === queries.length) throw results[0].reason;
@@ -37506,12 +37506,12 @@ async function worldNews(analysis2, lookBackDays, limit, queries) {
       all.push(a);
     }
   }
-  const list2 = all.filter((a) => inWindow(a, from, day2)).sort((a, b) => b.time.localeCompare(a.time)).slice(0, limit);
+  const list2 = all.filter((a) => inWindow(a, from, day3)).sort((a, b) => b.time.localeCompare(a.time)).slice(0, limit);
   const note = failed ? `
 (${failed} of ${queries.length} searches could not be run: Yahoo Finance did not answer them.)` : "";
-  if (!list2.length) return gap(all, from, day2, "world and economic news") + note;
-  const past = isHistorical(day2) ? " Search favours recent articles, so a past window may be thin." : "";
-  return [`World and economic news, ${from} to ${day2}, from ${queries.length} searches: ${queries.join("; ")}.${past}`, "", render2(list2)].join("\n") + note;
+  if (!list2.length) return gap(all, from, day3, "world and economic news") + note;
+  const past = isHistorical(day3) ? " Search favours recent articles, so a past window may be thin." : "";
+  return [`World and economic news, ${from} to ${day3}, from ${queries.length} searches: ${queries.join("; ")}.${past}`, "", render2(list2)].join("\n") + note;
 }
 
 // src/data/social.ts
@@ -37542,10 +37542,10 @@ function subredditsFor(raw, stock, crypto2) {
   return own2[base] ? [own2[base], ...crypto2] : crypto2;
 }
 async function socialPosts(raw, analysis2, opts) {
-  const day2 = analysisDate(analysis2), from = addDays(day2, -opts.lookBackDays), sym = normalizeSymbol(raw);
+  const day3 = analysisDate(analysis2), from = addDays(day3, -opts.lookBackDays), sym = normalizeSymbol(raw);
   const subs = subredditsFor(raw, opts.subreddits, opts.cryptoSubreddits);
-  const [tw, rd] = await Promise.allSettled([stocktwits(raw, from, day2, opts.stocktwitsLimit), reddit(raw, from, day2, subs)]);
-  const out = [`Posts about ${sym}, ${from} to ${day2}. Both sources serve only recent posts, so a past window can be empty for that reason alone.`, ""];
+  const [tw, rd] = await Promise.allSettled([stocktwits(raw, from, day3, opts.stocktwitsLimit), reddit(raw, from, day3, subs)]);
+  const out = [`Posts about ${sym}, ${from} to ${day3}. Both sources serve only recent posts, so a past window can be empty for that reason alone.`, ""];
   out.push("### StockTwits (retail traders; each author may tag a message Bullish or Bearish)");
   if (tw.status === "rejected") out.push(`StockTwits unavailable: ${tw.reason.message}. This is not a quiet crowd.`);
   else if (!tw.value.length) out.push(`No StockTwits messages about ${sym} in this window that the stream still serves.`);
@@ -37599,23 +37599,23 @@ function releaseLag(obs) {
   return median <= 3 ? 1 : median <= 10 ? 6 : median <= 45 ? 45 : 120;
 }
 async function economicSeries(indicator, analysis2, lookBackDays = 365) {
-  const day2 = analysisDate(analysis2), key = indicator.trim().toLowerCase(), known = SERIES[key];
+  const day3 = analysisDate(analysis2), key = indicator.trim().toLowerCase(), known = SERIES[key];
   const id = known?.[0] ?? indicator.trim().toUpperCase();
   if (!/^[A-Z0-9_]{1,40}$/.test(id)) throw new Error(`"${indicator}" is not a series name or a FRED series id`);
-  const from = addDays(day2, -Math.max(30, Math.min(3650, lookBackDays)) - 130);
-  let obs = parseCsv(await getText(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${id}&cosd=${from}&coed=${day2}`)).filter((o) => o.date <= day2);
-  const past = isHistorical(day2), lag = releaseLag(obs);
-  if (past) obs = obs.filter((o) => addDays(o.date, lag) <= day2);
-  obs = obs.filter((o) => o.date >= addDays(day2, -Math.max(30, Math.min(3650, lookBackDays))));
-  if (!obs.length) throw new NoData(`FRED has no ${id} values published by ${day2} in this window`);
+  const from = addDays(day3, -Math.max(30, Math.min(3650, lookBackDays)) - 130);
+  let obs = parseCsv(await getText(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${id}&cosd=${from}&coed=${day3}`)).filter((o) => o.date <= day3);
+  const past = isHistorical(day3), lag = releaseLag(obs);
+  if (past) obs = obs.filter((o) => addDays(o.date, lag) <= day3);
+  obs = obs.filter((o) => o.date >= addDays(day3, -Math.max(30, Math.min(3650, lookBackDays))));
+  if (!obs.length) throw new NoData(`FRED has no ${id} values published by ${day3} in this window`);
   const first = obs[0], last = obs[obs.length - 1], change3 = last.value - first.value, pct3 = first.value ? change3 / Math.abs(first.value) * 100 : 0;
   const fmt = (v) => Math.abs(v) >= 1e3 ? v.toLocaleString("en-US", { maximumFractionDigits: 1 }) : v.toFixed(2);
   const lines = [
     `## ${known?.[1] ?? id} - FRED series ${id}`,
     "",
-    `- Latest value known by ${day2}: ${fmt(last.value)} (for ${last.date})`,
+    `- Latest value known by ${day3}: ${fmt(last.value)} (for ${last.date})`,
     `- Change since ${first.date}: ${change3 >= 0 ? "+" : ""}${fmt(change3)} (${pct3 >= 0 ? "+" : ""}${pct3.toFixed(1)}%)`,
-    past ? `- A past analysis date: values are kept only if published by ${day2} (a ${lag}-day release lag for this series), and are today's revised figures; first releases may have differed slightly.` : "- Values as published today, revisions included.",
+    past ? `- A past analysis date: values are kept only if published by ${day3} (a ${lag}-day release lag for this series), and are today's revised figures; first releases may have differed slightly.` : "- Values as published today, revisions included.",
     "",
     "Date | Value",
     "---|---:",
@@ -37635,16 +37635,16 @@ var list = (s) => {
   }
 };
 async function predictionMarkets(topic, analysis2, limit = 6, now = /* @__PURE__ */ new Date()) {
-  const day2 = analysisDate(analysis2);
-  if (isHistorical(day2)) return `Prediction-market odds are withheld for ${day2}: Polymarket serves only today's odds on open markets, and those would put later knowledge into an analysis of ${day2}.`;
+  const day3 = analysisDate(analysis2);
+  if (isHistorical(day3)) return `Prediction-market odds are withheld for ${day3}: Polymarket serves only today's odds on open markets, and those would put later knowledge into an analysis of ${day3}.`;
   const j = await getJson(`https://gamma-api.polymarket.com/public-search?q=${encodeURIComponent(topic)}&limit_per_type=20`);
-  const open2 = (j.events ?? []).flatMap((e) => e.markets ?? []).filter((m2) => m2.question && !m2.closed && m2.active !== false && list(m2.outcomePrices).length && list(m2.outcomes).length && (!m2.endDate || Date.parse(m2.endDate) > now.getTime())).sort((a, b) => (b.volumeNum ?? 0) - (a.volumeNum ?? 0)).slice(0, Math.max(1, Math.min(10, limit)));
+  const open3 = (j.events ?? []).flatMap((e) => e.markets ?? []).filter((m2) => m2.question && !m2.closed && m2.active !== false && list(m2.outcomePrices).length && list(m2.outcomes).length && (!m2.endDate || Date.parse(m2.endDate) > now.getTime())).sort((a, b) => (b.volumeNum ?? 0) - (a.volumeNum ?? 0)).slice(0, Math.max(1, Math.min(10, limit)));
   const head2 = `## Polymarket: "${topic}"
 Live odds: the crowd's priced chance of each event (more traded volume, more reliable). A price is not a forecast to take as certain.
 `;
-  if (!open2.length) return `${head2}
+  if (!open3.length) return `${head2}
 No open markets matched "${topic}". Polymarket covers mostly economic, political, geopolitical and crypto events; a single company may have none.`;
-  return head2 + "\n" + open2.map((m2) => {
+  return head2 + "\n" + open3.map((m2) => {
     const p = Number(list(m2.outcomePrices)[0]), wk = m2.oneWeekPriceChange;
     return `- ${m2.question}: ${list(m2.outcomes)[0]} ${(p * 100).toFixed(0)}% \xB7 volume $${Math.round(m2.volumeNum ?? 0).toLocaleString("en-US")}${m2.endDate ? ` \xB7 resolves ${m2.endDate.slice(0, 10)}` : ""}${typeof wk === "number" ? ` \xB7 ${wk >= 0 ? "+" : ""}${(wk * 100).toFixed(1)} points this week` : ""}`;
   }).join("\n");
@@ -37774,11 +37774,11 @@ function yahooSession() {
   });
   return session;
 }
-async function yahooJson(path18) {
+async function yahooJson(path19) {
   for (let attempt = 0; ; attempt++) {
     const s = await yahooSession();
     try {
-      return await getJson(`${HOSTS[1]}${path18}&crumb=${encodeURIComponent(s.crumb)}`, { headers: { Cookie: s.cookie } });
+      return await getJson(`${HOSTS[1]}${path19}&crumb=${encodeURIComponent(s.crumb)}`, { headers: { Cookie: s.cookie } });
     } catch (e) {
       if (attempt === 0 && /HTTP 401/.test(e.message)) {
         session = null;
@@ -37800,8 +37800,8 @@ var money = (v, currency) => has(v) ? `${v.raw.toLocaleString("en-US", { maximum
 var plain2 = (v) => has(v) ? String(Number(v.raw.toFixed(4))) : null;
 var percent = (v) => has(v) ? `${(v.raw * 100).toFixed(2)}%` : null;
 async function companyOverview(raw, analysis2) {
-  const day2 = analysisDate(analysis2), sym = companySymbol(raw);
-  if (isHistorical(day2)) return `Company profile and ratios for ${sym} are withheld for ${day2}: Yahoo Finance serves them only as they stand today. Market value, multiples, the 52-week range and the past year's income move with today's price, and even the name, sector and industry are today's; they would put later knowledge into an analysis of ${day2}. Use get_financial_statement, which serves a US filer's accounts as filed by then.`;
+  const day3 = analysisDate(analysis2), sym = companySymbol(raw);
+  if (isHistorical(day3)) return `Company profile and ratios for ${sym} are withheld for ${day3}: Yahoo Finance serves them only as they stand today. Market value, multiples, the 52-week range and the past year's income move with today's price, and even the name, sector and industry are today's; they would put later knowledge into an analysis of ${day3}. Use get_financial_statement, which serves a US filer's accounts as filed by then.`;
   const r = await summary(sym, "price,summaryProfile,summaryDetail,defaultKeyStatistics,financialData");
   const p = r.price ?? {}, d = r.summaryDetail ?? {}, k = r.defaultKeyStatistics ?? {}, f = r.financialData ?? {};
   const quote = p.currency, main = quote ? MAIN_UNIT[quote] ?? quote : void 0, reported = f.financialCurrency;
@@ -37838,11 +37838,11 @@ async function companyOverview(raw, analysis2) {
   ];
   const lines = fields.filter(([, v]) => v !== null && v !== void 0 && v !== "").map(([l, v]) => `${l}: ${v}`);
   if (!lines.length) throw new NoData(`Yahoo Finance has no profile or ratios for ${sym}`);
-  return [`Company profile and ratios for ${sym}, from Yahoo Finance as they stand today (${day2}). TTM is the last twelve months; a field Yahoo does not give is left out.`, "", ...lines].join("\n");
+  return [`Company profile and ratios for ${sym}, from Yahoo Finance as they stand today (${day3}). TTM is the last twelve months; a field Yahoo does not give is left out.`, "", ...lines].join("\n");
 }
 async function insiderTransactions(raw, analysis2, limit = 30) {
-  const day2 = analysisDate(analysis2), sym = companySymbol(raw);
-  if (isHistorical(day2)) return `Insider transactions for ${sym} are withheld for ${day2}: Yahoo Finance dates a trade by when it happened, not by when its filing made it public (up to two business days later), so it cannot show which trades were known on ${day2}.`;
+  const day3 = analysisDate(analysis2), sym = companySymbol(raw);
+  if (isHistorical(day3)) return `Insider transactions for ${sym} are withheld for ${day3}: Yahoo Finance dates a trade by when it happened, not by when its filing made it public (up to two business days later), so it cannot show which trades were known on ${day3}.`;
   const r = await summary(sym, "insiderTransactions");
   const list2 = (r.insiderTransactions?.transactions ?? []).filter((t) => has(t.startDate)).sort((a, b) => b.startDate.raw - a.startDate.raw).slice(0, limit);
   if (!list2.length) return `No insider transactions reported for ${sym} by Yahoo Finance. Many listings have none.`;
@@ -37878,9 +37878,9 @@ function yahooTable(j, kind, freq) {
   return { columns: ends, rows: lines.map((l) => ({ label: l.label, unit: l.unit, cells: ends.map((e) => l.values.get(e) ?? null) })) };
 }
 var epoch2 = (date5) => Math.floor(Date.parse(`${date5}T00:00:00Z`) / 1e3);
-async function yahooStatement(sym, kind, freq, day2) {
+async function yahooStatement(sym, kind, freq, day3) {
   const types = YAHOO_LINES[kind].map((n2) => freq + n2).join(",");
-  const j = await yahooJson(`/ws/fundamentals-timeseries/v1/finance/timeseries/${encodeURIComponent(sym)}?symbol=${encodeURIComponent(sym)}&type=${types}&period1=${epoch2(addDays(day2, -6 * 366))}&period2=${epoch2(addDays(day2, 1))}`);
+  const j = await yahooJson(`/ws/fundamentals-timeseries/v1/finance/timeseries/${encodeURIComponent(sym)}?symbol=${encodeURIComponent(sym)}&type=${types}&period1=${epoch2(addDays(day3, -6 * 366))}&period2=${epoch2(addDays(day3, 1))}`);
   return yahooTable(j, kind, freq);
 }
 function renderTable(t, head2, note) {
@@ -37905,21 +37905,21 @@ var reason = (e) => {
   return /sec\.gov refused \(HTTP 403\)/.test(m2) && m2.includes("[no contact email was sent]") ? `${m2}: ${ASK_FOR_EMAIL}` : m2;
 };
 async function financialStatement(raw, kind, freq, analysis2) {
-  const day2 = analysisDate(analysis2), sym = companySymbol(raw), title = STATEMENTS[kind].title;
+  const day3 = analysisDate(analysis2), sym = companySymbol(raw), title = STATEMENTS[kind].title;
   let secFailure;
   try {
-    const t = await secStatement(sym, kind, freq, day2);
+    const t = await secStatement(sym, kind, freq, day3);
     const q4 = kind !== "balance_sheet" && freq === "quarterly" ? " A fourth quarter is never derived: it is filed only inside the annual figure." : "";
-    return renderTable(t, `${title} for ${sym} (${freq}), as filed with the SEC on or before ${day2}`, `Each figure is the latest filing of it by that day; a restatement counts only from the day it was filed.${q4}`);
+    return renderTable(t, `${title} for ${sym} (${freq}), as filed with the SEC on or before ${day3}`, `Each figure is the latest filing of it by that day; a restatement counts only from the day it was filed.${q4}`);
   } catch (e) {
     secFailure = e;
   }
-  if (isHistorical(day2)) {
-    if (!(secFailure instanceof NoData)) throw new Unavailable(`the SEC, the only source of accounts as filed by ${day2}, could not answer (${reason(secFailure)})`);
-    return `${title} for ${sym} is withheld for ${day2}: ${reason(secFailure)}, and the other source, Yahoo Finance, dates a statement by the period it covers, not by when it was filed, so it cannot show which figures were public on ${day2}.`;
+  if (isHistorical(day3)) {
+    if (!(secFailure instanceof NoData)) throw new Unavailable(`the SEC, the only source of accounts as filed by ${day3}, could not answer (${reason(secFailure)})`);
+    return `${title} for ${sym} is withheld for ${day3}: ${reason(secFailure)}, and the other source, Yahoo Finance, dates a statement by the period it covers, not by when it was filed, so it cannot show which figures were public on ${day3}.`;
   }
   try {
-    const t = await yahooStatement(sym, kind, freq, day2);
+    const t = await yahooStatement(sym, kind, freq, day3);
     return renderTable(t, `${title} for ${sym} (${freq}), from Yahoo Finance as it stands today`, `Not from the SEC (${reason(secFailure)}). Yahoo gives money spent, such as capital expenditure, as a negative figure.`);
   } catch (e) {
     const both = `SEC: ${reason(secFailure)}; Yahoo Finance: ${e.message}`;
@@ -37928,8 +37928,8 @@ async function financialStatement(raw, kind, freq, analysis2) {
 }
 
 // src/tools/desk.ts
-import fs13 from "node:fs";
-import path16 from "node:path";
+import fs14 from "node:fs";
+import path17 from "node:path";
 
 // src/desk/holdings.ts
 import fs8 from "node:fs";
@@ -38178,11 +38178,11 @@ ${keep(reflection)}`;
   }
   rotate(blocks) {
     if (!this.maxResolved || this.maxResolved <= 0) return blocks;
-    const settled = blocks.filter((b) => {
+    const settled2 = blocks.filter((b) => {
       const e = parse3(b);
       return e && !e.pending;
     }).length;
-    let drop = settled - this.maxResolved;
+    let drop = settled2 - this.maxResolved;
     return drop <= 0 ? blocks : blocks.filter((b) => {
       const e = parse3(b);
       if (e && !e.pending && drop > 0) {
@@ -38196,10 +38196,10 @@ ${keep(reflection)}`;
    *  With `asOf`, only calls whose outcome was already known on that day - a past-dated run must not learn from its future. */
   pastContext(ticker, o = {}) {
     const { sameLimit = 5, otherLimit = 3 } = o;
-    let settled = this.load().filter((e) => !e.pending);
-    if (o.asOf) settled = settled.filter((e) => e.resolved && e.resolved <= o.asOf);
+    let settled2 = this.load().filter((e) => !e.pending);
+    if (o.asOf) settled2 = settled2.filter((e) => e.resolved && e.resolved <= o.asOf);
     const same = [], other = [];
-    for (const e of settled.reverse()) {
+    for (const e of settled2.reverse()) {
       if (e.ticker === ticker ? same.length < sameLimit : other.length < otherLimit) (e.ticker === ticker ? same : other).push(e);
       if (same.length >= sameLimit && other.length >= otherLimit) break;
     }
@@ -38359,15 +38359,15 @@ function stepsFor(analysts, debateRounds, riskRounds) {
 function buildPlan(root, req, ws = workspaceOf(root)) {
   if (!readContactEmail(root)) throw new NeedsEmail(ASK_FOR_EMAIL);
   const s = readSettings(root), dir = ws.dir;
-  const symbol4 = safeSymbol(req.symbol), day2 = analysisDate(req.analysisDate), notes = [];
+  const symbol4 = safeSymbol(req.symbol), day3 = analysisDate(req.analysisDate), notes = [];
   const kind = kindOf(req.symbol, symbol4);
-  if (req.restart) deleteRun(dir, symbol4, day2);
-  const done = progress(dir, symbol4, day2), saved = savedPlan(dir, symbol4, day2);
+  if (req.restart) deleteRun(dir, symbol4, day3);
+  const done = progress(dir, symbol4, day3), saved = savedPlan(dir, symbol4, day3);
   const resumed = Object.keys(done).length > 0 && !!saved?.analysts;
   let analysts, debateRounds, riskRounds, language;
   if (resumed) {
     ({ analysts, debateRounds, riskRounds, language } = saved);
-    notes.push(`Resuming the run started earlier for ${symbol4} on ${day2}, with its original plan (${analysts.join(", ")}; ${debateRounds} debate and ${riskRounds} risk round(s); ${language}). To start over, plan again with restart.`);
+    notes.push(`Resuming the run started earlier for ${symbol4} on ${day3}, with its original plan (${analysts.join(", ")}; ${debateRounds} debate and ${riskRounds} risk round(s); ${language}). To start over, plan again with restart.`);
   } else {
     if (req.analysts) {
       const unknown2 = req.analysts.filter((a) => !ANALYSTS.includes(a));
@@ -38387,10 +38387,10 @@ function buildPlan(root, req, ws = workspaceOf(root)) {
     language = req.language !== void 0 ? languageName(req.language) : s.analysis.outputLanguage;
   }
   const benchmark = resolveBenchmark(symbol4, s.scoring);
-  const plan = { symbol: symbol4, analysisDate: day2, kind, analysts, debateRounds, riskRounds, language, managerModel: s.analysis.managerModel, benchmark, holdingDays: s.scoring.holdingPeriodDays, steps: [], notes };
+  const plan = { symbol: symbol4, analysisDate: day3, kind, analysts, debateRounds, riskRounds, language, managerModel: s.analysis.managerModel, benchmark, holdingDays: s.scoring.holdingPeriodDays, steps: [], notes };
   plan.steps = stepsFor(analysts, debateRounds, riskRounds).map((st) => ({ ...st, done: (done[st.section] ?? 0) >= st.turn }));
-  if (!resumed) startRun(dir, symbol4, day2, plan);
-  const lessons = journalOf(root, ws).pastContext(symbol4, isHistorical(day2) ? { asOf: day2 } : {});
+  if (!resumed) startRun(dir, symbol4, day3, plan);
+  const lessons = journalOf(root, ws).pastContext(symbol4, isHistorical(day3) ? { asOf: day3 } : {});
   return { plan, holdings: renderHoldings(readHoldings(deskDataDir(root)), symbol4), lessons, resumed };
 }
 function renderPlan({ plan: p, holdings, lessons, resumed }) {
@@ -38416,35 +38416,124 @@ ${lessons}` : "Lessons from past calls: none yet (no earlier call has been settl
   ].join("\n");
 }
 
-// src/terminal/store.ts
+// src/desk/queue.ts
 import fs11 from "node:fs";
 import path12 from "node:path";
-var read = (file5, ok) => {
-  try {
-    const v = JSON.parse(fs11.readFileSync(file5, "utf8"));
-    return Array.isArray(v) ? v.filter(ok) : [];
-  } catch {
-    return [];
+var DEPTHS = { shallow: 1, medium: 3, deep: 5 };
+var isDepth = (v) => typeof v === "string" && Object.hasOwn(DEPTHS, v);
+var MAX_FINISHED = 20;
+var STALE_MS2 = 2 * 60 * 6e4;
+var STALE_REASON = "the run did not finish (it stopped, or took over two hours): press Retry";
+var QueueRefusal = class extends Error {
+  constructor(code, message) {
+    super(message);
+    this.code = code;
   }
+  code;
 };
-function change2(file5, edit, ok) {
-  fs11.mkdirSync(path12.dirname(file5), { recursive: true });
+var queueFile = (dir) => path12.join(dir, "queue.json");
+var doorbellFile = (dir) => path12.join(dir, "doorbell.json");
+var iso = (v) => typeof v === "string" && v.length <= 40 && !Number.isNaN(Date.parse(v)) ? v : void 0;
+var day = (v) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : void 0;
+var words = (v, max) => {
+  const s = typeof v === "string" ? v.replace(/<[^>]*>/g, "").replace(/[<>]/g, "").replace(/\s+/g, " ").trim().slice(0, max) : "";
+  return s || void 0;
+};
+var STATES = ["waiting", "running", "done", "failed"];
+function itemOf(v) {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+  const r = v;
+  let symbol4;
+  try {
+    symbol4 = safeSymbol(String(r.symbol ?? ""));
+  } catch {
+    return null;
+  }
+  const requestedAt = iso(r.requestedAt);
+  if (!requestedAt) return null;
+  const state = STATES.includes(r.state) ? r.state : "waiting";
+  const out = { symbol: symbol4, requestedAt, state };
+  if (isDepth(r.depth)) out.depth = r.depth;
+  const date5 = day(r.date), startedAt = iso(r.startedAt), endedAt = iso(r.endedAt), rating = words(r.rating, 30), reason2 = words(r.reason, 300);
+  if (date5) out.date = date5;
+  if (startedAt) out.startedAt = startedAt;
+  if (endedAt) out.endedAt = endedAt;
+  if (state === "done" && rating) out.rating = rating;
+  if (state === "failed") out.reason = reason2 ?? "no reason was given";
+  return out;
+}
+function settled(item, now) {
+  if (item.state !== "running") return item;
+  const started = Date.parse(item.startedAt ?? item.requestedAt);
+  return now.getTime() - started > STALE_MS2 ? { ...item, state: "failed", reason: STALE_REASON, endedAt: now.toISOString() } : item;
+}
+function load2(dir, now) {
+  let raw = [];
+  try {
+    raw = JSON.parse(fs11.readFileSync(queueFile(dir), "utf8"));
+  } catch {
+  }
+  const seen = /* @__PURE__ */ new Set(), out = [];
+  for (const v of Array.isArray(raw) ? raw : []) {
+    const item = itemOf(v);
+    if (!item || seen.has(item.symbol)) continue;
+    seen.add(item.symbol);
+    out.push(settled(item, now));
+  }
+  return out;
+}
+var open2 = (i) => i.state === "waiting" || i.state === "running";
+function trimmed(list2) {
+  const finished = list2.filter((i) => !open2(i)).sort((a, b) => (b.endedAt ?? "").localeCompare(a.endedAt ?? ""));
+  const keep2 = new Set(finished.slice(0, MAX_FINISHED));
+  return list2.filter((i) => open2(i) || keep2.has(i));
+}
+function change2(dir, now, edit) {
+  const file5 = queueFile(dir);
+  fs11.mkdirSync(dir, { recursive: true });
   return withLock(file5, () => {
-    const next = edit(read(file5, ok));
-    writeWhole(file5, JSON.stringify(next, null, 2) + "\n");
-    return next;
+    const { list: list2, result } = edit(load2(dir, now));
+    writeWhole(file5, JSON.stringify(trimmed(list2), null, 2) + "\n");
+    return result;
   });
 }
-var isWatch = (v) => !!v && typeof v.symbol === "string" && typeof v.favourite === "boolean";
-var isQueued = (v) => !!v && typeof v.symbol === "string" && typeof v.requestedAt === "string";
-var watchFile = (dir) => path12.join(dir, "watchlist.json");
-var queueFile = (dir) => path12.join(dir, "queue.json");
-var readWatchlist = (dir) => read(watchFile(dir), isWatch);
-var readQueue = (dir) => read(queueFile(dir), isQueued);
-function dequeue(dir, raw) {
+var readQueue = (dir, now = /* @__PURE__ */ new Date()) => load2(dir, now);
+var waitingIn = (list2) => list2.filter((i) => i.state === "waiting");
+function startItem(dir, raw, date5, now = /* @__PURE__ */ new Date()) {
   const symbol4 = safeSymbol(raw);
-  return change2(queueFile(dir), (list2) => list2.filter((q) => q.symbol !== symbol4), isQueued);
+  return change2(dir, now, (list2) => {
+    const item = list2.find((i) => i.symbol === symbol4);
+    if (!item) throw new QueueRefusal("NOT_ON_LIST", `${symbol4} is not on the waiting list`);
+    const busy = list2.find((i) => i.state === "running" && i.symbol !== symbol4);
+    if (busy) throw new QueueRefusal("BUSY", `${busy.symbol} is being analysed now: one stock runs at a time`);
+    if (item.state === "running") return { list: list2, result: item };
+    if (item.state !== "waiting") throw new QueueRefusal("NOT_WAITING", `${symbol4} is not waiting (it is ${item.state}): the person presses Retry to ask again`);
+    const started = { ...item, state: "running", date: date5, startedAt: now.toISOString() };
+    delete started.endedAt;
+    delete started.rating;
+    delete started.reason;
+    return { list: list2.map((i) => i === item ? started : i), result: started };
+  });
 }
+function finishItem(dir, raw, outcome, now = /* @__PURE__ */ new Date()) {
+  const symbol4 = safeSymbol(raw);
+  return change2(dir, now, (list2) => {
+    const item = list2.find((i) => i.symbol === symbol4);
+    if (!item) throw new QueueRefusal("NOT_ON_LIST", `${symbol4} is not on the waiting list`);
+    if (!open2(item)) throw new QueueRefusal("FINISHED", `${symbol4} is already ${item.state}`);
+    const finished = "rating" in outcome ? { ...item, state: "done", rating: words(outcome.rating, 30) ?? "recorded", endedAt: now.toISOString() } : { ...item, state: "failed", reason: words(outcome.reason, 300) ?? "no reason was given", endedAt: now.toISOString() };
+    if (finished.state === "done") delete finished.reason;
+    else delete finished.rating;
+    return { list: list2.map((i) => i === item ? finished : i), result: finished };
+  });
+}
+function ringDoorbell(dir, why, now = /* @__PURE__ */ new Date()) {
+  const bell = { at: now.toISOString(), waiting: waitingIn(readQueue(dir, now)).length, why };
+  fs11.mkdirSync(dir, { recursive: true });
+  writeWhole(doorbellFile(dir), JSON.stringify(bell, null, 2) + "\n");
+  return bell;
+}
+var LISTENER_FRESH_MS = 3 * 6e4;
 
 // src/desk/settle.ts
 var pct2 = (v) => `${v >= 0 ? "+" : "-"}${(Math.abs(v) * 100).toFixed(1)}%`;
@@ -38518,11 +38607,11 @@ async function runningOn(root, timeoutMs = 700) {
 }
 async function openDashboard(root, opts = {}) {
   const already = await runningOn(root);
-  const words = (port, started) => `The dashboard ${started ? "has started and opened" : "was already running and has opened"} in the person's browser (http://127.0.0.1:${port}/ , this computer only). The page it opened is the one to use: it was given the dashboard's key, and the address typed into another browser opens a page without one. It stays open until the person presses Stop on it. Everything on it - connecting Robinhood, choosing accounts, the trading switch and caps, and every order's Review, Place and Confirm - is the person's own to press: never press it for them or reach the page yourself.`;
+  const words2 = (port, started) => `The dashboard ${started ? "has started and opened" : "was already running and has opened"} in the person's browser (http://127.0.0.1:${port}/ , this computer only). The page it opened is the one to use: it was given the dashboard's key, and the address typed into another browser opens a page without one. It stays open until the person presses Stop on it. Everything on it - connecting Robinhood, choosing accounts, the trading switch and caps, and every order's Review, Place and Confirm - is the person's own to press: never press it for them or reach the page yourself.`;
   if (already) {
     if (!opts.noOpen) spawn(process.execPath, [path13.join(root, "dist", "terminal.mjs")], { cwd: root, detached: true, stdio: "ignore", windowsHide: true }).on("error", () => {
     }).unref();
-    return words(already, false);
+    return words2(already, false);
   }
   const child = spawn(process.execPath, [path13.join(root, "dist", "terminal.mjs"), ...opts.noOpen ? ["--no-open"] : []], { cwd: root, detached: true, stdio: "ignore", windowsHide: true });
   child.on("error", () => {
@@ -38531,14 +38620,14 @@ async function openDashboard(root, opts = {}) {
   const end = Date.now() + (opts.waitMs ?? 15e3);
   while (Date.now() < end) {
     const port = await runningOn(root, 400);
-    if (port) return words(port, true);
+    if (port) return words2(port, true);
     await new Promise((r) => setTimeout(r, 300));
   }
   return "DATA_UNAVAILABLE: the dashboard did not answer within 15 seconds. Ask the person to run /terminal, or `node dist/terminal.mjs` in this folder, and to tell you what it prints.";
 }
 
 // src/desk/routine.ts
-import path15 from "node:path";
+import path16 from "node:path";
 
 // src/desk/orders.ts
 import fs12 from "node:fs";
@@ -38561,21 +38650,37 @@ function readOrders(dir) {
 }
 var ordersOn = (dir, now) => readOrders(dir).filter((o) => marketDay(new Date(o.at)) === marketDay(now));
 
+// src/terminal/store.ts
+import fs13 from "node:fs";
+import path15 from "node:path";
+var read = (file5, ok) => {
+  try {
+    const v = JSON.parse(fs13.readFileSync(file5, "utf8"));
+    return Array.isArray(v) ? v.filter(ok) : [];
+  } catch {
+    return [];
+  }
+};
+var isWatch = (v) => !!v && typeof v.symbol === "string" && typeof v.favourite === "boolean";
+var watchFile = (dir) => path15.join(dir, "watchlist.json");
+var readWatchlist = (dir) => read(watchFile(dir), isWatch);
+
 // src/desk/routine.ts
 var DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-var weekday = (day2) => DAYS[(/* @__PURE__ */ new Date(`${day2}T12:00:00Z`)).getUTCDay()];
+var weekday = (day3) => DAYS[(/* @__PURE__ */ new Date(`${day3}T12:00:00Z`)).getUTCDay()];
 function morningList(dir, today2, max) {
-  const called = new Set(new Journal(path15.join(dir, "journal.md")).load().filter((e) => e.date === today2).map((e) => e.ticker));
-  const wanted = [], seen = /* @__PURE__ */ new Set();
-  const add = (symbol4, why) => {
+  const called = new Set(new Journal(path16.join(dir, "journal.md")).load().filter((e) => e.date === today2).map((e) => e.ticker));
+  const queue2 = readQueue(dir), running = queue2.find((q) => q.state === "running")?.symbol ?? null;
+  const wanted = [], seen = new Set(running ? [running] : []);
+  const add = (symbol4, why, queued) => {
     if (!seen.has(symbol4) && !called.has(symbol4)) {
       seen.add(symbol4);
-      wanted.push({ symbol: symbol4, why });
+      wanted.push({ symbol: symbol4, why, queued });
     }
   };
-  for (const q of readQueue(dir)) add(q.symbol, "asked for on the dashboard");
-  for (const w of readWatchlist(dir)) if (w.favourite && !w.symbol.startsWith("^")) add(w.symbol, "a starred watchlist stock");
-  return { analyse: wanted.slice(0, max), later: wanted.slice(max).map((w) => w.symbol), calledToday: [...called] };
+  for (const q of queue2) if (q.state === "waiting") add(q.symbol, `asked for on the dashboard, ${q.depth ?? "the settings'"} depth`, true);
+  for (const w of readWatchlist(dir)) if (w.favourite && !w.symbol.startsWith("^")) add(w.symbol, "a starred watchlist stock", false);
+  return { analyse: wanted.slice(0, max), later: wanted.slice(max).map((w) => w.symbol), calledToday: [...called], running };
 }
 var holdingsLine = (dir) => {
   const h = readHoldings(dir);
@@ -38583,26 +38688,28 @@ var holdingsLine = (dir) => {
   return h.source === "robinhood" ? `Holdings: as the dashboard last read them from Robinhood, on ${h.savedOn}. The team never reads Robinhood itself; for fresher figures the person presses "Refresh from Robinhood" on the dashboard.` : `Holdings: as the person gave them, on ${h.savedOn}.`;
 };
 function morningBrief(dir, today2, max) {
-  const day2 = weekday(today2), weekend = day2 === "Saturday" || day2 === "Sunday";
+  const day3 = weekday(today2), weekend = day3 === "Saturday" || day3 === "Sunday";
   const m2 = morningList(dir, today2, max);
-  const lines = [`MORNING ROUTINE for ${day2} ${today2}.`];
-  if (weekend) lines.push(`US markets do not open on a ${day2}: score past calls (step 1), then stop and say so. Analyse nothing unless the person asked for it in words.`);
+  const lines = [`MORNING ROUTINE for ${day3} ${today2}.`];
+  if (weekend) lines.push(`US markets do not open on a ${day3}: score past calls (step 1), then stop and say so. Analyse nothing unless the person asked for it in words.`);
   lines.push("", "1. Score past calls first: list_settlements, then record_outcome with a lesson for each READY call (the /settle playbook).");
+  if (m2.running) lines.push("", `   ${m2.running} is being analysed now by another run: leave it alone.`);
   if (!m2.analyse.length) lines.push("", "2. Nothing to analyse: no stock is waiting on the dashboard and no starred watchlist stock is without a call today. Say so.");
   else {
-    lines.push("", `2. Analyse, one after another, in this order (${m2.analyse.length} of at most ${max} a morning), each by the /analyse playbook with today's date and the settings' depth:`);
+    lines.push("", `2. Analyse, one after another, in this order (${m2.analyse.length} of at most ${max} a morning), each by the /analyse playbook with today's date:`);
     m2.analyse.forEach((a, i) => lines.push(`   ${i + 1}. ${a.symbol} (${a.why})`));
-    lines.push("   For a stock asked for on the dashboard, call finish_queue_item once its call is recorded.");
+    if (m2.analyse.some((a) => a.queued)) lines.push("   A stock asked for on the dashboard is run as the /analyse playbook's waiting list says: start_queue_item first (it gives the depth), finish_queue_item once its call is recorded or with why it failed. A starred stock uses the settings' depth.");
   }
   if (m2.later.length) lines.push(`   Left for another morning, over the limit of ${max}: ${m2.later.join(", ")}.`);
   if (m2.calledToday.length) lines.push(`   Already called today, so not analysed again: ${m2.calledToday.join(", ")}.`);
+  if (m2.analyse.some((a) => a.queued) || m2.later.length) lines.push("   Last, call end_queue_run once: stocks still waiting on the dashboard get another run.");
   lines.push("", `3. ${holdingsLine(dir)}`);
   lines.push("", `4. Finish with a short plain list: each new call (stock, rating, one sentence of its executive summary), anything skipped and why, and any data that was unavailable. Then: decide on the dashboard ("Decide\u2026" on a call); only the person's own Confirm there places an order. Not investment advice.`);
   lines.push("", "No one may be watching: do not wait for an answer. If a step needs the person (for example no contact email is saved), skip what depends on it and say so at the end.");
   return lines.join("\n");
 }
 function eveningBrief(dir, today2, now) {
-  const calls = new Journal(path15.join(dir, "journal.md")).load();
+  const calls = new Journal(path16.join(dir, "journal.md")).load();
   const todays = calls.filter((e) => e.date === today2), pending = calls.filter((e) => e.pending).length;
   const orders = ordersOn(dir, now);
   const lines = [`EVENING WRAP-UP for ${weekday(today2)} ${today2}.`, "", "1. Score what is ready: list_settlements, then record_outcome with a lesson for each READY call (the /settle playbook).", ""];
@@ -38625,7 +38732,7 @@ function eveningBrief(dir, today2, now) {
 // src/tools/desk.ts
 var text = (t) => ({ content: [{ type: "text", text: t }] });
 var symbol2 = external_exports.string().min(1).max(20).describe("The ticker as the plan gives it");
-var day = external_exports.string().describe("The analysis date, YYYY-MM-DD");
+var day2 = external_exports.string().describe("The analysis date, YYYY-MM-DD");
 var DEBATES2 = ["investment_debate", "risk_debate"];
 async function act(run) {
   try {
@@ -38639,10 +38746,10 @@ async function act(run) {
 function registerDeskTools(server, root) {
   const dir = deskDataDir(root);
   const write = { readOnlyHint: false, openWorldHint: false };
-  const activeFile = path16.join(dir, "backtest", "active.json"), IDLE_MS = 2 * 36e5;
+  const activeFile = path17.join(dir, "backtest", "active.json"), IDLE_MS = 2 * 36e5;
   const getSweep = () => {
     try {
-      const a = JSON.parse(fs13.readFileSync(activeFile, "utf8"));
+      const a = JSON.parse(fs14.readFileSync(activeFile, "utf8"));
       if (typeof a.sweep === "string" && SWEEP_ID.test(a.sweep) && typeof a.at === "number" && Date.now() - a.at < IDLE_MS) return a.sweep;
     } catch {
     }
@@ -38650,10 +38757,10 @@ function registerDeskTools(server, root) {
   };
   const setSweep = (id) => {
     if (id === null) {
-      fs13.rmSync(activeFile, { force: true });
+      fs14.rmSync(activeFile, { force: true });
       return;
     }
-    fs13.mkdirSync(path16.dirname(activeFile), { recursive: true });
+    fs14.mkdirSync(path17.dirname(activeFile), { recursive: true });
     writeWhole(activeFile, JSON.stringify({ sweep: id, at: Date.now() }));
   };
   const ws = () => {
@@ -38666,7 +38773,7 @@ function registerDeskTools(server, root) {
     description: "Draw up the plan for analysing a stock on a date, before any agent speaks: the instrument, the analysts that run, the debate rounds, the report language, the index the call will be judged against, what the person holds, the lessons from past calls, and - for a run that stopped half way - the next step. Refused with NEEDS_EMAIL until the person has given their email. Call it first, and follow it.",
     inputSchema: {
       symbol: symbol2,
-      analysis_date: day,
+      analysis_date: day2,
       analysts: external_exports.array(external_exports.enum(["market", "sentiment", "news", "fundamentals"])).optional().describe("Only these analysts; the settings' when left out"),
       debate_rounds: external_exports.number().int().min(1).max(5).optional().describe("Rounds of bull and bear; the settings' when left out"),
       risk_rounds: external_exports.number().int().min(1).max(5).optional().describe("Rounds of the three risk voices; the settings' when left out"),
@@ -38679,7 +38786,7 @@ function registerDeskTools(server, root) {
   server.registerTool("save_run_section", {
     title: "Save a run section",
     description: `Save what you wrote for your step of an analysis, so the next agent reads it from the desk and a stopped run can resume. section is one of ${SECTIONS.join(", ")}. A debate turn (bull, bear, aggressive, conservative, neutral) is added; any other section replaces the earlier text.`,
-    inputSchema: { symbol: symbol2, analysis_date: day, section: external_exports.enum(SECTIONS), text: external_exports.string().min(1).max(6e4) },
+    inputSchema: { symbol: symbol2, analysis_date: day2, section: external_exports.enum(SECTIONS), text: external_exports.string().min(1).max(6e4) },
     annotations: write
   }, async (a) => act(() => {
     const d = analysisDate(a.analysis_date), turns = saveSection(ws().dir, a.symbol, d, a.section, a.text);
@@ -38688,7 +38795,7 @@ function registerDeskTools(server, root) {
   server.registerTool("read_run", {
     title: "Read a run",
     description: `Read what the team has written so far for a stock and day. Without sections it lists which sections exist and how many turns each holds. With sections it returns their text; ${DEBATES2.join(" and ")} give a whole debate in the order spoken. A section not written yet is said to be missing, never blank.`,
-    inputSchema: { symbol: symbol2, analysis_date: day, sections: external_exports.array(external_exports.enum([...SECTIONS, ...DEBATES2])).optional() },
+    inputSchema: { symbol: symbol2, analysis_date: day2, sections: external_exports.array(external_exports.enum([...SECTIONS, ...DEBATES2])).optional() },
     annotations: { readOnlyHint: true, openWorldHint: false }
   }, async (a) => act(() => {
     const d = analysisDate(a.analysis_date);
@@ -38699,7 +38806,7 @@ function registerDeskTools(server, root) {
   server.registerTool("write_report", {
     title: "Write the report",
     description: "Assemble the finished report of an analysis from everything the team saved - the analysts, the debates, the manager, the trader, the risk voices, the decision - into one markdown page in the run's folder. Returns where it is. Call it after the portfolio manager's decision is saved.",
-    inputSchema: { symbol: symbol2, analysis_date: day },
+    inputSchema: { symbol: symbol2, analysis_date: day2 },
     annotations: write
   }, async (a) => act(() => {
     const d = analysisDate(a.analysis_date), sym = safeSymbol(a.symbol), plan = savedPlan(ws().dir, sym, d);
@@ -38714,7 +38821,7 @@ Rating: ${rating}`;
   server.registerTool("record_decision", {
     title: "Record the decision",
     description: "Put the portfolio manager's saved decision in the journal as a pending call, to be scored later against its market index. The text is the one saved in the run, so the journal always matches the report. One call per stock and day: a repeat is ignored. Pass the rating the decision states; without one it is read from the text, and a decision with no readable rating is recorded as Needs review.",
-    inputSchema: { symbol: symbol2, analysis_date: day, rating: external_exports.enum(RATINGS).optional() },
+    inputSchema: { symbol: symbol2, analysis_date: day2, rating: external_exports.enum(RATINGS).optional() },
     annotations: write
   }, async (a) => act(() => {
     const d = analysisDate(a.analysis_date), sym = safeSymbol(a.symbol);
@@ -38734,7 +38841,7 @@ Rating: ${rating}`;
   server.registerTool("record_outcome", {
     title: "Settle a call",
     description: "Settle one pending call whose window has finished: the desk measures the outcome again itself and keeps it with your lesson. Give only the lesson - 2 to 4 plain sentences naming what the alpha shows, what part of the thesis it supports or undercuts, and one thing to do next time. Never pass or invent a number.",
-    inputSchema: { symbol: symbol2, trade_date: day, lesson: external_exports.string().min(1).max(1200) },
+    inputSchema: { symbol: symbol2, trade_date: day2, lesson: external_exports.string().min(1).max(1200) },
     annotations: { readOnlyHint: false, openWorldHint: true }
   }, async (a) => act(() => settleOne(journalOf(root, ws()), readSettings(root).scoring, safeSymbol(a.symbol), a.trade_date, a.lesson)));
   server.registerTool("start_backtest", {
@@ -38742,8 +38849,8 @@ Rating: ${rating}`;
     description: "Lay out a backtest: the team is run over every stock on every date from start to end (every few days) and the calls are scored later against the market index. From now until end_backtest every desk tool records into this sweep's own journal and runs, so the live journal and its lessons are untouched. Repeat the call with the same sweep_id to resume: cells already recorded are skipped. Every cell is a full team run, so tell the person the number of cells before running any.",
     inputSchema: {
       symbols: external_exports.array(symbol2).min(1).max(10),
-      start_date: day,
-      end_date: day,
+      start_date: day2,
+      end_date: day2,
       every_days: external_exports.number().int().min(1).max(60).optional().describe("Days between analysis dates; 7 when left out"),
       sweep_id: external_exports.string().max(40).optional().describe("Name of the sweep, to resume it; made from the time when left out")
     },
@@ -38752,10 +38859,10 @@ Rating: ${rating}`;
     if (!readContactEmail(root)) throw new NeedsEmail(ASK_FOR_EMAIL);
     const every = a.every_days ?? 7, dates = iterGrid(a.start_date, a.end_date, every), grid = cells(a.symbols, dates);
     const id = a.sweep_id ?? (/* @__PURE__ */ new Date()).toISOString().replace(/\D/g, "").slice(0, 14), w = workspaceOf(root, id);
-    fs13.mkdirSync(w.dir, { recursive: true });
+    fs14.mkdirSync(w.dir, { recursive: true });
     const recorded = new Set(journalOf(root, w).load().map((e) => `${e.ticker}|${e.date}`));
     const todo = grid.filter((c) => !recorded.has(`${c.symbol}|${c.date}`));
-    writeWhole(path16.join(w.dir, "sweep.json"), JSON.stringify({ symbols: [...new Set(grid.map((c) => c.symbol))], dates, every, cells: grid.length }));
+    writeWhole(path17.join(w.dir, "sweep.json"), JSON.stringify({ symbols: [...new Set(grid.map((c) => c.symbol))], dates, every, cells: grid.length }));
     setSweep(id);
     const symbols = new Set(grid.map((c) => c.symbol)).size;
     return [
@@ -38787,10 +38894,10 @@ Rating: ${rating}`;
     const id = a.sweep_id ?? getSweep();
     if (!id) throw new Error("no backtest is running: name the sweep to score");
     const w = workspaceOf(root, id);
-    if (!fs13.existsSync(path16.join(w.dir, "journal.md"))) throw new Error(`sweep ${id} has no recorded calls yet`);
+    if (!fs14.existsSync(path17.join(w.dir, "journal.md"))) throw new Error(`sweep ${id} has no recorded calls yet`);
     let meta3 = "";
     try {
-      const m2 = JSON.parse(fs13.readFileSync(path16.join(w.dir, "sweep.json"), "utf8"));
+      const m2 = JSON.parse(fs14.readFileSync(path17.join(w.dir, "sweep.json"), "utf8"));
       meta3 = ` of ${m2.cells} planned`;
     } catch {
     }
@@ -38805,31 +38912,81 @@ ${renderSummary(summarize(entries))}`;
     inputSchema: { kind: external_exports.enum(["morning", "evening"]).describe("morning: before the open; evening: after the close") },
     annotations: { readOnlyHint: true, openWorldHint: false }
   }, async (a) => act(() => {
-    const day2 = today();
-    return a.kind === "morning" ? morningBrief(dir, day2, readSettings(root).routines.maxAnalyses) : eveningBrief(dir, day2, /* @__PURE__ */ new Date());
+    const day3 = today();
+    return a.kind === "morning" ? morningBrief(dir, day3, readSettings(root).routines.maxAnalyses) : eveningBrief(dir, day3, /* @__PURE__ */ new Date());
   }));
   server.registerTool("open_dashboard", {
     title: "Open the dashboard",
     description: "Start the Trading Agents dashboard on this computer and open it in the person's browser, or open the one already running. Use when the person asks to see the dashboard, their accounts, the markets or the desk's calls. It only starts the page; everything on it, Robinhood and any order included, is the person's own to press.",
     annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false }
   }, async () => act(() => openDashboard(root)));
+  const perRun = () => readSettings(root).routines.maxAnalyses;
+  const depthWords = (d) => d ? `${d} (debate_rounds ${DEPTHS[d]} and risk_rounds ${DEPTHS[d]})` : "the settings' depth (leave the rounds out)";
+  const called = (sym, d) => new Journal(path17.join(dir, "journal.md")).load().find((e) => e.ticker === sym && e.date === d);
+  const queueAct = (run) => act(() => {
+    try {
+      return run();
+    } catch (e) {
+      if (e instanceof QueueRefusal) return `${e.code}: ${e.message}.`;
+      throw e;
+    }
+  });
   server.registerTool("read_queue", {
-    title: "Analyses waiting",
-    description: "The stocks the person asked the desk to analyse from the dashboard, oldest first. /analyse with no ticker runs these. Read-only.",
+    title: "The waiting list",
+    description: "The stocks the person asked the desk to analyse from the dashboard: those waiting, in the order to run them, each with the depth asked, any being analysed now, and how many one run may analyse. /analyse with no ticker runs them. Read-only.",
     annotations: { readOnlyHint: true, openWorldHint: false }
   }, async () => act(() => {
-    const q = readQueue(dir);
-    return q.length ? `${q.length} analysis request(s) waiting, oldest first:
-${q.map((i, n2) => `${n2 + 1}. ${i.symbol} (asked ${i.requestedAt.slice(0, 16).replace("T", " ")} UTC)`).join("\n")}` : "Nothing is waiting: the person has not asked for any analysis from the dashboard.";
+    const list2 = readQueue(dir), waiting = waitingIn(list2), running = list2.find((i) => i.state === "running");
+    const lines = [];
+    if (running) lines.push(`Being analysed now: ${running.symbol} (started ${running.startedAt?.slice(11, 16) ?? "?"} UTC). One stock runs at a time: if this run did not start it, stop and say so.`);
+    if (!waiting.length) lines.push("Nothing is waiting: the person has not asked for any analysis from the dashboard.");
+    else {
+      lines.push(`${waiting.length} waiting, in the order to run them; one run analyses at most ${perRun()}:`);
+      waiting.forEach((i, n2) => lines.push(`${n2 + 1}. ${i.symbol}, depth ${depthWords(i.depth)}, asked ${i.requestedAt.slice(0, 16).replace("T", " ")} UTC`));
+      lines.push("For each, in order: start_queue_item, the analysis, then finish_queue_item. At the end, end_queue_run.");
+    }
+    return lines.join("\n");
+  }));
+  server.registerTool("start_queue_item", {
+    title: "Start a waiting analysis",
+    description: "Mark a stock from the waiting list as being analysed now, before its analysis starts, so the dashboard shows it running. It answers the date and the debate rounds to plan with. BUSY means another stock is being analysed: stop the run. ALREADY means it was called today: it is marked done, take the next.",
+    inputSchema: { symbol: symbol2 },
+    annotations: write
+  }, async (a) => queueAct(() => {
+    if (ws().sweep) return `BUSY: a backtest sweep (${ws().sweep}) is running; the waiting list runs only on the live desk. Stop and say so.`;
+    const sym = safeSymbol(a.symbol), d = today(), done = called(sym, d);
+    if (done) {
+      finishItem(dir, sym, { rating: done.rating });
+      return `ALREADY: ${sym} was already called today (${done.rating}); it is marked done. Take the next.`;
+    }
+    const item = startItem(dir, sym, d);
+    return `START: ${sym} is marked as being analysed. Plan it with analysis date ${d}, depth ${depthWords(item.depth)}. When its call is recorded, call finish_queue_item; if it cannot be finished, call finish_queue_item with failed_because.`;
   }));
   server.registerTool("finish_queue_item", {
-    title: "Mark a waiting analysis done",
-    description: "Take a stock off the waiting list once its analysis has been run and recorded (or the person no longer wants it).",
-    inputSchema: { symbol: symbol2 },
-    annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false }
-  }, async (a) => act(() => {
-    const left = dequeue(dir, a.symbol);
-    return `Taken off the waiting list. ${left.length} left.`;
+    title: "Finish a waiting analysis",
+    description: "Mark a stock from the waiting list as done once its call is recorded (the rating is taken from the journal), or as failed with failed_because: one plain sentence the person reads on the dashboard, saying what went wrong and what to do.",
+    inputSchema: { symbol: symbol2, failed_because: external_exports.string().min(3).max(300).optional() },
+    annotations: write
+  }, async (a) => queueAct(() => {
+    const sym = safeSymbol(a.symbol);
+    if (a.failed_because) {
+      finishItem(dir, sym, { reason: a.failed_because });
+      return `Marked failed: ${sym}. The person sees why on the dashboard and can press Retry.`;
+    }
+    const item = readQueue(dir).find((i) => i.symbol === sym), call = called(sym, item?.date ?? today());
+    if (!call) throw new Error(`no call for ${sym} on ${item?.date ?? today()} is recorded yet: call record_decision first, or pass failed_because`);
+    finishItem(dir, sym, { rating: call.rating });
+    return `Marked done: ${sym}, ${call.rating}. The dashboard shows it.`;
+  }));
+  server.registerTool("end_queue_run", {
+    title: "End a run of the waiting list",
+    description: "Call once when a run of the waiting list stops. If stocks are still waiting (the run reached its limit, or stopped early), it asks whoever listens on this computer for another run. Answers one line to end the run with.",
+    annotations: write
+  }, async () => act(() => {
+    const list2 = readQueue(dir), waiting = waitingIn(list2).length;
+    const doneN = list2.filter((i) => i.state === "done").length, failedN = list2.filter((i) => i.state === "failed").length;
+    if (waiting) ringDoorbell(dir, "more");
+    return `${waiting ? `${waiting} still waiting: another run was asked for.` : "Nothing is waiting."} On the dashboard's list: ${doneN} done, ${failedN} failed.`;
   }));
   server.registerTool("set_holdings", {
     title: "Save what the person holds",
@@ -38991,6 +39148,6 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root) {
 // src/tools/main.ts
 if (process.argv.includes("--check")) console.log(await deskCheck());
 else {
-  configure({ spacingMs: 250, cacheDir: path17.join(deskDataDir(process.cwd()), "cache") });
+  configure({ spacingMs: 250, cacheDir: path18.join(deskDataDir(process.cwd()), "cache") });
   await deskServer().connect(new StdioServerTransport());
 }

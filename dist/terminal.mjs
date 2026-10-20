@@ -3263,8 +3263,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path17) {
-      let input = path17;
+    function removeDotSegments(path19) {
+      let input = path19;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3673,8 +3673,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path17 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path17 && path17 !== "/" ? path17 : void 0;
+        const path19 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path19 && path19 !== "/" ? path19 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -6966,8 +6966,8 @@ var require_formats = __commonJS({
         return false;
       const year = +matches[1];
       const month = +matches[2];
-      const day = +matches[3];
-      return month >= 1 && month <= 12 && day >= 1 && day <= (month === 2 && isLeapYear(year) ? 29 : DAYS[month]);
+      const day2 = +matches[3];
+      return month >= 1 && month <= 12 && day2 >= 1 && day2 <= (month === 2 && isLeapYear(year) ? 29 : DAYS[month]);
     }
     function compareDate(d1, d2) {
       if (!(d1 && d2))
@@ -7187,12 +7187,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list2, fs17, exportName) {
+    function addFormats(ajv, list2, fs19, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list2)
-        ajv.addFormat(f, fs17[f]);
+        ajv.addFormat(f, fs19[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -7305,9 +7305,9 @@ var require_content_type = __commonJS({
 });
 
 // src/terminal/main.ts
-import fs16 from "node:fs";
+import fs18 from "node:fs";
 import http3 from "node:http";
-import path16 from "node:path";
+import path18 from "node:path";
 import { spawn as spawn2 } from "node:child_process";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
@@ -7522,9 +7522,9 @@ async function getJson(url2, opts = {}) {
 
 // src/terminal/server.ts
 import crypto6 from "node:crypto";
-import fs15 from "node:fs";
+import fs17 from "node:fs";
 import http2 from "node:http";
-import path15 from "node:path";
+import path17 from "node:path";
 import { fileURLToPath } from "node:url";
 
 // src/data/dates.ts
@@ -7618,10 +7618,10 @@ function parseChart(json, symbol) {
   const offset = m.gmtoffset ?? 0;
   const bars = [];
   (r.timestamp ?? []).forEach((ts, i) => {
-    const open3 = num(q.open?.[i]), high = num(q.high?.[i]), low = num(q.low?.[i]), close = num(q.close?.[i]);
-    if (open3 === null || high === null || low === null || close === null || close <= 0) return;
+    const open4 = num(q.open?.[i]), high = num(q.high?.[i]), low = num(q.low?.[i]), close = num(q.close?.[i]);
+    if (open4 === null || high === null || low === null || close === null || close <= 0) return;
     const a = num(adj?.[i]), k = a !== null ? a / close : 1;
-    bars.push({ date: new Date((ts + offset) * 1e3).toISOString().slice(0, 10), open: open3 * k, high: high * k, low: low * k, close: close * k, volume: num(q.volume?.[i]) ?? 0 });
+    bars.push({ date: new Date((ts + offset) * 1e3).toISOString().slice(0, 10), open: open4 * k, high: high * k, low: low * k, close: close * k, volume: num(q.volume?.[i]) ?? 0 });
   });
   const seen = /* @__PURE__ */ new Set();
   const unique = bars.filter((b) => seen.has(b.date) ? false : (seen.add(b.date), true));
@@ -8177,10 +8177,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj4, path17) {
-  if (!path17)
+function getElementAtPath(obj4, path19) {
+  if (!path19)
     return obj4;
-  return path17.reduce((acc, key) => acc?.[key], obj4);
+  return path19.reduce((acc, key) => acc?.[key], obj4);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -8520,11 +8520,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path17, issues) {
+function prefixIssues(path19, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path17);
+    iss.path.unshift(path19);
     return iss;
   });
 }
@@ -8985,16 +8985,16 @@ function flattenError(error2, mapper = (issue2) => issue2.message) {
 }
 function formatError(error2, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error3, path17 = []) => {
+  const processError = (error3, path19 = []) => {
     for (const issue2 of error3.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path17, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path19, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path17, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path19, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path17, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path19, ...issue2.path]);
       } else {
-        const fullpath = [...path17, ...issue2.path];
+        const fullpath = [...path19, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -9804,23 +9804,23 @@ function canParseURL(input) {
     return false;
   }
 }
-function validateURL(trimmed, def) {
+function validateURL(trimmed2, def) {
   if (!("normalize" in def) && !("hostname" in def) && !("protocol" in def)) {
-    return canParseURL(trimmed) || URL_UNPARSEABLE;
+    return canParseURL(trimmed2) || URL_UNPARSEABLE;
   }
-  return parseURLObject(trimmed, def);
+  return parseURLObject(trimmed2, def);
 }
-function parseURLObject(trimmed, def) {
-  if (!def.normalize && def.protocol?.source === httpProtocol.source && !/^https?:\/\//i.test(trimmed)) {
+function parseURLObject(trimmed2, def) {
+  if (!def.normalize && def.protocol?.source === httpProtocol.source && !/^https?:\/\//i.test(trimmed2)) {
     return URL_BAD_FORMAT;
   }
   try {
     if (typeof URL !== "undefined") {
       const URLStatic = URL;
       if (typeof URLStatic.parse === "function")
-        return URLStatic.parse(trimmed) ?? URL_UNPARSEABLE;
+        return URLStatic.parse(trimmed2) ?? URL_UNPARSEABLE;
     }
-    return new URL(trimmed);
+    return new URL(trimmed2);
   } catch {
     return URL_UNPARSEABLE;
   }
@@ -9841,8 +9841,8 @@ var $ZodURL = /* @__PURE__ */ $constructor("$ZodURL", (inst, def) => {
   $ZodStringFormat.init(inst, def);
   inst._zod.check = (payload) => {
     try {
-      const trimmed = payload.value.trim();
-      const url2 = validateURL(trimmed, def);
+      const trimmed2 = payload.value.trim();
+      const url2 = validateURL(trimmed2, def);
       if (url2 === URL_BAD_FORMAT) {
         payload.issues.push({
           code: "invalid_format",
@@ -9865,7 +9865,7 @@ var $ZodURL = /* @__PURE__ */ $constructor("$ZodURL", (inst, def) => {
         return;
       }
       if (url2 === true) {
-        payload.value = stripTabAndNewline(trimmed);
+        payload.value = stripTabAndNewline(trimmed2);
         return;
       }
       if (def.hostname && !urlHostnameOk(url2, def.hostname)) {
@@ -9890,7 +9890,7 @@ var $ZodURL = /* @__PURE__ */ $constructor("$ZodURL", (inst, def) => {
           continue: !def.abort
         });
       }
-      payload.value = def.normalize ? url2.href : stripTabAndNewline(trimmed);
+      payload.value = def.normalize ? url2.href : stripTabAndNewline(trimmed2);
       return;
     } catch (_) {
       payload.issues.push({
@@ -19569,8 +19569,8 @@ var FileAuth = class {
       token_endpoint_auth_method: "none"
     };
   }
-  update(change2) {
-    writeSaved(this.file, { ...readSaved(this.file), ...change2 });
+  update(change3) {
+    writeSaved(this.file, { ...readSaved(this.file), ...change3 });
   }
   state() {
     const state = crypto3.randomBytes(16).toString("hex");
@@ -19806,9 +19806,9 @@ function waitForCode(port, expectedState, timeoutMs = 5 * 6e4) {
   let close = () => {
   };
   const code2 = new Promise((resolve, reject) => {
-    const page = (words3) => `<!doctype html><meta charset="utf-8"><title>Trading Agents</title><body style="font:16px system-ui;padding:40px">${words3}</body>`;
-    const answer = (res, status, words3) => {
-      res.writeHead(status, { connection: "close", ...words3 ? { "content-type": "text/html" } : {} }).end(words3 ? page(words3) : void 0);
+    const page = (words4) => `<!doctype html><meta charset="utf-8"><title>Trading Agents</title><body style="font:16px system-ui;padding:40px">${words4}</body>`;
+    const answer = (res, status, words4) => {
+      res.writeHead(status, { connection: "close", ...words4 ? { "content-type": "text/html" } : {} }).end(words4 ? page(words4) : void 0);
     };
     const server = http.createServer((req, res) => {
       const url2 = new URL(req.url ?? "/", `http://127.0.0.1:${port}`);
@@ -19998,8 +19998,8 @@ var Link = class {
       const p = parsePortfolio(await data("get_portfolio", { account_number: ids.accountNumber }));
       const held = parsePositions(await data("get_equity_positions", { account_number: ids.accountNumber })).find((x) => x.symbol === symbol)?.quantity ?? 0;
       const price = parseQuotes(await data("get_equity_quotes", { symbols: [symbol] })).get(symbol) ?? null;
-      const day = (iso) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date(iso));
-      const ordersToday = parseOrders(await data("get_equity_orders", { account_number: ids.accountNumber })).orders.filter((o) => o.at && day(o.at) === day(now.toISOString())).length;
+      const day2 = (iso2) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date(iso2));
+      const ordersToday = parseOrders(await data("get_equity_orders", { account_number: ids.accountNumber })).orders.filter((o) => o.at && day2(o.at) === day2(now.toISOString())).length;
       return { symbol, accountValue: p.total, buyingPower: p.buyingPower, held, price, ordersToday };
     }
   }
@@ -20100,8 +20100,8 @@ var Link = class {
     };
   }
   bad(e) {
-    const words3 = oneLine(masked(e instanceof Error ? e.message : String(e)), 200);
-    const why = e instanceof NotSignedIn ? "Robinhood asks you to sign in again." : /^Robinhood refused/.test(words3) ? words3 : `Robinhood did not answer as expected: ${words3}`;
+    const words4 = oneLine(masked(e instanceof Error ? e.message : String(e)), 200);
+    const why = e instanceof NotSignedIn ? "Robinhood asks you to sign in again." : /^Robinhood refused/.test(words4) ? words4 : `Robinhood did not answer as expected: ${words4}`;
     return { state: "failed", checkedAt: this.now(), tools: null, message: why };
   }
   /** Sends the person to Robinhood's sign-in page and waits for them to come back, in the background. */
@@ -20267,7 +20267,7 @@ function proposeOwn(c, side, t2) {
 }
 function check(o, c, t2, caps) {
   const out = [];
-  const add = (ok, words3) => out.push({ ok, words: words3 });
+  const add = (ok, words4) => out.push({ ok, words: words4 });
   add(Number.isInteger(o.quantity) && o.quantity >= 1 && o.quantity <= 1e5, Number.isInteger(o.quantity) && o.quantity >= 1 ? `${o.quantity} whole share(s)` : "The quantity must be a whole number of shares, at least one");
   const priceOk = Number.isFinite(o.limitPrice) && o.limitPrice > 0 && cents(o.limitPrice) === o.limitPrice;
   add(priceOk, priceOk ? `Limit price ${money(o.limitPrice)}` : "The limit price must be above zero, in dollars and cents");
@@ -20416,11 +20416,11 @@ ${keep(reflection)}`;
   }
   rotate(blocks) {
     if (!this.maxResolved || this.maxResolved <= 0) return blocks;
-    const settled = blocks.filter((b) => {
+    const settled2 = blocks.filter((b) => {
       const e = parse3(b);
       return e && !e.pending;
     }).length;
-    let drop = settled - this.maxResolved;
+    let drop = settled2 - this.maxResolved;
     return drop <= 0 ? blocks : blocks.filter((b) => {
       const e = parse3(b);
       if (e && !e.pending && drop > 0) {
@@ -20434,10 +20434,10 @@ ${keep(reflection)}`;
    *  With `asOf`, only calls whose outcome was already known on that day - a past-dated run must not learn from its future. */
   pastContext(ticker, o = {}) {
     const { sameLimit = 5, otherLimit = 3 } = o;
-    let settled = this.load().filter((e) => !e.pending);
-    if (o.asOf) settled = settled.filter((e) => e.resolved && e.resolved <= o.asOf);
+    let settled2 = this.load().filter((e) => !e.pending);
+    if (o.asOf) settled2 = settled2.filter((e) => e.resolved && e.resolved <= o.asOf);
     const same = [], other = [];
-    for (const e of settled.reverse()) {
+    for (const e of settled2.reverse()) {
       if (e.ticker === ticker ? same.length < sameLimit : other.length < otherLimit) (e.ticker === ticker ? same : other).push(e);
       if (same.length >= sameLimit && other.length >= otherLimit) break;
     }
@@ -20455,12 +20455,13 @@ ${e.reflection || e.decision.slice(0, 300) + (e.decision.length > 300 ? "..." : 
 };
 
 // src/terminal/state.ts
-import fs13 from "node:fs";
-import path12 from "node:path";
+import fs14 from "node:fs";
+import path13 from "node:path";
 
 // src/desk/runs.ts
 import fs11 from "node:fs";
 import path10 from "node:path";
+var SECTIONS = ["market", "sentiment", "news", "fundamentals", "bull", "bear", "research_plan", "trader", "aggressive", "conservative", "neutral", "decision"];
 var DEBATES = { investment_debate: ["bull", "bear"], risk_debate: ["aggressive", "conservative", "neutral"] };
 var TURNS = new Set(Object.values(DEBATES).flat());
 var folder = (dir, ticker, date4) => path10.join(dir, "runs", `${safeSymbol(ticker).replace(/\^/g, "IDX_").replace(/=/g, "_EQ_")}_${date4}`);
@@ -20470,6 +20471,42 @@ function load(dir, ticker, date4) {
     return JSON.parse(fs11.readFileSync(runFile(dir, ticker, date4), "utf8"));
   } catch {
     return { ticker: safeSymbol(ticker), date: date4, startedAt: (/* @__PURE__ */ new Date()).toISOString(), log: [] };
+  }
+}
+var isSection = (s) => SECTIONS.includes(s);
+function progress(dir, ticker, date4) {
+  const out = {};
+  for (const e of load(dir, ticker, date4).log) out[e.section] = (out[e.section] ?? 0) + 1;
+  return out;
+}
+var savedPlan = (dir, ticker, date4) => load(dir, ticker, date4).plan;
+function stepWords(dir, ticker, date4) {
+  const plan = savedPlan(dir, ticker, date4);
+  const steps = Array.isArray(plan?.steps) ? plan.steps.filter((s) => isSection(String(s.section)) && Number.isInteger(s.turn)) : [];
+  if (!steps.length) return "starting";
+  const done = progress(dir, ticker, date4), next = steps.find((s) => (done[s.section] ?? 0) < s.turn);
+  if (!next) return "recording the call";
+  const analysts = steps.filter((s) => ["market", "sentiment", "news", "fundamentals"].includes(s.section));
+  const of = (n) => Number.isInteger(n) ? ` of ${n}` : "";
+  switch (next.section) {
+    case "market":
+    case "sentiment":
+    case "news":
+    case "fundamentals":
+      return `analysts reading: ${analysts.filter((s) => (done[s.section] ?? 0) >= 1).length} of ${analysts.length} done`;
+    case "bull":
+    case "bear":
+      return `debate round ${next.turn}${of(plan?.debateRounds)}`;
+    case "research_plan":
+      return "the research manager is weighing the debate";
+    case "trader":
+      return "the trader is drafting the plan";
+    case "aggressive":
+    case "conservative":
+    case "neutral":
+      return `risk round ${next.turn}${of(plan?.riskRounds)}`;
+    default:
+      return "the portfolio manager is deciding";
   }
 }
 function sectionsOf(dir, ticker, date4) {
@@ -20510,21 +20547,155 @@ function renderSummary(s) {
   return lines.join("\n");
 }
 
-// src/terminal/store.ts
+// src/desk/queue.ts
 import fs12 from "node:fs";
 import path11 from "node:path";
+var DEPTHS = { shallow: 1, medium: 3, deep: 5 };
+var isDepth = (v) => typeof v === "string" && Object.hasOwn(DEPTHS, v);
+var depthOfRounds = (rounds) => rounds >= 5 ? "deep" : rounds >= 3 ? "medium" : "shallow";
+var MAX_OPEN = 20;
+var MAX_FINISHED = 20;
+var STALE_MS2 = 2 * 60 * 6e4;
+var STALE_REASON = "the run did not finish (it stopped, or took over two hours): press Retry";
+var QueueRefusal = class extends Error {
+  constructor(code2, message) {
+    super(message);
+    this.code = code2;
+  }
+  code;
+};
+var queueFile = (dir) => path11.join(dir, "queue.json");
+var doorbellFile = (dir) => path11.join(dir, "doorbell.json");
+var listenerFile = (dir) => path11.join(dir, "listener.json");
+var iso = (v) => typeof v === "string" && v.length <= 40 && !Number.isNaN(Date.parse(v)) ? v : void 0;
+var day = (v) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : void 0;
+var words2 = (v, max) => {
+  const s = typeof v === "string" ? v.replace(/<[^>]*>/g, "").replace(/[<>]/g, "").replace(/\s+/g, " ").trim().slice(0, max) : "";
+  return s || void 0;
+};
+var STATES = ["waiting", "running", "done", "failed"];
+function itemOf(v) {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+  const r = v;
+  let symbol;
+  try {
+    symbol = safeSymbol(String(r.symbol ?? ""));
+  } catch {
+    return null;
+  }
+  const requestedAt = iso(r.requestedAt);
+  if (!requestedAt) return null;
+  const state = STATES.includes(r.state) ? r.state : "waiting";
+  const out = { symbol, requestedAt, state };
+  if (isDepth(r.depth)) out.depth = r.depth;
+  const date4 = day(r.date), startedAt = iso(r.startedAt), endedAt = iso(r.endedAt), rating = words2(r.rating, 30), reason = words2(r.reason, 300);
+  if (date4) out.date = date4;
+  if (startedAt) out.startedAt = startedAt;
+  if (endedAt) out.endedAt = endedAt;
+  if (state === "done" && rating) out.rating = rating;
+  if (state === "failed") out.reason = reason ?? "no reason was given";
+  return out;
+}
+function settled(item, now) {
+  if (item.state !== "running") return item;
+  const started = Date.parse(item.startedAt ?? item.requestedAt);
+  return now.getTime() - started > STALE_MS2 ? { ...item, state: "failed", reason: STALE_REASON, endedAt: now.toISOString() } : item;
+}
+function load2(dir, now) {
+  let raw = [];
+  try {
+    raw = JSON.parse(fs12.readFileSync(queueFile(dir), "utf8"));
+  } catch {
+  }
+  const seen = /* @__PURE__ */ new Set(), out = [];
+  for (const v of Array.isArray(raw) ? raw : []) {
+    const item = itemOf(v);
+    if (!item || seen.has(item.symbol)) continue;
+    seen.add(item.symbol);
+    out.push(settled(item, now));
+  }
+  return out;
+}
+var open2 = (i) => i.state === "waiting" || i.state === "running";
+function trimmed(list2) {
+  const finished = list2.filter((i) => !open2(i)).sort((a, b) => (b.endedAt ?? "").localeCompare(a.endedAt ?? ""));
+  const keep2 = new Set(finished.slice(0, MAX_FINISHED));
+  return list2.filter((i) => open2(i) || keep2.has(i));
+}
+function change(dir, now, edit) {
+  const file4 = queueFile(dir);
+  fs12.mkdirSync(dir, { recursive: true });
+  return withLock(file4, () => {
+    const { list: list2, result } = edit(load2(dir, now));
+    writeWhole(file4, JSON.stringify(trimmed(list2), null, 2) + "\n");
+    return result;
+  });
+}
+var readQueue = (dir, now = /* @__PURE__ */ new Date()) => load2(dir, now);
+var waitingIn = (list2) => list2.filter((i) => i.state === "waiting");
+function enqueue(dir, raw, at, depth, now = /* @__PURE__ */ new Date()) {
+  const symbol = safeSymbol(raw);
+  return change(dir, now, (list2) => {
+    const was = list2.find((i) => i.symbol === symbol);
+    if (was?.state === "running") return { list: list2, result: list2 };
+    if (was?.state === "waiting") {
+      const next2 = list2.map((i) => i === was ? { ...i, ...depth ? { depth } : {} } : i);
+      return { list: next2, result: next2 };
+    }
+    const rest = list2.filter((i) => i !== was);
+    if (rest.filter(open2).length >= MAX_OPEN) throw new QueueRefusal("FULL", `${MAX_OPEN} analyses are already waiting: let them run first`);
+    const next = [...rest, { symbol, requestedAt: at, state: "waiting", ...depth ? { depth } : {} }];
+    return { list: next, result: next };
+  });
+}
+function dequeue(dir, raw, now = /* @__PURE__ */ new Date()) {
+  const symbol = safeSymbol(raw);
+  return change(dir, now, (list2) => {
+    if (list2.some((i) => i.symbol === symbol && i.state === "running")) throw new QueueRefusal("RUNNING", `${symbol} is being analysed now: it can be taken off once its run ends`);
+    const next = list2.filter((i) => i.symbol !== symbol);
+    return { list: next, result: next };
+  });
+}
+function ringDoorbell(dir, why, now = /* @__PURE__ */ new Date()) {
+  const bell = { at: now.toISOString(), waiting: waitingIn(readQueue(dir, now)).length, why };
+  fs12.mkdirSync(dir, { recursive: true });
+  writeWhole(doorbellFile(dir), JSON.stringify(bell, null, 2) + "\n");
+  return bell;
+}
+var LISTENER_FRESH_MS = 3 * 6e4;
+function readListener(dir, now = /* @__PURE__ */ new Date()) {
+  try {
+    const v = JSON.parse(fs12.readFileSync(listenerFile(dir), "utf8"));
+    const listener = words2(v.listener, 40), since = iso(v.since), beat = iso(v.beat) ?? since;
+    if (!listener || !since || !beat) return null;
+    const note = { listener, since, beat, fresh: now.getTime() - Date.parse(beat) <= LISTENER_FRESH_MS };
+    if (Number.isInteger(v.pid) && v.pid > 0) note.pid = v.pid;
+    const last = v.lastRun, lastAt = iso(last?.at), result = words2(last?.result, 200);
+    if (lastAt && result) note.lastRun = { at: lastAt, result };
+    return note;
+  } catch {
+    return null;
+  }
+}
+function removeListener(dir, pid) {
+  if (pid !== void 0 && readListener(dir)?.pid !== pid) return;
+  fs12.rmSync(listenerFile(dir), { force: true });
+}
+
+// src/terminal/store.ts
+import fs13 from "node:fs";
+import path12 from "node:path";
 var MAX_WATCH = 50;
-var MAX_QUEUE = 20;
 var read = (file4, ok) => {
   try {
-    const v = JSON.parse(fs12.readFileSync(file4, "utf8"));
+    const v = JSON.parse(fs13.readFileSync(file4, "utf8"));
     return Array.isArray(v) ? v.filter(ok) : [];
   } catch {
     return [];
   }
 };
-function change(file4, edit, ok) {
-  fs12.mkdirSync(path11.dirname(file4), { recursive: true });
+function change2(file4, edit, ok) {
+  fs13.mkdirSync(path12.dirname(file4), { recursive: true });
   return withLock(file4, () => {
     const next = edit(read(file4, ok));
     writeWhole(file4, JSON.stringify(next, null, 2) + "\n");
@@ -20532,13 +20703,11 @@ function change(file4, edit, ok) {
   });
 }
 var isWatch = (v) => !!v && typeof v.symbol === "string" && typeof v.favourite === "boolean";
-var isQueued = (v) => !!v && typeof v.symbol === "string" && typeof v.requestedAt === "string";
-var watchFile = (dir) => path11.join(dir, "watchlist.json");
-var queueFile = (dir) => path11.join(dir, "queue.json");
+var watchFile = (dir) => path12.join(dir, "watchlist.json");
 var readWatchlist = (dir) => read(watchFile(dir), isWatch);
 function addWatch(dir, raw, onDay) {
   const symbol = safeSymbol(raw);
-  return change(watchFile(dir), (list2) => {
+  return change2(watchFile(dir), (list2) => {
     if (list2.some((w) => w.symbol === symbol)) return list2;
     if (list2.length >= MAX_WATCH) throw new Error(`the watchlist holds ${MAX_WATCH} stocks: remove one first`);
     return [...list2, { symbol, favourite: false, addedOn: onDay }];
@@ -20546,27 +20715,14 @@ function addWatch(dir, raw, onDay) {
 }
 function setFavourite(dir, raw, favourite) {
   const symbol = safeSymbol(raw);
-  return change(watchFile(dir), (list2) => {
+  return change2(watchFile(dir), (list2) => {
     if (!list2.some((w) => w.symbol === symbol)) throw new Error(`${symbol} is not on the watchlist`);
     return list2.map((w) => w.symbol === symbol ? { ...w, favourite } : w);
   }, isWatch);
 }
 function removeWatch(dir, raw) {
   const symbol = safeSymbol(raw);
-  return change(watchFile(dir), (list2) => list2.filter((w) => w.symbol !== symbol), isWatch);
-}
-var readQueue = (dir) => read(queueFile(dir), isQueued);
-function enqueue(dir, raw, at) {
-  const symbol = safeSymbol(raw);
-  return change(queueFile(dir), (list2) => {
-    if (list2.some((q) => q.symbol === symbol)) return list2;
-    if (list2.length >= MAX_QUEUE) throw new Error(`${MAX_QUEUE} analyses are already waiting: run them first`);
-    return [...list2, { symbol, requestedAt: at }];
-  }, isQueued);
-}
-function dequeue(dir, raw) {
-  const symbol = safeSymbol(raw);
-  return change(queueFile(dir), (list2) => list2.filter((q) => q.symbol !== symbol), isQueued);
+  return change2(watchFile(dir), (list2) => list2.filter((w) => w.symbol !== symbol), isWatch);
 }
 
 // src/terminal/state.ts
@@ -20577,28 +20733,37 @@ function summaryOf(decision) {
   const heading = /^\s{0,3}#{1,6}\s*Executive Summary\s*:?\s*\n+([\s\S]*?)(?=\n\s{0,3}#{1,6}\s|\n\s*\n\*\*[^*\n]+\*\*\s*:|$)/im.exec(text2);
   const found = [label, heading].filter((m) => !!m && !!m[1]?.trim()).sort((a, b) => a.index - b.index)[0];
   const source = found?.[1] ?? text2.split("\n").filter((l) => !/^\s{0,3}#/.test(l) && !/^\s*\*\*[^*\n]+\*\*\s*:/.test(l) && !/^\s*\|/.test(l)).join("\n");
-  const words3 = plainText(source) || plainText(text2);
-  return words3.length > 320 ? `${words3.slice(0, 317).trimEnd()}...` : words3;
+  const words4 = plainText(source) || plainText(text2);
+  return words4.length > 320 ? `${words4.slice(0, 317).trimEnd()}...` : words4;
 }
 var stamp = (file4) => {
   try {
-    return String(fs13.statSync(file4).mtimeMs);
+    return String(fs14.statSync(file4).mtimeMs);
   } catch {
     return "0";
   }
 };
 function versionOf(root2) {
-  const dir = deskDataDir(root2), runs = path12.join(dir, "runs");
+  const dir = deskDataDir(root2), runs = path13.join(dir, "runs");
   let latest = 0;
   try {
-    for (const d of fs13.readdirSync(runs)) latest = Math.max(latest, Number(stamp(path12.join(runs, d, "run.json"))));
+    for (const d of fs14.readdirSync(runs)) latest = Math.max(latest, Number(stamp(path13.join(runs, d, "run.json"))));
   } catch {
   }
-  return [stamp(path12.join(dir, "journal.md")), stamp(path12.join(dir, "watchlist.json")), stamp(path12.join(dir, "queue.json")), latest, stamp(path12.join(dir, "contact.json"))].join("-");
+  const timely = `${listenerOf(dir) ? "L" : "n"}${readQueue(dir).map((i) => i.state[0]).join("")}`;
+  return [stamp(path13.join(dir, "journal.md")), stamp(path13.join(dir, "watchlist.json")), stamp(path13.join(dir, "queue.json")), latest, stamp(path13.join(dir, "contact.json")), stamp(path13.join(dir, "listener.json")), timely].join("-");
 }
-function stateOf(root2, day) {
+function queueOf(dir, now = /* @__PURE__ */ new Date()) {
+  const rank = { running: 0, waiting: 1, done: 2, failed: 2 };
+  return readQueue(dir, now).map((i) => i.state === "running" && i.date ? { ...i, progress: stepWords(dir, i.symbol, i.date) } : i).sort((a, b) => rank[a.state] - rank[b.state] || (rank[a.state] === 2 ? (b.endedAt ?? "").localeCompare(a.endedAt ?? "") : 0));
+}
+function listenerOf(dir, now = /* @__PURE__ */ new Date()) {
+  const n = readListener(dir, now);
+  return n?.fresh ? { listener: n.listener, since: n.since, ...n.lastRun ? { lastRun: n.lastRun } : {} } : null;
+}
+function stateOf(root2, day2) {
   const dir = deskDataDir(root2), s = readSettings(root2);
-  const entries = new Journal(path12.join(dir, "journal.md")).load();
+  const entries = new Journal(path13.join(dir, "journal.md")).load();
   const calls = entries.map((e) => ({
     date: e.date,
     ticker: e.ticker,
@@ -20613,16 +20778,17 @@ function stateOf(root2, day) {
   const summary = summarize(entries);
   return {
     version: versionOf(root2),
-    today: day,
+    today: day2,
     watchlist: readWatchlist(dir),
-    queue: readQueue(dir),
+    queue: queueOf(dir),
     calls,
     record: { summary, text: renderSummary(summary), benchmarkNote: `Each call is judged after ${s.scoring.holdingPeriodDays} trading days against its market's index.` },
-    desk: { emailSaved: !!readContactEmail(root2), tradingEnabled: false, holdingDays: s.scoring.holdingPeriodDays }
+    desk: { emailSaved: !!readContactEmail(root2), tradingEnabled: false, holdingDays: s.scoring.holdingPeriodDays },
+    analyses: { depth: depthOfRounds(s.analysis.debateRounds), perRun: s.routines.maxAnalyses, listener: listenerOf(dir) }
   };
 }
 function callOf(root2, ticker, date4) {
-  const dir = deskDataDir(root2), e = new Journal(path12.join(dir, "journal.md")).load().find((x) => x.ticker === ticker && x.date === date4);
+  const dir = deskDataDir(root2), e = new Journal(path13.join(dir, "journal.md")).load().find((x) => x.ticker === ticker && x.date === date4);
   if (!e) return null;
   return { decision: e.decision, sections: sectionsOf(dir, ticker, date4), hasReport: hasReport(dir, ticker, date4) };
 }
@@ -20773,7 +20939,7 @@ function parseQuote(json, symbol, nowSec = Date.now() / 1e3) {
   if (!finite2(price) || price <= 0) throw new NoData(`Yahoo Finance has no price for ${symbol}`);
   const previousClose = finite2(m.chartPreviousClose) && m.chartPreviousClose > 0 ? m.chartPreviousClose : finite2(m.previousClose) && m.previousClose > 0 ? m.previousClose : null;
   const reg = m.currentTradingPeriod?.regular;
-  const open3 = m.instrumentType === "CRYPTOCURRENCY" || finite2(reg?.start) && finite2(reg?.end) && nowSec >= reg.start && nowSec <= reg.end;
+  const open4 = m.instrumentType === "CRYPTOCURRENCY" || finite2(reg?.start) && finite2(reg?.end) && nowSec >= reg.start && nowSec <= reg.end;
   const t2 = finite2(m.regularMarketTime) ? m.regularMarketTime : (r.timestamp ?? [])[Math.max(0, (r.timestamp ?? []).length - 1)];
   return {
     symbol,
@@ -20783,7 +20949,7 @@ function parseQuote(json, symbol, nowSec = Date.now() / 1e3) {
     previousClose,
     change: previousClose === null ? null : price - previousClose,
     changePct: previousClose === null ? null : (price / previousClose - 1) * 100,
-    open: open3,
+    open: open4,
     asOf: finite2(t2) ? new Date(t2 * 1e3).toISOString() : new Date(nowSec * 1e3).toISOString(),
     points: points.length ? points : [price]
   };
@@ -20889,8 +21055,8 @@ function findSymbols(raw) {
 }
 
 // src/terminal/prefs.ts
-import fs14 from "node:fs";
-import path13 from "node:path";
+import fs15 from "node:fs";
+import path14 from "node:path";
 var MAX_RECENT = 6;
 var one = (v, of) => of.includes(v) ? v : void 0;
 var sym = (v) => {
@@ -20900,7 +21066,7 @@ var sym = (v) => {
     return void 0;
   }
 };
-var words2 = (v, or) => (typeof v === "string" ? v.replace(/<[^>]*>/g, "").replace(/[<>]/g, "").replace(/\s+/g, " ").trim().slice(0, 80) : "") || or;
+var words3 = (v, or) => (typeof v === "string" ? v.replace(/<[^>]*>/g, "").replace(/[<>]/g, "").replace(/\s+/g, " ").trim().slice(0, 80) : "") || or;
 function cleanPrefs(raw) {
   const r = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
   const out = {};
@@ -20924,50 +21090,73 @@ function cleanPrefs(raw) {
       const s = sym(x?.symbol);
       if (!s || seen.has(s)) continue;
       seen.add(s);
-      recent.push({ symbol: s, name: words2(x.name, s) });
+      recent.push({ symbol: s, name: words3(x.name, s) });
       if (recent.length >= MAX_RECENT) break;
     }
     out.recent = recent;
   }
+  if (typeof r.autorun === "boolean") out.autorun = r.autorun;
   return out;
 }
-var prefsFile = (dir) => path13.join(dir, "dashboard.json");
+var prefsFile = (dir) => path14.join(dir, "dashboard.json");
 function readPrefs(dir) {
   try {
-    return cleanPrefs(JSON.parse(fs14.readFileSync(prefsFile(dir), "utf8")));
+    return cleanPrefs(JSON.parse(fs15.readFileSync(prefsFile(dir), "utf8")));
   } catch {
     return {};
   }
 }
-function savePrefs(dir, change2) {
+function savePrefs(dir, change3) {
   const file4 = prefsFile(dir);
-  fs14.mkdirSync(dir, { recursive: true });
+  fs15.mkdirSync(dir, { recursive: true });
   return withLock(file4, () => {
-    const next = cleanPrefs({ ...readPrefs(dir), ...cleanPrefs(change2) });
+    const next = cleanPrefs({ ...readPrefs(dir), ...cleanPrefs(change3) });
     writeWhole(file4, JSON.stringify(next, null, 2) + "\n");
     return next;
   });
 }
 
+// src/watch/claude.ts
+import fs16 from "node:fs";
+import os3 from "node:os";
+import path15 from "node:path";
+function findClaude(env = process.env, platform = process.platform, exists = (p) => fs16.existsSync(p)) {
+  const p = platform === "win32" ? path15.win32 : path15.posix;
+  const dirs = (env.PATH ?? env.Path ?? "").split(platform === "win32" ? ";" : ":").filter(Boolean);
+  const home = env.USERPROFILE ?? env.HOME ?? os3.homedir();
+  if (platform === "win32") {
+    for (const d of [...dirs, p.join(home, ".local", "bin")]) {
+      if (exists(p.join(d, "claude.exe"))) return { command: p.join(d, "claude.exe"), args: [] };
+      if (!exists(p.join(d, "claude.cmd"))) continue;
+      const pkg = p.join(d, "node_modules", "@anthropic-ai", "claude-code");
+      if (exists(p.join(pkg, "bin", "claude.exe"))) return { command: p.join(pkg, "bin", "claude.exe"), args: [] };
+      if (exists(p.join(pkg, "cli.js"))) return { command: process.execPath, args: [p.join(pkg, "cli.js")] };
+    }
+    return null;
+  }
+  for (const d of [...dirs, p.join(home, ".local", "bin"), p.join(home, ".claude", "local")]) if (exists(p.join(d, "claude"))) return { command: p.join(d, "claude"), args: [] };
+  return null;
+}
+
 // src/terminal/launch.ts
 import crypto5 from "node:crypto";
-import path14 from "node:path";
+import path16 from "node:path";
 var PORTS = [47615, 47625];
-var deskIdOf = (root2) => crypto5.createHash("sha256").update(path14.resolve(root2)).digest("hex").slice(0, 12);
+var deskIdOf = (root2) => crypto5.createHash("sha256").update(path16.resolve(root2)).digest("hex").slice(0, 12);
 
 // src/terminal/server.ts
 var TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".woff2": "font/woff2", ".svg": "image/svg+xml" };
-function loadAssets(dir = path15.join(path15.dirname(fileURLToPath(import.meta.url)), "terminal")) {
+function loadAssets(dir = path17.join(path17.dirname(fileURLToPath(import.meta.url)), "terminal")) {
   const out = /* @__PURE__ */ new Map();
-  const add = (rel) => out.set(`/${rel.replace(/\\/g, "/")}`, { type: TYPES[path15.extname(rel)] ?? "application/octet-stream", body: fs15.readFileSync(path15.join(dir, rel)) });
+  const add = (rel) => out.set(`/${rel.replace(/\\/g, "/")}`, { type: TYPES[path17.extname(rel)] ?? "application/octet-stream", body: fs17.readFileSync(path17.join(dir, rel)) });
   for (const f of ["index.html", "app.js", "app.css"]) add(f);
   try {
-    for (const f of fs15.readdirSync(path15.join(dir, "fonts"))) if (f.endsWith(".woff2")) add(`fonts/${f}`);
+    for (const f of fs17.readdirSync(path17.join(dir, "fonts"))) if (f.endsWith(".woff2")) add(`fonts/${f}`);
   } catch {
   }
   return out;
 }
-function shareHoldings(dir, snap, day) {
+function shareHoldings(dir, snap, day2) {
   if (!snap.views.length || snap.views.some((v) => v.problems.some((x) => /held/.test(x)) || v.unread > 0)) return false;
   saveAccountHoldings(dir, snap.views.map((v) => ({
     label: v.account.label,
@@ -20976,7 +21165,7 @@ function shareHoldings(dir, snap, day) {
     ...v.portfolio?.cash == null ? {} : { cash: v.portfolio.cash },
     ...v.portfolio?.buyingPower == null ? {} : { buyingPower: v.portfolio.buyingPower },
     positions: v.holdings.map((h) => ({ ticker: h.symbol, quantity: h.quantity, ...h.averageCost == null ? {} : { averagePrice: h.averageCost } }))
-  })), day);
+  })), day2);
   return true;
 }
 var REVIEW_MS = 5 * 6e4;
@@ -20999,13 +21188,14 @@ function fingerprint(files) {
   const h = crypto6.createHash("sha256");
   for (const f of files) {
     try {
-      h.update(fs15.readFileSync(f));
+      h.update(fs17.readFileSync(f));
     } catch {
       h.update(`missing ${f}`);
     }
   }
   return h.digest("hex").slice(0, 12);
 }
+var OWN_LISTENER = "Claude Code";
 var KEY = /^[0-9a-f]{48}$/;
 var CLAIM = /^[0-9a-f]{36}$/;
 async function startTerminal(opts) {
@@ -21067,6 +21257,14 @@ async function startTerminal(opts) {
     });
     req.on("error", reject);
   });
+  const queued = (job) => {
+    try {
+      return job();
+    } catch (e) {
+      if (e instanceof QueueRefusal) throw new Refused2(409, e.message);
+      throw e;
+    }
+  };
   const askRobinhood = async (job) => {
     try {
       return await job();
@@ -21098,9 +21296,9 @@ async function startTerminal(opts) {
       return json(res, 200, { key: token });
     }
     if (!same(String(req.headers["x-desk-token"] ?? ""), token)) throw new Refused2(401, "this page has no key to the dashboard: open the dashboard again");
-    const day = today(), sym2 = url2.searchParams.get("symbol") ?? "";
+    const day2 = today(), sym2 = url2.searchParams.get("symbol") ?? "";
     if (method === "GET") {
-      if (p === "/api/state") return json(res, 200, stateOf(root2, day));
+      if (p === "/api/state") return json(res, 200, stateOf(root2, day2));
       if (p === "/api/version") return json(res, 200, { version: versionOf(root2), build, update: updated, restarting });
       if (p === "/api/prefs") return json(res, 200, readPrefs(dir));
       if (p === "/api/search") {
@@ -21144,13 +21342,55 @@ async function startTerminal(opts) {
       safeSymbol(name);
       const q = await quote(name);
       if ("error" in q && q.error === "no-data") throw new Refused2(422, q.message);
-      return json(res, 200, { watchlist: addWatch(dir, name, day) });
+      return json(res, 200, { watchlist: addWatch(dir, name, day2) });
     }
     if (p === "/api/watchlist" && method === "DELETE") return json(res, 200, { watchlist: removeWatch(dir, name) });
     if (p === "/api/favourite" && method === "POST") return json(res, 200, { watchlist: setFavourite(dir, name, b.favourite === true) });
-    if (p === "/api/queue" && method === "POST") return json(res, 200, { queue: enqueue(dir, name, (/* @__PURE__ */ new Date()).toISOString()) });
-    if (p === "/api/queue" && method === "DELETE") return json(res, 200, { queue: dequeue(dir, name) });
-    if (p === "/api/prefs" && method === "POST") return json(res, 200, savePrefs(dir, b));
+    if (p === "/api/queue" && method === "POST") {
+      const symbol = safeSymbol(name), d = b.depth === void 0 ? depthOfRounds(readSettings(root2).analysis.debateRounds) : b.depth;
+      if (!isDepth(d)) throw new Refused2(400, "the depth is shallow, medium or deep");
+      const call = new Journal(path17.join(dir, "journal.md")).load().find((e) => e.ticker === symbol && e.date === day2);
+      if (call) throw new Refused2(409, `${symbol} was already analysed today (${call.rating}): its call is in the journal. Ask again tomorrow`);
+      queued(() => enqueue(dir, symbol, (/* @__PURE__ */ new Date()).toISOString(), d));
+      ringDoorbell(dir, "press");
+      return json(res, 200, { queue: queueOf(dir) });
+    }
+    if (p === "/api/queue" && method === "DELETE") {
+      queued(() => dequeue(dir, name));
+      return json(res, 200, { queue: queueOf(dir) });
+    }
+    if (p === "/api/queue/run" && method === "POST") {
+      if (!waitingIn(readQueue(dir)).length) throw new Refused2(409, "nothing is waiting to be analysed");
+      ringDoorbell(dir, "press");
+      return json(res, 200, { queue: queueOf(dir) });
+    }
+    if (p === "/api/listen" && method === "POST") {
+      if (!opts.listen) throw new Refused2(404, "not found");
+      const now = listenerOf(dir);
+      if (b.on === false) {
+        if (now && now.listener !== OWN_LISTENER) throw new Refused2(409, `${now.listener} is listening, not Claude Code: switch it off there`);
+        savePrefs(dir, { autorun: false });
+        if (now) removeListener(dir);
+        return json(res, 200, { listener: null });
+      }
+      if (b.on !== true) throw new Refused2(400, "say on or off");
+      if (now) {
+        if (now.listener === OWN_LISTENER) return json(res, 200, { listener: now });
+        throw new Refused2(409, `${now.listener} is already listening: analyses already run by themselves`);
+      }
+      if (!(opts.listen.claude ?? (() => !!findClaude()))()) throw new Refused2(400, 'Claude Code is not installed on this computer: install it from claude.com/claude-code, or switch on "Run automatically" in Madav');
+      savePrefs(dir, { autorun: true });
+      opts.listen.start();
+      for (const until = Date.now() + 8e3; Date.now() < until; await new Promise((r) => setTimeout(r, 200))) {
+        const l = listenerOf(dir);
+        if (l) return json(res, 200, { listener: l });
+      }
+      throw new Refused2(502, "the listener did not start: see desk-data/watcher.log, or start it yourself with node dist/watch.mjs");
+    }
+    if (p === "/api/prefs" && method === "POST") {
+      delete b.autorun;
+      return json(res, 200, savePrefs(dir, b));
+    }
     if (p === "/api/stop" && method === "POST") {
       if (!opts.stop) throw new Refused2(404, "not found");
       const stop = opts.stop;
@@ -21181,7 +21421,7 @@ async function startTerminal(opts) {
     }
     if (p === "/api/ticket" && method === "POST") {
       const symbol = safeSymbol(typeof b.symbol === "string" ? b.symbol : ""), date4 = typeof b.date === "string" ? b.date : "";
-      const call = new Journal(path15.join(dir, "journal.md")).load().find((e) => e.ticker === symbol && e.date === date4);
+      const call = new Journal(path17.join(dir, "journal.md")).load().find((e) => e.ticker === symbol && e.date === date4);
       if (!call) throw new Refused2(404, "no such call");
       const trading = readSettings(root2).trading, { caps } = robinhood.trading();
       const context = { ...await askRobinhood(() => robinhood.ticketContext(symbol)), rating: call.rating, callDate: call.date };
@@ -21256,7 +21496,7 @@ async function startTerminal(opts) {
     }
     if (p === "/api/robinhood/refresh" && method === "POST") {
       const snapshot = await askRobinhood(() => robinhood.refresh());
-      return json(res, 200, { snapshot, chosen: robinhood.chosen(), holdingsShared: shareHoldings(dir, snapshot, day) });
+      return json(res, 200, { snapshot, chosen: robinhood.chosen(), holdingsShared: shareHoldings(dir, snapshot, day2) });
     }
     throw new Refused2(404, "not found");
   };
@@ -21271,7 +21511,7 @@ async function startTerminal(opts) {
       json(res, /not a ticker|not on the watchlist|holds \d+ stocks|are already waiting/.test(m) ? 400 : 500, { error: /not a ticker|not on the watchlist|holds \d+ stocks|are already waiting/.test(m) ? m : "something went wrong" });
     });
   });
-  const listen = (candidate) => new Promise((resolve, reject) => {
+  const listen2 = (candidate) => new Promise((resolve, reject) => {
     const onError = (e) => {
       server.off("listening", onListen);
       e.code === "EADDRINUSE" ? resolve(false) : reject(e);
@@ -21285,29 +21525,35 @@ async function startTerminal(opts) {
     server.listen(candidate, "127.0.0.1");
   });
   const tryPorts = opts.port !== void 0 ? [opts.port] : Array.from({ length: PORTS[1] - PORTS[0] + 1 }, (_, i) => PORTS[0] + i);
-  for (const candidate of tryPorts) if (await listen(candidate)) {
+  for (const candidate of tryPorts) if (await listen2(candidate)) {
     port = server.address().port;
     break;
   }
   if (!port) throw new Error(`no free port from ${PORTS[0]} to ${PORTS[1]} on this computer`);
   const keyFile = opts.keyFile ?? dashboardKeyFile();
-  const keep2 = (change2) => {
+  const keep2 = (change3) => {
     try {
       let keys = {};
       try {
-        const v = JSON.parse(fs15.readFileSync(keyFile, "utf8"));
+        const v = JSON.parse(fs17.readFileSync(keyFile, "utf8"));
         if (v && typeof v === "object" && !Array.isArray(v)) keys = v;
       } catch {
       }
-      change2(keys);
+      change3(keys);
       if (Object.keys(keys).length) writePrivate(keyFile, JSON.stringify(keys, null, 2) + "\n");
-      else fs15.rmSync(keyFile, { force: true });
+      else fs17.rmSync(keyFile, { force: true });
     } catch {
     }
   };
   keep2((keys) => {
     keys[deskId] = { port, key: token };
   });
+  if (opts.listen && readPrefs(dir).autorun && !listenerOf(dir) && (opts.listen.claude ?? (() => !!findClaude()))()) {
+    try {
+      opts.listen.start();
+    } catch {
+    }
+  }
   const sweep = setInterval(() => {
     clearCache();
     clearQuotes();
@@ -21355,7 +21601,7 @@ var again = Number.isInteger(wanted) && wanted >= PORTS[0] && wanted <= PORTS[1]
 var HANDED = "TRADING_AGENTS_RESTART_KEY";
 var handed = process.env[HANDED];
 delete process.env[HANDED];
-function open2(url2) {
+function open3(url2) {
   const [cmd, args] = process.platform === "win32" ? ["rundll32", ["url.dll,FileProtocolHandler", url2]] : process.platform === "darwin" ? ["open", [url2]] : ["xdg-open", [url2]];
   try {
     spawn2(cmd, args, { detached: true, stdio: "ignore" }).on("error", () => {
@@ -21387,7 +21633,7 @@ var running = (port) => new Promise((resolve) => {
 async function openingLink(port) {
   const plain = `http://127.0.0.1:${port}/`;
   try {
-    const keys = JSON.parse(fs16.readFileSync(dashboardKeyFile(), "utf8"));
+    const keys = JSON.parse(fs18.readFileSync(dashboardKeyFile(), "utf8"));
     const mine = keys[deskIdOf(root)];
     if (!mine || mine.port !== port || typeof mine.key !== "string") return plain;
     const r = await fetch(`${plain}api/claim/new`, { method: "POST", headers: { "x-desk-token": mine.key, "content-type": "application/json" }, body: "{}" });
@@ -21403,13 +21649,13 @@ if (!again) {
       console.log(`The Trading Agents dashboard is already running: http://127.0.0.1:${p}/`);
       const link = await openingLink(p);
       if (noOpen) console.log(`Open it with this link, which works once, within two minutes: ${link}`);
-      else open2(link);
+      else open3(link);
       process.exit(0);
     }
   }
 }
 var self = fileURLToPath2(import.meta.url);
-var code = [self, ...["index.html", "app.js", "app.css"].map((f) => path16.join(path16.dirname(self), "terminal", f))];
+var code = [self, ...["index.html", "app.js", "app.css"].map((f) => path18.join(path18.dirname(self), "terminal", f))];
 var t = null;
 var quit = () => {
   void (t?.close() ?? Promise.resolve()).then(() => process.exit(0));
@@ -21424,7 +21670,11 @@ var restart = () => {
 };
 configure({ spacingMs: 250 });
 var quick = Number(process.env.TRADING_AGENTS_UPDATE_MS) || void 0;
-var base = { root, assets: loadAssets(), code, restart, stop: quit, ...quick ? { updateCheckMs: quick } : {} };
+var listen = { start: () => {
+  spawn2(process.execPath, [path18.join(path18.dirname(self), "watch.mjs")], { cwd: root, detached: true, stdio: "ignore", windowsHide: true }).on("error", () => {
+  }).unref();
+} };
+var base = { root, assets: loadAssets(), code, restart, stop: quit, listen, ...quick ? { updateCheckMs: quick } : {} };
 async function start() {
   if (again) for (let i = 0; i < 20; i++) {
     try {
@@ -21444,7 +21694,7 @@ if (!again) {
   else {
     console.log("If no browser opened, open it yourself with this link, which works once, within two minutes:");
     console.log(link);
-    open2(link);
+    open3(link);
   }
 }
 process.on("SIGINT", quit);

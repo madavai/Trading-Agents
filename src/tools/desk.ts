@@ -14,7 +14,8 @@ import { ASK_FOR_EMAIL, readContactEmail } from '../contact.js';
 import { cells, iterGrid, renderSummary, summarize } from '../desk/backtest.js';
 import { buildPlan, journalOf, NeedsEmail, renderPlan, type Plan } from '../desk/plan.js';
 import { SWEEP_ID, workspaceOf } from '../desk/workspace.js';
-import { dequeue, readQueue } from '../terminal/store.js';
+import { DEPTHS, finishItem, QueueRefusal, readQueue, ringDoorbell, startItem, waitingIn, type Depth } from '../desk/queue.js';
+import { Journal } from '../desk/journal.js';
 import { writeWhole } from '../desk/lock.js';
 import { parseRating, RATINGS } from '../desk/rating.js';
 import { progress, readSections, savedPlan, saveSection, SECTIONS, writeReport } from '../desk/runs.js';
@@ -201,21 +202,68 @@ export function registerDeskTools(server: McpServer, root: string): void {
     annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false },
   }, async () => act(() => openDashboard(root)));
 
+  // The waiting list: the stocks the person asked for on the dashboard. A run takes them one at a time, in order, up to the
+  // routines' limit: start_queue_item marks one running (one at a time, whoever started the run), finish_queue_item marks
+  // it done with the rating recorded or failed with why, and end_queue_run asks for another run when stocks still wait.
+  const perRun = () => readSettings(root).routines.maxAnalyses;
+  const depthWords = (d: Depth | undefined) => (d ? `${d} (debate_rounds ${DEPTHS[d]} and risk_rounds ${DEPTHS[d]})` : "the settings' depth (leave the rounds out)");
+  const called = (sym: string, d: string) => new Journal(path.join(dir, 'journal.md')).load().find((e) => e.ticker === sym && e.date === d);
+  const queueAct = (run: () => string) => act(() => { try { return run(); } catch (e) { if (e instanceof QueueRefusal) return `${e.code}: ${e.message}.`; throw e; } });
+
   server.registerTool('read_queue', {
-    title: 'Analyses waiting',
-    description: 'The stocks the person asked the desk to analyse from the dashboard, oldest first. /analyse with no ticker runs these. Read-only.',
+    title: 'The waiting list',
+    description: 'The stocks the person asked the desk to analyse from the dashboard: those waiting, in the order to run them, each with the depth asked, any being analysed now, and how many one run may analyse. /analyse with no ticker runs them. Read-only.',
     annotations: { readOnlyHint: true, openWorldHint: false },
   }, async () => act(() => {
-    const q = readQueue(dir);
-    return q.length ? `${q.length} analysis request(s) waiting, oldest first:\n${q.map((i, n) => `${n + 1}. ${i.symbol} (asked ${i.requestedAt.slice(0, 16).replace('T', ' ')} UTC)`).join('\n')}` : 'Nothing is waiting: the person has not asked for any analysis from the dashboard.';
+    const list = readQueue(dir), waiting = waitingIn(list), running = list.find((i) => i.state === 'running');
+    const lines: string[] = [];
+    if (running) lines.push(`Being analysed now: ${running.symbol} (started ${running.startedAt?.slice(11, 16) ?? '?'} UTC). One stock runs at a time: if this run did not start it, stop and say so.`);
+    if (!waiting.length) lines.push('Nothing is waiting: the person has not asked for any analysis from the dashboard.');
+    else {
+      lines.push(`${waiting.length} waiting, in the order to run them; one run analyses at most ${perRun()}:`);
+      waiting.forEach((i, n) => lines.push(`${n + 1}. ${i.symbol}, depth ${depthWords(i.depth)}, asked ${i.requestedAt.slice(0, 16).replace('T', ' ')} UTC`));
+      lines.push('For each, in order: start_queue_item, the analysis, then finish_queue_item. At the end, end_queue_run.');
+    }
+    return lines.join('\n');
+  }));
+
+  server.registerTool('start_queue_item', {
+    title: 'Start a waiting analysis',
+    description: 'Mark a stock from the waiting list as being analysed now, before its analysis starts, so the dashboard shows it running. It answers the date and the debate rounds to plan with. BUSY means another stock is being analysed: stop the run. ALREADY means it was called today: it is marked done, take the next.',
+    inputSchema: { symbol },
+    annotations: write,
+  }, async (a) => queueAct(() => {
+    if (ws().sweep) return `BUSY: a backtest sweep (${ws().sweep}) is running; the waiting list runs only on the live desk. Stop and say so.`;
+    const sym = safeSymbol(a.symbol), d = today(), done = called(sym, d);
+    if (done) { finishItem(dir, sym, { rating: done.rating }); return `ALREADY: ${sym} was already called today (${done.rating}); it is marked done. Take the next.`; }
+    const item = startItem(dir, sym, d);
+    return `START: ${sym} is marked as being analysed. Plan it with analysis date ${d}, depth ${depthWords(item.depth)}. When its call is recorded, call finish_queue_item; if it cannot be finished, call finish_queue_item with failed_because.`;
   }));
 
   server.registerTool('finish_queue_item', {
-    title: 'Mark a waiting analysis done',
-    description: 'Take a stock off the waiting list once its analysis has been run and recorded (or the person no longer wants it).',
-    inputSchema: { symbol },
-    annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false },
-  }, async (a) => act(() => { const left = dequeue(dir, a.symbol); return `Taken off the waiting list. ${left.length} left.`; }));
+    title: 'Finish a waiting analysis',
+    description: 'Mark a stock from the waiting list as done once its call is recorded (the rating is taken from the journal), or as failed with failed_because: one plain sentence the person reads on the dashboard, saying what went wrong and what to do.',
+    inputSchema: { symbol, failed_because: z.string().min(3).max(300).optional() },
+    annotations: write,
+  }, async (a) => queueAct(() => {
+    const sym = safeSymbol(a.symbol);
+    if (a.failed_because) { finishItem(dir, sym, { reason: a.failed_because }); return `Marked failed: ${sym}. The person sees why on the dashboard and can press Retry.`; }
+    const item = readQueue(dir).find((i) => i.symbol === sym), call = called(sym, item?.date ?? today());
+    if (!call) throw new Error(`no call for ${sym} on ${item?.date ?? today()} is recorded yet: call record_decision first, or pass failed_because`);
+    finishItem(dir, sym, { rating: call.rating });
+    return `Marked done: ${sym}, ${call.rating}. The dashboard shows it.`;
+  }));
+
+  server.registerTool('end_queue_run', {
+    title: 'End a run of the waiting list',
+    description: 'Call once when a run of the waiting list stops. If stocks are still waiting (the run reached its limit, or stopped early), it asks whoever listens on this computer for another run. Answers one line to end the run with.',
+    annotations: write,
+  }, async () => act(() => {
+    const list = readQueue(dir), waiting = waitingIn(list).length;
+    const doneN = list.filter((i) => i.state === 'done').length, failedN = list.filter((i) => i.state === 'failed').length;
+    if (waiting) ringDoorbell(dir, 'more');
+    return `${waiting ? `${waiting} still waiting: another run was asked for.` : 'Nothing is waiting.'} On the dashboard's list: ${doneN} done, ${failedN} failed.`;
+  }));
 
   server.registerTool('set_holdings', {
     title: 'Save what the person holds',

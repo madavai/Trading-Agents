@@ -82,7 +82,10 @@ const restart = () => {
 configure({ spacingMs: 250 });   // Yahoo is asked politely: one request at a time per host every quarter second
 // For the tests only: how often to look for an update (normally every 15 seconds).
 const quick = Number(process.env.TRADING_AGENTS_UPDATE_MS) || undefined;
-const base: TerminalOptions = { root, assets: loadAssets(), code, restart, stop: quit, ...(quick ? { updateCheckMs: quick } : {}) };
+// "Run automatically with Claude Code": the desk's own listener, a program of its own beside this one, which outlives a
+// restart of the dashboard and is switched off from the page.
+const listen = { start: () => { spawn(process.execPath, [path.join(path.dirname(self), 'watch.mjs')], { cwd: root, detached: true, stdio: 'ignore', windowsHide: true }).on('error', () => {}).unref(); } };
+const base: TerminalOptions = { root, assets: loadAssets(), code, restart, stop: quit, listen, ...(quick ? { updateCheckMs: quick } : {}) };
 /** On a restart the old dashboard has only just let go of its address, so it is asked for a few times before any other. */
 async function start(): Promise<Terminal> {
   if (again) for (let i = 0; i < 20; i++) {

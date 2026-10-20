@@ -585,7 +585,7 @@ p { text-wrap: pretty; }
         <div class="link c-desk"><span class="lbl">save</span><span class="wire"><span class="pulse" style="--d:.5s"></span></span></div>
         <div class="lane c-store">
           <div class="lane-h"><span class="icbox"><svg class="ic"><use href="#i-book"/></svg></span><div><p class="lane-name">The records</p><p class="lane-sub">In the project, on this computer</p></div></div>
-          <ul><li>Journal of calls</li><li>Full reports</li><li>Watchlist</li><li>Waiting list</li><li>Your holdings</li><li>Orders log</li></ul>
+          <ul><li>Journal of calls</li><li>Full reports</li><li>Watchlist</li><li>Analyses asked for</li><li>Your holdings</li><li>Orders log</li></ul>
         </div>
         <div class="link c-you"><span class="lbl">show</span><span class="wire two"><span class="pulse" style="--d:1s"></span></span></div>
         <div class="lane c-you">
@@ -815,8 +815,8 @@ p { text-wrap: pretty; }
         <ol class="steps">
           <li class="step c-you"><span class="badge">1</span><div class="step-body">
             <div class="step-h"><p class="step-title">You ask</p><span class="at-chip c-you"><i></i>You</span></div>
-            <p>In Madav / Claude: ask the team ("analyse NVDA"), or type /analyse NVDA in a chat. Or from a morning routine, or with the robot button on a watchlist stock.</p>
-            <p class="why"><b>Why it matters.</b> Nothing starts on its own. A routine runs only because you scheduled it.</p>
+            <p>In Madav / Claude: ask the team ("analyse NVDA"), or type /analyse NVDA in a chat. Or from a morning routine, or on the dashboard: press the robot beside a stock and choose how deep. It runs by itself when Madav or Claude Code is listening.</p>
+            <p class="why"><b>Why it matters.</b> Nothing starts on its own. A routine runs only because you scheduled it, and an analysis from the dashboard only because you asked for it.</p>
           </div></li>
           <li class="step c-desk"><span class="badge">2</span><div class="step-body">
             <div class="step-h"><p class="step-title">Past calls are scored first</p><span class="at-chip c-desk"><i></i>The lead</span></div>
@@ -925,7 +925,7 @@ p { text-wrap: pretty; }
             <li><b>Journal</b><span>Every call and its rating; once scored, its return against the index and its lesson.</span></li>
             <li><b>Reports</b><span>A folder per analysis: a page per agent and the complete report.</span></li>
             <li><b>Watchlist</b><span>Your stocks, and which ones you starred.</span></li>
-            <li><b>Waiting list</b><span>Stocks you asked the desk to analyse from the dashboard.</span></li>
+            <li><b>Analyses you asked for</b><span>Each stock you asked for on the dashboard, at the depth you chose: waiting, being analysed, done with its rating, or failed with why.</span></li>
             <li><b>Holdings</b><span>What you hold, as the dashboard last read it from Robinhood.</span></li>
             <li><b>Orders log</b><span>Each order the dashboard sent, from a call or your own, and what Robinhood answered.</span></li>
             <li><b>Your dashboard</b><span>Where you left it: the page, the stock, the chart, the stocks you looked at last. Never an order.</span></li>
@@ -1056,6 +1056,7 @@ p { text-wrap: pretty; }
           <li><svg class="ic sm"><use href="#i-chart"/></svg>Chart</li>
           <li><svg class="ic sm"><use href="#i-ledger"/></svg>Stock page</li>
           <li><svg class="ic sm"><use href="#i-star"/></svg>Watchlist</li>
+          <li><svg class="ic sm"><use href="#i-bot"/></svg>Analyses</li>
           <li><svg class="ic sm"><use href="#i-flag"/></svg>The desk's calls</li>
           <li><svg class="ic sm"><use href="#i-target"/></svg>Scorecard</li>
         </ul>
@@ -1102,7 +1103,7 @@ p { text-wrap: pretty; }
     <div class="joined feats">
       <div class="feat edge c-desk"><span class="icbox"><svg class="ic"><use href="#i-grid"/></svg></span><b>Your desk today</b><p>Four tiles at the top: your accounts with their gain since bought, Agentic buying power, the S&amp;P 500 today, and the desk's calls.</p></div>
       <div class="feat edge c-src"><span class="icbox"><svg class="ic"><use href="#i-chart"/></svg></span><b>Markets and chart</b><p>Six market tiles, and any stock across the whole width: area or candles, averages, volume and its key figures underneath.</p></div>
-      <div class="feat edge c-you"><span class="icbox"><svg class="ic"><use href="#i-star"/></svg></span><b>Search and watchlist</b><p>Type a company or a ticker and pick from the matches as you type. Star and remove stocks; the robot button puts one on the desk's waiting list.</p></div>
+      <div class="feat edge c-you"><span class="icbox"><svg class="ic"><use href="#i-star"/></svg></span><b>Watchlist and analyses</b><p>Pick a stock from the matches as you type and star it. The robot asks the desk to analyse it, as deep as you choose; each shows waiting, the step it is on, its rating or why it failed.</p></div>
       <div class="feat edge c-desk"><span class="icbox"><svg class="ic"><use href="#i-flag"/></svg></span><b>The desk's calls</b><p>Each call in two lines; in full, a coloured summary, the price since the call and every agent's part as a card.</p></div>
       <div class="feat edge c-desk"><span class="icbox"><svg class="ic"><use href="#i-target"/></svg></span><b>How the desk is doing</b><p>The scorecard: calls scored against their index, and those still waiting.</p></div>
       <div class="feat edge c-you"><span class="icbox"><svg class="ic"><use href="#i-ledger"/></svg></span><b>Stock page</b><p>Everything on one stock: what you hold with Buy… and Sell…, your orders on it, and each call with its score.</p></div>

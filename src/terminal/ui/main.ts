@@ -2,7 +2,7 @@
 // scorecard worked out from them, the watchlist, the analyses waiting, and the person's Robinhood accounts on a page of
 // their own. A number that cannot be had is a dash. An order starts only from a ticket - one of the desk's calls
 // (Decide…) or the person's own (Trade…) - and is placed only on their Confirm, with trading switched on by them.
-import { api, ApiError, claimKey, hasKey, KEY_LOST, type CallDetail, type DeskState, type History, type LinkInfo, type Market, type Match, type Prefs, type QuoteResult, type Account, type AccountView, type Holding, type Order, type Recent, type Snapshot, type TicketOpen, type Check, type Review, type Placed, type Trading } from './api.js';
+import { api, ApiError, claimKey, hasKey, KEY_LOST, type CallDetail, type DeskState, type Depth, type History, type LinkInfo, type Market, type Match, type Prefs, type QueueView, type QuoteResult, type Account, type AccountView, type Holding, type Order, type Recent, type Snapshot, type TicketOpen, type Check, type Review, type Placed, type Trading } from './api.js';
 import { heroChart, sparkline } from './chart.js';
 import { barOn, clock, dayText, esc, labelled, money, num, opening, pct, plain, ratingTone, SECTION_NAMES, shortDay, tone } from './fmt.js';
 import { markdown } from './md.js';
@@ -127,7 +127,7 @@ function renderSub(): void {
   if (life.updating) { $('#subline').textContent = 'The desk was updated: the dashboard is restarting with the new version, and this page reloads by itself.'; return; }
   if (S.lost) { $('#subline').textContent = 'The dashboard has lost the desk. Run /terminal in Madav to start it again.'; return; }
   if (!d) { $('#subline').textContent = "Reading the desk's files."; return; }
-  const w = d.watchlist.length, c = d.calls.length, q = d.queue.length;
+  const w = d.watchlist.length, c = d.calls.length, q = d.queue.filter(isOpenItem).length;
   const parts = [`${w} ${w === 1 ? 'stock' : 'stocks'} on the watchlist`, `${c} ${c === 1 ? 'call' : 'calls'} on record`];
   if (q) parts.push(`${q} waiting to be analysed`);
   $('#subline').textContent = `${parts.join(' · ')}.${d.desk.emailSaved ? '' : ' The desk has no contact email yet, which the SEC asks for before company accounts can be read: run /desk-check in Madav.'}`;
@@ -217,7 +217,7 @@ function renderToday(): void {
   const market = kpi({ tone: q ? (q.changePct !== null && q.changePct < 0 ? 'bad' : 'ok') : '', icon: 'i-pulse', name: 'S&P 500 today', value: q ? num(q.price, 0) : '—', line: q ? `<span class="${(q.changePct ?? 0) >= 0 ? 'ta-up' : 'ta-down'}">${pct(q.changePct)}</span> · ${q.open ? 'now' : 'last close'}` : 'Reading the market', act: { act: 'select', symbol: '^GSPC' }, spark: q ? 'gspc' : '' });
   // the desk: its latest call, what is waiting, what is scored
   const latest = d?.calls[0];
-  const desk = kpi({ tone: 'merged', icon: 'i-check', name: "The desk's calls", value: d ? String(d.calls.length) : '—', line: d ? `${latest ? `latest <b>${esc(latest.ticker)}</b> ${esc(latest.rating)}` : 'none yet'} · ${d.queue.length} waiting · ${d.record.summary.resolved} scored` : 'Reading the desk', act: { act: 'goto', to: 'sec-calls' } });
+  const desk = kpi({ tone: 'merged', icon: 'i-check', name: "The desk's calls", value: d ? String(d.calls.length) : '—', line: d ? `${latest ? `latest <b>${esc(latest.ticker)}</b> ${esc(latest.rating)}` : 'none yet'} · ${d.queue.filter(isOpenItem).length} waiting · ${d.record.summary.resolved} scored` : 'Reading the desk', act: { act: 'goto', to: 'sec-calls' } });
   el.innerHTML = accounts + agentic + market + desk;
   const sp = el.querySelector<HTMLElement>('[data-kpi="gspc"]');
   if (sp && q) sparkline(sp, q.points, (q.changePct ?? 0) >= 0 ? 'ok' : 'bad', { dot: true });
@@ -570,8 +570,8 @@ function renderStats(sym: string, h: History | null): void {
 function renderHeroActions(): void {
   const sym = S.symbol, d = S.desk, el = $('#heroActions');
   if (!sym || !d || isIndex(sym)) { el.innerHTML = ''; return; }
-  const queued = d.queue.some((x) => x.symbol === sym), c = latestCall(sym);
-  const ask = queued ? '<span class="at-chip">waiting to be analysed</span>'
+  const c = latestCall(sym);
+  const ask = isOpen(sym) ? openChip(sym)
     : `<button class="at-btn at-press" data-act="analyse" data-symbol="${esc(sym)}"><svg class="g"><use href="#i-bot"/></svg><span>${c ? 'Analyse again' : 'Ask the desk to analyse'}</span></button>`;
   const trade = isStock(sym) ? `<button class="at-btn at-press" data-act="trade" data-symbol="${esc(sym)}" title="Your own order for ${esc(sym)}, in the Agentic account"><svg class="g"><use href="#i-trade"/></svg><span>Trade…</span></button>` : '';
   el.innerHTML = ask + trade;
@@ -599,8 +599,7 @@ function renderCall(): void {
   const label = `<span class="ta-callbar-l">The desk's call</span>`;
   if (isIndex(sym)) { el.innerHTML = `${label}<span class="at-quiet ta-callbar-t">The desk analyses stocks, not indices.</span>`; return; }
   if (!c) {
-    const queued = d.queue.some((x) => x.symbol === sym);
-    el.innerHTML = `${label}<span class="at-quiet ta-callbar-t">No call on ${esc(sym)} yet${queued ? ': it is waiting to be analysed' : '. Ask the desk to analyse it, above'}.</span>`;
+    el.innerHTML = `${label}<span class="at-quiet ta-callbar-t">No call on ${esc(sym)} yet${isOpen(sym) ? ': it is asked for, see Analyses you asked for' : '. Ask the desk to analyse it, above'}.</span>`;
     return;
   }
   el.innerHTML = `${label}${ratingChip(c.rating)}<span class="at-quiet">${esc(dayText(c.date))}</span>${resultChip(c)}
@@ -608,15 +607,55 @@ function renderCall(): void {
     <span class="ta-callbar-do">${readButton(c.ticker, c.date, 'Read the reasoning')}${decideButton(c.ticker, c.date)}</span>`;
 }
 
-/** What is waiting to be analysed, beside the watchlist's heading: one chip each, with a cross to take it off. */
-function renderQueue(): void {
-  const q = S.desk?.queue ?? [];
-  $('#queueBox').innerHTML = q.length
-    ? `<span class="at-quiet">Waiting to be analysed</span>${q.map((x) => `<span class="at-chip" title="Asked ${esc(dayText(x.requestedAt))}">${esc(x.symbol)}<button class="at-chip-x" data-act="dequeue" data-symbol="${esc(x.symbol)}" aria-label="Take ${esc(x.symbol)} off the list" title="Take off the list"><svg class="g"><use href="#i-x"/></svg></button></span>`).join('')}`
-    : '';
-  $('#watchSub').textContent = q.length
-    ? 'Press a row to chart it · ask the team to "analyse what is waiting" in Madav / Claude'
-    : 'Press a row to chart it · the star keeps it in the side list';
+// ---------- the analyses the person asked for: waiting, running, done or failed ----------
+const DEPTH_ORDER: readonly Depth[] = ['shallow', 'medium', 'deep'];
+const DEPTH_WORDS: Record<Depth, [string, string]> = {
+  shallow: ['Shallow', 'Quick: the bull and the bear each make their case once, and so do the three risk voices.'],
+  medium: ['Medium', 'The two sides answer each other three times, and so do the risk voices. Slower, and costs more.'],
+  deep: ['Deep', 'Five rounds of each debate. The slowest and costliest: for a call you may act on.'],
+};
+const isOpenItem = (x: QueueView) => x.state === 'waiting' || x.state === 'running';
+const itemOf = (sym: string) => S.desk?.queue.find((x) => x.symbol === sym);
+const isOpen = (sym: string) => { const x = itemOf(sym); return !!x && isOpenItem(x); };
+const openChip = (sym: string) => (itemOf(sym)?.state === 'running' ? '<span class="at-chip accent">being analysed</span>' : '<span class="at-chip">waiting to be analysed</span>');
+
+/** Each stock asked for, where it stands, and who runs them: a listener (Madav, Claude Code), or nobody yet. */
+function renderAnalyses(): void {
+  const d = S.desk;
+  if (!d) return;
+  const q = d.queue, l = d.analyses.listener, waiting = q.filter((x) => x.state === 'waiting').length, running = q.some((x) => x.state === 'running');
+  $('#analysesSub').textContent = l
+    ? `Runs by itself: ${l.listener} is listening on this computer${l.lastRun ? ` · last run ${clock(l.lastRun.at)}: ${l.lastRun.result}` : ''}. One stock at a time, at most ${d.analyses.perRun} a run.`
+    : 'Nothing is listening, so analyses wait here. Switch on "Run automatically" in Madav, or run them with Claude Code on this computer, or ask the desk to "analyse what is waiting" in a chat.';
+  const press = (act: string, words: string, primary = false) => `<button class="at-btn at-press${primary ? ' primary' : ''}" data-act="${act}">${esc(words)}</button>`;
+  $('#analysesDo').innerHTML = (l && waiting && !running ? press('q-run', 'Run now') : '')
+    + (!l ? press('listen-on', 'Run automatically with Claude Code', waiting > 0) : l.listener === 'Claude Code' ? press('listen-off', 'Stop running automatically') : '');
+  const stands = (x: QueueView): string => {
+    if (x.state === 'running') return `<span class="at-chip accent">Being analysed</span> <span class="at-quiet">${esc(x.progress ?? 'starting')}</span>`;
+    if (x.state === 'waiting') return `<span class="at-chip">Waiting</span>${l ? '' : ' <span class="at-quiet">for a run to start</span>'}`;
+    if (x.state === 'done') return `${ratingChip(x.rating ?? 'Recorded')} <span class="at-quiet">done ${esc(x.endedAt ? clock(x.endedAt) : '')}</span>`;
+    return `<span class="at-chip danger">Failed</span> <span class="at-quiet">${esc(x.reason ?? '')}</span>`;
+  };
+  const doing = (x: QueueView): string => {
+    const off = `<button class="icon-btn" data-act="dequeue" data-symbol="${esc(x.symbol)}" title="Take ${esc(x.symbol)} off this list" aria-label="Take ${esc(x.symbol)} off this list"><svg class="g"><use href="#i-x"/></svg></button>`;
+    if (x.state === 'running') return '';
+    if (x.state === 'done' && x.date) return `<span class="at-row">${readButton(x.symbol, x.date, 'Read the call')}${off}</span>`;
+    if (x.state === 'failed') return `<span class="at-row"><button class="at-btn at-press" data-act="q-retry" data-symbol="${esc(x.symbol)}">Retry</button>${off}</span>`;
+    return `<span class="at-row">${off}</span>`;
+  };
+  const rows = q.map((x) => `<tr><td><b>${esc(x.symbol)}</b></td><td>${esc(x.depth ? DEPTH_WORDS[x.depth][0] : 'Settings')}</td><td class="wrap">${stands(x)}</td><td class="at-quiet">${esc(dayText(x.requestedAt))}</td><td>${doing(x)}</td></tr>`).join('');
+  $('#analysesTable').innerHTML = `<thead><tr><th>Stock</th><th>Depth</th><th class="wrap">Where it stands</th><th>Asked</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="ta-empty">Nothing asked for yet. Press the robot beside a stock to ask the desk to analyse it.</td></tr>'}</tbody>`;
+}
+
+/** A stock that finished since the page last looked: a notice, so the person hears of it wherever they are on the page. */
+function noticeFinished(before: QueueView[] | undefined, after: QueueView[]): void {
+  if (!before) return;
+  for (const x of after) {
+    const was = before.find((b) => b.symbol === x.symbol);
+    if (!was || !isOpenItem(was)) continue;
+    if (x.state === 'done') toast(`${x.symbol}: ${x.rating ?? 'recorded'}. Its call is in the desk's calls.`);
+    else if (x.state === 'failed') toast(`${x.symbol} could not be analysed: ${x.reason ?? ''}`, 'bad');
+  }
 }
 
 // ---------- the stock page: everything on the stock being charted ----------
@@ -661,15 +700,14 @@ function renderStock(): void {
     </div>
     <div class="at-card at-box"><div class="at-card-head"><h3>The desk's calls on it</h3></div>${latest ? `<p class="at-lede">${esc(latest.summary)}</p>` : ''}${list}</div>`;
 
-  const queued = d.queue.some((x) => x.symbol === sym);
-  $('#stockActions').innerHTML = `${queued ? '<span class="at-chip">waiting to be analysed</span>' : `<button class="at-btn at-press" data-act="analyse" data-symbol="${esc(sym)}"><svg class="g"><use href="#i-bot"/></svg><span>Ask the desk to analyse</span></button>`}${isStock(sym) ? `<button class="at-btn at-press" data-act="trade" data-symbol="${esc(sym)}"><svg class="g"><use href="#i-trade"/></svg><span>Trade…</span></button>` : ''}${latest ? decideButton(sym, latest.date) : ''}`;
+  $('#stockActions').innerHTML = `${isOpen(sym) ? openChip(sym) : `<button class="at-btn at-press" data-act="analyse" data-symbol="${esc(sym)}"><svg class="g"><use href="#i-bot"/></svg><span>Ask the desk to analyse</span></button>`}${isStock(sym) ? `<button class="at-btn at-press" data-act="trade" data-symbol="${esc(sym)}"><svg class="g"><use href="#i-trade"/></svg><span>Trade…</span></button>` : ''}${latest ? decideButton(sym, latest.date) : ''}`;
 }
 
 // ---------- watchlist, calls, scorecard ----------
 function renderWatch(): void {
   const list = S.desk?.watchlist ?? [];
   const rows = list.map((w) => {
-    const q = quoteOf(w.symbol), c = latestCall(w.symbol), queued = S.desk?.queue.some((x) => x.symbol === w.symbol);
+    const q = quoteOf(w.symbol), c = latestCall(w.symbol), queued = isOpen(w.symbol);
     const err = S.quotes.get(w.symbol);
     return `<tr class="ta-go ${w.symbol === S.symbol ? 'on' : ''}" data-act="select" data-symbol="${esc(w.symbol)}">
       <td><button class="icon-btn ta-fav ${w.favourite ? 'on' : ''}" data-act="fav" data-symbol="${esc(w.symbol)}" aria-label="${w.favourite ? 'Remove' : 'Add'} ${esc(w.symbol)} ${w.favourite ? 'from' : 'to'} the side list"><svg class="g"><use href="#i-star"/></svg></button></td>
@@ -678,7 +716,7 @@ function renderWatch(): void {
       <td class="num">${q ? changeChip(q) : `<span class="at-quiet" title="${esc(err && 'message' in err ? err.message : '')}">${err && 'error' in err ? (err.error === 'no-data' ? 'No data' : 'Unavailable') : '—'}</span>`}</td>
       <td><div class="ta-tablespark" data-sp="${esc(w.symbol)}"></div></td>
       <td>${c ? `${ratingChip(c.rating)} <span class="at-quiet">${esc(dayText(c.date))}</span>` : '<span class="at-quiet">no call yet</span>'}</td>
-      <td><span class="at-row">${queued ? '<span class="at-chip">queued</span>' : `<button class="icon-btn" data-act="analyse" data-symbol="${esc(w.symbol)}" title="Ask the desk to analyse ${esc(w.symbol)}" aria-label="Ask the desk to analyse ${esc(w.symbol)}"><svg class="g"><use href="#i-bot"/></svg></button>`}<button class="icon-btn" data-act="remove" data-symbol="${esc(w.symbol)}" title="Remove ${esc(w.symbol)}" aria-label="Remove ${esc(w.symbol)} from the watchlist"><svg class="g"><use href="#i-trash"/></svg></button></span></td></tr>`;
+      <td><span class="at-row">${queued ? openChip(w.symbol) : `<button class="icon-btn" data-act="analyse" data-symbol="${esc(w.symbol)}" title="Ask the desk to analyse ${esc(w.symbol)}" aria-label="Ask the desk to analyse ${esc(w.symbol)}"><svg class="g"><use href="#i-bot"/></svg></button>`}<button class="icon-btn" data-act="remove" data-symbol="${esc(w.symbol)}" title="Remove ${esc(w.symbol)}" aria-label="Remove ${esc(w.symbol)} from the watchlist"><svg class="g"><use href="#i-trash"/></svg></button></span></td></tr>`;
   }).join('');
   $('#watchTable').innerHTML = `<thead><tr><th></th><th>Stock</th><th class="num">Price</th><th class="num">Today</th><th>Today's moves</th><th>Latest call</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="7" class="ta-empty">Nothing on the watchlist yet. Type a stock above, for example NVDA, and press Add.</td></tr>'}</tbody>`;
   for (const w of list) {
@@ -793,7 +831,7 @@ async function sinceCall(symbol: string, date: string): Promise<void> {
 
 // ---------- everything ----------
 function renderAll(): void {
-  renderSub(); renderFavs(); renderAccount(); renderToday(); renderControls(); renderHero(); renderCall(); renderStock(); renderQueue(); renderWatch(); renderCalls(); renderScore();
+  renderSub(); renderFavs(); renderAccount(); renderToday(); renderControls(); renderHero(); renderCall(); renderStock(); renderAnalyses(); renderWatch(); renderCalls(); renderScore();
 }
 
 /** Shows the desk or the account page; the side list marks where the person is. */
@@ -838,7 +876,9 @@ function withRecent(sym: string, name = ''): Recent[] {
 
 async function refreshState(): Promise<void> {
   try {
+    const before = S.desk?.queue;
     S.desk = await api.state(); S.lost = false;
+    noticeFinished(before, S.desk.queue);
     const watch = S.desk.watchlist.map((w) => w.symbol);
     const shown = (s: string | undefined): s is string => !!s && (watch.includes(s) || isIndex(s));
     if (!shown(S.symbol)) {
@@ -877,11 +917,29 @@ async function addStock(raw: string): Promise<void> {
   });
 }
 
-async function ask(sym: string): Promise<void> {
+/** Asking the desk to analyse a stock: the person chooses how deep (the settings' depth first), then it joins the list. */
+const ASK = { symbol: '', depth: 'shallow' as Depth };
+function ask(sym: string): void {
+  ASK.symbol = sym; ASK.depth = S.desk?.analyses.depth ?? 'shallow';
+  renderAsk();
+  $<HTMLDialogElement>('#askDialog').showModal();
+}
+function renderAsk(): void {
+  const l = S.desk?.analyses.listener;
+  $('#askDialog').innerHTML = `<h2 id="askTitle">Analyse ${esc(ASK.symbol)}</h2>
+    <p class="at-lede">The desk's twelve agents read the price, the news, the mood and the accounts, argue both sides, and record a call you can read and decide on. It never places an order.</p>
+    <div class="at-seg" role="radiogroup" aria-label="How deep">${DEPTH_ORDER.map((d) => `<button class="at-seg-b${d === ASK.depth ? ' on' : ''}" role="radio" aria-checked="${d === ASK.depth}" data-act="ask-depth" data-depth="${d}">${DEPTH_WORDS[d][0]}</button>`).join('')}</div>
+    <p class="at-quiet">${esc(DEPTH_WORDS[ASK.depth][1])}</p>
+    <p class="at-honest">${l ? `It runs by itself: ${esc(l.listener)} is listening.` : 'Nothing is listening on this computer yet, so it waits until a run starts: see Analyses you asked for.'}</p>
+    <div class="at-pop-do"><button class="at-btn at-press" data-act="ask-cancel">Cancel</button><button class="at-btn at-press primary" data-act="ask-yes"><svg class="g"><use href="#i-bot"/></svg><span>Ask the desk</span></button></div>`;
+}
+async function askNow(): Promise<void> {
+  const sym = ASK.symbol, l = S.desk?.analyses.listener;
   await run(async () => {
-    await api.enqueue(sym);
+    await api.enqueue(sym, ASK.depth);
+    $<HTMLDialogElement>('#askDialog').close();
     await refreshState();
-    toast(`${sym} is waiting. Run /analyse in Madav to have the team analyse it.`);
+    toast(l ? `${sym} is asked for: it runs by itself, and its call appears here.` : `${sym} is waiting. Nothing is listening yet: see Analyses you asked for.`);
   });
 }
 
@@ -917,8 +975,15 @@ document.addEventListener('click', (e) => {
     case 'select': select(sym); break;
     case 'fav': void run(async () => { const on = !S.desk?.watchlist.find((w) => w.symbol === sym)?.favourite; await api.favourite(sym, on); await refreshState(); }); break;
     case 'remove': void run(async () => { await api.removeWatch(sym); await refreshState(); toast(`${sym} is off the watchlist.`); }); break;
-    case 'analyse': void ask(sym); break;
+    case 'analyse': ask(sym); break;
     case 'dequeue': void run(async () => { await api.dequeue(sym); await refreshState(); }); break;
+    case 'ask-depth': ASK.depth = (el.dataset.depth ?? 'shallow') as Depth; renderAsk(); break;
+    case 'ask-cancel': $<HTMLDialogElement>('#askDialog').close(); break;
+    case 'ask-yes': void askNow(); break;
+    case 'q-retry': { const x = S.desk?.queue.find((i) => i.symbol === sym); void run(async () => { await api.enqueue(sym, x?.depth ?? S.desk?.analyses.depth ?? 'shallow'); await refreshState(); toast(`${sym} is asked for again.`); }); break; }
+    case 'q-run': void run(async () => { await api.runQueue(); await refreshState(); toast('Asked for a run of what is waiting.'); }); break;
+    case 'listen-on': void run(async () => { await api.listen(true); await refreshState(); toast('Analyses you ask for now run by themselves, with Claude Code on this computer.'); }); break;
+    case 'listen-off': void run(async () => { await api.listen(false); await refreshState(); toast('Analyses no longer run by themselves. A run in progress finishes first.'); }); break;
     case 'open-call': void openCall(sym, el.dataset.date ?? ''); break;
     case 'decide': if (dlg.open) dlg.close(); if (ready()) void openTicket(sym, el.dataset.date ?? ''); break;
     case 'trade': if (dlg.open) dlg.close(); if (ready()) void openTicket(sym, '', el.dataset.side === 'sell' ? 'sell' : 'buy'); break;

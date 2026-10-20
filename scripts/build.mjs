@@ -3,7 +3,7 @@ import { build } from 'esbuild';
 import fs from 'node:fs';
 
 const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
-const entries = { 'desk-tools': 'src/tools/main.ts', robinhood: 'src/robinhood/cli.ts', terminal: 'src/terminal/main.ts' };
+const entries = { 'desk-tools': 'src/tools/main.ts', robinhood: 'src/robinhood/cli.ts', terminal: 'src/terminal/main.ts', watch: 'src/watch/main.ts' };
 
 for (const [name, entry] of Object.entries(entries)) {
   await build({

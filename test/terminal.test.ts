@@ -14,11 +14,12 @@ import { saveContactEmail } from '../src/contact.js';
 import { deskServer } from '../src/tools/server.js';
 import { clearQuotes, parseQuote } from '../src/terminal/quotes.js';
 import { clearSearches, parseSearch } from '../src/terminal/search.js';
-import { MAX_RECENT } from '../src/terminal/prefs.js';
+import { MAX_RECENT, readPrefs, savePrefs } from '../src/terminal/prefs.js';
 import { summaryOf } from '../src/terminal/state.js';
 import { lockState } from '../src/private.js';
 import { startTerminal, type Assets, type Terminal } from '../src/terminal/server.js';
-import { enqueue, MAX_QUEUE, MAX_WATCH, addWatch } from '../src/terminal/store.js';
+import { MAX_WATCH, addWatch } from '../src/terminal/store.js';
+import { enqueue, MAX_OPEN, readDoorbell, writeListener } from '../src/desk/queue.js';
 import { chartJson, series } from './chart.js';
 
 const NOW = Date.parse('2026-10-12T15:00:00Z') / 1000;
@@ -153,21 +154,72 @@ test('a stock is added only if it has a price, can be starred and removed, and t
   assert.throws(() => addWatch(dir(), 'LAST', '2026-10-12'), /holds 50 stocks/);
 });
 
-test('an analysis asked for on the page waits in a queue the desk\'s own tools can read and clear', async () => {
-  assert.deepEqual((await call(term, 'POST', '/api/queue', { body: { symbol: 'nvda' } })).json().queue.map((q: any) => q.symbol), ['NVDA']);
-  assert.equal((await call(term, 'POST', '/api/queue', { body: { symbol: 'NVDA' } })).json().queue.length, 1);
+test('an analysis asked for on the page waits at its depth, rings for whoever listens, and the desk\'s tools take it from waiting to running to done', async () => {
+  const first = (await call(term, 'POST', '/api/queue', { body: { symbol: 'nvda' } })).json().queue;
+  assert.deepEqual(first.map((q: any) => [q.symbol, q.state, q.depth]), [['NVDA', 'waiting', 'shallow']], "the settings' depth when none is chosen");
+  const bell = readDoorbell(dir());
+  assert.deepEqual([bell?.why, bell?.waiting], ['press', 1], 'the press rings the doorbell');
+  assert.deepEqual((await call(term, 'POST', '/api/queue', { body: { symbol: 'NVDA', depth: 'deep' } })).json().queue.map((q: any) => [q.symbol, q.depth]), [['NVDA', 'deep']], 'asked again while waiting: the new depth stands');
+  assert.equal((await call(term, 'POST', '/api/queue', { body: { symbol: 'AAPL', depth: 'deepest' } })).status, 400);
   const [a, b] = InMemoryTransport.createLinkedPair();
   await deskServer(root, yahoo).connect(a);
   const client = new Client({ name: 't', version: '0' });
   await client.connect(b);
   const tool = async (name: string, args: Record<string, unknown> = {}) => ((await client.callTool({ name, arguments: args })) as { content: Array<{ text: string }> }).content[0]!.text;
-  assert.match(await tool('read_queue'), /^1 analysis request\(s\) waiting, oldest first:\n1\. NVDA \(asked /);
-  assert.match(await tool('finish_queue_item', { symbol: 'NVDA' }), /0 left/);
-  assert.match(await tool('read_queue'), /Nothing is waiting/);
-  assert.equal((await call(term, 'GET', '/api/state')).json().queue.length, 0);
-  for (let i = 0; i < MAX_QUEUE; i++) enqueue(dir(), `Q${i}`, '2026-10-12T10:00:00Z');
-  assert.equal((await call(term, 'POST', '/api/queue', { body: { symbol: 'ONEMORE' } })).status, 400);
+  assert.match(await tool('read_queue'), /^1 waiting, in the order to run them; one run analyses at most 5:\n1\. NVDA, depth deep \(debate_rounds 5 and risk_rounds 5\)/);
+  assert.match(await tool('start_queue_item', { symbol: 'NVDA' }), /^START: NVDA is marked as being analysed\. Plan it with analysis date 2026-10-12, depth deep/);
+  const running = (await call(term, 'GET', '/api/state')).json().queue[0];
+  assert.deepEqual([running.state, running.date, running.progress], ['running', '2026-10-12', 'starting']);
+  assert.equal((await call(term, 'DELETE', '/api/queue?symbol=NVDA')).status, 409, 'a stock being analysed stays on the list');
+  await call(term, 'POST', '/api/queue', { body: { symbol: 'AAPL' } });
+  assert.match(await tool('start_queue_item', { symbol: 'AAPL' }), /^BUSY: NVDA is being analysed now: one stock runs at a time/);
+  assert.match(await tool('finish_queue_item', { symbol: 'NVDA' }), /^INPUT_ERROR: no call for NVDA on 2026-10-12 is recorded yet/);
+  new Journal(path.join(dir(), 'journal.md')).storeDecision('NVDA', '2026-10-12', '**Rating**: Buy\n\n**Executive Summary**: Buy.');
+  assert.match(await tool('finish_queue_item', { symbol: 'NVDA' }), /^Marked done: NVDA, Buy/);
+  assert.match(await tool('finish_queue_item', { symbol: 'NVDA' }), /^FINISHED: NVDA is already done/);
+  assert.match(await tool('start_queue_item', { symbol: 'AAPL' }), /^START/);
+  assert.match(await tool('finish_queue_item', { symbol: 'AAPL', failed_because: 'Yahoo Finance did not answer: press Retry later' }), /^Marked failed: AAPL/);
+  const after = (await call(term, 'GET', '/api/state')).json().queue;
+  assert.deepEqual(after.map((q: any) => [q.symbol, q.state, q.rating ?? q.reason]), [['AAPL', 'failed', 'Yahoo Finance did not answer: press Retry later'], ['NVDA', 'done', 'Buy']]);
+  assert.match((await call(term, 'POST', '/api/queue', { body: { symbol: 'NVDA' } })).json().error, /NVDA was already analysed today \(Buy\): its call is in the journal/);
+  assert.equal((await call(term, 'POST', '/api/queue/run', { body: {} })).status, 409, 'nothing is waiting to run');
+  assert.deepEqual((await call(term, 'POST', '/api/queue', { body: { symbol: 'AAPL' } })).json().queue.map((q: any) => [q.symbol, q.state]), [['AAPL', 'waiting'], ['NVDA', 'done']], 'Retry: a failed stock waits afresh');
+  assert.equal((await call(term, 'POST', '/api/queue/run', { body: {} })).status, 200, 'Run now rings again');
+  assert.equal((await call(term, 'DELETE', '/api/queue?symbol=NVDA')).status, 200, 'a finished stock can be taken off');
+  assert.equal(await tool('end_queue_run'), "1 still waiting: another run was asked for. On the dashboard's list: 0 done, 0 failed.");
+  assert.equal(readDoorbell(dir())?.why, 'more');
+  for (let i = 0; i < MAX_OPEN; i++) { try { enqueue(dir(), `Q${i}`, '2026-10-12T10:00:00Z'); } catch { /* full */ } }
+  assert.match((await call(term, 'POST', '/api/queue', { body: { symbol: 'ONEMORE' } })).json().error, /20 analyses are already waiting/);
   await client.close();
+});
+
+test('"Run automatically with Claude Code": started and stopped from the page, remembered across starts, and never over another listener', async () => {
+  assert.equal((await call(term, 'POST', '/api/listen', { body: { on: true } })).status, 404, 'a dashboard given no way to start it has no switch');
+  let started = 0, claude = true;
+  const own = () => { started++; writeListener(dir(), { listener: 'Claude Code', since: new Date().toISOString(), beat: new Date().toISOString(), pid: 4242 }); };
+  const t = await startTerminal({ root, assets: ASSETS, port: 0, keyFile: KEYS(), listen: { start: own, claude: () => claude } });
+  try {
+    claude = false;
+    assert.match((await call(t, 'POST', '/api/listen', { body: { on: true } })).json().error, /Claude Code is not installed on this computer/);
+    claude = true;
+    assert.equal((await call(t, 'POST', '/api/listen', { body: { on: true } })).json().listener.listener, 'Claude Code');
+    assert.deepEqual([started, readPrefs(dir()).autorun], [1, true]);
+    assert.equal((await call(t, 'GET', '/api/state')).json().analyses.listener.listener, 'Claude Code');
+    assert.equal((await call(t, 'POST', '/api/prefs', { body: { autorun: false, theme: 'light' } })).json().autorun, true, "the page's other choices never change the switch");
+    assert.equal((await call(t, 'POST', '/api/listen', { body: { on: false } })).json().listener, null);
+    assert.deepEqual([fs.existsSync(path.join(dir(), 'listener.json')), readPrefs(dir()).autorun], [false, false], 'off: the note is taken away, and the listener ends after the run in hand');
+    writeListener(dir(), { listener: 'Madav', since: new Date().toISOString(), beat: new Date().toISOString() });
+    assert.match((await call(t, 'POST', '/api/listen', { body: { on: true } })).json().error, /Madav is already listening/);
+    assert.match((await call(t, 'POST', '/api/listen', { body: { on: false } })).json().error, /Madav is listening, not Claude Code: switch it off there/);
+    writeListener(dir(), { listener: 'Madav', since: '2026-10-01T09:00:00Z', beat: '2026-10-01T09:00:00Z' });
+    assert.equal((await call(t, 'GET', '/api/state')).json().analyses.listener, null, 'a listener whose heartbeat stopped is not believed');
+  } finally { await t.close(); }
+  savePrefs(dir(), { autorun: true });
+  started = 0;
+  const again = await startTerminal({ root, assets: ASSETS, port: 0, keyFile: KEYS(), listen: { start: own, claude: () => true } });
+  try { assert.equal(started, 1, 'left on: started again with the dashboard'); } finally { await again.close(); }
+  const third = await startTerminal({ root, assets: ASSETS, port: 0, keyFile: KEYS(), listen: { start: own, claude: () => true } });
+  try { assert.equal(started, 1, 'not twice: someone already listens'); } finally { await third.close(); }
 });
 
 const BUY = '**Rating**: Overweight\n\n**Executive Summary**: Add gradually on a close above 229.\n\n**Investment Thesis**: The trend is up.';
