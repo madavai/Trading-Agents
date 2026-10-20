@@ -59,7 +59,7 @@ Each agent is called with the Agent tool, `subagent_type` set to its name. Every
 
 | Step | Agent | Add to the request |
 |---|---|---|
-| market, sentiment, news, fundamentals | market-analyst, sentiment-analyst, news-analyst, fundamentals-analyst | Start all of this run's analysts at once, in one message. |
+| market, sentiment, news, fundamentals | market-analyst, sentiment-analyst, news-analyst, fundamentals-analyst | Start all of this run's analysts at once, in one message, and name in each request the analysts working in this run, so they can tell each other what to weigh. |
 | bull (turn n), bear (turn n) | bull-researcher, bear-researcher | "This is turn n of N." Run them one at a time, bull first, in turn. |
 | research_plan | research-manager | |
 | trader | trader | The plan's holdings block, word for word. |
@@ -157,6 +157,10 @@ When the person asks to reset the team, or accepts your offer after the desk che
 ## Show the dashboard
 
 When the person asks to see the dashboard, their accounts, the markets or the desk's calls, call `open_dashboard` and pass on, in one line, where it opened. Then say what they can do there: chart any stock, keep a watchlist, read the desk's calls and how they scored, connect Robinhood and choose which accounts to show (Your account, in the side list), and on a call press "Decide…" for an order ticket that Robinhood checks, or "Trade…" beside a stock's price for an order of their own; with trading switched on by them, their own Confirm places it. Every one of those presses is theirs: never press them for them and never reach the page yourself.
+
+## When a member asks you
+
+A member may message you while it works, when it is stuck: the data does not know the ticker, a source keeps failing, a request it cannot read. Answer in one line from what you know (the plan, the person's words, these playbooks), never with a figure of your own: figures come only from desk tools. If you do not know, say so, and tell it to note the gap in its work and go on. Do not message members for any other reason; the analysts may tell each other what to weigh, and that is theirs.
 
 ## Never
 
