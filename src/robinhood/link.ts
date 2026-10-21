@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseAccounts, parseOrders, parsePortfolio, parsePositions, parseQuotes, readAccount, sortAccounts, type Account, type AccountIds, type AccountView } from './account.js';
+import { marketDay } from '../data/dates.js';
 import type { Check, Order, TicketContext } from '../desk/ticket.js';
 import { writePrivate } from '../private.js';
 import { capsOf, type Caps } from '../settings.js';
@@ -122,8 +123,7 @@ export class Link {
       const held = all.find((x) => x.symbol === symbol)?.quantity ?? 0;
       const quotes = parseQuotes(await data('get_equity_quotes', { symbols: [...new Set([symbol, ...all.map((x) => x.symbol)])] }));
       const price = quotes.get(symbol) ?? null;
-      const day = (iso: string) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date(iso));
-      const ordersToday = parseOrders(await data('get_equity_orders', { account_number: ids.accountNumber })).orders.filter((o) => o.at && day(o.at) === day(now.toISOString())).length;
+      const ordersToday = parseOrders(await data('get_equity_orders', { account_number: ids.accountNumber })).orders.filter((o) => o.at && marketDay(new Date(o.at)) === marketDay(now)).length;
       return { symbol, accountValue: p.total, buyingPower: p.buyingPower, held, price, ordersToday, positions: all.map((x) => ({ symbol: x.symbol, quantity: x.quantity, price: quotes.get(x.symbol) ?? null })) };
     }
   }
@@ -167,7 +167,7 @@ export class Link {
   noteValue(total: number | null, now: Date = new Date()): TradingState {
     const state = this.trading();
     if (total === null || !(total > 0)) return state;
-    const day = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(d);
+    const day = marketDay;
     const today = day(now), weekAgo = day(new Date(now.getTime() - 7 * 86_400_000)), twoWeeks = day(new Date(now.getTime() - 14 * 86_400_000));
     const days = this.values().filter((d) => d.day >= twoWeeks && d.day !== today);
     const mine = this.values().find((d) => d.day === today);

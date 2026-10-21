@@ -274,7 +274,7 @@ export function registerDeskTools(server: McpServer, root: string): void {
     },
     annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false },
   }, async (a) => act(() => {
-    const h = saveHoldings(dir, { cash: a.cash, currency: a.currency, positions: a.positions.map((p) => ({ ticker: p.ticker, quantity: p.quantity, averagePrice: p.average_price })) }, new Date().toISOString().slice(0, 10));
+    const h = saveHoldings(dir, { cash: a.cash, currency: a.currency, positions: a.positions.map((p) => ({ ticker: p.ticker, quantity: p.quantity, averagePrice: p.average_price })) }, today());
     return h.positions.length ? `Saved ${h.positions.length} position(s)${h.cash !== undefined ? ` and cash ${h.cash}` : ''}.` : `Saved: the person holds nothing${h.cash !== undefined ? `, with cash ${h.cash}` : ''}.`;
   }));
 

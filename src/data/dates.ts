@@ -1,11 +1,16 @@
 // Dates as the desk uses them: every tool works "as of" an analysis date and never serves anything dated after it, so an
-// analysis of a past day reads only what was known that day. Dates are calendar days, YYYY-MM-DD.
+// analysis of a past day reads only what was known that day. Dates are calendar days, YYYY-MM-DD, and the desk's day is
+// New York's, the market's own: an evening run in America is not dated the next day, wherever the computer is.
 
 const DAY = 86_400_000;
 
-/** Today's date (UTC). TRADING_AGENTS_TODAY sets it, for the tests. */
-export function today(): string {
-  return process.env.TRADING_AGENTS_TODAY || new Date().toISOString().slice(0, 10);
+/** New York's calendar day of a moment, YYYY-MM-DD: the market's own day. */
+export const marketDay = (d: Date): string => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+
+/** Today, as the desk counts days (New York's), or the day of `now`. TRADING_AGENTS_TODAY sets today, for the tests. */
+export function today(now?: Date): string {
+  if (!now && process.env.TRADING_AGENTS_TODAY) return process.env.TRADING_AGENTS_TODAY;
+  return marketDay(now ?? new Date());
 }
 
 /** A YYYY-MM-DD date checked to be a real calendar day; throws with plain words otherwise. */
@@ -21,7 +26,7 @@ export function parseDate(value: string, what = 'date'): string {
 /** The analysis date, refused when it is in the future: the desk cannot analyse a day that has not happened. */
 export function analysisDate(value: string): string {
   const d = parseDate(value, 'analysis date');
-  if (d > today()) throw new Error(`the analysis date ${d} is in the future (today is ${today()})`);
+  if (d > today()) throw new Error(`the analysis date ${d} is in the future (today is ${today()}, New York's day, the market's: use it or an earlier day)`);
   return d;
 }
 

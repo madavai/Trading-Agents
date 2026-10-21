@@ -9,7 +9,8 @@ export interface WatcherOptions {
   dir: string;
   /** Who is listening, as the person reads it on the dashboard. */
   listener: string;
-  /** Runs the team once. Resolves with nothing, or with a few words on what went wrong. */
+  /** Runs the team once. Resolves with nothing, or with a few plain words on why it stopped early, which the person reads
+   *  beside the stock it left unfinished. */
   run: () => Promise<string | void>;
   pid?: number;
   /** Wait this long after the last ring before a run (20 seconds); look this often (2 seconds); beat this often (a minute). */
@@ -51,11 +52,12 @@ export function watch(o: WatcherOptions): Watcher {
     const start = now().toISOString();
     let trouble = '';
     try { trouble = (await o.run()) ?? ''; } catch (e) { trouble = (e as Error).message; }
-    // A stock this run started and left running did not finish: say so now rather than after two hours.
-    for (const i of readQueue(o.dir)) if (i.state === 'running' && (i.startedAt ?? '') >= start) finishItem(o.dir, i.symbol, { reason: 'the run stopped before this stock was finished: press Retry' });
+    // A stock this run started and left running did not finish: say so now, and why, rather than after two hours.
+    const why = trouble || 'the run stopped before this stock was finished: press Retry';
+    for (const i of readQueue(o.dir)) if (i.state === 'running' && (i.startedAt ?? '') >= start) finishItem(o.dir, i.symbol, { reason: why });
     const ended = readQueue(o.dir).filter((i) => (i.endedAt ?? '') >= start);
     const d = ended.filter((i) => i.state === 'done').length, f = ended.filter((i) => i.state === 'failed').length;
-    note.lastRun = { at: now().toISOString(), result: `${d} analysed, ${f} failed${trouble ? `; ${trouble}` : ''}` };
+    note.lastRun = { started: start, at: now().toISOString(), result: `${d} analysed, ${f} failed${trouble ? `; ${trouble}` : ''}` };
     running = false;
     beat();
     if (owed) { owed = false; pending = true; }

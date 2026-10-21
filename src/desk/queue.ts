@@ -78,21 +78,26 @@ function itemOf(v: unknown): QueueItem | null {
   return out;
 }
 
-/** A run that died leaves its stock "running" for ever; past two hours it reads as failed, the same everywhere. */
-function settled(item: QueueItem, now: Date): QueueItem {
+/** A run that died leaves its stock "running" for ever. When the listener's note says the run that started it has ended
+ *  (its last run started before the stock and ended after), it reads as failed with the listener's own words, whoever
+ *  the listener is; and past two hours it reads as failed anyway, the same everywhere. */
+function settled(item: QueueItem, now: Date, note: ListenerNote | null): QueueItem {
   if (item.state !== 'running') return item;
-  const started = Date.parse(item.startedAt ?? item.requestedAt);
+  const last = note?.lastRun, started = Date.parse(item.startedAt ?? item.requestedAt);
+  if (last?.started && Date.parse(last.started) <= started && started <= Date.parse(last.at)) {
+    return { ...item, state: 'failed', reason: words(`${note!.listener}'s run ended before this stock was finished: ${last.result}`, 300)!, endedAt: last.at };
+  }
   return now.getTime() - started > STALE_MS ? { ...item, state: 'failed', reason: STALE_REASON, endedAt: now.toISOString() } : item;
 }
 
 function load(dir: string, now: Date): QueueItem[] {
   let raw: unknown = [];
   try { raw = JSON.parse(fs.readFileSync(queueFile(dir), 'utf8')) as unknown; } catch { /* none yet */ }
-  const seen = new Set<string>(), out: QueueItem[] = [];
+  const seen = new Set<string>(), out: QueueItem[] = [], note = readListener(dir, now);
   for (const v of Array.isArray(raw) ? raw : []) {
     const item = itemOf(v);
     if (!item || seen.has(item.symbol)) continue;   // one entry per stock
-    seen.add(item.symbol); out.push(settled(item, now));
+    seen.add(item.symbol); out.push(settled(item, now, note));
   }
   return out;
 }
@@ -205,7 +210,9 @@ export interface ListenerNote {
   beat: string;
   /** The desk's own watcher writes its process id, to know the note is its own. */
   pid?: number;
-  lastRun?: { at: string; result: string };
+  /** The last run: when it started and ended, and what it did or why it stopped, in plain words. With `started`, a stock
+   *  that run left "running" reads as failed with these words at once. */
+  lastRun?: { started?: string; at: string; result: string };
 }
 export const LISTENER_FRESH_MS = 3 * 60_000;
 
@@ -217,8 +224,8 @@ export function readListener(dir: string, now: Date = new Date()): (ListenerNote
     if (!listener || !since || !beat) return null;
     const note: ListenerNote & { fresh: boolean } = { listener, since, beat, fresh: now.getTime() - Date.parse(beat) <= LISTENER_FRESH_MS };
     if (Number.isInteger(v.pid) && (v.pid as number) > 0) note.pid = v.pid as number;
-    const last = v.lastRun as Record<string, unknown> | undefined, lastAt = iso(last?.at), result = words(last?.result, 200);
-    if (lastAt && result) note.lastRun = { at: lastAt, result };
+    const last = v.lastRun as Record<string, unknown> | undefined, lastAt = iso(last?.at), result = words(last?.result, 200), started = iso(last?.started);
+    if (lastAt && result) note.lastRun = { ...(started && Date.parse(started) <= Date.parse(lastAt) ? { started } : {}), at: lastAt, result };
     return note;
   } catch { return null; }
 }

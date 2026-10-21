@@ -7540,8 +7540,10 @@ import { fileURLToPath } from "node:url";
 
 // src/data/dates.ts
 var DAY = 864e5;
-function today() {
-  return process.env.TRADING_AGENTS_TODAY || (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+var marketDay = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+function today(now) {
+  if (!now && process.env.TRADING_AGENTS_TODAY) return process.env.TRADING_AGENTS_TODAY;
+  return marketDay(now ?? /* @__PURE__ */ new Date());
 }
 var addDays = (date4, days) => new Date(Date.parse(`${date4}T00:00:00Z`) + days * DAY).toISOString().slice(0, 10);
 var daysBetween = (from, to) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY);
@@ -7765,7 +7767,6 @@ var passes = (checks) => checks.length > 0 && checks.every((x) => x.ok);
 import fs4 from "node:fs";
 import path4 from "node:path";
 var file2 = (dir) => path4.join(dir, "orders.jsonl");
-var marketDay = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(d);
 function logOrder(dir, line) {
   fs4.mkdirSync(dir, { recursive: true });
   fs4.appendFileSync(file2(dir), JSON.stringify(line) + "\n");
@@ -20310,8 +20311,7 @@ var Link = class {
       const held = all.find((x) => x.symbol === symbol)?.quantity ?? 0;
       const quotes = parseQuotes(await data("get_equity_quotes", { symbols: [.../* @__PURE__ */ new Set([symbol, ...all.map((x) => x.symbol)])] }));
       const price = quotes.get(symbol) ?? null;
-      const day2 = (iso2) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date(iso2));
-      const ordersToday = parseOrders(await data("get_equity_orders", { account_number: ids.accountNumber })).orders.filter((o) => o.at && day2(o.at) === day2(now.toISOString())).length;
+      const ordersToday = parseOrders(await data("get_equity_orders", { account_number: ids.accountNumber })).orders.filter((o) => o.at && marketDay(new Date(o.at)) === marketDay(now)).length;
       return { symbol, accountValue: p.total, buyingPower: p.buyingPower, held, price, ordersToday, positions: all.map((x) => ({ symbol: x.symbol, quantity: x.quantity, price: quotes.get(x.symbol) ?? null })) };
     }
   }
@@ -20362,7 +20362,7 @@ var Link = class {
   noteValue(total, now = /* @__PURE__ */ new Date()) {
     const state = this.trading();
     if (total === null || !(total > 0)) return state;
-    const day2 = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(d);
+    const day2 = marketDay;
     const today2 = day2(now), weekAgo = day2(new Date(now.getTime() - 7 * 864e5)), twoWeeks = day2(new Date(now.getTime() - 14 * 864e5));
     const days = this.values().filter((d) => d.day >= twoWeeks && d.day !== today2);
     const mine = this.values().find((d) => d.day === today2);
@@ -20948,9 +20948,12 @@ function itemOf(v) {
   if (state === "failed") out.reason = reason ?? "no reason was given";
   return out;
 }
-function settled(item, now) {
+function settled(item, now, note) {
   if (item.state !== "running") return item;
-  const started = Date.parse(item.startedAt ?? item.requestedAt);
+  const last = note?.lastRun, started = Date.parse(item.startedAt ?? item.requestedAt);
+  if (last?.started && Date.parse(last.started) <= started && started <= Date.parse(last.at)) {
+    return { ...item, state: "failed", reason: words2(`${note.listener}'s run ended before this stock was finished: ${last.result}`, 300), endedAt: last.at };
+  }
   return now.getTime() - started > STALE_MS2 ? { ...item, state: "failed", reason: STALE_REASON, endedAt: now.toISOString() } : item;
 }
 function load2(dir, now) {
@@ -20959,12 +20962,12 @@ function load2(dir, now) {
     raw = JSON.parse(fs13.readFileSync(queueFile(dir), "utf8"));
   } catch {
   }
-  const seen = /* @__PURE__ */ new Set(), out = [];
+  const seen = /* @__PURE__ */ new Set(), out = [], note = readListener(dir, now);
   for (const v of Array.isArray(raw) ? raw : []) {
     const item = itemOf(v);
     if (!item || seen.has(item.symbol)) continue;
     seen.add(item.symbol);
-    out.push(settled(item, now));
+    out.push(settled(item, now, note));
   }
   return out;
 }
@@ -21022,8 +21025,8 @@ function readListener(dir, now = /* @__PURE__ */ new Date()) {
     if (!listener || !since || !beat) return null;
     const note = { listener, since, beat, fresh: now.getTime() - Date.parse(beat) <= LISTENER_FRESH_MS };
     if (Number.isInteger(v.pid) && v.pid > 0) note.pid = v.pid;
-    const last = v.lastRun, lastAt = iso(last?.at), result = words2(last?.result, 200);
-    if (lastAt && result) note.lastRun = { at: lastAt, result };
+    const last = v.lastRun, lastAt = iso(last?.at), result = words2(last?.result, 200), started = iso(last?.started);
+    if (lastAt && result) note.lastRun = { ...started && Date.parse(started) <= Date.parse(lastAt) ? { started } : {}, at: lastAt, result };
     return note;
   } catch {
     return null;

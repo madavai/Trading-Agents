@@ -10,7 +10,7 @@ import { Journal } from '../src/desk/journal.js';
 import { enqueue, finishItem, readListener, readQueue, ringDoorbell, startItem, STALE_MS, writeListener } from '../src/desk/queue.js';
 import { deskServer } from '../src/tools/server.js';
 import { startTerminal, type Assets } from '../src/terminal/server.js';
-import { findClaude, RUN_ARGS, RUN_WORDS, runClaude } from '../src/watch/claude.js';
+import { findClaude, RUN_ARGS, RUN_WORDS, runClaude, stopReason } from '../src/watch/claude.js';
 import { AlreadyListening, watch } from '../src/watch/watcher.js';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -93,24 +93,64 @@ test('the listener: several presses make one run, a ring during a run owes one m
   assert.equal(readListener(dir)?.pid, 999, 'it leaves a note that is not its own');
 });
 
+test("why Claude Code stopped, in plain words: its usage limit and when it resets, a sign-in, no credit, a busy service", () => {
+  assert.equal(stopReason("Working...\nYou've hit your weekly limit · resets 6am (America/Chicago)\n"), "Claude Code's weekly usage limit was reached; it resets 6am (America/Chicago). Press Retry after that.", 'the words of the first real run');
+  assert.equal(stopReason('5-hour limit reached ∙ resets 3am'), "Claude Code's 5-hour usage limit was reached; it resets 3am. Press Retry after that.");
+  assert.equal(stopReason("You've hit your limit · resets Oct 24, 9am"), "Claude Code's usage limit was reached; it resets Oct 24, 9am. Press Retry after that.");
+  assert.match(stopReason('Claude AI usage limit reached|1792047600')!, /^Claude Code's usage limit was reached; it resets [A-Z][a-z]{2} \d{1,2}, .+\. Press Retry after that\.$/, 'the older words, with the time as a number');
+  assert.match(stopReason('Invalid API key · Please run /login')!, /not signed in/);
+  assert.match(stopReason('Credit balance is too low')!, /no credit left/);
+  assert.match(stopReason('API Error: 529 {"type":"error","error":{"type":"overloaded_error"}}')!, /too busy/);
+  assert.equal(stopReason('API Error: 500 Internal server error'), "Claude's service answered with an error (500): press Retry in a while.");
+  assert.equal(stopReason('Analysed NVDA: Hold.'), null, 'nothing known: the listener says so in its own words');
+  assert.doesNotMatch(stopReason("You've hit your limit · resets <b>6am</b>")!, /[<>]/, 'nothing but words reaches the page');
+});
+
 test('a run that stops half way leaves no stock "running": the listener marks it failed, and a run that died long ago reads as failed everywhere', async (t) => {
   const { dir } = desk();
   enqueue(dir, 'NVDA', '2026-10-12T10:00:00Z');
   t.after(() => w.stop());
-  const w = watch({ dir, listener: 'Claude Code', pid: 201, ...quick, run: async () => { startItem(dir, 'NVDA', '2026-10-12'); return 'Claude Code did not finish the run'; } });
+  const limit = "Claude Code's weekly usage limit was reached; it resets 6am (America/Chicago). Press Retry after that.";
+  const w = watch({ dir, listener: 'Claude Code', pid: 201, ...quick, run: async () => { startItem(dir, 'NVDA', '2026-10-12'); return limit; } });
   await until(() => readQueue(dir)[0]?.state === 'failed');
-  assert.match(readQueue(dir)[0]!.reason!, /the run stopped before this stock was finished: press Retry/);
+  assert.equal(readQueue(dir)[0]!.reason, limit, 'the person reads why it stopped beside the stock');
   await until(() => !!readListener(dir)?.lastRun);
-  assert.equal(readListener(dir)?.lastRun?.result, '0 analysed, 1 failed; Claude Code did not finish the run');
+  assert.equal(readListener(dir)?.lastRun?.result, `0 analysed, 1 failed; ${limit}`);
+  assert.ok(readListener(dir)?.lastRun?.started, 'its note says when the run started');
   w.stop();
   assert.equal(await w.done, 'stopped');
   assert.equal(readListener(dir), null, 'its note goes with it');
+
+  enqueue(dir, 'NVDA', '2026-10-12T11:00:00Z');   // a run that ends without a word still leaves no stock running
+  const w2 = watch({ dir, listener: 'Claude Code', pid: 202, ...quick, run: async () => { startItem(dir, 'NVDA', '2026-10-12'); } });
+  t.after(() => w2.stop());
+  await until(() => readQueue(dir)[0]?.state === 'failed');
+  assert.match(readQueue(dir)[0]!.reason!, /the run stopped before this stock was finished: press Retry/);
+  w2.stop(); await w2.done;
 
   enqueue(dir, 'AAPL', '2026-10-12T10:00:00Z');
   startItem(dir, 'AAPL', '2026-10-12', new Date('2026-10-12T10:00:00Z'));
   assert.equal(readQueue(dir, new Date(Date.parse('2026-10-12T10:00:00Z') + STALE_MS - 1000)).find((i) => i.symbol === 'AAPL')?.state, 'running');
   const late = readQueue(dir, new Date(Date.parse('2026-10-12T10:00:00Z') + STALE_MS + 1000)).find((i) => i.symbol === 'AAPL');
   assert.deepEqual([late?.state, /did not finish/.test(late?.reason ?? '')], ['failed', true]);
+});
+
+test("any listener's note that its run has ended fails the stock that run left running at once, in the listener's words", () => {
+  const { dir } = desk();
+  const at = new Date('2026-10-21T03:50:00Z');
+  enqueue(dir, 'NVDA', '2026-10-21T03:40:00Z'); enqueue(dir, 'META', '2026-10-21T03:40:01Z');
+  startItem(dir, 'NVDA', '2026-10-20', new Date('2026-10-21T03:46:44Z'));
+  const note = { listener: 'Madav', since: '2026-10-21T03:00:00Z', beat: at.toISOString() };
+  writeListener(dir, { ...note, lastRun: { at: '2026-10-21T03:40:00Z', result: '1 analysed, 0 failed' } });
+  assert.equal(readQueue(dir, at)[0]?.state, 'running', 'an older run says nothing about this one');
+  writeListener(dir, { ...note, lastRun: { at: '2026-10-21T03:51:35Z', result: "0 analysed; Claude's usage limit was reached, it resets 6am" } });
+  assert.equal(readQueue(dir, at)[0]?.state, 'running', 'without when its run started, the note is not enough');
+  writeListener(dir, { ...note, lastRun: { started: '2026-10-21T03:47:00Z', at: '2026-10-21T03:51:35Z', result: '0 analysed' } });
+  assert.equal(readQueue(dir, at)[0]?.state, 'running', 'a run that started after this stock did not start it');
+  writeListener(dir, { ...note, lastRun: { started: '2026-10-21T03:46:34Z', at: '2026-10-21T03:51:35Z', result: "0 analysed; Claude's usage limit was reached, it resets 6am" } });
+  const nvda = readQueue(dir, at)[0]!;
+  assert.deepEqual([nvda.state, nvda.reason, nvda.endedAt], ['failed', "Madav's run ended before this stock was finished: 0 analysed; Claude's usage limit was reached, it resets 6am", '2026-10-21T03:51:35Z']);
+  assert.equal(readQueue(dir, at)[1]?.state, 'waiting', 'a stock still waiting stays waiting');
 });
 
 test('after an update the listener makes way between runs, never during one', async (t) => {

@@ -2,6 +2,7 @@
 // call, and what Robinhood answered. The dashboard writes it; the evening wrap-up reads it. No account number is in it.
 import fs from 'node:fs';
 import path from 'node:path';
+import { marketDay } from '../data/dates.js';
 
 export interface SentOrder {
   at: string; symbol: string; side: 'buy' | 'sell'; quantity: number; limitPrice: number; timeInForce?: string;
@@ -10,8 +11,6 @@ export interface SentOrder {
 }
 
 const file = (dir: string) => path.join(dir, 'orders.jsonl');
-/** New York's calendar day of a moment, YYYY-MM-DD: the market's own day. */
-export const marketDay = (d: Date): string => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(d);
 
 export function logOrder(dir: string, line: SentOrder): void {
   fs.mkdirSync(dir, { recursive: true });
