@@ -61,6 +61,8 @@
     search: (query) => call("GET", `/api/search?${q({ q: query })}`),
     prefs: () => call("GET", "/api/prefs"),
     savePrefs: (p) => call("POST", "/api/prefs", p),
+    /** The contact email the SEC asks for; the desk checks it, keeps it, and answers with it masked, never in full. */
+    setContact: (email) => call("POST", "/api/contact", { email }),
     /** "Worth a look today", worked out at most once an hour; `queued` is what the morning switch just put on the waiting list. */
     screen: () => call("GET", "/api/screen"),
     /** "Market weather": the trend, the mood and the rates, worked out at most once an hour. */
@@ -109,6 +111,57 @@
     readAccounts: () => call("POST", "/api/robinhood/refresh", {})
   };
 
+  // src/terminal/ui/glossary.ts
+  var ratings = "The desk's ratings";
+  var desk = "How the desk works";
+  var markets = "Markets";
+  var account = "Your account and orders";
+  var GLOSSARY = {
+    Buy: { group: ratings, term: "Buy", means: "the desk would own it. As shipped, its ticket buys a full position." },
+    Overweight: { group: ratings, term: "Overweight", means: "the desk leans towards owning it. As shipped, its ticket buys half a position." },
+    Hold: { group: ratings, term: "Hold", means: "the desk would keep what is held, and neither buy nor sell." },
+    Underweight: { group: ratings, term: "Underweight", means: "the desk leans against it. As shipped, its ticket sells half of what is held." },
+    Sell: { group: ratings, term: "Sell", means: "the desk would not own it. As shipped, its ticket sells everything held." },
+    "Needs review": { group: ratings, term: "Needs review", means: "the decision gave no rating that could be read, so it asks for no order." },
+    call: { group: desk, term: "The desk's call", means: "its twelve agents' rating, from Buy to Sell, on the day they analysed it." },
+    depth: { group: desk, term: "Depth", means: "how long the debates in an analysis run: shallow (one round each, quick), medium (three) or deep (five, the slowest and costliest)." },
+    alpha: { group: desk, term: "Alpha", means: "how much better (+) or worse (\u2212) a call did than its market's index in the trading days after it: above zero, it beat the market." },
+    paper: { group: desk, term: "On paper", means: "followed with pretend money only, to see what the desk's calls would have done before any real money is at stake." },
+    scorecard: { group: desk, term: "Scorecard", means: "the desk's record, good or bad: its paper money against the S&P 500, and each rating's average alpha." },
+    rerating: { group: desk, term: "Re-rating", means: "it is on the waiting list, so the desk analyses it again and its view is fresh. Monday's morning routine re-rates the Agentic account's holdings whose view is a week old." },
+    stop: { group: desk, term: "Stop", means: "the price under which the desk's trader proposed selling, to limit a loss. The dashboard watches it against Yahoo Finance's price and tells you when the price falls below it. Nothing is ever sold by itself." },
+    stock: { group: markets, term: "Stock", means: "a small share of one company; its price moves with what people will pay for that company." },
+    fund: { group: markets, term: "Fund", means: "a basket of many companies (or bonds) bought and sold as one share, also called an ETF." },
+    index: { group: markets, term: "Index", means: "a list of companies whose prices are averaged into one number, such as the S&P 500. It cannot be bought itself, only through a fund that copies it." },
+    sp500: { group: markets, term: "S&P 500", means: "the 500 largest US companies taken together: the yardstick the desk measures itself against." },
+    sector: { group: markets, term: "Sector", means: "one part of the economy, such as technology or energy. Companies in one sector tend to rise and fall together." },
+    crypto: { group: markets, term: "Crypto", means: "digital coins such as Bitcoin, which swing far more than shares. The desk follows Bitcoin and Ether on paper only." },
+    today: { group: markets, term: "Today", means: "the change in price since the last day's close." },
+    volume: { group: markets, term: "Volume", means: "how many shares changed hands in a day. A move on high volume means many people acted on it." },
+    average: { group: markets, term: "50- and 200-day average", means: "the average closing price over that many days. A price above it has been rising lately; below it, falling." },
+    vix: { group: markets, term: "VIX", means: "the market's own measure of nerves, from what insurance on the S&P 500 costs: under 15 is calm, over 25 is wild." },
+    fed: { group: markets, term: "The Fed", means: "the Federal Reserve, which sets US interest rates. What it is expected to do moves almost everything." },
+    agentic: { group: account, term: "Agentic account", means: "the one Robinhood account the desk may ever trade in, and only on your Confirm. Every other account is shown view-only." },
+    buyingPower: { group: account, term: "Buying power", means: "the money Robinhood lets you spend on new buys right now." },
+    position: { group: account, term: "Position", means: "what you hold of one stock or fund. As shipped, a full position is 10% of the account, and half a position 5%." },
+    cap: { group: account, term: "Cap", means: "a limit you set: the most an order may cost, or the most of the account one stock, one sector or crypto may be." },
+    limitOrder: { group: account, term: "Limit order", means: "an order to buy at no more, or sell at no less, than a price you set. The desk's tickets place only these." },
+    ticket: { group: account, term: "Order ticket", means: "one proposed order with its checks against your caps, which Robinhood looks over and you confirm or close." },
+    dryRun: { group: account, term: "Robinhood's check", means: "a dry run: Robinhood looks the order over and says what it would do, without placing it." },
+    shortestHold: { group: account, term: "Shortest hold", means: "the fewest trading days a stock bought here is kept before the desk proposes selling it." },
+    weeklyLoss: { group: account, term: "Weekly loss limit", means: "when the Agentic account falls this much below its best value of the last seven days, trading switches itself off." }
+  };
+  var means = (key2) => `${GLOSSARY[key2].term}: ${GLOSSARY[key2].means}`;
+  var isTerm = (key2) => Object.hasOwn(GLOSSARY, key2);
+  function glossaryGroups() {
+    const out = [];
+    for (const [key2, t] of Object.entries(GLOSSARY)) {
+      const g = out.find((x) => x.group === t.group) ?? out[out.push({ group: t.group, terms: [] }) - 1];
+      g.terms.push({ key: key2, ...t });
+    }
+    return out;
+  }
+
   // src/terminal/ui/fmt.ts
   var MINUS = "\u2212";
   var esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -123,24 +176,11 @@
   var pct = (n) => n === null || n === void 0 || !Number.isFinite(n) ? "\u2014" : `${n >= 0 ? "+" : MINUS}${Math.abs(n).toFixed(2)}%`;
   var tone = (n) => n === null || n === void 0 || !Number.isFinite(n) ? "" : n >= 0 ? "ok" : "danger";
   var ratingTone = (r) => r === "Buy" || r === "Overweight" ? "ok" : r === "Underweight" || r === "Sell" ? "danger" : r === "Hold" ? "" : "warn";
-  var RATING_MEANING = {
-    Buy: "Buy: the desk would own it. As shipped, its ticket buys a full position.",
-    Overweight: "Overweight: the desk leans towards owning it. As shipped, its ticket buys half a position.",
-    Hold: "Hold: the desk would keep what is held, and neither buy nor sell.",
-    Underweight: "Underweight: the desk leans against it. As shipped, its ticket sells half of what is held.",
-    Sell: "Sell: the desk would not own it. As shipped, its ticket sells everything held.",
-    "Needs review": "Needs review: the decision gave no rating that could be read, so it asks for no order."
-  };
-  var ratingMeaning = (r) => RATING_MEANING[r] ?? "";
-  var WORDS = {
-    today: "Today: the change in price since the last day's close.",
-    call: "The desk's call: its twelve agents' rating, from Buy to Sell, on the day they analysed it.",
-    fund: "A fund: a basket of many companies (or bonds) bought as one share.",
-    paper: "On paper: followed with pretend money only. Robinhood's agent doorway trades stocks and funds, so a coin never gets an order ticket.",
+  var ratingMeaning = (r) => isTerm(r) && GLOSSARY[r].group === GLOSSARY.Buy.group ? means(r) : "";
+  var NOTES = {
+    coinOnPaper: "Robinhood's agent doorway trades stocks and funds, so a coin never gets an order ticket.",
     noTicket: "No order ticket: Robinhood's agent doorway trades stocks and funds, and among crypto the desk follows only Bitcoin and Ether on paper.",
-    stop: "Stop: the price under which the desk's trader proposed selling, to limit a loss. The dashboard watches it against Yahoo Finance's price and tells you when the price falls below it. Nothing is ever sold by itself.",
-    noView: "No view yet: the desk has not analysed it. Ask it to (the robot); in the Agentic account, Monday's morning routine rates it.",
-    rerating: "Re-rating: it is on the waiting list, so the desk analyses it again and its view is fresh. Monday's morning routine re-rates the Agentic account's holdings whose view is a week old."
+    noView: "No view yet: the desk has not analysed it. Ask it to (the robot); in the Agentic account, Monday's morning routine rates it."
   };
   var MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   var dayText = (iso) => {
@@ -515,12 +555,14 @@
       kind: S.kind,
       layers: { ...S.layers },
       recent: Array.isArray(p.recent) ? p.recent.slice(0, RECENT_MAX) : P.recent ?? [],
-      ...Array.isArray(p.folded) ? { folded: TIER_KEYS.filter((t) => p.folded.includes(t)) } : {}
+      ...Array.isArray(p.folded) ? { folded: TIER_KEYS.filter((t) => p.folded.includes(t)) } : {},
+      ...p.guide === "open" || p.guide === "away" ? { guide: p.guide } : {}
     });
   }
+  var term = (key2, words = GLOSSARY[key2].term) => `<span class="ta-term" title="${esc(means(key2))}">${esc(words)}</span>`;
   var ratingChip = (r) => `<span class="at-chip ${ratingTone(r)}"${ratingMeaning(r) ? ` title="${esc(ratingMeaning(r))}"` : ""}>${esc(r)}</span>`;
-  var changeChip = (q2) => q2 && q2.changePct !== null ? `<span class="at-chip ${tone(q2.changePct)}" title="${esc(WORDS.today)}">${pct(q2.changePct)}</span>` : `<span class="at-chip" title="${esc(WORDS.today)}">\u2014</span>`;
-  var noTicketChip = (paper) => paper ? `<span class="at-chip" title="${esc(WORDS.paper)}">on paper only</span>` : `<span class="at-chip" title="${esc(WORDS.noTicket)}">no order ticket</span>`;
+  var changeChip = (q2) => q2 && q2.changePct !== null ? `<span class="at-chip ${tone(q2.changePct)}" title="${esc(means("today"))}">${pct(q2.changePct)}</span>` : `<span class="at-chip" title="${esc(means("today"))}">\u2014</span>`;
+  var noTicketChip = (paper) => paper ? `<span class="at-chip" title="${esc(`${means("paper")} ${NOTES.coinOnPaper}`)}">on paper only</span>` : `<span class="at-chip" title="${esc(NOTES.noTicket)}">no order ticket</span>`;
   var robot = (sym) => `<button class="icon-btn" data-act="analyse" data-symbol="${esc(sym)}" title="Ask the desk to analyse ${esc(sym)}" aria-label="Ask the desk to analyse ${esc(sym)}"><svg class="g"><use href="#i-bot"/></svg></button>`;
   var listWords = (xs) => xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
   var priceText = (sym, q2) => {
@@ -555,7 +597,126 @@
     const w = d.watchlist.length, c = d.calls.length, q2 = d.queue.filter(isOpenItem).length;
     const parts = [`${w} ${w === 1 ? "stock" : "stocks"} on the watchlist`, `${c} ${c === 1 ? "call" : "calls"} on record`];
     if (q2) parts.push(`${q2} waiting to be analysed`);
-    $("#subline").textContent = `${parts.join(" \xB7 ")}.${d.desk.emailSaved ? "" : " The desk has no contact email yet, which the SEC asks for before company accounts can be read: run /desk-check in Madav."}`;
+    $("#subline").textContent = `${parts.join(" \xB7 ")}.${d.desk.emailSaved ? "" : " The desk has no contact email yet, which the SEC asks for before the first analysis: give it in Get started (in the side list), or to the desk in a chat."}`;
+  }
+  var GUIDE = { editing: false, asking: false };
+  var guideShown = () => P.guide ? P.guide === "open" : !!S.desk?.guide.show;
+  function guideStep(n, done, title, body, folded = done) {
+    return `<li class="ta-gstep${folded ? " done" : ""}"><span class="ta-gtick" aria-hidden="true">${done ? '<svg class="g"><use href="#i-tick"/></svg>' : n}</span>
+    <div class="ta-gbody"><div class="ta-ghead"><b>${title}</b>${done ? '<span class="at-chip ok">done</span>' : ""}</div>${body}</div></li>`;
+  }
+  var factChip = (ok, words) => `<span class="at-chip${ok ? " ok" : ""}">${esc(words)}</span>`;
+  var toAsk = () => (S.desk?.watchlist ?? []).map((w) => w.symbol).filter((s) => !isIndex(s) && !latestCall(s) && !isOpen(s));
+  function renderGuide() {
+    const d = S.desk, g = d?.guide;
+    $("#guideCount").textContent = g ? `${g.done} of ${g.of}` : "";
+    const shown = !!g && guideShown();
+    $("#sec-guide").classList.toggle("hide", !shown);
+    if (!g || !shown) return;
+    if (g.first && !P.guide) remember({ guide: "open" });
+    const typing = document.getElementById("contactInput");
+    const kept = typing ? { value: typing.value, focus: document.activeElement === typing, from: typing.selectionStart, to: typing.selectionEnd } : null;
+    const e = g.email, editing = !e.done || GUIDE.editing;
+    const email = guideStep(
+      1,
+      e.done,
+      "Give the desk your email for the SEC",
+      `<p class="at-quiet ta-gwhy">The SEC, which keeps US companies' official accounts, asks everyone who reads them for a contact email. It is kept in the desk's records on this computer and sent to the SEC alone, with each request for a company's filings: no other source sees it, and this page never shows it in full.</p>
+    ${editing ? `<div class="at-row"><label class="at-field ta-grow"><span class="at-field-l">Your own email address</span><input class="at-input at-box" id="contactInput" type="email" autocomplete="email" maxlength="254" spellcheck="false"></label><button class="at-btn at-press primary" data-act="contact-save">Save</button>${e.done ? '<button class="at-btn at-press" data-act="contact-cancel">Cancel</button>' : ""}</div>` : `<div class="at-row"><span class="at-quiet">Saved: ${esc(e.saved)} \xB7 sent to the SEC alone</span><button class="at-btn at-press" data-act="contact-edit">Change\u2026</button></div>`}`,
+      e.done && !GUIDE.editing
+    );
+    const p = g.picks;
+    const picks = guideStep(
+      2,
+      p.done,
+      `Pick three to five ${term("stock", "companies")} you know, plus the whole market and one or two ${term("sector", "sectors")} you understand`,
+      `<div class="at-row">${factChip(p.names >= p.need, `${Math.min(p.names, p.need)} of ${p.need} names`)}${factChip(p.market, p.market ? "the whole market \u2713" : "the whole market")}${factChip(p.sector, p.sector ? "a sector \u2713" : "a sector")}</div>
+    <p class="at-quiet ta-gwhy">Type a company you know in the search box at the top and press Add to watchlist. On Start here, press + on a whole-market ${term("fund", "fund")} and on one or two sectors you understand. The desk suggests no company: the names are yours, and nothing here is investment advice.</p>
+    <div class="at-row ta-gwhy"><button class="at-btn at-press" data-act="goto" data-to="sec-start"><svg class="g"><use href="#i-layers"/></svg><span>Go to Start here</span></button></div>`
+    );
+    const a = g.analyse, ask2 = toAsk(), l = d.analyses.listener;
+    const analyse = guideStep(
+      3,
+      a.done,
+      `Ask the desk to analyse them, ${term("depth", "shallow")}, and switch on running automatically`,
+      `<div class="at-row">${factChip(a.asked > 0, `${a.asked} asked for`)}${factChip(!!a.automatic, a.automatic ? `runs by itself: ${a.automatic}` : "not running by itself yet")}</div>
+    <p class="at-quiet ta-gwhy">Shallow is the quickest and costs least: each analysis uses your Claude plan, like a chat. Running automatically means each one you ask for starts by itself, one at a time; they are listed under Analyses you asked for.</p>
+    <div class="at-row">${ask2.length ? `<button class="at-btn at-press primary" data-act="guide-ask"${GUIDE.asking ? " disabled" : ""}><svg class="g"><use href="#i-bot"/></svg><span>${GUIDE.asking ? "Asking\u2026" : `Ask for your ${ask2.length === 1 ? "pick" : `${ask2.length} picks`}, shallow`}</span></button>` : ""}${l ? "" : '<button class="at-btn at-press" data-act="listen-on"><span>Run automatically with Claude Code</span></button>'}</div>
+    ${l ? "" : '<p class="at-quiet">Or switch on "Run automatically" in Madav, if you use it.</p>'}`
+    );
+    const r = g.read, mean = (k) => `<div><dt>${esc(GLOSSARY[k].term)}</dt><dd>${esc(GLOSSARY[k].means)}</dd></div>`;
+    const read = guideStep(
+      4,
+      r.done,
+      "Read your first calls",
+      `<dl class="at-facts ruled at-box ta-gmeans">${["Buy", "Hold", "Sell", "alpha"].map(mean).join("")}</dl>
+    <div class="at-row">${r.latest ? readButton(r.latest.ticker, r.latest.date, `Read the call on ${r.latest.ticker} (${r.latest.rating})`) : '<span class="at-quiet">Your first call appears here when an analysis finishes.</span>'}<button class="at-btn at-press" data-act="gloss-open"><svg class="g"><use href="#i-book"/></svg><span>Every word explained</span></button></div>`
+    );
+    const w = g.paper;
+    const paper = guideStep(
+      5,
+      w.done,
+      `Follow them ${term("paper", "on paper")} for ${esc(w.words)}, then read the ${term("scorecard", "scorecard")} before deciding about money and Robinhood`,
+      `<div class="at-meter${w.done ? " ok" : ""}"><progress class="at-bar" max="${w.need}" value="${Math.min(w.weeks, w.need)}" aria-label="${w.weeks} of ${w.need} weeks on paper"></progress><b>${Math.min(w.weeks, w.need)} of ${w.need} weeks</b></div>
+    <p class="at-quiet ta-gwhy">Paper follows every call with pretend money, against the ${term("sp500", "S&P 500")}. A few weeks are noise, not proof: read the scorecard, good or bad, before you decide anything. Connecting Robinhood and switching trading on stay your own decisions.</p>
+    <div class="at-row"><button class="at-btn at-press" data-act="goto" data-to="sec-score"><svg class="g"><use href="#i-target"/></svg><span>Go to the scorecard</span></button></div>`
+    );
+    const all = g.done === g.of;
+    $("#guideSub").textContent = all ? "All five done. The desk keeps reading and proposing; every decision stays yours." : "A safe first month, one step at a time. Each step ticks itself off when it is done, wherever you do it: here, or by asking the desk in a chat.";
+    $("#guideDo").innerHTML = `<span class="at-chip${all ? " ok" : ""}">${g.done} of ${g.of} done</span><button class="at-btn at-press" data-act="gloss-open"><svg class="g"><use href="#i-book"/></svg><span>What does this mean?</span></button><button class="at-btn at-press" data-act="guide-away" title="Put it away: the side list opens it again">Put away</button>`;
+    $("#guideCard").innerHTML = `<ol class="ta-guide">${email}${picks}${analyse}${read}${paper}</ol>
+    <p class="at-honest">The desk reads and proposes; it never places an order by itself, and nothing here is investment advice.</p>`;
+    const field = document.getElementById("contactInput");
+    if (kept && field) {
+      field.value = kept.value;
+      if (kept.focus) {
+        field.focus();
+        field.setSelectionRange(kept.from, kept.to);
+      }
+    }
+  }
+  async function saveContact() {
+    const field = document.getElementById("contactInput");
+    if (!field) return;
+    await run(async () => {
+      const { saved } = await api.setContact(field.value);
+      field.value = "";
+      GUIDE.editing = false;
+      await refreshState();
+      toast(`Saved: ${saved}. The desk sends it to the SEC alone.`);
+    });
+  }
+  async function askPicks() {
+    const list = toAsk();
+    if (!list.length || GUIDE.asking) return;
+    GUIDE.asking = true;
+    renderGuide();
+    const asked = [], refused = [];
+    for (const s of list) {
+      try {
+        await api.enqueue(s, "shallow");
+        asked.push(s);
+      } catch (e) {
+        refused.push(`${s}: ${say(e)}`);
+      }
+    }
+    GUIDE.asking = false;
+    await refreshState();
+    if (asked.length) toast(`${listWords(asked)} ${asked.length === 1 ? "is" : "are"} waiting to be analysed, at shallow depth.${S.desk?.analyses.listener ? "" : " Nothing is listening yet: switch on running automatically."}`);
+    if (refused.length) toast(refused.join(" \xB7 "), "bad");
+  }
+  function openGlossary() {
+    $("#glossDialog").innerHTML = `<div class="ta-pophead"><h2 id="glossTitle">What does this mean?</h2><button class="icon-btn" data-act="gloss-close" aria-label="Close"><svg class="g"><use href="#i-x"/></svg></button></div>
+    <p class="at-lede">Every trading word on the dashboard, in one plain line. On the page, point at a dotted word or a rating to see its line there.</p>
+    ${glossaryGroups().map((g) => `<p class="at-kicker ta-stage">${esc(g.group)}</p><dl class="at-facts ruled at-box ta-gloss">${g.terms.map((t) => `<div><dt>${esc(t.term)}</dt><dd>${esc(t.means)}</dd></div>`).join("")}</dl>`).join("")}
+    <p class="at-honest">Nothing here is investment advice.</p>`;
+    $("#glossDialog").showModal();
+  }
+  function explainStaticWords() {
+    for (const el of document.querySelectorAll("[data-term]")) {
+      const k = el.dataset.term ?? "";
+      if (isTerm(k)) el.title = means(k);
+    }
   }
   function renderFavs() {
     const favs = (S.desk?.watchlist ?? []).filter((w) => w.favourite);
@@ -631,12 +792,12 @@
       accounts = kpi({ tone: gain === null ? "accent" : gain >= 0 ? "ok" : "bad", icon: "i-wallet", name: `Your ${views.length} account${views.length === 1 ? "" : "s"}`, value: whole ? money(sum) : "\u2014", line: gainWords, act: { act: "view", view: "account" } });
     }
     const ag = views.find((v) => v.account.agentic);
-    const agentic = kpi({ tone: "accent", icon: "i-bolt", name: "Agentic buying power", value: ag ? money(ag.portfolio?.buyingPower, ag.portfolio?.currency ?? "USD") : "\u2014", line: ag ? tradingOn() ? '<span class="ta-warn">Trading is on</span> \xB7 orders only on your Confirm' : "Trading is off \xB7 the dashboard only reads" : "Show your Agentic account to trade", act: { act: "view", view: "account" } });
+    const agentic = kpi({ tone: "accent", icon: "i-bolt", name: "Agentic buying power", term: "buyingPower", value: ag ? money(ag.portfolio?.buyingPower, ag.portfolio?.currency ?? "USD") : "\u2014", line: ag ? tradingOn() ? '<span class="ta-warn">Trading is on</span> \xB7 orders only on your Confirm' : "Trading is off \xB7 the dashboard only reads" : "Show your Agentic account to trade", act: { act: "view", view: "account" } });
     const m = marketOf("^GSPC"), q2 = m && isQuote(m.quote) ? m.quote : null;
-    const market = kpi({ tone: q2 ? q2.changePct !== null && q2.changePct < 0 ? "bad" : "ok" : "", icon: "i-pulse", name: "S&P 500 today", value: q2 ? num(q2.price, 0) : "\u2014", line: q2 ? `<span class="${(q2.changePct ?? 0) >= 0 ? "ta-up" : "ta-down"}">${pct(q2.changePct)}</span> \xB7 ${q2.open ? "now" : "last close"}` : "Reading the market", act: { act: "select", symbol: "^GSPC" }, spark: q2 ? "gspc" : "" });
+    const market = kpi({ tone: q2 ? q2.changePct !== null && q2.changePct < 0 ? "bad" : "ok" : "", icon: "i-pulse", name: "S&P 500 today", term: "sp500", value: q2 ? num(q2.price, 0) : "\u2014", line: q2 ? `<span class="${(q2.changePct ?? 0) >= 0 ? "ta-up" : "ta-down"}">${pct(q2.changePct)}</span> \xB7 ${q2.open ? "now" : "last close"}` : "Reading the market", act: { act: "select", symbol: "^GSPC" }, spark: q2 ? "gspc" : "" });
     const latest = d?.calls[0];
-    const desk = kpi({ tone: "merged", icon: "i-check", name: "The desk's calls", value: d ? String(d.calls.length) : "\u2014", line: d ? `${latest ? `latest <b>${esc(latest.ticker)}</b> ${esc(latest.rating)}` : "none yet"} \xB7 ${d.queue.filter(isOpenItem).length} waiting \xB7 ${d.record.summary.resolved} scored` : "Reading the desk", act: { act: "goto", to: "sec-calls" } });
-    el.innerHTML = accounts + agentic + market + desk;
+    const desk2 = kpi({ tone: "merged", icon: "i-check", name: "The desk's calls", value: d ? String(d.calls.length) : "\u2014", line: d ? `${latest ? `latest <b>${esc(latest.ticker)}</b> ${esc(latest.rating)}` : "none yet"} \xB7 ${d.queue.filter(isOpenItem).length} waiting \xB7 ${d.record.summary.resolved} scored` : "Reading the desk", act: { act: "goto", to: "sec-calls" } });
+    el.innerHTML = accounts + agentic + market + desk2;
     const sp = el.querySelector('[data-kpi="gspc"]');
     if (sp && q2) sparkline(sp, q2.points, (q2.changePct ?? 0) >= 0 ? "ok" : "bad", { dot: true });
   }
@@ -653,7 +814,7 @@
   var signedIn = () => S.rh?.state === "saved" || S.rh?.state === "connected";
   function kpi(o) {
     const attrs = o.act ? Object.entries(o.act).map(([k, v]) => ` data-${k}="${esc(v)}"`).join("") : "";
-    const inner = `<span class="ta-kpi-ic"><svg class="g"><use href="#${o.icon}"/></svg></span><span class="at-tile-sub">${esc(o.name)}</span><span class="ta-kpi-v at-num">${o.value}</span>${o.line ? `<span class="ta-kpi-l">${o.line}</span>` : ""}${o.spark ? `<span class="ta-spark ta-kpi-spark" data-kpi="${esc(o.spark)}"></span>` : ""}`;
+    const inner = `<span class="ta-kpi-ic"><svg class="g"><use href="#${o.icon}"/></svg></span><span class="at-tile-sub"${o.term ? ` title="${esc(means(o.term))}"` : ""}>${esc(o.name)}</span><span class="ta-kpi-v at-num">${o.value}</span>${o.line ? `<span class="ta-kpi-l">${o.line}</span>` : ""}${o.spark ? `<span class="ta-spark ta-kpi-spark" data-kpi="${esc(o.spark)}"></span>` : ""}`;
     return o.act ? `<button class="at-tile at-box at-press ta-kpi ${o.tone}"${attrs}>${inner}</button>` : `<div class="at-tile at-box ta-kpi ${o.tone}">${inner}</div>`;
   }
   function gainOf(hs) {
@@ -669,7 +830,7 @@
   var signedMoney = (n, cur = "USD") => `${n >= 0 ? "+" : ""}${money(n, cur)}`;
   var sideWord = (s) => s === "buy" ? "Buy" : s === "sell" ? "Sell" : s ?? "\u2014";
   var CARE = { holdings: [], noticed: /* @__PURE__ */ new Set() };
-  var careFor = (account, symbol) => CARE.holdings.find((c) => c.account === account && c.symbol === symbol);
+  var careFor = (account2, symbol) => CARE.holdings.find((c) => c.account === account2 && c.symbol === symbol);
   var belowWords = (c) => c.price && c.stop?.level != null ? `${c.desk} is at ${money(c.price.value)} on Yahoo Finance (${clock(c.price.asOf)}, up to 15 minutes late), below the stop of ${money(c.stop.level)} the desk's trader proposed on ${dayText(c.stop.date)}. Nothing is sold by itself: selling is your decision.` : "";
   var sellWords = (c) => {
     if (!c.sell || !c.view) return "";
@@ -679,15 +840,15 @@
   var sellButton = (c) => c.sell?.ticket && c.view ? `<button class="at-btn at-press" data-act="decide" data-symbol="${esc(c.desk)}" data-date="${esc(c.view.date)}" title="${esc(`An order ticket from the desk's ${c.view.rating} call: ${c.sell.action}`)}">Sell\u2026</button>` : "";
   function careMarks(c) {
     const parts = [];
-    if (c.rerating) parts.push(`<span class="at-chip accent" title="${esc(`${WORDS.rerating}${c.rerating === "running" ? " It is being analysed now." : ""}`)}">re-rating</span>`);
+    if (c.rerating) parts.push(`<span class="at-chip accent" title="${esc(`${means("rerating")}${c.rerating === "running" ? " It is being analysed now." : ""}`)}">re-rating</span>`);
     if (c.below) parts.push(`<span class="at-chip danger" title="${esc(belowWords(c))}">below its stop</span>`);
-    else if (c.stop?.level != null) parts.push(`<small class="at-quiet" title="${esc(WORDS.stop)}">stop ${money(c.stop.level)}</small>`);
+    else if (c.stop?.level != null) parts.push(`<small class="at-quiet" title="${esc(means("stop"))}">stop ${money(c.stop.level)}</small>`);
     if (c.sell) parts.push(`<span class="at-chip danger" title="${esc(sellWords(c))}">the desk says sell</span>`, sellButton(c));
     return parts.join(" ");
   }
   function careCell(c) {
     if (!c) return '<span class="at-quiet">\u2014</span>';
-    const view2 = c.view ? `${ratingChip(c.view.rating)} <small class="at-quiet" title="${esc(`The desk's call of ${dayText(c.view.date)}${c.stale ? ": a week old or more" : ""}`)}">${esc(c.view.ago)}</small>` : `<small class="at-quiet" title="${esc(WORDS.noView)}">no view yet</small>`;
+    const view2 = c.view ? `${ratingChip(c.view.rating)} <small class="at-quiet" title="${esc(`The desk's call of ${dayText(c.view.date)}${c.stale ? ": a week old or more" : ""}`)}">${esc(c.view.ago)}</small>` : `<small class="at-quiet" title="${esc(NOTES.noView)}">no view yet</small>`;
     return `${view2} ${careMarks(c)}`.trim();
   }
   function renderCare() {
@@ -731,12 +892,12 @@
   function viewCard(v, at) {
     const a = v.account, cur = v.portfolio?.currency ?? "USD", p = v.portfolio;
     const stocks = v.holdings.filter((h) => h.kind === "stock").length, coins = v.holdings.filter((h) => h.kind === "crypto").length;
-    const role = a.agentic ? '<span class="at-chip accent">Agentic \xB7 the desk may trade here, only on your Confirm</span>' : '<span class="at-chip">View only \xB7 the desk never trades here</span>';
+    const role = a.agentic ? `<span class="at-chip accent" title="${esc(means("agentic"))}">Agentic \xB7 the desk may trade here, only on your Confirm</span>` : '<span class="at-chip">View only \xB7 the desk never trades here</span>';
     const g = gainOf(v.holdings), gain = g ? g.value - g.cost : null;
     const tiles = `<div class="at-deck ta-deck-5">
     ${kpi({ tone: "accent", icon: "i-wallet", name: "Total value", value: money(p?.total, cur) })}
     ${kpi({ tone: "", icon: "i-cash", name: "Cash", value: money(p?.cash, cur) })}
-    ${kpi({ tone: "ok", icon: "i-bolt", name: "Buying power", value: money(p?.buyingPower, cur) })}
+    ${kpi({ tone: "ok", icon: "i-bolt", name: "Buying power", term: "buyingPower", value: money(p?.buyingPower, cur) })}
     ${kpi({ tone: gain === null ? "" : gain >= 0 ? "ok" : "bad", icon: gain !== null && gain < 0 ? "i-down" : "i-up", name: "Since bought", value: gain === null ? "\u2014" : signedMoney(gain, cur), line: g ? `${pct(gain / g.cost * 100)} on ${money(g.cost, cur)} paid` : v.holdings.length ? "a holding lacks its cost" : "nothing held" })}
     ${kpi({ tone: "merged", icon: "i-pie", name: "Holdings", value: String(v.holdings.length), line: `${stocks} ${stocks === 1 ? "stock" : "stocks"}${coins ? ` \xB7 ${coins} crypto` : ""}` })}</div>`;
     const total = p?.total ?? null;
@@ -857,7 +1018,7 @@
     const c = TR.state?.caps;
     if (!c) return "";
     if (CAPS.editing) return `<div class="at-card-head"><h3>Your caps</h3></div>
-    <p class="at-lede">The most an order may cost, the most of the account one stock or one sector may be after a buy, the most in crypto, the most orders in a day, the fall in a week after which trading switches itself off, and the fewest trading days a stock bought here is held before the desk proposes selling it. Every ticket is checked against them, and again just before an order is sent. They are kept beside the trading switch, where agents are refused.</p>
+    <p class="at-lede">The most an order may cost, the most of the account one stock or one sector may be after a buy, the most in crypto, the most orders in a day, the fall in a week after which trading switches itself off, and the shortest hold, in trading days, of a stock bought here. Every ticket is checked against them, and again just before an order is sent. They are kept beside the trading switch, where agents are refused.</p>
     <div class="at-row">
       <label class="at-field"><span class="at-field-l">An order at most, $</span><input class="at-input at-box" id="capOrder" type="text" inputmode="decimal" value="${c.perOrderUsd}"></label>
       <label class="at-field"><span class="at-field-l">One stock, % of the account</span><input class="at-input at-box" id="capStock" type="text" inputmode="decimal" value="${c.perStockPercent}"></label>
@@ -868,9 +1029,10 @@
       <label class="at-field"><span class="at-field-l">Switch off after a fall in a week of, %</span><input class="at-input at-box" id="capWeek" type="text" inputmode="decimal" value="${c.weeklyLossPercent}"></label>
       <label class="at-field"><span class="at-field-l">Shortest hold, trading days</span><input class="at-input at-box" id="capHold" type="number" min="0" max="60" step="1" inputmode="numeric" value="${c.minHoldDays}"></label></div>
     <div class="at-row">${rhButton("caps-save", "Save the caps", { primary: true })}${rhButton("caps-cancel", "Cancel")}</div>`;
-    return `<div class="at-card-head"><h3>Your caps</h3></div>
-    <div class="at-row"><span class="at-chip">${esc(money(c.perOrderUsd))} an order at most</span><span class="at-chip">${esc(String(c.perStockPercent))}% of the account in one stock</span><span class="at-chip">${esc(String(c.ordersPerDay))} ${c.ordersPerDay === 1 ? "order" : "orders"} a day</span></div>
-    <div class="at-row"><span class="at-chip">one sector at most ${esc(String(c.perSectorPercent))}%</span><span class="at-chip">crypto at most ${esc(String(c.cryptoPercent))}%</span><span class="at-chip">switches itself off after a ${esc(String(c.weeklyLossPercent))}% fall in a week</span><span class="at-chip">a stock bought here is held at least ${esc(String(c.minHoldDays))} trading ${c.minHoldDays === 1 ? "day" : "days"}</span></div>
+    const chip = (k, words) => `<span class="at-chip" title="${esc(means(k))}">${esc(words)}</span>`;
+    return `<div class="at-card-head"><h3>Your ${term("cap", "caps")}</h3></div>
+    <div class="at-row">${chip("cap", `${money(c.perOrderUsd)} an order at most`)}${chip("position", `${c.perStockPercent}% of the account in one stock`)}${chip("cap", `${c.ordersPerDay} ${c.ordersPerDay === 1 ? "order" : "orders"} a day`)}</div>
+    <div class="at-row">${chip("sector", `one sector at most ${c.perSectorPercent}%`)}${chip("crypto", `crypto at most ${c.cryptoPercent}%`)}${chip("weeklyLoss", `switches itself off after a ${c.weeklyLossPercent}% fall in a week`)}${chip("shortestHold", `a stock bought here is held at least ${c.minHoldDays} trading ${c.minHoldDays === 1 ? "day" : "days"}`)}</div>
     <div class="at-row">${rhButton("caps-edit", "Change the caps\u2026")}</div>`;
   }
   var capsTyped = () => {
@@ -885,7 +1047,7 @@
     ${TR.state?.offBecause ? `<p class="at-honest bad">${esc(TR.state.offBecause.words)}</p>` : ""}<p class="at-lede">With trading off, a ticket can be checked by Robinhood but never placed.</p>${recordLine()}<div class="at-row">${rhButton("tr-ask", "Switch trading on\u2026")}</div>`;
     return `<div class="at-card-head"><h3>Switch trading on?</h3></div>
     <p class="at-lede">From then on, a ticket you open, from one of the desk's calls or your own, can place a real order with real money in your Agentic account. Every order still needs Robinhood's check with no alerts, your caps, and your own Confirm naming the exact order. Keep Robinhood's approval on your phone switched on until you trust the desk. This is not investment advice.</p>
-    ${recordLine()}${young() ? `<p class="at-honest bad">That is under ${S.desk?.paper.minWeeks ?? 4} weeks: too little to tell whether the desk's calls are any good. Read your paper record first.</p><div class="at-row">${TR.understood ? '<span class="at-chip ok">You understand</span>' : rhButton("tr-understood", "I understand")}</div>` : ""}
+    ${recordLine()}${young() ? `<p class="at-honest bad">That is under ${esc(S.desk?.paper.minWords ?? "")}: too little to tell whether the desk's calls are any good. Read your paper record first.</p><div class="at-row">${TR.understood ? '<span class="at-chip ok">You understand</span>' : rhButton("tr-understood", "I understand")}</div>` : ""}
     <div class="at-row">${young() && !TR.understood ? "" : rhButton("tr-on", "Yes, switch trading on", { primary: true })}${rhButton("tr-cancel", "Cancel")}</div>`;
   }
   async function loadTrading() {
@@ -905,7 +1067,7 @@
     const asks = T.checks.filter((c) => c.ask), ok = T.checks.length > 0 && T.checks.every((c) => c.ok) && (!asks.length || T.early);
     const checks = t.proposal.order ? `<div class="at-card-head"><h3>Your checks</h3></div><div class="at-row">${T.checks.map((c) => `<span class="at-chip ${c.ask ? "warn" : c.ok ? "ok" : "danger"}">${esc(c.words)}</span>`).join("")}</div>` : "";
     const r = T.review;
-    const review = r ? `<div class="at-card at-box"><div class="at-card-head"><h3>Robinhood's check</h3>${!r.answered ? '<span class="at-chip danger">Robinhood reported an error</span>' : r.alerts.length ? `<span class="at-chip danger">${r.alerts.length} alert(s)</span>` : '<span class="at-chip ok">No alerts</span>'}</div>
+    const review = r ? `<div class="at-card at-box"><div class="at-card-head"><h3>${term("dryRun")}</h3>${!r.answered ? '<span class="at-chip danger">Robinhood reported an error</span>' : r.alerts.length ? `<span class="at-chip danger">${r.alerts.length} alert(s)</span>` : '<span class="at-chip ok">No alerts</span>'}</div>
       ${r.error ? `<p class="at-honest bad">${esc(r.error)}</p>` : ""}${r.alerts.map((a) => `<p class="at-honest bad">${esc(a)}</p>`).join("")}
       ${r.approvalRequired === null ? "" : `<p class="at-lede">${r.approvalRequired ? "Robinhood would ask you to approve this order on your phone before it is sent." : "Robinhood would not ask for your approval on your phone: an order would be sent at once."}</p>`}
       ${r.facts.length ? `<dl class="at-facts ruled at-box">${r.facts.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>` : ""}
@@ -958,7 +1120,7 @@
     ${t.proposal.why.map((w) => `<p class="at-quiet">${esc(w)}</p>`).join("")}`;
     $("#tkFields").innerHTML = o ? `<div class="at-row">
       <label class="at-field"><span class="at-field-l">Shares (${o.side === "buy" ? "to buy" : "to sell"})</span><input class="at-input at-box" id="tkQty" type="number" min="1" step="1" inputmode="numeric" value="${o.quantity}"></label>
-      <label class="at-field"><span class="at-field-l">Limit price, $ \xB7 good for the ${o.timeInForce === "gtc" ? "next 90 days" : "day"}</span><input class="at-input at-box" id="tkLimit" type="text" inputmode="decimal" value="${o.limitPrice.toFixed(2)}"></label></div>` : "";
+      <label class="at-field"><span class="at-field-l">${term("limitOrder", "Limit price")}, $ \xB7 good for the ${o.timeInForce === "gtc" ? "next 90 days" : "day"}</span><input class="at-input at-box" id="tkLimit" type="text" inputmode="decimal" value="${o.limitPrice.toFixed(2)}"></label></div>` : "";
     renderTicketDyn();
   }
   async function openTicket(symbol, date, side) {
@@ -1113,13 +1275,13 @@
     const p = (n) => unit ? `${num(n)}${unit}` : isIndex(sym) ? num(n) : money(n, cur);
     const hi = Math.max(...bars.map((b) => b.high)), lo = Math.min(...bars.map((b) => b.low));
     const vols = bars.map((b) => b.volume).filter((v) => v > 0), avg = vols.length ? vols.reduce((a, b) => a + b, 0) / vols.length : null;
-    const fact = (k, v) => `<div><dt>${esc(k)}</dt><dd>${v}</dd></div>`;
+    const fact = (k, v, word) => `<div><dt${word ? ` title="${esc(means(word))}"` : ""}>${esc(k)}</dt><dd>${v}</dd></div>`;
     el.innerHTML = [
       fact(`Open \xB7 ${shortDay(last.date)}`, p(last.open)),
       fact("Day's range", `${p(last.low)} \u2013 ${p(last.high)}`),
       fact(`${S.range} range`, `${p(lo)} \u2013 ${p(hi)}`),
-      fact("Volume", compact(last.volume)),
-      fact(`Average volume \xB7 ${S.range}`, compact(avg))
+      fact("Volume", compact(last.volume), "volume"),
+      fact(`Average volume \xB7 ${S.range}`, compact(avg), "volume")
     ].join("");
   }
   function renderHeroActions() {
@@ -1149,9 +1311,9 @@
     }
     renderHero();
   }
-  var resultChip = (c) => c.pending ? '<span class="at-chip">not scored yet</span>' : `<span class="at-chip ${tone(parseFloat(c.alpha ?? ""))}">alpha ${esc(c.alpha ?? "\u2014")}</span>`;
+  var resultChip = (c) => c.pending ? `<span class="at-chip" title="${esc(`Not scored yet: ${S.desk?.desk.holdingDays ?? 5} trading days after the call, its alpha is worked out.`)}">not scored yet</span>` : `<span class="at-chip ${tone(parseFloat(c.alpha ?? ""))}" title="${esc(means("alpha"))}">alpha ${esc(c.alpha ?? "\u2014")}</span>`;
   var readButton = (ticker, date, words = "Read") => `<button class="at-btn at-press" data-act="open-call" data-symbol="${esc(ticker)}" data-date="${esc(date)}"><svg class="g"><use href="#i-file"/></svg><span>${esc(words)}</span></button>`;
-  var decideButton = (c) => c.ticket ? `<button class="at-btn at-press primary" data-act="decide" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}" title="An order ticket from this call, checked against your caps and by Robinhood"><span>Decide\u2026</span></button>` : noTicketChip(c.paper);
+  var decideButton = (c) => c.ticket ? `<button class="at-btn at-press primary" data-act="decide" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}" title="${esc(means("ticket"))}"><span>Decide\u2026</span></button>` : noTicketChip(c.paper);
   function renderCall() {
     const sym = S.symbol, c = latestCall(sym), d = S.desk, el = $("#callCard");
     if (!d || !sym) {
@@ -1205,7 +1367,7 @@
       return `<span class="at-row">${off}</span>`;
     };
     const rows = q2.map((x) => `<tr><td><b>${esc(x.symbol)}</b></td><td>${esc(x.depth ? DEPTH_WORDS[x.depth][0] : "Settings")}</td><td class="wrap">${stands(x)}</td><td class="at-quiet">${esc(dayText(x.requestedAt))}</td><td>${doing(x)}</td></tr>`).join("");
-    $("#analysesTable").innerHTML = `<thead><tr><th>Stock</th><th>Depth</th><th class="wrap">Where it stands</th><th>Asked</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="ta-empty">Nothing asked for yet. Press the robot beside a stock to ask the desk to analyse it.</td></tr>'}</tbody>`;
+    $("#analysesTable").innerHTML = `<thead><tr><th>Stock</th><th>${term("depth")}</th><th class="wrap">Where it stands</th><th>Asked</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="ta-empty">Nothing asked for yet. Press the robot beside a stock to ask the desk to analyse it.</td></tr>'}</tbody>`;
   }
   function noticeFinished(before, after) {
     if (!before) return;
@@ -1259,7 +1421,7 @@
       <td class="num"><span class="at-num">${q2 ? priceText(i.symbol, q2) : "\u2014"}</span></td>
       <td class="num">${q2 ? changeChip(q2) : `<span class="at-quiet" title="${esc(err && "message" in err ? err.message : "")}">${err && "error" in err ? err.error === "no-data" ? "No data" : "Unavailable" : "\u2014"}</span>`}</td>
       <td><div class="ta-tablespark" data-sp="${esc(i.symbol)}"></div></td>
-      <td><span class="at-row compact">${c ? `${ratingChip(c.rating)}<span class="at-quiet">${esc(dayText(c.date))}</span>` : `<span class="at-quiet" title="${esc(WORDS.call)}">no call yet</span>`}${i.ticket ? "" : noTicketChip(i.paper)}</span></td>
+      <td><span class="at-row compact">${c ? `${ratingChip(c.rating)}<span class="at-quiet">${esc(dayText(c.date))}</span>` : `<span class="at-quiet" title="${esc(means("call"))}">no call yet</span>`}${i.ticket ? "" : noTicketChip(i.paper)}</span></td>
       <td><span class="at-row">${queued ? openChip(i.symbol) : isIndex(i.symbol) ? "" : robot(i.symbol)}<button class="icon-btn" data-act="remove" data-symbol="${esc(i.symbol)}" title="Remove ${esc(i.symbol)}" aria-label="Remove ${esc(i.symbol)} from the watchlist"><svg class="g"><use href="#i-trash"/></svg></button></span></td></tr>`;
     };
     const groups = tiers.map((t) => {
@@ -1283,8 +1445,8 @@
   };
   function tierTile(i) {
     const q2 = quoteOf(i.symbol);
-    const call2 = i.call ? `${ratingChip(i.call.rating)}<span class="at-quiet">${esc(dayText(i.call.date))}</span>` : `<span class="at-quiet" title="${esc(WORDS.call)}">no call yet</span>`;
-    const ask2 = isIndex(i.symbol) ? "" : isOpen(i.symbol) ? openChip(i.symbol) : robot(i.symbol);
+    const call2 = i.call ? `${ratingChip(i.call.rating)}<span class="at-quiet">${esc(dayText(i.call.date))}</span>` : `<span class="at-quiet" title="${esc(means("call"))}">no call yet</span>`;
+    const ask2 = (isIndex(i.symbol) ? "" : isOpen(i.symbol) ? openChip(i.symbol) : robot(i.symbol)) + (i.watched ? "" : `<button class="icon-btn" data-act="watch-add" data-symbol="${esc(i.symbol)}" title="Add ${esc(i.symbol)} to your watchlist" aria-label="Add ${esc(i.symbol)} to your watchlist"><svg class="g"><use href="#i-plus"/></svg></button>`);
     return `<div class="at-tile at-box ta-tier-tile${i.symbol === S.symbol ? " on" : ""}">
     <button class="ta-tier-go" data-act="select" data-symbol="${esc(i.symbol)}" title="Chart ${esc(i.symbol)}">
       <span class="ta-tier-top"><b class="at-tile-name">${esc(i.name ?? q2?.name ?? i.symbol)}</b>${changeChip(q2)}</span>
@@ -1302,7 +1464,8 @@
   }
   function tierBlock(t) {
     const change = t.tier === "market" && !MK.editing ? '<button class="at-btn at-press" data-act="mk-edit" title="Choose the broad funds this tier shows">Change\u2026</button>' : "";
-    const head = `<div class="ta-tier-head"><h3>${esc(t.name)}</h3><p class="at-quiet">${esc(t.meaning)}</p>${change}</div>`;
+    const name = t.tier === "sectors" ? term("sector", t.name) : t.tier === "crypto" ? term("crypto", t.name) : t.tier === "names" ? term("stock", t.name) : esc(t.name);
+    const head = `<div class="ta-tier-head"><h3>${name}</h3><p class="at-quiet">${esc(t.meaning)}</p>${change}</div>`;
     const body = t.items.length ? `<div class="at-deck ta-tier-deck">${t.items.map(tierTile).join("")}</div>` : `<p class="at-quiet">${esc(EMPTY[t.tier] ?? "")}</p>`;
     const more = t.more ? `<div class="at-row"><button class="at-btn at-press" data-act="goto" data-to="sec-watch">${t.more} more on your watchlist</button></div>` : "";
     return `<div class="ta-tier">${head}${t.tier === "market" && MK.editing ? marketEditor() : ""}${body}${more}</div>`;
@@ -1315,7 +1478,7 @@
     }
     const typing = document.getElementById("mkInput");
     const kept = typing ? { value: typing.value, focus: document.activeElement === typing, from: typing.selectionStart, to: typing.selectionEnd } : null;
-    el.innerHTML = d.startHere.map(tierBlock).join("") + `<p class="at-honest">${esc(WORDS.today)} A dash is a price Yahoo Finance did not give. ${esc(WORDS.call)} Buy and Overweight lean towards owning it, Hold keeps what is held, Underweight and Sell lean against it: point at a rating for what its ticket does. ${esc(WORDS.fund)} Nothing here is investment advice.</p>`;
+    el.innerHTML = d.startHere.map(tierBlock).join("") + `<p class="at-honest">${term("today", "Today's move")} is the change since the last day's close; a dash is a price Yahoo Finance did not give. Each ${term("call", "call")} is the desk's rating, from Buy to Sell: Buy and Overweight lean towards owning it, Hold keeps what is held, Underweight and Sell lean against it, and pointing at a rating says what its ticket does. A ${term("fund", "fund")} holds many companies at once; + adds one to your watchlist. Nothing here is investment advice.</p>`;
     const field = document.getElementById("mkInput");
     if (kept && field) {
       field.value = kept.value;
@@ -1334,8 +1497,9 @@
       el.innerHTML = `${head}<p class="at-quiet">${esc(MORNING.weatherFailed || "Reading the S&P 500, the VIX and the odds on the Federal Reserve.")}</p>`;
       return;
     }
+    const named = (l) => l.key === "trend" ? term("average", l.name) : l.key === "mood" ? term("vix", l.name) : l.key === "rates" ? term("fed", l.name) : esc(l.name);
     el.innerHTML = `${head}<div class="ta-lines">${w.lines.map((l) => `<div class="ta-line">
-      <div class="ta-line-head"><b>${esc(l.name)}</b>${l.state ? `<span class="at-chip ${LINE_TONE[l.tone]}">${esc(l.state)}</span>` : '<span class="at-chip">\u2014</span>'}</div>
+      <div class="ta-line-head"><b>${named(l)}</b>${l.state ? `<span class="at-chip ${LINE_TONE[l.tone]}">${esc(l.state)}</span>` : '<span class="at-chip">\u2014</span>'}</div>
       <p>${esc(l.words)}</p><p class="at-quiet">${esc(l.meaning)}</p></div>`).join("")}</div>
     <p class="at-honest">From Yahoo Finance and Polymarket at ${esc(clock(w.at))}. Nothing here is investment advice.</p>`;
   }
@@ -1439,9 +1603,9 @@
     else if (!b) lede = PAPER.failed ? "The paper record could not be worked out just now: Yahoo Finance did not answer. It tries again in a moment." : "Working out the paper record from the closing prices.";
     else if (b.series.length < 2 || b.returnPct === null) lede = `Following the desk on paper since ${dayText(b.since ?? d.paper.since)}: nothing has filled yet. A call fills at the first closing price after its day.`;
     else lede = `Following the desk on paper since ${dayText(b.since ?? d.paper.since)}: ${pct(b.returnPct * 100)} (${money(b.value)} from ${money(b.startUsd)}), ${b.benchmarkPct === null ? "the S&P 500 unavailable" : `the S&P 500 ${pct(b.benchmarkPct * 100)}`} over the same days.`;
-    const held = b?.positions.length ? `<p class="at-quiet">On paper now: ${b.positions.map((p) => `${esc(p.ticker)} ${p.quantity}`).join(", ")}, and ${esc(money(b.cash))} in cash.</p>` : "";
-    $("#paperCard").innerHTML = `<div class="at-card-head"><h3>Your paper record</h3><span class="at-chip">${esc(weeksWords(d.paper))} of record</span></div>
-    <p class="at-lede">${esc(lede)}</p>${b && b.series.length > 1 ? '<div class="ta-spark-tall" id="paperChart"></div><p class="at-quiet">The solid line is the paper money; the dashed one is the S&amp;P 500 from the same start.</p>' : ""}${held}
+    const held = b?.positions.length ? `<p class="at-quiet">${term("position", "Positions")} on paper now: ${b.positions.map((p) => `${esc(p.ticker)} ${p.quantity}`).join(", ")}, and ${esc(money(b.cash))} in cash.</p>` : "";
+    $("#paperCard").innerHTML = `<div class="at-card-head"><h3>Your ${term("paper", "paper")} record</h3><span class="at-chip">${esc(weeksWords(d.paper))} of record</span></div>
+    <p class="at-lede">${esc(lede)}</p>${b && b.series.length > 1 ? `<div class="ta-spark-tall" id="paperChart"></div><p class="at-quiet">The solid line is the paper money; the dashed one is the ${term("sp500", "S&P 500")} from the same start.</p>` : ""}${held}
     <p class="at-honest">Every call on a stock, a fund, Bitcoin or Ether is followed as its order ticket would size it, and fills at the first closing price after its day. Crypto is bought in fractions within your crypto limit, on paper only: Robinhood's agent doorway trades stocks and funds. No costs are counted (Robinhood charges no commission). A few weeks of record are noise, not proof, and nothing here is investment advice.</p>`;
     const el = document.getElementById("paperChart");
     if (el && b) paperChart(el, b.series);
@@ -1453,7 +1617,7 @@
     const r = d.record.summary, pctOf = (v) => `${v >= 0 ? "+" : "\u2212"}${Math.abs(v * 100).toFixed(1)}%`;
     $("#scoreSub").textContent = `${r.resolved} scored \xB7 ${r.pending} waiting${r.unscored ? ` \xB7 ${r.unscored} unreadable` : ""}`;
     const names = [...RATINGS.filter((x) => r.byRating[x]), ...Object.keys(r.byRating).filter((x) => !RATINGS.includes(x))];
-    const grid = names.length ? `<div class="ta-score"><span class="head">Rating</span><span class="head">Calls</span><span class="head">Called the direction</span><span class="head">Average alpha vs the index</span>${names.map((n) => {
+    const grid = names.length ? `<div class="ta-score"><span class="head">Rating</span><span class="head">Calls</span><span class="head">Called the direction</span><span class="head">Average ${term("alpha", "alpha")} vs the ${term("index", "index")}</span>${names.map((n) => {
       const s = r.byRating[n];
       return `${ratingChip(n)}<b>${s.count}</b><b>${s.hitRate === null ? "\u2014" : `${Math.round(s.hitRate * 100)}%`}</b><b>${pctOf(s.meanAlpha)}</b>`;
     }).join("")}</div>` : '<p class="at-quiet">Nothing has been scored yet. A call is scored once its window has traded; run /settle in Madav to score the ones that are ready.</p>';
@@ -1556,6 +1720,7 @@
   }
   function renderAll() {
     renderSub();
+    renderGuide();
     renderFavs();
     renderAccount();
     renderToday();
@@ -1687,7 +1852,7 @@
     $("#askDialog").innerHTML = `<h2 id="askTitle">Analyse ${esc(it?.name ? `${it.name} (${ASK.symbol})` : ASK.symbol)}</h2>
     <p class="at-lede">The desk's twelve agents read ${reads}, argue both sides, and record a call you can read and decide on. It never places an order${coin ? `: ${it?.paper === false ? "among crypto, the desk follows only Bitcoin and Ether on paper" : "a coin is followed on paper only"}` : ""}.</p>
     <div class="at-seg" role="radiogroup" aria-label="How deep">${DEPTH_ORDER.map((d) => `<button class="at-seg-b${d === ASK.depth ? " on" : ""}" role="radio" aria-checked="${d === ASK.depth}" data-act="ask-depth" data-depth="${d}">${DEPTH_WORDS[d][0]}</button>`).join("")}</div>
-    <p class="at-quiet">${esc(DEPTH_WORDS[ASK.depth][1])}</p>
+    <p class="at-quiet">${term("depth")} \xB7 ${esc(DEPTH_WORDS[ASK.depth][1])}</p>
     <p class="at-honest">${l ? `It runs by itself: ${esc(l.listener)} is listening.` : "Nothing is listening on this computer yet, so it waits until a run starts: see Analyses you asked for."}</p>
     <div class="at-pop-do"><button class="at-btn at-press" data-act="ask-cancel">Cancel</button><button class="at-btn at-press primary" data-act="ask-yes"><svg class="g"><use href="#i-bot"/></svg><span>Ask the desk</span></button></div>`;
   }
@@ -1713,6 +1878,10 @@
     }
     if (e.target === $("#stopDialog")) {
       $("#stopDialog").close();
+      return;
+    }
+    if (e.target === $("#glossDialog")) {
+      $("#glossDialog").close();
       return;
     }
     const el = e.target.closest("[data-act]");
@@ -1798,6 +1967,41 @@
         break;
       case "select":
         select(sym);
+        break;
+      case "guide-open":
+        remember({ guide: "open" });
+        showView("overview");
+        renderGuide();
+        $("#sec-guide").scrollIntoView({ behavior: "smooth", block: "start" });
+        break;
+      case "guide-away":
+        remember({ guide: "away" });
+        renderGuide();
+        toast("Get started is put away. The side list opens it again any time.");
+        break;
+      case "gloss-open":
+        openGlossary();
+        break;
+      case "gloss-close":
+        $("#glossDialog").close();
+        break;
+      case "contact-save":
+        void saveContact();
+        break;
+      case "contact-edit":
+        GUIDE.editing = true;
+        renderGuide();
+        document.getElementById("contactInput")?.focus();
+        break;
+      case "contact-cancel":
+        GUIDE.editing = false;
+        renderGuide();
+        break;
+      case "guide-ask":
+        void askPicks();
+        break;
+      case "watch-add":
+        void addStock(sym);
         break;
       case "fold": {
         const t = el.dataset.tier;
@@ -2068,6 +2272,11 @@
   });
   document.addEventListener("keydown", (e) => {
     const t = e.target;
+    if (t.id === "contactInput" && e.key === "Enter") {
+      e.preventDefault();
+      void saveContact();
+      return;
+    }
     if (t.id !== "mkInput") return;
     if (e.key === "Enter") {
       e.preventDefault();
@@ -2292,6 +2501,7 @@
     renderHero();
   });
   renderControls();
+  explainStaticWords();
   function noKey() {
     if (life.noKey) return;
     life.noKey = true;

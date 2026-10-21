@@ -39277,6 +39277,10 @@ function eveningBrief(dir, today2, now) {
 import fs16 from "node:fs";
 import path19 from "node:path";
 
+// src/desk/paper.ts
+var RECORD_WEEKS = 4;
+var RECORD_WORDS = `${["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"][RECORD_WEEKS] ?? RECORD_WEEKS} ${RECORD_WEEKS === 1 ? "week" : "weeks"}`;
+
 // src/desk/sectors.ts
 var SECTOR_FUNDS = {
   XLK: "Technology",
@@ -39376,6 +39380,9 @@ function cleanPrefs(raw) {
   if (market) out.market = market;
   if (Array.isArray(r.folded)) out.folded = TIERS.filter((t) => r.folded.includes(t));
   if (typeof r.morning === "boolean") out.morning = r.morning;
+  const guide = one2(r.guide, ["open", "away"]);
+  if (guide) out.guide = guide;
+  if (typeof r.readCall === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.readCall)) out.readCall = r.readCall;
   return out;
 }
 var prefsFile = (dir) => path19.join(dir, "dashboard.json");

@@ -27,7 +27,8 @@ import type { Match } from '../search.js';
 import type { Prefs, Recent } from '../prefs.js';
 import type { Caps } from '../../settings.js';
 import type { HoldingCare } from '../../desk/care.js';
-export type { Match, Prefs, Recent, Caps, HoldingCare };
+import type { Guide } from '../guide.js';
+export type { Match, Prefs, Recent, Caps, HoldingCare, Guide };
 export type Trading = TradingState;
 export type { Placed };
 /** An open ticket; own: the person's own order for a stock they chose, not one of the desk's calls. */
@@ -90,6 +91,8 @@ export const api = {
   search: (query: string) => call<{ matches: Match[] }>('GET', `/api/search?${q({ q: query })}`),
   prefs: () => call<Prefs>('GET', '/api/prefs'),
   savePrefs: (p: Prefs) => call<Prefs>('POST', '/api/prefs', p),
+  /** The contact email the SEC asks for; the desk checks it, keeps it, and answers with it masked, never in full. */
+  setContact: (email: string) => call<{ saved: string }>('POST', '/api/contact', { email }),
   /** "Worth a look today", worked out at most once an hour; `queued` is what the morning switch just put on the waiting list. */
   screen: () => call<{ screen: Screen; morning: Morning; queued: string[] }>('GET', '/api/screen'),
   /** "Market weather": the trend, the mood and the rates, worked out at most once an hour. */

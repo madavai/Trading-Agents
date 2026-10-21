@@ -257,5 +257,27 @@
 .ta-tier-fold > .g { flex: none; color: var(--text-3); transition: transform var(--fast) var(--ease); }
 .ta-tier-fold[aria-expanded="true"] > .g { transform: rotate(90deg); }
 
+/* get started: the first month in five steps, each a numbered circle that turns into a tick when it is done */
+#guideDo { flex: 1 1 auto; flex-wrap: wrap; justify-content: flex-end; min-width: 0; }
+.ta-gstep.done .ta-gwhy { display: none; }   /* a step done shows what it holds, not how to do it */
+.ta-guide { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.ta-gstep { display: grid; grid-template-columns: var(--icon-box) minmax(0, 1fr); gap: var(--space-3); padding-block: var(--space-4); border-top: 1px solid var(--line); }
+.ta-gstep:first-child { border-top: 0; padding-top: var(--space-2); }
+.ta-gtick { width: var(--icon-box); height: var(--icon-box); border-radius: 50%; display: grid; place-items: center; background: var(--tint); color: var(--text-2); font-family: var(--font-title); font-weight: var(--weight-medium); }
+.ta-gstep.done > .ta-gtick { background: var(--ok-tint); color: var(--ok); }
+.ta-gbody { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.ta-ghead { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-2); }
+.ta-ghead > b { font-family: var(--font-title); font-weight: var(--weight-medium); font-size: var(--size-text); line-height: var(--line-height); color: var(--text); }
+.ta-gstep.done .ta-ghead > b { color: var(--text-2); }
+.ta-gmeans { max-width: calc(var(--card-min) * 2.4); }
+.ta-gbody > .at-meter { max-width: calc(var(--card-min) * 1.4); }
+.ta-gbody .at-btn { flex: 0 1 auto; max-width: 100%; height: auto; min-height: var(--control); white-space: normal; text-align: left; line-height: var(--line-tight); }   /* a long label wraps on a phone */
+.ta-gbody .at-btn > span { overflow: visible; }
+@media (max-width: 640px) { .at-facts.ruled:is(.ta-gmeans, .ta-gloss) > div { grid-template-columns: minmax(0, 1fr); } }   /* on a phone, the word over its meaning */
+
+/* a trading word that says what it means when pointed at (glossary.ts): a dotted line under it */
+.ta-term { text-decoration: underline dotted; text-decoration-color: var(--text-3); text-underline-offset: 0.2em; cursor: help; }
+.ta-gloss dt { color: var(--text); font-weight: var(--weight-medium); }
+
 /* a style that sets display would otherwise show an element the page has hidden */
 .ta-suggest[hidden], .ta-update-wrap[hidden] { display: none; }

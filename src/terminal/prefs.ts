@@ -1,6 +1,6 @@
 // What the dashboard remembers between visits, so the person finds it as they left it: the face, the side list, the page
-// they were on, the stock on the chart with its range and lines, the stocks they looked at last, their whole-market funds
-// and which tiers of the watchlist they folded away. It is kept in one small file in desk-data on this computer, so it
+// they were on, the stock on the chart with its range and lines, the stocks they looked at last, their whole-market funds,
+// which tiers of the watchlist they folded away, and whether "Get started" is open. It is kept in one small file in desk-data on this computer, so it
 // outlives a restart, another browser and another port. Nothing about an order is ever kept here: every ticket starts
 // afresh, with Robinhood's check and the person's Confirm.
 import fs from 'node:fs';
@@ -26,6 +26,11 @@ export interface Prefs {
   /** "Analyse the top three each market morning" is on (off as shipped): the top three of "Worth a look today" go on the
    *  waiting list at shallow depth once each market day (desk/screen.ts queueTop). Set only by that switch. */
   morning?: boolean;
+  /** "Get started" is open (it opened by itself on a first visit, or the person reopened it) or put away. */
+  guide?: 'open' | 'away';
+  /** The day the person first opened one of the desk's calls in full: the guide's fourth step. Set only by the dashboard
+   *  when it serves a call, never by the page's choices. */
+  readCall?: string;
 }
 
 export const MAX_RECENT = 6;
@@ -60,6 +65,8 @@ export function cleanPrefs(raw: unknown): Prefs {
   const market = cleanMarket(r.market); if (market) out.market = market;
   if (Array.isArray(r.folded)) out.folded = TIERS.filter((t) => (r.folded as unknown[]).includes(t));
   if (typeof r.morning === 'boolean') out.morning = r.morning;
+  const guide = one(r.guide, ['open', 'away'] as const); if (guide) out.guide = guide;
+  if (typeof r.readCall === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.readCall)) out.readCall = r.readCall;
   return out;
 }
 

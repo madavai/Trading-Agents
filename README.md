@@ -26,7 +26,8 @@ to open that part of the guide. They follow your light or dark theme.
 > **Every part is built** - the desk check, the free data tools, the twelve-agent team with its scoring and lessons,
 > back-testing, the dashboard with your Robinhood accounts, order tickets with Robinhood's own check, placing an order
 > on your Confirm, care for what you hold (the desk's view beside each holding, its stop watched, sells you confirm),
-> the morning and evening routines, and the trading-desk team in Madav's Agent Studio.
+> the morning and evening routines, a guided first month on the dashboard with every trading word explained, and the
+> trading-desk team in Madav's Agent Studio.
 > **Being proven now, on a real computer:** a full analysis with company accounts, the dashboard with a real Robinhood
 > account, and a first real order. Until that is done, keep trading switched off, or keep orders to one share with
 > Robinhood's phone approval on.
@@ -53,6 +54,10 @@ affiliated with them.
 
 You need Node 22 or later (Madav needs it too). No keys and no installs; only your email, once.
 
+**New to trading?** Open the dashboard: on your first visit, **Get started** walks you through a safe first month in
+five steps, each ticked off by itself as you do it, and **What does this mean?** explains every trading word in one
+line (see [Your first month](#your-first-month-get-started)).
+
 **To go back to the project's team:** ask the team to "reset the team". On your yes it writes the desk's agent files
 again exactly as the project ships them, and Madav goes back to them too, undoing changes made in Agent Studio (the
 model, permissions and effort you chose there stay yours). The desk check also names any agent file that differs
@@ -77,8 +82,9 @@ that does not answer is reported as unavailable, never as "nothing happened". Ma
 late.
 
 **Why your email:** the SEC asks everyone who reads its filings for a contact address, so the desk needs yours before
-its first analysis. It is kept in this folder's `desk-data` (which git never commits) and sent to the SEC alone; no
-other source sees it.
+its first analysis. Give it to the desk in a chat, or in the field in Get started on the dashboard. It is kept in this
+folder's `desk-data` (which git never commits) and sent to the SEC alone; no other source sees it, and the dashboard
+never shows it back in full (only its first letter and its domain).
 </details>
 
 ## Who does what: twelve agents
@@ -185,7 +191,7 @@ the team's "talk" switch shows these messages in the Messages panel; with it off
 <a href="https://madavai.github.io/Trading-Agents/inside-the-trading-desk.html#dashboard">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/dashboard-dark.webp">
-  <img alt="The dashboard: a side list with your account at the top and the desk's sections below; Your desk today, What you hold needs a look (shown only when something does), Start here with the whole market, the eleven sectors and your own names, This morning with the market weather and what is worth a look today, the markets, a full-width chart, the watchlist by tier, the desk's calls, your accounts with the desk's view beside each holding, and the order ticket from Decide…, Sell… or Trade… to your Confirm." src="docs/readme/dashboard-light.webp">
+  <img alt="The dashboard: a side list with your account at the top and the desk's sections below, Get started and What does this mean? among them; Get started's five steps on a first visit; Your desk today, What you hold needs a look (shown only when something does), Start here with the whole market, the eleven sectors and your own names, This morning with the market weather and what is worth a look today, the markets, a full-width chart, the watchlist by tier, the desk's calls, your accounts with the desk's view beside each holding, and the order ticket from Decide…, Sell… or Trade… to your Confirm." src="docs/readme/dashboard-light.webp">
 </picture>
 </a>
 
@@ -202,6 +208,31 @@ at last. The dashboard opens where you left it (the page, the stock, the chart's
 browser. After an update it offers Restart at the top of the page, and one press opens the new version where you were;
 Stop, at the top right, closes it.
 
+### Your first month: Get started
+On your first visit, while the desk has no calls yet, the dashboard opens on **Get started**: a safe first month in five
+steps, each ticked off by itself as it is done, wherever you do it (on the page, or by asking the desk in a chat). The
+ticks are read from the desk's own records, never from what the page says happened:
+1. **Give the desk your email for the SEC**, once, in the field there (or in a chat). It ticks when the email is saved.
+2. **Pick three to five companies you know, plus the whole market and one or two sectors you understand.** Search your
+   companies at the top and press Add to watchlist; on Start here, press + on a whole-market fund and on a sector or
+   two. It ticks with three of your own names, a whole-market fund and a sector fund watched (or asked about). The desk
+   suggests no company: the names are yours.
+3. **Ask the desk to analyse them, shallow, and switch on running automatically.** One press asks for every pick it has
+   not called yet, at shallow depth; another switches on "Run automatically with Claude Code" (or use Madav's
+   routine). It ticks when something is asked for and something runs it.
+4. **Read your first calls**, with what Buy, Hold, Sell and alpha mean beside them. It ticks when you open a call in
+   full.
+5. **Follow them on paper for four weeks, then read the scorecard** before deciding anything about money and Robinhood.
+   It ticks when the paper record is four weeks old.
+
+Press **Put away** to hide it; **Get started** in the side list opens it again, with how many steps are done. Someone
+who already has calls does not see it unless they open it.
+
+**What does this mean?**, in the side list and in Get started, lists about thirty trading words, each in one plain line:
+the ratings, alpha, index, fund, sector, cap, limit order, stop, paper, depth and the rest. The same line appears when
+you point at that word anywhere on the dashboard (a dotted line marks such a word, and every rating explains itself),
+so a word means the same thing everywhere.
+
 ### Start here: the whole market first
 The first section of the dashboard shows the world in tiers, broadest first, because the broadest risk is the steadiest:
 - **The whole market**: as shipped, four funds: SPY (the S&P 500), QQQ (the Nasdaq 100), VT (the whole world) and BND
@@ -214,10 +245,10 @@ The first section of the dashboard shows the world in tiers, broadest first, bec
   ticket, and its calls say "on paper only" where a stock's say Decide….
 
 Each tile shows today's move (a dash when Yahoo Finance gave none), the desk's latest call with its date or "no call
-yet", and the robot, which asks the desk to analyse a fund as readily as a stock (for a fund it reads what it holds and
-what it costs). Every trading word has its meaning beside it: under each tier, at the foot of the section, and on each
-rating when you point at it. The watchlist further down is grouped the same way; press a tier's name to fold it away,
-and the dashboard remembers which you folded.
+yet", the robot, which asks the desk to analyse a fund as readily as a stock (for a fund it reads what it holds and
+what it costs), and + to add it to your watchlist. Every trading word has its meaning beside it: under each tier, at the
+foot of the section, and on each rating and dotted word when you point at it. The watchlist further down is grouped the
+same way; press a tier's name to fold it away, and the dashboard remembers which you folded.
 
 ### This morning: the market weather, and what is worth a look
 Right after Start here, two cards are worked out from figures, at most once an hour, and never from a model or a

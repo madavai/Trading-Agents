@@ -60,11 +60,19 @@
   `desk-data/dashboard.json`, each value checked; the whole-market funds only through `/api/tiers/market`, which checks
   each one's price first), `tiers.ts` (the world in tiers for "Start here" and the watchlist: the whole market, the
   sector funds, single names and crypto, with every fund's and tier's name and meaning in plain words; the page draws
-  what it is sent and holds no tier rules of its own), `state.ts` and `store.ts` (the desk's files and the watchlist; the
+  what it is sent and holds no tier rules of its own), `guide.ts` ("Get started", the first month in five steps:
+  `guideOf` ticks each from the desk's own records, the contact email, the watchlist, the waiting list and its listener,
+  the journal, `prefs.ts` `readCall` (noted by `/api/call`, never by the page) and the paper record against
+  `paper.ts` `RECORD_WEEKS`, said everywhere as `RECORD_WORDS`; it opens by itself while the desk has no calls and the
+  page keeps it open until it is put away; `maskEmail` is all of the address the page ever sees; `/api/contact` saves
+  it as `set_contact_email` does), `state.ts` and `store.ts` (the desk's files and the watchlist; the
   waiting list for the page, with each running stock's step), `main.ts` (the program: Stop, and Restart into an update on the person's press only, on the same address
   with `--port=N` and the same key, handed over in the new program's environment, never on a command line), and `ui/` (the
   page: `house.css` is the Madav House theme, `dashboard.css` only places its objects with tokens, `main.ts` and the
-  rest are the page). The page has no inline script or style (the policy refuses them): colours in charts come from
+  rest are the page; `glossary.ts` is "What does this mean?", every trading word the page uses in one plain line, written
+  there once: the page shows a word's line with `term()` / `means()`, the words in `index.html` carry `data-term`, and
+  a test fails when a word is never pointed at, a pointed word is missing, or another file spells a meaning again).
+  The page has no inline script or style (the policy refuses them): colours in charts come from
   classes, and anything an agent wrote goes through `md.ts`, which escapes first. `npm run build` bundles the page into
   `dist/terminal/`. `ui/` has its own `tsconfig.json` (it needs the browser's types).
 - `src/desk/queue.ts` - the analyses asked for on the dashboard, and the contract with whatever runs the agents. Three
@@ -128,7 +136,8 @@
   Ether) sized by `propose` and held to `check` as
   its ticket would be, filled at the first close after the call's day, valued daily against SPY; worked out afresh from
   the journal and Yahoo's daily closes (the dashboard's `/api/paper`, kept ten minutes). Only the starting money is
-  kept (`desk-data/paper.json`). `recordOf` is the record (weeks, calls) the trading switch's four-week press uses.
+  kept (`desk-data/paper.json`). `recordOf` is the record (weeks, calls) the trading switch's four-week press and Get started's fifth step use;
+  `RECORD_WEEKS` and `RECORD_WORDS` are that paper time, one number said one way everywhere.
 - `desk-settings.json` - the desk's settings (read and checked by `src/settings.ts`, trading part included, but never
   the caps: those are the person's own, beside the trading switch); `docs/design/` - the dashboard's design reference.
 - `docs/inside-the-trading-desk.html` - the visual guide (GitHub Pages serves `docs/` from `main`). The README shows it

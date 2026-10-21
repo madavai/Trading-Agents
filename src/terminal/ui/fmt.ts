@@ -1,4 +1,6 @@
 // How numbers and words are written on the page. A number that is missing is a dash, never a zero.
+import { GLOSSARY, isTerm, means } from './glossary.js';
+
 const MINUS = '−';
 
 export const esc = (s: unknown): string => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -22,28 +24,15 @@ export const tone = (n: number | null | undefined): '' | 'ok' | 'danger' => (n =
 export const ratingTone = (r: string): '' | 'ok' | 'danger' | 'warn' =>
   r === 'Buy' || r === 'Overweight' ? 'ok' : r === 'Underweight' || r === 'Sell' ? 'danger' : r === 'Hold' ? '' : 'warn';
 
-/** What each of the desk's ratings means, in one plain line, with what its ticket (and paper) does as shipped. */
-export const RATING_MEANING: Readonly<Record<string, string>> = {
-  Buy: 'Buy: the desk would own it. As shipped, its ticket buys a full position.',
-  Overweight: 'Overweight: the desk leans towards owning it. As shipped, its ticket buys half a position.',
-  Hold: 'Hold: the desk would keep what is held, and neither buy nor sell.',
-  Underweight: 'Underweight: the desk leans against it. As shipped, its ticket sells half of what is held.',
-  Sell: 'Sell: the desk would not own it. As shipped, its ticket sells everything held.',
-  'Needs review': 'Needs review: the decision gave no rating that could be read, so it asks for no order.',
-};
-/** A rating's meaning, or '' for one the desk does not use. */
-export const ratingMeaning = (r: string): string => RATING_MEANING[r] ?? '';
+/** A rating's meaning in one plain line, from the glossary, with what its ticket (and paper) does as shipped; '' for one
+ *  the desk does not use. */
+export const ratingMeaning = (r: string): string => (isTerm(r) && GLOSSARY[r].group === GLOSSARY.Buy.group ? means(r) : '');
 
-/** The other trading words the page uses, each in one plain line. */
-export const WORDS = {
-  today: "Today: the change in price since the last day's close.",
-  call: "The desk's call: its twelve agents' rating, from Buy to Sell, on the day they analysed it.",
-  fund: 'A fund: a basket of many companies (or bonds) bought as one share.',
-  paper: 'On paper: followed with pretend money only. Robinhood\'s agent doorway trades stocks and funds, so a coin never gets an order ticket.',
+/** Why a mark is there, each in one plain line. The trading words themselves are in the glossary (glossary.ts). */
+export const NOTES = {
+  coinOnPaper: "Robinhood's agent doorway trades stocks and funds, so a coin never gets an order ticket.",
   noTicket: 'No order ticket: Robinhood\'s agent doorway trades stocks and funds, and among crypto the desk follows only Bitcoin and Ether on paper.',
-  stop: "Stop: the price under which the desk's trader proposed selling, to limit a loss. The dashboard watches it against Yahoo Finance's price and tells you when the price falls below it. Nothing is ever sold by itself.",
   noView: "No view yet: the desk has not analysed it. Ask it to (the robot); in the Agentic account, Monday's morning routine rates it.",
-  rerating: "Re-rating: it is on the waiting list, so the desk analyses it again and its view is fresh. Monday's morning routine re-rates the Agentic account's holdings whose view is a week old.",
 } as const;
 
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
