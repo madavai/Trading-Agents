@@ -63,6 +63,16 @@ test('the guard rails on a ticket: one sector, crypto, and the shortest hold, ea
   assert.match(words({ ...buy, symbol: 'SPY' }, { ...big, symbol: 'SPY', sector: { name: null, label: 'a whole-market fund', heldUsd: 0 } }), /SPY is a whole-market fund: it counts towards no sector/);
   assert.equal(passes(check({ ...buy, symbol: 'BTC-USD', limitPrice: 182.4 }, { ...big, symbol: 'BTC-USD', cryptoHeldUsd: 300 }, T, C)), false, 'crypto at most 5%: $300 held and $364.80 more is 6.6%');
   assert.match(words({ ...buy, symbol: 'BTC-USD' }, { ...big, symbol: 'BTC-USD', cryptoHeldUsd: 100 }), /Crypto would be 4\.6% of the account; your limit is 5%/);
+  assert.doesNotMatch(words({ ...buy, symbol: 'BTC-USD' }, { ...big, symbol: 'BTC-USD', cryptoHeldUsd: 100 }), /Sector/, 'crypto has its own limit in place of a sector');
+  // Crypto, sized for paper only: in fractions, within what the crypto limit leaves, never under a dollar.
+  const btc = propose({ ...big, symbol: 'BTC-USD', price: 82_000, cryptoHeldUsd: 200 }, T, C);
+  assert.deepEqual(btc.order, { symbol: 'BTC-USD', side: 'buy', quantity: 0.003658, limitPrice: 82_000, timeInForce: 'gfd' }, '5% of $10,000 less the $200 held leaves $300: 0.003658 BTC');
+  assert.match(btc.why.join(' '), /Your crypto limit of 5% of the account leaves \$300\.00, so at most that\..*rounded down to six decimal places: 0\.003658 unit\(s\)/);
+  assert.equal(passes(check(btc.order!, { ...big, symbol: 'BTC-USD', price: 82_000, cryptoHeldUsd: 200 }, T, C)), true);
+  assert.match(propose({ ...big, symbol: 'BTC-USD', price: 82_000, cryptoHeldUsd: 499.5 }, T, C).why.at(-1)!, /\$0\.50 is under \$1\.00, the smallest crypto order/);
+  assert.equal(propose({ ...big, symbol: 'BTC-USD', price: 82_000, held: 0.003658, rating: 'Underweight' }, T, C).order?.quantity, 0.001829, 'half of what is held, to six decimal places');
+  assert.equal(passes(check({ ...buy, symbol: 'BTC-USD', quantity: 0.0000001 }, { ...big, symbol: 'BTC-USD' }, T, C)), false, 'no finer than six decimal places');
+  assert.equal(passes(check({ ...buy, quantity: 0.5 }, big, T, C)), false, 'a stock is still bought in whole shares');
   const sell: Order = { ...buy, side: 'sell', quantity: 1 };
   const young = { ...big, held: 2, boughtOn: '2026-10-13', heldDays: 2 };
   const early = check(sell, young, T, C);
@@ -175,6 +185,7 @@ async function desk(buyingPower: string) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ta-tk-term-'));
   fs.copyFileSync('desk-settings.json', path.join(root, 'desk-settings.json'));
   new Journal(path.join(root, 'desk-data', 'journal.md')).storeDecision('NVDA', '2026-10-15', '**Rating**: Buy\n\n**Executive Summary**: Buy on strength.');
+  new Journal(path.join(root, 'desk-data', 'journal.md')).storeDecision('BTC-USD', '2026-10-15', '**Rating**: Buy\n\n**Executive Summary**: Buy, on paper.');
   const term = await startTerminal({ root, assets: new Map([['/index.html', { type: 'text/html', body: '<p>page</p>' }]]) as Assets, port: 0, robinhood: link, keyFile: path.join(path.dirname(file), 'dashboard.json') });
   const ask = async (p: string, body: unknown) => { const r = await fetch(`${term.url}${p.slice(1)}`, { method: 'POST', headers: { 'x-desk-token': term.token, 'content-type': 'application/json' }, body: JSON.stringify(body) }); const t = await r.text(); return { status: r.status, body: t, json: () => JSON.parse(t) }; };
   const show = async () => { const { accounts } = await link.accounts(); await link.choose(accounts.filter((a) => !a.deactivated).map((a) => a.key)); };
@@ -187,6 +198,8 @@ test("from a call to Robinhood's check: proposed on the real figures, changed on
     const early = await ask('/api/ticket', { symbol: 'NVDA', date: '2026-10-15' });
     assert.equal(early.status, 400);
     assert.match(early.json().error, /show your Agentic account on the dashboard first/);
+    const coin = await ask('/api/ticket', { symbol: 'BTC-USD', date: '2026-10-15' });
+    assert.deepEqual([coin.status, coin.json().error], [400, "Robinhood's agent doorway trades stocks and funds only: BTC-USD is crypto, which the desk follows on paper"], 'a crypto call never opens a ticket: it is refused before Robinhood is asked');
     await show();
     assert.equal((await ask('/api/ticket', { symbol: 'NVDA', date: '2020-01-01' })).status, 404);
     const opened = await ask('/api/ticket', { symbol: 'nvda', date: '2026-10-15' });

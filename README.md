@@ -110,7 +110,8 @@ the team's "talk" switch shows these messages in the Messages panel; with it off
 
 1. **Agents analyse.** Ask the trading-desk team in Agent Studio ("analyse NVDA"), type `/analyse NVDA` in a chat, or
    press the robot beside a stock on the dashboard (see "Analyses that run by themselves" below).
-   Four analysts (price and indicators, mood, news, company accounts), a bull and a bear, a research manager, a trader,
+   Four analysts (price and indicators, mood, news, company accounts or, for a fund, what it holds and what it costs
+   each year), a bull and a bear, a research manager, a trader,
    three risk voices and a portfolio manager work in turn, from free public data, and give a rating. Each call is scored
    a few trading days later against its market's index (`/settle`), and the lessons go into later analyses.
    `/backtest NVDA,AAPL 2026-06-01 2026-08-01` runs the team over past dates in a journal of its own and reports, by
@@ -194,13 +195,18 @@ browser. After an update it offers Restart at the top of the page, and one press
 Stop, at the top right, closes it.
 
 ### Your paper record
-Before you risk money, every call the desk makes on a stock or a fund is followed on paper, and the dashboard opens on
+Before you risk money, every call the desk makes on a stock, a fund, Bitcoin or Ether is followed on paper, and the dashboard opens on
 what that would have done: one sentence, a line of the paper money against the S&P 500 from the same start, and how
 many weeks and calls stand behind it. Each call is sized exactly as its order ticket would size it (the rating, a full
 position of 10%, your caps), takes no order the real ticket would refuse, and fills at the first closing price after
 the call's day. No costs are counted. The paper money starts at $10,000; change it on the scorecard. Each call shows a
 small "paper" badge with what it did. Switching trading on with under four weeks of record shows that record first and
-asks you to press "I understand". Crypto and indices are not followed on paper yet.
+asks you to press "I understand".
+
+Bitcoin and Ether are followed on paper only: Robinhood's agent doorway trades stocks and funds, so a crypto call never
+opens a ticket. On paper they are bought in fractions (to six decimal places, at least $1), sized to fit what your crypto
+limit leaves, and filled at the next day's close, weekends included, since crypto trades every day. Other coins and
+indices are analysed but not followed on paper.
 
 ### Analyses that run by themselves
 Press the robot beside any stock, choose how deep (shallow, medium or deep; your settings' depth is chosen first) and

@@ -614,7 +614,7 @@ p { text-wrap: pretty; }
     <div class="joined src-grid">
       <article class="src edge c-src">
         <div class="src-h"><span class="icbox"><svg class="ic"><use href="#i-chart"/></svg></span><div><p class="src-name">Yahoo Finance</p><p class="src-kind">Prices, news and company data</p></div></div>
-        <p>Daily prices for charts and indicators, company and world news, and a company's profile, ratios and insider trades.</p>
+        <p>Daily prices for charts and indicators, company and world news, a company's profile, ratios and insider trades, and a fund's holdings and yearly cost.</p>
         <p class="note"><svg class="ic sm"><use href="#i-clock"/></svg><span>Prices can be up to 15 minutes late. It has no official free service: the desk reads the public pages its website uses, for personal use.</span></p>
       </article>
       <article class="src edge c-src">
@@ -655,7 +655,7 @@ p { text-wrap: pretty; }
           <tr><th scope="col">Source</th><th scope="col">Market<small>analyst</small></th><th scope="col">Sentiment<small>analyst</small></th><th scope="col">News<small>analyst</small></th><th scope="col">Fundamentals<small>analyst</small></th><th scope="col">Trader<small>agent</small></th><th scope="col">Dashboard<small>yours</small></th></tr>
         </thead>
         <tbody>
-          <tr><th scope="row">Yahoo Finance</th><td><span class="cell c-src">prices, indicators</span></td><td><span class="cell c-src">headlines</span></td><td><span class="cell c-src">company and world news</span></td><td><span class="cell c-src">profile, ratios, insider trades</span></td><td><span class="cell c-src">checked price table</span></td><td><span class="cell c-src">markets, charts</span></td></tr>
+          <tr><th scope="row">Yahoo Finance</th><td><span class="cell c-src">prices, indicators</span></td><td><span class="cell c-src">headlines</span></td><td><span class="cell c-src">company and world news</span></td><td><span class="cell c-src">profile, ratios, insider trades; a fund's holdings and yearly cost</span></td><td><span class="cell c-src">checked price table</span></td><td><span class="cell c-src">markets, charts</span></td></tr>
           <tr><th scope="row">StockTwits</th><td><span class="none" aria-label="no"></span></td><td><span class="cell c-src">traders' posts</span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td></tr>
           <tr><th scope="row">Reddit</th><td><span class="none" aria-label="no"></span></td><td><span class="cell c-src">forum posts</span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td></tr>
           <tr><th scope="row">FRED</th><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="cell c-src">economic figures</span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td></tr>
@@ -705,8 +705,8 @@ p { text-wrap: pretty; }
           </article>
           <article class="agent edge c-desk">
             <div class="agent-h"><span class="icbox"><svg class="ic"><use href="#i-ledger"/></svg></span><div><p class="agent-name">Fundamentals analyst</p><p class="agent-id">fundamentals-analyst</p></div></div>
-            <p class="agent-role">Checks the business itself: its accounts as filed, its ratios, and who inside the company is buying or selling. Not used for a coin.</p>
-            <dl><dt>Reads</dt><dd>SEC filings, Yahoo profile, ratios, insider trades</dd><dt>Writes</dt><dd>The fundamentals report</dd></dl>
+            <p class="agent-role">Checks the business itself: its accounts as filed, its ratios, and who inside the company is buying or selling; for a fund, what it holds and what it costs to own. Not used for a coin.</p>
+            <dl><dt>Reads</dt><dd>SEC filings, Yahoo profile, ratios, insider trades; for a fund, what it holds and what it costs each year</dd><dt>Writes</dt><dd>The fundamentals report</dd></dl>
           </article>
         </div>
       </div>
@@ -834,7 +834,7 @@ p { text-wrap: pretty; }
               <div class="mini"><p class="mini-h"><svg class="ic sm"><use href="#i-chart"/></svg>Market</p><p class="quiet">Prices, indicators</p></div>
               <div class="mini"><p class="mini-h"><svg class="ic sm"><use href="#i-chat"/></svg>Sentiment</p><p class="quiet">Headlines, posts</p></div>
               <div class="mini"><p class="mini-h"><svg class="ic sm"><use href="#i-news"/></svg>News</p><p class="quiet">News, economy, odds</p></div>
-              <div class="mini"><p class="mini-h"><svg class="ic sm"><use href="#i-ledger"/></svg>Fundamentals</p><p class="quiet">Filed accounts</p></div>
+              <div class="mini"><p class="mini-h"><svg class="ic sm"><use href="#i-ledger"/></svg>Fundamentals</p><p class="quiet">Accounts, or a fund's holdings</p></div>
             </div>
             <p class="why"><b>Why it matters.</b> All four run at the same time. Their reports are the evidence the rest of the desk argues from.</p>
           </div></li>
@@ -1107,7 +1107,7 @@ p { text-wrap: pretty; }
       <div class="feat edge c-src"><span class="icbox"><svg class="ic"><use href="#i-chart"/></svg></span><b>Markets and chart</b><p>Six market tiles, and any stock across the whole width: area or candles, averages, volume and its key figures underneath.</p></div>
       <div class="feat edge c-you"><span class="icbox"><svg class="ic"><use href="#i-star"/></svg></span><b>Watchlist and analyses</b><p>Pick a stock from the matches as you type and star it. The robot asks the desk to analyse it, as deep as you choose; each shows waiting, the step it is on, its rating or why it failed.</p></div>
       <div class="feat edge c-desk"><span class="icbox"><svg class="ic"><use href="#i-flag"/></svg></span><b>The desk's calls</b><p>Each call in two lines; in full, a coloured summary, the price since the call and every agent's part as a card.</p></div>
-      <div class="feat edge c-desk"><span class="icbox"><svg class="ic"><use href="#i-target"/></svg></span><b>Your paper record</b><p>First on the page: every call followed on paper at its ticket's size, against the S&amp;P 500, and how each call scored.</p></div>
+      <div class="feat edge c-desk"><span class="icbox"><svg class="ic"><use href="#i-target"/></svg></span><b>Your paper record</b><p>First on the page: every call on a stock, a fund, Bitcoin or Ether followed on paper at its ticket's size, against the S&amp;P 500, and how each call scored. Crypto stays on paper, within your crypto limit.</p></div>
       <div class="feat edge c-you"><span class="icbox"><svg class="ic"><use href="#i-ledger"/></svg></span><b>Stock page</b><p>Everything on one stock: what you hold with Buy… and Sell…, your orders on it, and each call with its score.</p></div>
       <div class="feat edge c-rh"><span class="icbox"><svg class="ic"><use href="#i-bank"/></svg></span><b>Your account</b><p>In the side list and on its own page: value, cash, buying power and gain in colour, each holding's share, orders, the trading switch and your caps.</p></div>
       <div class="feat edge c-you"><span class="icbox"><svg class="ic"><use href="#i-send"/></svg></span><b>Order tickets</b><p>Decide… from a call, or Trade… for your own: checked against your caps, reviewed by Robinhood, placed only on your Confirm.</p></div>

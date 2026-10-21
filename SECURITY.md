@@ -22,6 +22,10 @@ Only you, on the dashboard, and only when all of these hold:
 The same holds whether the ticket comes from one of the desk's calls ("Decide…") or is your own ("Trade…", a stock you
 chose, starting at one share): your own order gets no way around any of it, and the desk's log records it as yours.
 
+Crypto and indices never reach Robinhood: Robinhood's agent doorway trades stocks and funds, so the dashboard refuses a
+ticket for a coin or an index when it opens and again before Robinhood checks or places it. Bitcoin and Ether calls are
+followed on paper only.
+
 A ticket sends at most one order, with Robinhood's own protection against a repeat. Keep Robinhood's phone approval on
 until you trust the desk: then Robinhood also asks you on your phone before the order reaches the market.
 

@@ -85,6 +85,13 @@ const SECURITY = {
 
 class Refused extends Error { constructor(readonly status: number, message: string) { super(message); } }
 
+/** Robinhood's agent doorway trades stocks and funds only: an index cannot be bought, and crypto is followed on paper.
+ *  Asked when a ticket opens and again before Robinhood checks or places it, before anything reaches Robinhood. */
+function tradable(symbol: string): void {
+  if (isCrypto(symbol)) throw new Refused(400, `Robinhood's agent doorway trades stocks and funds only: ${symbol} is crypto, which the desk follows on paper`);
+  if (/[\^=]/.test(symbol)) throw new Refused(400, 'the order ticket trades stocks and funds only, not indices, futures or currencies');
+}
+
 /** A short fingerprint of the dashboard's own code on disk. When an update changes it, the running dashboard is old. */
 export function fingerprint(files: readonly string[]): string {
   const h = crypto.createHash('sha256');
@@ -358,6 +365,7 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
       const symbol = safeSymbol(typeof b.symbol === 'string' ? b.symbol : ''), date = typeof b.date === 'string' ? b.date : '';
       const call = new Journal(path.join(dir, 'journal.md')).load().find((e) => e.ticker === symbol && e.date === date);
       if (!call) throw new Refused(404, 'no such call');
+      tradable(symbol);
       const trading = readSettings(root).trading, { caps } = robinhood.trading();
       const context: TicketContext = await limited({ ...(await askRobinhood(() => robinhood.ticketContext(symbol))), rating: call.rating, callDate: call.date });
       const t = opened(false, context, propose(context, trading, caps), trading, caps);
@@ -368,7 +376,7 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
     if (p === '/api/ticket/own' && method === 'POST') {
       let symbol: string;
       try { symbol = safeSymbol(typeof b.symbol === 'string' ? b.symbol : ''); } catch (e) { throw new Refused(400, (e as Error).message); }
-      if (/[\^=]/.test(symbol) || isCrypto(symbol)) throw new Refused(400, 'the order ticket trades stocks only, not indices, currencies or crypto');
+      tradable(symbol);
       const side = b.side === 'buy' || b.side === 'sell' ? b.side : null;
       if (!side) throw new Refused(400, 'say whether to buy or to sell');
       const trading = readSettings(root).trading, { caps } = robinhood.trading();
@@ -387,6 +395,7 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
       const t = ticketOf(b.id);
       if (t.placed || t.placing) throw new Refused(409, 'this ticket has already sent its order');
       const o = edited(t, b), checks = check(o, t.context, readSettings(root).trading, robinhood.trading().caps);
+      tradable(o.symbol);
       t.order = o; t.checks = checks; t.review = null; t.reviewedAt = 0;
       if (!passes(checks)) throw new Refused(400, 'the order does not pass every check, so it was not sent to Robinhood');
       if (checks.some((c) => c.ask) && b.early !== true) throw new Refused(400, `${o.symbol} was bought here under your shortest hold: press "Sell anyway" to go on`);
@@ -407,6 +416,7 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
       if (b.confirm !== confirmWords(t.order)) throw new Refused(400, 'the confirmation does not name this order: nothing was sent');
       if (t.checks.some((c) => c.ask) && b.early !== true) throw new Refused(400, `${t.order.symbol} was bought here under your shortest hold: press "Sell anyway" to go on`);
       const order = t.order, trading = readSettings(root).trading, sentToday = placedToday(dir, new Date());
+      tradable(order.symbol);
       t.placing = true;
       try {
         const { placed } = await askRobinhood(() => robinhood.placeChecked(order, t.refId, (fresh) => check(order, limitedNow({ ...fresh, rating: t.context.rating, callDate: t.context.callDate, ordersToday: Math.max(fresh.ordersToday, sentToday) }), trading, tr.caps)));

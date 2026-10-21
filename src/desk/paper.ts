@@ -20,8 +20,8 @@ export type Closes = Record<string, ReadonlyArray<{ date: string; close: number 
 export interface PaperTrade {
   ticker: string; callDate: string; rating: string;
   /** filled: bought or sold on paper; none: the call asks for no order, or its order would not pass the checks;
-   *  waiting: its first close after the call has not come yet; unavailable: its prices could not be read; skipped: not a
-   *  stock or a fund (crypto and indices come later). */
+   *  waiting: its first close after the call has not come yet; unavailable: its prices could not be read; skipped: not
+   *  followed on paper (an index, or crypto other than Bitcoin and Ether). */
   status: 'filled' | 'none' | 'waiting' | 'unavailable' | 'skipped';
   side?: 'buy' | 'sell'; quantity?: number; price?: number; fillDate?: string;
   /** For a paper buy: how its stock has done since, at the latest close. */
@@ -48,8 +48,14 @@ export const PAPER_START_USD = 10_000, PAPER_MIN = 100, PAPER_MAX = 10_000_000;
 export const RECORD_WEEKS = 4;
 const cents = (n: number) => Math.round(n * 100) / 100;
 
-/** Only stocks and funds are followed for now: an index cannot be bought, and crypto comes with its own cap later. */
-export const followed = (ticker: string): boolean => !/[\^=]/.test(ticker) && !isCrypto(ticker);
+/** The crypto followed on paper, to start: Bitcoin and Ether, within the crypto limit. Never sent to Robinhood. */
+export const PAPER_CRYPTO: ReadonlySet<string> = new Set(['BTC-USD', 'ETH-USD']);
+/** Followed on paper: stocks, funds, and Bitcoin and Ether. An index, a future or a currency cannot be bought. */
+export const followed = (ticker: string): boolean => !/[\^=]/.test(ticker) && (!isCrypto(ticker) || PAPER_CRYPTO.has(ticker));
+/** Why a call is not followed on paper, in plain words. */
+const notFollowed = (ticker: string): string => (isCrypto(ticker)
+  ? 'Among crypto, paper follows Bitcoin and Ether for now.'
+  : 'An index, a future or a currency cannot be bought: paper follows stocks, funds, Bitcoin and Ether.');
 
 export function recordOf(calls: readonly PaperCall[], today: string): PaperRecord {
   const mine = calls.filter((c) => followed(c.ticker) && c.date <= today);
@@ -73,7 +79,7 @@ export function paperBook(calls: readonly PaperCall[], closes: Closes, o: { star
   const fills: Array<{ trade: PaperTrade; date: string; price: number }> = [];
   for (const c of ordered) {
     const base = { ticker: c.ticker, callDate: c.date, rating: c.rating };
-    if (!followed(c.ticker)) { trades.push({ ...base, status: 'skipped', why: 'Paper follows stocks and funds; crypto and indices come later.' }); continue; }
+    if (!followed(c.ticker)) { trades.push({ ...base, status: 'skipped', why: notFollowed(c.ticker) }); continue; }
     if (actionOf(c.rating, o.trading) === 'no order') { trades.push({ ...base, status: 'none', why: `A ${c.rating} call asks for no order.` }); continue; }
     const rows = closes[c.ticker];
     if (!rows) { trades.push({ ...base, status: 'unavailable', why: `Prices for ${c.ticker} could not be read just now.` }); continue; }
@@ -96,7 +102,8 @@ export function paperBook(calls: readonly PaperCall[], closes: Closes, o: { star
     const h = held.get(f.trade.ticker) ?? { quantity: 0, cost: 0 };
     const positions = [...held].map(([ticker, x]) => ({ symbol: ticker, quantity: x.quantity, price: closeOn(closes[ticker], f.date) }));
     const bought = boughtOn.get(f.trade.ticker);
-    const context: TicketContext = { symbol: f.trade.ticker, rating: f.trade.rating, callDate: f.trade.callDate, accountValue: cents(worth(f.date)), buyingPower: cents(cash), held: h.quantity, price: f.price, ordersToday: ordersThatDay, positions,
+    const cryptoHeldUsd = cents(positions.filter((x) => isCrypto(x.symbol)).reduce((a, x) => a + x.quantity * (x.price ?? 0), 0));
+    const context: TicketContext = { symbol: f.trade.ticker, rating: f.trade.rating, callDate: f.trade.callDate, accountValue: cents(worth(f.date)), buyingPower: cents(cash), held: h.quantity, price: f.price, ordersToday: ordersThatDay, positions, cryptoHeldUsd,
       ...(o.sectors ? { sector: o.sectors.context(f.trade.ticker, positions) } : {}), ...(bought && h.quantity > 0 ? { boughtOn: bought, heldDays: tradingDaysBetween(bought, f.date) } : {}) };
     const p = propose(context, o.trading, o.caps);
     if (!p.order) { f.trade.why = p.why.at(-1) ?? 'No order.'; return; }

@@ -4,7 +4,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { configure } from '../src/data/http.js';
 import { clearSecCache, filedStatement, type Facts } from '../src/data/sec.js';
-import { clearYahooSession, companyOverview, financialStatement, insiderTransactions, yahooTable } from '../src/data/company.js';
+import { clearYahooSession, companyOverview, financialStatement, fundProfile, insiderTransactions, yahooTable } from '../src/data/company.js';
 import { deskServer } from '../src/tools/server.js';
 
 const json = (v: unknown, status = 200) => new Response(JSON.stringify(v), { status });
@@ -141,6 +141,41 @@ test('insider trades come newest first; withheld for a past day', async () => {
   assert.match(await insiderTransactions('ACME', '2026-10-01'), /withheld for 2026-10-01/);
 });
 
+// The shape Yahoo gives a sector fund (field names and kinds of values as it answered for XLK on 21 Oct 2026; figures made up).
+const FUND = { quoteSummary: { result: [{
+  price: { longName: 'Tech Sector Fund', currency: 'USD' },
+  quoteType: { quoteType: 'ETF' },
+  fundProfile: { family: 'Example Advisors', categoryName: 'Technology', feesExpensesInvestment: { annualReportExpenseRatio: { raw: 0.000945, fmt: '0.09%' }, netExpRatio: {}, annualHoldingsTurnover: { raw: 0.03 } } },
+  topHoldings: {
+    stockPosition: { raw: 0.9997 }, bondPosition: { raw: 0 }, cashPosition: { raw: 0.0004 },
+    holdings: [{ symbol: 'NVDA', holdingName: 'NVIDIA Corp', holdingPercent: { raw: 0.154659 } }, { symbol: 'AAPL', holdingName: 'Apple Inc', holdingPercent: { raw: 0.136004 } }, { symbol: 'MSFT', holdingName: 'Microsoft Corp', holdingPercent: { raw: 0.10657679 } }],
+    sectorWeightings: [{ realestate: { raw: 0 } }, { technology: { raw: 0.9811 } }, { communication_services: { raw: 0.0189 } }],
+    equityHoldings: { priceToEarnings: { raw: 0.03121, fmt: '0.03' } },
+  },
+  summaryDetail: { totalAssets: { raw: 127297691648 }, yield: { raw: 0.0062 } },
+  defaultKeyStatistics: { fundInceptionDate: { raw: Date.parse('1998-12-16T00:00:00Z') / 1000 }, annualReportExpenseRatio: {}, beta3Year: { raw: 1.21 } },
+}], error: null } };
+
+test("a fund's fundamentals are what it holds and what it costs: always named, unavailable when not given; withheld for a past day", async () => {
+  configure({ fetch: route([...YAHOO_SESSION, [/quoteSummary\/XLK/, () => json(FUND)], [/quoteSummary\/ACME/, () => json({ quoteSummary: { result: [{ ...SUMMARY.quoteSummary.result[0], quoteType: { quoteType: 'EQUITY' } }] } })], [/quoteSummary\/BARE/, () => json({ quoteSummary: { result: [{ quoteType: { quoteType: 'ETF' }, price: { currency: 'USD' } }] } })]]) });
+  const t = await fundProfile('XLK', '2026-10-12');
+  assert.match(t, /^Fund profile for XLK, from Yahoo Finance as it stands today \(2026-10-12\)/);
+  assert.match(t, /Kind: an exchange-traded fund \(ETF\)\nFamily: Example Advisors\nCategory: Technology\nStarted: 1998-12-16/);
+  assert.match(t, /Net assets \(its size\): 127,297,691,648 USD/);
+  assert.match(t, /Yearly cost \(expense ratio, taken from the fund's value each year\): 0\.0945%/, 'three figures, so its cost on 1,000 dollars can be worked out');
+  assert.match(t, /Held in: stocks 99\.97%, bonds 0\.00%, cash 0\.04%/);
+  assert.match(t, /Top 3 holdings \(39\.72% of the fund together\):\n- NVDA NVIDIA Corp: 15\.47%\n- AAPL Apple Inc: 13\.60%\n- MSFT Microsoft Corp: 10\.66%/);
+  assert.match(t, /By sector: Technology 98\.11%, Communication services 1\.89%$/m, 'largest first, nothing at zero');
+  assert.doesNotMatch(t, /price to earnings|0\.03/i, "Yahoo's odd averages for a fund's stocks are left out");
+  const bare = await fundProfile('BARE', '2026-10-12');
+  assert.match(bare, /Net assets \(its size\): unavailable/);
+  assert.match(bare, /Yearly cost .*: unavailable/);
+  assert.match(bare, /Top holdings: unavailable/);
+  await assert.rejects(fundProfile('ACME', '2026-10-12'), /ACME is not a fund \(Yahoo Finance lists it as equity\): use the company tools instead/);
+  await assert.rejects(fundProfile('BTC-USD', '2026-10-12'), /is not a company/);
+  assert.match(await fundProfile('XLK', '2026-10-01'), /withheld for 2026-10-01: Yahoo Finance serves it only as it stands today/);
+});
+
 test('an expired session key is renewed once', async () => {
   let crumbs = 0;
   configure({ fetch: route([
@@ -164,7 +199,7 @@ test('the server offers the company tools', async () => {
   const client = new Client({ name: 'test', version: '0' });
   await client.connect(b);
   const names = (await client.listTools()).tools.map((t) => t.name);
-  for (const n of ['get_company_overview', 'get_financial_statement', 'get_insider_transactions']) assert.ok(names.includes(n), n);
+  for (const n of ['get_company_overview', 'get_financial_statement', 'get_insider_transactions', 'get_fund_profile']) assert.ok(names.includes(n), n);
   const r = await client.callTool({ name: 'get_financial_statement', arguments: { symbol: 'ACME', analysis_date: '2025-09-01', statement: 'balance_sheet' } }) as { content: Array<{ text: string }> };
   assert.match(r.content[0]!.text, /Balance sheet for ACME \(quarterly\), as filed with the SEC on or before 2025-09-01/);
   const bad = await client.callTool({ name: 'get_insider_transactions', arguments: { symbol: 'BTC-USD', analysis_date: '2026-10-12' } }) as { content: Array<{ text: string }> };
