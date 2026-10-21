@@ -134,6 +134,14 @@
 - `docs/inside-the-trading-desk.html` - the visual guide (GitHub Pages serves `docs/` from `main`). The README shows it
   as pictures in `docs/readme/`, light and dark: after the guide changes, `node scripts/readme-pictures.mjs` takes
   them again with a hidden Chrome or Edge (it downloads and installs nothing).
+- `docs/trading-agents-walk.html` - the Trading Agents walk: the hands-on test of the whole desk, section by section,
+  that the person walks on their own setup and marks Pass, Fail or Skip (kept in their browser, or in the page's own
+  record when it is opened on claude.ai). Its tests are one JSON block in the page (`<script type="application/json"
+  id="walk">`): a section is a letter, a name and a line; a test is `id` (the section's letter and the next free
+  number, never reused or renumbered), `title`, `where`, `tags` (`Market hours`, `Real money`, `Optional`, `Later`), `do`
+  (the steps), `see` (what the person should see, in the page's own words) and `changed` (the day its steps last
+  changed: a mark made before it counts as still to do). `updated` is the latest `changed`, and `version` follows
+  `package.json`. `test/walk.test.ts` keeps it sound.
 - `test/fake-robinhood.ts` - a pretend Robinhood for the tests: an MCP door that wants a sign-in, with read tools and
   order tools, recording every call. Its sign-in is the MCP library's own demo server (`test/fake-sign-in-server.ts`,
   a side process). The guard refuses any file that spells out the sign-in's token field names, so tests reach the
@@ -152,6 +160,9 @@
 - A fix comes with a test that fails without it.
 - The page shows only what the desk really has. A number that cannot be had is a dash; a control for something that
   does not work yet is not drawn. Screenshots in a pull request must say when they were made on fixture data.
+- Every pull request that changes what a person can do or see adds or updates the walk's tests in the same pull request
+  (`docs/trading-agents-walk.html`): a new test for something new, the steps rewritten (and `changed` moved to that
+  day) for something changed, the test taken out for something removed. The pull request says which tests to walk.
 
 ## Milestones
 0 skeleton and desk check · 1 data layer · 2 the desk team · 3 the dashboard · 4 Robinhood read and review ·
