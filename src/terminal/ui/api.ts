@@ -2,7 +2,9 @@
 // dashboard opens the browser on a one-time link (#open=…), which the page swaps for the key once (claimKey) and keeps
 // in this browser's own storage for this address alone. A page opened by hand, or one left from a dashboard that was
 // since stopped and started afresh, has no key, and says so rather than guessing.
-import type { DeskState } from '../state.js';
+import type { DeskState, MarketView } from '../state.js';
+import type { Tier, TierItem, TierView } from '../tiers.js';
+export type { MarketView, Tier, TierItem, TierView };
 import type { History, QuoteResult } from '../quotes.js';
 import type { WatchItem } from '../store.js';
 import type { ListenerView, QueueView } from '../state.js';
@@ -82,6 +84,8 @@ export const api = {
   search: (query: string) => call<{ matches: Match[] }>('GET', `/api/search?${q({ q: query })}`),
   prefs: () => call<Prefs>('GET', '/api/prefs'),
   savePrefs: (p: Prefs) => call<Prefs>('POST', '/api/prefs', p),
+  /** The whole-market funds on "Start here"; the desk checks each has a price before it keeps the list. */
+  setMarket: (symbols: string[]) => call<{ market: MarketView }>('POST', '/api/tiers/market', { symbols }),
   stop: () => call<{ stopping: boolean }>('POST', '/api/stop', {}),
   quotes: (symbols: string[]) => call<{ quotes: QuoteResult[] }>('GET', `/api/quotes?${q({ symbols: symbols.join(',') })}`),
   markets: () => call<{ markets: Market[] }>('GET', '/api/markets'),

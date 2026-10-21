@@ -75,8 +75,9 @@ order tool.
   one-time link, which the page swaps for the key once, within two minutes, and then keeps for itself. A page opened by
   hand has no key and says so; opening the dashboard again (run /terminal) opens a page that has one.
 - What the dashboard remembers between visits (light or dark, the side list, the page and the stock you were on, the
-  chart's settings and the stocks you looked at last) is kept in `desk-data/dashboard.json`. Nothing about an order is
-  ever remembered: every ticket starts afresh.
+  chart's settings, the stocks you looked at last, your whole-market funds and which watchlist tiers you folded) is kept
+  in `desk-data/dashboard.json`, each value checked before it is kept. Nothing about an order is ever remembered: every
+  ticket starts afresh.
 - After an update the dashboard offers Restart at the top of the page: new code on this computer runs only after your
   press, and never while an order is being sent. Stop, at the top right of the page, closes it.
 - The search box sends what you type to Yahoo Finance's public search, which suggests matching stocks.

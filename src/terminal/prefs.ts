@@ -1,11 +1,13 @@
 // What the dashboard remembers between visits, so the person finds it as they left it: the face, the side list, the page
-// they were on, the stock on the chart with its range and lines, and the stocks they looked at last. It is kept in one
-// small file in desk-data on this computer, so it outlives a restart, another browser and another port. Nothing about an
-// order is ever kept here: every ticket starts afresh, with Robinhood's check and the person's Confirm.
+// they were on, the stock on the chart with its range and lines, the stocks they looked at last, their whole-market funds
+// and which tiers of the watchlist they folded away. It is kept in one small file in desk-data on this computer, so it
+// outlives a restart, another browser and another port. Nothing about an order is ever kept here: every ticket starts
+// afresh, with Robinhood's check and the person's Confirm.
 import fs from 'node:fs';
 import path from 'node:path';
 import { safeSymbol } from '../data/symbols.js';
 import { withLock, writeWhole } from '../desk/lock.js';
+import { cleanMarket, isShipped, SHIPPED_MARKET, TIERS, type Tier } from './tiers.js';
 
 export interface Recent { symbol: string; name: string }
 export interface Prefs {
@@ -16,6 +18,11 @@ export interface Prefs {
   /** "Run automatically with Claude Code" is on: the dashboard starts the desk's listener again when it starts. Set only
    *  by that switch, never by the page's other choices. */
   autorun?: boolean;
+  /** The person's whole-market funds, when they changed the shipped four (tiers.ts SHIPPED_MARKET). Set only by "Change…"
+   *  on "Start here", once each fund's price is checked, never by the page's other choices. */
+  market?: string[];
+  /** The tiers of the watchlist folded away. */
+  folded?: Tier[];
 }
 
 export const MAX_RECENT = 6;
@@ -47,6 +54,8 @@ export function cleanPrefs(raw: unknown): Prefs {
     out.recent = recent;
   }
   if (typeof r.autorun === 'boolean') out.autorun = r.autorun;
+  const market = cleanMarket(r.market); if (market) out.market = market;
+  if (Array.isArray(r.folded)) out.folded = TIERS.filter((t) => (r.folded as unknown[]).includes(t));
   return out;
 }
 
@@ -56,13 +65,22 @@ export function readPrefs(dir: string): Prefs {
   try { return cleanPrefs(JSON.parse(fs.readFileSync(prefsFile(dir), 'utf8'))); } catch { return {}; }
 }
 
-/** Merges what changed into what is kept, and returns the whole. */
-export function savePrefs(dir: string, change: unknown): Prefs {
+/** Merges what changed into what is kept, and returns the whole; the names in `drop` are taken out. */
+export function savePrefs(dir: string, change: unknown, drop: ReadonlyArray<keyof Prefs> = []): Prefs {
   const file = prefsFile(dir);
   fs.mkdirSync(dir, { recursive: true });
   return withLock(file, () => {
     const next = cleanPrefs({ ...readPrefs(dir), ...cleanPrefs(change) });
+    for (const k of drop) delete next[k];
     writeWhole(file, JSON.stringify(next, null, 2) + '\n');
     return next;
   });
 }
+
+/** The person's whole-market funds: their own list, else the shipped four. */
+export const marketOf = (dir: string): string[] => readPrefs(dir).market ?? [...SHIPPED_MARKET];
+
+/** Keeps the person's whole-market funds (already checked); the shipped four are kept as no list at all, so a later
+ *  version's four reach them. */
+export const saveMarket = (dir: string, list: readonly string[]): string[] =>
+  (isShipped(list) ? savePrefs(dir, {}, ['market']) : savePrefs(dir, { market: list })).market ?? [...SHIPPED_MARKET];

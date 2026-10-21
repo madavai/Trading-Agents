@@ -20852,8 +20852,8 @@ ${e.reflection || e.decision.slice(0, 300) + (e.decision.length > 300 ? "..." : 
 };
 
 // src/terminal/state.ts
-import fs15 from "node:fs";
-import path14 from "node:path";
+import fs16 from "node:fs";
+import path15 from "node:path";
 
 // src/desk/runs.ts
 import fs12 from "node:fs";
@@ -21125,7 +21125,186 @@ function removeWatch(dir, raw) {
   return change2(watchFile(dir), (list2) => list2.filter((w) => w.symbol !== symbol), isWatch);
 }
 
+// src/terminal/prefs.ts
+import fs15 from "node:fs";
+import path14 from "node:path";
+
+// src/terminal/tiers.ts
+var TIERS = ["market", "sectors", "names", "crypto"];
+var TIER_WORDS = {
+  market: { name: "The whole market", meaning: "Funds that each hold hundreds or thousands of companies, or bonds: the broadest and steadiest place to start." },
+  sectors: { name: "Sectors", meaning: "The eleven parts of the economy, such as technology or energy, one fund each: side by side, they show which parts are rising." },
+  names: { name: "Single names", meaning: "One company each, or a narrower fund: each can swing far more than the whole market." },
+  crypto: { name: "Crypto", meaning: "Coins such as Bitcoin, which swing far more than shares: the desk follows them on paper only, never with an order." }
+};
+var SHIPPED_MARKET = ["SPY", "QQQ", "VT", "BND"];
+var MAX_MARKET = 8;
+var START_NAMES = 12;
+var sp500 = { name: "S&P 500", meaning: "the 500 largest US companies" };
+var us = { name: "The whole US market", meaning: "nearly every US company, large and small" };
+var bonds = { name: "US bonds", meaning: "loans to the US government and to companies: steadier than shares, and they pay interest" };
+var PLAIN = {
+  SPY: sp500,
+  VOO: sp500,
+  IVV: sp500,
+  VTI: us,
+  ITOT: us,
+  SCHB: us,
+  BND: bonds,
+  AGG: bonds,
+  QQQ: { name: "Nasdaq 100", meaning: "the 100 largest companies on the Nasdaq exchange, mostly technology" },
+  DIA: { name: "Dow Jones", meaning: "30 large, long-established US companies" },
+  IWM: { name: "Russell 2000", meaning: "2,000 smaller US companies" },
+  VT: { name: "The whole world", meaning: "thousands of companies in dozens of countries" },
+  VXUS: { name: "The world outside the US", meaning: "thousands of companies outside the United States" },
+  VEA: { name: "Developed markets", meaning: "large companies in Europe, Japan, Canada and Australia" },
+  EFA: { name: "Developed markets", meaning: "large companies in Europe, Japan and Australia" },
+  VWO: { name: "Emerging markets", meaning: "companies in growing economies such as China, India and Brazil" },
+  XLK: { name: "Technology", meaning: "makers of chips, software and computers" },
+  XLF: { name: "Financials", meaning: "banks, insurers and investment firms" },
+  XLV: { name: "Health care", meaning: "drug makers, hospitals and medical equipment" },
+  XLE: { name: "Energy", meaning: "oil and gas producers and the firms that serve them" },
+  XLI: { name: "Industrials", meaning: "machines, planes, railways and builders" },
+  XLY: { name: "Consumer discretionary", meaning: "what people choose to buy, such as cars, shops and travel" },
+  XLP: { name: "Consumer staples", meaning: "what people buy whatever happens, such as food, drink and soap" },
+  XLU: { name: "Utilities", meaning: "electricity, gas and water companies" },
+  XLB: { name: "Materials", meaning: "chemicals, metals, mining and packaging" },
+  XLRE: { name: "Real estate", meaning: "owners of offices, homes, warehouses and phone towers" },
+  XLC: { name: "Communication", meaning: "phone companies, media and internet platforms" },
+  "BTC-USD": { name: "Bitcoin", meaning: "the first and largest coin" },
+  "ETH-USD": { name: "Ether", meaning: "the coin of the Ethereum network, the second largest" }
+};
+function marketSymbol(raw) {
+  if (typeof raw !== "string") throw new Error("a ticker is a word, such as SPY");
+  const s = safeSymbol(raw);
+  if (isCrypto(s)) throw new Error(`${s} is crypto, which has a tier of its own`);
+  if (/[\^=]/.test(s)) throw new Error(`${s} is an index, a future or a currency, which cannot be held: choose a fund that follows it, such as SPY`);
+  if (SECTOR_FUNDS[s]) throw new Error(`${s} is a sector fund, already among the sectors`);
+  return s;
+}
+function cleanMarket(raw) {
+  if (!Array.isArray(raw)) return void 0;
+  const out = [];
+  for (const v of raw) {
+    if (out.length >= MAX_MARKET) break;
+    try {
+      const s = marketSymbol(v);
+      if (!out.includes(s)) out.push(s);
+    } catch {
+    }
+  }
+  return out;
+}
+var ticketable = (symbol) => !isCrypto(symbol) && !/[\^=]/.test(symbol);
+var isShipped = (list2) => list2.length === SHIPPED_MARKET.length && list2.every((s, i) => s === SHIPPED_MARKET[i]);
+function tierOf(symbol, market = SHIPPED_MARKET) {
+  if (isCrypto(symbol)) return "crypto";
+  if (SECTOR_FUNDS[symbol]) return "sectors";
+  if (symbol.startsWith("^") || MARKET_FUNDS.has(symbol) || market.includes(symbol)) return "market";
+  return "names";
+}
+function tiersOf(watchlist, market, calls) {
+  const latest = /* @__PURE__ */ new Map();
+  for (const c of calls) {
+    const was = latest.get(c.ticker);
+    if (!was || c.date > was.date) latest.set(c.ticker, { rating: c.rating, date: c.date });
+  }
+  const watched = new Map(watchlist.map((w) => [w.symbol, w]));
+  const item = (symbol) => {
+    const w = watched.get(symbol), p = PLAIN[symbol];
+    return {
+      symbol,
+      ...p ? { name: p.name, meaning: p.meaning } : {},
+      watched: !!w,
+      favourite: !!w?.favourite,
+      call: latest.get(symbol) ?? null,
+      paper: followed(symbol),
+      ticket: ticketable(symbol)
+    };
+  };
+  const view = (tier, symbols, more = 0) => ({ tier, ...TIER_WORDS[tier], items: symbols.map(item), ...more > 0 ? { more } : {} });
+  const of = (t2) => watchlist.filter((w) => tierOf(w.symbol, market) === t2).map((w) => w.symbol);
+  const own2 = (t2) => {
+    const list2 = watchlist.filter((w) => tierOf(w.symbol, market) === t2).sort((a, b) => Number(b.favourite) - Number(a.favourite)).map((w) => w.symbol);
+    return view(t2, list2.slice(0, START_NAMES), list2.length - START_NAMES);
+  };
+  return {
+    startHere: [view("market", market), view("sectors", Object.keys(SECTOR_FUNDS)), own2("names"), ...of("crypto").length ? [own2("crypto")] : []],
+    watch: TIERS.map((t2) => view(t2, of(t2))).filter((v) => v.items.length > 0)
+  };
+}
+
+// src/terminal/prefs.ts
+var MAX_RECENT = 6;
+var one = (v, of) => of.includes(v) ? v : void 0;
+var sym = (v) => {
+  try {
+    return typeof v === "string" ? safeSymbol(v) : void 0;
+  } catch {
+    return void 0;
+  }
+};
+var words3 = (v, or) => (typeof v === "string" ? v.replace(/<[^>]*>/g, "").replace(/[<>]/g, "").replace(/\s+/g, " ").trim().slice(0, 80) : "") || or;
+function cleanPrefs(raw) {
+  const r = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+  const out = {};
+  const theme = one(r.theme, ["light", "dark"]);
+  if (theme) out.theme = theme;
+  const side = one(r.side, ["open", "folded"]);
+  if (side) out.side = side;
+  const view = one(r.view, ["overview", "account"]);
+  if (view) out.view = view;
+  const symbol = sym(r.symbol);
+  if (symbol) out.symbol = symbol;
+  const range = one(r.range, ["1M", "3M", "6M", "1Y", "5Y"]);
+  if (range) out.range = range;
+  const kind = one(r.kind, ["area", "candles"]);
+  if (kind) out.kind = kind;
+  const l = r.layers;
+  if (l && typeof l === "object" && ["ma50", "ma200", "vol"].every((k) => typeof l[k] === "boolean")) out.layers = { ma50: l.ma50, ma200: l.ma200, vol: l.vol };
+  if (Array.isArray(r.recent)) {
+    const seen = /* @__PURE__ */ new Set(), recent = [];
+    for (const x of r.recent) {
+      const s = sym(x?.symbol);
+      if (!s || seen.has(s)) continue;
+      seen.add(s);
+      recent.push({ symbol: s, name: words3(x.name, s) });
+      if (recent.length >= MAX_RECENT) break;
+    }
+    out.recent = recent;
+  }
+  if (typeof r.autorun === "boolean") out.autorun = r.autorun;
+  const market = cleanMarket(r.market);
+  if (market) out.market = market;
+  if (Array.isArray(r.folded)) out.folded = TIERS.filter((t2) => r.folded.includes(t2));
+  return out;
+}
+var prefsFile = (dir) => path14.join(dir, "dashboard.json");
+function readPrefs(dir) {
+  try {
+    return cleanPrefs(JSON.parse(fs15.readFileSync(prefsFile(dir), "utf8")));
+  } catch {
+    return {};
+  }
+}
+function savePrefs(dir, change3, drop = []) {
+  const file4 = prefsFile(dir);
+  fs15.mkdirSync(dir, { recursive: true });
+  return withLock(file4, () => {
+    const next = cleanPrefs({ ...readPrefs(dir), ...cleanPrefs(change3) });
+    for (const k of drop) delete next[k];
+    writeWhole(file4, JSON.stringify(next, null, 2) + "\n");
+    return next;
+  });
+}
+var marketOf = (dir) => readPrefs(dir).market ?? [...SHIPPED_MARKET];
+var saveMarket = (dir, list2) => (isShipped(list2) ? savePrefs(dir, {}, ["market"]) : savePrefs(dir, { market: list2 })).market ?? [...SHIPPED_MARKET];
+
 // src/terminal/state.ts
+var marketView = (dir) => {
+  const symbols = marketOf(dir);
+  return { symbols, asShipped: isShipped(symbols), shipped: [...SHIPPED_MARKET], max: MAX_MARKET };
+};
 var plainText = (s) => s.replace(/\*\*([^*]+)\*\*/g, "$1").replace(/(^|\s)[*_]([^*_\n]+)[*_](?=\s|[.,;:!?]|$)/g, "$1$2").replace(/`([^`]+)`/g, "$1").replace(/^\s{0,3}#{1,6}\s*/gm, "").replace(/^\s*(?:[-*+]|\d+\.)\s+/gm, "").replace(/\|/g, " ").replace(/\s+/g, " ").trim();
 function summaryOf(decision) {
   const text2 = decision.replace(/\r\n/g, "\n");
@@ -21138,20 +21317,20 @@ function summaryOf(decision) {
 }
 var stamp = (file4) => {
   try {
-    return String(fs15.statSync(file4).mtimeMs);
+    return String(fs16.statSync(file4).mtimeMs);
   } catch {
     return "0";
   }
 };
 function versionOf(root2) {
-  const dir = deskDataDir(root2), runs = path14.join(dir, "runs");
+  const dir = deskDataDir(root2), runs = path15.join(dir, "runs");
   let latest = 0;
   try {
-    for (const d of fs15.readdirSync(runs)) latest = Math.max(latest, Number(stamp(path14.join(runs, d, "run.json"))));
+    for (const d of fs16.readdirSync(runs)) latest = Math.max(latest, Number(stamp(path15.join(runs, d, "run.json"))));
   } catch {
   }
-  const timely = `${listenerOf(dir) ? "L" : "n"}${readQueue(dir).map((i) => i.state[0]).join("")}`;
-  return [stamp(path14.join(dir, "journal.md")), stamp(path14.join(dir, "watchlist.json")), stamp(path14.join(dir, "queue.json")), latest, stamp(path14.join(dir, "contact.json")), stamp(path14.join(dir, "listener.json")), stamp(path14.join(dir, "paper.json")), timely].join("-");
+  const timely = `${listenerOf(dir) ? "L" : "n"}${readQueue(dir).map((i) => i.state[0]).join("")}|${readPrefs(dir).market?.join(",") ?? "shipped"}`;
+  return [stamp(path15.join(dir, "journal.md")), stamp(path15.join(dir, "watchlist.json")), stamp(path15.join(dir, "queue.json")), latest, stamp(path15.join(dir, "contact.json")), stamp(path15.join(dir, "listener.json")), stamp(path15.join(dir, "paper.json")), timely].join("-");
 }
 function queueOf(dir, now = /* @__PURE__ */ new Date()) {
   const rank = { running: 0, waiting: 1, done: 2, failed: 2 };
@@ -21163,7 +21342,7 @@ function listenerOf(dir, now = /* @__PURE__ */ new Date()) {
 }
 function stateOf(root2, day2) {
   const dir = deskDataDir(root2), s = readSettings(root2);
-  const entries = new Journal(path14.join(dir, "journal.md")).load();
+  const entries = new Journal(path15.join(dir, "journal.md")).load();
   const calls = entries.map((e) => ({
     date: e.date,
     ticker: e.ticker,
@@ -21173,15 +21352,21 @@ function stateOf(root2, day2) {
     alpha: e.alpha,
     holding: e.holding,
     summary: summaryOf(e.decision),
-    hasReport: hasReport(dir, e.ticker, e.date)
+    hasReport: hasReport(dir, e.ticker, e.date),
+    ticket: ticketable(e.ticker),
+    paper: followed(e.ticker)
   })).reverse().sort((a, b) => b.date.localeCompare(a.date));
-  const summary = summarize(entries);
+  const summary = summarize(entries), watchlist = readWatchlist(dir), market = marketView(dir);
+  const { startHere, watch } = tiersOf(watchlist, market.symbols, calls);
   return {
     version: versionOf(root2),
     today: day2,
-    watchlist: readWatchlist(dir),
+    watchlist,
     queue: queueOf(dir),
     calls,
+    startHere,
+    watchTiers: watch,
+    market,
     record: { summary, text: renderSummary(summary), benchmarkNote: `Each call is judged after ${s.scoring.holdingPeriodDays} trading days against its market's index.` },
     desk: { emailSaved: !!readContactEmail(root2), tradingEnabled: false, holdingDays: s.scoring.holdingPeriodDays },
     analyses: { depth: depthOfRounds(s.analysis.debateRounds), perRun: s.routines.maxAnalyses, listener: listenerOf(dir) },
@@ -21189,7 +21374,7 @@ function stateOf(root2, day2) {
   };
 }
 function callOf(root2, ticker, date4) {
-  const dir = deskDataDir(root2), e = new Journal(path14.join(dir, "journal.md")).load().find((x) => x.ticker === ticker && x.date === date4);
+  const dir = deskDataDir(root2), e = new Journal(path15.join(dir, "journal.md")).load().find((x) => x.ticker === ticker && x.date === date4);
   if (!e) return null;
   return { decision: e.decision, sections: sectionsOf(dir, ticker, date4), hasReport: hasReport(dir, ticker, date4) };
 }
@@ -21453,68 +21638,6 @@ function findSymbols(raw) {
   if (memo3.size > 500) memo3.clear();
   memo3.set(key, { at: Date.now(), value });
   return value;
-}
-
-// src/terminal/prefs.ts
-import fs16 from "node:fs";
-import path15 from "node:path";
-var MAX_RECENT = 6;
-var one = (v, of) => of.includes(v) ? v : void 0;
-var sym = (v) => {
-  try {
-    return typeof v === "string" ? safeSymbol(v) : void 0;
-  } catch {
-    return void 0;
-  }
-};
-var words3 = (v, or) => (typeof v === "string" ? v.replace(/<[^>]*>/g, "").replace(/[<>]/g, "").replace(/\s+/g, " ").trim().slice(0, 80) : "") || or;
-function cleanPrefs(raw) {
-  const r = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
-  const out = {};
-  const theme = one(r.theme, ["light", "dark"]);
-  if (theme) out.theme = theme;
-  const side = one(r.side, ["open", "folded"]);
-  if (side) out.side = side;
-  const view = one(r.view, ["overview", "account"]);
-  if (view) out.view = view;
-  const symbol = sym(r.symbol);
-  if (symbol) out.symbol = symbol;
-  const range = one(r.range, ["1M", "3M", "6M", "1Y", "5Y"]);
-  if (range) out.range = range;
-  const kind = one(r.kind, ["area", "candles"]);
-  if (kind) out.kind = kind;
-  const l = r.layers;
-  if (l && typeof l === "object" && ["ma50", "ma200", "vol"].every((k) => typeof l[k] === "boolean")) out.layers = { ma50: l.ma50, ma200: l.ma200, vol: l.vol };
-  if (Array.isArray(r.recent)) {
-    const seen = /* @__PURE__ */ new Set(), recent = [];
-    for (const x of r.recent) {
-      const s = sym(x?.symbol);
-      if (!s || seen.has(s)) continue;
-      seen.add(s);
-      recent.push({ symbol: s, name: words3(x.name, s) });
-      if (recent.length >= MAX_RECENT) break;
-    }
-    out.recent = recent;
-  }
-  if (typeof r.autorun === "boolean") out.autorun = r.autorun;
-  return out;
-}
-var prefsFile = (dir) => path15.join(dir, "dashboard.json");
-function readPrefs(dir) {
-  try {
-    return cleanPrefs(JSON.parse(fs16.readFileSync(prefsFile(dir), "utf8")));
-  } catch {
-    return {};
-  }
-}
-function savePrefs(dir, change3) {
-  const file4 = prefsFile(dir);
-  fs16.mkdirSync(dir, { recursive: true });
-  return withLock(file4, () => {
-    const next = cleanPrefs({ ...readPrefs(dir), ...cleanPrefs(change3) });
-    writeWhole(file4, JSON.stringify(next, null, 2) + "\n");
-    return next;
-  });
 }
 
 // src/watch/claude.ts
@@ -21830,7 +21953,24 @@ async function startTerminal(opts) {
     }
     if (p === "/api/prefs" && method === "POST") {
       delete b.autorun;
+      delete b.market;
       return json(res, 200, savePrefs(dir, b));
+    }
+    if (p === "/api/tiers/market" && method === "POST") {
+      if (!Array.isArray(b.symbols) || b.symbols.length > MAX_MARKET) throw new Refused2(400, `choose up to ${MAX_MARKET} funds for the whole market`);
+      const list2 = [];
+      for (const v of b.symbols) {
+        let s;
+        try {
+          s = marketSymbol(v);
+        } catch (e) {
+          throw new Refused2(400, e.message);
+        }
+        if (!list2.includes(s)) list2.push(s);
+      }
+      for (const q of await Promise.all(list2.map(quote))) if ("error" in q && q.error === "no-data") throw new Refused2(422, q.message);
+      saveMarket(dir, list2);
+      return json(res, 200, { market: marketView(dir) });
     }
     if (p === "/api/paper" && method === "POST") {
       try {

@@ -1,5 +1,6 @@
-// What the page shows of the desk itself: the calls in the journal, how they turned out, the stocks being watched and the
-// analyses waiting. All of it is read from the desk's own files; nothing here is invented, and a part with nothing in it is empty.
+// What the page shows of the desk itself: the calls in the journal, how they turned out, the stocks being watched, the
+// world in tiers ("Start here") and the analyses waiting. All of it is read from the desk's own files; nothing here is
+// invented, and a part with nothing in it is empty.
 import fs from 'node:fs';
 import path from 'node:path';
 import { readContactEmail } from '../contact.js';
@@ -7,10 +8,12 @@ import { Journal, type Entry } from '../desk/journal.js';
 import { hasReport, sectionsOf, stepWords } from '../desk/runs.js';
 import { renderSummary, summarize, type Summary } from '../desk/backtest.js';
 import { depthOfRounds, readListener, readQueue, type Depth, type QueueItem } from '../desk/queue.js';
-import { readPaperStart, recordOf, RECORD_WEEKS, type PaperRecord } from '../desk/paper.js';
+import { followed, readPaperStart, recordOf, RECORD_WEEKS, type PaperRecord } from '../desk/paper.js';
 import { readSettings } from '../settings.js';
 import { deskDataDir } from '../paths.js';
 import { readWatchlist, type WatchItem } from './store.js';
+import { marketOf, readPrefs } from './prefs.js';
+import { isShipped, MAX_MARKET, SHIPPED_MARKET, ticketable, tiersOf, type TierView } from './tiers.js';
 
 /** A stock on the waiting list as the page shows it: a running one says where its run stands. */
 export type QueueView = QueueItem & { progress?: string };
@@ -20,6 +23,8 @@ export interface ListenerView { listener: string; since: string; lastRun?: { at:
 export interface Call {
   date: string; ticker: string; rating: string; pending: boolean; raw: string | null; alpha: string | null; holding: string | null;
   summary: string; hasReport: boolean;
+  /** Whether Decide… can open an order ticket from it (not for crypto or an index), and whether paper follows it. */
+  ticket: boolean; paper: boolean;
 }
 export interface DeskState {
   version: string; today: string; watchlist: WatchItem[]; queue: QueueView[]; calls: Call[];
@@ -30,7 +35,18 @@ export interface DeskState {
   /** How much record the desk has on paper, the paper money it starts with, and the weeks under which switching trading
    *  on asks for one extra press. The paper book itself, with its prices, is /api/paper. */
   paper: PaperRecord & { startUsd: number; minWeeks: number };
+  /** "Start here": the whole market, the eleven sectors, the person's own names (and crypto, when they watch any), each
+   *  with the desk's latest call; and the watchlist grouped the same way, broadest first. Prices are /api/quotes. */
+  startHere: TierView[]; watchTiers: TierView[];
+  /** The person's whole-market funds, whether they are the shipped four, those four, and how many the list may hold. */
+  market: MarketView;
 }
+export interface MarketView { symbols: string[]; asShipped: boolean; shipped: string[]; max: number }
+
+export const marketView = (dir: string): MarketView => {
+  const symbols = marketOf(dir);
+  return { symbols, asShipped: isShipped(symbols), shipped: [...SHIPPED_MARKET], max: MAX_MARKET };
+};
 
 /** Markdown's marks taken out, so a few words read as words: bold, slanted, code, headings, list marks, table bars. */
 const plainText = (s: string): string => s
@@ -59,8 +75,9 @@ export function versionOf(root: string): string {
   let latest = 0;
   try { for (const d of fs.readdirSync(runs)) latest = Math.max(latest, Number(stamp(path.join(runs, d, 'run.json')))); } catch { /* no runs yet */ }
   // Two things change with time alone, not with a file: a listener whose heartbeat stopped, and a run that died. Both are
-  // part of the fingerprint, so the page hears of them too.
-  const timely = `${listenerOf(dir) ? 'L' : 'n'}${readQueue(dir).map((i) => i.state[0]).join('')}`;
+  // part of the fingerprint, so the page hears of them too; so are the whole-market funds, which another page may change
+  // (the page's other choices, kept in the same file, change nothing the desk shows).
+  const timely = `${listenerOf(dir) ? 'L' : 'n'}${readQueue(dir).map((i) => i.state[0]).join('')}|${readPrefs(dir).market?.join(',') ?? 'shipped'}`;
   return [stamp(path.join(dir, 'journal.md')), stamp(path.join(dir, 'watchlist.json')), stamp(path.join(dir, 'queue.json')), latest, stamp(path.join(dir, 'contact.json')), stamp(path.join(dir, 'listener.json')), stamp(path.join(dir, 'paper.json')), timely].join('-');
 }
 
@@ -82,11 +99,12 @@ export function stateOf(root: string, day: string): DeskState {
   const entries: Entry[] = new Journal(path.join(dir, 'journal.md')).load();
   const calls: Call[] = entries.map((e) => ({
     date: e.date, ticker: e.ticker, rating: e.rating, pending: e.pending, raw: e.raw, alpha: e.alpha, holding: e.holding,
-    summary: summaryOf(e.decision), hasReport: hasReport(dir, e.ticker, e.date),
+    summary: summaryOf(e.decision), hasReport: hasReport(dir, e.ticker, e.date), ticket: ticketable(e.ticker), paper: followed(e.ticker),
   })).reverse().sort((a, b) => b.date.localeCompare(a.date));
-  const summary = summarize(entries);
+  const summary = summarize(entries), watchlist = readWatchlist(dir), market = marketView(dir);
+  const { startHere, watch } = tiersOf(watchlist, market.symbols, calls);
   return {
-    version: versionOf(root), today: day, watchlist: readWatchlist(dir), queue: queueOf(dir), calls,
+    version: versionOf(root), today: day, watchlist, queue: queueOf(dir), calls, startHere, watchTiers: watch, market,
     record: { summary, text: renderSummary(summary), benchmarkNote: `Each call is judged after ${s.scoring.holdingPeriodDays} trading days against its market's index.` },
     desk: { emailSaved: !!readContactEmail(root), tradingEnabled: false, holdingDays: s.scoring.holdingPeriodDays },
     analyses: { depth: depthOfRounds(s.analysis.debateRounds), perRun: s.routines.maxAnalyses, listener: listenerOf(dir) },

@@ -29,10 +29,11 @@ import type { Placed } from '../robinhood/order.js';
 import { Journal } from '../desk/journal.js';
 import { capsFrom, readSettings, type Caps } from '../settings.js';
 import { VERSION } from '../version.js';
-import { callOf, listenerOf, queueOf, stateOf, versionOf } from './state.js';
+import { callOf, listenerOf, marketView, queueOf, stateOf, versionOf } from './state.js';
 import { clearQuotes, history, isRange, MARKETS, quote } from './quotes.js';
 import { findSymbols, QUERY } from './search.js';
-import { readPrefs, savePrefs } from './prefs.js';
+import { readPrefs, saveMarket, savePrefs } from './prefs.js';
+import { marketSymbol, MAX_MARKET } from './tiers.js';
 import { addWatch, removeWatch, setFavourite } from './store.js';
 import { dequeue, depthOfRounds, enqueue, isDepth, QueueRefusal, readQueue, removeListener, ringDoorbell, waitingIn } from '../desk/queue.js';
 import { findClaude } from '../watch/claude.js';
@@ -329,7 +330,21 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
       for (const until = Date.now() + 8_000; Date.now() < until; await new Promise((r) => setTimeout(r, 200))) { const l = listenerOf(dir); if (l) return json(res, 200, { listener: l }); }
       throw new Refused(502, 'the listener did not start: see desk-data/watcher.log, or start it yourself with node dist/watch.mjs');
     }
-    if (p === '/api/prefs' && method === 'POST') { delete b.autorun; return json(res, 200, savePrefs(dir, b)); }   // only the switch sets autorun
+    if (p === '/api/prefs' && method === 'POST') { delete b.autorun; delete b.market; return json(res, 200, savePrefs(dir, b)); }   // only the switch sets autorun, only Change… the whole market
+    // The whole-market funds on "Start here": the person's own list, each a fund or a stock Yahoo has a price for, checked
+    // before it is kept. The shipped four put back are kept as no list, so a later version's four reach the person.
+    if (p === '/api/tiers/market' && method === 'POST') {
+      if (!Array.isArray(b.symbols) || b.symbols.length > MAX_MARKET) throw new Refused(400, `choose up to ${MAX_MARKET} funds for the whole market`);
+      const list: string[] = [];
+      for (const v of b.symbols as unknown[]) {
+        let s: string;
+        try { s = marketSymbol(v); } catch (e) { throw new Refused(400, (e as Error).message); }
+        if (!list.includes(s)) list.push(s);
+      }
+      for (const q of await Promise.all(list.map(quote))) if ('error' in q && q.error === 'no-data') throw new Refused(422, q.message);
+      saveMarket(dir, list);
+      return json(res, 200, { market: marketView(dir) });
+    }
     if (p === '/api/paper' && method === 'POST') {
       try { savePaperStart(dir, b.startUsd); } catch (e) { throw new Refused(400, (e as Error).message); }
       paperMemo = null;

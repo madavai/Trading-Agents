@@ -217,5 +217,33 @@
 .ta-update { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-color: var(--accent); box-shadow: var(--shadow); color: var(--text); }
 .ta-update > span { flex: 1 1 calc(var(--unit) * 60); min-width: 0; }
 .ta-update > svg { color: var(--accent); }
+/* start here: the world in tiers, broadest first, each a heading with its meaning over a deck of small tiles */
+.ta-tiers { gap: var(--space-6); }
+.ta-tier { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.ta-tier-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-3); min-width: 0; }
+.ta-tier-head > h3 { font-family: var(--font-title); font-weight: var(--weight-medium); font-size: var(--size-text); line-height: var(--line-tight); color: var(--text); }
+.ta-tier-head > p { flex: 1 1 calc(var(--card-min) * 1.2); min-width: 0; }
+.ta-tier-head > .at-btn { margin-left: auto; }
+.ta-tier-deck { grid-template-columns: repeat(auto-fill, minmax(min(calc(var(--card-min) * 0.66), 100%), 1fr)); }
+.ta-tier-tile { gap: var(--space-1); padding: var(--space-3); }
+.ta-tier-tile.on { border-color: var(--accent); }
+.ta-tier-go { display: flex; flex-direction: column; gap: var(--space-half); min-width: 0; text-align: left; }
+.ta-tier-go:hover .at-tile-name { color: var(--accent); }
+.ta-tier-top { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-1) var(--space-2); min-width: 0; }
+.ta-tier-top > .at-tile-name { flex: 1 1 auto; white-space: normal; overflow-wrap: break-word; }   /* a long plain name ("Consumer discretionary") wraps by words, never cut */
+.ta-tier-top > .at-chip { flex: none; margin-left: auto; }   /* beside the name, or under it at the right when the name is long */
+.ta-tier-go > .at-tile-sub { -webkit-line-clamp: 3; line-clamp: 3; }
+.ta-tier-tile > .at-tile-foot { gap: var(--space-1) var(--space-2); padding-top: var(--space-1); }
+.ta-grow { flex: 1 1 var(--card-min); }
+
+/* the watchlist by tier: each tier's head is a row that folds the tier away */
+.at-table tr.ta-tier-row td { padding: 0; background: var(--tint); }
+.at-table tbody + tbody tr.ta-tier-row td { border-top: 1px solid var(--line); }
+.ta-tier-fold { display: flex; align-items: center; gap: var(--space-2); width: 100%; min-height: var(--list-row); padding: var(--space-2) var(--space-3); text-align: left; color: var(--text); }
+.ta-tier-fold > b { font-family: var(--font-title); font-weight: var(--weight-medium); white-space: nowrap; }
+.ta-tier-fold > .at-quiet { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ta-tier-fold > .g { flex: none; color: var(--text-3); transition: transform var(--fast) var(--ease); }
+.ta-tier-fold[aria-expanded="true"] > .g { transform: rotate(90deg); }
+
 /* a style that sets display would otherwise show an element the page has hidden */
 .ta-suggest[hidden], .ta-update-wrap[hidden] { display: none; }

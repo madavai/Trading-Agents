@@ -22,6 +22,27 @@ export const tone = (n: number | null | undefined): '' | 'ok' | 'danger' => (n =
 export const ratingTone = (r: string): '' | 'ok' | 'danger' | 'warn' =>
   r === 'Buy' || r === 'Overweight' ? 'ok' : r === 'Underweight' || r === 'Sell' ? 'danger' : r === 'Hold' ? '' : 'warn';
 
+/** What each of the desk's ratings means, in one plain line, with what its ticket (and paper) does as shipped. */
+export const RATING_MEANING: Readonly<Record<string, string>> = {
+  Buy: 'Buy: the desk would own it. As shipped, its ticket buys a full position.',
+  Overweight: 'Overweight: the desk leans towards owning it. As shipped, its ticket buys half a position.',
+  Hold: 'Hold: the desk would keep what is held, and neither buy nor sell.',
+  Underweight: 'Underweight: the desk leans against it. As shipped, its ticket sells half of what is held.',
+  Sell: 'Sell: the desk would not own it. As shipped, its ticket sells everything held.',
+  'Needs review': 'Needs review: the decision gave no rating that could be read, so it asks for no order.',
+};
+/** A rating's meaning, or '' for one the desk does not use. */
+export const ratingMeaning = (r: string): string => RATING_MEANING[r] ?? '';
+
+/** The other trading words the page uses, each in one plain line. */
+export const WORDS = {
+  today: "Today: the change in price since the last day's close.",
+  call: "The desk's call: its twelve agents' rating, from Buy to Sell, on the day they analysed it.",
+  fund: 'A fund: a basket of many companies (or bonds) bought as one share.',
+  paper: 'On paper: followed with pretend money only. Robinhood\'s agent doorway trades stocks and funds, so a coin never gets an order ticket.',
+  noTicket: 'No order ticket: Robinhood\'s agent doorway trades stocks and funds, and among crypto the desk follows only Bitcoin and Ether on paper.',
+} as const;
+
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 /** 2026-10-09 as "9 Oct 2026". */
 export const dayText = (iso: string): string => {
