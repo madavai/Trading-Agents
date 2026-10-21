@@ -10,6 +10,8 @@ import { isCrypto } from '../data/symbols.js';
 import { writeWhole } from './lock.js';
 import { actionOf, check, passes, propose, type TicketContext } from './ticket.js';
 import type { Caps, Trading } from '../settings.js';
+import { tradingDaysBetween } from './orders.js';
+import type { Sectors } from './sectors.js';
 
 export interface PaperCall { ticker: string; date: string; rating: string }
 /** Closing prices by symbol, oldest first. A symbol missing here could not be read; an empty list has no prices. */
@@ -62,7 +64,8 @@ const closeOn = (rows: Closes[string] | undefined, date: string): number | null 
   return last;
 };
 
-export function paperBook(calls: readonly PaperCall[], closes: Closes, o: { startUsd: number; trading: Trading; caps: Caps; today: string; benchmark?: string }): PaperBook {
+/** sectors: where each ticker's sector comes from, for the sector limit (without it, each stock counts as its own). */
+export function paperBook(calls: readonly PaperCall[], closes: Closes, o: { startUsd: number; trading: Trading; caps: Caps; today: string; benchmark?: string; sectors?: Pick<Sectors, 'context'> }): PaperBook {
   const benchmark = o.benchmark ?? 'SPY';
   const ordered = [...calls].filter((c) => c.date <= o.today).sort((a, b) => a.date.localeCompare(b.date));
   const trades: PaperTrade[] = [];
@@ -83,7 +86,7 @@ export function paperBook(calls: readonly PaperCall[], closes: Closes, o: { star
   fills.sort((a, b) => a.date.localeCompare(b.date));
 
   let cash = o.startUsd;
-  const held = new Map<string, { quantity: number; cost: number }>();
+  const held = new Map<string, { quantity: number; cost: number }>(), boughtOn = new Map<string, string>();
   const worth = (date: string): number => {
     let v = cash;
     for (const [ticker, h] of held) v += h.quantity * (closeOn(closes[ticker], date) ?? (h.cost / (h.quantity || 1)));
@@ -91,13 +94,16 @@ export function paperBook(calls: readonly PaperCall[], closes: Closes, o: { star
   };
   const apply = (f: (typeof fills)[number], ordersThatDay: number): void => {
     const h = held.get(f.trade.ticker) ?? { quantity: 0, cost: 0 };
-    const context: TicketContext = { symbol: f.trade.ticker, rating: f.trade.rating, callDate: f.trade.callDate, accountValue: cents(worth(f.date)), buyingPower: cents(cash), held: h.quantity, price: f.price, ordersToday: ordersThatDay };
+    const positions = [...held].map(([ticker, x]) => ({ symbol: ticker, quantity: x.quantity, price: closeOn(closes[ticker], f.date) }));
+    const bought = boughtOn.get(f.trade.ticker);
+    const context: TicketContext = { symbol: f.trade.ticker, rating: f.trade.rating, callDate: f.trade.callDate, accountValue: cents(worth(f.date)), buyingPower: cents(cash), held: h.quantity, price: f.price, ordersToday: ordersThatDay, positions,
+      ...(o.sectors ? { sector: o.sectors.context(f.trade.ticker, positions) } : {}), ...(bought && h.quantity > 0 ? { boughtOn: bought, heldDays: tradingDaysBetween(bought, f.date) } : {}) };
     const p = propose(context, o.trading, o.caps);
     if (!p.order) { f.trade.why = p.why.at(-1) ?? 'No order.'; return; }
     const failing = check(p.order, context, o.trading, o.caps);
     if (!passes(failing)) { f.trade.why = `Its order would not pass: ${failing.filter((x) => !x.ok).map((x) => x.words).join('; ')}.`; return; }
     const { side, quantity, limitPrice } = p.order, amount = cents(quantity * limitPrice);
-    if (side === 'buy') { cash = cents(cash - amount); held.set(f.trade.ticker, { quantity: h.quantity + quantity, cost: cents(h.cost + amount) }); }
+    if (side === 'buy') { cash = cents(cash - amount); held.set(f.trade.ticker, { quantity: h.quantity + quantity, cost: cents(h.cost + amount) }); boughtOn.set(f.trade.ticker, f.date); }
     else {
       const left = h.quantity - quantity;
       cash = cents(cash + amount);

@@ -13,7 +13,7 @@ test('trading ships switched off; the caps ship small and are not in the setting
   const s = json('desk-settings.json');
   assert.equal(s.trading.enabled, false);
   assert.equal(s.trading.caps, undefined, 'the caps are the person\'s own, kept beside the trading switch in their private folder');
-  assert.deepEqual(DEFAULT_CAPS, { perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 3 });
+  assert.deepEqual(DEFAULT_CAPS, { perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 3, perSectorPercent: 30, cryptoPercent: 5, weeklyLossPercent: 5, minHoldDays: 5 });
   assert.equal(s.scoring.holdingPeriodDays, 5);
   assert.equal(s.scoring.benchmarks[''], 'SPY');
 });

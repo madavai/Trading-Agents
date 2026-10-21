@@ -3,6 +3,7 @@
 // power and holdings as Robinhood gave them, Robinhood's live price): when a figure is missing the ticket says so and
 // proposes nothing, it never guesses. Limit orders of whole shares only: Robinhood takes fractions on market orders alone.
 import type { Action, Caps, Trading } from '../settings.js';
+import { isCrypto } from '../data/symbols.js';
 
 export interface TicketContext {
   symbol: string;
@@ -18,11 +19,23 @@ export interface TicketContext {
   price: number | null;
   /** Orders the Agentic account has had today (Robinhood's own list). */
   ordersToday: number;
+  /** The stock's sector and how much of the account is already in it, for the sector limit. name null: a whole-market
+   *  fund, in no sector. Absent: not known, so the stock counts as a sector of its own. */
+  sector?: { name: string | null; label: string; heldUsd: number };
+  /** How much of the account is already in crypto, for the crypto limit. */
+  cryptoHeldUsd?: number;
+  /** When this stock was last bought here, and how many trading days ago, for the shortest hold. Absent: not bought here. */
+  boughtOn?: string; heldDays?: number;
+  /** What the Agentic account holds, at Robinhood's live prices, for the sector and crypto limits. */
+  positions?: Array<{ symbol: string; quantity: number; price: number | null }>;
 }
 
 export type Side = 'buy' | 'sell';
 export interface Order { symbol: string; side: Side; quantity: number; limitPrice: number; timeInForce: 'gfd' | 'gtc' }
-export interface Check { ok: boolean; words: string }
+/** ask: it passes, but the person presses once more before Review (selling a stock bought here under the shortest hold). */
+export interface Check { ok: boolean; words: string; ask?: true }
+/** Under the shortest hold: a stock bought here fewer trading days ago than the person's limit. */
+export const early = (c: TicketContext, caps: Caps): boolean => c.heldDays !== undefined && c.heldDays < caps.minHoldDays;
 /** What a ticket proposes: from a call, the action its rating asks in the person's settings; from the person, their own. */
 export type OwnAction = 'your own buy' | 'your own sell';
 export interface Proposal { action: Action | OwnAction; order: Order | null; why: string[] }
@@ -44,6 +57,7 @@ export function propose(c: TicketContext, t: Trading, caps: Caps): Proposal {
 
   if (action === 'sell half of what is held' || action === 'sell everything held') {
     if (c.held <= 0) return none(`The desk rated ${c.symbol} ${c.rating}, but the Agentic account holds none to sell.`);
+    if (early(c, caps)) return none(`${c.symbol} was bought here on ${c.boughtOn}, ${c.heldDays} trading day(s) ago: your shortest hold is ${caps.minHoldDays}, so the desk proposes no sell yet.`);
     const quantity = Math.floor(action === 'sell everything held' ? c.held : c.held / 2);
     if (quantity < 1) return none(`The Agentic account holds ${c.held} share(s); half of that is less than one whole share, and a limit order sells whole shares only.`);
     why.push(`${action === 'sell everything held' ? 'Everything held' : 'Half of what is held'}: ${quantity} of ${c.held} share(s), whole shares only.`);
@@ -100,8 +114,22 @@ export function check(o: Order, c: TicketContext, t: Trading, caps: Caps): Check
     else {
       const after = ((c.held + o.quantity) * o.limitPrice / c.accountValue) * 100;
       add(after <= caps.perStockPercent, `${o.symbol} would be ${after.toFixed(1)}% of the account; your cap is ${caps.perStockPercent}%`);
+      // The sector limit: a whole-market fund is in no sector; a stock whose sector is not known counts as one of its own.
+      const s = c.sector ?? { name: `own:${o.symbol}`, label: 'not known, so counted as a sector of its own', heldUsd: c.held * o.limitPrice };
+      if (s.name === null) add(true, `${o.symbol} is a whole-market fund: it counts towards no sector`);
+      else {
+        const inSector = ((s.heldUsd + cost) / c.accountValue) * 100;
+        add(inSector <= caps.perSectorPercent, `${s.label === '' ? 'Its sector' : `Sector ${s.label}`} would be ${inSector.toFixed(1)}% of the account; your limit is ${caps.perSectorPercent}%`);
+      }
+      if (isCrypto(o.symbol)) {
+        const inCrypto = (((c.cryptoHeldUsd ?? 0) + cost) / c.accountValue) * 100;
+        add(inCrypto <= caps.cryptoPercent, `Crypto would be ${inCrypto.toFixed(1)}% of the account; your limit is ${caps.cryptoPercent}%`);
+      }
     }
-  } else add(o.quantity <= c.held, o.quantity <= c.held ? `Selling ${o.quantity} of the ${c.held} held` : `Only ${c.held} share(s) are held in the Agentic account`);
+  } else {
+    add(o.quantity <= c.held, o.quantity <= c.held ? `Selling ${o.quantity} of the ${c.held} held` : `Only ${c.held} share(s) are held in the Agentic account`);
+    if (early(c, caps)) out.push({ ok: true, ask: true, words: `${o.symbol} was bought here on ${c.boughtOn}, ${c.heldDays} trading day(s) ago, under your shortest hold of ${caps.minHoldDays}: selling it now takes one more press` });
+  }
   add(c.ordersToday < caps.ordersPerDay, `${c.ordersToday} of your ${caps.ordersPerDay} orders a day used`);
   return out;
 }

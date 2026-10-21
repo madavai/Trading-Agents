@@ -36720,6 +36720,7 @@ import fs3 from "node:fs";
 import path4 from "node:path";
 var ANALYSTS = ["market", "sentiment", "news", "fundamentals"];
 var ACTIONS = ["buy a full position", "buy half a position", "no order", "sell half of what is held", "sell everything held"];
+var DEFAULT_CAPS = { perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 3, perSectorPercent: 30, cryptoPercent: 5, weeklyLossPercent: 5, minHoldDays: 5 };
 var DEFAULTS = {
   analysis: {
     outputLanguage: "English",
@@ -36752,6 +36753,7 @@ var DEFAULTS = {
 };
 var within = (v, lo, hi, fallback) => typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi ? v : fallback;
 var int2 = (v, lo, hi, fallback) => Number.isInteger(v) && v >= lo && v <= hi ? v : fallback;
+var CAP_KEYS = Object.keys(DEFAULT_CAPS);
 function tradingOf(raw) {
   const t = raw && typeof raw === "object" ? raw : {}, d = DEFAULTS.trading;
   const od = t.orderDefaults && typeof t.orderDefaults === "object" ? t.orderDefaults : {};

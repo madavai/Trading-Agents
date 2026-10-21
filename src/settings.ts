@@ -46,10 +46,19 @@ export interface Trading {
  *  orders in a day. They are not in the project's settings file, which anything working in this folder could edit: the
  *  dashboard keeps them beside the trading switch in the person's private folder (robinhood/link.ts), and only the
  *  person changes them, on the page. */
-export interface Caps { perOrderUsd: number; perStockPercent: number; ordersPerDay: number }
-export const DEFAULT_CAPS: Caps = { perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 3 };
-/** What a cap may be: $1 to $100,000 an order, 1% to 100% of the account, 1 to 50 orders a day. */
-export const CAP_RANGES = { perOrderUsd: [1, 100_000], perStockPercent: [1, 100], ordersPerDay: [1, 50] } as const;
+export interface Caps {
+  perOrderUsd: number; perStockPercent: number; ordersPerDay: number;
+  /** The guard rails: the most of the account in one sector after a buy, the most in crypto, the fall in a week after
+   *  which trading switches itself off, and the fewest trading days a stock bought here is held before the desk
+   *  proposes selling it. */
+  perSectorPercent: number; cryptoPercent: number; weeklyLossPercent: number; minHoldDays: number;
+}
+export const DEFAULT_CAPS: Caps = { perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 3, perSectorPercent: 30, cryptoPercent: 5, weeklyLossPercent: 5, minHoldDays: 5 };
+/** What each may be: $1 to $100,000 an order, 1% to 100% of the account in a stock or a sector, 0% to 100% in crypto,
+ *  1 to 50 orders a day, a weekly fall of 1% to 50%, a shortest hold of 0 to 60 trading days. */
+export const CAP_RANGES = { perOrderUsd: [1, 100_000], perStockPercent: [1, 100], ordersPerDay: [1, 50], perSectorPercent: [1, 100], cryptoPercent: [0, 100], weeklyLossPercent: [1, 50], minHoldDays: [0, 60] } as const;
+/** The limits counted in whole numbers. */
+const WHOLE_CAPS = new Set<keyof Caps>(['ordersPerDay', 'minHoldDays']);
 
 export const DEFAULTS: Settings = {
   analysis: {
@@ -85,18 +94,27 @@ const within = (v: unknown, lo: number, hi: number, fallback: number): number =>
 
 const int = (v: unknown, lo: number, hi: number, fallback: number): number => (Number.isInteger(v) && (v as number) >= lo && (v as number) <= hi ? (v as number) : fallback);
 
-/** The caps as kept, checked: a value out of range falls back to the shipped one, never to something larger. */
+const CAP_KEYS = Object.keys(DEFAULT_CAPS) as Array<keyof Caps>;
+
+/** The caps as kept, checked: a value missing or out of range falls back to the shipped one, never to something larger. */
 export function capsOf(raw: unknown): Caps {
-  const c = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>, d = DEFAULT_CAPS, r = CAP_RANGES;
-  return { perOrderUsd: within(c.perOrderUsd, r.perOrderUsd[0], r.perOrderUsd[1], d.perOrderUsd), perStockPercent: within(c.perStockPercent, r.perStockPercent[0], r.perStockPercent[1], d.perStockPercent), ordersPerDay: int(c.ordersPerDay, r.ordersPerDay[0], r.ordersPerDay[1], d.ordersPerDay) };
+  const c = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const out = { ...DEFAULT_CAPS };
+  for (const k of CAP_KEYS) { const [lo, hi] = CAP_RANGES[k]; out[k] = WHOLE_CAPS.has(k) ? int(c[k], lo, hi, DEFAULT_CAPS[k]) : within(c[k], lo, hi, DEFAULT_CAPS[k]); }
+  return out;
 }
 
-/** Caps as the person typed them on the page: all three, each within its range (whole orders a day), or null. */
+/** Caps as the person typed them on the page: every one, each within its range (whole numbers where they count), or null.
+ *  Dollars are kept to the cent and percentages to a tenth. */
 export function capsFrom(raw: unknown): Caps | null {
-  const c = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>, r = CAP_RANGES;
-  const n = (v: unknown, [lo, hi]: readonly [number, number], whole = false) => (typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi && (!whole || Number.isInteger(v)) ? v : null);
-  const perOrderUsd = n(c.perOrderUsd, r.perOrderUsd), perStockPercent = n(c.perStockPercent, r.perStockPercent), ordersPerDay = n(c.ordersPerDay, r.ordersPerDay, true);
-  return perOrderUsd === null || perStockPercent === null || ordersPerDay === null ? null : { perOrderUsd: Math.round(perOrderUsd * 100) / 100, perStockPercent: Math.round(perStockPercent * 10) / 10, ordersPerDay };
+  const c = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const out = { ...DEFAULT_CAPS };
+  for (const k of CAP_KEYS) {
+    const v = c[k], [lo, hi] = CAP_RANGES[k];
+    if (typeof v !== 'number' || !Number.isFinite(v) || v < lo || v > hi || (WHOLE_CAPS.has(k) && !Number.isInteger(v))) return null;
+    out[k] = k === 'perOrderUsd' ? Math.round(v * 100) / 100 : WHOLE_CAPS.has(k) ? v : Math.round(v * 10) / 10;
+  }
+  return out;
 }
 
 /** The trading part, checked: a value out of range falls back to the shipped one, never to something larger. */

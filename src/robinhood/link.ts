@@ -28,8 +28,9 @@ export interface LinkInfo {
 /** What the dashboard shows of the accounts: the ones the person ticked, read whole, and when. */
 export interface Snapshot { at: string; views: AccountView[] }
 
-/** The trading switch and the person's caps, as kept beside the sign-in. */
-export interface TradingState { on: boolean; since: string | null; caps: Caps }
+/** The trading switch and the person's caps, as kept beside the sign-in. offBecause: the weekly loss limit switched it
+ *  off, when and why; cleared when the person switches it on again. */
+export interface TradingState { on: boolean; since: string | null; caps: Caps; offBecause: { at: string; words: string } | null }
 
 /** A failure of Robinhood's, in plain words for the page. */
 export const plainFailure = (e: unknown): string => e instanceof NotSignedIn ? 'Robinhood asks you to sign in again: press Connect.' : `Robinhood did not answer as expected: ${masked(e instanceof Error ? e.message : String(e))}`;
@@ -116,11 +117,14 @@ export class Link {
       const ids = this.agenticIds();
       const data = async (name: string, args: Record<string, unknown>) => { const x = await r.read(name, args); if (x.failed) throw new Error(`Robinhood could not give ${name.replace(/^get_|_/g, ' ').trim()}`); return x.data; };
       const p = parsePortfolio(await data('get_portfolio', { account_number: ids.accountNumber }));
-      const held = parsePositions(await data('get_equity_positions', { account_number: ids.accountNumber })).find((x) => x.symbol === symbol)?.quantity ?? 0;
-      const price = parseQuotes(await data('get_equity_quotes', { symbols: [symbol] })).get(symbol) ?? null;
+      this.noteValue(p.total, now);   // every read of the account's value counts towards the weekly loss limit
+      const all = parsePositions(await data('get_equity_positions', { account_number: ids.accountNumber }));
+      const held = all.find((x) => x.symbol === symbol)?.quantity ?? 0;
+      const quotes = parseQuotes(await data('get_equity_quotes', { symbols: [...new Set([symbol, ...all.map((x) => x.symbol)])] }));
+      const price = quotes.get(symbol) ?? null;
       const day = (iso: string) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date(iso));
       const ordersToday = parseOrders(await data('get_equity_orders', { account_number: ids.accountNumber })).orders.filter((o) => o.at && day(o.at) === day(now.toISOString())).length;
-      return { symbol, accountValue: p.total, buyingPower: p.buyingPower, held, price, ordersToday };
+      return { symbol, accountValue: p.total, buyingPower: p.buyingPower, held, price, ordersToday, positions: all.map((x) => ({ symbol: x.symbol, quantity: x.quantity, price: quotes.get(x.symbol) ?? null })) };
     }
   }
 
@@ -128,12 +132,13 @@ export class Link {
    *  agents are refused: a cap missing or out of range is the shipped one, never a larger one. */
   private get switchFile(): string { return path.join(path.dirname(this.file), 'trading.json'); }
   trading(): TradingState {
-    let v: { on?: unknown; since?: unknown; caps?: unknown } = {};
+    let v: { on?: unknown; since?: unknown; caps?: unknown; offBecause?: { at?: unknown; words?: unknown } } = {};
     try { v = JSON.parse(fs.readFileSync(this.switchFile, 'utf8')) as typeof v; } catch { /* off, with the shipped caps */ }
-    return { on: v.on === true, since: v.on === true && typeof v.since === 'string' ? v.since : null, caps: capsOf(v.caps) };
+    const off = v.on !== true && typeof v.offBecause?.at === 'string' && typeof v.offBecause.words === 'string' ? { at: v.offBecause.at, words: v.offBecause.words.slice(0, 300) } : null;
+    return { on: v.on === true, since: v.on === true && typeof v.since === 'string' ? v.since : null, caps: capsOf(v.caps), offBecause: off };
   }
-  private keepTrading(on: boolean, caps: Caps): TradingState {
-    writePrivate(this.switchFile, JSON.stringify(on ? { on: true, since: this.now(), caps } : { on: false, caps }, null, 2) + '\n');
+  private keepTrading(on: boolean, caps: Caps, offBecause?: { at: string; words: string }): TradingState {
+    writePrivate(this.switchFile, JSON.stringify(on ? { on: true, since: this.now(), caps } : { on: false, caps, ...(offBecause ? { offBecause } : {}) }, null, 2) + '\n');
     return this.trading();
   }
   setTrading(on: boolean): TradingState {
@@ -144,8 +149,36 @@ export class Link {
   /** The person's caps, as the dashboard's server checked them (settings.ts capsFrom). The switch is left as it is. */
   setCaps(caps: Caps): TradingState {
     const was = this.trading();
-    writePrivate(this.switchFile, JSON.stringify({ ...(was.on ? { on: true, since: was.since } : { on: false }), caps }, null, 2) + '\n');
+    writePrivate(this.switchFile, JSON.stringify({ ...(was.on ? { on: true, since: was.since } : { on: false, ...(was.offBecause ? { offBecause: was.offBecause } : {}) }), caps }, null, 2) + '\n');
     return this.trading();
+  }
+
+  /** The Agentic account's value, day by day (New York's), kept beside the sign-in: the day's highest and latest reading,
+   *  for the last fourteen days. When trading is on and the value falls the person's weekly limit below its highest of
+   *  the last seven days, trading switches itself off and says why. A large withdrawal can trip it too; the person
+   *  switches it back on. */
+  private get valuesFile(): string { return path.join(path.dirname(this.file), 'values.json'); }
+  values(): Array<{ day: string; high: number; last: number }> {
+    try {
+      const v = JSON.parse(fs.readFileSync(this.valuesFile, 'utf8')) as unknown;
+      return Array.isArray(v) ? v.filter((d): d is { day: string; high: number; last: number } => !!d && /^\d{4}-\d{2}-\d{2}$/.test(String(d.day)) && Number.isFinite(d.high) && Number.isFinite(d.last)) : [];
+    } catch { return []; }
+  }
+  noteValue(total: number | null, now: Date = new Date()): TradingState {
+    const state = this.trading();
+    if (total === null || !(total > 0)) return state;
+    const day = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(d);
+    const today = day(now), weekAgo = day(new Date(now.getTime() - 7 * 86_400_000)), twoWeeks = day(new Date(now.getTime() - 14 * 86_400_000));
+    const days = this.values().filter((d) => d.day >= twoWeeks && d.day !== today);
+    const mine = this.values().find((d) => d.day === today);
+    days.push({ day: today, high: Math.max(mine?.high ?? 0, total), last: total });
+    days.sort((a, b) => a.day.localeCompare(b.day));
+    writePrivate(this.valuesFile, JSON.stringify(days, null, 2) + '\n');
+    const week = days.filter((d) => d.day >= weekAgo), top = week.reduce((a, d) => (d.high > a.high ? d : a), week[0]!);
+    const fall = (1 - total / top.high) * 100;
+    if (!state.on || fall < state.caps.weeklyLossPercent) return state;
+    const money = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return this.keepTrading(false, state.caps, { at: now.toISOString(), words: `The Agentic account fell ${fall.toFixed(1)}% below its highest value of the last seven days (${money(top.high)} on ${top.day}, now ${money(total)}), past your weekly limit of ${state.caps.weeklyLossPercent}%. Trading switched itself off. A large withdrawal can do this too; switch it back on when you are ready.` });
   }
 
   /** Places one order on the Agentic account, in one session: reads the account afresh, has `approve` check the order on
@@ -155,6 +188,9 @@ export class Link {
     const session = await openSession(this.file, { ...this.opts, signIn: false });
     try {
       const context = await this.contextWith(session.reader, order.symbol, new Date());
+      // Reading the account just now may have tripped the weekly loss limit: then nothing is sent.
+      const now = this.trading();
+      if (!now.on) throw new Error(`trading switched itself off: ${now.offBecause?.words ?? 'switch it on in Your account first'}`);
       const failed = approve(context).filter((c) => !c.ok);
       if (failed.length) throw new Error(`the order no longer passes on Robinhood's latest figures: ${failed.map((c) => c.words).join('; ')}`);
       const placed = await session.placer.place({ accountNumber: this.agenticIds().accountNumber, agentic: true }, order, refId);
@@ -186,6 +222,8 @@ export class Link {
           const accounts = this.learn(a.data), show = this.chosen();
           const views: AccountView[] = [];
           for (const account of accounts.filter((x) => show.includes(x.key))) views.push(await readAccount(r, account, this.ids.get(account.key)!));
+          const agentic = views.find((v) => v.account.agentic);
+          if (agentic) this.noteValue(agentic.portfolio?.total ?? null, this.opts.now?.() ?? new Date());
           this.last_snapshot = { at: this.now(), views };
           return this.last_snapshot;
         });
@@ -255,6 +293,7 @@ export class Link {
   forget(): LinkInfo {
     fs.rmSync(this.file, { force: true });
     fs.rmSync(this.choiceFile, { force: true });
+    fs.rmSync(this.valuesFile, { force: true });   // the account's values go with the sign-in
     if (fs.existsSync(this.switchFile)) this.setTrading(false);   // disconnecting switches trading off too; the caps are the person's rules and stay
     this.last = null; this.last_snapshot = null; this.known = null; this.ids.clear();
     return this.info();

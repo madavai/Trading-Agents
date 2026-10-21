@@ -107,8 +107,8 @@ export const api = {
   openTicket: (symbol: string, date: string) => call<TicketOpen>('POST', '/api/ticket', { symbol, date }),
   openOwnTicket: (symbol: string, side: 'buy' | 'sell') => call<TicketOpen>('POST', '/api/ticket/own', { symbol, side }),
   checkTicket: (id: string, quantity: number, limitPrice: number) => call<{ checks: Check[] }>('POST', '/api/ticket/check', { id, quantity, limitPrice }),
-  reviewTicket: (id: string, quantity: number, limitPrice: number) => call<{ checks: Check[]; review: Review; confirm: string; trading: Trading }>('POST', '/api/ticket/review', { id, quantity, limitPrice }),
-  placeTicket: (id: string, confirm: string) => call<{ placed: Placed }>('POST', '/api/ticket/place', { id, confirm }),
+  reviewTicket: (id: string, quantity: number, limitPrice: number, early = false) => call<{ checks: Check[]; review: Review; confirm: string; trading: Trading }>('POST', '/api/ticket/review', { id, quantity, limitPrice, ...(early ? { early } : {}) }),
+  placeTicket: (id: string, confirm: string, early = false) => call<{ placed: Placed }>('POST', '/api/ticket/place', { id, confirm, ...(early ? { early } : {}) }),
   trading: () => call<Trading & { placedToday: number }>('GET', '/api/trading'),
   /** Switching on with under four weeks of record also says the person understood that. */
   setTrading: (on: boolean, understood = false) => call<Trading>('POST', '/api/trading', on ? { on, confirm: 'switch trading on', ...(understood ? { understood } : {}) } : { on }),

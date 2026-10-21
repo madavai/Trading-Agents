@@ -7511,6 +7511,17 @@ async function getText(url2, opts = {}) {
     return text2;
   }
 }
+async function getCookies(url2) {
+  let res;
+  try {
+    res = await fetchImpl(url2, { headers: { "User-Agent": userAgentFor(url2, contact, emailNow()) }, redirect: "manual", signal: AbortSignal.timeout(15e3) });
+  } catch (e) {
+    throw new Unavailable(`${new URL(url2).host} did not answer (${e.message})`);
+  }
+  await res.body?.cancel().catch(() => {
+  });
+  return res.headers.getSetCookie().map((c) => c.split(";")[0]).join("; ");
+}
 async function getJson(url2, opts = {}) {
   const text2 = await getText(url2, opts);
   try {
@@ -7657,10 +7668,11 @@ async function daily(raw, from, to) {
 var clearCache = () => cache.clear();
 
 // src/desk/paper.ts
-import fs4 from "node:fs";
-import path4 from "node:path";
+import fs5 from "node:fs";
+import path5 from "node:path";
 
 // src/desk/ticket.ts
+var early = (c, caps) => c.heldDays !== void 0 && c.heldDays < caps.minHoldDays;
 var money = (n) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 var cents = (n) => Math.round(n * 100) / 100;
 var actionOf = (rating, t2) => t2.ratingToOrder[rating] ?? "no order";
@@ -7673,6 +7685,7 @@ function propose(c, t2, caps) {
   why.push(`Limit price: Robinhood's live price, ${money(limitPrice)}. You can change it.`);
   if (action === "sell half of what is held" || action === "sell everything held") {
     if (c.held <= 0) return none(`The desk rated ${c.symbol} ${c.rating}, but the Agentic account holds none to sell.`);
+    if (early(c, caps)) return none(`${c.symbol} was bought here on ${c.boughtOn}, ${c.heldDays} trading day(s) ago: your shortest hold is ${caps.minHoldDays}, so the desk proposes no sell yet.`);
     const quantity2 = Math.floor(action === "sell everything held" ? c.held : c.held / 2);
     if (quantity2 < 1) return none(`The Agentic account holds ${c.held} share(s); half of that is less than one whole share, and a limit order sells whole shares only.`);
     why.push(`${action === "sell everything held" ? "Everything held" : "Half of what is held"}: ${quantity2} of ${c.held} share(s), whole shares only.`);
@@ -7728,12 +7741,65 @@ function check(o, c, t2, caps) {
     else {
       const after = (c.held + o.quantity) * o.limitPrice / c.accountValue * 100;
       add(after <= caps.perStockPercent, `${o.symbol} would be ${after.toFixed(1)}% of the account; your cap is ${caps.perStockPercent}%`);
+      const s = c.sector ?? { name: `own:${o.symbol}`, label: "not known, so counted as a sector of its own", heldUsd: c.held * o.limitPrice };
+      if (s.name === null) add(true, `${o.symbol} is a whole-market fund: it counts towards no sector`);
+      else {
+        const inSector = (s.heldUsd + cost) / c.accountValue * 100;
+        add(inSector <= caps.perSectorPercent, `${s.label === "" ? "Its sector" : `Sector ${s.label}`} would be ${inSector.toFixed(1)}% of the account; your limit is ${caps.perSectorPercent}%`);
+      }
+      if (isCrypto(o.symbol)) {
+        const inCrypto = ((c.cryptoHeldUsd ?? 0) + cost) / c.accountValue * 100;
+        add(inCrypto <= caps.cryptoPercent, `Crypto would be ${inCrypto.toFixed(1)}% of the account; your limit is ${caps.cryptoPercent}%`);
+      }
     }
-  } else add(o.quantity <= c.held, o.quantity <= c.held ? `Selling ${o.quantity} of the ${c.held} held` : `Only ${c.held} share(s) are held in the Agentic account`);
+  } else {
+    add(o.quantity <= c.held, o.quantity <= c.held ? `Selling ${o.quantity} of the ${c.held} held` : `Only ${c.held} share(s) are held in the Agentic account`);
+    if (early(c, caps)) out.push({ ok: true, ask: true, words: `${o.symbol} was bought here on ${c.boughtOn}, ${c.heldDays} trading day(s) ago, under your shortest hold of ${caps.minHoldDays}: selling it now takes one more press` });
+  }
   add(c.ordersToday < caps.ordersPerDay, `${c.ordersToday} of your ${caps.ordersPerDay} orders a day used`);
   return out;
 }
 var passes = (checks) => checks.length > 0 && checks.every((x) => x.ok);
+
+// src/desk/orders.ts
+import fs4 from "node:fs";
+import path4 from "node:path";
+var file2 = (dir) => path4.join(dir, "orders.jsonl");
+var marketDay = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(d);
+function logOrder(dir, line) {
+  fs4.mkdirSync(dir, { recursive: true });
+  fs4.appendFileSync(file2(dir), JSON.stringify(line) + "\n");
+}
+function readOrders(dir) {
+  try {
+    return fs4.readFileSync(file2(dir), "utf8").split("\n").flatMap((l) => {
+      try {
+        const v = JSON.parse(l);
+        return v && typeof v.at === "string" && typeof v.symbol === "string" && v.robinhood ? [v] : [];
+      } catch {
+        return [];
+      }
+    });
+  } catch {
+    return [];
+  }
+}
+var ordersOn = (dir, now) => readOrders(dir).filter((o) => marketDay(new Date(o.at)) === marketDay(now));
+var placedToday = (dir, now) => ordersOn(dir, now).length;
+function tradingDaysBetween(from, to) {
+  let n = 0;
+  for (let d = Date.parse(`${from}T12:00:00Z`) + 864e5; d <= Date.parse(`${to}T12:00:00Z`); d += 864e5) {
+    const w = new Date(d).getUTCDay();
+    if (w !== 0 && w !== 6) n++;
+  }
+  return n;
+}
+function lastBuy(dir, symbol, now) {
+  const buy = readOrders(dir).filter((o) => o.symbol === symbol && o.side === "buy" && o.robinhood.answered).at(-1);
+  if (!buy) return null;
+  const boughtOn = marketDay(new Date(buy.at));
+  return { boughtOn, heldDays: tradingDaysBetween(boughtOn, marketDay(now)) };
+}
 
 // src/desk/paper.ts
 var PAPER_START_USD = 1e4;
@@ -7786,7 +7852,7 @@ function paperBook(calls, closes, o) {
   }
   fills.sort((a, b) => a.date.localeCompare(b.date));
   let cash = o.startUsd;
-  const held = /* @__PURE__ */ new Map();
+  const held = /* @__PURE__ */ new Map(), boughtOn = /* @__PURE__ */ new Map();
   const worth = (date4) => {
     let v = cash;
     for (const [ticker, h] of held) v += h.quantity * (closeOn(closes[ticker], date4) ?? h.cost / (h.quantity || 1));
@@ -7794,7 +7860,21 @@ function paperBook(calls, closes, o) {
   };
   const apply = (f, ordersThatDay) => {
     const h = held.get(f.trade.ticker) ?? { quantity: 0, cost: 0 };
-    const context = { symbol: f.trade.ticker, rating: f.trade.rating, callDate: f.trade.callDate, accountValue: cents2(worth(f.date)), buyingPower: cents2(cash), held: h.quantity, price: f.price, ordersToday: ordersThatDay };
+    const positions2 = [...held].map(([ticker, x]) => ({ symbol: ticker, quantity: x.quantity, price: closeOn(closes[ticker], f.date) }));
+    const bought = boughtOn.get(f.trade.ticker);
+    const context = {
+      symbol: f.trade.ticker,
+      rating: f.trade.rating,
+      callDate: f.trade.callDate,
+      accountValue: cents2(worth(f.date)),
+      buyingPower: cents2(cash),
+      held: h.quantity,
+      price: f.price,
+      ordersToday: ordersThatDay,
+      positions: positions2,
+      ...o.sectors ? { sector: o.sectors.context(f.trade.ticker, positions2) } : {},
+      ...bought && h.quantity > 0 ? { boughtOn: bought, heldDays: tradingDaysBetween(bought, f.date) } : {}
+    };
     const p = propose(context, o.trading, o.caps);
     if (!p.order) {
       f.trade.why = p.why.at(-1) ?? "No order.";
@@ -7809,6 +7889,7 @@ function paperBook(calls, closes, o) {
     if (side === "buy") {
       cash = cents2(cash - amount);
       held.set(f.trade.ticker, { quantity: h.quantity + quantity, cost: cents2(h.cost + amount) });
+      boughtOn.set(f.trade.ticker, f.date);
     } else {
       const left = h.quantity - quantity;
       cash = cents2(cash + amount);
@@ -7855,11 +7936,11 @@ function paperBook(calls, closes, o) {
     benchmark
   };
 }
-var paperFile = (dir) => path4.join(dir, "paper.json");
+var paperFile = (dir) => path5.join(dir, "paper.json");
 var whole = (v) => Number.isInteger(v) && v >= PAPER_MIN && v <= PAPER_MAX ? v : null;
 function readPaperStart(dir) {
   try {
-    return whole(JSON.parse(fs4.readFileSync(paperFile(dir), "utf8")).startUsd) ?? PAPER_START_USD;
+    return whole(JSON.parse(fs5.readFileSync(paperFile(dir), "utf8")).startUsd) ?? PAPER_START_USD;
   } catch {
     return PAPER_START_USD;
   }
@@ -7867,19 +7948,19 @@ function readPaperStart(dir) {
 function savePaperStart(dir, raw) {
   const v = whole(raw);
   if (v === null) throw new Error(`the paper money is a whole number of dollars from $${PAPER_MIN} to $${PAPER_MAX.toLocaleString("en-US")}`);
-  fs4.mkdirSync(dir, { recursive: true });
+  fs5.mkdirSync(dir, { recursive: true });
   writeWhole(paperFile(dir), JSON.stringify({ startUsd: v }, null, 2) + "\n");
   return v;
 }
 
 // src/private.ts
 import { spawnSync } from "node:child_process";
-import fs5 from "node:fs";
+import fs6 from "node:fs";
 import os2 from "node:os";
-import path5 from "node:path";
+import path6 from "node:path";
 var SYSTEM = "*S-1-5-18";
 var owner = null;
-var windowsTool = (exe) => path5.join(process.env.SystemRoot ?? process.env.windir ?? "C:\\Windows", "System32", exe);
+var windowsTool = (exe) => path6.join(process.env.SystemRoot ?? process.env.windir ?? "C:\\Windows", "System32", exe);
 function ownerOnWindows() {
   if (owner) return owner;
   const r = spawnSync(windowsTool("whoami.exe"), ["/user", "/fo", "csv", "/nh"], { encoding: "utf8", windowsHide: true, timeout: 5e3 });
@@ -7894,13 +7975,13 @@ var lockArgs = (target, folder2, who) => {
 function lockDown(target) {
   let folder2;
   try {
-    folder2 = fs5.statSync(target).isDirectory();
+    folder2 = fs6.statSync(target).isDirectory();
   } catch {
     return false;
   }
   if (process.platform !== "win32") {
     try {
-      fs5.chmodSync(target, folder2 ? 448 : 384);
+      fs6.chmodSync(target, folder2 ? 448 : 384);
       return true;
     } catch {
       return false;
@@ -7911,22 +7992,22 @@ function lockDown(target) {
 }
 var lockedFolders = /* @__PURE__ */ new Set();
 function writePrivate(file4, text2) {
-  const folder2 = path5.dirname(file4);
-  fs5.mkdirSync(folder2, { recursive: true, mode: 448 });
+  const folder2 = path6.dirname(file4);
+  fs6.mkdirSync(folder2, { recursive: true, mode: 448 });
   if (!lockedFolders.has(folder2)) {
     lockDown(folder2);
     lockedFolders.add(folder2);
   }
   const tmp = `${file4}.${process.pid}.tmp`;
-  fs5.writeFileSync(tmp, text2, { mode: 384 });
-  fs5.renameSync(tmp, file4);
+  fs6.writeFileSync(tmp, text2, { mode: 384 });
+  fs6.renameSync(tmp, file4);
   lockDown(file4);
 }
 
 // src/robinhood/link.ts
 import crypto4 from "node:crypto";
-import fs8 from "node:fs";
-import path7 from "node:path";
+import fs9 from "node:fs";
+import path8 from "node:path";
 
 // src/robinhood/account.ts
 import crypto from "node:crypto";
@@ -8056,12 +8137,13 @@ async function readAccount(reader, account, ids) {
 }
 
 // src/settings.ts
-import fs6 from "node:fs";
-import path6 from "node:path";
+import fs7 from "node:fs";
+import path7 from "node:path";
 var ANALYSTS = ["market", "sentiment", "news", "fundamentals"];
 var ACTIONS = ["buy a full position", "buy half a position", "no order", "sell half of what is held", "sell everything held"];
-var DEFAULT_CAPS = { perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 3 };
-var CAP_RANGES = { perOrderUsd: [1, 1e5], perStockPercent: [1, 100], ordersPerDay: [1, 50] };
+var DEFAULT_CAPS = { perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 3, perSectorPercent: 30, cryptoPercent: 5, weeklyLossPercent: 5, minHoldDays: 5 };
+var CAP_RANGES = { perOrderUsd: [1, 1e5], perStockPercent: [1, 100], ordersPerDay: [1, 50], perSectorPercent: [1, 100], cryptoPercent: [0, 100], weeklyLossPercent: [1, 50], minHoldDays: [0, 60] };
+var WHOLE_CAPS = /* @__PURE__ */ new Set(["ordersPerDay", "minHoldDays"]);
 var DEFAULTS = {
   analysis: {
     outputLanguage: "English",
@@ -8094,15 +8176,25 @@ var DEFAULTS = {
 };
 var within = (v, lo, hi, fallback) => typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi ? v : fallback;
 var int = (v, lo, hi, fallback) => Number.isInteger(v) && v >= lo && v <= hi ? v : fallback;
+var CAP_KEYS = Object.keys(DEFAULT_CAPS);
 function capsOf(raw) {
-  const c = raw && typeof raw === "object" ? raw : {}, d = DEFAULT_CAPS, r = CAP_RANGES;
-  return { perOrderUsd: within(c.perOrderUsd, r.perOrderUsd[0], r.perOrderUsd[1], d.perOrderUsd), perStockPercent: within(c.perStockPercent, r.perStockPercent[0], r.perStockPercent[1], d.perStockPercent), ordersPerDay: int(c.ordersPerDay, r.ordersPerDay[0], r.ordersPerDay[1], d.ordersPerDay) };
+  const c = raw && typeof raw === "object" ? raw : {};
+  const out = { ...DEFAULT_CAPS };
+  for (const k of CAP_KEYS) {
+    const [lo, hi] = CAP_RANGES[k];
+    out[k] = WHOLE_CAPS.has(k) ? int(c[k], lo, hi, DEFAULT_CAPS[k]) : within(c[k], lo, hi, DEFAULT_CAPS[k]);
+  }
+  return out;
 }
 function capsFrom(raw) {
-  const c = raw && typeof raw === "object" ? raw : {}, r = CAP_RANGES;
-  const n = (v, [lo, hi], whole2 = false) => typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi && (!whole2 || Number.isInteger(v)) ? v : null;
-  const perOrderUsd = n(c.perOrderUsd, r.perOrderUsd), perStockPercent = n(c.perStockPercent, r.perStockPercent), ordersPerDay = n(c.ordersPerDay, r.ordersPerDay, true);
-  return perOrderUsd === null || perStockPercent === null || ordersPerDay === null ? null : { perOrderUsd: Math.round(perOrderUsd * 100) / 100, perStockPercent: Math.round(perStockPercent * 10) / 10, ordersPerDay };
+  const c = raw && typeof raw === "object" ? raw : {};
+  const out = { ...DEFAULT_CAPS };
+  for (const k of CAP_KEYS) {
+    const v = c[k], [lo, hi] = CAP_RANGES[k];
+    if (typeof v !== "number" || !Number.isFinite(v) || v < lo || v > hi || WHOLE_CAPS.has(k) && !Number.isInteger(v)) return null;
+    out[k] = k === "perOrderUsd" ? Math.round(v * 100) / 100 : WHOLE_CAPS.has(k) ? v : Math.round(v * 10) / 10;
+  }
+  return out;
 }
 function tradingOf(raw) {
   const t2 = raw && typeof raw === "object" ? raw : {}, d = DEFAULTS.trading;
@@ -8126,7 +8218,7 @@ function languageName(v, fallback = "English") {
 function readSettings(root2) {
   let raw = {};
   try {
-    raw = JSON.parse(fs6.readFileSync(path6.join(root2, "desk-settings.json"), "utf8"));
+    raw = JSON.parse(fs7.readFileSync(path7.join(root2, "desk-settings.json"), "utf8"));
   } catch {
   }
   const a = { ...DEFAULTS.analysis, ...raw.analysis }, s = { ...DEFAULTS.scoring, ...raw.scoring }, j = { ...DEFAULTS.journal, ...raw.journal };
@@ -19757,10 +19849,10 @@ var StreamableHTTPClientTransport = class {
 
 // src/robinhood/store.ts
 import crypto3 from "node:crypto";
-import fs7 from "node:fs";
+import fs8 from "node:fs";
 function readSaved(file4) {
   try {
-    return JSON.parse(fs7.readFileSync(file4, "utf8"));
+    return JSON.parse(fs8.readFileSync(file4, "utf8"));
   } catch {
     return {};
   }
@@ -20133,32 +20225,32 @@ var Link = class {
   refreshing = null;
   /** Which accounts the person ticked, kept beside the sign-in as keys (never account numbers). */
   get choiceFile() {
-    return path7.join(path7.dirname(this.file), "accounts.json");
+    return path8.join(path8.dirname(this.file), "accounts.json");
   }
   chosen() {
     try {
-      const v = JSON.parse(fs8.readFileSync(this.choiceFile, "utf8"));
+      const v = JSON.parse(fs9.readFileSync(this.choiceFile, "utf8"));
       return Array.isArray(v.show) ? v.show.filter((k) => typeof k === "string") : [];
     } catch {
       return [];
     }
   }
   async withReader(job) {
-    const session = await openSession(this.file, { ...this.opts, signIn: false });
+    const session2 = await openSession(this.file, { ...this.opts, signIn: false });
     try {
-      return await job(session.reader);
+      return await job(session2.reader);
     } finally {
-      await session.close();
+      await session2.close();
     }
   }
   /** The secret the account fingerprints are made with: random, made once on this computer and kept beside the sign-in.
    *  Without it a fingerprint says nothing about the account number, even to someone who knows the number. */
   get secretFile() {
-    return path7.join(path7.dirname(this.file), "secrets.json");
+    return path8.join(path8.dirname(this.file), "secrets.json");
   }
   secret() {
     try {
-      const v = JSON.parse(fs8.readFileSync(this.secretFile, "utf8"));
+      const v = JSON.parse(fs9.readFileSync(this.secretFile, "utf8"));
       if (typeof v.fingerprint === "string" && /^[0-9a-f]{64}$/.test(v.fingerprint)) return v.fingerprint;
     } catch {
     }
@@ -20213,28 +20305,32 @@ var Link = class {
         return x.data;
       };
       const p = parsePortfolio(await data("get_portfolio", { account_number: ids.accountNumber }));
-      const held = parsePositions(await data("get_equity_positions", { account_number: ids.accountNumber })).find((x) => x.symbol === symbol)?.quantity ?? 0;
-      const price = parseQuotes(await data("get_equity_quotes", { symbols: [symbol] })).get(symbol) ?? null;
+      this.noteValue(p.total, now);
+      const all = parsePositions(await data("get_equity_positions", { account_number: ids.accountNumber }));
+      const held = all.find((x) => x.symbol === symbol)?.quantity ?? 0;
+      const quotes = parseQuotes(await data("get_equity_quotes", { symbols: [.../* @__PURE__ */ new Set([symbol, ...all.map((x) => x.symbol)])] }));
+      const price = quotes.get(symbol) ?? null;
       const day2 = (iso2) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date(iso2));
       const ordersToday = parseOrders(await data("get_equity_orders", { account_number: ids.accountNumber })).orders.filter((o) => o.at && day2(o.at) === day2(now.toISOString())).length;
-      return { symbol, accountValue: p.total, buyingPower: p.buyingPower, held, price, ordersToday };
+      return { symbol, accountValue: p.total, buyingPower: p.buyingPower, held, price, ordersToday, positions: all.map((x) => ({ symbol: x.symbol, quantity: x.quantity, price: quotes.get(x.symbol) ?? null })) };
     }
   }
   /** Whether the person has switched trading on, on the dashboard, and their caps. Kept together beside the sign-in, where
    *  agents are refused: a cap missing or out of range is the shipped one, never a larger one. */
   get switchFile() {
-    return path7.join(path7.dirname(this.file), "trading.json");
+    return path8.join(path8.dirname(this.file), "trading.json");
   }
   trading() {
     let v = {};
     try {
-      v = JSON.parse(fs8.readFileSync(this.switchFile, "utf8"));
+      v = JSON.parse(fs9.readFileSync(this.switchFile, "utf8"));
     } catch {
     }
-    return { on: v.on === true, since: v.on === true && typeof v.since === "string" ? v.since : null, caps: capsOf(v.caps) };
+    const off = v.on !== true && typeof v.offBecause?.at === "string" && typeof v.offBecause.words === "string" ? { at: v.offBecause.at, words: v.offBecause.words.slice(0, 300) } : null;
+    return { on: v.on === true, since: v.on === true && typeof v.since === "string" ? v.since : null, caps: capsOf(v.caps), offBecause: off };
   }
-  keepTrading(on, caps) {
-    writePrivate(this.switchFile, JSON.stringify(on ? { on: true, since: this.now(), caps } : { on: false, caps }, null, 2) + "\n");
+  keepTrading(on, caps, offBecause) {
+    writePrivate(this.switchFile, JSON.stringify(on ? { on: true, since: this.now(), caps } : { on: false, caps, ...offBecause ? { offBecause } : {} }, null, 2) + "\n");
     return this.trading();
   }
   setTrading(on) {
@@ -20245,34 +20341,67 @@ var Link = class {
   /** The person's caps, as the dashboard's server checked them (settings.ts capsFrom). The switch is left as it is. */
   setCaps(caps) {
     const was = this.trading();
-    writePrivate(this.switchFile, JSON.stringify({ ...was.on ? { on: true, since: was.since } : { on: false }, caps }, null, 2) + "\n");
+    writePrivate(this.switchFile, JSON.stringify({ ...was.on ? { on: true, since: was.since } : { on: false, ...was.offBecause ? { offBecause: was.offBecause } : {} }, caps }, null, 2) + "\n");
     return this.trading();
+  }
+  /** The Agentic account's value, day by day (New York's), kept beside the sign-in: the day's highest and latest reading,
+   *  for the last fourteen days. When trading is on and the value falls the person's weekly limit below its highest of
+   *  the last seven days, trading switches itself off and says why. A large withdrawal can trip it too; the person
+   *  switches it back on. */
+  get valuesFile() {
+    return path8.join(path8.dirname(this.file), "values.json");
+  }
+  values() {
+    try {
+      const v = JSON.parse(fs9.readFileSync(this.valuesFile, "utf8"));
+      return Array.isArray(v) ? v.filter((d) => !!d && /^\d{4}-\d{2}-\d{2}$/.test(String(d.day)) && Number.isFinite(d.high) && Number.isFinite(d.last)) : [];
+    } catch {
+      return [];
+    }
+  }
+  noteValue(total, now = /* @__PURE__ */ new Date()) {
+    const state = this.trading();
+    if (total === null || !(total > 0)) return state;
+    const day2 = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(d);
+    const today2 = day2(now), weekAgo = day2(new Date(now.getTime() - 7 * 864e5)), twoWeeks = day2(new Date(now.getTime() - 14 * 864e5));
+    const days = this.values().filter((d) => d.day >= twoWeeks && d.day !== today2);
+    const mine = this.values().find((d) => d.day === today2);
+    days.push({ day: today2, high: Math.max(mine?.high ?? 0, total), last: total });
+    days.sort((a, b) => a.day.localeCompare(b.day));
+    writePrivate(this.valuesFile, JSON.stringify(days, null, 2) + "\n");
+    const week = days.filter((d) => d.day >= weekAgo), top = week.reduce((a, d) => d.high > a.high ? d : a, week[0]);
+    const fall = (1 - total / top.high) * 100;
+    if (!state.on || fall < state.caps.weeklyLossPercent) return state;
+    const money2 = (n) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return this.keepTrading(false, state.caps, { at: now.toISOString(), words: `The Agentic account fell ${fall.toFixed(1)}% below its highest value of the last seven days (${money2(top.high)} on ${top.day}, now ${money2(total)}), past your weekly limit of ${state.caps.weeklyLossPercent}%. Trading switched itself off. A large withdrawal can do this too; switch it back on when you are ready.` });
   }
   /** Places one order on the Agentic account, in one session: reads the account afresh, has `approve` check the order on
    *  those figures, and only if every check passes sends it. The caller has already had the person Confirm it. */
   async placeChecked(order, refId, approve) {
     if (!this.trading().on) throw new Error("trading is switched off: switch it on in Your account first");
-    const session = await openSession(this.file, { ...this.opts, signIn: false });
+    const session2 = await openSession(this.file, { ...this.opts, signIn: false });
     try {
-      const context = await this.contextWith(session.reader, order.symbol, /* @__PURE__ */ new Date());
+      const context = await this.contextWith(session2.reader, order.symbol, /* @__PURE__ */ new Date());
+      const now = this.trading();
+      if (!now.on) throw new Error(`trading switched itself off: ${now.offBecause?.words ?? "switch it on in Your account first"}`);
       const failed = approve(context).filter((c) => !c.ok);
       if (failed.length) throw new Error(`the order no longer passes on Robinhood's latest figures: ${failed.map((c) => c.words).join("; ")}`);
-      const placed = await session.placer.place({ accountNumber: this.agenticIds().accountNumber, agentic: true }, order, refId);
+      const placed = await session2.placer.place({ accountNumber: this.agenticIds().accountNumber, agentic: true }, order, refId);
       return { placed, context };
     } finally {
-      await session.close();
+      await session2.close();
     }
   }
   /** Robinhood's own check of an order on the Agentic account. Nothing is placed. */
   async review(order) {
-    const session = await openSession(this.file, { ...this.opts, signIn: false });
+    const session2 = await openSession(this.file, { ...this.opts, signIn: false });
     try {
-      const a = await session.reader.read("get_accounts");
+      const a = await session2.reader.read("get_accounts");
       if (a.failed) throw new Error("Robinhood could not list the accounts");
       this.learn(a.data);
-      return await session.reviewer.review({ accountNumber: this.agenticIds().accountNumber, agentic: true }, order);
+      return await session2.reviewer.review({ accountNumber: this.agenticIds().accountNumber, agentic: true }, order);
     } finally {
-      await session.close();
+      await session2.close();
     }
   }
   /** The last read of the chosen accounts, without asking Robinhood again. */
@@ -20289,6 +20418,8 @@ var Link = class {
           const accounts = this.learn(a.data), show = this.chosen();
           const views = [];
           for (const account of accounts.filter((x) => show.includes(x.key))) views.push(await readAccount(r, account, this.ids.get(account.key)));
+          const agentic = views.find((v) => v.account.agentic);
+          if (agentic) this.noteValue(agentic.portfolio?.total ?? null, this.opts.now?.() ?? /* @__PURE__ */ new Date());
           this.last_snapshot = { at: this.now(), views };
           return this.last_snapshot;
         });
@@ -20327,11 +20458,11 @@ var Link = class {
     this.last = null;
     this.signing = (async () => {
       try {
-        const session = await openSession(this.file, { ...this.opts, signIn: true });
+        const session2 = await openSession(this.file, { ...this.opts, signIn: true });
         try {
-          this.last = this.good(session.reader);
+          this.last = this.good(session2.reader);
         } finally {
-          await session.close();
+          await session2.close();
         }
       } catch (e) {
         this.last = this.bad(e);
@@ -20346,11 +20477,11 @@ var Link = class {
     if (this.signing) return Promise.resolve(this.info());
     this.checking ??= (async () => {
       try {
-        const session = await openSession(this.file, { ...this.opts, signIn: false });
+        const session2 = await openSession(this.file, { ...this.opts, signIn: false });
         try {
-          this.last = this.good(session.reader);
+          this.last = this.good(session2.reader);
         } finally {
-          await session.close();
+          await session2.close();
         }
       } catch (e) {
         this.last = e instanceof NotSignedIn && !this.saved() ? null : this.bad(e);
@@ -20363,9 +20494,10 @@ var Link = class {
   }
   /** Deletes the saved sign-in. Robinhood is not told; the person can also end the access on Robinhood's side. */
   forget() {
-    fs8.rmSync(this.file, { force: true });
-    fs8.rmSync(this.choiceFile, { force: true });
-    if (fs8.existsSync(this.switchFile)) this.setTrading(false);
+    fs9.rmSync(this.file, { force: true });
+    fs9.rmSync(this.choiceFile, { force: true });
+    fs9.rmSync(this.valuesFile, { force: true });
+    if (fs9.existsSync(this.switchFile)) this.setTrading(false);
     this.last = null;
     this.last_snapshot = null;
     this.known = null;
@@ -20375,9 +20507,9 @@ var Link = class {
 };
 
 // src/desk/holdings.ts
-import fs9 from "node:fs";
-import path8 from "node:path";
-var file2 = (dir) => path8.join(dir, "holdings.json");
+import fs10 from "node:fs";
+import path9 from "node:path";
+var file3 = (dir) => path9.join(dir, "holdings.json");
 var finite = (v) => typeof v === "number" && Number.isFinite(v) ? v : void 0;
 function saveAccountHoldings(dir, accounts, today2) {
   let leftOut = 0;
@@ -20403,36 +20535,114 @@ function saveAccountHoldings(dir, accounts, today2) {
   }));
   const tradable = clean.find((a) => a.tradable);
   const saved = { positions: tradable?.positions ?? [], ...tradable?.cash === void 0 ? {} : { cash: tradable.cash }, ...tradable?.currency ? { currency: tradable.currency } : {}, source: "robinhood", savedOn: today2, accounts: clean };
-  fs9.mkdirSync(dir, { recursive: true });
-  writeWhole(file2(dir), JSON.stringify(saved, null, 2) + "\n");
+  fs10.mkdirSync(dir, { recursive: true });
+  writeWhole(file3(dir), JSON.stringify(saved, null, 2) + "\n");
   return { saved, leftOut };
 }
 
-// src/desk/orders.ts
-import fs10 from "node:fs";
-import path9 from "node:path";
-var file3 = (dir) => path9.join(dir, "orders.jsonl");
-var marketDay = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(d);
-function logOrder(dir, line) {
-  fs10.mkdirSync(dir, { recursive: true });
-  fs10.appendFileSync(file3(dir), JSON.stringify(line) + "\n");
+// src/data/company.ts
+function companySymbol(raw) {
+  const sym2 = normalizeSymbol(raw);
+  if (cryptoBase(raw) || /[\^=]/.test(sym2)) throw new NoData(`${sym2} is not a company: a crypto asset, index, future or currency pair has no company accounts`);
+  return sym2;
 }
-function readOrders(dir) {
-  try {
-    return fs10.readFileSync(file3(dir), "utf8").split("\n").flatMap((l) => {
-      try {
-        const v = JSON.parse(l);
-        return v && typeof v.at === "string" && typeof v.symbol === "string" && v.robinhood ? [v] : [];
-      } catch {
-        return [];
+var session = null;
+function yahooSession() {
+  session ??= (async () => {
+    const cookie = await getCookies("https://fc.yahoo.com");
+    if (!cookie) throw new Unavailable("Yahoo Finance gave no session cookie");
+    const crumb = (await getText(`${HOSTS[1]}/v1/test/getcrumb`, { headers: { Cookie: cookie } })).trim();
+    if (!crumb || crumb.length > 64 || /[\s<]/.test(crumb)) throw new Unavailable("Yahoo Finance gave no session key");
+    return { cookie, crumb };
+  })();
+  session.catch(() => {
+    session = null;
+  });
+  return session;
+}
+async function yahooJson(path20) {
+  for (let attempt = 0; ; attempt++) {
+    const s = await yahooSession();
+    try {
+      return await getJson(`${HOSTS[1]}${path20}&crumb=${encodeURIComponent(s.crumb)}`, { headers: { Cookie: s.cookie } });
+    } catch (e) {
+      if (attempt === 0 && /HTTP 401/.test(e.message)) {
+        session = null;
+        continue;
       }
-    });
-  } catch {
-    return [];
+      throw e;
+    }
   }
 }
-var ordersOn = (dir, now) => readOrders(dir).filter((o) => marketDay(new Date(o.at)) === marketDay(now));
-var placedToday = (dir, now) => ordersOn(dir, now).length;
+async function summary(sym2, modules) {
+  const j = await yahooJson(`/v10/finance/quoteSummary/${encodeURIComponent(sym2)}?modules=${modules}`);
+  const r = j.quoteSummary?.result?.[0];
+  if (!r) throw new NoData(`Yahoo Finance has no company data for ${sym2}${j.quoteSummary?.error?.description ? ` (${j.quoteSummary.error.description})` : ""}`);
+  return r;
+}
+async function profileSector(raw) {
+  const r = await summary(companySymbol(raw), "summaryProfile,quoteType");
+  const kind = r.quoteType?.quoteType ?? "";
+  return { sector: r.summaryProfile?.sector?.trim() || null, fund: kind === "ETF" || kind === "MUTUALFUND" };
+}
+
+// src/desk/sectors.ts
+var SECTOR_FUNDS = {
+  XLK: "Technology",
+  XLF: "Financial Services",
+  XLV: "Healthcare",
+  XLE: "Energy",
+  XLI: "Industrials",
+  XLY: "Consumer Cyclical",
+  XLP: "Consumer Defensive",
+  XLU: "Utilities",
+  XLB: "Basic Materials",
+  XLRE: "Real Estate",
+  XLC: "Communication Services"
+};
+var MARKET_FUNDS = /* @__PURE__ */ new Set(["SPY", "VOO", "IVV", "VTI", "ITOT", "SCHB", "QQQ", "DIA", "IWM", "VT", "VXUS", "VEA", "VWO", "EFA", "BND", "AGG"]);
+var ownGroup = (symbol) => ({ name: `own:${symbol}`, label: `${symbol}, whose sector is not known, counted on its own` });
+var Sectors = class {
+  constructor(lookup = profileSector) {
+    this.lookup = lookup;
+  }
+  lookup;
+  known = /* @__PURE__ */ new Map();
+  /** The group of a symbol, if it was looked up already (for a check that must not wait). */
+  cached(symbol) {
+    return this.known.get(symbol);
+  }
+  async of(symbol) {
+    const hit = this.known.get(symbol);
+    if (hit) return hit;
+    let g;
+    if (MARKET_FUNDS.has(symbol)) g = { name: null, label: "a whole-market fund" };
+    else if (SECTOR_FUNDS[symbol]) g = { name: SECTOR_FUNDS[symbol], label: SECTOR_FUNDS[symbol] };
+    else if (isCrypto(symbol)) g = { name: "Crypto", label: "Crypto" };
+    else {
+      try {
+        const p = await this.lookup(symbol);
+        g = !p.fund && p.sector ? { name: p.sector, label: p.sector } : ownGroup(symbol);
+      } catch {
+        return ownGroup(symbol);
+      }
+    }
+    this.known.set(symbol, g);
+    return g;
+  }
+  /** Looks up every symbol at once, so a later sync check finds them all. */
+  async warm(symbols) {
+    await Promise.all([...new Set(symbols)].map((s) => this.of(s)));
+  }
+  /** The sector a buy of `symbol` falls in, and how much the account already holds in it, from what is held now. A
+   *  symbol not looked up yet counts on its own. */
+  context(symbol, positions) {
+    const g = this.known.get(symbol) ?? ownGroup(symbol);
+    const same = (s) => (this.known.get(s) ?? ownGroup(s)).name === g.name;
+    const heldUsd = g.name === null ? 0 : positions.filter((p) => same(p.symbol)).reduce((a, p) => a + p.quantity * (p.price ?? 0), 0);
+    return { ...g, heldUsd: Math.round(heldUsd * 100) / 100 };
+  }
+};
 
 // src/desk/journal.ts
 import fs11 from "node:fs";
@@ -20917,14 +21127,14 @@ function stateOf(root2, day2) {
     summary: summaryOf(e.decision),
     hasReport: hasReport(dir, e.ticker, e.date)
   })).reverse().sort((a, b) => b.date.localeCompare(a.date));
-  const summary = summarize(entries);
+  const summary2 = summarize(entries);
   return {
     version: versionOf(root2),
     today: day2,
     watchlist: readWatchlist(dir),
     queue: queueOf(dir),
     calls,
-    record: { summary, text: renderSummary(summary), benchmarkNote: `Each call is judged after ${s.scoring.holdingPeriodDays} trading days against its market's index.` },
+    record: { summary: summary2, text: renderSummary(summary2), benchmarkNote: `Each call is judged after ${s.scoring.holdingPeriodDays} trading days against its market's index.` },
     desk: { emailSaved: !!readContactEmail(root2), tradingEnabled: false, holdingDays: s.scoring.holdingPeriodDays },
     analyses: { depth: depthOfRounds(s.analysis.debateRounds), perRun: s.routines.maxAnalyses, listener: listenerOf(dir) },
     paper: { ...recordOf(entries.map((e) => ({ ticker: e.ticker, date: e.date, rating: e.rating })), day2), startUsd: readPaperStart(dir), minWeeks: RECORD_WEEKS }
@@ -21421,9 +21631,19 @@ async function startTerminal(opts) {
           }
         }));
       }
-      paperMemo = { key, at: Date.now(), book: paperBook(calls, closes, { startUsd, trading, caps, today: today2 }) };
+      await sectors.warm(calls.filter((c) => followed(c.ticker)).map((c) => c.ticker));
+      paperMemo = { key, at: Date.now(), book: paperBook(calls, closes, { startUsd, trading, caps, today: today2, sectors }) };
     }
     return { ...paperMemo.book, record: recordOf(calls, today2) };
+  };
+  const sectors = opts.sectors ?? new Sectors();
+  const limitedNow = (c) => {
+    const positions = c.positions ?? [], bought = lastBuy(dir, c.symbol, /* @__PURE__ */ new Date());
+    return { ...c, sector: sectors.context(c.symbol, positions), ...bought ? bought : {} };
+  };
+  const limited = async (c) => {
+    await sectors.warm([c.symbol, ...(c.positions ?? []).map((p) => p.symbol)]);
+    return limitedNow(c);
   };
   const queued = (job) => {
     try {
@@ -21437,7 +21657,7 @@ async function startTerminal(opts) {
     try {
       return await job();
     } catch (e) {
-      const m = e instanceof Error ? e.message : "", own2 = /not one of your Robinhood accounts|show your Agentic account|not the Agentic account|not complete, so it was not sent|no longer passes on Robinhood's latest figures|trading is switched off/.test(m);
+      const m = e instanceof Error ? e.message : "", own2 = /not one of your Robinhood accounts|show your Agentic account|not the Agentic account|not complete, so it was not sent|no longer passes on Robinhood's latest figures|trading is switched off|trading switched itself off/.test(m);
       throw new Refused2(own2 ? 400 : 502, own2 ? m : plainFailure(e));
     }
   };
@@ -21602,7 +21822,7 @@ async function startTerminal(opts) {
       const call = new Journal(path18.join(dir, "journal.md")).load().find((e) => e.ticker === symbol && e.date === date4);
       if (!call) throw new Refused2(404, "no such call");
       const trading = readSettings(root2).trading, { caps } = robinhood.trading();
-      const context = { ...await askRobinhood(() => robinhood.ticketContext(symbol)), rating: call.rating, callDate: call.date };
+      const context = await limited({ ...await askRobinhood(() => robinhood.ticketContext(symbol)), rating: call.rating, callDate: call.date });
       const t2 = opened(false, context, propose(context, trading, caps), trading, caps);
       return json(res, 200, { id: t2.id, own: false, context, proposal: t2.proposal, checks: t2.checks, caps });
     }
@@ -21617,7 +21837,7 @@ async function startTerminal(opts) {
       const side = b.side === "buy" || b.side === "sell" ? b.side : null;
       if (!side) throw new Refused2(400, "say whether to buy or to sell");
       const trading = readSettings(root2).trading, { caps } = robinhood.trading();
-      const context = { ...await askRobinhood(() => robinhood.ticketContext(symbol)), rating: "", callDate: "" };
+      const context = await limited({ ...await askRobinhood(() => robinhood.ticketContext(symbol)), rating: "", callDate: "" });
       const t2 = opened(true, context, proposeOwn(context, side, trading), trading, caps);
       return json(res, 200, { id: t2.id, own: true, context, proposal: t2.proposal, checks: t2.checks, caps });
     }
@@ -21639,6 +21859,7 @@ async function startTerminal(opts) {
       t2.review = null;
       t2.reviewedAt = 0;
       if (!passes(checks)) throw new Refused2(400, "the order does not pass every check, so it was not sent to Robinhood");
+      if (checks.some((c) => c.ask) && b.early !== true) throw new Refused2(400, `${o.symbol} was bought here under your shortest hold: press "Sell anyway" to go on`);
       t2.review = await askRobinhood(() => robinhood.review(o));
       t2.reviewedAt = Date.now();
       return json(res, 200, { checks, review: t2.review, confirm: confirmWords(o), trading: robinhood.trading() });
@@ -21651,10 +21872,11 @@ async function startTerminal(opts) {
       if (Date.now() - t2.reviewedAt > REVIEW_MS) throw new Refused2(400, "Robinhood's check is more than five minutes old: review the order again");
       if (!t2.review.answered || t2.review.alerts.length) throw new Refused2(400, "Robinhood raised alerts on this order, so it cannot be placed");
       if (b.confirm !== confirmWords(t2.order)) throw new Refused2(400, "the confirmation does not name this order: nothing was sent");
+      if (t2.checks.some((c) => c.ask) && b.early !== true) throw new Refused2(400, `${t2.order.symbol} was bought here under your shortest hold: press "Sell anyway" to go on`);
       const order = t2.order, trading = readSettings(root2).trading, sentToday = placedToday(dir, /* @__PURE__ */ new Date());
       t2.placing = true;
       try {
-        const { placed } = await askRobinhood(() => robinhood.placeChecked(order, t2.refId, (fresh) => check(order, { ...fresh, rating: t2.context.rating, callDate: t2.context.callDate, ordersToday: Math.max(fresh.ordersToday, sentToday) }, trading, tr.caps)));
+        const { placed } = await askRobinhood(() => robinhood.placeChecked(order, t2.refId, (fresh) => check(order, limitedNow({ ...fresh, rating: t2.context.rating, callDate: t2.context.callDate, ordersToday: Math.max(fresh.ordersToday, sentToday) }), trading, tr.caps)));
         t2.placed = placed;
         logOrder(dir, { at: (/* @__PURE__ */ new Date()).toISOString(), symbol: order.symbol, side: order.side, quantity: order.quantity, limitPrice: order.limitPrice, timeInForce: order.timeInForce, ...t2.own ? { own: true } : { call: { date: t2.context.callDate, rating: t2.context.rating } }, ticket: t2.id, robinhood: { answered: placed.answered, approvalRequired: placed.approvalRequired, orderId: placed.orderId, state: placed.state, error: placed.error } });
         return json(res, 200, { placed });

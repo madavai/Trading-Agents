@@ -53,6 +53,7 @@ interface Summary {
     result?: Array<{
       price?: { longName?: string; shortName?: string; currency?: string; marketCap?: V };
       summaryProfile?: { sector?: string; industry?: string };
+      quoteType?: { quoteType?: string };
       summaryDetail?: Record<string, V>;
       defaultKeyStatistics?: Record<string, V>;
       financialData?: Record<string, V> & { financialCurrency?: string };
@@ -75,6 +76,14 @@ const has = (v: V): v is { raw: number } => typeof v?.raw === 'number' && Number
 const money = (v: V, currency?: string) => (has(v) ? `${v.raw.toLocaleString('en-US', { maximumFractionDigits: 2 })}${currency ? ` ${currency}` : ''}` : null);
 const plain = (v: V) => (has(v) ? String(Number(v.raw.toFixed(4))) : null);
 const percent = (v: V) => (has(v) ? `${(v.raw * 100).toFixed(2)}%` : null);   // Yahoo gives margins, returns and yield as fractions
+
+/** A symbol's sector as Yahoo Finance gives it today, and whether it is a fund. For the dashboard's sector limit, which
+ *  is about now, never for an analysis of a past day. */
+export async function profileSector(raw: string): Promise<{ sector: string | null; fund: boolean }> {
+  const r = await summary(companySymbol(raw), 'summaryProfile,quoteType');
+  const kind = r.quoteType?.quoteType ?? '';
+  return { sector: r.summaryProfile?.sector?.trim() || null, fund: kind === 'ETF' || kind === 'MUTUALFUND' };
+}
 
 export async function companyOverview(raw: string, analysis: string): Promise<string> {
   const day = analysisDate(analysis), sym = companySymbol(raw);

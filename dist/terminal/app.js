@@ -86,8 +86,8 @@
     openTicket: (symbol, date) => call("POST", "/api/ticket", { symbol, date }),
     openOwnTicket: (symbol, side) => call("POST", "/api/ticket/own", { symbol, side }),
     checkTicket: (id, quantity, limitPrice) => call("POST", "/api/ticket/check", { id, quantity, limitPrice }),
-    reviewTicket: (id, quantity, limitPrice) => call("POST", "/api/ticket/review", { id, quantity, limitPrice }),
-    placeTicket: (id, confirm) => call("POST", "/api/ticket/place", { id, confirm }),
+    reviewTicket: (id, quantity, limitPrice, early = false) => call("POST", "/api/ticket/review", { id, quantity, limitPrice, ...early ? { early } : {} }),
+    placeTicket: (id, confirm, early = false) => call("POST", "/api/ticket/place", { id, confirm, ...early ? { early } : {} }),
     trading: () => call("GET", "/api/trading"),
     /** Switching on with under four weeks of record also says the person understood that. */
     setTrading: (on, understood = false) => call("POST", "/api/trading", on ? { on, confirm: "switch trading on", ...understood ? { understood } : {} } : { on }),
@@ -760,26 +760,32 @@
     const c = TR.state?.caps;
     if (!c) return "";
     if (CAPS.editing) return `<div class="at-card-head"><h3>Your caps</h3></div>
-    <p class="at-lede">The most an order may cost, the most of the account one stock may be after a buy, and the most orders in a day. Every ticket is checked against them, and again just before an order is sent. They are kept beside the trading switch, where agents are refused.</p>
+    <p class="at-lede">The most an order may cost, the most of the account one stock or one sector may be after a buy, the most in crypto, the most orders in a day, the fall in a week after which trading switches itself off, and the fewest trading days a stock bought here is held before the desk proposes selling it. Every ticket is checked against them, and again just before an order is sent. They are kept beside the trading switch, where agents are refused.</p>
     <div class="at-row">
       <label class="at-field"><span class="at-field-l">An order at most, $</span><input class="at-input at-box" id="capOrder" type="text" inputmode="decimal" value="${c.perOrderUsd}"></label>
       <label class="at-field"><span class="at-field-l">One stock, % of the account</span><input class="at-input at-box" id="capStock" type="text" inputmode="decimal" value="${c.perStockPercent}"></label>
-      <label class="at-field"><span class="at-field-l">Orders a day</span><input class="at-input at-box" id="capDay" type="number" min="1" max="50" step="1" inputmode="numeric" value="${c.ordersPerDay}"></label></div>
+      <label class="at-field"><span class="at-field-l">One sector, % of the account</span><input class="at-input at-box" id="capSector" type="text" inputmode="decimal" value="${c.perSectorPercent}"></label>
+      <label class="at-field"><span class="at-field-l">Crypto, % of the account</span><input class="at-input at-box" id="capCrypto" type="text" inputmode="decimal" value="${c.cryptoPercent}"></label></div>
+    <div class="at-row">
+      <label class="at-field"><span class="at-field-l">Orders a day</span><input class="at-input at-box" id="capDay" type="number" min="1" max="50" step="1" inputmode="numeric" value="${c.ordersPerDay}"></label>
+      <label class="at-field"><span class="at-field-l">Switch off after a fall in a week of, %</span><input class="at-input at-box" id="capWeek" type="text" inputmode="decimal" value="${c.weeklyLossPercent}"></label>
+      <label class="at-field"><span class="at-field-l">Shortest hold, trading days</span><input class="at-input at-box" id="capHold" type="number" min="0" max="60" step="1" inputmode="numeric" value="${c.minHoldDays}"></label></div>
     <div class="at-row">${rhButton("caps-save", "Save the caps", { primary: true })}${rhButton("caps-cancel", "Cancel")}</div>`;
     return `<div class="at-card-head"><h3>Your caps</h3></div>
     <div class="at-row"><span class="at-chip">${esc(money(c.perOrderUsd))} an order at most</span><span class="at-chip">${esc(String(c.perStockPercent))}% of the account in one stock</span><span class="at-chip">${esc(String(c.ordersPerDay))} ${c.ordersPerDay === 1 ? "order" : "orders"} a day</span></div>
+    <div class="at-row"><span class="at-chip">one sector at most ${esc(String(c.perSectorPercent))}%</span><span class="at-chip">crypto at most ${esc(String(c.cryptoPercent))}%</span><span class="at-chip">switches itself off after a ${esc(String(c.weeklyLossPercent))}% fall in a week</span><span class="at-chip">a stock bought here is held at least ${esc(String(c.minHoldDays))} trading ${c.minHoldDays === 1 ? "day" : "days"}</span></div>
     <div class="at-row">${rhButton("caps-edit", "Change the caps\u2026")}</div>`;
   }
   var capsTyped = () => {
     const n = (id) => Number($(id).value.replace(/[$,%\s]/g, ""));
-    return { perOrderUsd: n("#capOrder"), perStockPercent: n("#capStock"), ordersPerDay: n("#capDay") };
+    return { perOrderUsd: n("#capOrder"), perStockPercent: n("#capStock"), ordersPerDay: n("#capDay"), perSectorPercent: n("#capSector"), cryptoPercent: n("#capCrypto"), weeklyLossPercent: n("#capWeek"), minHoldDays: n("#capHold") };
   };
   function switchBlock() {
     if (tradingOn()) return `<div class="at-card-head"><h3>Trading</h3><span class="at-chip warn">On${TR.state?.since ? ` since ${esc(dayText(TR.state.since))}` : ""}</span></div>
     <p class="at-lede">You can place an order from a ticket, from one of the desk's calls (Decide\u2026) or your own (Trade\u2026), in the Agentic account only, within your caps, after Robinhood's check and your Confirm.</p>
     <div class="at-row">${rhButton("tr-off", "Switch trading off")}</div>`;
     if (!TR.asking) return `<div class="at-card-head"><h3>Trading</h3><span class="at-chip">Off</span></div>
-    <p class="at-lede">With trading off, a ticket can be checked by Robinhood but never placed.</p>${recordLine()}<div class="at-row">${rhButton("tr-ask", "Switch trading on\u2026")}</div>`;
+    ${TR.state?.offBecause ? `<p class="at-honest bad">${esc(TR.state.offBecause.words)}</p>` : ""}<p class="at-lede">With trading off, a ticket can be checked by Robinhood but never placed.</p>${recordLine()}<div class="at-row">${rhButton("tr-ask", "Switch trading on\u2026")}</div>`;
     return `<div class="at-card-head"><h3>Switch trading on?</h3></div>
     <p class="at-lede">From then on, a ticket you open, from one of the desk's calls or your own, can place a real order with real money in your Agentic account. Every order still needs Robinhood's check with no alerts, your caps, and your own Confirm naming the exact order. Keep Robinhood's approval on your phone switched on until you trust the desk. This is not investment advice.</p>
     ${recordLine()}${young() ? `<p class="at-honest bad">That is under ${S.desk?.paper.minWeeks ?? 4} weeks: too little to tell whether the desk's calls are any good. Read your paper record first.</p><div class="at-row">${TR.understood ? '<span class="at-chip ok">You understand</span>' : rhButton("tr-understood", "I understand")}</div>` : ""}
@@ -794,13 +800,13 @@
     renderTrading();
     renderAccount();
   }
-  var T = { open: null, checks: [], review: null, quantity: 0, limit: 0, busy: false, timer: 0, confirm: "", confirming: false, placed: null };
+  var T = { open: null, checks: [], review: null, quantity: 0, limit: 0, busy: false, timer: 0, confirm: "", confirming: false, placed: null, early: false };
   var hasAgentic = () => !!A.snapshot?.views.some((v) => v.account.agentic);
   function renderTicketDyn() {
     const t = T.open;
     if (!t) return;
-    const ok = T.checks.length > 0 && T.checks.every((c) => c.ok);
-    const checks = t.proposal.order ? `<div class="at-card-head"><h3>Your checks</h3></div><div class="at-row">${T.checks.map((c) => `<span class="at-chip ${c.ok ? "ok" : "danger"}">${esc(c.words)}</span>`).join("")}</div>` : "";
+    const asks = T.checks.filter((c) => c.ask), ok = T.checks.length > 0 && T.checks.every((c) => c.ok) && (!asks.length || T.early);
+    const checks = t.proposal.order ? `<div class="at-card-head"><h3>Your checks</h3></div><div class="at-row">${T.checks.map((c) => `<span class="at-chip ${c.ask ? "warn" : c.ok ? "ok" : "danger"}">${esc(c.words)}</span>`).join("")}</div>` : "";
     const r = T.review;
     const review = r ? `<div class="at-card at-box"><div class="at-card-head"><h3>Robinhood's check</h3>${!r.answered ? '<span class="at-chip danger">Robinhood reported an error</span>' : r.alerts.length ? `<span class="at-chip danger">${r.alerts.length} alert(s)</span>` : '<span class="at-chip ok">No alerts</span>'}</div>
       ${r.error ? `<p class="at-honest bad">${esc(r.error)}</p>` : ""}${r.alerts.map((a) => `<p class="at-honest bad">${esc(a)}</p>`).join("")}
@@ -817,6 +823,7 @@
     if (p) buttons = "";
     else if (clean && tradingOn() && T.confirming) buttons = `<button class="at-btn at-press" data-act="tk-back">Back</button><button class="at-btn at-press primary" data-act="tk-confirm"${T.busy ? " disabled" : ""}>${T.busy ? "Sending to Robinhood\u2026" : `Confirm: ${esc(T.confirm)}`}</button>`;
     else if (clean && tradingOn()) buttons = `<button class="at-btn at-press primary" data-act="tk-place">Place order\u2026</button>`;
+    else if (t.proposal.order && asks.length && !T.early) buttons = `<button class="at-btn at-press" data-act="tk-early">Sell anyway</button>`;
     else if (t.proposal.order) buttons = `<button class="at-btn at-press primary" data-act="tk-review"${ok && !T.busy ? "" : " disabled"}>${T.busy ? "Asking Robinhood\u2026" : r ? "Review again" : "Review with Robinhood"}</button>`;
     const note = p ? "" : clean && !tradingOn() ? '<p class="at-honest">Trading is switched off, so this order cannot be placed: switch it on in Your account first.</p>' : clean && T.confirming ? `<p class="at-honest">Pressing Confirm sends a real order with real money to Robinhood${r?.approvalRequired === false ? ", and Robinhood will not ask you again on your phone" : ""}.</p>` : "";
     $("#tkDyn").innerHTML = `${checks}${review}${placed}${note}
@@ -829,7 +836,7 @@
     T.busy = true;
     renderTicketDyn();
     try {
-      T.placed = (await api.placeTicket(t.id, T.confirm)).placed;
+      T.placed = (await api.placeTicket(t.id, T.confirm, T.early)).placed;
       toast(T.placed.answered ? "The order is with Robinhood." : "Robinhood refused the order.", T.placed.answered ? "ok" : "bad");
       void readAccounts();
       void loadTrading();
@@ -865,6 +872,7 @@
     T.confirming = false;
     T.placed = null;
     T.confirm = "";
+    T.early = false;
     $("#tkHead").innerHTML = `<p class="at-quiet">Reading the Agentic account and the live price from Robinhood.</p>`;
     $("#tkFields").innerHTML = "";
     $("#tkDyn").innerHTML = "";
@@ -903,7 +911,7 @@
     T.busy = true;
     renderTicketDyn();
     try {
-      const r = await api.reviewTicket(t.id, T.quantity, T.limit);
+      const r = await api.reviewTicket(t.id, T.quantity, T.limit, T.early);
       T.checks = r.checks;
       T.review = r.review;
       T.confirm = r.confirm;
@@ -1644,6 +1652,10 @@
         break;
       case "tk-back":
         T.confirming = false;
+        renderTicketDyn();
+        break;
+      case "tk-early":
+        T.early = true;
         renderTicketDyn();
         break;
       case "tk-confirm":
