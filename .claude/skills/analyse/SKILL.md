@@ -35,7 +35,7 @@ Each agent is called with the Agent tool, `subagent_type` set to its name. Every
 
 | Step | Agent | Add to the request |
 |---|---|---|
-| market, sentiment, news, fundamentals | market-analyst, sentiment-analyst, news-analyst, fundamentals-analyst | Start all of this run's analysts at once, in one message. |
+| market, sentiment, news, fundamentals | market-analyst, sentiment-analyst, news-analyst, fundamentals-analyst | Start all of this run's analysts at once, in one message, and name in each request the analysts working in this run, so they can tell each other what to weigh. |
 | bull (turn n), bear (turn n) | bull-researcher, bear-researcher | "This is turn n of N." Run them one at a time, bull first, in turn. |
 | research_plan | research-manager | |
 | trader | trader | The plan's holdings block, word for word. |

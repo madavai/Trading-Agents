@@ -72,6 +72,23 @@ test('every agent carries the desk\'s rules and saves the section the plan expec
   }
 });
 
+test('the team talks only with a reason: analysts tell each other what to weigh (at most two, noted in their report), anyone stuck asks the lead, and the lead answers without a figure', () => {
+  const s = src as unknown as { ANALYST_TALK: string; ANALYSTS: string[] };
+  assert.deepEqual(s.ANALYSTS, ['market-analyst', 'sentiment-analyst', 'news-analyst', 'fundamentals-analyst']);
+  for (const agent of src.AGENTS) {
+    const { text } = front(agent.file), analyst = s.ANALYSTS.includes(agent.file);
+    assert.equal(text.includes(s.ANALYST_TALK), analyst, `${agent.file}: only the analysts, who read at the same time, are given reasons to message each other`);
+    assert.match(text, /If you are stuck .* do not guess: ask the lead, the agent that started you, one short question with SendMessage, write the same question into your work/, agent.file);
+    assert.match(text, /Never send a message without a purpose: no greetings, progress reports or summaries/, agent.file);
+    assert.match(text, /If you have no SendMessage tool, the team does not talk in this run/, `${agent.file}: with the talk switch off, silence`);
+  }
+  for (const rule of ['At most two in this run', 'never carries a figure of your own', 'Only to an analyst the request names', 'under "Told the other analysts"', 'say in one line of your report what you did with it']) assert.ok(s.ANALYST_TALK.includes(rule), rule);
+  const lead = front('trading-desk').text;
+  assert.match(lead, /## When a member asks you\n\nA member may message you while it works, when it is stuck/);
+  assert.match(lead, /never with a figure of your own: figures come only from desk tools/);
+  assert.match(lead, /name in each request the analysts working in this run, so they can tell each other what to weigh/, 'the lead names who is reading, so analysts know whom to tell');
+});
+
 test('the labelled lines the journal and report read are the ones the agents are asked to write', () => {
   const body = (f: string) => src.AGENTS.find((a) => a.file === f)!.body;
   assert.match(body('portfolio-manager'), /\*\*Rating\*\*: exactly one of Buy \/ Overweight \/ Hold \/ Underweight \/ Sell/);

@@ -90,6 +90,12 @@ other source sees it.
 
 Choose `shallow`, `medium` or `deep` (1, 3 or 5 rounds of debate), which analysts run, and the report language.
 
+The agents talk only when it does work the written record cannot. The four analysts read at the same time, so when one
+finds something another should weigh ("a recall was announced on the 14th: weigh the reaction since then"), it says
+so: at most two short messages each, pointing at a source or a date, never a figure of their own, and each noted in the
+sender's report so you see it on the dashboard. Any member that is stuck asks the lead instead of guessing. In Madav,
+the team's "talk" switch shows these messages in the Messages panel; with it off, the team works in silence.
+
 ## One call, from question to order
 
 <a href="https://madavai.github.io/Trading-Agents/inside-the-trading-desk.html#journey">
