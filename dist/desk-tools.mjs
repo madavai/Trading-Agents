@@ -36821,13 +36821,13 @@ function driftOf(root, shipped) {
   return { changed, missing };
 }
 function resetAgentFiles(root, shipped) {
-  const { changed, missing } = driftOf(root, shipped), wrote = [...changed, ...missing];
-  for (const p of wrote) {
+  const { changed, missing } = driftOf(root, shipped);
+  for (const [p, text3] of shipped) {
     const file5 = path5.join(root, p);
     fs4.mkdirSync(path5.dirname(file5), { recursive: true });
-    fs4.writeFileSync(file5, shipped.get(p));
+    fs4.writeFileSync(file5, text3);
   }
-  return wrote;
+  return [...changed, ...missing];
 }
 function plainName(p) {
   const base = path5.basename(p);
@@ -36871,7 +36871,7 @@ function agentsLine(drift) {
   if (typeof drift === "string") return { ok: false, text: `The desk's agents could not be compared with the project's version: ${drift}` };
   const off = [...drift.changed, ...drift.missing].map(plainName);
   if (!off.length) return { ok: true, text: "The desk's agents and the trading-desk team are as the project ships them" };
-  return { ok: false, text: `${off.length === 1 ? "One of the desk's agent files differs" : `${off.length} of the desk's agent files differ`} from the project's version (${listed(off)}). A save in Madav's Agent Studio can do this. Ask the desk to reset the team to put them back` };
+  return { ok: false, text: `${off.length === 1 ? "One of the desk's agent files differs" : `${off.length} of the desk's agent files differ`} from the project's version (${listed(off)}). An edit, or an older version of Madav, can do this. Ask the desk to reset the team to put them back` };
 }
 function render(lines, sources) {
   const mark = (ok) => ok ? "OK " : "NO ";
@@ -38832,12 +38832,19 @@ var LISTENER_FRESH_MS = 3 * 6e4;
 function readListener(dir, now = /* @__PURE__ */ new Date()) {
   try {
     const v = JSON.parse(fs11.readFileSync(listenerFile(dir), "utf8"));
-    const listener = words(v.listener, 40), since = iso(v.since), beat = iso(v.beat) ?? since;
+    const listener = words(v.listener ?? v.listening, 40), since = iso(v.since), beat = iso(v.beat) ?? iso(v.checked) ?? since;
     if (!listener || !since || !beat) return null;
     const note = { listener, since, beat, fresh: now.getTime() - Date.parse(beat) <= LISTENER_FRESH_MS };
     if (Number.isInteger(v.pid) && v.pid > 0) note.pid = v.pid;
-    const last = v.lastRun, lastAt = iso(last?.at), result = words(last?.result, 200), started = iso(last?.started);
-    if (lastAt && result) note.lastRun = { ...started && Date.parse(started) <= Date.parse(lastAt) ? { started } : {}, at: lastAt, result };
+    const last = v.lastRun;
+    if (typeof last?.ended === "string") {
+      const began = iso(last.at), ended = iso(last.endedAt), how = { failed: "failed", stopped: "stopped" }[last.ended];
+      const result = words([how, words(last.result, 200)].filter(Boolean).join(": "), 200) ?? "finished";
+      if (began) note.lastRun = ended && Date.parse(began) <= Date.parse(ended) ? { started: began, at: ended, result } : { at: began, result };
+    } else {
+      const lastAt = iso(last?.at), result = words(last?.result, 200), started = iso(last?.started);
+      if (lastAt && result) note.lastRun = { ...started && Date.parse(started) <= Date.parse(lastAt) ? { started } : {}, at: lastAt, result };
+    }
     return note;
   } catch {
     return null;
@@ -39619,7 +39626,7 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root) {
   }, async () => text2(await deskCheck(root, fetchImpl2, source)));
   server.registerTool("reset_team", {
     title: "Reset the team",
-    description: "Put the desk's twelve agents, the trading-desk team's file and its line-up back exactly as the project ships them, when they were changed (a save in Madav's Agent Studio can do it). Only after the person asked for it and confirmed it in this conversation. It writes only those files in this folder and cannot change Madav's own saved settings for the team.",
+    description: "Put the desk's twelve agents, the trading-desk team's file and its line-up back exactly as the project ships them: each file is written again, even one that already matches, which also brings Madav back to the project's version of the team in place of changes made in its Agent Studio. Only after the person asked for it and confirmed it in this conversation. It writes only those files in this folder; the model, permissions and effort the person chose in Madav stay theirs.",
     inputSchema: { confirmed: external_exports.literal(true).describe("true: the person confirmed this reset in this conversation") },
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false }
   }, async () => {
@@ -39629,10 +39636,11 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root) {
     } catch (e) {
       return text2(`The team could not be reset: ${e.message}. Nothing was changed.`);
     }
-    if (!wrote.length) return text2("The desk's agents and the trading-desk team already match the project's version. Nothing was changed.");
+    const madav = "Madav goes back to the project's version of the team too, in place of changes made in its Agent Studio; the model, permissions and effort chosen there stay as they are. If Madav runs the desk's routines, it pauses them until they are switched on again in Madav.";
+    if (!wrote.length) return text2(["The desk's agent files already matched the project's version on this computer; each was written again as the project ships it.", madav].join("\n"));
     return text2([
-      `Put back as the project ships them: ${listed(wrote.map(plainName))}.`,
-      "They take effect from the next conversation or run. Madav keeps its own saved settings for the team, which this cannot change: until Madav can reset them itself, do not press Save on the trading-desk team in Agent Studio, or it may write its settings into these files again."
+      `Put back as the project ships them: ${listed(wrote.map(plainName))}; the others were written again too.`,
+      `They take effect from the next conversation or run. ${madav}`
     ].join("\n"));
   });
   server.registerTool("set_contact_email", {

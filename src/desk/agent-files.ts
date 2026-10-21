@@ -1,7 +1,9 @@
 // The desk's agent files - the twelve agents, the trading-desk team's file and its line-up - against the project's own
-// version of them. Madav's Agent Studio writes into a team's files when the person saves it, so the desk check says when
-// they differ and reset_team writes the project's version back. The project's version comes from its own source
-// (scripts/team-files.mjs and the skills, what `npm run agents` writes), so nothing here keeps a second copy to drift.
+// version of them. Madav keeps what the person changes in Agent Studio inside Madav, and goes back to the project's
+// version of a file whenever that file is written after the change; so reset_team writes every one of them again, even
+// one that already matches, and Madav's runs return to the project's version too. The desk check still says when a file
+// on disk differs (an edit by hand, or an older Madav that wrote into them). The project's version comes from its own
+// source (scripts/team-files.mjs and the skills, what `npm run agents` writes), so nothing here keeps a second copy.
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -28,16 +30,16 @@ export function driftOf(root: string, shipped: AgentFiles): Drift {
   return { changed, missing };
 }
 
-/** Writes the project's version back over the desk's agent files that differ or are missing, and nothing else; returns
- *  the ones it wrote. */
+/** Writes the project's version of every desk agent file again, those that match too (a fresh write is what tells Madav
+ *  to go back to the project's version), and nothing else; returns the ones that differed or were missing. */
 export function resetAgentFiles(root: string, shipped: AgentFiles): string[] {
-  const { changed, missing } = driftOf(root, shipped), wrote = [...changed, ...missing];
-  for (const p of wrote) {
+  const { changed, missing } = driftOf(root, shipped);
+  for (const [p, text] of shipped) {
     const file = path.join(root, p);
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, shipped.get(p)!);
+    fs.writeFileSync(file, text);
   }
-  return wrote;
+  return [...changed, ...missing];
 }
 
 /** A file's name as a person reads it: the agent's name, or "the team's line-up". */

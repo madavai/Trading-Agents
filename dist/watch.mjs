@@ -308,12 +308,19 @@ var LISTENER_FRESH_MS = 3 * 6e4;
 function readListener(dir2, now = /* @__PURE__ */ new Date()) {
   try {
     const v = JSON.parse(fs3.readFileSync(listenerFile(dir2), "utf8"));
-    const listener = words(v.listener, 40), since = iso(v.since), beat = iso(v.beat) ?? since;
+    const listener = words(v.listener ?? v.listening, 40), since = iso(v.since), beat = iso(v.beat) ?? iso(v.checked) ?? since;
     if (!listener || !since || !beat) return null;
     const note = { listener, since, beat, fresh: now.getTime() - Date.parse(beat) <= LISTENER_FRESH_MS };
     if (Number.isInteger(v.pid) && v.pid > 0) note.pid = v.pid;
-    const last = v.lastRun, lastAt = iso(last?.at), result = words(last?.result, 200), started = iso(last?.started);
-    if (lastAt && result) note.lastRun = { ...started && Date.parse(started) <= Date.parse(lastAt) ? { started } : {}, at: lastAt, result };
+    const last = v.lastRun;
+    if (typeof last?.ended === "string") {
+      const began = iso(last.at), ended = iso(last.endedAt), how = { failed: "failed", stopped: "stopped" }[last.ended];
+      const result = words([how, words(last.result, 200)].filter(Boolean).join(": "), 200) ?? "finished";
+      if (began) note.lastRun = ended && Date.parse(began) <= Date.parse(ended) ? { started: began, at: ended, result } : { at: began, result };
+    } else {
+      const lastAt = iso(last?.at), result = words(last?.result, 200), started = iso(last?.started);
+      if (lastAt && result) note.lastRun = { ...started && Date.parse(started) <= Date.parse(lastAt) ? { started } : {}, at: lastAt, result };
+    }
     return note;
   } catch {
     return null;

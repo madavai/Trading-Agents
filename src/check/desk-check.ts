@@ -57,7 +57,7 @@ export function agentsLine(drift: Drift | string): Line {
   if (typeof drift === 'string') return { ok: false, text: `The desk's agents could not be compared with the project's version: ${drift}` };
   const off = [...drift.changed, ...drift.missing].map(plainName);
   if (!off.length) return { ok: true, text: "The desk's agents and the trading-desk team are as the project ships them" };
-  return { ok: false, text: `${off.length === 1 ? 'One of the desk\'s agent files differs' : `${off.length} of the desk's agent files differ`} from the project's version (${listed(off)}). A save in Madav's Agent Studio can do this. Ask the desk to reset the team to put them back` };
+  return { ok: false, text: `${off.length === 1 ? 'One of the desk\'s agent files differs' : `${off.length} of the desk's agent files differ`} from the project's version (${listed(off)}). An edit, or an older version of Madav, can do this. Ask the desk to reset the team to put them back` };
 }
 
 export function render(lines: Line[], sources: ProbeResult[]): string {

@@ -8,7 +8,7 @@ argument-hint: morning|evening
 
 The person asked: $ARGUMENTS
 
-A routine may be started by Madav's scheduler with no one watching. Never wait for an answer: if a step needs the person (for example no contact email is saved), skip what depends on it and say so at the end. Nothing in a routine places, changes or cancels an order.
+A routine may be started by Madav's scheduler with no one watching. Never wait for an answer: if a step needs the person (for example no contact email is saved), skip what depends on it and say so at the end. Nothing in a routine places, changes or cancels an order. End your answer with one short line on its own that sums the routine up, for example `3 analysed, 1 skipped, 2 scored` or `2 calls today, 1 order sent, 4 to score`: a routine shows the last line as the run's result.
 
 ## Morning routine
 Asked for as "the morning routine", "morning", or at the start of a market day.

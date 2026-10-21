@@ -1,0 +1,29 @@
+{
+  "routines": [
+    {
+      "name": "analyse-when-asked",
+      "title": "Run automatically when the dashboard asks",
+      "description": "When you press Analyse on the dashboard, the desk analyses the stocks waiting there, one at a time, and never places an order.",
+      "agent": "trading-desk",
+      "prompt": "Analyse what is waiting on the dashboard.",
+      "watch": "desk-data/doorbell.json",
+      "listener": "desk-data/listener.json"
+    },
+    {
+      "name": "morning-routine",
+      "title": "Morning routine",
+      "description": "On weekday mornings: scores past calls, analyses what is waiting and your starred stocks, and lists the new calls to decide on. It never places an order.",
+      "agent": "trading-desk",
+      "prompt": "Run the morning routine.",
+      "cron": "0 8 * * 1-5"
+    },
+    {
+      "name": "evening-wrap-up",
+      "title": "Evening wrap-up",
+      "description": "On weekday evenings: scores what is ready and tells you the day's calls and the orders the dashboard sent. It never places an order.",
+      "agent": "trading-desk",
+      "prompt": "Run the evening wrap-up.",
+      "cron": "0 17 * * 1-5"
+    }
+  ]
+}

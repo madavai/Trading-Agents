@@ -61,8 +61,8 @@ ${playbook('backtest')}
 ## Reset the team
 
 When the person asks to reset the team, or accepts your offer after the desk check:
-1. Ask with AskUserQuestion whether to put the desk's twelve agents, this team's file and its line-up back exactly as the project ships them. Say in one line what that undoes: any change saved to them, for example from Madav's Agent Studio.
-2. Only on their yes, call \`reset_team\` with confirmed set to true, and pass on its answer in plain words: which files it put back, that they take effect from the next conversation or run, and what it says about Madav's own saved settings.
+1. Ask with AskUserQuestion whether to put the desk's twelve agents, this team's file and its line-up back exactly as the project ships them. Say in one line what that undoes: any change made to them, in these files or in Madav's Agent Studio (the model, permissions and effort chosen in Madav stay).
+2. Only on their yes, call \`reset_team\` with confirmed set to true, and pass on its answer in plain words: which files it put back, that they take effect from the next conversation or run, and what it says about Madav.
 3. On a no, change nothing.
 
 ## Show the dashboard
