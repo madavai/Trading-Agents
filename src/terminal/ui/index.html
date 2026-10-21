@@ -49,6 +49,9 @@
     <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></symbol>
     <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M12 4v1.5M5.6 6.6l1 1M18.4 6.6l-1 1M4 12h1.5"/><path d="M8.5 12a3.5 3.5 0 0 1 6.6-1.6"/><path d="M17.5 20H9a4 4 0 1 1 .9-7.9 5 5 0 0 1 9.6 1.9 3 3 0 0 1-2 6Z"/></symbol>
     <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 2 10 5-10 5L2 7z"/><path d="m2 12 10 5 10-5"/><path d="m2 17 10 5 10-5"/></symbol>
+    <symbol id="i-steps" viewBox="0 0 24 24"><path d="m3 6 1.5 1.5L7 5M3 12l1.5 1.5L7 11M3 18l1.5 1.5L7 17M11 6h10M11 12h10M11 18h10"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 19.5V5a2 2 0 0 1 2-2h14v15H6a2 2 0 0 0-2 2 2 2 0 0 0 2 2h14v-4"/><path d="M8 7h8M8 11h5"/></symbol>
+    <symbol id="i-tick" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
   </defs>
 </svg>
 
@@ -64,6 +67,8 @@
         <nav class="at-list" aria-label="Sections">
           <div class="at-lh"><span>The desk</span></div>
           <button class="at-li" data-act="goto" data-to="top" id="navOverview" aria-current="page"><svg class="g"><use href="#i-grid"/></svg><span class="at-li-t">Overview</span></button>
+          <button class="at-li" data-act="guide-open"><svg class="g"><use href="#i-steps"/></svg><span class="at-li-t">Get started</span><small id="guideCount"></small></button>
+          <button class="at-li" data-act="gloss-open"><svg class="g"><use href="#i-book"/></svg><span class="at-li-t">What does this mean?</span></button>
           <button class="at-li" data-act="goto" data-to="sec-start"><svg class="g"><use href="#i-layers"/></svg><span class="at-li-t">Start here</span></button>
           <button class="at-li" data-act="goto" data-to="sec-morning"><svg class="g"><use href="#i-cloud"/></svg><span class="at-li-t">This morning</span></button>
           <button class="at-li" data-act="goto" data-to="sec-score"><svg class="g"><use href="#i-target"/></svg><span class="at-li-t">Scorecard</span></button>
@@ -86,6 +91,8 @@
       <button class="icon-btn" data-act="view" data-view="account" aria-label="Your account" title="Your account"><svg class="g"><use href="#i-wallet"/></svg><span class="at-dot" id="railDot"></span></button>
       <span class="ta-rail-rule"></span>
       <button class="icon-btn" data-act="goto" data-to="top" aria-label="Overview" title="Overview"><svg class="g"><use href="#i-grid"/></svg></button>
+      <button class="icon-btn" data-act="guide-open" aria-label="Get started" title="Get started"><svg class="g"><use href="#i-steps"/></svg></button>
+      <button class="icon-btn" data-act="gloss-open" aria-label="What does this mean?" title="What does this mean?"><svg class="g"><use href="#i-book"/></svg></button>
       <button class="icon-btn" data-act="goto" data-to="sec-start" aria-label="Start here" title="Start here"><svg class="g"><use href="#i-layers"/></svg></button>
       <button class="icon-btn" data-act="goto" data-to="sec-morning" aria-label="This morning" title="This morning"><svg class="g"><use href="#i-cloud"/></svg></button>
       <button class="icon-btn" data-act="goto" data-to="sec-score" aria-label="Scorecard" title="Scorecard"><svg class="g"><use href="#i-target"/></svg></button>
@@ -137,6 +144,11 @@
             </form>
           </div>
 
+          <section class="at-section hide" id="sec-guide">
+            <div class="at-sect-head"><div class="at-head-words"><h2>Get started</h2><p id="guideSub"></p></div><div class="at-head-tail" id="guideDo"></div></div>
+            <div class="at-card at-box" id="guideCard"></div>
+          </section>
+
           <section class="at-section" id="sec-today" aria-label="Your desk today">
             <div class="at-deck ta-deck-4" id="todayDeck"></div>
           </section>
@@ -147,7 +159,7 @@
           </section>
 
           <section class="at-section" id="sec-start">
-            <div class="at-sect-head"><div class="at-head-words"><h2>Start here</h2><p>The whole market first, then its parts, then single companies: the broadest risk is the steadiest. Press one to chart it · the robot asks the desk to analyse it</p></div></div>
+            <div class="at-sect-head"><div class="at-head-words"><h2>Start here</h2><p>The whole market first, then its parts, then single companies: the broadest risk is the steadiest. Press one to chart it · the robot asks the desk to analyse it · + adds it to your watchlist</p></div></div>
             <div class="at-card at-box ta-tiers" id="startHere"></div>
           </section>
 
@@ -160,7 +172,7 @@
           </section>
 
           <section class="at-section" id="sec-score">
-            <div class="at-sect-head"><div class="at-head-words"><h2>How the desk is doing</h2><p id="scoreSub"></p></div><div class="at-head-tail" id="paperDo"></div></div>
+            <div class="at-sect-head"><div class="at-head-words"><h2><span class="ta-term" data-term="scorecard">How the desk is doing</span></h2><p id="scoreSub"></p></div><div class="at-head-tail" id="paperDo"></div></div>
             <div class="at-card at-box" id="paperCard"></div>
             <div class="at-card at-box" id="score"></div>
           </section>
@@ -187,9 +199,9 @@
                 <div class="at-seg" id="rangeSeg" role="tablist" aria-label="Time range"></div>
                 <div class="ta-toolbar-end">
                   <div class="ta-legend" id="heroLegend">
-                    <button class="at-chip at-press on" data-act="layer" data-layer="ma50"><span class="ta-swatch ma50-sw"></span>50-day average</button>
-                    <button class="at-chip at-press on" data-act="layer" data-layer="ma200"><span class="ta-swatch dash ma200-sw"></span>200-day average</button>
-                    <button class="at-chip at-press on" data-act="layer" data-layer="vol">Volume</button>
+                    <button class="at-chip at-press on" data-act="layer" data-layer="ma50" data-term="average"><span class="ta-swatch ma50-sw"></span>50-day average</button>
+                    <button class="at-chip at-press on" data-act="layer" data-layer="ma200" data-term="average"><span class="ta-swatch dash ma200-sw"></span>200-day average</button>
+                    <button class="at-chip at-press on" data-act="layer" data-layer="vol" data-term="volume">Volume</button>
                   </div>
                   <div class="at-seg" id="kindSeg" role="tablist" aria-label="Chart kind">
                     <button class="at-seg-b on" data-act="kind" data-kind="area">Area</button>
@@ -225,7 +237,7 @@
           </section>
 
 
-          <p class="at-honest">Prices come from Yahoo Finance and may be up to 15 minutes late. Nothing here is investment advice. <span id="tradeFoot">This page places no order: trading is switched off.</span></p>
+          <p class="at-honest">Prices come from Yahoo Finance and may be up to 15 minutes late. Point at a dotted word or a rating for what it means, or open "What does this mean?" in the side list. Nothing here is investment advice. <span id="tradeFoot">This page places no order: trading is switched off.</span></p>
         </div>
 
         <div class="at-page-col" id="view-account" hidden>
@@ -256,6 +268,7 @@
 <dialog class="at-pop l" id="callDialog" aria-label="A call in full"></dialog>
 <dialog class="at-pop" id="ticketDialog" aria-label="Order ticket"><div id="tkHead"></div><div id="tkFields"></div><div id="tkDyn"></div></dialog>
 <dialog class="at-pop s" id="askDialog" aria-labelledby="askTitle"></dialog>
+<dialog class="at-pop l" id="glossDialog" aria-labelledby="glossTitle"></dialog>
 <dialog class="at-pop s" id="stopDialog" aria-labelledby="stopTitle">
   <h2 id="stopTitle">Stop the dashboard?</h2>
   <p class="at-lede">It closes on this computer. Nothing is lost: your watchlist, your choices and the desk's calls all stay. To open it again, ask the trading-desk team to "open the dashboard", or run /terminal.</p>

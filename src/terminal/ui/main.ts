@@ -4,7 +4,8 @@
 // (Decide…) or the person's own (Trade…) - and is placed only on their Confirm, with trading switched on by them.
 import { api, ApiError, claimKey, hasKey, KEY_LOST, type CallDetail, type DeskState, type Depth, type History, type LinkInfo, type Market, type Match, type Prefs, type Caps, type PaperView, type PaperTrade, type QueueView, type QuoteResult, type Account, type AccountView, type Holding, type Order, type Recent, type Snapshot, type TicketOpen, type Check, type Review, type Placed, type Trading, type Tier, type TierItem, type TierView, type Worth, type Screen, type Weather, type WeatherLine, type HoldingCare } from './api.js';
 import { heroChart, paperChart, sparkline } from './chart.js';
-import { barOn, clock, dayText, esc, labelled, money, num, opening, pct, plain, ratingMeaning, ratingTone, SECTION_NAMES, shortDay, tone, WORDS } from './fmt.js';
+import { barOn, clock, dayText, esc, labelled, money, NOTES, num, opening, pct, plain, ratingMeaning, ratingTone, SECTION_NAMES, shortDay, tone } from './fmt.js';
+import { GLOSSARY, glossaryGroups, isTerm, means, type TermKey } from './glossary.js';
 import { markdown } from './md.js';
 import { isCrypto } from '../../data/symbols.js';
 import type { Quote } from '../quotes.js';
@@ -107,15 +108,18 @@ function adopt(p: Prefs): void {
     ...(p.theme ? { theme: p.theme } : {}), ...(p.side ? { side: p.side } : {}), ...(p.view ? { view: p.view } : {}), ...(p.symbol ? { symbol: p.symbol } : {}),
     range: S.range, kind: S.kind, layers: { ...S.layers }, recent: Array.isArray(p.recent) ? p.recent.slice(0, RECENT_MAX) : P.recent ?? [],
     ...(Array.isArray(p.folded) ? { folded: TIER_KEYS.filter((t) => p.folded!.includes(t)) } : {}),
+    ...(p.guide === 'open' || p.guide === 'away' ? { guide: p.guide } : {}),
   });
 }
 
 // ---------- pieces ----------
+/** A trading word with its plain meaning from the glossary, shown when the person points at it. */
+const term = (key: TermKey, words: string = GLOSSARY[key].term) => `<span class="ta-term" title="${esc(means(key))}">${esc(words)}</span>`;
 /** A rating as a chip; pointing at it says what it means. */
 const ratingChip = (r: string) => `<span class="at-chip ${ratingTone(r)}"${ratingMeaning(r) ? ` title="${esc(ratingMeaning(r))}"` : ''}>${esc(r)}</span>`;
-const changeChip = (q: Quote | null) => (q && q.changePct !== null ? `<span class="at-chip ${tone(q.changePct)}" title="${esc(WORDS.today)}">${pct(q.changePct)}</span>` : `<span class="at-chip" title="${esc(WORDS.today)}">—</span>`);
+const changeChip = (q: Quote | null) => (q && q.changePct !== null ? `<span class="at-chip ${tone(q.changePct)}" title="${esc(means('today'))}">${pct(q.changePct)}</span>` : `<span class="at-chip" title="${esc(means('today'))}">—</span>`);
 /** In place of an order ticket for what Robinhood's agent doorway does not trade: a coin on paper, or one not followed at all. */
-const noTicketChip = (paper: boolean) => (paper ? `<span class="at-chip" title="${esc(WORDS.paper)}">on paper only</span>` : `<span class="at-chip" title="${esc(WORDS.noTicket)}">no order ticket</span>`);
+const noTicketChip = (paper: boolean) => (paper ? `<span class="at-chip" title="${esc(`${means('paper')} ${NOTES.coinOnPaper}`)}">on paper only</span>` : `<span class="at-chip" title="${esc(NOTES.noTicket)}">no order ticket</span>`);
 const robot = (sym: string) => `<button class="icon-btn" data-act="analyse" data-symbol="${esc(sym)}" title="Ask the desk to analyse ${esc(sym)}" aria-label="Ask the desk to analyse ${esc(sym)}"><svg class="g"><use href="#i-bot"/></svg></button>`;
 /** "SPY, QQQ, VT and BND". */
 const listWords = (xs: readonly string[]) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
@@ -140,7 +144,113 @@ function renderSub(): void {
   const w = d.watchlist.length, c = d.calls.length, q = d.queue.filter(isOpenItem).length;
   const parts = [`${w} ${w === 1 ? 'stock' : 'stocks'} on the watchlist`, `${c} ${c === 1 ? 'call' : 'calls'} on record`];
   if (q) parts.push(`${q} waiting to be analysed`);
-  $('#subline').textContent = `${parts.join(' · ')}.${d.desk.emailSaved ? '' : ' The desk has no contact email yet, which the SEC asks for before company accounts can be read: run /desk-check in Madav.'}`;
+  $('#subline').textContent = `${parts.join(' · ')}.${d.desk.emailSaved ? '' : ' The desk has no contact email yet, which the SEC asks for before the first analysis: give it in Get started (in the side list), or to the desk in a chat.'}`;
+}
+
+// ---------- get started: the first month in five steps, each ticked off by itself from the desk's own records ----------
+// The desk works out each tick (terminal/guide.ts); the page draws them, with what to do next. It opens by itself on the
+// first visit, while the desk has no calls, and stays open until it is put away: the side list opens it again.
+const GUIDE = { editing: false, asking: false };
+const guideShown = (): boolean => (P.guide ? P.guide === 'open' : !!S.desk?.guide.show);
+
+/** One step: its number, or a tick once done; done, it folds to what it holds (its how-to lines, ta-gwhy, are hidden). */
+function guideStep(n: number, done: boolean, title: string, body: string, folded = done): string {
+  return `<li class="ta-gstep${folded ? ' done' : ''}"><span class="ta-gtick" aria-hidden="true">${done ? '<svg class="g"><use href="#i-tick"/></svg>' : n}</span>
+    <div class="ta-gbody"><div class="ta-ghead"><b>${title}</b>${done ? '<span class="at-chip ok">done</span>' : ''}</div>${body}</div></li>`;
+}
+/** A fact a step reads, as a chip: green once it holds. */
+const factChip = (ok: boolean, words: string) => `<span class="at-chip${ok ? ' ok' : ''}">${esc(words)}</span>`;
+/** What the person still has to pick to ask for: watched, not an index, never called, not on the waiting list. */
+const toAsk = (): string[] => (S.desk?.watchlist ?? []).map((w) => w.symbol).filter((s) => !isIndex(s) && !latestCall(s) && !isOpen(s));
+
+function renderGuide(): void {
+  const d = S.desk, g = d?.guide;
+  $('#guideCount').textContent = g ? `${g.done} of ${g.of}` : '';
+  const shown = !!g && guideShown();
+  $('#sec-guide').classList.toggle('hide', !shown);
+  if (!g || !shown) return;
+  if (g.first && !P.guide) remember({ guide: 'open' });   // opened by itself: kept open past the first call
+  // What is being typed in the email field survives the refresh around it.
+  const typing = document.getElementById('contactInput') as HTMLInputElement | null;
+  const kept = typing ? { value: typing.value, focus: document.activeElement === typing, from: typing.selectionStart, to: typing.selectionEnd } : null;
+
+  const e = g.email, editing = !e.done || GUIDE.editing;
+  const email = guideStep(1, e.done, 'Give the desk your email for the SEC',
+    `<p class="at-quiet ta-gwhy">The SEC, which keeps US companies' official accounts, asks everyone who reads them for a contact email. It is kept in the desk's records on this computer and sent to the SEC alone, with each request for a company's filings: no other source sees it, and this page never shows it in full.</p>
+    ${editing ? `<div class="at-row"><label class="at-field ta-grow"><span class="at-field-l">Your own email address</span><input class="at-input at-box" id="contactInput" type="email" autocomplete="email" maxlength="254" spellcheck="false"></label><button class="at-btn at-press primary" data-act="contact-save">Save</button>${e.done ? '<button class="at-btn at-press" data-act="contact-cancel">Cancel</button>' : ''}</div>`
+      : `<div class="at-row"><span class="at-quiet">Saved: ${esc(e.saved)} · sent to the SEC alone</span><button class="at-btn at-press" data-act="contact-edit">Change…</button></div>`}`, e.done && !GUIDE.editing);
+
+  const p = g.picks;
+  const picks = guideStep(2, p.done, `Pick three to five ${term('stock', 'companies')} you know, plus the whole market and one or two ${term('sector', 'sectors')} you understand`,
+    `<div class="at-row">${factChip(p.names >= p.need, `${Math.min(p.names, p.need)} of ${p.need} names`)}${factChip(p.market, p.market ? 'the whole market ✓' : 'the whole market')}${factChip(p.sector, p.sector ? 'a sector ✓' : 'a sector')}</div>
+    <p class="at-quiet ta-gwhy">Type a company you know in the search box at the top and press Add to watchlist. On Start here, press + on a whole-market ${term('fund', 'fund')} and on one or two sectors you understand. The desk suggests no company: the names are yours, and nothing here is investment advice.</p>
+    <div class="at-row ta-gwhy"><button class="at-btn at-press" data-act="goto" data-to="sec-start"><svg class="g"><use href="#i-layers"/></svg><span>Go to Start here</span></button></div>`);
+
+  const a = g.analyse, ask = toAsk(), l = d!.analyses.listener;
+  const analyse = guideStep(3, a.done, `Ask the desk to analyse them, ${term('depth', 'shallow')}, and switch on running automatically`,
+    `<div class="at-row">${factChip(a.asked > 0, `${a.asked} asked for`)}${factChip(!!a.automatic, a.automatic ? `runs by itself: ${a.automatic}` : 'not running by itself yet')}</div>
+    <p class="at-quiet ta-gwhy">Shallow is the quickest and costs least: each analysis uses your Claude plan, like a chat. Running automatically means each one you ask for starts by itself, one at a time; they are listed under Analyses you asked for.</p>
+    <div class="at-row">${ask.length ? `<button class="at-btn at-press primary" data-act="guide-ask"${GUIDE.asking ? ' disabled' : ''}><svg class="g"><use href="#i-bot"/></svg><span>${GUIDE.asking ? 'Asking…' : `Ask for your ${ask.length === 1 ? 'pick' : `${ask.length} picks`}, shallow`}</span></button>` : ''}${l ? '' : '<button class="at-btn at-press" data-act="listen-on"><span>Run automatically with Claude Code</span></button>'}</div>
+    ${l ? '' : '<p class="at-quiet">Or switch on "Run automatically" in Madav, if you use it.</p>'}`);
+
+  const r = g.read, mean = (k: TermKey) => `<div><dt>${esc(GLOSSARY[k].term)}</dt><dd>${esc(GLOSSARY[k].means)}</dd></div>`;
+  const read = guideStep(4, r.done, 'Read your first calls',
+    `<dl class="at-facts ruled at-box ta-gmeans">${(['Buy', 'Hold', 'Sell', 'alpha'] as const).map(mean).join('')}</dl>
+    <div class="at-row">${r.latest ? readButton(r.latest.ticker, r.latest.date, `Read the call on ${r.latest.ticker} (${r.latest.rating})`) : '<span class="at-quiet">Your first call appears here when an analysis finishes.</span>'}<button class="at-btn at-press" data-act="gloss-open"><svg class="g"><use href="#i-book"/></svg><span>Every word explained</span></button></div>`);
+
+  const w = g.paper;
+  const paper = guideStep(5, w.done, `Follow them ${term('paper', 'on paper')} for ${esc(w.words)}, then read the ${term('scorecard', 'scorecard')} before deciding about money and Robinhood`,
+    `<div class="at-meter${w.done ? ' ok' : ''}"><progress class="at-bar" max="${w.need}" value="${Math.min(w.weeks, w.need)}" aria-label="${w.weeks} of ${w.need} weeks on paper"></progress><b>${Math.min(w.weeks, w.need)} of ${w.need} weeks</b></div>
+    <p class="at-quiet ta-gwhy">Paper follows every call with pretend money, against the ${term('sp500', 'S&P 500')}. A few weeks are noise, not proof: read the scorecard, good or bad, before you decide anything. Connecting Robinhood and switching trading on stay your own decisions.</p>
+    <div class="at-row"><button class="at-btn at-press" data-act="goto" data-to="sec-score"><svg class="g"><use href="#i-target"/></svg><span>Go to the scorecard</span></button></div>`);
+
+  const all = g.done === g.of;
+  $('#guideSub').textContent = all ? 'All five done. The desk keeps reading and proposing; every decision stays yours.'
+    : 'A safe first month, one step at a time. Each step ticks itself off when it is done, wherever you do it: here, or by asking the desk in a chat.';
+  $('#guideDo').innerHTML = `<span class="at-chip${all ? ' ok' : ''}">${g.done} of ${g.of} done</span><button class="at-btn at-press" data-act="gloss-open"><svg class="g"><use href="#i-book"/></svg><span>What does this mean?</span></button><button class="at-btn at-press" data-act="guide-away" title="Put it away: the side list opens it again">Put away</button>`;
+  $('#guideCard').innerHTML = `<ol class="ta-guide">${email}${picks}${analyse}${read}${paper}</ol>
+    <p class="at-honest">The desk reads and proposes; it never places an order by itself, and nothing here is investment advice.</p>`;
+  const field = document.getElementById('contactInput') as HTMLInputElement | null;
+  if (kept && field) { field.value = kept.value; if (kept.focus) { field.focus(); field.setSelectionRange(kept.from, kept.to); } }
+}
+
+/** Keeps the email the person typed, once the desk has checked it. */
+async function saveContact(): Promise<void> {
+  const field = document.getElementById('contactInput') as HTMLInputElement | null;
+  if (!field) return;
+  await run(async () => {
+    const { saved } = await api.setContact(field.value);
+    field.value = ''; GUIDE.editing = false;
+    await refreshState();
+    toast(`Saved: ${saved}. The desk sends it to the SEC alone.`);
+  });
+}
+
+/** Asks the desk to analyse every pick it has not called yet, at shallow depth, one after another. */
+async function askPicks(): Promise<void> {
+  const list = toAsk();
+  if (!list.length || GUIDE.asking) return;
+  GUIDE.asking = true; renderGuide();
+  const asked: string[] = [], refused: string[] = [];
+  for (const s of list) { try { await api.enqueue(s, 'shallow'); asked.push(s); } catch (e) { refused.push(`${s}: ${say(e)}`); } }
+  GUIDE.asking = false;
+  await refreshState();
+  if (asked.length) toast(`${listWords(asked)} ${asked.length === 1 ? 'is' : 'are'} waiting to be analysed, at shallow depth.${S.desk?.analyses.listener ? '' : ' Nothing is listening yet: switch on running automatically.'}`);
+  if (refused.length) toast(refused.join(' · '), 'bad');
+}
+
+// ---------- what does this mean? every trading word, in one plain line ----------
+function openGlossary(): void {
+  $('#glossDialog').innerHTML = `<div class="ta-pophead"><h2 id="glossTitle">What does this mean?</h2><button class="icon-btn" data-act="gloss-close" aria-label="Close"><svg class="g"><use href="#i-x"/></svg></button></div>
+    <p class="at-lede">Every trading word on the dashboard, in one plain line. On the page, point at a dotted word or a rating to see its line there.</p>
+    ${glossaryGroups().map((g) => `<p class="at-kicker ta-stage">${esc(g.group)}</p><dl class="at-facts ruled at-box ta-gloss">${g.terms.map((t) => `<div><dt>${esc(t.term)}</dt><dd>${esc(t.means)}</dd></div>`).join('')}</dl>`).join('')}
+    <p class="at-honest">Nothing here is investment advice.</p>`;
+  $<HTMLDialogElement>('#glossDialog').showModal();
+}
+
+/** The trading words written into the page itself (data-term) take their meaning from the glossary, once at the start. */
+function explainStaticWords(): void {
+  for (const el of document.querySelectorAll<HTMLElement>('[data-term]')) { const k = el.dataset.term ?? ''; if (isTerm(k)) el.title = means(k); }
 }
 
 function renderFavs(): void {
@@ -221,10 +331,10 @@ function renderToday(): void {
   }
   // the Agentic account: what the desk may spend, on the person's Confirm
   const ag = views.find((v) => v.account.agentic);
-  const agentic = kpi({ tone: 'accent', icon: 'i-bolt', name: 'Agentic buying power', value: ag ? money(ag.portfolio?.buyingPower, ag.portfolio?.currency ?? 'USD') : '—', line: ag ? (tradingOn() ? '<span class="ta-warn">Trading is on</span> · orders only on your Confirm' : 'Trading is off · the dashboard only reads') : 'Show your Agentic account to trade', act: { act: 'view', view: 'account' } });
+  const agentic = kpi({ tone: 'accent', icon: 'i-bolt', name: 'Agentic buying power', term: 'buyingPower', value: ag ? money(ag.portfolio?.buyingPower, ag.portfolio?.currency ?? 'USD') : '—', line: ag ? (tradingOn() ? '<span class="ta-warn">Trading is on</span> · orders only on your Confirm' : 'Trading is off · the dashboard only reads') : 'Show your Agentic account to trade', act: { act: 'view', view: 'account' } });
   // the market: the S&P 500 today
   const m = marketOf('^GSPC'), q = m && isQuote(m.quote) ? m.quote : null;
-  const market = kpi({ tone: q ? (q.changePct !== null && q.changePct < 0 ? 'bad' : 'ok') : '', icon: 'i-pulse', name: 'S&P 500 today', value: q ? num(q.price, 0) : '—', line: q ? `<span class="${(q.changePct ?? 0) >= 0 ? 'ta-up' : 'ta-down'}">${pct(q.changePct)}</span> · ${q.open ? 'now' : 'last close'}` : 'Reading the market', act: { act: 'select', symbol: '^GSPC' }, spark: q ? 'gspc' : '' });
+  const market = kpi({ tone: q ? (q.changePct !== null && q.changePct < 0 ? 'bad' : 'ok') : '', icon: 'i-pulse', name: 'S&P 500 today', term: 'sp500', value: q ? num(q.price, 0) : '—', line: q ? `<span class="${(q.changePct ?? 0) >= 0 ? 'ta-up' : 'ta-down'}">${pct(q.changePct)}</span> · ${q.open ? 'now' : 'last close'}` : 'Reading the market', act: { act: 'select', symbol: '^GSPC' }, spark: q ? 'gspc' : '' });
   // the desk: its latest call, what is waiting, what is scored
   const latest = d?.calls[0];
   const desk = kpi({ tone: 'merged', icon: 'i-check', name: "The desk's calls", value: d ? String(d.calls.length) : '—', line: d ? `${latest ? `latest <b>${esc(latest.ticker)}</b> ${esc(latest.rating)}` : 'none yet'} · ${d.queue.filter(isOpenItem).length} waiting · ${d.record.summary.resolved} scored` : 'Reading the desk', act: { act: 'goto', to: 'sec-calls' } });
@@ -241,10 +351,11 @@ const A = {
 const signedIn = () => S.rh?.state === 'saved' || S.rh?.state === 'connected';
 
 type KpiTone = 'accent' | 'ok' | 'bad' | 'warn' | 'merged' | '';
-/** A figure tile: a coloured icon, its name, the figure in its colour, a line under it. With `act`, it is a button. */
-function kpi(o: { tone: KpiTone; icon: string; name: string; value: string; line?: string; act?: Record<string, string>; spark?: string }): string {
+/** A figure tile: a coloured icon, its name, the figure in its colour, a line under it. With `act`, it is a button; with
+ *  `term`, pointing at its name gives that word's meaning. */
+function kpi(o: { tone: KpiTone; icon: string; name: string; value: string; line?: string; act?: Record<string, string>; spark?: string; term?: TermKey }): string {
   const attrs = o.act ? Object.entries(o.act).map(([k, v]) => ` data-${k}="${esc(v)}"`).join('') : '';
-  const inner = `<span class="ta-kpi-ic"><svg class="g"><use href="#${o.icon}"/></svg></span><span class="at-tile-sub">${esc(o.name)}</span><span class="ta-kpi-v at-num">${o.value}</span>${o.line ? `<span class="ta-kpi-l">${o.line}</span>` : ''}${o.spark ? `<span class="ta-spark ta-kpi-spark" data-kpi="${esc(o.spark)}"></span>` : ''}`;
+  const inner = `<span class="ta-kpi-ic"><svg class="g"><use href="#${o.icon}"/></svg></span><span class="at-tile-sub"${o.term ? ` title="${esc(means(o.term))}"` : ''}>${esc(o.name)}</span><span class="ta-kpi-v at-num">${o.value}</span>${o.line ? `<span class="ta-kpi-l">${o.line}</span>` : ''}${o.spark ? `<span class="ta-spark ta-kpi-spark" data-kpi="${esc(o.spark)}"></span>` : ''}`;
   return o.act ? `<button class="at-tile at-box at-press ta-kpi ${o.tone}"${attrs}>${inner}</button>` : `<div class="at-tile at-box ta-kpi ${o.tone}">${inner}</div>`;
 }
 /** What the holdings cost and are worth now, from Robinhood's own figures; null when any holding lacks one. */
@@ -276,9 +387,9 @@ const sellButton = (c: HoldingCare): string => (c.sell?.ticket && c.view
 /** What the desk's view of a holding asks: re-rating, below its stop (else the stop it watches), the desk says sell. */
 function careMarks(c: HoldingCare): string {
   const parts: string[] = [];
-  if (c.rerating) parts.push(`<span class="at-chip accent" title="${esc(`${WORDS.rerating}${c.rerating === 'running' ? ' It is being analysed now.' : ''}`)}">re-rating</span>`);
+  if (c.rerating) parts.push(`<span class="at-chip accent" title="${esc(`${means('rerating')}${c.rerating === 'running' ? ' It is being analysed now.' : ''}`)}">re-rating</span>`);
   if (c.below) parts.push(`<span class="at-chip danger" title="${esc(belowWords(c))}">below its stop</span>`);
-  else if (c.stop?.level != null) parts.push(`<small class="at-quiet" title="${esc(WORDS.stop)}">stop ${money(c.stop.level)}</small>`);
+  else if (c.stop?.level != null) parts.push(`<small class="at-quiet" title="${esc(means('stop'))}">stop ${money(c.stop.level)}</small>`);
   if (c.sell) parts.push(`<span class="at-chip danger" title="${esc(sellWords(c))}">the desk says sell</span>`, sellButton(c));
   return parts.join(' ');
 }
@@ -287,7 +398,7 @@ function careCell(c: HoldingCare | undefined): string {
   if (!c) return '<span class="at-quiet">—</span>';
   const view = c.view
     ? `${ratingChip(c.view.rating)} <small class="at-quiet" title="${esc(`The desk's call of ${dayText(c.view.date)}${c.stale ? ': a week old or more' : ''}`)}">${esc(c.view.ago)}</small>`
-    : `<small class="at-quiet" title="${esc(WORDS.noView)}">no view yet</small>`;
+    : `<small class="at-quiet" title="${esc(NOTES.noView)}">no view yet</small>`;
   return `${view} ${careMarks(c)}`.trim();
 }
 
@@ -324,12 +435,12 @@ async function loadCare(): Promise<void> {
 function viewCard(v: AccountView, at: string): string {
   const a = v.account, cur = v.portfolio?.currency ?? 'USD', p = v.portfolio;
   const stocks = v.holdings.filter((h) => h.kind === 'stock').length, coins = v.holdings.filter((h) => h.kind === 'crypto').length;
-  const role = a.agentic ? '<span class="at-chip accent">Agentic · the desk may trade here, only on your Confirm</span>' : '<span class="at-chip">View only · the desk never trades here</span>';
+  const role = a.agentic ? `<span class="at-chip accent" title="${esc(means('agentic'))}">Agentic · the desk may trade here, only on your Confirm</span>` : '<span class="at-chip">View only · the desk never trades here</span>';
   const g = gainOf(v.holdings), gain = g ? g.value - g.cost : null;
   const tiles = `<div class="at-deck ta-deck-5">
     ${kpi({ tone: 'accent', icon: 'i-wallet', name: 'Total value', value: money(p?.total, cur) })}
     ${kpi({ tone: '', icon: 'i-cash', name: 'Cash', value: money(p?.cash, cur) })}
-    ${kpi({ tone: 'ok', icon: 'i-bolt', name: 'Buying power', value: money(p?.buyingPower, cur) })}
+    ${kpi({ tone: 'ok', icon: 'i-bolt', name: 'Buying power', term: 'buyingPower', value: money(p?.buyingPower, cur) })}
     ${kpi({ tone: gain === null ? '' : gain >= 0 ? 'ok' : 'bad', icon: gain !== null && gain < 0 ? 'i-down' : 'i-up', name: 'Since bought', value: gain === null ? '—' : signedMoney(gain, cur), line: g ? `${pct((gain! / g.cost) * 100)} on ${money(g.cost, cur)} paid` : v.holdings.length ? 'a holding lacks its cost' : 'nothing held' })}
     ${kpi({ tone: 'merged', icon: 'i-pie', name: 'Holdings', value: String(v.holdings.length), line: `${stocks} ${stocks === 1 ? 'stock' : 'stocks'}${coins ? ` · ${coins} crypto` : ''}` })}</div>`;
   const total = p?.total ?? null;
@@ -407,7 +518,7 @@ async function openPicker(): Promise<void> {
 
 // ---------- the trading switch: the person's alone, off until they switch it on ----------
 const TR = { state: null as (Trading & { placedToday?: number }) | null, asking: false, understood: false };
-/** The desk's record on paper, in one line beside the switch; under four weeks it is young. */
+/** The desk's record on paper, in one line beside the switch; under the desk's record weeks (paper.ts) it is young. */
 const young = () => !!S.desk && S.desk.paper.weeks < S.desk.paper.minWeeks;
 const recordLine = () => (S.desk ? `<p class="at-quiet">The desk has ${esc(weeksWords(S.desk.paper))} of record on paper.</p>` : '');
 const tradingOn = () => TR.state?.on === true;
@@ -430,7 +541,7 @@ function capsBlock(): string {
   const c = TR.state?.caps;
   if (!c) return '';
   if (CAPS.editing) return `<div class="at-card-head"><h3>Your caps</h3></div>
-    <p class="at-lede">The most an order may cost, the most of the account one stock or one sector may be after a buy, the most in crypto, the most orders in a day, the fall in a week after which trading switches itself off, and the fewest trading days a stock bought here is held before the desk proposes selling it. Every ticket is checked against them, and again just before an order is sent. They are kept beside the trading switch, where agents are refused.</p>
+    <p class="at-lede">The most an order may cost, the most of the account one stock or one sector may be after a buy, the most in crypto, the most orders in a day, the fall in a week after which trading switches itself off, and the shortest hold, in trading days, of a stock bought here. Every ticket is checked against them, and again just before an order is sent. They are kept beside the trading switch, where agents are refused.</p>
     <div class="at-row">
       <label class="at-field"><span class="at-field-l">An order at most, $</span><input class="at-input at-box" id="capOrder" type="text" inputmode="decimal" value="${c.perOrderUsd}"></label>
       <label class="at-field"><span class="at-field-l">One stock, % of the account</span><input class="at-input at-box" id="capStock" type="text" inputmode="decimal" value="${c.perStockPercent}"></label>
@@ -441,9 +552,10 @@ function capsBlock(): string {
       <label class="at-field"><span class="at-field-l">Switch off after a fall in a week of, %</span><input class="at-input at-box" id="capWeek" type="text" inputmode="decimal" value="${c.weeklyLossPercent}"></label>
       <label class="at-field"><span class="at-field-l">Shortest hold, trading days</span><input class="at-input at-box" id="capHold" type="number" min="0" max="60" step="1" inputmode="numeric" value="${c.minHoldDays}"></label></div>
     <div class="at-row">${rhButton('caps-save', 'Save the caps', { primary: true })}${rhButton('caps-cancel', 'Cancel')}</div>`;
-  return `<div class="at-card-head"><h3>Your caps</h3></div>
-    <div class="at-row"><span class="at-chip">${esc(money(c.perOrderUsd))} an order at most</span><span class="at-chip">${esc(String(c.perStockPercent))}% of the account in one stock</span><span class="at-chip">${esc(String(c.ordersPerDay))} ${c.ordersPerDay === 1 ? 'order' : 'orders'} a day</span></div>
-    <div class="at-row"><span class="at-chip">one sector at most ${esc(String(c.perSectorPercent))}%</span><span class="at-chip">crypto at most ${esc(String(c.cryptoPercent))}%</span><span class="at-chip">switches itself off after a ${esc(String(c.weeklyLossPercent))}% fall in a week</span><span class="at-chip">a stock bought here is held at least ${esc(String(c.minHoldDays))} trading ${c.minHoldDays === 1 ? 'day' : 'days'}</span></div>
+  const chip = (k: TermKey, words: string) => `<span class="at-chip" title="${esc(means(k))}">${esc(words)}</span>`;
+  return `<div class="at-card-head"><h3>Your ${term('cap', 'caps')}</h3></div>
+    <div class="at-row">${chip('cap', `${money(c.perOrderUsd)} an order at most`)}${chip('position', `${c.perStockPercent}% of the account in one stock`)}${chip('cap', `${c.ordersPerDay} ${c.ordersPerDay === 1 ? 'order' : 'orders'} a day`)}</div>
+    <div class="at-row">${chip('sector', `one sector at most ${c.perSectorPercent}%`)}${chip('crypto', `crypto at most ${c.cryptoPercent}%`)}${chip('weeklyLoss', `switches itself off after a ${c.weeklyLossPercent}% fall in a week`)}${chip('shortestHold', `a stock bought here is held at least ${c.minHoldDays} trading ${c.minHoldDays === 1 ? 'day' : 'days'}`)}</div>
     <div class="at-row">${rhButton('caps-edit', 'Change the caps…')}</div>`;
 }
 
@@ -461,7 +573,7 @@ function switchBlock(): string {
     ${TR.state?.offBecause ? `<p class="at-honest bad">${esc(TR.state.offBecause.words)}</p>` : ''}<p class="at-lede">With trading off, a ticket can be checked by Robinhood but never placed.</p>${recordLine()}<div class="at-row">${rhButton('tr-ask', 'Switch trading on…')}</div>`;
   return `<div class="at-card-head"><h3>Switch trading on?</h3></div>
     <p class="at-lede">From then on, a ticket you open, from one of the desk's calls or your own, can place a real order with real money in your Agentic account. Every order still needs Robinhood's check with no alerts, your caps, and your own Confirm naming the exact order. Keep Robinhood's approval on your phone switched on until you trust the desk. This is not investment advice.</p>
-    ${recordLine()}${young() ? `<p class="at-honest bad">That is under ${S.desk?.paper.minWeeks ?? 4} weeks: too little to tell whether the desk's calls are any good. Read your paper record first.</p><div class="at-row">${TR.understood ? '<span class="at-chip ok">You understand</span>' : rhButton('tr-understood', 'I understand')}</div>` : ''}
+    ${recordLine()}${young() ? `<p class="at-honest bad">That is under ${esc(S.desk?.paper.minWords ?? '')}: too little to tell whether the desk's calls are any good. Read your paper record first.</p><div class="at-row">${TR.understood ? '<span class="at-chip ok">You understand</span>' : rhButton('tr-understood', 'I understand')}</div>` : ''}
     <div class="at-row">${young() && !TR.understood ? '' : rhButton('tr-on', 'Yes, switch trading on', { primary: true })}${rhButton('tr-cancel', 'Cancel')}</div>`;
 }
 
@@ -480,7 +592,7 @@ function renderTicketDyn(): void {
   const asks = T.checks.filter((c) => c.ask), ok = T.checks.length > 0 && T.checks.every((c) => c.ok) && (!asks.length || T.early);
   const checks = t.proposal.order ? `<div class="at-card-head"><h3>Your checks</h3></div><div class="at-row">${T.checks.map((c) => `<span class="at-chip ${c.ask ? 'warn' : c.ok ? 'ok' : 'danger'}">${esc(c.words)}</span>`).join('')}</div>` : '';
   const r = T.review;
-  const review = r ? `<div class="at-card at-box"><div class="at-card-head"><h3>Robinhood's check</h3>${!r.answered ? '<span class="at-chip danger">Robinhood reported an error</span>' : r.alerts.length ? `<span class="at-chip danger">${r.alerts.length} alert(s)</span>` : '<span class="at-chip ok">No alerts</span>'}</div>
+  const review = r ? `<div class="at-card at-box"><div class="at-card-head"><h3>${term('dryRun')}</h3>${!r.answered ? '<span class="at-chip danger">Robinhood reported an error</span>' : r.alerts.length ? `<span class="at-chip danger">${r.alerts.length} alert(s)</span>` : '<span class="at-chip ok">No alerts</span>'}</div>
       ${r.error ? `<p class="at-honest bad">${esc(r.error)}</p>` : ''}${r.alerts.map((a) => `<p class="at-honest bad">${esc(a)}</p>`).join('')}
       ${r.approvalRequired === null ? '' : `<p class="at-lede">${r.approvalRequired ? 'Robinhood would ask you to approve this order on your phone before it is sent.' : 'Robinhood would not ask for your approval on your phone: an order would be sent at once.'}</p>`}
       ${r.facts.length ? `<dl class="at-facts ruled at-box">${r.facts.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>` : ''}
@@ -528,7 +640,7 @@ function renderTicket(): void {
     ${t.proposal.why.map((w) => `<p class="at-quiet">${esc(w)}</p>`).join('')}`;
   $('#tkFields').innerHTML = o ? `<div class="at-row">
       <label class="at-field"><span class="at-field-l">Shares (${o.side === 'buy' ? 'to buy' : 'to sell'})</span><input class="at-input at-box" id="tkQty" type="number" min="1" step="1" inputmode="numeric" value="${o.quantity}"></label>
-      <label class="at-field"><span class="at-field-l">Limit price, $ · good for the ${o.timeInForce === 'gtc' ? 'next 90 days' : 'day'}</span><input class="at-input at-box" id="tkLimit" type="text" inputmode="decimal" value="${o.limitPrice.toFixed(2)}"></label></div>` : '';
+      <label class="at-field"><span class="at-field-l">${term('limitOrder', 'Limit price')}, $ · good for the ${o.timeInForce === 'gtc' ? 'next 90 days' : 'day'}</span><input class="at-input at-box" id="tkLimit" type="text" inputmode="decimal" value="${o.limitPrice.toFixed(2)}"></label></div>` : '';
   renderTicketDyn();
 }
 
@@ -644,13 +756,13 @@ function renderStats(sym: string, h: History | null): void {
   const p = (n: number) => (unit ? `${num(n)}${unit}` : isIndex(sym) ? num(n) : money(n, cur));
   const hi = Math.max(...bars.map((b) => b.high)), lo = Math.min(...bars.map((b) => b.low));
   const vols = bars.map((b) => b.volume).filter((v) => v > 0), avg = vols.length ? vols.reduce((a, b) => a + b, 0) / vols.length : null;
-  const fact = (k: string, v: string) => `<div><dt>${esc(k)}</dt><dd>${v}</dd></div>`;
+  const fact = (k: string, v: string, word?: TermKey) => `<div><dt${word ? ` title="${esc(means(word))}"` : ''}>${esc(k)}</dt><dd>${v}</dd></div>`;
   el.innerHTML = [
     fact(`Open · ${shortDay(last.date)}`, p(last.open)),
     fact("Day's range", `${p(last.low)} – ${p(last.high)}`),
     fact(`${S.range} range`, `${p(lo)} – ${p(hi)}`),
-    fact('Volume', compact(last.volume)),
-    fact(`Average volume · ${S.range}`, compact(avg)),
+    fact('Volume', compact(last.volume), 'volume'),
+    fact(`Average volume · ${S.range}`, compact(avg), 'volume'),
   ].join('');
 }
 
@@ -675,11 +787,11 @@ async function loadHistory(): Promise<void> {
 }
 
 // ---------- the desk's call, the queue ----------
-const resultChip = (c: { pending: boolean; alpha?: string | null }) => (c.pending ? '<span class="at-chip">not scored yet</span>' : `<span class="at-chip ${tone(parseFloat(c.alpha ?? ''))}">alpha ${esc(c.alpha ?? '—')}</span>`);
+const resultChip = (c: { pending: boolean; alpha?: string | null }) => (c.pending ? `<span class="at-chip" title="${esc(`Not scored yet: ${S.desk?.desk.holdingDays ?? 5} trading days after the call, its alpha is worked out.`)}">not scored yet</span>` : `<span class="at-chip ${tone(parseFloat(c.alpha ?? ''))}" title="${esc(means('alpha'))}">alpha ${esc(c.alpha ?? '—')}</span>`);
 const readButton = (ticker: string, date: string, words = 'Read') => `<button class="at-btn at-press" data-act="open-call" data-symbol="${esc(ticker)}" data-date="${esc(date)}"><svg class="g"><use href="#i-file"/></svg><span>${esc(words)}</span></button>`;
 /** Decide… on a call: an order ticket from it. A call on a coin opens none, and says so instead. */
 const decideButton = (c: Pick<Call, 'ticker' | 'date' | 'ticket' | 'paper'>) => (c.ticket
-  ? `<button class="at-btn at-press primary" data-act="decide" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}" title="An order ticket from this call, checked against your caps and by Robinhood"><span>Decide…</span></button>`
+  ? `<button class="at-btn at-press primary" data-act="decide" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}" title="${esc(means('ticket'))}"><span>Decide…</span></button>`
   : noTicketChip(c.paper));
 
 /** The desk's latest call on the stock being charted, as one bar under the chart: its rating, day, score, gist, and the
@@ -735,7 +847,7 @@ function renderAnalyses(): void {
     return `<span class="at-row">${off}</span>`;
   };
   const rows = q.map((x) => `<tr><td><b>${esc(x.symbol)}</b></td><td>${esc(x.depth ? DEPTH_WORDS[x.depth][0] : 'Settings')}</td><td class="wrap">${stands(x)}</td><td class="at-quiet">${esc(dayText(x.requestedAt))}</td><td>${doing(x)}</td></tr>`).join('');
-  $('#analysesTable').innerHTML = `<thead><tr><th>Stock</th><th>Depth</th><th class="wrap">Where it stands</th><th>Asked</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="ta-empty">Nothing asked for yet. Press the robot beside a stock to ask the desk to analyse it.</td></tr>'}</tbody>`;
+  $('#analysesTable').innerHTML = `<thead><tr><th>Stock</th><th>${term('depth')}</th><th class="wrap">Where it stands</th><th>Asked</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="ta-empty">Nothing asked for yet. Press the robot beside a stock to ask the desk to analyse it.</td></tr>'}</tbody>`;
 }
 
 /** A stock that finished since the page last looked: a notice, so the person hears of it wherever they are on the page. */
@@ -808,7 +920,7 @@ function renderWatch(): void {
       <td class="num"><span class="at-num">${q ? priceText(i.symbol, q) : '—'}</span></td>
       <td class="num">${q ? changeChip(q) : `<span class="at-quiet" title="${esc(err && 'message' in err ? err.message : '')}">${err && 'error' in err ? (err.error === 'no-data' ? 'No data' : 'Unavailable') : '—'}</span>`}</td>
       <td><div class="ta-tablespark" data-sp="${esc(i.symbol)}"></div></td>
-      <td><span class="at-row compact">${c ? `${ratingChip(c.rating)}<span class="at-quiet">${esc(dayText(c.date))}</span>` : `<span class="at-quiet" title="${esc(WORDS.call)}">no call yet</span>`}${i.ticket ? '' : noTicketChip(i.paper)}</span></td>
+      <td><span class="at-row compact">${c ? `${ratingChip(c.rating)}<span class="at-quiet">${esc(dayText(c.date))}</span>` : `<span class="at-quiet" title="${esc(means('call'))}">no call yet</span>`}${i.ticket ? '' : noTicketChip(i.paper)}</span></td>
       <td><span class="at-row">${queued ? openChip(i.symbol) : isIndex(i.symbol) ? '' : robot(i.symbol)}<button class="icon-btn" data-act="remove" data-symbol="${esc(i.symbol)}" title="Remove ${esc(i.symbol)}" aria-label="Remove ${esc(i.symbol)} from the watchlist"><svg class="g"><use href="#i-trash"/></svg></button></span></td></tr>`;
   };
   const groups = tiers.map((t) => {
@@ -837,8 +949,9 @@ const EMPTY: Partial<Record<Tier, string>> = {
 /** One tile: its name in plain words, what it holds, today's move, the desk's latest call, and the robot. */
 function tierTile(i: TierItem): string {
   const q = quoteOf(i.symbol);
-  const call = i.call ? `${ratingChip(i.call.rating)}<span class="at-quiet">${esc(dayText(i.call.date))}</span>` : `<span class="at-quiet" title="${esc(WORDS.call)}">no call yet</span>`;
-  const ask = isIndex(i.symbol) ? '' : isOpen(i.symbol) ? openChip(i.symbol) : robot(i.symbol);
+  const call = i.call ? `${ratingChip(i.call.rating)}<span class="at-quiet">${esc(dayText(i.call.date))}</span>` : `<span class="at-quiet" title="${esc(means('call'))}">no call yet</span>`;
+  const ask = (isIndex(i.symbol) ? '' : isOpen(i.symbol) ? openChip(i.symbol) : robot(i.symbol))
+    + (i.watched ? '' : `<button class="icon-btn" data-act="watch-add" data-symbol="${esc(i.symbol)}" title="Add ${esc(i.symbol)} to your watchlist" aria-label="Add ${esc(i.symbol)} to your watchlist"><svg class="g"><use href="#i-plus"/></svg></button>`);
   return `<div class="at-tile at-box ta-tier-tile${i.symbol === S.symbol ? ' on' : ''}">
     <button class="ta-tier-go" data-act="select" data-symbol="${esc(i.symbol)}" title="Chart ${esc(i.symbol)}">
       <span class="ta-tier-top"><b class="at-tile-name">${esc(i.name ?? q?.name ?? i.symbol)}</b>${changeChip(q)}</span>
@@ -858,7 +971,8 @@ function marketEditor(): string {
 
 function tierBlock(t: TierView): string {
   const change = t.tier === 'market' && !MK.editing ? '<button class="at-btn at-press" data-act="mk-edit" title="Choose the broad funds this tier shows">Change…</button>' : '';
-  const head = `<div class="ta-tier-head"><h3>${esc(t.name)}</h3><p class="at-quiet">${esc(t.meaning)}</p>${change}</div>`;
+  const name = t.tier === 'sectors' ? term('sector', t.name) : t.tier === 'crypto' ? term('crypto', t.name) : t.tier === 'names' ? term('stock', t.name) : esc(t.name);
+  const head = `<div class="ta-tier-head"><h3>${name}</h3><p class="at-quiet">${esc(t.meaning)}</p>${change}</div>`;
   const body = t.items.length ? `<div class="at-deck ta-tier-deck">${t.items.map(tierTile).join('')}</div>` : `<p class="at-quiet">${esc(EMPTY[t.tier] ?? '')}</p>`;
   const more = t.more ? `<div class="at-row"><button class="at-btn at-press" data-act="goto" data-to="sec-watch">${t.more} more on your watchlist</button></div>` : '';
   return `<div class="ta-tier">${head}${t.tier === 'market' && MK.editing ? marketEditor() : ''}${body}${more}</div>`;
@@ -871,7 +985,7 @@ function renderStart(): void {
   const typing = document.getElementById('mkInput') as HTMLInputElement | null;
   const kept = typing ? { value: typing.value, focus: document.activeElement === typing, from: typing.selectionStart, to: typing.selectionEnd } : null;
   el.innerHTML = d.startHere.map(tierBlock).join('')
-    + `<p class="at-honest">${esc(WORDS.today)} A dash is a price Yahoo Finance did not give. ${esc(WORDS.call)} Buy and Overweight lean towards owning it, Hold keeps what is held, Underweight and Sell lean against it: point at a rating for what its ticket does. ${esc(WORDS.fund)} Nothing here is investment advice.</p>`;
+    + `<p class="at-honest">${term('today', "Today's move")} is the change since the last day's close; a dash is a price Yahoo Finance did not give. Each ${term('call', 'call')} is the desk's rating, from Buy to Sell: Buy and Overweight lean towards owning it, Hold keeps what is held, Underweight and Sell lean against it, and pointing at a rating says what its ticket does. A ${term('fund', 'fund')} holds many companies at once; + adds one to your watchlist. Nothing here is investment advice.</p>`;
   const field = document.getElementById('mkInput') as HTMLInputElement | null;
   if (kept && field) { field.value = kept.value; if (kept.focus) { field.focus(); field.setSelectionRange(kept.from, kept.to); } }
 }
@@ -885,8 +999,10 @@ function renderWeather(): void {
   const w = MORNING.weather, el = $('#weatherCard');
   const head = '<div class="at-card-head"><h3>Market weather</h3><span class="at-chip" title="Each line describes the market as it is; none says what it does next">never a forecast</span></div>';
   if (!w) { el.innerHTML = `${head}<p class="at-quiet">${esc(MORNING.weatherFailed || 'Reading the S&P 500, the VIX and the odds on the Federal Reserve.')}</p>`; return; }
+  // each line's name points at the word it rests on: the trend on the averages, the mood on the VIX, the rates on the Fed
+  const named = (l: WeatherLine) => (l.key === 'trend' ? term('average', l.name) : l.key === 'mood' ? term('vix', l.name) : l.key === 'rates' ? term('fed', l.name) : esc(l.name));
   el.innerHTML = `${head}<div class="ta-lines">${w.lines.map((l) => `<div class="ta-line">
-      <div class="ta-line-head"><b>${esc(l.name)}</b>${l.state ? `<span class="at-chip ${LINE_TONE[l.tone]}">${esc(l.state)}</span>` : '<span class="at-chip">—</span>'}</div>
+      <div class="ta-line-head"><b>${named(l)}</b>${l.state ? `<span class="at-chip ${LINE_TONE[l.tone]}">${esc(l.state)}</span>` : '<span class="at-chip">—</span>'}</div>
       <p>${esc(l.words)}</p><p class="at-quiet">${esc(l.meaning)}</p></div>`).join('')}</div>
     <p class="at-honest">From Yahoo Finance and Polymarket at ${esc(clock(w.at))}. Nothing here is investment advice.</p>`;
 }
@@ -978,9 +1094,9 @@ function renderPaper(): void {
   else if (!b) lede = PAPER.failed ? 'The paper record could not be worked out just now: Yahoo Finance did not answer. It tries again in a moment.' : 'Working out the paper record from the closing prices.';
   else if (b.series.length < 2 || b.returnPct === null) lede = `Following the desk on paper since ${dayText(b.since ?? d.paper.since)}: nothing has filled yet. A call fills at the first closing price after its day.`;
   else lede = `Following the desk on paper since ${dayText(b.since ?? d.paper.since)}: ${pct(b.returnPct * 100)} (${money(b.value)} from ${money(b.startUsd)}), ${b.benchmarkPct === null ? 'the S&P 500 unavailable' : `the S&P 500 ${pct(b.benchmarkPct * 100)}`} over the same days.`;
-  const held = b?.positions.length ? `<p class="at-quiet">On paper now: ${b.positions.map((p) => `${esc(p.ticker)} ${p.quantity}`).join(', ')}, and ${esc(money(b.cash))} in cash.</p>` : '';
-  $('#paperCard').innerHTML = `<div class="at-card-head"><h3>Your paper record</h3><span class="at-chip">${esc(weeksWords(d.paper))} of record</span></div>
-    <p class="at-lede">${esc(lede)}</p>${b && b.series.length > 1 ? '<div class="ta-spark-tall" id="paperChart"></div><p class="at-quiet">The solid line is the paper money; the dashed one is the S&amp;P 500 from the same start.</p>' : ''}${held}
+  const held = b?.positions.length ? `<p class="at-quiet">${term('position', 'Positions')} on paper now: ${b.positions.map((p) => `${esc(p.ticker)} ${p.quantity}`).join(', ')}, and ${esc(money(b.cash))} in cash.</p>` : '';
+  $('#paperCard').innerHTML = `<div class="at-card-head"><h3>Your ${term('paper', 'paper')} record</h3><span class="at-chip">${esc(weeksWords(d.paper))} of record</span></div>
+    <p class="at-lede">${esc(lede)}</p>${b && b.series.length > 1 ? `<div class="ta-spark-tall" id="paperChart"></div><p class="at-quiet">The solid line is the paper money; the dashed one is the ${term('sp500', 'S&P 500')} from the same start.</p>` : ''}${held}
     <p class="at-honest">Every call on a stock, a fund, Bitcoin or Ether is followed as its order ticket would size it, and fills at the first closing price after its day. Crypto is bought in fractions within your crypto limit, on paper only: Robinhood's agent doorway trades stocks and funds. No costs are counted (Robinhood charges no commission). A few weeks of record are noise, not proof, and nothing here is investment advice.</p>`;
   const el = document.getElementById('paperChart');
   if (el && b) paperChart(el, b.series);
@@ -994,7 +1110,7 @@ function renderScore(): void {
   $('#scoreSub').textContent = `${r.resolved} scored · ${r.pending} waiting${r.unscored ? ` · ${r.unscored} unreadable` : ''}`;
   const names = [...RATINGS.filter((x) => r.byRating[x]), ...Object.keys(r.byRating).filter((x) => !RATINGS.includes(x))];
   const grid = names.length
-    ? `<div class="ta-score"><span class="head">Rating</span><span class="head">Calls</span><span class="head">Called the direction</span><span class="head">Average alpha vs the index</span>${names.map((n) => {
+    ? `<div class="ta-score"><span class="head">Rating</span><span class="head">Calls</span><span class="head">Called the direction</span><span class="head">Average ${term('alpha', 'alpha')} vs the ${term('index', 'index')}</span>${names.map((n) => {
         const s = r.byRating[n]!;
         return `${ratingChip(n)}<b>${s.count}</b><b>${s.hitRate === null ? '—' : `${Math.round(s.hitRate * 100)}%`}</b><b>${pctOf(s.meanAlpha)}</b>`;
       }).join('')}</div>`
@@ -1081,7 +1197,7 @@ async function sinceCall(symbol: string, date: string): Promise<void> {
 
 // ---------- everything ----------
 function renderAll(): void {
-  renderSub(); renderFavs(); renderAccount(); renderToday(); renderStart(); renderMorning(); renderControls(); renderHero(); renderCall(); renderStock(); renderAnalyses(); renderWatch(); renderCalls(); renderScore();
+  renderSub(); renderGuide(); renderFavs(); renderAccount(); renderToday(); renderStart(); renderMorning(); renderControls(); renderHero(); renderCall(); renderStock(); renderAnalyses(); renderWatch(); renderCalls(); renderScore();
 }
 
 /** Shows the desk or the account page; the side list marks where the person is. */
@@ -1191,7 +1307,7 @@ function renderAsk(): void {
   $('#askDialog').innerHTML = `<h2 id="askTitle">Analyse ${esc(it?.name ? `${it.name} (${ASK.symbol})` : ASK.symbol)}</h2>
     <p class="at-lede">The desk's twelve agents read ${reads}, argue both sides, and record a call you can read and decide on. It never places an order${coin ? `: ${it?.paper === false ? 'among crypto, the desk follows only Bitcoin and Ether on paper' : 'a coin is followed on paper only'}` : ''}.</p>
     <div class="at-seg" role="radiogroup" aria-label="How deep">${DEPTH_ORDER.map((d) => `<button class="at-seg-b${d === ASK.depth ? ' on' : ''}" role="radio" aria-checked="${d === ASK.depth}" data-act="ask-depth" data-depth="${d}">${DEPTH_WORDS[d][0]}</button>`).join('')}</div>
-    <p class="at-quiet">${esc(DEPTH_WORDS[ASK.depth][1])}</p>
+    <p class="at-quiet">${term('depth')} · ${esc(DEPTH_WORDS[ASK.depth][1])}</p>
     <p class="at-honest">${l ? `It runs by itself: ${esc(l.listener)} is listening.` : 'Nothing is listening on this computer yet, so it waits until a run starts: see Analyses you asked for.'}</p>
     <div class="at-pop-do"><button class="at-btn at-press" data-act="ask-cancel">Cancel</button><button class="at-btn at-press primary" data-act="ask-yes"><svg class="g"><use href="#i-bot"/></svg><span>Ask the desk</span></button></div>`;
 }
@@ -1210,6 +1326,7 @@ document.addEventListener('click', (e) => {
   if (e.target === dlg) { dlg.close(); return; }
   if (e.target === $('#ticketDialog')) { $<HTMLDialogElement>('#ticketDialog').close(); T.open = null; return; }
   if (e.target === $('#stopDialog')) { $<HTMLDialogElement>('#stopDialog').close(); return; }
+  if (e.target === $('#glossDialog')) { $<HTMLDialogElement>('#glossDialog').close(); return; }
   const el = (e.target as Element).closest<HTMLElement>('[data-act]');
   if (!el) return;
   const sym = el.dataset.symbol ?? '';
@@ -1235,6 +1352,15 @@ document.addEventListener('click', (e) => {
       toast('The dashboard is stopped. Ask the team to open it again any time.');
     }); break;
     case 'select': select(sym); break;
+    case 'guide-open': remember({ guide: 'open' }); showView('overview'); renderGuide(); $('#sec-guide').scrollIntoView({ behavior: 'smooth', block: 'start' }); break;
+    case 'guide-away': remember({ guide: 'away' }); renderGuide(); toast('Get started is put away. The side list opens it again any time.'); break;
+    case 'gloss-open': openGlossary(); break;
+    case 'gloss-close': $<HTMLDialogElement>('#glossDialog').close(); break;
+    case 'contact-save': void saveContact(); break;
+    case 'contact-edit': GUIDE.editing = true; renderGuide(); document.getElementById('contactInput')?.focus(); break;
+    case 'contact-cancel': GUIDE.editing = false; renderGuide(); break;
+    case 'guide-ask': void askPicks(); break;
+    case 'watch-add': void addStock(sym); break;
     case 'fold': {
       const t = el.dataset.tier as Tier;
       if (!TIER_KEYS.includes(t)) break;
@@ -1299,9 +1425,10 @@ void loadTrading(); }); break;
 });
 
 document.addEventListener('input', (e) => { const id = (e.target as Element).id; if (id === 'tkQty' || id === 'tkLimit') ticketEdited(); });
-// In the whole-market field, Enter saves and Esc puts it away.
+// In the whole-market field, Enter saves and Esc puts it away; in the email field, Enter saves.
 document.addEventListener('keydown', (e) => {
   const t = e.target as HTMLInputElement;
+  if (t.id === 'contactInput' && e.key === 'Enter') { e.preventDefault(); void saveContact(); return; }
   if (t.id !== 'mkInput') return;
   if (e.key === 'Enter') { e.preventDefault(); void saveMarketList(t.value.split(/[\s,]+/).filter(Boolean)); }
   else if (e.key === 'Escape') { e.preventDefault(); MK.editing = false; renderStart(); }
@@ -1472,6 +1599,7 @@ async function prices(): Promise<void> {
 
 window.addEventListener('resize', () => { renderHero(); });
 renderControls();
+explainStaticWords();
 /** The page holds no key to the dashboard (or the desk refused the one it held): it says so and asks for nothing more. */
 function noKey(): void {
   if (life.noKey) return;

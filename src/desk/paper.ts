@@ -44,8 +44,10 @@ export interface PaperBook {
 export interface PaperRecord { since: string | null; weeks: number; calls: number }
 
 export const PAPER_START_USD = 10_000, PAPER_MIN = 100, PAPER_MAX = 10_000_000;
-/** Under this many weeks of record, switching trading on asks for one extra press. */
-export const RECORD_WEEKS = 4;
+/** Under this many weeks of record, switching trading on asks for one extra press. The paper time before the money step:
+ *  the dashboard's first-month guide, the trading switch and the docs all say it as RECORD_WORDS. */
+export const RECORD_WEEKS: number = 4;
+export const RECORD_WORDS = `${['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'][RECORD_WEEKS] ?? RECORD_WEEKS} ${RECORD_WEEKS === 1 ? 'week' : 'weeks'}`;
 const cents = (n: number) => Math.round(n * 100) / 100;
 
 /** The crypto followed on paper, to start: Bitcoin and Ether, within the crypto limit. Never sent to Robinhood. */

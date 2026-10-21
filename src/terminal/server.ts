@@ -1,6 +1,7 @@
 // The dashboard's local server: one page and its data, on this computer only. It reads the desk's own files and Yahoo
-// Finance's public prices and search, keeps the person's watchlist, the analyses they ask for and what the page should
-// remember (never anything about an order), and can connect to Robinhood to
+// Finance's public prices and search, keeps the person's watchlist, the analyses they ask for, the contact email the SEC
+// asks for (sent to sec.gov alone, never shown back in full) and what the page should remember (never anything about an
+// order), and can connect to Robinhood to
 // read (robinhood/link.ts); it holds no order. Everything it accepts is checked: the address it was reached by, where
 // a change came from, and a key made at start-up. The key is in no page it serves: the dashboard opens the person's
 // browser on a one-time link, which the page swaps for the key once (/api/claim), so another program on this computer
@@ -12,9 +13,11 @@ import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { today } from '../data/dates.js';
+import { configure } from '../data/http.js';
 import { clearCache, daily } from '../data/yahoo.js';
 import { addDays } from '../data/dates.js';
-import { followed, paperBook, readPaperStart, recordOf, RECORD_WEEKS, savePaperStart, type Closes, type PaperBook } from '../desk/paper.js';
+import { readContactEmail, saveContactEmail } from '../contact.js';
+import { followed, paperBook, readPaperStart, recordOf, RECORD_WEEKS, RECORD_WORDS, savePaperStart, type Closes, type PaperBook } from '../desk/paper.js';
 import { isCrypto, safeSymbol } from '../data/symbols.js';
 import { dashboardKeyFile, deskDataDir, robinhoodFile } from '../paths.js';
 import { writePrivate } from '../private.js';
@@ -40,6 +43,7 @@ import { queueTop, readScreen, SCREEN_MS, screenToday, TOP_QUEUED, type Screen }
 import { weatherNow, type Weather } from '../desk/weather.js';
 import { dequeue, depthOfRounds, enqueue, isDepth, QueueRefusal, readQueue, removeListener, ringDoorbell, waitingIn } from '../desk/queue.js';
 import { findClaude } from '../watch/claude.js';
+import { maskEmail } from './guide.js';
 
 export interface Asset { type: string; body: Buffer | string }
 export type Assets = Map<string, Asset>;
@@ -132,6 +136,9 @@ const KEY = /^[0-9a-f]{48}$/, CLAIM = /^[0-9a-f]{36}$/;
 
 export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
   const { root, assets } = opts, dir = deskDataDir(root), deskId = deskIdOf(root);
+  // The SEC asks everyone who reads its filings (a stock's sector comes from them) for a contact email: the person's own,
+  // looked up at each request, so one saved on this page or in a chat goes at once, and to sec.gov alone.
+  configure({ contact: readSettings(root).sources.contact, secEmail: () => readContactEmail(root) });
   const token = opts.key && KEY.test(opts.key) ? opts.key : crypto.randomBytes(24).toString('hex');
   const code = opts.code ?? [], build = fingerprint(code);
   let updated = false, restarting = false;
@@ -315,6 +322,7 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
       if (p === '/api/call') {
         const c = callOf(root, sym.toUpperCase(), url.searchParams.get('date') ?? '');
         if (!c) throw new Refused(404, 'no such call');
+        if (!readPrefs(dir).readCall) savePrefs(dir, { readCall: day });   // the first call read in full: "Get started", step four
         return json(res, 200, c);
       }
       throw new Refused(404, 'not found');
@@ -366,7 +374,14 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
       for (const until = Date.now() + 8_000; Date.now() < until; await new Promise((r) => setTimeout(r, 200))) { const l = listenerOf(dir); if (l) return json(res, 200, { listener: l }); }
       throw new Refused(502, 'the listener did not start: see desk-data/watcher.log, or start it yourself with node dist/watch.mjs');
     }
-    if (p === '/api/prefs' && method === 'POST') { delete b.autorun; delete b.market; delete b.morning; return json(res, 200, savePrefs(dir, b)); }   // only their own switches set autorun and morning, only Change… the whole market
+    if (p === '/api/prefs' && method === 'POST') { delete b.autorun; delete b.market; delete b.morning; delete b.readCall; return json(res, 200, savePrefs(dir, b)); }   // only their own switches set autorun and morning, only Change… the whole market, only a call served readCall
+    // The contact email the SEC asks for, from the field in "Get started": checked, kept in the desk's records like the
+    // desk tool set_contact_email keeps it, sent to sec.gov alone, and never shown back in full.
+    if (p === '/api/contact' && method === 'POST') {
+      let email: string;
+      try { email = saveContactEmail(root, typeof b.email === 'string' ? b.email : ''); } catch (e) { throw new Refused(400, (e as Error).message); }
+      return json(res, 200, { saved: maskEmail(email) });
+    }
     // "Analyse the top three each market morning": the person's switch, off as shipped. Switched on, today's top three (if
     // the screen was worked out today) go on the waiting list at once, and then once each market day.
     if (p === '/api/screen/morning' && method === 'POST') {
@@ -495,7 +510,7 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
       if (b.on !== true || b.confirm !== 'switch trading on') throw new Refused(400, 'to switch trading on, confirm it on the page');
       // Under four weeks of record, the person sees the record first and says they understand: never a block.
       const record = recordOf(callsOf(), day);
-      if (record.weeks < RECORD_WEEKS && b.understood !== true) throw new Refused(400, `the desk has ${record.weeks} ${record.weeks === 1 ? 'week' : 'weeks'} and ${record.calls} ${record.calls === 1 ? 'call' : 'calls'} of record, under four weeks: confirm on the page that you understand`);
+      if (record.weeks < RECORD_WEEKS && b.understood !== true) throw new Refused(400, `the desk has ${record.weeks} ${record.weeks === 1 ? 'week' : 'weeks'} and ${record.calls} ${record.calls === 1 ? 'call' : 'calls'} of record, under ${RECORD_WORDS}: confirm on the page that you understand`);
       return json(res, 200, robinhood.setTrading(true));
     }
     if (p === '/api/robinhood/refresh' && method === 'POST') {

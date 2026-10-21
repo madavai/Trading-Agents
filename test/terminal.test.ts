@@ -208,7 +208,7 @@ test('the paper record: every call followed at its ticket size from the closing 
   assert.ok(book.series.length > 20 && book.series[0].benchmark === 10_000, 'a value a day since the first call, the S&P 500 from the same start');
   assert.deepEqual(book.record, { since: '2026-09-01', weeks: 5, calls: 2 });
   const state = (await call(term, 'GET', '/api/state')).json();
-  assert.deepEqual(state.paper, { since: '2026-09-01', weeks: 5, calls: 2, startUsd: 10_000, minWeeks: 4 }, 'the page has the record without asking for prices');
+  assert.deepEqual(state.paper, { since: '2026-09-01', weeks: 5, calls: 2, startUsd: 10_000, minWeeks: 4, minWords: 'four weeks' }, 'the page has the record without asking for prices');
   assert.match((await call(term, 'POST', '/api/paper', { body: { startUsd: 50 } })).json().error, /whole number of dollars from \$100/);
   assert.equal((await call(term, 'POST', '/api/paper', { body: { startUsd: 20_000 } })).json().startUsd, 20_000);
   assert.equal((await call(term, 'GET', '/api/state')).json().paper.startUsd, 20_000);
@@ -554,4 +554,63 @@ test('after an update changes its code, the page is offered Restart; it restarts
     assert.equal((await version()).restarting, true);
     assert.equal((await call(t, 'POST', '/api/ticket/own', { body: { symbol: 'NVDA', side: 'buy' } })).status, 503);
   } finally { await t.close(); }
+});
+
+test('the email field: checked before it is kept, kept as the desk tool keeps it, and never shown back in full', async () => {
+  const contact = path.join(dir(), 'contact.json');
+  for (const [email, words] of [['jane', /is not an email address/], ['jane@mail.com\r\nX-Evil: 1', /is not an email address/], ['me@example.com', /made-up example address/], [42, /is not an email address/]] as const) {
+    const r = await call(term, 'POST', '/api/contact', { body: { email } });
+    assert.deepEqual([r.status, words.test(r.json().error)], [400, true], String(email));
+  }
+  assert.equal(fs.existsSync(contact), false, 'nothing refused is kept');
+  assert.equal((await call(term, 'POST', '/api/contact', { body: { email: 'jane.roe@mail.com' }, token: false })).status, 401);
+  assert.equal((await call(term, 'POST', '/api/contact', { body: { email: 'jane.roe@mail.com' }, headers: { origin: 'https://evil.example' } })).status, 403);
+  assert.equal(fs.existsSync(contact), false, 'another page cannot set it');
+  const saved = await call(term, 'POST', '/api/contact', { body: { email: ' jane.roe@mail.com ' } });
+  assert.deepEqual([saved.status, saved.json()], [200, { saved: 'j…@mail.com' }]);
+  assert.deepEqual(JSON.parse(fs.readFileSync(contact, 'utf8')), { email: 'jane.roe@mail.com' }, 'the same record set_contact_email keeps');
+  const state = await call(term, 'GET', '/api/state');
+  assert.deepEqual([state.json().desk.emailSaved, state.json().guide.email], [true, { done: true, saved: 'j…@mail.com' }]);
+  for (const p of ['/api/state', '/api/prefs', '/api/version']) assert.ok(!(await call(term, 'GET', p)).body.includes('jane.roe'), `${p} never shows the address in full`);
+  assert.equal((await call(term, 'POST', '/api/contact', { body: { email: 'joe@other.org' } })).json().saved, 'j…@other.org', 'changed from the page');
+});
+
+test('the email saved on the page goes to the SEC alone: Yahoo and every other source see the desk\'s name only', async () => {
+  const seen: Array<[string, string]> = [];
+  configure({ fetch: async (input, init) => { seen.push([new URL(String(input)).hostname, String((init?.headers as Record<string, string>)['User-Agent'])]); return yahoo(input, init); } });
+  assert.equal((await call(term, 'POST', '/api/contact', { body: { email: 'jane.roe@mail.com' } })).status, 200);
+  new Journal(path.join(dir(), 'journal.md')).storeDecision('NVDA', '2026-09-01', BUY);
+  assert.equal((await call(term, 'GET', '/api/paper')).status, 200);   // Yahoo's closes, and the SEC for the stock's sector
+  assert.equal((await call(term, 'GET', '/api/quotes?symbols=NVDA')).status, 200);
+  const hosts = new Set(seen.map(([h]) => h));
+  assert.ok([...hosts].some((h) => h.endsWith('sec.gov')) && [...hosts].some((h) => h.includes('yahoo')), [...hosts].join(', '));
+  for (const [host, ua] of seen) assert.equal(ua.includes('jane.roe@mail.com'), host === 'sec.gov' || host.endsWith('.sec.gov'), `${host}: ${ua}`);
+});
+
+test('"Get started" ticks itself off from the desk\'s own records, step by step', async () => {
+  const guide = async () => (await call(term, 'GET', '/api/state')).json().guide;
+  const ticks = async () => { const g = await guide(); return [g.email.done, g.picks.done, g.analyse.done, g.read.done, g.paper.done]; };
+  assert.deepEqual([(await guide()).show, (await guide()).first, await ticks()], [true, true, [false, false, false, false, false]], 'a first visit');
+  saveContactEmail(root, 'jane@mail.com');   // given in a chat, with the desk tool: it ticks here too
+  for (const s of ['NVDA', 'AAPL', 'KO', 'SPY', 'XLK']) assert.equal((await call(term, 'POST', '/api/watchlist', { body: { symbol: s } })).status, 200, s);
+  assert.deepEqual(await ticks(), [true, true, false, false, false]);
+  assert.equal((await call(term, 'POST', '/api/queue', { body: { symbol: 'NVDA', depth: 'shallow' } })).status, 200);
+  assert.equal((await guide()).analyse.done, false, 'asked, but nothing runs it yet');
+  writeListener(dir(), { listener: 'Madav', since: new Date().toISOString(), beat: new Date().toISOString() });
+  assert.deepEqual((await guide()).analyse, { done: true, asked: 1, automatic: 'Madav' });
+  new Journal(path.join(dir(), 'journal.md')).storeDecision('KO', '2026-09-01', BUY);
+  assert.deepEqual([(await guide()).read.done, (await guide()).read.latest], [false, { ticker: 'KO', date: '2026-09-01', rating: 'Overweight' }]);
+  assert.equal((await call(term, 'POST', '/api/prefs', { body: { readCall: '2026-10-12' } })).status, 200);
+  assert.equal((await guide()).read.done, false, 'the page cannot say a call was read');
+  const v = (await call(term, 'GET', '/api/version')).json().version;
+  assert.equal((await call(term, 'GET', '/api/call?symbol=KO&date=2026-09-01')).status, 200);
+  assert.equal((await guide()).read.done, true, 'reading a call in full ticks step four');
+  assert.notEqual((await call(term, 'GET', '/api/version')).json().version, v, 'and the page hears of it');
+  assert.equal(readPrefs(dir()).readCall, '2026-10-12');
+  assert.deepEqual([(await guide()).paper.done, (await guide()).paper.weeks, (await guide()).paper.words], [true, 5, 'four weeks'], 'the first call was six weeks ago');
+  assert.deepEqual([(await guide()).done, (await guide()).show, (await guide()).first], [5, false, false], 'with calls, it no longer opens by itself (the page keeps it open once shown)');
+  assert.equal((await call(term, 'POST', '/api/prefs', { body: { guide: 'open' } })).status, 200);
+  assert.equal((await guide()).show, true, 'reopened from the side list');
+  assert.equal((await call(term, 'POST', '/api/prefs', { body: { guide: 'away' } })).status, 200);
+  assert.equal((await guide()).show, false, 'put away');
 });
