@@ -2,7 +2,7 @@
 // scorecard worked out from them, the watchlist, the analyses waiting, and the person's Robinhood accounts on a page of
 // their own. A number that cannot be had is a dash. An order starts only from a ticket - one of the desk's calls
 // (Decide…) or the person's own (Trade…) - and is placed only on their Confirm, with trading switched on by them.
-import { api, ApiError, claimKey, hasKey, KEY_LOST, type CallDetail, type DeskState, type Depth, type History, type LinkInfo, type Market, type Match, type Prefs, type Caps, type PaperView, type PaperTrade, type QueueView, type QuoteResult, type Account, type AccountView, type Holding, type Order, type Recent, type Snapshot, type TicketOpen, type Check, type Review, type Placed, type Trading, type Tier, type TierItem, type TierView } from './api.js';
+import { api, ApiError, claimKey, hasKey, KEY_LOST, type CallDetail, type DeskState, type Depth, type History, type LinkInfo, type Market, type Match, type Prefs, type Caps, type PaperView, type PaperTrade, type QueueView, type QuoteResult, type Account, type AccountView, type Holding, type Order, type Recent, type Snapshot, type TicketOpen, type Check, type Review, type Placed, type Trading, type Tier, type TierItem, type TierView, type Worth, type Screen, type Weather, type WeatherLine } from './api.js';
 import { heroChart, paperChart, sparkline } from './chart.js';
 import { barOn, clock, dayText, esc, labelled, money, num, opening, pct, plain, ratingMeaning, ratingTone, SECTION_NAMES, shortDay, tone, WORDS } from './fmt.js';
 import { markdown } from './md.js';
@@ -808,6 +808,56 @@ function renderStart(): void {
   if (kept && field) { field.value = kept.value; if (kept.focus) { field.focus(); field.setSelectionRange(kept.from, kept.to); } }
 }
 
+// ---------- this morning: the market weather, and what is worth a look today ----------
+// Both are worked out by the desk from figures, at most once an hour; the page asks when it opens and every hour after.
+const MORNING = { weather: null as Weather | null, weatherFailed: '', screen: null as Screen | null, screenFailed: '', on: false, top: 3 };
+const LINE_TONE: Record<WeatherLine['tone'], string> = { ok: 'ok', warn: 'warn', bad: 'danger', '': '' };
+
+function renderWeather(): void {
+  const w = MORNING.weather, el = $('#weatherCard');
+  const head = '<div class="at-card-head"><h3>Market weather</h3><span class="at-chip" title="Each line describes the market as it is; none says what it does next">never a forecast</span></div>';
+  if (!w) { el.innerHTML = `${head}<p class="at-quiet">${esc(MORNING.weatherFailed || 'Reading the S&P 500, the VIX and the odds on the Federal Reserve.')}</p>`; return; }
+  el.innerHTML = `${head}<div class="ta-lines">${w.lines.map((l) => `<div class="ta-line">
+      <div class="ta-line-head"><b>${esc(l.name)}</b>${l.state ? `<span class="at-chip ${LINE_TONE[l.tone]}">${esc(l.state)}</span>` : '<span class="at-chip">—</span>'}</div>
+      <p>${esc(l.words)}</p><p class="at-quiet">${esc(l.meaning)}</p></div>`).join('')}</div>
+    <p class="at-honest">From Yahoo Finance and Polymarket at ${esc(clock(w.at))}. Nothing here is investment advice.</p>`;
+}
+
+/** One stock worth a look: its name, the day's move, why, and the robot. */
+function lookRow(p: Worth): string {
+  const it = tierItem(p.symbol), name = it?.name ?? quoteOf(p.symbol)?.name ?? p.symbol;
+  const move = p.movePct === null ? '<span class="at-chip">—</span>' : `<span class="at-chip ${tone(p.movePct)}" title="The move on ${esc(dayText(p.session))}, from the close before">${pct(p.movePct)}</span>`;
+  return `<div class="ta-look">
+    <button class="ta-look-go" data-act="select" data-symbol="${esc(p.symbol)}" title="Chart ${esc(p.symbol)}"><span class="ta-tier-top"><b class="at-tile-name">${esc(name)}</b>${move}</span><span class="at-tile-sub">${esc(p.symbol)} · ${esc(p.why)}</span></button>
+    <span class="at-tail">${isOpen(p.symbol) ? openChip(p.symbol) : robot(p.symbol)}</span></div>`;
+}
+
+function renderLook(): void {
+  const s = MORNING.screen, el = $('#lookCard');
+  const head = `<div class="at-card-head"><h3>Worth a look today</h3>${s ? `<span class="at-chip" title="How many funds and stocks were looked at">${s.picks.length} of ${s.looked}</span>` : ''}</div>`;
+  const sw = `<button class="at-toggle" data-act="morning-switch" role="switch" aria-checked="${MORNING.on}"><span class="at-switch${MORNING.on ? ' on' : ''}"></span><span>Analyse the top ${MORNING.top} each market morning</span></button>
+    <p class="at-quiet">${MORNING.on ? `On: each market day, the top ${MORNING.top} not already called go on the waiting list at shallow depth, once. Each analysis uses your Claude plan, like a chat.` : `Off as shipped. When on, the top ${MORNING.top} go on the waiting list at shallow depth once each market day, and run when something is listening.`}</p>`;
+  if (!s) { el.innerHTML = `${head}<p class="at-quiet">${esc(MORNING.screenFailed || "Looking over the whole market, the sectors and your names: the first look of the day takes a minute.")}</p>${sw}`; return; }
+  const list = s.picks.length ? `<div class="ta-looks">${s.picks.map(lookRow).join('')}</div>`
+    : `<p class="at-lede">Nothing stood out among the ${s.looked} looked at: no move of 3% or more, no volume twice its usual, no 52-week high or low, no cross of an average, and no news today about your companies or coins.</p>`;
+  el.innerHTML = `${head}${list}${s.unavailable.length ? `<p class="at-quiet">Could not be read just now: ${esc(listWords(s.unavailable))}.</p>` : ''}${sw}
+    <p class="at-honest">Ranked by how many of these fire, then by the size of the move: a move of 3% or more in a day; volume at least twice its usual (its average over 20 days); a new 52-week high or low (the highest or lowest price in a year); a close across its 50- or 200-day average (its average closing price over that many days); and, for a company or a coin, news about it today. From Yahoo Finance's daily prices at ${esc(clock(s.at))}. A move says what happened, not what comes next. Nothing here is investment advice.</p>`;
+}
+
+function renderMorning(): void { renderWeather(); renderLook(); }
+
+async function loadMorning(): Promise<void> {
+  if (life.noKey || life.stopped) return;
+  await Promise.all([
+    api.weather().then((r) => { MORNING.weather = r.weather; MORNING.weatherFailed = ''; }, (e) => { MORNING.weatherFailed = say(e); }),
+    api.screen().then(async (r) => {
+      MORNING.screen = r.screen; MORNING.on = r.morning.on; MORNING.top = r.morning.top; MORNING.screenFailed = '';
+      if (r.queued.length) { toast(`${listWords(r.queued)} ${r.queued.length === 1 ? 'is' : 'are'} waiting to be analysed: your morning switch put ${r.queued.length === 1 ? 'it' : 'them'} on the list.`); await refreshState(); }
+    }, (e) => { MORNING.screenFailed = say(e); }),
+  ]);
+  renderMorning();
+}
+
 /** Keeps the whole-market funds the person typed, once the desk has checked each one's price. */
 async function saveMarketList(symbols: string[]): Promise<void> {
   await run(async () => {
@@ -963,7 +1013,7 @@ async function sinceCall(symbol: string, date: string): Promise<void> {
 
 // ---------- everything ----------
 function renderAll(): void {
-  renderSub(); renderFavs(); renderAccount(); renderToday(); renderStart(); renderControls(); renderHero(); renderCall(); renderStock(); renderAnalyses(); renderWatch(); renderCalls(); renderScore();
+  renderSub(); renderFavs(); renderAccount(); renderToday(); renderStart(); renderMorning(); renderControls(); renderHero(); renderCall(); renderStock(); renderAnalyses(); renderWatch(); renderCalls(); renderScore();
 }
 
 /** Shows the desk or the account page; the side list marks where the person is. */
@@ -1123,6 +1173,13 @@ document.addEventListener('click', (e) => {
       if (f.has(t)) f.delete(t); else f.add(t);
       remember({ folded: TIER_KEYS.filter((k) => f.has(k)) }); renderWatch(); break;
     }
+    case 'morning-switch': void run(async () => {
+      const r = await api.setMorning(!MORNING.on);
+      MORNING.on = r.morning.on; MORNING.top = r.morning.top; renderLook();
+      toast(!r.morning.on ? 'Switched off: nothing goes on the waiting list by itself.'
+        : r.queued.length ? `Switched on: ${listWords(r.queued)} ${r.queued.length === 1 ? 'is' : 'are'} now waiting to be analysed, at shallow depth.` : `Switched on: each market day, the top ${r.morning.top} go on the waiting list at shallow depth.`);
+      if (r.queued.length) await refreshState();
+    }); break;
     case 'mk-edit': MK.editing = true; renderStart(); document.getElementById('mkInput')?.focus(); break;
     case 'mk-cancel': MK.editing = false; renderStart(); break;
     case 'mk-save': void saveMarketList($<HTMLInputElement>('#mkInput').value.split(/[\s,]+/).filter(Boolean)); break;
@@ -1357,7 +1414,8 @@ document.addEventListener(KEY_LOST, noKey);
 // First the one-time link the dashboard opened this page with, swapped for the key; then the desk's files, the prices and Robinhood.
 void claimKey().then(() => {
   if (!hasKey()) { noKey(); return; }
-  void loadPrefs().then(() => refreshState()).then(() => void prices());
+  void loadPrefs().then(() => refreshState()).then(() => { void prices(); void loadMorning(); });
   void refreshRobinhood();
   setInterval(() => void watchFiles(), 3_000);
+  setInterval(() => void loadMorning(), 60 * 60_000);   // the desk works them out at most once an hour
 });

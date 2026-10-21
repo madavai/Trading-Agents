@@ -23,6 +23,9 @@ export interface Prefs {
   market?: string[];
   /** The tiers of the watchlist folded away. */
   folded?: Tier[];
+  /** "Analyse the top three each market morning" is on (off as shipped): the top three of "Worth a look today" go on the
+   *  waiting list at shallow depth once each market day (desk/screen.ts queueTop). Set only by that switch. */
+  morning?: boolean;
 }
 
 export const MAX_RECENT = 6;
@@ -56,6 +59,7 @@ export function cleanPrefs(raw: unknown): Prefs {
   if (typeof r.autorun === 'boolean') out.autorun = r.autorun;
   const market = cleanMarket(r.market); if (market) out.market = market;
   if (Array.isArray(r.folded)) out.folded = TIERS.filter((t) => (r.folded as unknown[]).includes(t));
+  if (typeof r.morning === 'boolean') out.morning = r.morning;
   return out;
 }
 

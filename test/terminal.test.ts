@@ -20,7 +20,8 @@ import { lockState } from '../src/private.js';
 import { startTerminal, type Assets, type Terminal } from '../src/terminal/server.js';
 import { MAX_WATCH, addWatch } from '../src/terminal/store.js';
 import { enqueue, MAX_OPEN, readDoorbell, writeListener } from '../src/desk/queue.js';
-import { chartJson, series } from './chart.js';
+import { chartJson, series, weekdays, type Row } from './chart.js';
+import { readScreen } from '../src/desk/screen.js';
 
 const NOW = Date.parse('2026-10-12T15:00:00Z') / 1000;
 const intraday = (symbol: string, price: number | undefined, prev: number | undefined, extra: Record<string, unknown> = {}) => ({
@@ -432,6 +433,85 @@ test('which tiers of the watchlist are folded away is remembered, each one a tie
   assert.deepEqual(readPrefs(dir()).folded, []);
   savePrefs(dir(), { folded: ['crypto'] });
   assert.deepEqual(readPrefs(dir()).folded, ['crypto']);
+});
+
+/** 300 weekday rows to 2026-10-12, rising gently from 100; the last day's close is `times` the one before, a narrow day. */
+const drifting = (times = 1, low?: number): Row[] => weekdays('2026-10-12', 300).map((date, i, all) => {
+  const c = 100 + i * 0.02;
+  if (i < all.length - 1) return { date, o: c, h: c + 1, l: c - 1, c, v: 1_000_000 };
+  const close = (100 + (i - 1) * 0.02) * times;
+  return { date, o: close, h: close + 0.2, l: low ?? close - 0.2, c: close, v: 1_000_000 };
+});
+/** Yahoo for "Worth a look today": XLE jumps 6%, TSLA falls 5% to a year's low, NVDA is quiet but in the news today, DOWN does not answer. */
+const looking = (asked: string[]): typeof fetch => async (input) => {
+  const url = String(input); asked.push(url);
+  if (url.includes('/v1/finance/search')) {
+    const at = Date.parse('2026-10-12T15:00:00Z') / 1000;
+    return new Response(JSON.stringify({ news: url.includes('q=NVDA') ? [{ title: 'NVDA news', publisher: 'Wire', link: 'https://example.com/a', providerPublishTime: at, relatedTickers: ['NVDA'] }, { title: 'Older', publisher: 'Wire', providerPublishTime: at - 4 * 86_400, relatedTickers: ['NVDA'] }] : [] }));
+  }
+  const symbol = decodeURIComponent(/\/v8\/finance\/chart\/([^?]+)/.exec(url)?.[1] ?? '');
+  if (symbol === 'DOWN') return new Response('down', { status: 503, headers: { 'retry-after': '0' } });
+  return new Response(JSON.stringify(chartJson(symbol, symbol === 'XLE' ? drifting(1.06) : symbol === 'TSLA' ? drifting(0.95, 90) : drifting(1.001))));
+};
+
+test('"Worth a look today" is worked out from figures at most once an hour, kept for the morning routine, and the person\'s morning switch alone puts the top three on the waiting list', async () => {
+  const asked: string[] = [];
+  configure({ fetch: looking(asked) });
+  for (const s of ['NVDA', 'TSLA']) addWatch(dir(), s, '2026-10-12');
+  addWatch(dir(), 'DOWN', '2026-10-12');
+  const first = (await call(term, 'GET', '/api/screen')).json();
+  assert.deepEqual(first.screen.picks.map((p: any) => [p.symbol, p.why]), [
+    ['TSLA', 'Fell 5.0%, a new 52-week low, crossed below its 50-day average, crossed below its 200-day average'],
+    ['XLE', 'Rose 6.0%, a new 52-week high'], ['NVDA', 'In the news today (1 article)'],
+  ]);
+  assert.deepEqual([first.screen.looked, first.screen.unavailable, first.screen.day], [18, ['DOWN'], '2026-10-12'], 'the four whole-market funds, the eleven sectors and the watchlist; one that does not answer is said to be unavailable');
+  assert.deepEqual([first.morning, first.queued], [{ on: false, top: 3 }, []], 'off as shipped: nothing goes on the waiting list');
+  assert.deepEqual(readScreen(dir())!.picks.map((p) => p.symbol), ['TSLA', 'XLE', 'NVDA'], 'kept for the morning routine');
+  assert.ok(!asked.some((u) => u.includes('/search') && /q=(XLE|SPY)\b/.test(u)), 'news is read for companies and coins, not funds');
+  const before = asked.length;
+  await call(term, 'GET', '/api/screen');
+  assert.equal(asked.length, before, 'within the hour, Yahoo is not asked again');
+  assert.deepEqual((await call(term, 'GET', '/api/state')).json().queue, [], 'nothing was asked for');
+
+  const sw = (on: unknown, o: Parameters<typeof call>[3] = {}) => call(term, 'POST', '/api/screen/morning', { body: { on }, ...o });
+  assert.equal((await sw('yes')).status, 400);
+  assert.equal((await sw(true, { token: false })).status, 401);
+  assert.equal((await sw(true, { headers: { origin: 'https://evil.example' } })).status, 403);
+  await call(term, 'POST', '/api/prefs', { body: { morning: true } });
+  assert.equal(readPrefs(dir()).morning, undefined, "the page's other choices never switch it on");
+  new Journal(path.join(dir(), 'journal.md')).storeDecision('XLE', '2026-10-12', '**Rating**: Hold\n\n**Executive Summary**: x.');
+  const on = (await sw(true)).json();
+  assert.deepEqual([on.morning, on.queued], [{ on: true, top: 3 }, ['TSLA', 'NVDA']], 'switched on: today\'s top three at once, but not XLE, already called today');
+  assert.deepEqual((await call(term, 'GET', '/api/state')).json().queue.map((q: any) => [q.symbol, q.state, q.depth]), [['TSLA', 'waiting', 'shallow'], ['NVDA', 'waiting', 'shallow']]);
+  assert.ok(readDoorbell(dir()), 'the doorbell rings for whoever listens');
+  assert.deepEqual((await call(term, 'GET', '/api/screen')).json().queued, [], 'once a day');
+  assert.deepEqual((await sw(false)).json(), { morning: { on: false, top: 3 }, queued: [] });
+  assert.equal(readPrefs(dir()).morning, false);
+});
+
+test('"Market weather": the trend, the mood and the rates, each from figures, and a source that fails leaves its own line unavailable', async () => {
+  const rows = (closes: number[]): Row[] => weekdays('2026-10-12', closes.length).map((date, i) => ({ date, o: closes[i]!, h: closes[i]! + 1, l: closes[i]! - 1, c: closes[i]!, v: 0 }));
+  const events = { events: [{ title: 'Fed Decision in October?', endDate: '2026-10-29T03:59:00Z', closed: false, markets: [{ groupItemTitle: 'No change', outcomePrices: '["0.875", "0.125"]' }, { groupItemTitle: '25 bps increase', outcomePrices: '["0.115", "0.885"]' }] }] };
+  let polymarket = true;
+  configure({ fetch: async (input) => {
+    const url = String(input);
+    if (url.includes('polymarket')) return polymarket ? new Response(JSON.stringify(events)) : new Response('down', { status: 503, headers: { 'retry-after': '0' } });
+    const symbol = decodeURIComponent(/\/v8\/finance\/chart\/([^?]+)/.exec(url)?.[1] ?? '');
+    return new Response(JSON.stringify(chartJson(symbol, symbol === '^VIX' ? rows([18, 27.3]) : rows(Array.from({ length: 260 }, (_, i) => 5000 + i * 5)))));
+  } });
+  const w = (await call(term, 'GET', '/api/weather')).json().weather;
+  assert.deepEqual(w.lines.map((l: any) => [l.name, l.state, l.tone]), [['Trend', 'Rising', 'ok'], ['Mood', 'Wild', 'bad'], ['Rates', 'No change', '']]);
+  assert.match(w.lines[2].words, /by 28 Oct 2026, Polymarket's crowd puts no change at 88% and a rise of 0\.25% at 12%/);
+  assert.ok(w.lines.every((l: any) => l.meaning.length > 40), 'every line says what it means');
+  polymarket = false;
+  const kept = (await call(term, 'GET', '/api/weather')).json().weather;
+  assert.equal(kept.at, w.at, 'worked out once an hour');
+  const t = await startTerminal({ root, assets: ASSETS, port: 0, keyFile: KEYS() });
+  try {
+    const down = (await call(t, 'GET', '/api/weather')).json().weather;
+    assert.deepEqual(down.lines.map((l: any) => l.state), ['Rising', 'Wild', null]);
+    assert.match(down.lines[2].words, /^Unavailable: Polymarket did not answer\.$/);
+  } finally { await t.close(); }
 });
 
 test('Stop on the page stops the dashboard, from the page alone; a dashboard given no way to stop has no such door', async () => {

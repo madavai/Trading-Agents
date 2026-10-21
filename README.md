@@ -120,7 +120,8 @@ the team's "talk" switch shows these messages in the Messages panel; with it off
    dates only prices, indicators, economic figures and what US companies filed with the SEC (accounts, valuation,
    insider trades) are as known then: news, posts and odds are recent-only, so they are thin.
 2. **You see.** Ask the team to open the dashboard, or type `/terminal`: a page on your own computer that starts with
-   the whole market, the eleven sectors and your own names side by side, then the markets, a chart of any stock (area
+   the whole market, the eleven sectors and your own names side by side, then the market weather and what is worth a
+   look today, then the markets, a chart of any stock (area
    or candles, 50- and 200-day averages, volume), your watchlist by tier, a page per stock, the desk's calls with their
    full reasoning, and how the desk has scored. The agents see your chosen holdings when they analyse.
 3. **You decide and trade.** On a call, "Decide…" opens a ticket for the Agentic account, sized by your settings and
@@ -179,7 +180,7 @@ the team's "talk" switch shows these messages in the Messages panel; with it off
 <a href="https://madavai.github.io/Trading-Agents/inside-the-trading-desk.html#dashboard">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/dashboard-dark.webp">
-  <img alt="The dashboard: a side list with your account at the top and the desk's sections below; Your desk today, Start here with the whole market, the eleven sectors and your own names, the markets, a full-width chart, the watchlist by tier, the desk's calls, your accounts, and the order ticket from Decide… or Trade… to your Confirm." src="docs/readme/dashboard-light.webp">
+  <img alt="The dashboard: a side list with your account at the top and the desk's sections below; Your desk today, Start here with the whole market, the eleven sectors and your own names, This morning with the market weather and what is worth a look today, the markets, a full-width chart, the watchlist by tier, the desk's calls, your accounts, and the order ticket from Decide… or Trade… to your Confirm." src="docs/readme/dashboard-light.webp">
 </picture>
 </a>
 
@@ -213,9 +214,26 @@ what it costs). Every trading word has its meaning beside it: under each tier, a
 rating when you point at it. The watchlist further down is grouped the same way; press a tier's name to fold it away,
 and the dashboard remembers which you folded.
 
+### This morning: the market weather, and what is worth a look
+Right after Start here, two cards are worked out from figures, at most once an hour, and never from a model or a
+forecast:
+- **Market weather**, three plain lines, each with a colour and its meaning. The **trend**: the S&P 500 against its 50-
+  and 200-day averages (above both rising, between them mixed, below both falling). The **mood**: the VIX, the market's
+  own measure of expected swings (under 15 calm, 15 to 25 normal, over 25 wild). The **rates**: what Polymarket's crowd
+  prices for the Federal Reserve's next interest-rate decision, or "unavailable".
+- **Worth a look today**: up to five of the whole market, the eleven sectors and your watchlist, ranked by how many of
+  these fire, then by the size of the move: a move of 3% or more in a day; volume at least twice its usual (its 20-day
+  average); a new 52-week high or low; a close across its 50- or 200-day average; and, for a company or a coin, news
+  about it today. Each comes with its reason in one line, such as "Fell 4.2% on 3.1 times its usual volume, a new 52-week
+  low", and the robot beside it.
+
+Under the list, the switch **"Analyse the top 3 each market morning"** is off as shipped. When you switch it on, the top
+three that were not already called today go on the waiting list at shallow depth, once each weekday, and run when
+something is listening; each analysis uses your Claude plan, like a chat. The morning routine reads the same list.
+
 ### Your paper record
-Before you risk money, every call the desk makes on a stock, a fund, Bitcoin or Ether is followed on paper, and right
-after Start here the dashboard shows what that would have done: one sentence, a line of the paper money against the S&P 500 from the same start, and how
+Before you risk money, every call the desk makes on a stock, a fund, Bitcoin or Ether is followed on paper, and after
+Start here and This morning the dashboard shows what that would have done: one sentence, a line of the paper money against the S&P 500 from the same start, and how
 many weeks and calls stand behind it. Each call is sized exactly as its order ticket would size it (the rating, a full
 position of 10%, your caps), takes no order the real ticket would refuse, and fills at the first closing price after
 the call's day. No costs are counted. The paper money starts at $10,000; change it on the scorecard. Each call shows a
@@ -253,9 +271,11 @@ American evening is dated that day, not the next.
 
 ## Routines
 The trading-desk team has two routines, which Madav's scheduler can start for you:
-- **Morning routine**: scores past calls, then analyses what you asked for on the dashboard and your starred watchlist
-  stocks (at most 5 a morning, set in `desk-settings.json` under `routines`), and ends with the new calls to decide on.
-  On a weekend it only scores past calls.
+- **Morning routine**: scores past calls, reads "Worth a look today" (the dashboard's list, worked out afresh if it is
+  over an hour old; with your morning switch on, its top three join the waiting list at shallow depth), then analyses
+  what you asked for on the dashboard and your starred watchlist stocks (at most 5 a morning, set in
+  `desk-settings.json` under `routines`), and ends with the new calls to decide on and the list worth a look. On a
+  weekend it only scores past calls.
 - **Evening wrap-up**: scores what is ready and tells you the day's calls, the orders the dashboard sent and what
   Robinhood answered.
 

@@ -8,6 +8,11 @@ import { readHoldings } from './holdings.js';
 import { ordersOn } from './orders.js';
 import { readWatchlist } from '../terminal/store.js';
 import { readQueue } from './queue.js';
+import { TOP_QUEUED, type Screen } from './screen.js';
+
+/** "Worth a look today" as the morning reads it: the screen (null when it could not be worked out, with why), and whether
+ *  the person's switch "Analyse the top three each market morning" is on. */
+export interface MorningLook { screen: Screen | null; failed?: string; on: boolean }
 
 export type Kind = 'morning' | 'evening';
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -16,12 +21,13 @@ const weekday = (day: string): string => DAYS[new Date(`${day}T12:00:00Z`).getUT
 /** What the morning routine analyses, in order: what the person asked for on the dashboard and is still waiting first (at
  *  the depth they asked), then their starred watchlist stocks, leaving out any already called today or being analysed
  *  now, at most `max` in all. */
-export function morningList(dir: string, today: string, max: number): { analyse: Array<{ symbol: string; why: string; queued: boolean }>; later: string[]; calledToday: string[]; running: string | null } {
+export function morningList(dir: string, today: string, max: number, screen: Screen | null = null): { analyse: Array<{ symbol: string; why: string; queued: boolean }>; later: string[]; calledToday: string[]; running: string | null } {
   const called = new Set(new Journal(path.join(dir, 'journal.md')).load().filter((e) => e.date === today).map((e) => e.ticker));
   const queue = readQueue(dir), running = queue.find((q) => q.state === 'running')?.symbol ?? null;
   const wanted: Array<{ symbol: string; why: string; queued: boolean }> = [], seen = new Set<string>(running ? [running] : []);
   const add = (symbol: string, why: string, queued: boolean) => { if (!seen.has(symbol) && !called.has(symbol)) { seen.add(symbol); wanted.push({ symbol, why, queued }); } };
-  for (const q of queue) if (q.state === 'waiting') add(q.symbol, `asked for on the dashboard, ${q.depth ?? "the settings'"} depth`, true);
+  const bySwitch = new Set(screen?.queued?.day === today ? screen.queued.symbols : []);
+  for (const q of queue) if (q.state === 'waiting') add(q.symbol, bySwitch.has(q.symbol) ? `worth a look today, put on the list by the morning switch, ${q.depth ?? 'shallow'} depth` : `asked for on the dashboard, ${q.depth ?? "the settings'"} depth`, true);
   for (const w of readWatchlist(dir)) if (w.favourite && !w.symbol.startsWith('^')) add(w.symbol, 'a starred watchlist stock', false);
   return { analyse: wanted.slice(0, max), later: wanted.slice(max).map((w) => w.symbol), calledToday: [...called], running };
 }
@@ -34,12 +40,29 @@ const holdingsLine = (dir: string): string => {
     : `Holdings: as the person gave them, on ${h.savedOn}.`;
 };
 
-export function morningBrief(dir: string, today: string, max: number): string {
+/** "Worth a look today" in the brief: the list, figures only, and what the morning switch did with it. */
+function lookLines(look: MorningLook | undefined, today: string): string[] {
+  if (!look) return [];
+  if (!look.screen) return ['', `   Worth a look today: unavailable (${look.failed ?? 'it could not be worked out'}). Say so at the end.`];
+  const s = look.screen, out = ['', `   Worth a look today, from Yahoo Finance's prices at ${s.at.slice(11, 16)} UTC (figures only, never a forecast; ${s.looked} looked at):`];
+  if (!s.picks.length) out.push('   - nothing stood out: no move of 3% or more, no volume twice its usual, no 52-week high or low, no cross of an average, no news today.');
+  for (const p of s.picks) out.push(`   - ${p.symbol}: ${p.why}.`);
+  if (s.unavailable.length) out.push(`   Could not be read: ${s.unavailable.join(', ')}.`);
+  const queued = s.queued?.day === today ? s.queued.symbols : [];
+  out.push(look.on
+    ? `   The person's switch "Analyse the top ${TOP_QUEUED} each market morning" is on${queued.length ? `: ${queued.join(', ')} ${queued.length === 1 ? 'was' : 'were'} put on the waiting list at shallow depth, and ${queued.length === 1 ? 'is' : 'are'} analysed in step 2` : ': nothing more went on the waiting list today'}.`
+    : `   The person's switch "Analyse the top ${TOP_QUEUED} each market morning" is off: this list is for the person to read, not for you to analyse.`);
+  out.push('   In step 4, give this list in a line or two, with its reasons.');
+  return out;
+}
+
+export function morningBrief(dir: string, today: string, max: number, look?: MorningLook): string {
   const day = weekday(today), weekend = day === 'Saturday' || day === 'Sunday';
-  const m = morningList(dir, today, max);
+  const m = morningList(dir, today, max, look?.screen ?? null);
   const lines = [`MORNING ROUTINE for ${day} ${today}.`];
   if (weekend) lines.push(`US markets do not open on a ${day}: score past calls (step 1), then stop and say so. Analyse nothing unless the person asked for it in words.`);
   lines.push('', '1. Score past calls first: list_settlements, then record_outcome with a lesson for each READY call (the /settle playbook).');
+  if (!weekend) lines.push(...lookLines(look, today));
   if (m.running) lines.push('', `   ${m.running} is being analysed now by another run: leave it alone.`);
   if (!m.analyse.length) lines.push('', '2. Nothing to analyse: no stock is waiting on the dashboard and no starred watchlist stock is without a call today. Say so.');
   else {

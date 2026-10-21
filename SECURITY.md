@@ -87,6 +87,10 @@ order tool.
 - After an update the dashboard offers Restart at the top of the page: new code on this computer runs only after your
   press, and never while an order is being sent. Stop, at the top right of the page, closes it.
 - The search box sends what you type to Yahoo Finance's public search, which suggests matching stocks.
+- "This morning" asks Yahoo Finance for the daily prices of the whole-market funds, the sector funds and your watchlist
+  (and its news search for your companies and coins), and asks Polymarket's public search for its odds on the Federal
+  Reserve, at most once an hour. The list is kept in `desk-data/screen.json`. The switch "Analyse the top 3 each market
+  morning" ships off; on, it only puts those stocks on the waiting list, never an order.
 - For the sector limit, the dashboard asks the SEC for the industry of the stocks you trade and hold and for its list of
   funds (by ticker only, never a quantity or an account).
 - The desk always introduces itself by its own name, never as a web browser. Yahoo Finance gives its company data only
