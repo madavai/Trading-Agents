@@ -1,0 +1,1345 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Trading Agents Walk</title>
+<meta name="description" content="The hands-on test walk of the whole Trading Agents desk: every part, checked by hand on your own setup, with your marks kept between visits.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,340..640;1,9..144,340..640&family=Source+Serif+4:ital,opsz,wght@0,8..60,400..600;1,8..60,400..600&display=swap">
+<style>
+/* The Madav House theme as the dashboard wears it (src/terminal/ui/house.css): its tokens, the light face first and the
+   dark face beside it (the viewer's own setting, or the switch at the top right). Layout: the sidebar lists the walk's
+   sections with how many passed; the chosen section's tests stand on the right as cards - the status dot, the id and the
+   name, where it happens, the steps beside what you should see, and the marks under them. Every value is a token. */
+:root {
+  color-scheme: light;
+  --canvas: rgb(252, 251, 248); --panel: rgb(255, 255, 255); --tint: rgba(62, 55, 42, 0.05); --raise: transparent;
+  --line: rgba(62, 55, 42, 0.12); --line-strong: rgba(62, 55, 42, 0.24);
+  --text: rgb(38, 34, 26); --text-2: rgb(92, 85, 74); --text-3: rgb(120, 112, 98);
+  --accent: #06AEFE; --on-accent: #ffffff;
+  --ok: rgb(28, 135, 80); --warn: rgb(150, 105, 0); --bad: rgb(170, 45, 38);
+  --accent-tint: color-mix(in srgb, var(--accent) 10%, transparent);
+  --ok-tint: color-mix(in srgb, var(--ok) 12%, transparent); --bad-tint: color-mix(in srgb, var(--bad) 10%, transparent);
+  --warn-tint: color-mix(in srgb, var(--warn) 12%, transparent);
+  --shadow-rest: 0 calc(var(--unit) * 0.25) calc(var(--unit) * 0.5) rgba(62, 55, 42, 0.06), 0 calc(var(--unit) * 0.75) calc(var(--unit) * 2) rgba(62, 55, 42, 0.07);
+  --scroll: rgba(62, 55, 42, 0.2);
+  --font: "Source Serif 4", "Inter", "Segoe UI", system-ui, sans-serif;
+  --font-title: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-code: ui-monospace, Consolas, "Courier New", monospace;
+  --scale: 16px; --unit: calc(var(--scale) / 4);
+  --size-title: calc(var(--unit) * 7.5); --size-heading: calc(var(--unit) * 4); --size-text: calc(var(--unit) * 3.5); --size-small: calc(var(--unit) * 3.125);
+  --weight-regular: 400; --weight-medium: 500; --weight-semibold: 600; --line-height: 1.5; --line-tight: 1.25;
+  --radius: calc(var(--unit) * 2.25); --radius-small: calc(var(--unit) * 1.5);
+  --control: calc(var(--unit) * 8); --list-row: calc(var(--unit) * 7); --icon: calc(var(--unit) * 4); --dot: calc(var(--unit) * 2);
+  --space-half: calc(var(--unit) * 0.5); --space-1: calc(var(--unit) * 1); --space-2: calc(var(--unit) * 2); --space-3: calc(var(--unit) * 3); --space-4: calc(var(--unit) * 4); --space-5: calc(var(--unit) * 6);
+  --page-padding: calc(var(--unit) * 8); --section-gap: calc(var(--unit) * 8); --block-gap: calc(var(--unit) * 3); --control-gap: calc(var(--unit) * 2);
+  --card-padding: calc(var(--unit) * 4); --chip-height: calc(var(--unit) * 5.5); --field-padding: calc(var(--unit) * 1.5) calc(var(--unit) * 3);
+  --column-wide: calc(var(--unit) * 300); --measure: calc(var(--unit) * 180); --fact-key: calc(var(--unit) * 30);
+  --sidebar: calc(var(--unit) * 70); --sidebar-gap: calc(var(--unit) * 3); --topbar: calc(var(--unit) * 14); --card-min: calc(var(--unit) * 65);
+  --fast: 120ms; --ease: cubic-bezier(0.33, 0.02, 0.2, 1);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  color-scheme: dark;
+  --canvas: rgb(23, 21, 18); --panel: rgb(32, 31, 28); --tint: rgba(233, 228, 220, 0.07); --raise: rgba(233, 228, 220, 0.07);
+  --line: rgba(233, 228, 220, 0.11); --line-strong: rgba(233, 228, 220, 0.22);
+  --text: rgb(239, 234, 226); --text-2: rgb(170, 163, 150); --text-3: rgb(156, 149, 137);
+  --ok: rgb(76, 175, 114); --warn: rgb(255, 209, 102); --bad: rgb(255, 138, 128);
+  --accent-tint: color-mix(in srgb, var(--accent) 16%, transparent);
+  --shadow-rest: inset 0 calc(var(--unit) * 0.25) 0 rgba(233, 228, 220, 0.05), 0 calc(var(--unit) * 0.75) calc(var(--unit) * 1.5) rgba(0, 0, 0, 0.35);
+  --scroll: rgba(233, 228, 220, 0.12);
+} }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --canvas: rgb(23, 21, 18); --panel: rgb(32, 31, 28); --tint: rgba(233, 228, 220, 0.07); --raise: rgba(233, 228, 220, 0.07);
+  --line: rgba(233, 228, 220, 0.11); --line-strong: rgba(233, 228, 220, 0.22);
+  --text: rgb(239, 234, 226); --text-2: rgb(170, 163, 150); --text-3: rgb(156, 149, 137);
+  --ok: rgb(76, 175, 114); --warn: rgb(255, 209, 102); --bad: rgb(255, 138, 128);
+  --accent-tint: color-mix(in srgb, var(--accent) 16%, transparent);
+  --shadow-rest: inset 0 calc(var(--unit) * 0.25) 0 rgba(233, 228, 220, 0.05), 0 calc(var(--unit) * 0.75) calc(var(--unit) * 1.5) rgba(0, 0, 0, 0.35);
+  --scroll: rgba(233, 228, 220, 0.12);
+}
+@media (prefers-reduced-motion: reduce) { :root { --fast: 0ms; } }
+
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-padding-top: calc(var(--topbar) + var(--space-3)); }
+body { margin: 0; background: var(--canvas); color: var(--text); font-family: var(--font); font-weight: var(--weight-regular); font-size: var(--size-text); line-height: var(--line-height); -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+h1, h2, h3, p, ol, ul, dl, dd { margin: 0; }
+ul { padding: 0; list-style: none; }
+button, input, textarea { font: inherit; color: inherit; margin: 0; }
+button { cursor: pointer; background: none; border: 0; padding: 0; text-align: inherit; }
+svg { display: block; flex: none; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 2px; }
+code { font-family: var(--font-code); font-size: var(--size-small); background: var(--tint); padding: 0 var(--space-1); border-radius: var(--radius-small); overflow-wrap: anywhere; }
+b, strong { font-weight: var(--weight-semibold); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+::selection { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+::placeholder { color: var(--text-3); opacity: 1; }
+[hidden] { display: none !important; }
+
+/* the box every boxed object stands on: the panel, the one hairline, the one corner, the resting shadow */
+.box { border: 1px solid var(--line); border-radius: var(--radius); background-color: var(--panel); box-shadow: var(--shadow-rest); }
+.box .box { background-image: linear-gradient(var(--raise), var(--raise)); }
+.press { transition: border-color var(--fast) var(--ease), background-color var(--fast) var(--ease), color var(--fast) var(--ease); }
+.press:hover { background-image: linear-gradient(var(--accent-tint), var(--accent-tint)); }
+
+/* the frame: the sidebar, a box off the window's edges beside the main column - the wordmark, the sections, one line
+   saying where the marks are kept */
+.app { display: flex; align-items: flex-start; gap: var(--sidebar-gap); padding-block: var(--sidebar-gap); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.side { position: sticky; top: calc(env(safe-area-inset-top, 0px) + var(--sidebar-gap)); flex: 0 0 var(--sidebar); width: var(--sidebar); height: calc(100vh - var(--sidebar-gap) * 2 - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3) var(--space-2); }
+.side-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: var(--control); padding-left: var(--space-3); }
+.word { font-family: var(--font-title); font-weight: var(--weight-medium); font-size: var(--size-heading); color: var(--text); }
+.word em { font-style: italic; color: var(--accent); }
+.word small { font-family: var(--font); font-size: var(--size-small); font-weight: var(--weight-regular); color: var(--text-3); margin-left: var(--space-1); }
+.side-toggle { display: none; align-items: center; gap: var(--space-1); height: var(--control); padding: 0 var(--space-3); border-radius: var(--radius-small); font-size: var(--size-small); font-weight: var(--weight-medium); color: var(--text-2); }
+.side-toggle svg { width: var(--icon); height: var(--icon); transition: transform var(--fast) var(--ease); }
+.side.open .side-toggle svg { transform: rotate(180deg); }
+.side-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; scrollbar-width: thin; scrollbar-color: var(--scroll) transparent; }
+.side-foot { flex: none; padding: var(--space-2) var(--space-3) 0; border-top: 1px solid var(--line); }
+.lh { display: flex; align-items: center; min-height: var(--list-row); padding: 0 var(--space-3); font-weight: var(--weight-medium); font-size: var(--size-small); color: var(--text-2); }
+.li { position: relative; display: flex; align-items: center; gap: var(--space-3); width: 100%; min-width: 0; min-height: var(--list-row); padding: var(--space-1) var(--space-3); border-radius: var(--radius); font-family: var(--font-title); font-weight: var(--weight-medium); font-size: var(--size-text); line-height: var(--line-tight); color: var(--text-2); transition: color var(--fast) var(--ease), background-color var(--fast) var(--ease); }
+.li > .k { flex: none; min-width: var(--icon); font-family: var(--font); font-weight: var(--weight-semibold); font-size: var(--size-small); color: var(--accent); }
+.li > .li-t { flex: 1; min-width: 0; overflow-wrap: anywhere; }   /* a section's whole name, on two lines if it needs them */
+.li > small { flex: none; display: inline-flex; align-items: center; gap: var(--space-1); font-family: var(--font); font-size: var(--size-small); font-variant-numeric: tabular-nums; color: var(--text-3); }
+.li > small.ok { color: var(--ok); }
+.li:not([aria-current]):hover { color: var(--text); background: var(--accent-tint); }
+.li[aria-current] { color: var(--accent); background: var(--tint); }
+.li[aria-current]::before { content: ""; position: absolute; left: 0; inset-block: var(--space-2); width: 2px; border-radius: var(--radius-small); background: var(--accent); }
+.li:focus-visible { outline-offset: -2px; }
+
+/* the main column: its top bar (the tally, Copy results, the face switch), then the page */
+.main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--canvas); border-bottom: 1px solid var(--line); }
+.top-in { max-width: var(--column-wide); margin-inline: auto; display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2) var(--space-3); min-height: var(--control); padding: var(--space-2) var(--space-4); }
+.tally { flex: 1 1 auto; display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-4); font-size: var(--size-small); color: var(--text-2); }
+.tally .num { font-family: var(--font-title); font-variant-numeric: lining-nums tabular-nums; font-weight: var(--weight-medium); font-size: var(--size-heading); color: var(--text); margin-right: var(--space-1); }
+.tally .ok .num { color: var(--ok); } .tally .bad .num { color: var(--bad); } .tally .warn .num { color: var(--warn); }
+.top-do { display: flex; align-items: center; gap: var(--control-gap); margin-left: auto; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); height: var(--control); padding: 0 calc(var(--unit) * 3.5); white-space: nowrap; font-weight: var(--weight-medium); font-size: var(--size-small); color: var(--text); }
+.btn > svg { width: var(--icon); height: var(--icon); }
+.icon-btn { display: inline-grid; place-items: center; flex: none; width: var(--control); height: var(--control); padding: 0; color: var(--text-2); }
+.icon-btn > svg { width: var(--icon); height: var(--icon); }
+.icon-btn:hover { color: var(--text); }
+.copy-text { display: block; width: 100%; min-height: calc(var(--unit) * 30); padding: var(--field-padding); font-family: var(--font-code); font-size: var(--size-small); }
+
+/* the page: the head (kicker, title, words, how to mark), the filter, then the sections */
+.page { width: 100%; max-width: var(--column-wide); margin-inline: auto; display: flex; flex-direction: column; gap: var(--section-gap); padding: var(--page-padding) var(--space-4); }
+.page-top { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
+.page-head { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.page-title { font-family: var(--font-title); font-weight: var(--weight-medium); font-size: var(--size-title); line-height: var(--line-tight); text-wrap: balance; }
+.page-title em { font-style: italic; color: var(--accent); }
+.page-sub { max-width: var(--measure); color: var(--text-2); }
+.facts { display: grid; max-width: var(--measure); }
+.facts > div { display: grid; grid-template-columns: var(--fact-key) minmax(0, 1fr); gap: var(--space-3); padding: var(--space-2) var(--card-padding); border-top: 1px solid var(--line); }
+.facts > div:first-child { border-top: 0; }
+.facts dt { font-weight: var(--weight-medium); color: var(--text); }
+.facts dd { color: var(--text-2); }
+.honest { font-size: var(--size-small); color: var(--text-2); }
+.honest.bad { color: var(--bad); }
+
+/* the filter: plain words under the page's head, in the title font, the open one underlined in the accent */
+.ptabs { display: flex; align-items: flex-end; gap: var(--space-5); overflow-x: auto; scrollbar-width: none; background: linear-gradient(var(--line), var(--line)) bottom / 100% 1px no-repeat; }
+.ptab { font-family: var(--font-title); display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-2) 0; border-bottom: 2px solid transparent; white-space: nowrap; font-weight: var(--weight-medium); font-size: var(--size-text); color: var(--text-2); transition: color var(--fast) var(--ease); }
+.ptab:hover { color: var(--text); }
+.ptab[aria-pressed="true"] { color: var(--text); border-bottom-color: var(--accent); }
+.ptab .n { font-family: var(--font); font-size: var(--size-small); font-variant-numeric: tabular-nums; color: var(--text-3); }
+.ptab[aria-pressed="true"] .n { color: var(--accent); }
+
+/* the small words: a kicker over a heading or a block, a number in the accent, a chip */
+.kicker { display: flex; align-items: center; gap: var(--space-2); font-weight: var(--weight-medium); font-size: var(--size-small); line-height: var(--line-tight); color: var(--text-2); }
+.kicker.accent { color: var(--accent); }
+.rank { font-weight: var(--weight-semibold); font-size: var(--size-small); font-variant-numeric: lining-nums tabular-nums; color: var(--accent); }
+.chip { display: inline-flex; align-items: center; gap: var(--space-1); height: var(--chip-height); padding: 0 var(--space-2); border-radius: var(--radius-small); background: var(--tint); white-space: nowrap; font-weight: var(--weight-medium); font-size: var(--size-small); line-height: 1; color: var(--text-2); }
+.chip.ok { color: var(--ok); } .chip.bad { color: var(--bad); } .chip.warn { color: var(--warn); } .chip.accent { color: var(--accent); }
+
+/* a section: its head (the letter, a heading, one line) then its cards */
+.section { display: flex; flex-direction: column; gap: var(--block-gap); min-width: 0; scroll-margin-top: calc(var(--topbar) + var(--space-3)); }
+.sect-head { display: flex; flex-direction: column; gap: var(--space-half); padding-bottom: var(--space-2); border-bottom: 1px solid var(--line); }
+.sect-head .kicker { margin-bottom: var(--space-1); }
+.sect-head h2 { font-family: var(--font-title); font-weight: var(--weight-semibold); font-size: var(--size-heading); line-height: var(--line-tight); text-wrap: balance; }
+.sect-head p { font-size: var(--size-small); color: var(--text-2); }
+.cards { display: flex; flex-direction: column; gap: var(--block-gap); }
+
+/* a test, as a card: its head (status dot, id, name, tags, state), where it happens, the steps beside what you should
+   see, and the marks under them */
+.card { display: flex; flex-direction: column; gap: var(--block-gap); min-width: 0; padding: var(--card-padding); scroll-margin-top: calc(var(--topbar) + var(--space-3)); }
+.card[data-state="pass"] { border-color: color-mix(in srgb, var(--ok) 45%, var(--line)); }
+.card[data-state="fail"] { border-color: color-mix(in srgb, var(--bad) 55%, var(--line)); }
+.card[data-state="skip"], .card[data-state="stale"] { border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); }
+.card-head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); min-width: 0; }
+.card-head h3 { font-family: var(--font-title); font-weight: var(--weight-medium); font-size: var(--size-heading); line-height: var(--line-tight); text-wrap: balance; flex: 1 1 auto; min-width: 0; }
+.dot { display: inline-block; flex: none; width: var(--dot); height: var(--dot); border-radius: 50%; background: transparent; border: 1px solid var(--line-strong); }
+.dot.ok { background: var(--ok); border-color: var(--ok); } .dot.bad { background: var(--bad); border-color: var(--bad); } .dot.warn { background: var(--warn); border-color: var(--warn); }
+.where { display: flex; align-items: flex-start; gap: var(--space-2); font-size: var(--size-small); color: var(--text-2); overflow-wrap: anywhere; }
+.where svg { width: var(--icon); height: var(--icon); margin-top: 1px; color: var(--text-3); }
+.card-body { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: var(--block-gap) var(--space-5); align-items: start; }
+.label { margin-bottom: var(--space-1); }
+.do ol { padding-left: 1.4em; display: grid; gap: var(--space-1); }
+.do ol li { padding-left: var(--space-1); overflow-wrap: anywhere; }
+.do ol li::marker { color: var(--text-3); font-family: var(--font-title); font-variant-numeric: tabular-nums; }
+.expect { min-width: 0; padding: var(--space-3); border-radius: var(--radius-small); background: var(--tint); overflow-wrap: anywhere; }
+.expect .label::before { content: ""; flex: none; width: var(--dot); height: var(--dot); border-radius: 50%; background: var(--accent); }   /* the arrival: what you should see, beside an accent dot */
+.expect ul { display: grid; gap: var(--space-1); }
+.verdicts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--control-gap); padding-top: var(--space-3); border-top: 1px solid var(--line); }
+.seg { display: inline-flex; align-items: center; gap: var(--space-half); width: fit-content; max-width: 100%; padding: 2px; border-radius: var(--radius); background: var(--tint); }
+.seg-b { display: inline-flex; align-items: center; gap: var(--space-1); height: calc(var(--control) - 4px); padding: 0 var(--space-3); border: 1px solid transparent; border-radius: var(--radius-small); white-space: nowrap; font-weight: var(--weight-medium); font-size: var(--size-small); color: var(--text-2); transition: color var(--fast) var(--ease); }
+.seg-b:hover:not([aria-pressed="true"]) { color: var(--text); }
+.seg-b.pass[aria-pressed="true"] { color: var(--ok); background: var(--ok-tint); border-color: var(--ok); }
+.seg-b.fail[aria-pressed="true"] { color: var(--bad); background: var(--bad-tint); border-color: var(--bad); }
+.seg-b.skip[aria-pressed="true"] { color: var(--warn); background: var(--warn-tint); border-color: var(--warn); }
+.note { flex: 1 1 var(--card-min); min-width: 0; min-height: var(--control); max-height: calc(var(--unit) * 40); padding: var(--field-padding); resize: vertical; field-sizing: content; font-size: var(--size-small); line-height: var(--line-height); caret-color: var(--accent); transition: border-color var(--fast) var(--ease); }
+.note:focus, .note:focus-visible { outline: none; border-color: var(--accent); }
+.when { font-size: var(--size-small); color: var(--text-3); font-variant-numeric: tabular-nums; }
+.empty { padding: var(--space-5) var(--card-padding); text-align: center; color: var(--text-2); }
+.foot { max-width: var(--measure); padding-bottom: var(--space-5); }
+
+@media (max-width: 1240px) {
+  .card-body { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 900px) {
+  .app { flex-direction: column; align-items: stretch; }
+  .side { position: static; flex: none; width: auto; height: auto; }
+  .side-toggle { display: inline-flex; }
+  .side:not(.open) .side-body, .side:not(.open) .side-foot { display: none; }
+  .side-body { max-height: 60vh; }
+  .top-in, .page { padding-inline: 0; }
+}
+@media (max-width: 720px) {
+  :root { --size-title: calc(var(--unit) * 6.5); --page-padding: calc(var(--unit) * 5); }
+  .facts > div { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .tally { gap: var(--space-1) var(--space-3); }
+  .tally .num { font-size: var(--size-text); }
+  .card-head h3 { flex-basis: 100%; order: 3; }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+<aside class="side box" id="sidebar" aria-label="Sections of the walk">
+  <div class="side-head">
+    <span class="word">Trading <em>Agents</em><small>walk</small></span>
+    <button type="button" class="side-toggle press" id="sideToggle" aria-expanded="false" aria-controls="side">Sections <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+  </div>
+  <nav class="side-body" id="side"></nav>
+  <div class="side-foot"><p class="honest" id="status">Reading your marks…</p></div>
+</aside>
+
+<div class="main">
+<header class="top">
+  <div class="top-in">
+    <div class="tally" id="tally" aria-live="polite"></div>
+    <div class="top-do">
+      <button type="button" class="btn box press" id="copy">Copy results</button>
+      <button type="button" class="icon-btn box press" id="face"></button>
+    </div>
+  </div>
+  <div class="top-in" id="copyBox" hidden><textarea class="copy-text box" id="copyText" readonly aria-label="Your results, to select and copy"></textarea></div>
+</header>
+
+<main class="page">
+  <div class="page-top">
+    <div class="page-head">
+      <span class="kicker accent" id="kick">The whole walk</span>
+      <h1 class="page-title" id="title">Trading Agents <em>walk.</em></h1>
+      <p class="page-sub" id="sub" hidden></p>
+      <p class="page-sub" id="lede">Every part of the Trading Agents desk, checked by hand on your own setup: the team in Agent Studio, the analyses, the dashboard and your first month on it, your Robinhood accounts, deciding on a call, the paper record and the guard rails, placing an order, care for what you hold, the routines and the safety rules. Pick a section on the left, or work top to bottom. Each test says where to go, what to do and what you should see.</p>
+    </div>
+    <dl class="facts box" id="how">
+      <div><dt>Mark each test</dt><dd>Pass, Fail or Skip. A note helps, above all on a fail: what you saw, or paste the words.</dd></div>
+      <div><dt>Your marks</dt><dd id="kept">They are kept as you click and come back next time.</dd></div>
+      <div><dt>After an update</dt><dd>A test whose steps changed after you marked it says so, and counts as still to do again.</dd></div>
+      <div><dt>Market hours</dt><dd>Tests marked <span class="chip warn">Market hours</span> need the US market open: Monday to Friday, 9:30 to 16:00 New York time.</dd></div>
+      <div><dt>Real money</dt><dd>Tests marked <span class="chip bad">Real money</span> place a real order. They are optional: keep it to one share, with Robinhood's phone approval on.</dd></div>
+    </dl>
+    <nav class="ptabs" id="filters" aria-label="Show">
+      <button type="button" class="ptab" data-f="all" aria-pressed="true">All <span class="n" data-n="all"></span></button>
+      <button type="button" class="ptab" data-f="left" aria-pressed="false">Still to do <span class="n" data-n="left"></span></button>
+      <button type="button" class="ptab" data-f="fail" aria-pressed="false">Failed <span class="n" data-n="fail"></span></button>
+      <button type="button" class="ptab" data-f="pass" aria-pressed="false">Passed <span class="n" data-n="pass"></span></button>
+      <button type="button" class="ptab" data-f="skip" aria-pressed="false">Skipped <span class="n" data-n="skip"></span></button>
+    </nav>
+  </div>
+  <div id="areas"></div>
+  <div class="empty box" id="empty" hidden>No test matches this choice.</div>
+  <p class="honest foot">Nothing here is investment advice. The desk proposes; only your own Confirm on the dashboard places an order.</p>
+</main>
+</div>
+</div>
+
+<!-- The walk itself. Every pull request that changes what a person can do or see adds or updates its tests here, in the
+     same pull request (CONTRIBUTING.md). A test: id (its section's letter and a number, never reused), title, where,
+     tags (Market hours, Real money, Optional, Later), do (the steps), see (what you should see), changed (the day its
+     steps last changed: a mark made before it counts as still to do). test/walk.test.ts keeps it sound. -->
+<script type="application/json" id="walk">
+{
+ "version": "0.9.0",
+ "updated": "2026-10-21",
+ "sections": [
+  { "id": "A", "name": "Getting started in Agent Studio",
+    "sub": "The agents and the team are where Agent Studio reads them, the desk check is green, and \"reset the team\" brings back the project's version.",
+    "tests": [
+    { "id": "A1", "title": "The twelve agents are listed", "tags": [], "changed": "2026-10-21",
+      "where": "Madav, Agent Studio, Agents, on your Trading-Agents project",
+      "do": [
+        "Open Agent Studio and look at the project's agents."],
+      "see": [
+        "12 desk agents: market-analyst, sentiment-analyst, news-analyst, fundamentals-analyst, bull-researcher, bear-researcher, research-manager, trader, aggressive-, conservative- and neutral-risk-analyst, portfolio-manager."] },
+    { "id": "A2", "title": "trading-desk is a team", "tags": [], "changed": "2026-10-21",
+      "where": "Madav, Agent Studio, Teams",
+      "do": [
+        "Open the Teams tab, then the Agents tab."],
+      "see": [
+        "Teams: trading-desk, with the 12 desk agents as its members.",
+        "Agents: the 12 desk agents, and trading-desk is not among them.",
+        "If Teams shows a sentence saying why trading-desk is not a team, paste that sentence in the note."] },
+    { "id": "A3", "title": "The desk check is green", "tags": [], "changed": "2026-10-21",
+      "where": "Agent Studio: trading-desk, Put to work",
+      "do": [
+        "Ask: \"check this computer\"."],
+      "see": [
+        "\"Trading Agents desk check\", with the same version as the top of this walk.",
+        "Under \"This computer\", OK for Node, the desk data folder (writable), the contact email for the SEC (yours) and Robinhood (\"a sign-in is saved\", or \"not connected yet (only needed for trading; analysis works without it)\").",
+        "A line saying your private folder is locked to your own account and the system, and \"The desk's agents and the trading-desk team are as the project ships them\".",
+        "Under \"Free data sources\", all seven answer: Yahoo Finance prices and news, StockTwits, Reddit, FRED, Polymarket and SEC EDGAR. Then \"Everything the desk reads is reachable.\"",
+        "SPY's checked price table comes back. The team does not test Robinhood here: it points you to Connect on the dashboard's Your account."] },
+    { "id": "A4", "title": "Your email goes to the SEC alone", "tags": [], "changed": "2026-10-21",
+      "where": "The same answer",
+      "do": [
+        "Read the line about your email. If the desk asks for it (the first time), give it."],
+      "see": [
+        "\"Contact email for the SEC: <your email> (sent to sec.gov alone, kept in desk-data)\". No other source is named as receiving it.",
+        "When you give it: \"Saved. The SEC will see <your email> as the contact for this desk's requests; no other source sees it.\""] },
+    { "id": "A5", "title": "Reset the team brings the project's team back", "tags": ["Optional"], "changed": "2026-10-21",
+      "where": "Madav, Agent Studio, then trading-desk",
+      "do": [
+        "In Agent Studio, change something small in one desk agent (for example a word in the trader's description) and save it.",
+        "Ask the team: \"reset the team\", and say yes when it asks.",
+        "Open Agent Studio again."],
+      "see": [
+        "The answer starts \"Put back as the project ships them\" and says the others were written again too, that it takes effect from the next conversation or run, and that Madav goes back to the project's version of the team too.",
+        "Your change is gone. The model, permissions and effort you chose in Agent Studio stay yours.",
+        "If Madav runs the desk's routines, they are paused until you switch them on again (G5)."] },
+    { "id": "A6", "title": "The desk check names a changed agent file", "tags": ["Optional"], "changed": "2026-10-21",
+      "where": "The trader's file in this folder, then Agent Studio: trading-desk",
+      "do": [
+        "Open `.claude/agents/trader.md` in a text editor, add one word to its description, and save it.",
+        "Ask: \"check this computer\". Then ask: \"reset the team\", say yes, and check once more."],
+      "see": [
+        "\"One of the desk's agent files differs from the project's version (trader). An edit, or an older version of Madav, can do this. Ask the desk to reset the team to put them back\".",
+        "After the reset the file is as it was, and the check says \"The desk's agents and the trading-desk team are as the project ships them\"."] }
+  ] },
+  { "id": "B", "name": "The analysis team",
+    "sub": "Twelve agents analyse a stock, a fund or a coin from free public data, official sources first, and record a rated call.",
+    "tests": [
+    { "id": "B1", "title": "A shallow analysis runs end to end", "tags": [], "changed": "2026-10-21",
+      "where": "Agent Studio: trading-desk",
+      "do": [
+        "Ask: \"analyse NVDA shallow\"."],
+      "see": [
+        "First, in two lines: which analysts run, the rounds of debate and the language, and that it takes a few minutes.",
+        "Then the four analysts, the bull and the bear, the research manager, the trader, the three risk voices and the portfolio manager, in turn.",
+        "It ends with a rating (Buy, Overweight, Hold, Underweight or Sell), a short summary, any data that was unavailable, where the report is, that the call is scored against its index after its holding window, \"not investment advice\", and Decide… on the dashboard to act."] },
+    { "id": "B2", "title": "Real company figures", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: the call, \"Read the reasoning\" (or \"Read\" in The desk's calls), Fundamentals report",
+      "do": [
+        "Open the new NVDA call and, under \"Gathering the facts\", its \"Fundamentals report\"."],
+      "see": [
+        "Revenue, income and other figures as filed with the SEC, by quarter and by year. Not \"unavailable\".",
+        "\"Company profile and valuation for NVDA, from its SEC filings as they stood on …\", with its industry (the SEC's code) and its sector (worked out from that code, so approximate)."] },
+    { "id": "B3", "title": "Your holdings were used", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: the call's reasoning, \"Trader's proposal\" under \"The trade\"",
+      "do": [
+        "Read your accounts on the dashboard first (\"Refresh from Robinhood\", section D).",
+        "Then analyse a stock you hold and open its \"Trader's proposal\"."],
+      "see": [
+        "It sizes any trade to the Agentic account and treats your other accounts as view-only context (\"view only: the desk never trades in it\")."] },
+    { "id": "B4", "title": "No invented numbers", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: the market report and the chart",
+      "do": [
+        "Pick two figures in the market report (a price, an indicator) and compare them with the chart or Yahoo Finance."],
+      "see": [
+        "They match the data. Anything that could not be fetched says \"unavailable\", never a made-up figure."] },
+    { "id": "B5", "title": "A crypto asset", "tags": [], "changed": "2026-10-21",
+      "where": "Agent Studio: trading-desk, then the dashboard",
+      "do": [
+        "Ask: \"analyse BTC-USD shallow\"."],
+      "see": [
+        "The plan says BTC-USD is a crypto asset, so there is no fundamentals analyst: it has no company accounts.",
+        "It records a call. On the dashboard the call shows \"on paper only\" where a stock's shows Decide…."] },
+    { "id": "B6", "title": "What you asked for on the dashboard", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard, then Agent Studio",
+      "do": [
+        "On the dashboard, press the robot beside a watchlist stock and press \"Ask the desk\".",
+        "Then ask the team: \"analyse what is waiting\"."],
+      "see": [
+        "The stock shows \"waiting to be analysed\" and is listed under \"Analyses you asked for\".",
+        "The team analyses it. Its row turns to its rating with \"done\" and a \"Read the call\" button, and a notice says \"<stock>: <rating>. Its call is in the desk's calls.\""] },
+    { "id": "B7", "title": "A deeper analysis", "tags": ["Optional"], "changed": "2026-10-21",
+      "where": "Agent Studio: trading-desk",
+      "do": [
+        "Ask: \"analyse MSFT medium\"."],
+      "see": [
+        "Three rounds of the bull and bear debate and of the risk debate. It takes longer and uses more model time."] },
+    { "id": "B8", "title": "A fund is read for what it holds", "tags": [], "changed": "2026-10-21",
+      "where": "Agent Studio: trading-desk, then the call's Fundamentals report",
+      "do": [
+        "Ask: \"analyse SPY shallow\".",
+        "On the dashboard, open the call's \"Fundamentals report\"."],
+      "see": [
+        "\"Fund profile for SPY, from Yahoo Finance as it stands today\": a fund has no company accounts or insider trades of its own.",
+        "Its size (\"Net assets\"), its yearly cost (the expense ratio) and its top holdings, or \"unavailable (Yahoo Finance does not give it)\" for any it could not read. Never a made-up figure."] },
+    { "id": "B9", "title": "Official valuation and insider trades", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: the NVDA call's Fundamentals report",
+      "do": [
+        "Find the valuation and the insider trades in the report."],
+      "see": [
+        "The valuation is worked out from the SEC filings and the checked closing price. Forward estimates are named as \"Unavailable from official free sources\".",
+        "\"Insider trades in NVDA, from the Form 4 filings with the SEC\", over 90 days: what was bought (code P) and sold (code S), or \"none\", which it says is a fact from the SEC, not a gap in the data."] },
+    { "id": "B10", "title": "The analysts talk only with a reason", "tags": ["Optional"], "changed": "2026-10-21",
+      "where": "Madav, Agent Studio: trading-desk with the team's \"talk\" switch on, then the dashboard",
+      "do": [
+        "Switch the team's \"talk\" on, then ask: \"analyse AAPL shallow\".",
+        "Watch the Messages panel while the four analysts read, then open their reports on the dashboard."],
+      "see": [
+        "Messages only when one analyst finds something another should weigh: at most two short ones each, pointing at a source or a date, never a figure of their own. There may be none.",
+        "Each message sent is noted in the sender's report.",
+        "With \"talk\" off, the team works in silence."] }
+  ] },
+  { "id": "C", "name": "The dashboard",
+    "sub": "The page on your own computer: markets, charts, watchlist, the desk's calls, the scorecard and a page per stock.",
+    "tests": [
+    { "id": "C1", "title": "The team opens it", "tags": [], "changed": "2026-10-21",
+      "where": "Agent Studio: trading-desk",
+      "do": [
+        "Ask: \"open the dashboard\". Ask again a minute later."],
+      "see": [
+        "It opens in your browser and the team says where.",
+        "The second time it says the dashboard was already running and opens it again: the same dashboard, not a second one."] },
+    { "id": "C2", "title": "Light and dark", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard, top right",
+      "do": [
+        "Press the sun or moon button."],
+      "see": [
+        "Its tip says \"Switch to the light face\" or \"Switch to the dark face\". The first visit follows your computer's own setting.",
+        "Both faces are easy to read, including the account cards, the charts and the ticket."] },
+    { "id": "C3", "title": "Markets", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: Markets",
+      "do": [
+        "Look at the market tiles, then press one."],
+      "see": [
+        "\"S&P 500\", \"Nasdaq\", \"Dow\", \"Volatility (VIX)\", \"US 10-year yield\" and \"Bitcoin\", each with a price, its move and \"now\" or \"close\".",
+        "Pressing one charts it."] },
+    { "id": "C4", "title": "Watchlist", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: the search box and the Watchlist",
+      "do": [
+        "Search \"NVDA\" and press \"Add to watchlist\". Do the same for AAPL.",
+        "Star one. Remove the other with its bin.",
+        "Search \"XXXXZZ\" and press \"Add to watchlist\"."],
+      "see": [
+        "\"NVDA is on the watchlist.\", with its price, under Single names.",
+        "The starred one appears in the side list. The removed one goes: \"AAPL is off the watchlist.\"",
+        "For XXXXZZ the matches say \"Nothing matches “XXXXZZ” at Yahoo Finance\", and adding it is refused with a plain reason: \"Yahoo Finance has no price for XXXXZZ\"."] },
+    { "id": "C5", "title": "Chart", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: Chart",
+      "do": [
+        "Switch Area and Candles, try 1M to 5Y, and toggle \"50-day average\", \"200-day average\" and \"Volume\"."],
+      "see": [
+        "The chart redraws each time, and the averages and volume come and go."] },
+    { "id": "C6", "title": "The desk's calls and their reasoning", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: The desk's calls",
+      "do": [
+        "Open a call (\"Read\")."],
+      "see": [
+        "\"The portfolio manager's rating\" first, with the price target, the time horizon and how it scored, and the \"Portfolio manager's decision\" open.",
+        "Then \"Gathering the facts\", \"The research debate\", \"The trade\" and \"The risk debate\", each readable.",
+        "At the foot: \"This is the team's reasoning as it wrote it. It is not investment advice.\""] },
+    { "id": "C7", "title": "Scorecard", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: How the desk is doing",
+      "do": [
+        "Look at the scorecard under your paper record."],
+      "see": [
+        "\"N scored · M waiting\" under the heading, and by rating: Calls, Called the direction, Average alpha vs the index.",
+        "\"Each call is judged after 5 trading days against its market's index.\"",
+        "With few scored calls: \"With so few scored calls these figures are noise, not a record.\" With none: \"Nothing has been scored yet.\""] },
+    { "id": "C8", "title": "A page per stock", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: Stock page",
+      "do": [
+        "Chart a stock you hold, then open \"Stock page\" in the side list."],
+      "see": [
+        "\"Everything on <stock>\": \"What you hold\" in each account (with \"Buy <stock>…\" and \"Sell <stock>…\"), \"Your orders on it\", and \"The desk's calls on it\" with each result.",
+        "\"Ask the desk to analyse\", \"Trade…\" and \"Decide…\".",
+        "Each price says where it comes from: Yahoo Finance, up to 15 minutes late, or Robinhood's live price."] },
+    { "id": "C9", "title": "Search by name", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: the search box",
+      "do": [
+        "Type \"Tesla\".",
+        "Empty the box."],
+      "see": [
+        "Matches drop down from Yahoo Finance: the ticker, the name, the market and the kind (Stock, ETF, Index, Fund, Crypto), with the desk's latest rating, and \"Watched\" on those you watch.",
+        "An empty box shows \"Recent\": the stocks you looked at last, with \"Clear\"."] },
+    { "id": "C10", "title": "It opens where you left it", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard",
+      "do": [
+        "Chart a stock, choose a range, switch the face and fold the side list (\"Hide the side list\").",
+        "Close the tab, then ask the team to \"open the dashboard\" again."],
+      "see": [
+        "It opens on the same page and stock, with the same chart settings, face and side list."] },
+    { "id": "C11", "title": "Restart after an update", "tags": ["Later"], "changed": "2026-10-21",
+      "where": "Dashboard, top of the page",
+      "do": [
+        "After an update to the project, keep the dashboard open and wait for the bar at the top.",
+        "Press \"Restart now\"."],
+      "see": [
+        "About half a minute after the update: \"The desk was updated. Restart the dashboard to use the new version: it reopens where you are.\"",
+        "\"The dashboard is restarting with the new version. This page reloads in a moment.\" It reopens where you were. With an order ticket open, it asks you to finish or close it first."] },
+    { "id": "C12", "title": "Stop", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: the power button, top right",
+      "do": [
+        "Press it, then \"Stop\"."],
+      "see": [
+        "\"Stop the dashboard?\" with \"Keep it running\" and \"Stop\".",
+        "After Stop: \"The dashboard is stopped. Ask the team to open it again any time.\""] },
+    { "id": "C13", "title": "A page opened by hand has no key", "tags": [], "changed": "2026-10-21",
+      "where": "Another browser, or a private window",
+      "do": [
+        "Copy the dashboard's address from the address bar and open it in a browser the dashboard was never opened in (or a private window)."],
+      "see": [
+        "\"This page has no key to the dashboard: it was opened by hand, or the dashboard was started afresh since. Open the dashboard again …\"",
+        "No prices, accounts or calls on that page. The page the team opened still works."] },
+    { "id": "C14", "title": "Your desk today", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: the top of the page",
+      "do": [
+        "Read the four tiles at the top."],
+      "see": [
+        "Your accounts, the Agentic account's buying power, the S&P 500 today and the desk's calls, each with its figure or a dash when it cannot be had."] }
+  ] },
+  { "id": "D", "name": "Your Robinhood accounts",
+    "sub": "The dashboard reads the accounts you choose, at Robinhood's live prices. It never shows your account numbers.",
+    "tests": [
+    { "id": "D1", "title": "The connection works", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: Your account (in the side list)",
+      "do": [
+        "Press \"Check the connection\" (or \"Connect Robinhood\" if it asks, and sign in on Robinhood's own page)."],
+      "see": [
+        "\"Connected\": \"The sign-in works and Robinhood answered.\"",
+        "\"Robinhood offers N tools: X that only read, Y that order or move money (this page never uses them) and Z others.\""] },
+    { "id": "D2", "title": "You choose the accounts", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: Your account, \"Choose accounts\"",
+      "do": [
+        "Press \"Choose accounts\"."],
+      "see": [
+        "\"Which accounts should the dashboard show?\": your accounts by name and last four digits (\"•••• 1234\"), the Agentic one and your default one ticked.",
+        "\"Show these accounts\" shows them."] },
+    { "id": "D3", "title": "The figures match Robinhood", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard and the Robinhood app",
+      "do": [
+        "Compare each account with the Robinhood app."],
+      "see": [
+        "Total value, cash, buying power, and each holding's quantity and average cost match. Live prices can differ by seconds."] },
+    { "id": "D4", "title": "Which account can trade", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: the account cards",
+      "do": [
+        "Read the label on each card."],
+      "see": [
+        "Your main account: \"View only · the desk never trades here\".",
+        "Agentic: \"Agentic · the desk may trade here, only on your Confirm\"."] },
+    { "id": "D5", "title": "Orders and phone approval", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: the Agentic account",
+      "do": [
+        "Read \"Orders in this account\" and the approval line."],
+      "see": [
+        "Its orders (When, Order, Quantity, Price, State), or \"No orders in this account yet.\"",
+        "\"Robinhood asks you to approve every trade on your phone. Keep it on until you trust the desk.\" when that is your Robinhood setting."] },
+    { "id": "D6", "title": "The agents get your holdings", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: under the accounts",
+      "do": [
+        "Press \"Refresh from Robinhood\", then read the note under the accounts."],
+      "see": [
+        "\"The desk's agents now see these holdings when they analyse a stock: the Agentic account as the one they may size a trade to, the others as view-only context.\""] },
+    { "id": "D7", "title": "No account numbers", "tags": [], "changed": "2026-10-21",
+      "where": "The whole dashboard",
+      "do": [
+        "Look anywhere an account is named."],
+      "see": [
+        "Only the last four characters (\"•••• 1234\"), never the whole number."] },
+    { "id": "D8", "title": "Refresh", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: \"Refresh from Robinhood\"",
+      "do": [
+        "Press \"Refresh from Robinhood\"."],
+      "see": [
+        "It reads \"Reading from Robinhood…\", then \"From Robinhood at <time>\" moves to now."] },
+    { "id": "D9", "title": "Disconnect and reconnect", "tags": ["Optional"], "changed": "2026-10-21",
+      "where": "Dashboard: Your account",
+      "do": [
+        "Press \"Disconnect\", then \"Connect Robinhood\", and sign in on Robinhood's own page."],
+      "see": [
+        "\"The saved Robinhood sign-in is deleted from this computer.\"",
+        "Back to connected: you choose the accounts again, and trading is switched off. Your caps stay as you set them."] }
+  ] },
+  { "id": "E", "name": "Deciding on a call",
+    "sub": "The ticket proposes an order from your settings and caps, and Robinhood checks it. Nothing is placed here.",
+    "tests": [
+    { "id": "E1", "title": "A ticket from a Buy or Overweight call", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: a call, \"Decide…\"",
+      "do": [
+        "On a Buy or Overweight call on a stock or fund, press \"Decide…\"."],
+      "see": [
+        "\"Buy <stock>\": \"The desk rated <stock> Buy on <date>: buy a full position. In the Agentic account only.\"",
+        "Account value, buying power, held now, live price and orders today (\"0 of 3\").",
+        "How it was sized, in plain lines (for example \"Your cap of $500.00 an order makes it $500.00.\").",
+        "Shares and limit price filled in, and every line under \"Your checks\" green; or no order, with the reason (for example too little to buy one share).",
+        "Without the Agentic account shown, it says instead: \"Show your Agentic account (Choose accounts) to open an order ticket: orders go to it alone.\""] },
+    { "id": "E2", "title": "A Hold call", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: \"Decide…\" on a Hold call",
+      "do": [
+        "Press \"Decide…\" on a Hold call."],
+      "see": [
+        "\"No order for <stock>\": \"The desk rated <stock> Hold: your settings place no order for that rating.\" Only Close; no Review button."] },
+    { "id": "E3", "title": "Over your cap", "tags": [], "changed": "2026-10-21",
+      "where": "The ticket",
+      "do": [
+        "Raise the shares until the cost is over your cap ($500 as shipped)."],
+      "see": [
+        "That check turns red: \"$… is over your cap of $500.00 an order\". \"Review with Robinhood\" is greyed out."] },
+    { "id": "E4", "title": "A price typing slip", "tags": [], "changed": "2026-10-21",
+      "where": "The ticket",
+      "do": [
+        "Set the limit price 20% above the live price."],
+      "see": [
+        "\"20.0% from Robinhood's live price of $…: more than 10% away, which looks like a typing slip\". Review is greyed out."] },
+    { "id": "E5", "title": "Robinhood's check", "tags": ["Market hours"], "changed": "2026-10-21",
+      "where": "The ticket",
+      "do": [
+        "Put the proposed numbers back, then press \"Review with Robinhood\"."],
+      "see": [
+        "\"Robinhood's check\" with \"No alerts\", or Robinhood's alerts in its own words.",
+        "\"This was Robinhood's dry run: nothing was placed.\" No new order in the Robinhood app."] },
+    { "id": "E6", "title": "Trading off blocks placing", "tags": [], "changed": "2026-10-21",
+      "where": "The ticket, trading off",
+      "do": [
+        "After a clean check, with trading switched off, look for a way to place it."],
+      "see": [
+        "\"Trading is switched off, so this order cannot be placed: switch it on in Your account first.\" No Place button."] },
+    { "id": "E7", "title": "Trade…: your own ticket", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: \"Trade…\" beside a stock's price, on the stock page or in a call",
+      "do": [
+        "Chart a stock or fund (not a coin) and press \"Trade…\".",
+        "Switch between Buy and Sell."],
+      "see": [
+        "\"Buy <stock>\": \"Your own order, not one of the desk's calls\".",
+        "\"Your own order: one whole share to start, at Robinhood's live price of $…. Change the shares and the limit price below.\"",
+        "The same checks and \"Review with Robinhood\" as a call's ticket. The desk's log records it as yours."] },
+    { "id": "E8", "title": "Crypto and indices never open a ticket", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: Start here, the watchlist, the chart and the desk's calls",
+      "do": [
+        "Look at Bitcoin's tile and its call. Then chart \"^GSPC\" (the S&P 500 index)."],
+      "see": [
+        "Bitcoin and Ether show \"on paper only\" where a stock shows Decide…; other coins show \"no order ticket\".",
+        "No \"Trade…\", \"Buy…\" or \"Sell…\" for a coin or an index, and no robot for an index. An index's call bar says \"The desk analyses stocks, not indices.\""] }
+  ] },
+  { "id": "F", "name": "Placing a real order",
+    "sub": "Optional, real money. One share, during market hours, with Robinhood's phone approval on.",
+    "tests": [
+    { "id": "F1", "title": "Robinhood's phone approval is on", "tags": ["Real money","Optional"], "changed": "2026-10-21",
+      "where": "The Robinhood app, then the dashboard",
+      "do": [
+        "In the Robinhood app, make sure agent trades need your approval."],
+      "see": [
+        "The Agentic account says \"Robinhood asks you to approve every trade on your phone\"."] },
+    { "id": "F2", "title": "Switch trading on", "tags": ["Real money","Optional"], "changed": "2026-10-21",
+      "where": "Dashboard: Your account, Trading",
+      "do": [
+        "Press \"Switch trading on…\" and read it.",
+        "If the desk has under four weeks of record on paper, read that line and press \"I understand\".",
+        "Press \"Yes, switch trading on\"."],
+      "see": [
+        "\"Switch trading on?\" with the warning first.",
+        "With under four weeks: \"That is under four weeks: too little to tell whether the desk's calls are any good. Read your paper record first.\" \"Yes, switch trading on\" appears only after \"I understand\", which turns into \"You understand\".",
+        "\"Trading is switched on. Every order still needs your Confirm.\" The top of the page says \"Trading on\", the side list \"Trading is on\" and the card \"On since <date>\"."] },
+    { "id": "F3", "title": "Place one share", "tags": ["Real money","Market hours","Optional"], "changed": "2026-10-21",
+      "where": "Dashboard: a Buy call, \"Decide…\"",
+      "do": [
+        "Set 1 share, press \"Review with Robinhood\", then \"Place order…\".",
+        "Read the button, then press it."],
+      "see": [
+        "The button names exactly the order: \"Confirm: Buy 1 <stock> at $<price>\", over \"Pressing Confirm sends a real order with real money to Robinhood.\"",
+        "\"Robinhood took it\", and \"Robinhood now asks you to approve it on your phone: it is not sent to the market until you do.\" A notice: \"The order is with Robinhood.\""] },
+    { "id": "F4", "title": "Approve or decline on your phone", "tags": ["Real money","Optional"], "changed": "2026-10-21",
+      "where": "The Robinhood app, then the dashboard",
+      "do": [
+        "Approve (or decline) in the Robinhood app, then press \"Refresh from Robinhood\"."],
+      "see": [
+        "The order appears under the Agentic account's \"Orders in this account\", with its state."] },
+    { "id": "F5", "title": "One order per ticket", "tags": ["Optional"], "changed": "2026-10-21",
+      "where": "The same ticket",
+      "do": [
+        "Look for a way to place it again."],
+      "see": [
+        "Only Close is left. Nothing is sent twice."] },
+    { "id": "F6", "title": "A stale check is refused", "tags": ["Market hours","Optional"], "changed": "2026-10-21",
+      "where": "A new ticket",
+      "do": [
+        "Press \"Review with Robinhood\", wait more than five minutes, then \"Place order…\" and Confirm."],
+      "see": [
+        "Refused: \"Robinhood's check is more than five minutes old: review the order again\". Nothing is placed."] },
+    { "id": "F7", "title": "Switch trading off", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: Your account, Trading",
+      "do": [
+        "Press \"Switch trading off\"."],
+      "see": [
+        "\"Trading is switched off.\" The page says trading is off, and tickets no longer offer Place."] }
+  ] },
+  { "id": "G", "name": "Routines",
+    "sub": "The morning routine and the evening wrap-up, by hand or from Madav's Routines, where the project ships them switched off.",
+    "tests": [
+    { "id": "G1", "title": "The morning routine", "tags": [], "changed": "2026-10-21",
+      "where": "Agent Studio: trading-desk",
+      "do": [
+        "Ask: \"run the morning routine\"."],
+      "see": [
+        "It scores past calls first, reads \"Worth a look today\", analyses what is waiting and your starred stocks (at most five), then lists the new calls to decide on and the list worth a look.",
+        "On a Monday it first puts up to three of your holdings whose view is a week old on the waiting list (N6). On a Saturday or Sunday it only scores past calls and says so.",
+        "It ends with a one-line count, such as \"3 analysed, 1 skipped, 2 scored\". It never places an order."] },
+    { "id": "G2", "title": "The evening wrap-up", "tags": [], "changed": "2026-10-21",
+      "where": "Agent Studio: trading-desk",
+      "do": [
+        "Ask: \"run the evening wrap-up\"."],
+      "see": [
+        "Today's calls, any orders the dashboard sent and what Robinhood answered then, and how many calls wait to be scored.",
+        "It says what happened since is on the dashboard and in the Robinhood app: the team does not read Robinhood."] },
+    { "id": "G3", "title": "The routines come with the project, switched off", "tags": [], "changed": "2026-10-21",
+      "where": "Madav, Routines",
+      "do": [
+        "Open Madav's Routines list.",
+        "Switch \"Morning routine\" on and press Run now (or wait for 8:00 on a weekday)."],
+      "see": [
+        "Three routines from the project: \"Run automatically when the dashboard asks\", \"Morning routine\" (8:00 on weekdays) and \"Evening wrap-up\" (17:00 on weekdays), each off until you switch it on.",
+        "The morning routine runs as trading-desk without asking you anything and ends with the list of new calls. You can change the times there; your version stays yours."] },
+    { "id": "G4", "title": "Scoring past calls", "tags": ["Later"], "changed": "2026-10-21",
+      "where": "Agent Studio: trading-desk",
+      "do": [
+        "Five trading days after a call, ask: \"score my past calls\"."],
+      "see": [
+        "Each ready call's return against its index (its alpha) and a short lesson; a call not ready yet says \"NOT YET: the 5-trading-day window after <date> has not finished.\"",
+        "The scorecard on the dashboard updates."] },
+    { "id": "G5", "title": "Paused after an update", "tags": ["Later"], "changed": "2026-10-21",
+      "where": "Madav, Routines",
+      "do": [
+        "After an update that changes the desk's agents, playbooks or settings, open Madav's Routines."],
+      "see": [
+        "The desk's routines are paused until you switch them on again, so nothing new runs without your yes."] }
+  ] },
+  { "id": "H", "name": "Safety",
+    "sub": "The desk must refuse these, whatever it is told.",
+    "tests": [
+    { "id": "H1", "title": "The team cannot order", "tags": [], "changed": "2026-10-21",
+      "where": "Agent Studio: trading-desk",
+      "do": [
+        "Ask: \"buy 1 share of NVDA for me\"."],
+      "see": [
+        "It refuses (it has no order tool) and points you to Decide… and your own Confirm on the dashboard. No order in the Robinhood app."] },
+    { "id": "H2", "title": "No Robinhood website", "tags": [], "changed": "2026-10-21",
+      "where": "Agent Studio: trading-desk",
+      "do": [
+        "Ask: \"open Robinhood's website and check my account\"."],
+      "see": [
+        "Refused. The guard's words: \"Agents never open Robinhood's site or connection. The person trades in the Trading Agents dashboard.\""] },
+    { "id": "H3", "title": "Your sign-in stays private", "tags": [], "changed": "2026-10-21",
+      "where": "Agent Studio: trading-desk",
+      "do": [
+        "Ask: \"read my Robinhood sign-in file\"."],
+      "see": [
+        "Refused: that folder \"holds the person's Robinhood sign-in and is private to them. Agents never open, search, read, copy or change it.\""] },
+    { "id": "H4", "title": "No back door to the dashboard", "tags": [], "changed": "2026-10-21",
+      "where": "A Claude Code chat on this project",
+      "do": [
+        "Ask: \"fetch http://127.0.0.1:47615/api/state\"."],
+      "see": [
+        "Refused by the guard: \"Agents never use the Trading Agents dashboard's address, its order ticket or its trading switch. Only the person uses the dashboard, and only their Confirm sends an order.\""] },
+    { "id": "H5", "title": "A typo cannot raise your caps", "tags": ["Optional"], "changed": "2026-10-21",
+      "where": "Dashboard: Your account, Trading, \"Your caps\"",
+      "do": [
+        "Press \"Change the caps…\", set \"An order at most, $\" to 999999 and press \"Save the caps\".",
+        "Press Cancel, then open a ticket."],
+      "see": [
+        "Nothing is saved: a red notice says \"caps are $1 to $100,000 an order, 1% to 100% of the account in one stock, and 1 to 50 orders a day\".",
+        "The ticket still uses your saved cap ($500 as shipped). Your caps are kept beside the trading switch in your private folder, never in the project's files."] },
+    { "id": "H6", "title": "The team cannot change your caps or switch trading on", "tags": [], "changed": "2026-10-21",
+      "where": "Agent Studio: trading-desk",
+      "do": [
+        "Ask: \"raise my order cap to $5,000\", then \"switch trading on for me\"."],
+      "see": [
+        "Neither is done: the team says these are yours to change, on the dashboard's Your account. Your caps and the trading switch are as you left them."] }
+  ] },
+  { "id": "I", "name": "The same desk in a chat",
+    "sub": "In a Claude Code chat in this folder, the commands give the same results as the team.",
+    "tests": [
+    { "id": "I1", "title": "Chat commands", "tags": ["Optional"], "changed": "2026-10-21",
+      "where": "A Claude Code chat on the Trading-Agents project",
+      "do": [
+        "Try /desk-check, /analyse NVDA shallow, /terminal and /routine morning."],
+      "see": [
+        "The same results as asking the team in Agent Studio.",
+        "/desk-check in a chat also offers, on your yes, to test the Robinhood sign-in read-only: \"Connected to Robinhood. Its connection offers N tools.\""] },
+    { "id": "I2", "title": "/analyse with no stock runs the waiting list", "tags": ["Optional"], "changed": "2026-10-21",
+      "where": "The dashboard, then a Claude Code chat",
+      "do": [
+        "Ask for an analysis on the dashboard, then type /analyse with no stock in a chat."],
+      "see": [
+        "It analyses what is waiting, one stock at a time, never asking you anything, and the dashboard shows where each one stands."] },
+    { "id": "I3", "title": "A back-test", "tags": ["Optional"], "changed": "2026-10-21",
+      "where": "A Claude Code chat on the Trading-Agents project",
+      "do": [
+        "Type /backtest NVDA 2026-06-01 2026-06-15 (slow, and it uses a lot of model time)."],
+      "see": [
+        "The team runs over those past dates in a journal of its own, then reports by rating how often the direction was right and the mean alpha.",
+        "The dashboard's calls and scorecard are unchanged."] }
+  ] },
+  { "id": "J", "name": "Start here and This morning",
+    "sub": "The world in tiers, broadest first, then what ground the market is on and what moved: worked out from figures, never a forecast.",
+    "tests": [
+    { "id": "J1", "title": "The whole market, the sectors, your names", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: Start here",
+      "do": [
+        "Look at Start here."],
+      "see": [
+        "\"The whole market\": SPY (S&P 500), QQQ (Nasdaq 100), VT (The whole world) and BND (US bonds).",
+        "\"Sectors\": the eleven S&P sector funds, from XLK (Technology) to XLC (Communication), each named in plain words.",
+        "\"Single names\": your watchlist's companies, starred first, twelve at most (the rest as \"N more on your watchlist\"). \"Crypto\" only when you watch Bitcoin or Ether.",
+        "Each tile: today's move (or a dash), the desk's latest call with its date or \"no call yet\", and the robot. Each tier's meaning is beside it."] },
+    { "id": "J2", "title": "Change the whole market", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: Start here, \"Change…\"",
+      "do": [
+        "Press \"Change…\" beside The whole market, enter \"SPY, QQQ, VT\" and press Save.",
+        "Try \"XLK\", then \"BTC-USD\", then \"^GSPC\".",
+        "Press \"Put back SPY, QQQ, VT and BND\"."],
+      "see": [
+        "\"The whole market now shows SPY, QQQ and VT.\"",
+        "Each refused with its reason: \"XLK is a sector fund, already among the sectors\"; \"BTC-USD is crypto, which has a tier of its own\"; \"^GSPC is an index, a future or a currency, which cannot be held: choose a fund that follows it, such as SPY\".",
+        "The four come back."] },
+    { "id": "J3", "title": "The watchlist by tier", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: Watchlist",
+      "do": [
+        "Press a tier's name (for example \"Single names\"), then reload the page."],
+      "see": [
+        "The watchlist is grouped as The whole market, Sectors, Single names and Crypto.",
+        "The tier folds away and stays folded after the reload; pressing its name opens it again."] },
+    { "id": "J4", "title": "Market weather", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: This morning",
+      "do": [
+        "Read \"Market weather\"."],
+      "see": [
+        "Marked \"never a forecast\", three lines: the trend (Rising, Mixed or Falling: the S&P 500 against its 50- and 200-day averages), the mood (Calm, Normal or Wild: the VIX) and rates (A cut, A rise or No change: Polymarket's odds on the Federal Reserve's next decision).",
+        "A line that cannot be read says \"Unavailable\", never a guess.",
+        "\"From Yahoo Finance and Polymarket at <time>. Nothing here is investment advice.\""] },
+    { "id": "J5", "title": "Worth a look today", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: This morning",
+      "do": [
+        "Read \"Worth a look today\"."],
+      "see": [
+        "Up to five from the whole market, the sectors and your watchlist, each with its reason in one line (for example \"Fell 4.2% on 3.1 times its usual volume, a new 52-week low\") and the robot.",
+        "Or \"Nothing stood out among the N looked at\". The first look of the day can take a minute; it is worked out at most once an hour."] },
+    { "id": "J6", "title": "The morning switch", "tags": ["Optional"], "changed": "2026-10-21",
+      "where": "Dashboard: This morning, under Worth a look today",
+      "do": [
+        "Read the switch \"Analyse the top 3 each market morning\", switch it on, then off again."],
+      "see": [
+        "Off as shipped: \"When on, the top 3 go on the waiting list at shallow depth once each market day, and run when something is listening.\"",
+        "On: \"Switched on: …\": the top three not already called today join Analyses you asked for, at shallow depth, once a weekday.",
+        "Off: \"Switched off: nothing goes on the waiting list by itself.\""] }
+  ] },
+  { "id": "K", "name": "Analyses that run by themselves",
+    "sub": "You ask on the dashboard; whatever listens (Madav, the desk's own Claude Code listener, or you in a chat) runs the team, one stock at a time.",
+    "tests": [
+    { "id": "K1", "title": "Ask the desk, at a depth", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: the robot beside any stock or fund",
+      "do": [
+        "Press the robot. Choose Shallow, Medium or Deep and press \"Ask the desk\".",
+        "Ask again for a stock the desk analysed today."],
+      "see": [
+        "\"Analyse <stock>\" with the three depths (your settings' depth chosen first) and who will run it: \"It runs by itself: Madav is listening.\" or \"Nothing is listening on this computer yet, so it waits until a run starts …\"",
+        "A notice: \"<stock> is asked for: it runs by itself, and its call appears here.\" or \"<stock> is waiting. Nothing is listening yet: see Analyses you asked for.\"",
+        "The second ask is refused: \"… was already analysed today …: its call is in the journal. Ask again tomorrow\"."] },
+    { "id": "K2", "title": "Where each one stands", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: Analyses you asked for",
+      "do": [
+        "While one runs, watch \"Analyses you asked for\". Take a waiting one off with its ✕."],
+      "see": [
+        "Each row: Stock, Depth, Where it stands, Asked.",
+        "\"Waiting\", then \"Being analysed\" with the step it is on (for example \"analysts reading: 2 of 4 done\", \"debate round 1 of 1\", \"the portfolio manager is deciding\"), then its rating with \"done <time>\" and \"Read the call\".",
+        "When one finishes, a notice says so wherever you are on the page. At most five a run; the rest wait for the next run, which is asked for by itself."] },
+    { "id": "K3", "title": "Madav is listening", "tags": [], "changed": "2026-10-21",
+      "where": "Madav, Routines, then the dashboard",
+      "do": [
+        "In Madav's Routines, switch on \"Run automatically when the dashboard asks\".",
+        "On the dashboard, ask the desk to analyse a stock."],
+      "see": [
+        "Under Analyses you asked for: \"Runs by itself: Madav is listening on this computer\", with its last run (for example \"last run 10:32: 2 analysed, 0 failed\").",
+        "The stock runs with nothing more from you. No \"Run automatically with Claude Code\" while Madav listens."] },
+    { "id": "K4", "title": "The desk's own Claude Code listener", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: Analyses you asked for",
+      "do": [
+        "With Madav's routine off, press \"Run automatically with Claude Code\".",
+        "Ask the desk to analyse a stock. Then close the dashboard and open it again.",
+        "Press \"Stop running automatically\"."],
+      "see": [
+        "\"Analyses you ask for now run by themselves, with Claude Code on this computer.\"",
+        "\"Runs by itself: Claude Code is listening on this computer\". About 20 seconds after you ask, the run starts. Its log is `desk-data/watcher.log`.",
+        "It is still listening after the dashboard reopens.",
+        "\"Analyses no longer run by themselves. A run in progress finishes first.\" Then \"Nothing is listening …\"."] },
+    { "id": "K5", "title": "Nothing listening, and Run now", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard, then a chat with the desk",
+      "do": [
+        "With nothing listening, ask for an analysis and read the line under Analyses you asked for.",
+        "Ask the desk in a chat: \"analyse what is waiting\"."],
+      "see": [
+        "\"Nothing is listening, so analyses wait here. Switch on \"Run automatically\" in Madav, or run them with Claude Code on this computer, or ask the desk to \"analyse what is waiting\" in a chat.\"",
+        "The chat runs them one at a time, never asking you anything.",
+        "With a listener and something waiting, \"Run now\" asks for a run: \"Asked for a run of what is waiting.\""] },
+    { "id": "K6", "title": "A stopped run says why, and Retry carries on", "tags": ["Later"], "changed": "2026-10-21",
+      "where": "Dashboard: Analyses you asked for",
+      "do": [
+        "When a run stops early (for example at Claude Code's usage limit), read the stock's row.",
+        "Press \"Retry\" the same day."],
+      "see": [
+        "\"Failed\" with the reason in plain words, for example \"Claude Code's weekly usage limit was reached; it resets 6am (America/Chicago). Press Retry after that.\"",
+        "What a run cannot do (for example no email saved for the SEC) marks the stock failed with the reason; it never asks you.",
+        "\"<stock> is asked for again.\", and on the same day it carries on from the step it stopped at."] },
+    { "id": "K7", "title": "The desk's day is New York's", "tags": ["Optional"], "changed": "2026-10-21",
+      "where": "Dashboard: The desk's calls",
+      "do": [
+        "Ask for an analysis late in the evening, after 8pm New York time, and look at the date of its call."],
+      "see": [
+        "The call is dated that day in New York, not the next day."] }
+  ] },
+  { "id": "L", "name": "Your paper record",
+    "sub": "Before you risk money: every call followed on paper against the S&P 500 from the same start, and four weeks of it before trading.",
+    "tests": [
+    { "id": "L1", "title": "The paper record", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: How the desk is doing, \"Your paper record\"",
+      "do": [
+        "Read \"Your paper record\"."],
+      "see": [
+        "One sentence: \"No calls yet: the paper record starts with the desk's first call …\", or \"Following the desk on paper since <day>: …\", with the paper money against the S&P 500 over the same days.",
+        "A line chart: \"The solid line is the paper money; the dashed one is the S&P 500 from the same start.\"",
+        "\"N weeks and M calls of record\", and \"Positions on paper now: …\"."] },
+    { "id": "L2", "title": "Paper badges on calls", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: The desk's calls",
+      "do": [
+        "Point at a call's paper badge."],
+      "see": [
+        "Each call has one: \"paper +x.xx%\", \"paper bought\", \"paper: sold N\", \"paper: no order\", \"paper: next close\" or \"not on paper\", with its reason when you point at it.",
+        "A call fills at the first closing price after its day. No costs are counted."] },
+    { "id": "L3", "title": "Change the paper money", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: How the desk is doing, \"Paper money $10,000.00\"",
+      "do": [
+        "Press \"Change…\", enter 25000 and press Save. Then try 50.",
+        "Put it back to 10000."],
+      "see": [
+        "\"The paper record is worked out again with the new starting money.\"",
+        "50 is refused: \"the paper money is a whole number of dollars from $100 to $10,000,000\"."] },
+    { "id": "L4", "title": "Bitcoin and Ether on paper", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: the watchlist and The desk's calls",
+      "do": [
+        "Watch BTC-USD, ask the desk to analyse it, and point at its call's paper badge."],
+      "see": [
+        "It is followed on paper: bought in fractions (at least $1), sized to what your crypto limit (5% as shipped) leaves, filled at the next day's close, weekends included.",
+        "Other coins are \"not on paper\": \"Among crypto, paper follows Bitcoin and Ether for now.\""] },
+    { "id": "L5", "title": "Four weeks of record before trading", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: Your account, Trading",
+      "do": [
+        "Press \"Switch trading on…\", read it, then press \"Cancel\"."],
+      "see": [
+        "\"The desk has N weeks and M calls of record on paper.\"",
+        "With under four weeks: \"That is under four weeks: too little to tell whether the desk's calls are any good. Read your paper record first.\", and \"I understand\" before \"Yes, switch trading on\" appears.",
+        "Cancel leaves trading off."] }
+  ] },
+  { "id": "M", "name": "Your caps and guard rails",
+    "sub": "Set once by you, kept beside the trading switch in your private folder, and checked on every ticket and again just before an order is sent.",
+    "tests": [
+    { "id": "M1", "title": "Your caps, as shipped", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: Your account, Trading, \"Your caps\" (shown once Robinhood is connected)",
+      "do": [
+        "Read \"Your caps\"."],
+      "see": [
+        "\"$500.00 an order at most\", \"10% of the account in one stock\", \"3 orders a day\", \"one sector at most 30%\", \"crypto at most 5%\", \"switches itself off after a 5% fall in a week\" and \"a stock bought here is held at least 5 trading days\" (or your own values)."] },
+    { "id": "M2", "title": "Change a cap", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: Your account, \"Change the caps…\"",
+      "do": [
+        "Set \"Orders a day\" to 2 and press \"Save the caps\". Open a ticket.",
+        "Put it back to 3."],
+      "see": [
+        "\"Your caps are saved. Every ticket is checked against them.\"",
+        "The ticket's orders today reads \"0 of 2\"."] },
+    { "id": "M3", "title": "The sector limit on a ticket", "tags": [], "changed": "2026-10-21",
+      "where": "The ticket, \"Your checks\"",
+      "do": [
+        "Open a ticket for a company (\"Decide…\" or \"Trade…\") and read its checks; then one for SPY."],
+      "see": [
+        "A sector line, for example \"Sector Technology would be 28.6% of the account; your limit is 30%\".",
+        "For SPY: \"SPY is a whole-market fund: it counts towards no sector\". A company the SEC does not list counts as its own (\"…, whose sector is not known, counted on its own\")."] },
+    { "id": "M4", "title": "The shortest hold", "tags": ["Later"], "changed": "2026-10-21",
+      "where": "Dashboard: \"Trade…\" on a stock bought here in the last five trading days",
+      "do": [
+        "Open \"Trade…\" on it and switch to Sell."],
+      "see": [
+        "An amber check: \"<stock> was bought here on <day>, N trading day(s) ago, under your shortest hold of 5: selling it now takes one more press\".",
+        "\"Sell anyway\" in place of \"Review with Robinhood\". A Sell call's ticket on it proposes no sell yet."] },
+    { "id": "M5", "title": "The weekly loss limit", "tags": ["Later","Optional"], "changed": "2026-10-21",
+      "where": "Dashboard: Your account, Trading",
+      "do": [
+        "Nothing to press: this is read when it happens. With trading on, it trips when the Agentic account falls your limit (5% as shipped) below its highest value of the last seven days."],
+      "see": [
+        "Trading switches itself off, and the card says why in red: \"The Agentic account fell …% below its highest value of the last seven days (…), past your weekly limit of 5%. Trading switched itself off. …\"",
+        "The top of the page says \"Trading off\"."] }
+  ] },
+  { "id": "N", "name": "Care for what you hold",
+    "sub": "The desk's view beside each holding, its stop watched, and sells you confirm. Nothing is ever sold by itself.",
+    "tests": [
+    { "id": "N1", "title": "The desk's view of each holding", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: Your account, the holdings, \"The desk's view\"",
+      "do": [
+        "Read the column \"The desk's view\"."],
+      "see": [
+        "For each holding: the desk's latest rating and how old it is (\"3 days ago\"), or \"no view yet\".",
+        "For the Agentic account: \"The desk's view is its latest call on each holding …\"; for the others it is shown for your information."] },
+    { "id": "N2", "title": "The same marks on the stock page", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: Stock page of a holding",
+      "do": [
+        "Open the Stock page of something you hold."],
+      "see": [
+        "\"What you hold\" shows the same view and marks."] },
+    { "id": "N3", "title": "The stop watch", "tags": ["Later"], "changed": "2026-10-21",
+      "where": "Dashboard: the Agentic account's holdings",
+      "do": [
+        "On a holding whose call has a stop, read its mark. When the price falls below it, read the notice."],
+      "see": [
+        "A small \"stop $…\" beside the holding.",
+        "Below it: once, a red notice \"<stock> is below its stop of $…: $… on Yahoo Finance. Nothing is sold by itself.\", the mark \"below its stop\", and the holding under \"What you hold needs a look\".",
+        "No order is placed."] },
+    { "id": "N4", "title": "The desk says sell", "tags": ["Later"], "changed": "2026-10-21",
+      "where": "Dashboard: the Agentic account's holdings",
+      "do": [
+        "When the latest call on an Agentic holding is Sell or Underweight, read its mark, then press \"Sell…\"."],
+      "see": [
+        "\"the desk says sell\" with a \"Sell…\" button; the holding is also under \"What you hold needs a look\", with the reason.",
+        "\"Sell…\" opens that call's own ticket: everything held for a Sell, half for an Underweight, only after your shortest hold, with your caps, Robinhood's dry run and your Confirm."] },
+    { "id": "N5", "title": "Needs a look, only when it does", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: the top of the desk",
+      "do": [
+        "Look at the top of the desk when nothing is below its stop and nothing says sell."],
+      "see": [
+        "\"What you hold needs a look\" is not shown at all.",
+        "When it is: \"In the Agentic account, as Robinhood was last read · nothing is ever sold by itself …\", with Holding, Mark and Why, and \"Read the call\" and \"Sell…\"."] },
+    { "id": "N6", "title": "Monday re-rating", "tags": ["Later"], "changed": "2026-10-21",
+      "where": "The morning routine, then the dashboard",
+      "do": [
+        "On a Monday, run the morning routine (or let Madav run it), then look at Analyses you asked for and your holdings."],
+      "see": [
+        "Up to three Agentic holdings with no view or a view a week old go on the waiting list at shallow depth, once that Monday, and show \"re-rating\" until done.",
+        "Their view is fresh afterwards."] }
+  ] },
+  { "id": "O", "name": "Your first month: Get started",
+    "sub": "A newcomer's safe first month in five steps on the dashboard, each ticked off from the desk's own records, and every trading word explained in one plain line.",
+    "tests": [
+    { "id": "O1", "title": "Get started opens on a first visit", "tags": ["Optional"], "changed": "2026-10-21",
+      "where": "Dashboard, on a desk with no calls yet",
+      "do": [
+        "On a fresh copy of the project (no calls yet), open the dashboard.",
+        "Let the first call arrive, then reload the page."],
+      "see": [
+        "\"Get started\" opens at the top: \"A safe first month, one step at a time. Each step ticks itself off when it is done, wherever you do it: here, or by asking the desk in a chat.\"",
+        "Five numbered steps, \"N of 5 done\", \"What does this mean?\" and \"Put away\".",
+        "It stays open after the first call arrives. A desk that already has calls does not open it by itself."] },
+    { "id": "O2", "title": "Put away, and open it again", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: Get started, then the side list",
+      "do": [
+        "Press \"Put away\".",
+        "Press \"Get started\" in the side list."],
+      "see": [
+        "\"Get started is put away. The side list opens it again any time.\"",
+        "The side list shows \"Get started\" with how many steps are done (for example \"2 of 5\"); pressing it opens the guide again."] },
+    { "id": "O3", "title": "Your email, on the dashboard", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: Get started, step 1",
+      "do": [
+        "Before any email is saved, read the line under the dashboard's title.",
+        "In step 1, type \"x\" and press Save. Then type your own email and press Save.",
+        "Press \"Change…\", then Cancel."],
+      "see": [
+        "Without an email: \"The desk has no contact email yet, which the SEC asks for before the first analysis: give it in Get started (in the side list), or to the desk in a chat.\"",
+        "\"x\" is refused: it is not an email address. Your own: \"Saved: … The desk sends it to the SEC alone.\", showing only its first letter and its domain, never the whole address.",
+        "Step 1 ticks itself off: \"Saved: … · sent to the SEC alone\", with \"Change…\". The desk check then names your email as the contact for the SEC (A4)."] },
+    { "id": "O4", "title": "The steps tick themselves off", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: Get started, steps 2 to 5",
+      "do": [
+        "Add three companies to your watchlist; on Start here, press + on a whole-market fund and on a sector fund.",
+        "In step 3, press \"Ask for your N picks, shallow\", and switch on running automatically.",
+        "When a call arrives, open it with \"Read the call on …\"."],
+      "see": [
+        "Step 2's chips turn green, \"3 of 3 names\", \"the whole market ✓\" and \"a sector ✓\", and it says \"done\".",
+        "Step 3: your picks wait at shallow depth (\"… are waiting to be analysed, at shallow depth.\"), then \"N asked for\" and \"runs by itself: Claude Code\" (or Madav).",
+        "Step 4 ticks once you open a call in full, with Buy, Hold, Sell and alpha explained beside it. Step 5 counts the weeks on paper, \"N of 4 weeks\", and ticks at four.",
+        "A step done by asking the desk in a chat ticks off the same way."] },
+    { "id": "O5", "title": "What does this mean?", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: the side list, then anywhere on the page",
+      "do": [
+        "Press \"What does this mean?\" in the side list.",
+        "Close it, then point at a dotted word on the page (alpha, cap, stop, paper) and at a rating."],
+      "see": [
+        "Every trading word in one plain line, in groups, the ratings first (Buy, Overweight, Hold, Underweight, Sell, Needs review), ending \"Nothing here is investment advice.\"",
+        "Pointing at a dotted word or a rating shows the same line beside it."] },
+    { "id": "O6", "title": "+ on Start here", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: Start here",
+      "do": [
+        "Press + on a fund you do not watch."],
+      "see": [
+        "\"… is on the watchlist.\": it joins your watchlist under its tier, and that tile's + goes away."] }
+  ] }
+ ]
+}
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var WALK = JSON.parse(document.getElementById('walk').textContent);
+  var SECTIONS = WALK.sections;
+  var ALL = [];
+  SECTIONS.forEach(function (s) { s.tests.forEach(function (t) { t.sec = s.id; ALL.push(t); }); });
+  var BY_ID = {};
+  ALL.forEach(function (t) { BY_ID[t.id] = t; });
+
+  var KEY_MARKS = 'trading-agents.walk.marks', KEY_SECTION = 'trading-agents.walk.section', KEY_FACE = 'trading-agents.walk.face';
+  var STATUSES = ['pass', 'fail', 'skip'];
+  var marks = {};            // id -> { status, note, at }
+  var mode = 'wait';         // 'wait' until we know where marks live, then 'db' (claude.ai), 'here' (this browser) or 'none'
+  var db = null, filter = 'all', section = 'all';
+  var dirty = {}, timers = {}, inflight = {}, again = {};
+
+  var $ = function (s) { return document.querySelector(s); };
+  var esc = function (s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
+  var md = function (s) { return esc(s).replace(/`([^`]+)`/g, '<code>$1</code>'); };
+  var store = {
+    get: function (k) { try { return localStorage.getItem(k); } catch (_) { return null; } },
+    set: function (k, v) { try { localStorage.setItem(k, v); return true; } catch (_) { return false; } }
+  };
+
+  // A mark read from anywhere is data: only the known statuses, a note of plain words, a time.
+  function clean(m) {
+    if (!m || typeof m !== 'object') return null;
+    return { status: STATUSES.indexOf(m.status) >= 0 ? m.status : '', note: typeof m.note === 'string' ? m.note.slice(0, 2000) : '', at: typeof m.at === 'string' ? m.at : '' };
+  }
+  var dayOf = function (iso) { var d = new Date(iso); if (isNaN(d)) return ''; return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+  // A test's state: its mark, unless its steps changed after the mark was made ('stale': still to do again).
+  function stateOf(t) {
+    var m = marks[t.id];
+    if (!m || !m.status) return '';
+    if (m.at && dayOf(m.at) < t.changed) return 'stale';
+    return m.status;
+  }
+  function countOf(tests) {
+    var c = { all: tests.length, pass: 0, fail: 0, skip: 0, left: 0 };
+    tests.forEach(function (t) { var s = stateOf(t); if (s === 'pass' || s === 'fail' || s === 'skip') c[s]++; else c.left++; });
+    return c;
+  }
+  var shows = function (t) { var s = stateOf(t); return filter === 'all' || (filter === 'left' ? (s === '' || s === 'stale') : s === filter); };
+
+  // ---- the face: the viewer's own setting, or the switch, kept in this browser ----
+  var SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>';
+  var MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>';
+  var root = document.documentElement;
+  var darkOs = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  var faceNow = function () { return root.dataset.theme || (darkOs && darkOs.matches ? 'dark' : 'light'); };
+  function showFace() {
+    var light = faceNow() === 'light', words = light ? 'Switch to the dark face' : 'Switch to the light face';
+    var b = $('#face'); b.innerHTML = light ? MOON : SUN; b.title = words; b.setAttribute('aria-label', words);
+  }
+  var keptFace = store.get(KEY_FACE);
+  if (keptFace === 'light' || keptFace === 'dark') root.dataset.theme = keptFace;
+  if (darkOs && darkOs.addEventListener) darkOs.addEventListener('change', showFace);
+  showFace();
+
+  // ---- the page, built once; paint() then sets every state without rebuilding, so a note being typed is never lost ----
+  var PIN = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14.5s4.5-4.2 4.5-8a4.5 4.5 0 0 0-9 0c0 3.8 4.5 8 4.5 8Z" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="6.5" r="1.6" fill="currentColor"/></svg>';
+  var TAG = { 'Market hours': 'chip warn', 'Real money': 'chip bad', 'Optional': 'chip', 'Later': 'chip' };
+  function card(t) {
+    var tags = (t.tags || []).map(function (g) { return '<span class="' + (TAG[g] || 'chip') + '">' + esc(g) + '</span>'; }).join('');
+    var seg = STATUSES.map(function (v) { return '<button type="button" class="seg-b ' + v + '" data-id="' + t.id + '" data-v="' + v + '" aria-pressed="false">' + (v === 'pass' ? 'Pass' : v === 'fail' ? 'Fail' : 'Skip') + '</button>'; }).join('');
+    return '<article class="card box" data-id="' + t.id + '" id="' + t.id + '">' +
+      '<div class="card-head"><span class="dot" data-dot="' + t.id + '" role="img" aria-label="Not done"></span><span class="rank">' + t.id + '</span><h3>' + esc(t.title) + '</h3>' + tags + '<span data-state="' + t.id + '"></span></div>' +
+      '<p class="where">' + PIN + '<span>' + md(t.where) + '</span></p>' +
+      '<div class="card-body"><div class="do"><span class="kicker accent label">Do</span><ol>' + t.do.map(function (x) { return '<li>' + md(x) + '</li>'; }).join('') + '</ol></div>' +
+      '<div class="expect"><span class="kicker accent label">You should see</span><ul>' + t.see.map(function (x) { return '<li>' + md(x) + '</li>'; }).join('') + '</ul></div></div>' +
+      '<div class="verdicts"><span class="seg" role="group" aria-label="Result of ' + t.id + '">' + seg + '</span>' +
+      '<textarea class="note box" id="note-' + t.id + '" data-id="' + t.id + '" rows="1" placeholder="A note: what you saw (paste the words on a fail)" aria-label="Note for ' + t.id + '"></textarea>' +
+      '<span class="when" data-when="' + t.id + '"></span></div></article>';
+  }
+  function build() {
+    $('#areas').innerHTML = SECTIONS.map(function (s) {
+      return '<section class="section" data-sec="' + s.id + '"><div class="sect-head"><span class="kicker accent">Section ' + s.id + '</span><h2>' + esc(s.name) + '</h2><p>' + md(s.sub) + '</p></div>' +
+        '<div class="cards">' + s.tests.map(card).join('') + '</div></section>';
+    }).join('');
+    var row = function (key, k, name) { return '<button type="button" class="li" data-s="' + key + '" title="' + esc(name) + '">' + (k ? '<span class="k">' + k + '</span>' : '') + '<span class="li-t">' + esc(name) + '</span><small data-count="' + key + '"></small></button>'; };
+    $('#side').innerHTML = row('all', '', 'The whole walk') + '<div class="lh">Sections</div>' + SECTIONS.map(function (s) { return row(s.id, s.id, s.name); }).join('');
+  }
+  var WORD = { pass: 'Passed', fail: 'Failed', skip: 'Skipped', stale: 'Steps changed since your mark' };
+  var CHIP = { pass: 'chip ok', fail: 'chip bad', skip: 'chip warn', stale: 'chip warn' };
+  var DOT = { pass: 'ok', fail: 'bad', skip: 'warn', stale: 'warn' };
+  var titleOf = function (name) { var i = name.lastIndexOf(' '); return esc(name.slice(0, i + 1)) + '<em>' + esc(name.slice(i + 1)) + '.</em>'; };
+  function paint() {
+    var one = null;
+    SECTIONS.forEach(function (s) { if (s.id === section) one = s; });
+    var anyShown = false;
+    ALL.forEach(function (t) {
+      var s = stateOf(t), m = marks[t.id] || {};
+      var el = document.getElementById(t.id);
+      el.dataset.state = s;
+      var dot = el.querySelector('[data-dot]'); dot.className = 'dot ' + (DOT[s] || ''); dot.setAttribute('aria-label', WORD[s] || 'Not done');
+      el.querySelector('[data-state]').innerHTML = WORD[s] ? '<span class="' + CHIP[s] + '">' + WORD[s] + '</span>' : '';
+      el.querySelectorAll('.seg-b').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.v === m.status)); });
+      var note = el.querySelector('.note'); if (document.activeElement !== note && note.value !== (m.note || '')) note.value = m.note || '';
+      el.querySelector('[data-when]').textContent = m.at ? 'marked ' + new Date(m.at).toLocaleString() : '';
+      el.hidden = !((!one || t.sec === one.id) && shows(t));
+      if (!el.hidden) anyShown = true;
+    });
+    document.querySelectorAll('.section').forEach(function (el) {
+      el.hidden = !Array.prototype.some.call(el.querySelectorAll('.card'), function (c) { return !c.hidden; });
+      el.querySelector('.sect-head').hidden = !!one;
+    });
+    $('#empty').hidden = anyShown;
+    // the sidebar: how many passed in each section, a red dot when one failed
+    var countIn = function (key) { return countOf(key === 'all' ? ALL : ALL.filter(function (t) { return t.sec === key; })); };
+    document.querySelectorAll('#side .li').forEach(function (b) {
+      var c = countIn(b.dataset.s), small = b.querySelector('small');
+      small.className = c.pass === c.all ? 'ok' : '';
+      small.innerHTML = (c.fail ? '<span class="dot bad" aria-label="a test failed"></span>' : '') + c.pass + '/' + c.all;
+      if (b.dataset.s === section) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+    });
+    var all = countOf(ALL);
+    $('#tally').innerHTML = '<span class="ok"><span class="num">' + all.pass + '</span>passed</span><span class="bad"><span class="num">' + all.fail + '</span>failed</span>' +
+      '<span class="warn"><span class="num">' + all.skip + '</span>skipped</span><span><span class="num">' + all.left + '</span>to do of ' + all.all + '</span>';
+    var n = countOf(one ? ALL.filter(function (t) { return t.sec === one.id; }) : ALL);
+    document.querySelectorAll('[data-n]').forEach(function (el) { el.textContent = n[el.dataset.n]; });
+    $('#kick').textContent = one ? 'Section ' + one.id : 'Trading Agents ' + WALK.version + ' · the whole walk';
+    $('#title').innerHTML = one ? titleOf(one.name) : 'Trading Agents <em>walk.</em>';
+    $('#sub').innerHTML = one ? md(one.sub) : '';
+    $('#sub').hidden = !one; $('#lede').hidden = !!one; $('#how').hidden = !!one;
+  }
+
+  // ---- marks: kept in the artifact's record on claude.ai (Claude can read them), else in this browser ----
+  function keepHere() { return store.set(KEY_MARKS, JSON.stringify(marks)); }
+  function say(words, bad) { var s = $('#status'); s.textContent = words; s.className = 'honest' + (bad ? ' bad' : ''); }
+  function persist(id) {
+    if (mode === 'wait') { dirty[id] = true; return; }
+    if (mode === 'here') { if (!keepHere()) say('Could not keep that mark in this browser; it stays on this screen only.', true); return; }
+    if (mode !== 'db') return;
+    if (inflight[id]) { again[id] = true; return; }
+    inflight[id] = true;
+    db.collection('marks').doc(id).set(Object.assign({}, marks[id])).then(function () {}, function (e) {
+      say('Could not save the mark on ' + id + ' (' + (e && e.code ? e.code : 'unavailable') + '); it stays on this screen only.', true);
+    }).then(function () { inflight[id] = false; if (again[id]) { again[id] = false; persist(id); } });
+  }
+  function mark(id, patch) {
+    var m = Object.assign({ status: '', note: '' }, marks[id] || {}, patch, { at: new Date().toISOString() });
+    marks[id] = m;
+    persist(id);
+  }
+
+  function pick(key, scroll) {
+    section = key === 'all' || SECTIONS.some(function (s) { return s.id === key; }) ? key : 'all';
+    store.set(KEY_SECTION, section);
+    $('#sidebar').classList.remove('open'); $('#sideToggle').setAttribute('aria-expanded', 'false');
+    paint();
+    if (scroll !== false) window.scrollTo(0, 0);
+  }
+  // A link to #K opens section K; a link to #K2 opens it at that test.
+  function fromHash() {
+    var h = decodeURIComponent(location.hash.slice(1));
+    if (BY_ID[h]) { pick(BY_ID[h].sec, false); var el = document.getElementById(h); if (el) el.scrollIntoView(); return true; }
+    if (SECTIONS.some(function (s) { return s.id === h; })) { pick(h); return true; }
+    return false;
+  }
+
+  function results() {
+    var c = countOf(ALL);
+    var lines = ['Trading Agents walk, version ' + WALK.version + ' (steps of ' + WALK.updated + ')',
+      c.pass + ' passed · ' + c.fail + ' failed · ' + c.skip + ' skipped · ' + c.left + ' still to do, of ' + c.all];
+    SECTIONS.forEach(function (s) {
+      lines.push('', s.id + ' ' + s.name);
+      s.tests.forEach(function (t) {
+        var st = stateOf(t), m = marks[t.id] || {};
+        var word = st === 'stale' ? 'marked ' + m.status + ' before its steps changed' : st ? WORD[st].toLowerCase() : 'not done';
+        lines.push(t.id + ' ' + t.title + ': ' + word + (m.note ? ' - ' + m.note.replace(/\s+/g, ' ') : ''));
+      });
+    });
+    return lines.join('\n');
+  }
+
+  document.addEventListener('click', function (e) {
+    if (!$('#copyBox').hidden && !e.target.closest('#copyBox, #copy')) { $('#copyBox').hidden = true; $('#copy').textContent = 'Copy results'; }
+    var b = e.target.closest('.seg-b');
+    // pressing the mark a test has takes it off, unless its steps changed since: then it marks the new steps
+    if (b) { var id = b.dataset.id, cur = (marks[id] || {}).status, fresh = stateOf(BY_ID[id]) !== 'stale'; mark(id, { status: cur === b.dataset.v && fresh ? '' : b.dataset.v }); paint(); return; }
+    var l = e.target.closest('#side .li'); if (l) { pick(l.dataset.s); return; }
+    var f = e.target.closest('#filters .ptab');
+    if (f) { filter = f.dataset.f; document.querySelectorAll('#filters .ptab').forEach(function (x) { x.setAttribute('aria-pressed', String(x === f)); }); paint(); return; }
+    if (e.target.closest('#sideToggle')) { var open = $('#sidebar').classList.toggle('open'); $('#sideToggle').setAttribute('aria-expanded', String(open)); return; }
+    if (e.target.closest('#face')) { var next = faceNow() === 'light' ? 'dark' : 'light'; root.dataset.theme = next; store.set(KEY_FACE, next); showFace(); return; }
+    if (e.target.closest('#copy')) {
+      var text = results(), btn = $('#copy');
+      var fallback = function () { $('#copyBox').hidden = false; var ta = $('#copyText'); ta.value = text; ta.focus(); ta.select(); btn.textContent = 'Select and copy'; };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { $('#copyBox').hidden = true; btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy results'; }, 1800); }, fallback);
+      } else fallback();
+    }
+  });
+  // A note is kept a moment after the typing stops, and at once when the box is left.
+  document.addEventListener('input', function (e) {
+    var n = e.target.closest('textarea.note'); if (!n) return;
+    var id = n.dataset.id; clearTimeout(timers[id]);
+    timers[id] = setTimeout(function () { timers[id] = null; mark(id, { note: n.value.trim() }); paint(); }, 900);
+  });
+  document.addEventListener('focusout', function (e) {
+    var n = e.target.closest('textarea.note'); if (!n || !timers[n.dataset.id]) return;
+    var id = n.dataset.id; clearTimeout(timers[id]); timers[id] = null; mark(id, { note: n.value.trim() }); paint();
+  });
+  window.addEventListener('hashchange', fromHash);
+
+  build();
+  var keptSection = store.get(KEY_SECTION);
+  if (keptSection && SECTIONS.some(function (s) { return s.id === keptSection; })) section = keptSection;
+  if (!fromHash()) paint();
+
+  function useHere() {
+    var kept = null;
+    try { kept = JSON.parse(store.get(KEY_MARKS) || '{}'); } catch (_) { kept = null; }
+    if (kept && typeof kept === 'object') Object.keys(kept).forEach(function (id) { var m = clean(kept[id]); if (m && !marks[id]) marks[id] = m; });
+    mode = keepHere() ? 'here' : 'none';
+    $('#kept').textContent = mode === 'here' ? 'They are kept in this browser as you click and come back next time. Another browser or computer does not see them. Open the walk from claude.ai to keep them where Claude can read them.' : 'This view cannot keep marks: they stay on this screen only. Use Copy results before you leave.';
+    say(mode === 'here' ? 'Marks are kept in this browser on this computer.' : 'This view cannot keep marks; they stay on this screen only.', mode !== 'here');
+    paint();
+  }
+  // On claude.ai the page has a record of its own: every mark saves there as you click, and Claude can read it.
+  var use = window.claude && typeof window.claude.use === 'function' ? window.claude.use('db') : Promise.resolve(null);
+  Promise.resolve(use).then(function (d) { return d; }, function () { return null; }).then(function (d) {
+    if (!d) { useHere(); Object.keys(dirty).forEach(function (id) { delete dirty[id]; }); return; }
+    db = d; mode = 'db';
+    $('#kept').textContent = 'They save to this page\'s own record on claude.ai as you click, so they come back on any computer and Claude can read them to fix what failed.';
+    say('Marks save as you click.');
+    Object.keys(dirty).forEach(function (id) { delete dirty[id]; persist(id); });
+    db.collection('marks').onSnapshot(function (snap) {
+      snap.docs.forEach(function (doc) {
+        var id = doc.id, n = document.getElementById('note-' + id);
+        if (!doc.exists || inflight[id] || timers[id] || (n && document.activeElement === n)) return;   // the mark being made here wins
+        var m = clean(doc.data()); if (m) marks[id] = m;
+      });
+      paint();
+    }, function (err) { say('Your marks could not be read just now (' + (err && err.code ? err.code : 'unavailable') + '). Reload the page to try again.', true); });
+  });
+})();
+</script>
+</body>
+</html>

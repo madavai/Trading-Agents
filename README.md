@@ -382,6 +382,10 @@ design reference (open it in a browser; the prices in it are made up).
   published at [madavai.github.io/Trading-Agents](https://madavai.github.io/Trading-Agents/). The pictures on this page
   are taken from it by `node scripts/readme-pictures.mjs` (with Chrome or Edge); take them again after the guide
   changes.
+- **[The Trading Agents walk](https://madavai.github.io/Trading-Agents/trading-agents-walk.html)**
+  (`docs/trading-agents-walk.html`): every part of the desk, checked by hand on your own setup, section by section.
+  Mark each test Pass, Fail or Skip with a note; your marks stay in your browser between visits, and "Copy results"
+  gives them to whoever helps you fix what failed.
 - `SECURITY.md`: who can place an order, what agents can and cannot do, where your data stays, and how to report a
   problem.
 - `CONTRIBUTING.md`: building, testing and the project's own rules.
