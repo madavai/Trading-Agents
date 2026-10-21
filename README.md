@@ -116,8 +116,8 @@ the team's "talk" switch shows these messages in the Messages panel; with it off
    a few trading days later against its market's index (`/settle`), and the lessons go into later analyses.
    `/backtest NVDA,AAPL 2026-06-01 2026-08-01` runs the team over past dates in a journal of its own and reports, by
    rating, how often the direction was right and the mean alpha. It is slow and uses a lot of model time, and for past
-   dates only prices, indicators, economic figures and SEC accounts are as known then: news, posts, odds and insider
-   trades are recent-only, so they are thin.
+   dates only prices, indicators, economic figures and what US companies filed with the SEC (accounts, valuation,
+   insider trades) are as known then: news, posts and odds are recent-only, so they are thin.
 2. **You see.** Ask the team to open the dashboard, or type `/terminal`: a page on your own computer with the markets,
    a chart of any stock (area or candles, 50- and 200-day averages, volume), your watchlist, a page per stock, the
    desk's calls with their full reasoning, and how the desk has scored. The agents see your chosen holdings when they
@@ -161,8 +161,9 @@ the team's "talk" switch shows these messages in the Messages panel; with it off
   proposes selling it (your own early sell takes one more press). You change them on the dashboard's "Your account"
   page, beside the trading switch, and they are kept with it in your private folder, where agents are refused, never
   in the project's files. A value out of range falls back to the shipped one, never to a larger one. A sector comes
-  from the company's own profile; whole-market funds count towards none, the S&P sector funds towards theirs, and a
-  stock whose sector is not known counts as its own. Paper follows the same rules. A full position is 10% of the
+  from the industry code the company gave the SEC (approximate: the SEC's codes are older than the market's sectors);
+  whole-market funds count towards none, the S&P sector funds towards theirs, and a stock whose sector is not known (a
+  company that does not file with the SEC) counts as its own. Paper follows the same rules. A full position is 10% of the
   account (`desk-settings.json` under `trading`).
 - Robinhood only lets agents trade in its separate Agentic account, which you fund yourself. Keep Robinhood's own
   "trade approvals" on until you trust the desk: then every order also waits for your OK on your phone.

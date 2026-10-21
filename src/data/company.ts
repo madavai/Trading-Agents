@@ -1,14 +1,20 @@
-// What the company-accounts analyst reads: the financial statements - as filed with the SEC for a US filer, else Yahoo
-// Finance's for today only - and Yahoo Finance's profile, ratios and insider trades. Yahoo serves those only as they
-// stand today, with no filing date, so each is withheld for a past analysis date rather than leak later knowledge into it.
+// What the company-accounts analyst reads, from official sources first: for a US filer, the SEC's own records - the
+// financial statements, the profile and valuation worked out from what was filed and the checked closing price, and the
+// insider trades of its Form 4s - each as known on the analysis date, so a past day reads them too. Yahoo Finance is
+// asked only for a company that does not file with the SEC, and for today only: it serves such data with no filing date,
+// so it is withheld for a past analysis date rather than leak later knowledge into it.
 // Adapted from TradingAgents (tradingagents/dataflows/vendors/yahoo/fundamentals.py and date_window.py), Apache License
 // 2.0; rewritten in TypeScript.
 import { addDays, analysisDate, isHistorical } from './dates.js';
 import { getCookies, getJson, getText, NoData, Unavailable } from './http.js';
 import { cryptoBase, normalizeSymbol } from './symbols.js';
-import { HOSTS } from './yahoo.js';
-import { secStatement, SHOWN, STATEMENTS, type Frequency, type Statement, type Table } from './sec.js';
+import { history, HOSTS } from './yahoo.js';
+import { cikFor, companyFacts, fundTickers, latestBalance, sectorOfSic, secStatement, sharesOutstanding, SHOWN, STATEMENTS, submissions, trailingYear, type Fact, type Frequency, type Statement, type Table } from './sec.js';
+import { secInsiders } from './insiders.js';
 import { ASK_FOR_EMAIL } from '../contact.js';
+
+/** The filer's CIK, or null when the SEC does not list it (or its list could not be read). */
+const filer = (sym: string): Promise<string | null> => cikFor(sym).catch(() => null);
 
 /** The symbol of a company; a crypto asset, an index, a future or a currency pair has no company accounts. */
 function companySymbol(raw: string): string {
@@ -82,16 +88,70 @@ const money = (v: V, currency?: string) => (has(v) ? `${v.raw.toLocaleString('en
 const plain = (v: V) => (has(v) ? String(Number(v.raw.toFixed(4))) : null);
 const percent = (v: V) => (has(v) ? `${(v.raw * 100).toFixed(2)}%` : null);   // Yahoo gives margins, returns and yield as fractions
 
-/** A symbol's sector as Yahoo Finance gives it today, and whether it is a fund. For the dashboard's sector limit, which
- *  is about now, never for an analysis of a past day. */
+/** A symbol's sector and whether it is a fund, from the SEC: a fund if the SEC lists it among funds, else the sector of
+ *  the industry code its filer gave (approximate); not known for a company that does not file with the SEC. For the
+ *  dashboard's sector limit, which is about now. */
 export async function profileSector(raw: string): Promise<{ sector: string | null; fund: boolean }> {
-  const r = await summary(companySymbol(raw), 'summaryProfile,quoteType');
-  const kind = r.quoteType?.quoteType ?? '';
-  return { sector: r.summaryProfile?.sector?.trim() || null, fund: kind === 'ETF' || kind === 'MUTUALFUND' };
+  const sym = companySymbol(raw);
+  if ((await fundTickers()).has(sym)) return { sector: null, fund: true };
+  const cik = await cikFor(sym);
+  return { sector: cik ? sectorOfSic((await submissions(cik)).sic) : null, fund: false };
+}
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const units = (facts: { units?: Record<string, Fact[]> } | undefined, unit: string): Fact[] => facts?.units?.[unit] ?? [];
+const fixed = (n: number, d = 2) => n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+const whole = (n: number) => Math.round(n).toLocaleString('en-US');
+
+/** A US filer's profile and valuation as known on `day`: who it is from its SEC record, and the multiples worked out from
+ *  what it had filed by then and the checked closing price on or before then. Every multiple is derived and shows what it
+ *  came from; what no official free source gives (forward estimates, analysts' targets) is said to be unavailable. */
+async function secOverview(sym: string, cik: string, day: string): Promise<string> {
+  const [s, facts] = await Promise.all([submissions(cik), companyFacts(cik)]);
+  const g = facts.facts?.['us-gaap'] ?? {}, dei = facts.facts?.dei ?? {};
+  const lines: string[] = [];
+  if (s.name) lines.push(`Name: ${s.name}`);
+  if (s.sic) lines.push(`Industry (the SEC's code ${s.sic}): ${s.sicDescription || 'not named'}`, `Sector (worked out from that code, so approximate): ${sectorOfSic(s.sic) ?? 'not known'}`);
+  const fy = /^(\d\d)(\d\d)$/.exec(s.fiscalYearEnd ?? '');
+  if (fy && Number(fy[1]) >= 1 && Number(fy[1]) <= 12) lines.push(`Fiscal year ends: ${Number(fy[2])} ${MONTHS[Number(fy[1]) - 1]}`);
+
+  let close: { date: string; close: number; currency?: string } | null = null;
+  // The close in cents, as the price table shows it, so a product like the market value carries no rounding noise.
+  try { const h = await history(sym, day), last = h.bars.at(-1)!; close = { date: last.date, close: Math.round(last.close * 100) / 100, currency: h.meta.currency }; } catch { /* no price: the multiples are unavailable */ }
+  const usd = !close?.currency || close.currency === 'USD';
+  lines.push(close ? `Close: ${fixed(close.close)} ${close.currency ?? ''} on ${close.date} (the checked price table's latest row on or before ${day})`.replace('  ', ' ') : 'Close: unavailable (the prices could not be read), so no multiple can be worked out');
+
+  const shares = sharesOutstanding(units(dei.EntityCommonStockSharesOutstanding, 'shares'), day);
+  lines.push(shares ? `Shares outstanding: ${whole(shares.shares)} (counted on ${shares.end}, filed ${shares.filed})` : 'Shares outstanding: unavailable (not on a cover page filed by then)');
+  if (shares && close && usd) lines.push(`Market value (derived: shares × close): ${whole(shares.shares * close.close)} USD`);
+
+  const eps = trailingYear(units(g.EarningsPerShareDiluted, 'USD/shares'), day);
+  if (eps) {
+    lines.push(`Diluted EPS, last twelve months (derived from ${eps.parts}): ${fixed(eps.value)} USD`);
+    if (close && usd) lines.push(eps.value > 0 ? `Price to earnings (derived: close ÷ that): ${fixed(close.close / eps.value)}` : 'Price to earnings: not meaningful (the last twelve months lost money)');
+  } else lines.push('Diluted EPS, last twelve months: unavailable (not filed in US dollars by then)');
+
+  const equity = latestBalance(units(g.StockholdersEquity, 'USD'), day);
+  if (equity) {
+    lines.push(`Stockholders' equity: ${whole(equity.val)} USD (at ${equity.end}, filed ${equity.filed})`);
+    if (shares && shares.shares > 0) {
+      const bv = equity.val / shares.shares;
+      lines.push(`Book value per share (derived: equity ÷ shares): ${fixed(bv)} USD`);
+      if (close && usd && bv > 0) lines.push(`Price to book (derived: close ÷ that): ${fixed(close.close / bv)}`);
+    }
+  }
+  const dps = trailingYear(units(g.CommonStockDividendsPerShareDeclared, 'USD/shares'), day) ?? trailingYear(units(g.CommonStockDividendsPerShareCashPaid, 'USD/shares'), day);
+  if (dps) {
+    lines.push(`Dividends per share, last twelve months (derived from ${dps.parts}): ${fixed(dps.value, 4)} USD`);
+    if (close && usd && close.close > 0) lines.push(`Dividend yield (derived: that ÷ close): ${fixed((dps.value / close.close) * 100)}%`);
+  } else lines.push('Dividends per share: not among its filed figures (many companies pay none)');
+  lines.push('Unavailable from official free sources: forward estimates (forward P/E, PEG), analysts\' price targets and beta.');
+  return [`Company profile and valuation for ${sym}, from its SEC filings as they stood on ${day} and the desk's checked closing price. Every multiple is derived here from those filed figures and that price, and shows what it came from; nothing is an estimate.`, '', ...lines].join('\n');
 }
 
 export async function companyOverview(raw: string, analysis: string): Promise<string> {
-  const day = analysisDate(analysis), sym = companySymbol(raw);
+  const day = analysisDate(analysis), sym = companySymbol(raw), cik = await filer(sym);
+  if (cik) return secOverview(sym, cik, day);
   if (isHistorical(day)) return `Company profile and ratios for ${sym} are withheld for ${day}: Yahoo Finance serves them only as they stand today. Market value, multiples, the 52-week range and the past year's income move with today's price, and even the name, sector and industry are today's; they would put later knowledge into an analysis of ${day}. Use get_financial_statement, which serves a US filer's accounts as filed by then.`;
   const r = await summary(sym, 'price,summaryProfile,summaryDetail,defaultKeyStatistics,financialData');
   const p = r.price ?? {}, d = r.summaryDetail ?? {}, k = r.defaultKeyStatistics ?? {}, f = r.financialData ?? {};
@@ -119,7 +179,8 @@ export async function companyOverview(raw: string, analysis: string): Promise<st
 }
 
 export async function insiderTransactions(raw: string, analysis: string, limit = 30): Promise<string> {
-  const day = analysisDate(analysis), sym = companySymbol(raw);
+  const day = analysisDate(analysis), sym = companySymbol(raw), cik = await filer(sym);
+  if (cik) return secInsiders(sym, cik, day);
   if (isHistorical(day)) return `Insider transactions for ${sym} are withheld for ${day}: Yahoo Finance dates a trade by when it happened, not by when its filing made it public (up to two business days later), so it cannot show which trades were known on ${day}.`;
   const r = await summary(sym, 'insiderTransactions');
   const list = (r.insiderTransactions?.transactions ?? []).filter((t) => has(t.startDate)).sort((a, b) => b.startDate!.raw! - a.startDate!.raw!).slice(0, limit);

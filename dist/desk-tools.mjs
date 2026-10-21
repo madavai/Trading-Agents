@@ -6460,11 +6460,11 @@ var require_format = __commonJS({
           }
           function getFormat(fmtDef) {
             const code = fmtDef instanceof RegExp ? (0, codegen_1.regexpCode)(fmtDef) : opts.code.formats ? (0, codegen_1._)`${opts.code.formats}${(0, codegen_1.getProperty)(schema)}` : void 0;
-            const fmt = gen.scopeValue("formats", { key: schema, ref: fmtDef, code });
+            const fmt2 = gen.scopeValue("formats", { key: schema, ref: fmtDef, code });
             if (typeof fmtDef == "object" && !(fmtDef instanceof RegExp)) {
-              return [fmtDef.type || "string", fmtDef.validate, (0, codegen_1._)`${fmt}.validate`];
+              return [fmtDef.type || "string", fmtDef.validate, (0, codegen_1._)`${fmt2}.validate`];
             }
-            return ["string", fmtDef, fmt];
+            return ["string", fmtDef, fmt2];
           }
           function validCondition() {
             if (typeof formatDef == "object" && !(formatDef instanceof RegExp) && formatDef.async) {
@@ -7126,8 +7126,8 @@ var require_limit = __commonJS({
             ref: self.formats,
             code: opts.code.formats
           });
-          const fmt = gen.const("fmt", (0, codegen_1._)`${fmts}[${fCxt.schemaCode}]`);
-          cxt.fail$data((0, codegen_1.or)((0, codegen_1._)`typeof ${fmt} != "object"`, (0, codegen_1._)`${fmt} instanceof RegExp`, (0, codegen_1._)`typeof ${fmt}.compare != "function"`, compareCode(fmt)));
+          const fmt2 = gen.const("fmt", (0, codegen_1._)`${fmts}[${fCxt.schemaCode}]`);
+          cxt.fail$data((0, codegen_1.or)((0, codegen_1._)`typeof ${fmt2} != "object"`, (0, codegen_1._)`${fmt2} instanceof RegExp`, (0, codegen_1._)`typeof ${fmt2}.compare != "function"`, compareCode(fmt2)));
         }
         function validateFormat() {
           const format = fCxt.schema;
@@ -7137,15 +7137,15 @@ var require_limit = __commonJS({
           if (typeof fmtDef != "object" || fmtDef instanceof RegExp || typeof fmtDef.compare != "function") {
             throw new Error(`"${keyword}": format "${format}" does not define "compare" function`);
           }
-          const fmt = gen.scopeValue("formats", {
+          const fmt2 = gen.scopeValue("formats", {
             key: format,
             ref: fmtDef,
             code: opts.code.formats ? (0, codegen_1._)`${opts.code.formats}${(0, codegen_1.getProperty)(format)}` : void 0
           });
-          cxt.fail$data(compareCode(fmt));
+          cxt.fail$data(compareCode(fmt2));
         }
-        function compareCode(fmt) {
-          return (0, codegen_1._)`${fmt}.compare(${data}, ${schemaCode}) ${KWDs[keyword].fail} 0`;
+        function compareCode(fmt2) {
+          return (0, codegen_1._)`${fmt2}.compare(${data}, ${schemaCode}) ${KWDs[keyword].fail} 0`;
         }
       },
       dependencies: ["format"]
@@ -8430,11 +8430,11 @@ function getSizableOrigin(input2) {
 }
 var highSurrogate = /[\uD800-\uDBFF]/;
 function codePointLength(str) {
-  const units = str.length;
+  const units2 = str.length;
   if (!highSurrogate.test(str))
-    return units;
-  let count = units;
-  for (let i = 0; i < units - 1; i++) {
+    return units2;
+  let count = units2;
+  for (let i = 0; i < units2 - 1; i++) {
     if ((str.charCodeAt(i) & 64512) === 55296 && (str.charCodeAt(i + 1) & 64512) === 56320) {
       count--;
       i++;
@@ -9532,8 +9532,8 @@ var $ZodCheckMaxLength = /* @__PURE__ */ $constructor("$ZodCheckMaxLength", (ins
   (_a3 = inst._zod.def).when ?? (_a3.when = _whenHasLength);
   inst._zod.check = (payload) => {
     const input2 = payload.value;
-    const units = input2.length;
-    const length = typeof input2 === "string" && units > def.maximum ? codePointLength(input2) : units;
+    const units2 = input2.length;
+    const length = typeof input2 === "string" && units2 > def.maximum ? codePointLength(input2) : units2;
     if (length <= def.maximum)
       return;
     const origin = getLengthableOrigin(input2);
@@ -9554,8 +9554,8 @@ var $ZodCheckMinLength = /* @__PURE__ */ $constructor("$ZodCheckMinLength", (ins
   (_a3 = inst._zod.def).when ?? (_a3.when = _whenHasLength);
   inst._zod.check = (payload) => {
     const input2 = payload.value;
-    const units = input2.length;
-    const length = typeof input2 === "string" && units >= def.minimum && units < def.minimum * 2 ? codePointLength(input2) : units;
+    const units2 = input2.length;
+    const length = typeof input2 === "string" && units2 >= def.minimum && units2 < def.minimum * 2 ? codePointLength(input2) : units2;
     if (length >= def.minimum)
       return;
     const origin = getLengthableOrigin(input2);
@@ -9576,8 +9576,8 @@ var $ZodCheckLengthEquals = /* @__PURE__ */ $constructor("$ZodCheckLengthEquals"
   (_a3 = inst._zod.def).when ?? (_a3.when = _whenHasLength);
   inst._zod.check = (payload) => {
     const input2 = payload.value;
-    const units = input2.length;
-    const length = typeof input2 === "string" && units >= def.length && units <= def.length * 2 ? codePointLength(input2) : units;
+    const units2 = input2.length;
+    const length = typeof input2 === "string" && units2 >= def.length && units2 <= def.length * 2 ? codePointLength(input2) : units2;
     if (length === def.length)
       return;
     const origin = getLengthableOrigin(input2);
@@ -10755,14 +10755,14 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
     const shape = zod.def.shape;
     const propValues = {};
     for (const key in shape) {
-      const field = shape[key]._zod;
-      if (field.values) {
+      const field2 = shape[key]._zod;
+      if (field2.values) {
         if (!Object.prototype.hasOwnProperty.call(propValues, key)) {
           assignProp(propValues, key, /* @__PURE__ */ new Set());
         }
-        for (const v of field.values)
+        for (const v of field2.values)
           propValues[key].add(v);
-        if (field.optin !== void 0)
+        if (field2.optin !== void 0)
           propValues[key].add(void 0);
       }
     }
@@ -20610,45 +20610,45 @@ var PATTERN_IS_COMPLETE = /* @__PURE__ */ new Set([
   "xid"
 ]);
 function generateStringFormatCheck(doc, ctx, def, accessor, needsValue = true) {
-  const fmt = def.format;
-  if (fmt === "base64") {
+  const fmt2 = def.format;
+  if (fmt2 === "base64") {
     const validator = addConstant(ctx, isValidBase64);
     doc.write(`if (!${validator}(${accessor})) return INVALID;`);
     return accessor;
   }
-  if (fmt === "base64url") {
+  if (fmt2 === "base64url") {
     const validator = addConstant(ctx, isValidBase64URL);
     doc.write(`if (!${validator}(${accessor})) return INVALID;`);
     return accessor;
   }
-  if (fmt === "jwt") {
+  if (fmt2 === "jwt") {
     const validator = addConstant(ctx, isValidJWT);
     const alg = addConstant(ctx, def.alg ?? null);
     doc.write(`if (!${validator}(${accessor}, ${alg})) return INVALID;`);
     return accessor;
   }
-  if (fmt === "ipv6") {
+  if (fmt2 === "ipv6") {
     const validator = addConstant(ctx, isValidIPv6);
     doc.write(`if (!${validator}(${accessor})) return INVALID;`);
     return accessor;
   }
-  if (fmt === "cidrv6") {
+  if (fmt2 === "cidrv6") {
     const validator = addConstant(ctx, isValidCIDRv6);
     doc.write(`if (!${validator}(${accessor})) return INVALID;`);
     return accessor;
   }
-  if (fmt === "credit_card") {
+  if (fmt2 === "credit_card") {
     const validator = addConstant(ctx, isValidCreditCard);
     doc.write(`if (!${validator}(${accessor})) return INVALID;`);
     return accessor;
   }
-  if (fmt === "iban") {
+  if (fmt2 === "iban") {
     const validator = addConstant(ctx, isValidIBAN);
     doc.write(`if (!${validator}(${accessor})) return INVALID;`);
     return accessor;
   }
   const formatDef = def;
-  if (fmt === "url" || fmt === "httpurl" || formatDef.normalize || formatDef.hostname !== void 0 || formatDef.protocol !== void 0) {
+  if (fmt2 === "url" || fmt2 === "httpurl" || formatDef.normalize || formatDef.hostname !== void 0 || formatDef.protocol !== void 0) {
     const parseConst = addConstant(ctx, validateURL);
     const defConst = addConstant(ctx, def);
     const trimVar = newVar(ctx);
@@ -20674,12 +20674,12 @@ function generateStringFormatCheck(doc, ctx, def, accessor, needsValue = true) {
   const customFn = def.fn;
   if (customFn) {
     if (isAsyncFunction(customFn))
-      throw new ZodCompileUnsupportedError(`async string format ${fmt}`);
+      throw new ZodCompileUnsupportedError(`async string format ${fmt2}`);
     const fnConst = addConstant(ctx, customFn);
     doc.write(`if (!${fnConst}(${accessor})) return INVALID;`);
     return accessor;
   }
-  if (PATTERN_IS_COMPLETE.has(fmt) && def.pattern) {
+  if (PATTERN_IS_COMPLETE.has(fmt2) && def.pattern) {
     const patternConst = addConstant(ctx, def.pattern);
     doc.write(`${patternConst}.lastIndex = 0;`);
     doc.write(`if (!${patternConst}.test(${accessor})) return INVALID;`);
@@ -23700,8 +23700,8 @@ var objectProcessor = (schema, ctx, _json, params) => {
   }
   const requiredKeys = [];
   for (const key of Object.keys(shape)) {
-    const field = def.shape[key];
-    if (ctx.io === "input" ? inputOptin(field) === void 0 : field._zod.optout === void 0) {
+    const field2 = def.shape[key];
+    if (ctx.io === "input" ? inputOptin(field2) === void 0 : field2._zod.optout === void 0) {
       requiredKeys.push(key);
     }
   }
@@ -36068,11 +36068,11 @@ var McpServer = class {
       return EMPTY_COMPLETION_RESULT;
     }
     const promptShape = getObjectShape(prompt.argsSchema);
-    const field = promptShape?.[request.params.argument.name];
-    if (!isCompletable(field)) {
+    const field2 = promptShape?.[request.params.argument.name];
+    if (!isCompletable(field2)) {
       return EMPTY_COMPLETION_RESULT;
     }
-    const completer = getCompleter(field);
+    const completer = getCompleter(field2);
     if (!completer) {
       return EMPTY_COMPLETION_RESULT;
     }
@@ -36345,8 +36345,8 @@ var McpServer = class {
     };
     this._registeredPrompts[name] = registeredPrompt;
     if (argsSchema) {
-      const hasCompletable = Object.values(argsSchema).some((field) => {
-        const inner = field instanceof ZodOptional ? field._def?.innerType : field;
+      const hasCompletable = Object.values(argsSchema).some((field2) => {
+        const inner = field2 instanceof ZodOptional ? field2._def?.innerType : field2;
         return isCompletable(inner);
       });
       if (hasCompletable) {
@@ -36555,9 +36555,9 @@ function promptArgumentsFromSchema(schema) {
   const shape = getObjectShape(schema);
   if (!shape)
     return [];
-  return Object.entries(shape).map(([name, field]) => {
-    const description = getSchemaDescription(field);
-    const isOptional = isSchemaOptional(field);
+  return Object.entries(shape).map(([name, field2]) => {
+    const description = getSchemaDescription(field2);
+    const isOptional = isSchemaOptional(field2);
     return {
       name,
       description,
@@ -37244,9 +37244,9 @@ function window(start, end, analysis2) {
   let s = parseDate(start, "start date"), e = parseDate(end, "end date");
   if (s > e) [s, e] = [e, s];
   if (e > analysis2) {
-    const span = daysBetween(s, e);
+    const span2 = daysBetween(s, e);
     e = analysis2;
-    if (s > analysis2) s = addDays(analysis2, -span);
+    if (s > analysis2) s = addDays(analysis2, -span2);
   }
   return [s, e];
 }
@@ -37613,17 +37613,17 @@ async function economicSeries(indicator, analysis2, lookBackDays = 365) {
   obs = obs.filter((o) => o.date >= addDays(day3, -Math.max(30, Math.min(3650, lookBackDays))));
   if (!obs.length) throw new NoData(`FRED has no ${id} values published by ${day3} in this window`);
   const first = obs[0], last = obs[obs.length - 1], change3 = last.value - first.value, pct3 = first.value ? change3 / Math.abs(first.value) * 100 : 0;
-  const fmt = (v) => Math.abs(v) >= 1e3 ? v.toLocaleString("en-US", { maximumFractionDigits: 1 }) : v.toFixed(2);
+  const fmt2 = (v) => Math.abs(v) >= 1e3 ? v.toLocaleString("en-US", { maximumFractionDigits: 1 }) : v.toFixed(2);
   const lines = [
     `## ${known?.[1] ?? id} - FRED series ${id}`,
     "",
-    `- Latest value known by ${day3}: ${fmt(last.value)} (for ${last.date})`,
-    `- Change since ${first.date}: ${change3 >= 0 ? "+" : ""}${fmt(change3)} (${pct3 >= 0 ? "+" : ""}${pct3.toFixed(1)}%)`,
+    `- Latest value known by ${day3}: ${fmt2(last.value)} (for ${last.date})`,
+    `- Change since ${first.date}: ${change3 >= 0 ? "+" : ""}${fmt2(change3)} (${pct3 >= 0 ? "+" : ""}${pct3.toFixed(1)}%)`,
     past ? `- A past analysis date: values are kept only if published by ${day3} (a ${lag}-day release lag for this series), and are today's revised figures; first releases may have differed slightly.` : "- Values as published today, revisions included.",
     "",
     "Date | Value",
     "---|---:",
-    ...obs.slice(-40).map((o) => `${o.date} | ${fmt(o.value)}`)
+    ...obs.slice(-40).map((o) => `${o.date} | ${fmt2(o.value)}`)
   ];
   if (!known) lines.push("", `Names this desk knows: ${Object.keys(SERIES).join(", ")}.`);
   return lines.join("\n");
@@ -37749,16 +37749,186 @@ async function cikFor(symbol4) {
   const hit = Object.values(table).find((e) => e.ticker?.toUpperCase() === symbol4.toUpperCase());
   return hit ? String(hit.cik_str).padStart(10, "0") : null;
 }
+var companyFacts = (cik) => cached2(`https://data.sec.gov/api/xbrl/companyfacts/CIK${cik}.json`, 45e3);
 async function secStatement(symbol4, kind, freq, asOf) {
   const cik = await cikFor(symbol4);
   if (!cik) throw new NoData(`${symbol4} is not in the SEC's list of US filers`);
-  const facts = await cached2(`https://data.sec.gov/api/xbrl/companyfacts/CIK${cik}.json`, 45e3);
-  const usGaap = facts.facts?.["us-gaap"];
+  const usGaap = (await companyFacts(cik)).facts?.["us-gaap"];
   if (!usGaap) throw new NoData(`${symbol4} files with the SEC but not in US GAAP terms`);
   return filedStatement(usGaap, kind, freq, asOf);
 }
+var submissions = (cik) => cached2(`https://data.sec.gov/submissions/CIK${cik}.json`, 3e4);
+function sectorOfSic(raw) {
+  const c = Number(raw);
+  if (!Number.isInteger(c) || c < 100) return null;
+  const in_ = (lo, hi) => c >= lo && c <= hi;
+  if (in_(100, 999)) return "Consumer Defensive";
+  if (in_(1e3, 1099) || in_(1400, 1499)) return "Basic Materials";
+  if (in_(1200, 1399)) return "Energy";
+  if (in_(1500, 1799)) return "Industrials";
+  if (in_(2e3, 2199)) return "Consumer Defensive";
+  if (in_(2200, 2399) || in_(2500, 2599)) return "Consumer Cyclical";
+  if (in_(2400, 2499) || in_(2600, 2699)) return "Basic Materials";
+  if (in_(2700, 2799)) return "Communication Services";
+  if (in_(2830, 2836)) return "Healthcare";
+  if (in_(2840, 2844)) return "Consumer Defensive";
+  if (in_(2800, 2899)) return "Basic Materials";
+  if (in_(2900, 2999)) return "Energy";
+  if (in_(3e3, 3099) || in_(3200, 3399)) return "Basic Materials";
+  if (in_(3100, 3199) || in_(3630, 3639) || in_(3710, 3716) || in_(3750, 3751) || in_(3900, 3999)) return "Consumer Cyclical";
+  if (in_(3570, 3579) || in_(3660, 3679)) return "Technology";
+  if (in_(3840, 3851)) return "Healthcare";
+  if (in_(3800, 3899)) return "Technology";
+  if (in_(3400, 3799)) return "Industrials";
+  if (in_(4e3, 4799)) return "Industrials";
+  if (in_(4800, 4899)) return "Communication Services";
+  if (in_(4950, 4959)) return "Industrials";
+  if (in_(4900, 4999)) return "Utilities";
+  if (c === 5122 || c === 5047) return "Healthcare";
+  if (in_(5140, 5149) || in_(5400, 5499) || c === 5331 || c === 5912) return "Consumer Defensive";
+  if (in_(5e3, 5199)) return "Industrials";
+  if (in_(5200, 5999)) return "Consumer Cyclical";
+  if (c === 6798 || in_(6500, 6599)) return "Real Estate";
+  if (in_(6e3, 6799)) return "Financial Services";
+  if (in_(7e3, 7299) || in_(7500, 7599) || in_(7900, 7999)) return "Consumer Cyclical";
+  if (in_(7310, 7319) || in_(7800, 7899)) return "Communication Services";
+  if (in_(7370, 7379)) return "Technology";
+  if (in_(7300, 7399)) return "Industrials";
+  if (in_(8e3, 8099)) return "Healthcare";
+  if (in_(8200, 8299)) return "Consumer Defensive";
+  if (in_(7600, 8999)) return "Industrials";
+  return null;
+}
+var ANNUAL = (f) => ANNUAL_FORMS.some((p) => (f.form ?? "").startsWith(p));
+var span = (f) => f.start ? daysBetween(f.start, f.end) : 0;
+function knownBy(list2, asOf) {
+  const best = /* @__PURE__ */ new Map();
+  for (const f of list2) {
+    if (f.filed > asOf) continue;
+    const key = `${f.start ?? ""}|${f.end}`, seen = best.get(key);
+    if (!seen || f.filed >= seen.filed) best.set(key, f);
+  }
+  return [...best.values()];
+}
+function trailingYear(list2, asOf) {
+  const known = knownBy(list2, asOf).filter((f) => f.start);
+  const year = known.filter((f) => ANNUAL(f) && span(f) >= YEAR[0] && span(f) <= YEAR[1]).sort((a, b) => b.end.localeCompare(a.end))[0];
+  if (!year) return null;
+  const after = known.filter((f) => f.end > year.end && daysBetween(year.end, f.start) >= 0 && daysBetween(year.end, f.start) <= 7 && span(f) >= 60 && span(f) <= 290).sort((a, b) => b.end.localeCompare(a.end) || span(b) - span(a))[0];
+  const round = (n2) => Number(n2.toFixed(6));
+  if (!after) return { value: round(year.val), parts: `the full year to ${year.end}, ${year.val}` };
+  const before = known.find((f) => Math.abs(daysBetween(f.end, after.end) - 365) <= 10 && Math.abs(span(f) - span(after)) <= 10);
+  if (!before) return { value: round(year.val), parts: `the full year to ${year.end}, ${year.val} (the same span a year before ${after.end} was not filed, so the year to date cannot be added)` };
+  return { value: round(year.val + after.val - before.val), parts: `the full year to ${year.end}, ${year.val}, plus ${after.start} to ${after.end}, ${after.val}, less ${before.start} to ${before.end}, ${before.val}` };
+}
+function latestBalance(list2, asOf) {
+  return knownBy(list2, asOf).filter((f) => !f.start).sort((a, b) => b.end.localeCompare(a.end) || b.filed.localeCompare(a.filed))[0] ?? null;
+}
+function sharesOutstanding(list2, asOf) {
+  const known = list2.filter((f) => f.filed <= asOf).sort((a, b) => b.filed.localeCompare(a.filed) || b.end.localeCompare(a.end));
+  const top = known[0];
+  if (!top) return null;
+  const same = known.filter((f) => f.filed === top.filed && f.end === top.end && (f.accn ?? "") === (top.accn ?? ""));
+  return { shares: same.reduce((a, f) => a + f.val, 0), end: top.end, filed: top.filed };
+}
+
+// src/data/insiders.ts
+var ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
+var decode4 = (s) => s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m2, e) => e[0] === "#" ? String.fromCodePoint(e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : Number(e.slice(1))) : ENTITIES[e.toLowerCase()] ?? m2);
+var blocks = (xml, tag) => [...xml.matchAll(new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</${tag}>`, "g"))].map((m2) => m2[1]);
+var field = (xml, tag) => {
+  const b = blocks(xml, tag)[0];
+  if (b === void 0) return "";
+  const v = blocks(b, "value")[0];
+  return decode4((v ?? b).replace(/<[^>]*>/g, "")).replace(/\s+/g, " ").trim();
+};
+var num2 = (s) => s !== "" && Number.isFinite(Number(s)) ? Number(s) : null;
+var yes = (s) => s === "1" || s.toLowerCase() === "true";
+function parseForm4(xml, filed) {
+  const owners = blocks(xml, "reportingOwner");
+  const owner = owners.map((o) => field(o, "rptOwnerName")).filter(Boolean).join(" and ") || "unnamed";
+  const r = owners[0] ?? "";
+  const role = [
+    yes(field(r, "isDirector")) && "Director",
+    yes(field(r, "isOfficer")) && (field(r, "officerTitle") || "Officer"),
+    yes(field(r, "isTenPercentOwner")) && "owner of over 10%",
+    yes(field(r, "isOther")) && (field(r, "otherText") || "other")
+  ].filter(Boolean).join(", ") || "insider";
+  const plan = yes(field(xml, "aff10b5One"));
+  return blocks(xml, "nonDerivativeTransaction").map((t) => ({
+    owner,
+    role,
+    filed,
+    plan,
+    date: field(t, "transactionDate").slice(0, 10),
+    code: field(t, "transactionCode").toUpperCase(),
+    shares: num2(field(t, "transactionShares")) ?? 0,
+    price: num2(field(t, "transactionPricePerShare")),
+    acquired: field(t, "transactionAcquiredDisposedCode").toUpperCase() === "A",
+    after: num2(field(t, "sharesOwnedFollowingTransaction")),
+    indirect: field(t, "directOrIndirectOwnership").toUpperCase() === "I" ? field(t, "natureOfOwnership") || "indirectly" : null
+  })).filter((t) => t.date && t.code);
+}
+var CODES = {
+  P: "bought",
+  S: "sold",
+  A: "was awarded",
+  M: "exercised options for",
+  X: "exercised options for",
+  F: "handed back, for tax or the exercise price,",
+  G: "gave away",
+  D: "returned to the company",
+  C: "converted into",
+  J: "other transaction of",
+  W: "inherited or bequeathed",
+  I: "discretionary trade of"
+};
+var fmt = (n2, d = 0) => n2.toLocaleString("en-US", { maximumFractionDigits: d });
+async function secInsiders(symbol4, cik, asOf, days = 90, limit = 25) {
+  const s = await submissions(cik), r = s.filings?.recent ?? {};
+  const forms = r.form ?? [], from = addDays(asOf, -days);
+  const oldest = (r.filingDate ?? []).at(-1);
+  const picked = forms.map((f, i) => ({ form: f, i, filed: r.filingDate?.[i] ?? "" })).filter((x) => (x.form === "4" || x.form === "4/A") && x.filed <= asOf && x.filed > from).sort((a, b) => b.filed.localeCompare(a.filed));
+  const head2 = `Insider trades in ${symbol4}, from the Form 4 filings with the SEC made public from ${addDays(from, 1)} to ${asOf}`;
+  const partial2 = oldest !== void 0 && oldest > addDays(from, 1) && (r.filingDate?.length ?? 0) >= 1e3;
+  const gap2 = partial2 ? ` The SEC's recent list of filings starts on ${oldest}, so filings before that day are not read.` : "";
+  if (!picked.length) {
+    if (partial2) throw new NoData(`the SEC's recent list of ${symbol4}'s filings starts on ${oldest}, after ${addDays(from, 1)}, so the trades of those days cannot be read`);
+    return `${head2}: none. No director, officer or large owner reported a trade in these ${days} days. That is a fact from the SEC, not a gap in the data.`;
+  }
+  const read2 = picked.slice(0, limit), trades = [];
+  let failed = 0;
+  for (const p of read2) {
+    const acc = r.accessionNumber?.[p.i] ?? "", doc = (r.primaryDocument?.[p.i] ?? "").replace(/^xsl[^/]*\//, "");
+    if (!/^[\d-]+$/.test(acc) || !/^[\w.-]+\.xml$/i.test(doc)) {
+      failed++;
+      continue;
+    }
+    try {
+      trades.push(...parseForm4(await getText(`https://www.sec.gov/Archives/edgar/data/${Number(cik)}/${acc.replaceAll("-", "")}/${doc}`), p.filed));
+    } catch {
+      failed++;
+    }
+  }
+  const market = (code) => trades.filter((t) => t.code === code);
+  const total = (list2) => {
+    const shares = list2.reduce((a, t) => a + t.shares, 0), value = list2.reduce((a, t) => a + t.shares * (t.price ?? 0), 0), planned = list2.filter((t) => t.plan).length;
+    return list2.length ? `${list2.length} (${fmt(shares)} shares, about ${fmt(value)} USD at their own prices${planned ? `; ${planned} under a pre-arranged 10b5-1 plan` : ""})` : "none";
+  };
+  const buys = market("P"), sales = market("S"), other = trades.length - buys.length - sales.length;
+  const lines = trades.map((t) => `- ${t.date} (made public ${t.filed}) \xB7 ${t.owner} (${t.role}): ${CODES[t.code] ?? `transaction ${t.code} of`} ${fmt(t.shares, 4)} shares${t.price ? ` at ${fmt(t.price, 4)}` : ", no price"}${t.after !== null ? ` \xB7 holds ${fmt(t.after, 4)} after` : ""}${t.indirect ? ` \xB7 indirectly (${t.indirect})` : ""}${t.plan ? " \xB7 under a 10b5-1 plan" : ""}`);
+  return [
+    `${head2} (${read2.length} of ${picked.length} filings read, newest first${failed ? `; ${failed} could not be read` : ""}). Each trade is dated by the day it happened and the day its filing made it public; only filings public by ${asOf} are shown.${gap2}`,
+    "",
+    `In these ${days} days: bought (code P) ${total(buys)}; sold (code S) ${total(sales)}; other kinds (awards, option exercises, shares handed back for tax, gifts) ${other}.`,
+    "P and S are purchases and sales on the market or in a private deal: a purchase is the insider spending their own money. A sale under a 10b5-1 plan was arranged months ahead. Awards, exercises, tax handbacks and gifts say little about what an insider thinks of the price.",
+    "",
+    ...lines.length ? lines : ["(these filings list no trades in shares, only options or holdings)"]
+  ].join("\n");
+}
 
 // src/data/company.ts
+var filer = (sym) => cikFor(sym).catch(() => null);
 function companySymbol(raw) {
   const sym = normalizeSymbol(raw);
   if (cryptoBase(raw) || /[\^=]/.test(sym)) throw new NoData(`${sym} is not a company: a crypto asset, index, future or currency pair has no company accounts`);
@@ -37803,8 +37973,54 @@ var has = (v) => typeof v?.raw === "number" && Number.isFinite(v.raw);
 var money = (v, currency) => has(v) ? `${v.raw.toLocaleString("en-US", { maximumFractionDigits: 2 })}${currency ? ` ${currency}` : ""}` : null;
 var plain2 = (v) => has(v) ? String(Number(v.raw.toFixed(4))) : null;
 var percent = (v) => has(v) ? `${(v.raw * 100).toFixed(2)}%` : null;
+var MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+var units = (facts, unit) => facts?.units?.[unit] ?? [];
+var fixed = (n2, d = 2) => n2.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+var whole = (n2) => Math.round(n2).toLocaleString("en-US");
+async function secOverview(sym, cik, day3) {
+  const [s, facts] = await Promise.all([submissions(cik), companyFacts(cik)]);
+  const g = facts.facts?.["us-gaap"] ?? {}, dei = facts.facts?.dei ?? {};
+  const lines = [];
+  if (s.name) lines.push(`Name: ${s.name}`);
+  if (s.sic) lines.push(`Industry (the SEC's code ${s.sic}): ${s.sicDescription || "not named"}`, `Sector (worked out from that code, so approximate): ${sectorOfSic(s.sic) ?? "not known"}`);
+  const fy = /^(\d\d)(\d\d)$/.exec(s.fiscalYearEnd ?? "");
+  if (fy && Number(fy[1]) >= 1 && Number(fy[1]) <= 12) lines.push(`Fiscal year ends: ${Number(fy[2])} ${MONTHS[Number(fy[1]) - 1]}`);
+  let close = null;
+  try {
+    const h = await history(sym, day3), last = h.bars.at(-1);
+    close = { date: last.date, close: Math.round(last.close * 100) / 100, currency: h.meta.currency };
+  } catch {
+  }
+  const usd = !close?.currency || close.currency === "USD";
+  lines.push(close ? `Close: ${fixed(close.close)} ${close.currency ?? ""} on ${close.date} (the checked price table's latest row on or before ${day3})`.replace("  ", " ") : "Close: unavailable (the prices could not be read), so no multiple can be worked out");
+  const shares = sharesOutstanding(units(dei.EntityCommonStockSharesOutstanding, "shares"), day3);
+  lines.push(shares ? `Shares outstanding: ${whole(shares.shares)} (counted on ${shares.end}, filed ${shares.filed})` : "Shares outstanding: unavailable (not on a cover page filed by then)");
+  if (shares && close && usd) lines.push(`Market value (derived: shares \xD7 close): ${whole(shares.shares * close.close)} USD`);
+  const eps = trailingYear(units(g.EarningsPerShareDiluted, "USD/shares"), day3);
+  if (eps) {
+    lines.push(`Diluted EPS, last twelve months (derived from ${eps.parts}): ${fixed(eps.value)} USD`);
+    if (close && usd) lines.push(eps.value > 0 ? `Price to earnings (derived: close \xF7 that): ${fixed(close.close / eps.value)}` : "Price to earnings: not meaningful (the last twelve months lost money)");
+  } else lines.push("Diluted EPS, last twelve months: unavailable (not filed in US dollars by then)");
+  const equity = latestBalance(units(g.StockholdersEquity, "USD"), day3);
+  if (equity) {
+    lines.push(`Stockholders' equity: ${whole(equity.val)} USD (at ${equity.end}, filed ${equity.filed})`);
+    if (shares && shares.shares > 0) {
+      const bv = equity.val / shares.shares;
+      lines.push(`Book value per share (derived: equity \xF7 shares): ${fixed(bv)} USD`);
+      if (close && usd && bv > 0) lines.push(`Price to book (derived: close \xF7 that): ${fixed(close.close / bv)}`);
+    }
+  }
+  const dps = trailingYear(units(g.CommonStockDividendsPerShareDeclared, "USD/shares"), day3) ?? trailingYear(units(g.CommonStockDividendsPerShareCashPaid, "USD/shares"), day3);
+  if (dps) {
+    lines.push(`Dividends per share, last twelve months (derived from ${dps.parts}): ${fixed(dps.value, 4)} USD`);
+    if (close && usd && close.close > 0) lines.push(`Dividend yield (derived: that \xF7 close): ${fixed(dps.value / close.close * 100)}%`);
+  } else lines.push("Dividends per share: not among its filed figures (many companies pay none)");
+  lines.push("Unavailable from official free sources: forward estimates (forward P/E, PEG), analysts' price targets and beta.");
+  return [`Company profile and valuation for ${sym}, from its SEC filings as they stood on ${day3} and the desk's checked closing price. Every multiple is derived here from those filed figures and that price, and shows what it came from; nothing is an estimate.`, "", ...lines].join("\n");
+}
 async function companyOverview(raw, analysis2) {
-  const day3 = analysisDate(analysis2), sym = companySymbol(raw);
+  const day3 = analysisDate(analysis2), sym = companySymbol(raw), cik = await filer(sym);
+  if (cik) return secOverview(sym, cik, day3);
   if (isHistorical(day3)) return `Company profile and ratios for ${sym} are withheld for ${day3}: Yahoo Finance serves them only as they stand today. Market value, multiples, the 52-week range and the past year's income move with today's price, and even the name, sector and industry are today's; they would put later knowledge into an analysis of ${day3}. Use get_financial_statement, which serves a US filer's accounts as filed by then.`;
   const r = await summary(sym, "price,summaryProfile,summaryDetail,defaultKeyStatistics,financialData");
   const p = r.price ?? {}, d = r.summaryDetail ?? {}, k = r.defaultKeyStatistics ?? {}, f = r.financialData ?? {};
@@ -37845,7 +38061,8 @@ async function companyOverview(raw, analysis2) {
   return [`Company profile and ratios for ${sym}, from Yahoo Finance as they stand today (${day3}). TTM is the last twelve months; a field Yahoo does not give is left out.`, "", ...lines].join("\n");
 }
 async function insiderTransactions(raw, analysis2, limit = 30) {
-  const day3 = analysisDate(analysis2), sym = companySymbol(raw);
+  const day3 = analysisDate(analysis2), sym = companySymbol(raw), cik = await filer(sym);
+  if (cik) return secInsiders(sym, cik, day3);
   if (isHistorical(day3)) return `Insider transactions for ${sym} are withheld for ${day3}: Yahoo Finance dates a trade by when it happened, not by when its filing made it public (up to two business days later), so it cannot show which trades were known on ${day3}.`;
   const r = await summary(sym, "insiderTransactions");
   const list2 = (r.insiderTransactions?.transactions ?? []).filter((t) => has(t.startDate)).sort((a, b) => b.startDate.raw - a.startDate.raw).slice(0, limit);
@@ -37992,7 +38209,7 @@ import path17 from "node:path";
 import fs8 from "node:fs";
 import path8 from "node:path";
 var file3 = (dir) => path8.join(dir, "holdings.json");
-var num2 = (v, what) => {
+var num3 = (v, what) => {
   if (typeof v !== "number" || !Number.isFinite(v)) throw new Error(`${what} must be a number`);
   return v;
 };
@@ -38003,13 +38220,13 @@ function saveHoldings(dir, input2, today2, source = "person") {
     const ticker = safeSymbol(p.ticker);
     if (seen.has(ticker)) throw new Error(`${ticker} is listed twice: give one total quantity`);
     seen.add(ticker);
-    const quantity = num2(p.quantity, `the quantity of ${ticker}`);
+    const quantity = num3(p.quantity, `the quantity of ${ticker}`);
     if (quantity === 0) throw new Error(`${ticker} has a quantity of 0: leave it out`);
-    const averagePrice = p.averagePrice === void 0 ? void 0 : num2(p.averagePrice, `the average price of ${ticker}`);
+    const averagePrice = p.averagePrice === void 0 ? void 0 : num3(p.averagePrice, `the average price of ${ticker}`);
     if (averagePrice !== void 0 && averagePrice <= 0) throw new Error(`the average price of ${ticker} must be above 0`);
     return { ticker, quantity, ...averagePrice === void 0 ? {} : { averagePrice } };
   });
-  const cash = input2.cash === void 0 ? void 0 : num2(input2.cash, "cash");
+  const cash = input2.cash === void 0 ? void 0 : num3(input2.cash, "cash");
   if (cash !== void 0 && cash < 0) throw new Error("cash cannot be negative");
   const currency = input2.currency?.trim().toUpperCase();
   if (currency !== void 0 && !/^[A-Z]{3}$/.test(currency)) throw new Error(`"${input2.currency}" is not a three-letter currency such as USD`);
@@ -38233,14 +38450,14 @@ ${keep(reflection)}`;
       return true;
     });
   }
-  rotate(blocks) {
-    if (!this.maxResolved || this.maxResolved <= 0) return blocks;
-    const settled2 = blocks.filter((b) => {
+  rotate(blocks2) {
+    if (!this.maxResolved || this.maxResolved <= 0) return blocks2;
+    const settled2 = blocks2.filter((b) => {
       const e = parse3(b);
       return e && !e.pending;
     }).length;
     let drop = settled2 - this.maxResolved;
-    return drop <= 0 ? blocks : blocks.filter((b) => {
+    return drop <= 0 ? blocks2 : blocks2.filter((b) => {
       const e = parse3(b);
       if (e && !e.pending && drop > 0) {
         drop--;
@@ -39194,7 +39411,7 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root) {
   }, async (a) => answer("prediction markets on " + a.topic, () => predictionMarkets(a.topic, a.analysis_date, a.limit ?? 6)));
   server.registerTool("get_company_overview", {
     title: "Company profile and ratios",
-    description: "The company's name, sector and industry, market value, valuation multiples (P/E, forward P/E, PEG, price to book), margins, returns, debt to equity, dividend yield, beta and the 52-week range, from Yahoo Finance as they stand today. Withheld for a past analysis date.",
+    description: "For a US filer, from its SEC filings as they stood on the analysis date and the checked closing price: its name, industry and sector, fiscal year, shares outstanding, and its valuation worked out from them (market value, last-twelve-months diluted EPS, price to earnings, book value and price to book, dividends and dividend yield), each shown with the filed figures it came from; a past analysis date has its own. For a company that does not file with the SEC, Yahoo Finance's profile and ratios for today only, withheld for a past analysis date.",
     inputSchema: { symbol: symbol3, analysis_date: analysis },
     annotations: READ
   }, async (a) => answer("profile of " + a.symbol, () => companyOverview(a.symbol, a.analysis_date)));
@@ -39211,7 +39428,7 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root) {
   }, async (a) => answer(`${a.statement.replace("_", " ")} of ${a.symbol}`, () => financialStatement(a.symbol, a.statement, a.frequency ?? "quarterly", a.analysis_date)));
   server.registerTool("get_insider_transactions", {
     title: "Insider transactions",
-    description: "Recent buying and selling by the company's directors and officers, from Yahoo Finance: who, their role, what, how many shares and the value. Withheld for a past analysis date.",
+    description: "Buying and selling by the company's directors, officers and largest owners in the 90 days up to the analysis date, for a US filer from its Form 4 filings with the SEC (only those made public by then, so a past date has its own): who, their role, what kind of trade, shares, price, what they hold after, and whether it was under a pre-arranged plan, with a count of purchases and sales. For a company that does not file with the SEC, Yahoo Finance's for today only, withheld for a past analysis date.",
     inputSchema: { symbol: symbol3, analysis_date: analysis },
     annotations: READ
   }, async (a) => answer("insider transactions of " + a.symbol, () => insiderTransactions(a.symbol, a.analysis_date)));

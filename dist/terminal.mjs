@@ -7478,8 +7478,8 @@ function pruneCache(dir) {
 }
 var excerpt = (body) => body.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 140);
 async function getText(url2, opts = {}) {
-  const host = new URL(url2).host, cached2 = readCache(url2);
-  if (cached2 !== null) return cached2;
+  const host = new URL(url2).host, cached3 = readCache(url2);
+  if (cached3 !== null) return cached3;
   for (let attempt = 0; ; attempt++) {
     let res;
     await pace(host);
@@ -7510,17 +7510,6 @@ async function getText(url2, opts = {}) {
     writeCache(url2, text2);
     return text2;
   }
-}
-async function getCookies(url2) {
-  let res;
-  try {
-    res = await fetchImpl(url2, { headers: { "User-Agent": userAgentFor(url2, contact, emailNow()) }, redirect: "manual", signal: AbortSignal.timeout(15e3) });
-  } catch (e) {
-    throw new Unavailable(`${new URL(url2).host} did not answer (${e.message})`);
-  }
-  await res.body?.cancel().catch(() => {
-  });
-  return res.headers.getSetCookie().map((c) => c.split(";")[0]).join("; ");
 }
 async function getJson(url2, opts = {}) {
   const text2 = await getText(url2, opts);
@@ -11679,9 +11668,9 @@ var NONE = 0;
 var ASSUMED = 1;
 var PROVEN = 2;
 function isRecursive(inst, stack, resolve) {
-  const cached2 = recursive.get(inst);
-  if (cached2 !== void 0)
-    return cached2 ? PROVEN : NONE;
+  const cached3 = recursive.get(inst);
+  if (cached3 !== void 0)
+    return cached3 ? PROVEN : NONE;
   if (stack.has(inst))
     return PROVEN;
   stack.add(inst);
@@ -20262,11 +20251,11 @@ var Link = class {
     }
   }
   async withReader(job) {
-    const session2 = await openSession(this.file, { ...this.opts, signIn: false });
+    const session = await openSession(this.file, { ...this.opts, signIn: false });
     try {
-      return await job(session2.reader);
+      return await job(session.reader);
     } finally {
-      await session2.close();
+      await session.close();
     }
   }
   /** The secret the account fingerprints are made with: random, made once on this computer and kept beside the sign-in.
@@ -20404,29 +20393,29 @@ var Link = class {
    *  those figures, and only if every check passes sends it. The caller has already had the person Confirm it. */
   async placeChecked(order, refId, approve) {
     if (!this.trading().on) throw new Error("trading is switched off: switch it on in Your account first");
-    const session2 = await openSession(this.file, { ...this.opts, signIn: false });
+    const session = await openSession(this.file, { ...this.opts, signIn: false });
     try {
-      const context = await this.contextWith(session2.reader, order.symbol, /* @__PURE__ */ new Date());
+      const context = await this.contextWith(session.reader, order.symbol, /* @__PURE__ */ new Date());
       const now = this.trading();
       if (!now.on) throw new Error(`trading switched itself off: ${now.offBecause?.words ?? "switch it on in Your account first"}`);
       const failed = approve(context).filter((c) => !c.ok);
       if (failed.length) throw new Error(`the order no longer passes on Robinhood's latest figures: ${failed.map((c) => c.words).join("; ")}`);
-      const placed = await session2.placer.place({ accountNumber: this.agenticIds().accountNumber, agentic: true }, order, refId);
+      const placed = await session.placer.place({ accountNumber: this.agenticIds().accountNumber, agentic: true }, order, refId);
       return { placed, context };
     } finally {
-      await session2.close();
+      await session.close();
     }
   }
   /** Robinhood's own check of an order on the Agentic account. Nothing is placed. */
   async review(order) {
-    const session2 = await openSession(this.file, { ...this.opts, signIn: false });
+    const session = await openSession(this.file, { ...this.opts, signIn: false });
     try {
-      const a = await session2.reader.read("get_accounts");
+      const a = await session.reader.read("get_accounts");
       if (a.failed) throw new Error("Robinhood could not list the accounts");
       this.learn(a.data);
-      return await session2.reviewer.review({ accountNumber: this.agenticIds().accountNumber, agentic: true }, order);
+      return await session.reviewer.review({ accountNumber: this.agenticIds().accountNumber, agentic: true }, order);
     } finally {
-      await session2.close();
+      await session.close();
     }
   }
   /** The last read of the chosen accounts, without asking Robinhood again. */
@@ -20483,11 +20472,11 @@ var Link = class {
     this.last = null;
     this.signing = (async () => {
       try {
-        const session2 = await openSession(this.file, { ...this.opts, signIn: true });
+        const session = await openSession(this.file, { ...this.opts, signIn: true });
         try {
-          this.last = this.good(session2.reader);
+          this.last = this.good(session.reader);
         } finally {
-          await session2.close();
+          await session.close();
         }
       } catch (e) {
         this.last = this.bad(e);
@@ -20502,11 +20491,11 @@ var Link = class {
     if (this.signing) return Promise.resolve(this.info());
     this.checking ??= (async () => {
       try {
-        const session2 = await openSession(this.file, { ...this.opts, signIn: false });
+        const session = await openSession(this.file, { ...this.opts, signIn: false });
         try {
-          this.last = this.good(session2.reader);
+          this.last = this.good(session.reader);
         } finally {
-          await session2.close();
+          await session.close();
         }
       } catch (e) {
         this.last = e instanceof NotSignedIn && !this.saved() ? null : this.bad(e);
@@ -20565,50 +20554,81 @@ function saveAccountHoldings(dir, accounts, today2) {
   return { saved, leftOut };
 }
 
+// src/data/sec.ts
+var DAY_MS = 864e5;
+var cache2 = /* @__PURE__ */ new Map();
+function cached2(url2, timeoutMs) {
+  const hit = cache2.get(url2);
+  if (hit && Date.now() - hit.at < DAY_MS) return hit.value;
+  const value = getJson(url2, { timeoutMs });
+  cache2.set(url2, { at: Date.now(), value });
+  value.catch(() => cache2.delete(url2));
+  return value;
+}
+async function cikFor(symbol) {
+  const table = await cached2("https://www.sec.gov/files/company_tickers.json", 3e4);
+  const hit = Object.values(table).find((e) => e.ticker?.toUpperCase() === symbol.toUpperCase());
+  return hit ? String(hit.cik_str).padStart(10, "0") : null;
+}
+var submissions = (cik) => cached2(`https://data.sec.gov/submissions/CIK${cik}.json`, 3e4);
+function sectorOfSic(raw) {
+  const c = Number(raw);
+  if (!Number.isInteger(c) || c < 100) return null;
+  const in_ = (lo, hi) => c >= lo && c <= hi;
+  if (in_(100, 999)) return "Consumer Defensive";
+  if (in_(1e3, 1099) || in_(1400, 1499)) return "Basic Materials";
+  if (in_(1200, 1399)) return "Energy";
+  if (in_(1500, 1799)) return "Industrials";
+  if (in_(2e3, 2199)) return "Consumer Defensive";
+  if (in_(2200, 2399) || in_(2500, 2599)) return "Consumer Cyclical";
+  if (in_(2400, 2499) || in_(2600, 2699)) return "Basic Materials";
+  if (in_(2700, 2799)) return "Communication Services";
+  if (in_(2830, 2836)) return "Healthcare";
+  if (in_(2840, 2844)) return "Consumer Defensive";
+  if (in_(2800, 2899)) return "Basic Materials";
+  if (in_(2900, 2999)) return "Energy";
+  if (in_(3e3, 3099) || in_(3200, 3399)) return "Basic Materials";
+  if (in_(3100, 3199) || in_(3630, 3639) || in_(3710, 3716) || in_(3750, 3751) || in_(3900, 3999)) return "Consumer Cyclical";
+  if (in_(3570, 3579) || in_(3660, 3679)) return "Technology";
+  if (in_(3840, 3851)) return "Healthcare";
+  if (in_(3800, 3899)) return "Technology";
+  if (in_(3400, 3799)) return "Industrials";
+  if (in_(4e3, 4799)) return "Industrials";
+  if (in_(4800, 4899)) return "Communication Services";
+  if (in_(4950, 4959)) return "Industrials";
+  if (in_(4900, 4999)) return "Utilities";
+  if (c === 5122 || c === 5047) return "Healthcare";
+  if (in_(5140, 5149) || in_(5400, 5499) || c === 5331 || c === 5912) return "Consumer Defensive";
+  if (in_(5e3, 5199)) return "Industrials";
+  if (in_(5200, 5999)) return "Consumer Cyclical";
+  if (c === 6798 || in_(6500, 6599)) return "Real Estate";
+  if (in_(6e3, 6799)) return "Financial Services";
+  if (in_(7e3, 7299) || in_(7500, 7599) || in_(7900, 7999)) return "Consumer Cyclical";
+  if (in_(7310, 7319) || in_(7800, 7899)) return "Communication Services";
+  if (in_(7370, 7379)) return "Technology";
+  if (in_(7300, 7399)) return "Industrials";
+  if (in_(8e3, 8099)) return "Healthcare";
+  if (in_(8200, 8299)) return "Consumer Defensive";
+  if (in_(7600, 8999)) return "Industrials";
+  return null;
+}
+async function fundTickers() {
+  const t2 = await cached2("https://www.sec.gov/files/company_tickers_mf.json", 3e4);
+  const at = t2.fields?.indexOf("symbol") ?? 3;
+  return new Set((t2.data ?? []).map((r) => String(r[at] ?? "").toUpperCase()).filter(Boolean));
+}
+
 // src/data/company.ts
 function companySymbol(raw) {
   const sym2 = normalizeSymbol(raw);
   if (cryptoBase(raw) || /[\^=]/.test(sym2)) throw new NoData(`${sym2} is not a company: a crypto asset, index, future or currency pair has no company accounts`);
   return sym2;
 }
-var session = null;
-function yahooSession() {
-  session ??= (async () => {
-    const cookie = await getCookies("https://fc.yahoo.com");
-    if (!cookie) throw new Unavailable("Yahoo Finance gave no session cookie");
-    const crumb = (await getText(`${HOSTS[1]}/v1/test/getcrumb`, { headers: { Cookie: cookie } })).trim();
-    if (!crumb || crumb.length > 64 || /[\s<]/.test(crumb)) throw new Unavailable("Yahoo Finance gave no session key");
-    return { cookie, crumb };
-  })();
-  session.catch(() => {
-    session = null;
-  });
-  return session;
-}
-async function yahooJson(path20) {
-  for (let attempt = 0; ; attempt++) {
-    const s = await yahooSession();
-    try {
-      return await getJson(`${HOSTS[1]}${path20}&crumb=${encodeURIComponent(s.crumb)}`, { headers: { Cookie: s.cookie } });
-    } catch (e) {
-      if (attempt === 0 && /HTTP 401/.test(e.message)) {
-        session = null;
-        continue;
-      }
-      throw e;
-    }
-  }
-}
-async function summary(sym2, modules) {
-  const j = await yahooJson(`/v10/finance/quoteSummary/${encodeURIComponent(sym2)}?modules=${modules}`);
-  const r = j.quoteSummary?.result?.[0];
-  if (!r) throw new NoData(`Yahoo Finance has no company data for ${sym2}${j.quoteSummary?.error?.description ? ` (${j.quoteSummary.error.description})` : ""}`);
-  return r;
-}
 async function profileSector(raw) {
-  const r = await summary(companySymbol(raw), "summaryProfile,quoteType");
-  const kind = r.quoteType?.quoteType ?? "";
-  return { sector: r.summaryProfile?.sector?.trim() || null, fund: kind === "ETF" || kind === "MUTUALFUND" };
+  const sym2 = companySymbol(raw);
+  if ((await fundTickers()).has(sym2)) return { sector: null, fund: true };
+  const cik = await cikFor(sym2);
+  return { sector: cik ? sectorOfSic((await submissions(cik)).sic) : null, fund: false };
 }
 
 // src/desk/sectors.ts
@@ -21155,14 +21175,14 @@ function stateOf(root2, day2) {
     summary: summaryOf(e.decision),
     hasReport: hasReport(dir, e.ticker, e.date)
   })).reverse().sort((a, b) => b.date.localeCompare(a.date));
-  const summary2 = summarize(entries);
+  const summary = summarize(entries);
   return {
     version: versionOf(root2),
     today: day2,
     watchlist: readWatchlist(dir),
     queue: queueOf(dir),
     calls,
-    record: { summary: summary2, text: renderSummary(summary2), benchmarkNote: `Each call is judged after ${s.scoring.holdingPeriodDays} trading days against its market's index.` },
+    record: { summary, text: renderSummary(summary), benchmarkNote: `Each call is judged after ${s.scoring.holdingPeriodDays} trading days against its market's index.` },
     desk: { emailSaved: !!readContactEmail(root2), tradingEnabled: false, holdingDays: s.scoring.holdingPeriodDays },
     analyses: { depth: depthOfRounds(s.analysis.debateRounds), perRun: s.routines.maxAnalyses, listener: listenerOf(dir) },
     paper: { ...recordOf(entries.map((e) => ({ ticker: e.ticker, date: e.date, rating: e.rating })), day2), startUsd: readPaperStart(dir), minWeeks: RECORD_WEEKS }
@@ -21364,7 +21384,7 @@ function quote(raw) {
 var clearQuotes = () => memo2.clear();
 var RANGES = { "1M": 31, "3M": 92, "6M": 183, "1Y": 366, "5Y": 1830 };
 var isRange = (s) => s in RANGES;
-async function history(raw, range) {
+async function history2(raw, range) {
   const symbol = safeSymbol(raw), end = today(), from = addDays(end, -(RANGES[range] + 320));
   const s = await daily(symbol, from, end);
   if (!s.bars.length) throw new NoData(`Yahoo Finance has no daily prices for ${symbol}`);
@@ -21744,7 +21764,7 @@ async function startTerminal(opts) {
         const range = url2.searchParams.get("range") ?? "6M";
         if (!isRange(range)) throw new Refused2(400, "range is one of 1M, 3M, 6M, 1Y, 5Y");
         try {
-          return json(res, 200, await history(sym2, range));
+          return json(res, 200, await history2(sym2, range));
         } catch (e) {
           throw new Refused2(e instanceof Error && e.name === "NoData" ? 404 : 502, e.message);
         }

@@ -144,7 +144,7 @@ export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetc
 
   server.registerTool('get_company_overview', {
     title: 'Company profile and ratios',
-    description: 'The company\'s name, sector and industry, market value, valuation multiples (P/E, forward P/E, PEG, price to book), margins, returns, debt to equity, dividend yield, beta and the 52-week range, from Yahoo Finance as they stand today. Withheld for a past analysis date.',
+    description: 'For a US filer, from its SEC filings as they stood on the analysis date and the checked closing price: its name, industry and sector, fiscal year, shares outstanding, and its valuation worked out from them (market value, last-twelve-months diluted EPS, price to earnings, book value and price to book, dividends and dividend yield), each shown with the filed figures it came from; a past analysis date has its own. For a company that does not file with the SEC, Yahoo Finance\'s profile and ratios for today only, withheld for a past analysis date.',
     inputSchema: { symbol, analysis_date: analysis },
     annotations: READ,
   }, async (a) => answer('profile of ' + a.symbol, () => companyOverview(a.symbol, a.analysis_date)));
@@ -162,7 +162,7 @@ export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetc
 
   server.registerTool('get_insider_transactions', {
     title: 'Insider transactions',
-    description: 'Recent buying and selling by the company\'s directors and officers, from Yahoo Finance: who, their role, what, how many shares and the value. Withheld for a past analysis date.',
+    description: 'Buying and selling by the company\'s directors, officers and largest owners in the 90 days up to the analysis date, for a US filer from its Form 4 filings with the SEC (only those made public by then, so a past date has its own): who, their role, what kind of trade, shares, price, what they hold after, and whether it was under a pre-arranged plan, with a count of purchases and sales. For a company that does not file with the SEC, Yahoo Finance\'s for today only, withheld for a past analysis date.',
     inputSchema: { symbol, analysis_date: analysis },
     annotations: READ,
   }, async (a) => answer('insider transactions of ' + a.symbol, () => insiderTransactions(a.symbol, a.analysis_date)));
