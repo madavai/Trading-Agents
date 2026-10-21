@@ -22,7 +22,11 @@ import { progress, readSections, savedPlan, saveSection, SECTIONS, writeReport }
 import { dueSettlements, settleOne } from '../desk/settle.js';
 import { failureText, NoData, Unavailable } from '../data/http.js';
 import { openDashboard } from '../terminal/launch.js';
-import { eveningBrief, morningBrief } from '../desk/routine.js';
+import { eveningBrief, morningBrief, type MorningLook } from '../desk/routine.js';
+import { queueTop, readScreen, screenToday } from '../desk/screen.js';
+import { marketOf, readPrefs } from '../terminal/prefs.js';
+import { readWatchlist } from '../terminal/store.js';
+import { screenUniverse } from '../terminal/tiers.js';
 
 const text = (t: string) => ({ content: [{ type: 'text' as const, text: t }] });
 const symbol = z.string().min(1).max(20).describe('The ticker as the plan gives it');
@@ -188,12 +192,23 @@ export function registerDeskTools(server: McpServer, root: string): void {
 
   server.registerTool('routine_brief', {
     title: "Today's routine",
-    description: "What the morning routine should do today (score past calls, then the stocks to analyse in order, within the person's limit) or what the evening wrap-up has to report (today's calls, the orders the dashboard sent and Robinhood's answer, what is still to be scored). Read-only; read from the desk's own files. Call it first when asked to run the morning routine or the evening wrap-up.",
+    description: "What the morning routine should do today (score past calls; \"Worth a look today\", the same list the dashboard shows, worked out from prices if it was not this hour; then the stocks to analyse in order, within the person's limit) or what the evening wrap-up has to report (today's calls, the orders the dashboard sent and Robinhood's answer, what is still to be scored). It changes nothing but this: with the person's switch \"Analyse the top three each market morning\" on, the top three of the list go on the waiting list at shallow depth, once a market day. Call it first when asked to run the morning routine or the evening wrap-up.",
     inputSchema: { kind: z.enum(['morning', 'evening']).describe('morning: before the open; evening: after the close') },
-    annotations: { readOnlyHint: true, openWorldHint: false },
-  }, async (a) => act(() => {
+    annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: true },
+  }, async (a) => act(async () => {
     const day = today();
-    return a.kind === 'morning' ? morningBrief(dir, day, readSettings(root).routines.maxAnalyses) : eveningBrief(dir, day, new Date());
+    if (a.kind === 'evening') return eveningBrief(dir, day, new Date());
+    const on = readPrefs(dir).morning === true, weekday = ![0, 6].includes(new Date(`${day}T12:00:00Z`).getUTCDay());
+    let look: MorningLook | undefined;
+    if (weekday) {
+      try {
+        const { symbols, news } = screenUniverse(readWatchlist(dir), marketOf(dir));
+        const worked = await screenToday(dir, symbols, news, day);
+        if (on) queueTop(dir, worked, day, false);   // the routine analyses what waits itself: no doorbell
+        look = { screen: readScreen(dir) ?? worked, on };
+      } catch (e) { look = { screen: null, failed: (e as Error).message, on }; }
+    }
+    return morningBrief(dir, day, readSettings(root).routines.maxAnalyses, look);
   }));
 
   server.registerTool('open_dashboard', {

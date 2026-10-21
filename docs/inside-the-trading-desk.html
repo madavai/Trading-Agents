@@ -396,6 +396,15 @@ p { text-wrap: pretty; }
 .tchip .sk { width: 22px; }
 .tchip .ic { color: var(--accent); }
 .wl li.wl-h { font-size: var(--size-tiny); color: var(--text-3); }
+.pn.morning { grid-column: 1 / -1; }
+.mhalves { grid-template-columns: repeat(2, minmax(0, 1fr)); border-radius: var(--radius-small); box-shadow: none; }
+.mhalf { display: flex; flex-direction: column; gap: 7px; padding: 8px 10px; font-size: var(--size-tiny); color: var(--text-2); }
+.mhalf > b { font-family: var(--font-title); font-size: 12.5px; font-weight: 600; color: var(--text); }
+.wline { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.wline .sk { flex: 1; }
+.wname { width: 40px; flex: none; }
+.wline .ic { color: var(--accent); }
+.mswitch { width: 22px; height: 12px; border-radius: 6px; background: var(--line-strong); flex: none; }
 .pn.chart { grid-column: 1 / 5; }
 .pn.watch { grid-column: 5 / -1; }
 .pn.calls { grid-column: 1 / 4; }
@@ -478,8 +487,9 @@ p { text-wrap: pretty; }
   .rate b { flex: 0 0 96px; }
   .drawers, .checks, .facts { grid-template-columns: minmax(0, 1fr); }
   .win-main { grid-template-columns: minmax(0, 1fr); }
-  .pn.today, .pn.start, .pn.markets, .pn.chart, .pn.watch, .pn.calls, .pn.acct-pn, .pn.ticket { grid-column: 1; }
+  .pn.today, .pn.start, .pn.morning, .pn.markets, .pn.chart, .pn.watch, .pn.calls, .pn.acct-pn, .pn.ticket { grid-column: 1; }
   .tier-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .mhalves { grid-template-columns: minmax(0, 1fr); }
   .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .hero-words { padding: 24px 20px 20px; }
@@ -598,7 +608,7 @@ p { text-wrap: pretty; }
         <div class="link c-you"><span class="lbl">show</span><span class="wire two"><span class="pulse" style="--d:1s"></span></span></div>
         <div class="lane c-you">
           <div class="lane-h"><span class="icbox"><svg class="ic"><use href="#i-screen"/></svg></span><div><p class="lane-name">Your dashboard</p><p class="lane-sub">On this computer only</p></div></div>
-          <ul><li>Your desk today</li><li>Markets and charts</li><li>The desk's calls</li><li>Your accounts</li><li>Decide… or Trade…<small>then your Confirm</small></li></ul>
+          <ul><li>Your desk today</li><li>Start here, this morning<small>the market in tiers, its weather</small></li><li>Markets and charts</li><li>The desk's calls</li><li>Your accounts</li><li>Decide… or Trade…<small>then your Confirm</small></li></ul>
         </div>
         <div class="link c-rh"><span class="lbl">three doors</span><span class="wire two"><span class="pulse" style="--d:1.5s"></span></span></div>
         <div class="lane c-rh">
@@ -663,11 +673,11 @@ p { text-wrap: pretty; }
           <tr><th scope="col">Source</th><th scope="col">Market<small>analyst</small></th><th scope="col">Sentiment<small>analyst</small></th><th scope="col">News<small>analyst</small></th><th scope="col">Fundamentals<small>analyst</small></th><th scope="col">Trader<small>agent</small></th><th scope="col">Dashboard<small>yours</small></th></tr>
         </thead>
         <tbody>
-          <tr><th scope="row">Yahoo Finance</th><td><span class="cell c-src">prices, indicators</span></td><td><span class="cell c-src">headlines</span></td><td><span class="cell c-src">company and world news</span></td><td><span class="cell c-src">a fund's holdings and yearly cost, when given</span></td><td><span class="cell c-src">checked price table</span></td><td><span class="cell c-src">markets, charts</span></td></tr>
+          <tr><th scope="row">Yahoo Finance</th><td><span class="cell c-src">prices, indicators</span></td><td><span class="cell c-src">headlines</span></td><td><span class="cell c-src">company and world news</span></td><td><span class="cell c-src">a fund's holdings and yearly cost, when given</span></td><td><span class="cell c-src">checked price table</span></td><td><span class="cell c-src">markets, charts, the morning's look</span></td></tr>
           <tr><th scope="row">StockTwits</th><td><span class="none" aria-label="no"></span></td><td><span class="cell c-src">traders' posts</span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td></tr>
           <tr><th scope="row">Reddit</th><td><span class="none" aria-label="no"></span></td><td><span class="cell c-src">forum posts</span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td></tr>
           <tr><th scope="row">FRED</th><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="cell c-src">economic figures</span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td></tr>
-          <tr><th scope="row">Polymarket</th><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="cell c-src">odds</span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td></tr>
+          <tr><th scope="row">Polymarket</th><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="cell c-src">odds</span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="cell c-src">the Fed's odds, for the weather</span></td></tr>
           <tr><th scope="row">SEC EDGAR</th><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="cell c-src">filed accounts, valuation, insider trades</span></td><td><span class="none" aria-label="no"></span></td><td><span class="cell c-src">industry, for the sector limit</span></td></tr>
           <tr><th scope="row">Robinhood</th><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="cell c-rh">your accounts</span></td></tr>
         </tbody>
@@ -915,7 +925,7 @@ p { text-wrap: pretty; }
       </div>
     </div>
 
-    <div class="at-box aside"><svg class="ic"><use href="#i-clock"/></svg><span><b>The routines run this same line for you.</b> The morning routine scores past calls, then analyses what is waiting and your starred stocks (at most five), and lists the new calls to decide on. The evening wrap-up scores what is ready and reports the day's calls and orders. Neither places an order.</span></div>
+    <div class="at-box aside"><svg class="ic"><use href="#i-clock"/></svg><span><b>The routines run this same line for you.</b> The morning routine scores past calls, reads what is worth a look today (and, with your morning switch on, puts its top three on the waiting list), then analyses what is waiting and your starred stocks (at most five), and lists the new calls to decide on. The evening wrap-up scores what is ready and reports the day's calls and orders. Neither places an order.</span></div>
   </section>
 
   <!-- 5 -->
@@ -936,7 +946,8 @@ p { text-wrap: pretty; }
             <li><b>Analyses you asked for</b><span>Each stock you asked for on the dashboard, at the depth you chose: waiting, being analysed, done with its rating, or failed with why.</span></li>
             <li><b>Holdings</b><span>What you hold, as the dashboard last read it from Robinhood.</span></li>
             <li><b>Orders log</b><span>Each order the dashboard sent, from a call or your own, and what Robinhood answered.</span></li>
-            <li><b>Your dashboard</b><span>Where you left it: the page, the stock, the chart, the stocks you looked at last. Never an order.</span></li>
+            <li><b>Worth a look today</b><span>The morning's list and its reasons, worked out at most once an hour, so the dashboard and the morning routine read the same one.</span></li>
+            <li><b>Your dashboard</b><span>Where you left it: the page, the stock, the chart, the stocks you looked at last, your whole-market funds, and whether your morning switch is on. Never an order.</span></li>
             <li><b>Your email</b><span>For the SEC, and only the SEC.</span></li>
             <li><b>Paper money</b><span>What your paper record starts with ($10,000 as shipped). The record itself is worked out from the journal and closing prices each time.</span></li>
             <li><b>Back-tests</b><span>Kept in journals of their own, apart from your real calls.</span></li>
@@ -1064,6 +1075,7 @@ p { text-wrap: pretty; }
           <li class="win-lh">The desk</li>
           <li class="on"><svg class="ic sm"><use href="#i-grid"/></svg>Overview</li>
           <li><svg class="ic sm"><use href="#i-compass"/></svg>Start here</li>
+          <li><svg class="ic sm"><use href="#i-sun"/></svg>This morning</li>
           <li><svg class="ic sm"><use href="#i-target"/></svg>Scorecard</li>
           <li><svg class="ic sm"><use href="#i-chart"/></svg>Chart</li>
           <li><svg class="ic sm"><use href="#i-ledger"/></svg>Stock page</li>
@@ -1079,6 +1091,20 @@ p { text-wrap: pretty; }
             <div class="tier-row"><b>The whole market</b><div class="tchips"><span class="tchip">S&amp;P 500<span class="sk"></span></span><span class="tchip">Nasdaq 100<span class="sk"></span></span><span class="tchip">The whole world<span class="sk"></span></span><span class="tchip">US bonds<span class="sk"></span></span><span class="tchip">yours to change</span></div></div>
             <div class="tier-row"><b>Sectors</b><div class="tchips"><span class="tchip">Technology</span><span class="tchip">Financials</span><span class="tchip">Health care</span><span class="tchip">Energy</span><span class="tchip">Industrials</span><span class="tchip">Consumer discretionary</span><span class="tchip">Consumer staples</span><span class="tchip">Utilities</span><span class="tchip">Materials</span><span class="tchip">Real estate</span><span class="tchip">Communication</span></div></div>
             <div class="tier-row"><b>Single names</b><div class="tchips"><span class="tchip"><svg class="ic sm"><use href="#i-star"/></svg>yours, starred first<span class="sk"></span></span><span class="tchip">Bitcoin and Ether on paper only</span></div></div>
+          </div>
+          <div class="at-box pn morning"><p class="pn-h">This morning <small>from figures, once an hour · never a forecast</small></p>
+            <div class="joined mhalves">
+              <div class="mhalf"><b>Market weather</b>
+                <span class="wline"><span class="wname">Trend</span><span class="rchip c-bull">Rising</span><span class="sk"></span></span>
+                <span class="wline"><span class="wname">Mood</span><span class="rchip c-mid">Normal</span><span class="sk"></span></span>
+                <span class="wline"><span class="wname">Rates</span><span class="rchip c-mid">No change</span><span class="sk"></span></span>
+              </div>
+              <div class="mhalf"><b>Worth a look today</b>
+                <span class="wline"><span class="sk"></span><span>a move, its volume, a new high</span><svg class="ic sm"><use href="#i-bot"/></svg></span>
+                <span class="wline"><span class="sk" style="max-width:70%"></span><span>in the news today</span><svg class="ic sm"><use href="#i-bot"/></svg></span>
+                <span class="wline"><span class="mswitch"></span>Analyse the top 3 each market morning · off as shipped</span>
+              </div>
+            </div>
           </div>
           <div class="at-box pn markets"><p class="pn-h">Markets <small>Yahoo Finance</small></p>
             <div class="joined tiles"><span class="tile">S&amp;P 500<span class="sk" style="width:70%"></span></span><span class="tile">Nasdaq<span class="sk" style="width:60%"></span></span><span class="tile">Dow<span class="sk" style="width:66%"></span></span><span class="tile">VIX<span class="sk" style="width:48%"></span></span><span class="tile">10-year yield<span class="sk" style="width:55%"></span></span><span class="tile">Bitcoin<span class="sk" style="width:72%"></span></span></div>
@@ -1123,8 +1149,8 @@ p { text-wrap: pretty; }
       <div class="feat edge c-you"><span class="icbox"><svg class="ic"><use href="#i-compass"/></svg></span><b>Start here</b><p>First on the page, broadest first: the whole market (four funds, yours to change), the eleven sectors in plain words, and your own names, each with today's move and the desk's latest call.</p></div>
       <div class="feat edge c-src"><span class="icbox"><svg class="ic"><use href="#i-chart"/></svg></span><b>Markets, chart and stock page</b><p>Six market tiles; any stock or fund across the whole width, with averages and volume; and its own page: what you hold, your orders on it, each call and its score.</p></div>
       <div class="feat edge c-you"><span class="icbox"><svg class="ic"><use href="#i-star"/></svg></span><b>Watchlist and analyses</b><p>Grouped by tier, each folding away. The robot asks the desk to analyse a stock or a fund, as deep as you choose; each shows waiting, the step it is on, its rating or why it failed.</p></div>
-      <div class="feat edge c-desk"><span class="icbox"><svg class="ic"><use href="#i-flag"/></svg></span><b>The desk's calls</b><p>Each call in two lines; in full, a coloured summary, the price since the call and every agent's part as a card.</p></div>
-      <div class="feat edge c-desk"><span class="icbox"><svg class="ic"><use href="#i-target"/></svg></span><b>Your paper record</b><p>Every call on a stock, a fund, Bitcoin or Ether followed on paper at its ticket's size, against the S&amp;P 500, and how each call scored. Crypto stays on paper, within your crypto limit.</p></div>
+      <div class="feat edge c-src"><span class="icbox"><svg class="ic"><use href="#i-sun"/></svg></span><b>This morning</b><p>The market weather in three plain lines (trend, mood, rates), and up to five worth a look today, each with its reason. A switch, off as shipped, sends the top three to analysis.</p></div>
+      <div class="feat edge c-desk"><span class="icbox"><svg class="ic"><use href="#i-target"/></svg></span><b>Calls and your paper record</b><p>Each call in two lines, and in full with every agent's part; each followed on paper at its ticket's size against the S&amp;P 500, and how it scored.</p></div>
       <div class="feat edge c-rh"><span class="icbox"><svg class="ic"><use href="#i-bank"/></svg></span><b>Your account</b><p>In the side list and on its own page: value, cash, buying power and gain in colour, each holding's share, orders, the trading switch and your caps.</p></div>
       <div class="feat edge c-you"><span class="icbox"><svg class="ic"><use href="#i-send"/></svg></span><b>Order tickets</b><p>Decide… from a call, or Trade… for your own: checked against your caps, reviewed by Robinhood, placed only on your Confirm.</p></div>
     </div>
