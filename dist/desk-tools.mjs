@@ -37857,6 +37857,59 @@ async function insiderTransactions(raw, analysis2, limit = 30) {
     ...list2.map((t) => `- ${new Date(t.startDate.raw * 1e3).toISOString().slice(0, 10)} \xB7 ${t.filerName ?? "unnamed"}${t.filerRelation ? ` (${t.filerRelation})` : ""}: ${t.transactionText || "no description"}${n2(t.shares) ? ` \xB7 ${n2(t.shares)} shares` : ""}${n2(t.value) ? ` \xB7 value ${n2(t.value)}` : ""}${t.ownership === "I" ? " \xB7 held indirectly" : ""}`)
   ].join("\n");
 }
+var FUND_SECTORS = {
+  technology: "Technology",
+  financial_services: "Financial services",
+  healthcare: "Health care",
+  consumer_cyclical: "Consumer cyclical",
+  communication_services: "Communication services",
+  industrials: "Industrials",
+  consumer_defensive: "Consumer defensive",
+  energy: "Energy",
+  basic_materials: "Basic materials",
+  realestate: "Real estate",
+  utilities: "Utilities"
+};
+async function fundProfile(raw, analysis2, topN = 10) {
+  const day3 = analysisDate(analysis2), sym = companySymbol(raw);
+  if (isHistorical(day3)) return `The fund profile of ${sym} is withheld for ${day3}: Yahoo Finance serves it only as it stands today. Today's holdings and their weights carry the prices of every day since ${day3}, and its size and yearly cost may have changed; they would put later knowledge into an analysis of ${day3}. Say the profile is unavailable for a past day.`;
+  const r = await summary(sym, "price,quoteType,fundProfile,topHoldings,summaryDetail,defaultKeyStatistics");
+  const type = r.quoteType?.quoteType ?? "";
+  if (type !== "ETF" && type !== "MUTUALFUND") throw new NoData(`${sym} is not a fund (Yahoo Finance lists it as ${type ? type.toLowerCase() : "not a fund"}): use the company tools instead`);
+  const p = r.price ?? {}, d = r.summaryDetail ?? {}, k = r.defaultKeyStatistics ?? {}, f = r.fundProfile ?? {}, fees = f.feesExpensesInvestment ?? {}, t = r.topHoldings ?? {};
+  const main = p.currency ? MAIN_UNIT[p.currency] ?? p.currency : void 0;
+  const inception = has(k.fundInceptionDate) ? new Date(k.fundInceptionDate.raw * 1e3).toISOString().slice(0, 10) : null;
+  const ratio = [fees.annualReportExpenseRatio, fees.netExpRatio, k.annualReportExpenseRatio].find(has);
+  const cost = ratio ? `${Number((ratio.raw * 100).toPrecision(3))}%` : null;
+  const size = money(d.totalAssets ?? k.totalAssets, main);
+  const lines = [];
+  const line2 = (label, v, always = false) => {
+    if (v) lines.push(`${label}: ${v}`);
+    else if (always) lines.push(`${label}: unavailable (Yahoo Finance does not give it)`);
+  };
+  line2("Name", p.longName ?? p.shortName);
+  line2("Kind", type === "ETF" ? "an exchange-traded fund (ETF)" : "a mutual fund");
+  line2("Family", f.family);
+  line2("Category", f.categoryName);
+  line2("Started", inception);
+  line2("Net assets (its size)", size, true);
+  line2("Yearly cost (expense ratio, taken from the fund's value each year)", cost, true);
+  line2("Yield (income paid out over the past year)", percent(d.yield ?? k.yield));
+  line2("Holdings turnover (how much of it is traded in a year)", percent(fees.annualHoldingsTurnover));
+  line2("Average yearly return, 3 years (past prices, as Yahoo gives it)", percent(k.threeYearAverageReturn));
+  line2("Average yearly return, 5 years (past prices, as Yahoo gives it)", percent(k.fiveYearAverageReturn));
+  line2("Beta, 3 years (how much it moves with the market)", plain2(k.beta3Year));
+  const split = [["stocks", t.stockPosition], ["bonds", t.bondPosition], ["cash", t.cashPosition], ["other", t.otherPosition]].filter(([, v]) => has(v)).map(([n2, v]) => `${n2} ${percent(v)}`);
+  if (split.length) lines.push(`Held in: ${split.join(", ")}`);
+  const top = (t.holdings ?? []).filter((h) => has(h.holdingPercent)).slice(0, topN);
+  if (top.length) {
+    const together = top.reduce((a, h) => a + h.holdingPercent.raw, 0);
+    lines.push("", `Top ${top.length} holdings (${(together * 100).toFixed(2)}% of the fund together):`, ...top.map((h) => `- ${h.symbol ?? "?"}${h.holdingName ? ` ${h.holdingName}` : ""}: ${percent(h.holdingPercent)}`));
+  } else lines.push("", "Top holdings: unavailable (Yahoo Finance does not give them)");
+  const sectors = (t.sectorWeightings ?? []).flatMap((w) => Object.entries(w)).filter(([, v]) => has(v) && v.raw > 0).sort((a, b) => b[1].raw - a[1].raw);
+  if (sectors.length) lines.push("", `By sector: ${sectors.map(([n2, v]) => `${FUND_SECTORS[n2] ?? n2.replace(/_/g, " ")} ${percent(v)}`).join(", ")}`);
+  return [`Fund profile for ${sym}, from Yahoo Finance as it stands today (${day3}). A fund has no company accounts or insider trades of its own: what it holds and what it costs to own are its fundamentals.`, "", ...lines].join("\n");
+}
 var YAHOO_LINES = {
   balance_sheet: ["TotalAssets", "CurrentAssets", "CashAndCashEquivalents", "TotalLiabilitiesNetMinorityInterest", "CurrentLiabilities", "StockholdersEquity"],
   income_statement: ["TotalRevenue", "CostOfRevenue", "GrossProfit", "OperatingIncome", "NetIncome", "DilutedEPS"],
@@ -39162,6 +39215,12 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root) {
     inputSchema: { symbol: symbol3, analysis_date: analysis },
     annotations: READ
   }, async (a) => answer("insider transactions of " + a.symbol, () => insiderTransactions(a.symbol, a.analysis_date)));
+  server.registerTool("get_fund_profile", {
+    title: "Fund profile",
+    description: "For a fund (an ETF or a mutual fund, as get_instrument says), its fundamentals in place of company accounts: what it holds (top holdings, sectors, stocks against bonds), what it costs to own each year, its size, yield, family, category and start date, from Yahoo Finance as they stand today. What Yahoo does not give is said as unavailable. Withheld for a past analysis date.",
+    inputSchema: { symbol: symbol3, analysis_date: analysis },
+    annotations: READ
+  }, async (a) => answer("fund profile of " + a.symbol, () => fundProfile(a.symbol, a.analysis_date)));
   registerDeskTools(server, root);
   return server;
 }

@@ -122,8 +122,8 @@ test('an order is placed only with trading switched on, after Robinhood\'s clean
 test('the person\'s own order takes the same road: one share to start, stocks only, Robinhood\'s clean check, the switch, their exact Confirm', async () => {
   const { o, dir, term, post, link } = await desk();
   try {
-    assert.match((await post('/api/ticket/own', { symbol: 'BTC-USD', side: 'buy' })).json().error, /stocks only/);
-    assert.match((await post('/api/ticket/own', { symbol: '^GSPC', side: 'buy' })).json().error, /stocks only/);
+    assert.match((await post('/api/ticket/own', { symbol: 'BTC-USD', side: 'buy' })).json().error, /stocks and funds only/);
+    assert.match((await post('/api/ticket/own', { symbol: '^GSPC', side: 'buy' })).json().error, /stocks and funds only/);
     assert.match((await post('/api/ticket/own', { symbol: 'NVDA' })).json().error, /buy or to sell/);
     const sell = (await post('/api/ticket/own', { symbol: 'NVDA', side: 'sell' })).json();
     assert.deepEqual([sell.own, sell.proposal.order], [true, null], 'nothing held to sell, so nothing is proposed');

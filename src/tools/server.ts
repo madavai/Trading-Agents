@@ -13,7 +13,7 @@ import { companyNews, worldNews } from '../data/news.js';
 import { socialPosts } from '../data/social.js';
 import { economicSeries, SERIES } from '../data/macro.js';
 import { predictionMarkets } from '../data/odds.js';
-import { companyOverview, financialStatement, insiderTransactions } from '../data/company.js';
+import { companyOverview, financialStatement, fundProfile, insiderTransactions } from '../data/company.js';
 import { registerDeskTools } from './desk.js';
 import { VERSION } from '../version.js';
 import { listed, plainName, resetAgentFiles, shippedAgentFiles } from '../desk/agent-files.js';
@@ -166,6 +166,13 @@ export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetc
     inputSchema: { symbol, analysis_date: analysis },
     annotations: READ,
   }, async (a) => answer('insider transactions of ' + a.symbol, () => insiderTransactions(a.symbol, a.analysis_date)));
+
+  server.registerTool('get_fund_profile', {
+    title: 'Fund profile',
+    description: 'For a fund (an ETF or a mutual fund, as get_instrument says), its fundamentals in place of company accounts: what it holds (top holdings, sectors, stocks against bonds), what it costs to own each year, its size, yield, family, category and start date, from Yahoo Finance as they stand today. What Yahoo does not give is said as unavailable. Withheld for a past analysis date.',
+    inputSchema: { symbol, analysis_date: analysis },
+    annotations: READ,
+  }, async (a) => answer('fund profile of ' + a.symbol, () => fundProfile(a.symbol, a.analysis_date)));
 
   registerDeskTools(server, root);
   return server;

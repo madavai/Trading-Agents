@@ -7674,12 +7674,16 @@ import fs5 from "node:fs";
 import path5 from "node:path";
 
 // src/desk/ticket.ts
+var COIN_STEP = 1e6;
+var MIN_COIN_USD = 1;
+var downToStep = (n) => Math.floor(n * COIN_STEP + 1e-6) / COIN_STEP;
+var units = (n, coin) => coin ? `${n} unit(s)` : `${n} share(s)`;
 var early = (c, caps) => c.heldDays !== void 0 && c.heldDays < caps.minHoldDays;
 var money = (n) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 var cents = (n) => Math.round(n * 100) / 100;
 var actionOf = (rating, t2) => t2.ratingToOrder[rating] ?? "no order";
 function propose(c, t2, caps) {
-  const action = actionOf(c.rating, t2), why = [];
+  const action = actionOf(c.rating, t2), why = [], coin = isCrypto(c.symbol);
   const none = (reason) => ({ action, order: null, why: [...why, reason] });
   if (action === "no order") return none(`The desk rated ${c.symbol} ${c.rating}: your settings place no order for that rating.`);
   if (c.price === null || c.price <= 0) return none(`Robinhood gave no live price for ${c.symbol}, so no order can be sized.`);
@@ -7688,9 +7692,10 @@ function propose(c, t2, caps) {
   if (action === "sell half of what is held" || action === "sell everything held") {
     if (c.held <= 0) return none(`The desk rated ${c.symbol} ${c.rating}, but the Agentic account holds none to sell.`);
     if (early(c, caps)) return none(`${c.symbol} was bought here on ${c.boughtOn}, ${c.heldDays} trading day(s) ago: your shortest hold is ${caps.minHoldDays}, so the desk proposes no sell yet.`);
-    const quantity2 = Math.floor(action === "sell everything held" ? c.held : c.held / 2);
-    if (quantity2 < 1) return none(`The Agentic account holds ${c.held} share(s); half of that is less than one whole share, and a limit order sells whole shares only.`);
-    why.push(`${action === "sell everything held" ? "Everything held" : "Half of what is held"}: ${quantity2} of ${c.held} share(s), whole shares only.`);
+    const all = action === "sell everything held", quantity2 = coin ? all ? c.held : downToStep(c.held / 2) : Math.floor(all ? c.held : c.held / 2);
+    if (coin && quantity2 <= 0) return none(`${units(c.held, true)} of ${c.symbol} are held; half of that is less than the smallest step of 0.000001.`);
+    if (quantity2 < (coin ? 0 : 1)) return none(`The Agentic account holds ${c.held} share(s); half of that is less than one whole share, and a limit order sells whole shares only.`);
+    why.push(`${all ? "Everything held" : "Half of what is held"}: ${quantity2} of ${units(c.held, coin)}${coin ? "" : ", whole shares only"}.`);
     return { action, order: { symbol: c.symbol, side: "sell", quantity: quantity2, limitPrice, timeInForce: t2.orderDefaults.timeInForce }, why };
   }
   if (c.accountValue === null || c.accountValue <= 0) return none("Robinhood gave no total value for the Agentic account, so a position cannot be sized.");
@@ -7706,6 +7711,18 @@ function propose(c, t2, caps) {
   if (amount > c.buyingPower) {
     amount = c.buyingPower;
     why.push(`Buying power is ${money(c.buyingPower)}, so at most that.`);
+  }
+  if (coin) {
+    const room = Math.max(0, Math.floor((c.accountValue * caps.cryptoPercent / 100 - (c.cryptoHeldUsd ?? 0)) * 100) / 100);
+    if (amount > room) {
+      amount = room;
+      why.push(`Your crypto limit of ${caps.cryptoPercent}% of the account leaves ${money(room)}, so at most that.`);
+    }
+    if (amount < MIN_COIN_USD) return none(`${money(amount)} is under ${money(MIN_COIN_USD)}, the smallest crypto order.`);
+    const quantity2 = downToStep(amount / limitPrice);
+    if (quantity2 <= 0) return none(`${money(amount)} buys no ${c.symbol} at ${money(limitPrice)}.`);
+    why.push(`${money(amount)} \xF7 ${money(limitPrice)}, rounded down to six decimal places: ${units(quantity2, true)}.`);
+    return { action, order: { symbol: c.symbol, side: "buy", quantity: quantity2, limitPrice, timeInForce: t2.orderDefaults.timeInForce }, why };
   }
   const quantity = Math.floor(amount / limitPrice);
   if (quantity < 1) return none(`${money(amount)} buys less than one share at ${money(limitPrice)}, and a limit order buys whole shares only.`);
@@ -7724,9 +7741,12 @@ function proposeOwn(c, side, t2) {
   return { action, order: { symbol: c.symbol, side, quantity: 1, limitPrice, timeInForce: t2.orderDefaults.timeInForce }, why };
 }
 function check(o, c, t2, caps) {
-  const out = [];
+  const out = [], coin = isCrypto(o.symbol);
   const add = (ok, words4) => out.push({ ok, words: words4 });
-  add(Number.isInteger(o.quantity) && o.quantity >= 1 && o.quantity <= 1e5, Number.isInteger(o.quantity) && o.quantity >= 1 ? `${o.quantity} whole share(s)` : "The quantity must be a whole number of shares, at least one");
+  if (coin) {
+    const steps = o.quantity * COIN_STEP, ok = Number.isFinite(o.quantity) && o.quantity > 0 && o.quantity <= 1e5 && Math.abs(steps - Math.round(steps)) < 1e-6;
+    add(ok, ok ? `${units(o.quantity, true)} of ${o.symbol}` : "The quantity must be above zero, to at most six decimal places");
+  } else add(Number.isInteger(o.quantity) && o.quantity >= 1 && o.quantity <= 1e5, Number.isInteger(o.quantity) && o.quantity >= 1 ? `${o.quantity} whole share(s)` : "The quantity must be a whole number of shares, at least one");
   const priceOk = Number.isFinite(o.limitPrice) && o.limitPrice > 0 && cents(o.limitPrice) === o.limitPrice;
   add(priceOk, priceOk ? `Limit price ${money(o.limitPrice)}` : "The limit price must be above zero, in dollars and cents");
   if (!out.every((x) => x.ok)) return out;
@@ -7743,19 +7763,20 @@ function check(o, c, t2, caps) {
     else {
       const after = (c.held + o.quantity) * o.limitPrice / c.accountValue * 100;
       add(after <= caps.perStockPercent, `${o.symbol} would be ${after.toFixed(1)}% of the account; your cap is ${caps.perStockPercent}%`);
-      const s = c.sector ?? { name: `own:${o.symbol}`, label: "not known, so counted as a sector of its own", heldUsd: c.held * o.limitPrice };
-      if (s.name === null) add(true, `${o.symbol} is a whole-market fund: it counts towards no sector`);
-      else {
-        const inSector = (s.heldUsd + cost) / c.accountValue * 100;
-        add(inSector <= caps.perSectorPercent, `${s.label === "" ? "Its sector" : `Sector ${s.label}`} would be ${inSector.toFixed(1)}% of the account; your limit is ${caps.perSectorPercent}%`);
-      }
-      if (isCrypto(o.symbol)) {
+      if (coin) {
         const inCrypto = ((c.cryptoHeldUsd ?? 0) + cost) / c.accountValue * 100;
-        add(inCrypto <= caps.cryptoPercent, `Crypto would be ${inCrypto.toFixed(1)}% of the account; your limit is ${caps.cryptoPercent}%`);
+        add(inCrypto <= caps.cryptoPercent + 1e-9, `Crypto would be ${inCrypto.toFixed(1)}% of the account; your limit is ${caps.cryptoPercent}%`);
+      } else {
+        const s = c.sector ?? { name: `own:${o.symbol}`, label: "not known, so counted as a sector of its own", heldUsd: c.held * o.limitPrice };
+        if (s.name === null) add(true, `${o.symbol} is a whole-market fund: it counts towards no sector`);
+        else {
+          const inSector = (s.heldUsd + cost) / c.accountValue * 100;
+          add(inSector <= caps.perSectorPercent, `${s.label === "" ? "Its sector" : `Sector ${s.label}`} would be ${inSector.toFixed(1)}% of the account; your limit is ${caps.perSectorPercent}%`);
+        }
       }
     }
   } else {
-    add(o.quantity <= c.held, o.quantity <= c.held ? `Selling ${o.quantity} of the ${c.held} held` : `Only ${c.held} share(s) are held in the Agentic account`);
+    add(o.quantity <= c.held, o.quantity <= c.held ? `Selling ${o.quantity} of the ${c.held} held` : `Only ${units(c.held, coin)} are held in the Agentic account`);
     if (early(c, caps)) out.push({ ok: true, ask: true, words: `${o.symbol} was bought here on ${c.boughtOn}, ${c.heldDays} trading day(s) ago, under your shortest hold of ${caps.minHoldDays}: selling it now takes one more press` });
   }
   add(c.ordersToday < caps.ordersPerDay, `${c.ordersToday} of your ${caps.ordersPerDay} orders a day used`);
@@ -7808,7 +7829,9 @@ var PAPER_MIN = 100;
 var PAPER_MAX = 1e7;
 var RECORD_WEEKS = 4;
 var cents2 = (n) => Math.round(n * 100) / 100;
-var followed = (ticker) => !/[\^=]/.test(ticker) && !isCrypto(ticker);
+var PAPER_CRYPTO = /* @__PURE__ */ new Set(["BTC-USD", "ETH-USD"]);
+var followed = (ticker) => !/[\^=]/.test(ticker) && (!isCrypto(ticker) || PAPER_CRYPTO.has(ticker));
+var notFollowed = (ticker) => isCrypto(ticker) ? "Among crypto, paper follows Bitcoin and Ether for now." : "An index, a future or a currency cannot be bought: paper follows stocks, funds, Bitcoin and Ether.";
 function recordOf(calls, today2) {
   const mine = calls.filter((c) => followed(c.ticker) && c.date <= today2);
   const since = mine.map((c) => c.date).sort()[0] ?? null;
@@ -7830,7 +7853,7 @@ function paperBook(calls, closes, o) {
   for (const c of ordered) {
     const base2 = { ticker: c.ticker, callDate: c.date, rating: c.rating };
     if (!followed(c.ticker)) {
-      trades.push({ ...base2, status: "skipped", why: "Paper follows stocks and funds; crypto and indices come later." });
+      trades.push({ ...base2, status: "skipped", why: notFollowed(c.ticker) });
       continue;
     }
     if (actionOf(c.rating, o.trading) === "no order") {
@@ -7863,6 +7886,7 @@ function paperBook(calls, closes, o) {
     const h = held.get(f.trade.ticker) ?? { quantity: 0, cost: 0 };
     const positions2 = [...held].map(([ticker, x]) => ({ symbol: ticker, quantity: x.quantity, price: closeOn(closes[ticker], f.date) }));
     const bought = boughtOn.get(f.trade.ticker);
+    const cryptoHeldUsd = cents2(positions2.filter((x) => isCrypto(x.symbol)).reduce((a, x) => a + x.quantity * (x.price ?? 0), 0));
     const context = {
       symbol: f.trade.ticker,
       rating: f.trade.rating,
@@ -7873,6 +7897,7 @@ function paperBook(calls, closes, o) {
       price: f.price,
       ordersToday: ordersThatDay,
       positions: positions2,
+      cryptoHeldUsd,
       ...o.sectors ? { sector: o.sectors.context(f.trade.ticker, positions2) } : {},
       ...bought && h.quantity > 0 ? { boughtOn: bought, heldDays: tradingDaysBetween(bought, f.date) } : {}
     };
@@ -8894,11 +8919,11 @@ function getSizableOrigin(input) {
 }
 var highSurrogate = /[\uD800-\uDBFF]/;
 function codePointLength(str) {
-  const units = str.length;
+  const units2 = str.length;
   if (!highSurrogate.test(str))
-    return units;
-  let count = units;
-  for (let i = 0; i < units - 1; i++) {
+    return units2;
+  let count = units2;
+  for (let i = 0; i < units2 - 1; i++) {
     if ((str.charCodeAt(i) & 64512) === 55296 && (str.charCodeAt(i + 1) & 64512) === 56320) {
       count--;
       i++;
@@ -9701,8 +9726,8 @@ var $ZodCheckMaxLength = /* @__PURE__ */ $constructor("$ZodCheckMaxLength", (ins
   (_a3 = inst._zod.def).when ?? (_a3.when = _whenHasLength);
   inst._zod.check = (payload) => {
     const input = payload.value;
-    const units = input.length;
-    const length = typeof input === "string" && units > def.maximum ? codePointLength(input) : units;
+    const units2 = input.length;
+    const length = typeof input === "string" && units2 > def.maximum ? codePointLength(input) : units2;
     if (length <= def.maximum)
       return;
     const origin = getLengthableOrigin(input);
@@ -9723,8 +9748,8 @@ var $ZodCheckMinLength = /* @__PURE__ */ $constructor("$ZodCheckMinLength", (ins
   (_a3 = inst._zod.def).when ?? (_a3.when = _whenHasLength);
   inst._zod.check = (payload) => {
     const input = payload.value;
-    const units = input.length;
-    const length = typeof input === "string" && units >= def.minimum && units < def.minimum * 2 ? codePointLength(input) : units;
+    const units2 = input.length;
+    const length = typeof input === "string" && units2 >= def.minimum && units2 < def.minimum * 2 ? codePointLength(input) : units2;
     if (length >= def.minimum)
       return;
     const origin = getLengthableOrigin(input);
@@ -9745,8 +9770,8 @@ var $ZodCheckLengthEquals = /* @__PURE__ */ $constructor("$ZodCheckLengthEquals"
   (_a3 = inst._zod.def).when ?? (_a3.when = _whenHasLength);
   inst._zod.check = (payload) => {
     const input = payload.value;
-    const units = input.length;
-    const length = typeof input === "string" && units >= def.length && units <= def.length * 2 ? codePointLength(input) : units;
+    const units2 = input.length;
+    const length = typeof input === "string" && units2 >= def.length && units2 <= def.length * 2 ? codePointLength(input) : units2;
     if (length === def.length)
       return;
     const origin = getLengthableOrigin(input);
@@ -20533,8 +20558,8 @@ function saveAccountHoldings(dir, accounts, today2) {
       }
     })
   }));
-  const tradable = clean.find((a) => a.tradable);
-  const saved = { positions: tradable?.positions ?? [], ...tradable?.cash === void 0 ? {} : { cash: tradable.cash }, ...tradable?.currency ? { currency: tradable.currency } : {}, source: "robinhood", savedOn: today2, accounts: clean };
+  const tradable2 = clean.find((a) => a.tradable);
+  const saved = { positions: tradable2?.positions ?? [], ...tradable2?.cash === void 0 ? {} : { cash: tradable2.cash }, ...tradable2?.currency ? { currency: tradable2.currency } : {}, source: "robinhood", savedOn: today2, accounts: clean };
   fs10.mkdirSync(dir, { recursive: true });
   writeWhole(file3(dir), JSON.stringify(saved, null, 2) + "\n");
   return { saved, leftOut };
@@ -21540,6 +21565,10 @@ var Refused2 = class extends Error {
   }
   status;
 };
+function tradable(symbol) {
+  if (isCrypto(symbol)) throw new Refused2(400, `Robinhood's agent doorway trades stocks and funds only: ${symbol} is crypto, which the desk follows on paper`);
+  if (/[\^=]/.test(symbol)) throw new Refused2(400, "the order ticket trades stocks and funds only, not indices, futures or currencies");
+}
 function fingerprint(files) {
   const h = crypto6.createHash("sha256");
   for (const f of files) {
@@ -21824,6 +21853,7 @@ async function startTerminal(opts) {
       const symbol = safeSymbol(typeof b.symbol === "string" ? b.symbol : ""), date4 = typeof b.date === "string" ? b.date : "";
       const call = new Journal(path18.join(dir, "journal.md")).load().find((e) => e.ticker === symbol && e.date === date4);
       if (!call) throw new Refused2(404, "no such call");
+      tradable(symbol);
       const trading = readSettings(root2).trading, { caps } = robinhood.trading();
       const context = await limited({ ...await askRobinhood(() => robinhood.ticketContext(symbol)), rating: call.rating, callDate: call.date });
       const t2 = opened(false, context, propose(context, trading, caps), trading, caps);
@@ -21836,7 +21866,7 @@ async function startTerminal(opts) {
       } catch (e) {
         throw new Refused2(400, e.message);
       }
-      if (/[\^=]/.test(symbol) || isCrypto(symbol)) throw new Refused2(400, "the order ticket trades stocks only, not indices, currencies or crypto");
+      tradable(symbol);
       const side = b.side === "buy" || b.side === "sell" ? b.side : null;
       if (!side) throw new Refused2(400, "say whether to buy or to sell");
       const trading = readSettings(root2).trading, { caps } = robinhood.trading();
@@ -21857,6 +21887,7 @@ async function startTerminal(opts) {
       const t2 = ticketOf(b.id);
       if (t2.placed || t2.placing) throw new Refused2(409, "this ticket has already sent its order");
       const o = edited(t2, b), checks = check(o, t2.context, readSettings(root2).trading, robinhood.trading().caps);
+      tradable(o.symbol);
       t2.order = o;
       t2.checks = checks;
       t2.review = null;
@@ -21877,6 +21908,7 @@ async function startTerminal(opts) {
       if (b.confirm !== confirmWords(t2.order)) throw new Refused2(400, "the confirmation does not name this order: nothing was sent");
       if (t2.checks.some((c) => c.ask) && b.early !== true) throw new Refused2(400, `${t2.order.symbol} was bought here under your shortest hold: press "Sell anyway" to go on`);
       const order = t2.order, trading = readSettings(root2).trading, sentToday = placedToday(dir, /* @__PURE__ */ new Date());
+      tradable(order.symbol);
       t2.placing = true;
       try {
         const { placed } = await askRobinhood(() => robinhood.placeChecked(order, t2.refId, (fresh) => check(order, limitedNow({ ...fresh, rating: t2.context.rating, callDate: t2.context.callDate, ordersToday: Math.max(fresh.ordersToday, sentToday) }), trading, tr.caps)));

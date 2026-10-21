@@ -7,6 +7,10 @@
 
 ## Layout
 - `src/tools/` - the desk tool server, the one MCP server this folder gives the engine (`.mcp.json`).
+- `src/data/` - the free sources, each held to the analysis date. `company.ts` is a company's accounts, profile, ratios
+  and insider trades, and `fundProfile` (tool `get_fund_profile`) a fund's in their place: what it holds, what it costs
+  each year and its size, with the cost, size and holdings named as unavailable when Yahoo does not give them, and the
+  whole profile withheld for a past day.
 - `src/check/` - the desk check: this computer, and the free data sources.
 - `src/robinhood/` - the connection to Robinhood's Trading MCP: sign-in (OAuth, kept in `~/.trading-agents`), and reads.
   `rules.ts` says what a Robinhood tool is (read, order or other) by its name and Robinhood's own read-only label;
@@ -71,12 +75,16 @@
   `/routine`, the team's playbook); `src/desk/orders.ts` - the dashboard's log of the orders it sent.
 - `src/desk/ticket.ts` - the order ticket: sizing from the person's settings and every cap check, on real figures only,
   the guard rails included (`sector`, `cryptoHeldUsd`, `boughtOn`/`heldDays` in its context; a `Check` with `ask`
-  passes but needs the person's "Sell anyway", which the server requires at Review and Place).
+  passes but needs the person's "Sell anyway", which the server requires at Review and Place). Crypto is sized here for
+  the paper book only: in fractions to six decimal places, at least $1, within what the crypto limit leaves, and with
+  the crypto limit in place of a sector's. The dashboard's server refuses crypto and indices (`tradable`) when a ticket
+  opens and again at Review and Place, before Robinhood is asked anything.
 - `src/desk/sectors.ts` - a symbol's sector for the sector limit: the S&P sector funds and the whole-market funds by
   table, else the company's profile (`data/company.ts` `profileSector`), an unknown one counted on its own; looked up
   once per run of the dashboard. The weekly loss limit is `robinhood/link.ts` `noteValue`, with the account's values day
   by day in `values.json` beside the sign-in.
-- `src/desk/paper.ts` - the paper book: every live call on a stock or a fund sized by `propose` and held to `check` as
+- `src/desk/paper.ts` - the paper book: every live call on a stock, a fund or a coin in `PAPER_CRYPTO` (Bitcoin and
+  Ether) sized by `propose` and held to `check` as
   its ticket would be, filled at the first close after the call's day, valued daily against SPY; worked out afresh from
   the journal and Yahoo's daily closes (the dashboard's `/api/paper`, kept ten minutes). Only the starting money is
   kept (`desk-data/paper.json`). `recordOf` is the record (weeks, calls) the trading switch's four-week press uses.

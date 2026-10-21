@@ -21,7 +21,7 @@ const book = (calls: Array<{ ticker: string; date: string; rating: string }>, o:
 test('every call is followed as its ticket would size it, filled at the first close after its day, against the S&P 500 from the same start', () => {
   const calls = [
     { ticker: 'NVDA', date: '2026-09-01', rating: 'Buy' }, { ticker: 'AAPL', date: '2026-09-01', rating: 'Hold' },
-    { ticker: 'BTC-USD', date: '2026-09-01', rating: 'Buy' }, { ticker: 'TSLA', date: '2026-09-01', rating: 'Buy' },
+    { ticker: 'SOL-USD', date: '2026-09-01', rating: 'Buy' }, { ticker: 'TSLA', date: '2026-09-01', rating: 'Buy' },
     { ticker: 'NVDA', date: '2026-09-03', rating: 'Sell' }, { ticker: 'MSFT', date: '2026-09-04', rating: 'Buy' },
   ];
   const held = book(calls).trades.find((x) => x.ticker === 'NVDA' && x.callDate === '2026-09-03')!;
@@ -32,7 +32,7 @@ test('every call is followed as its ticket would size it, filled at the first cl
   assert.ok(Math.abs(of('NVDA', '2026-09-01').sincePct! - (90 / 110 - 1)) < 1e-12, 'and how it has done since, at the latest close');
   assert.deepEqual([of('NVDA', '2026-09-03').side, of('NVDA', '2026-09-03').quantity, of('NVDA', '2026-09-03').price], ['sell', 4, 90], 'a Sell sells everything held, at the next close');
   assert.deepEqual([of('AAPL', '2026-09-01').status, of('AAPL', '2026-09-01').why], ['none', 'A Hold call asks for no order.']);
-  assert.equal(of('BTC-USD', '2026-09-01').status, 'skipped', 'crypto comes later, with its own cap');
+  assert.deepEqual([of('SOL-USD', '2026-09-01').status, of('SOL-USD', '2026-09-01').why], ['skipped', 'Among crypto, paper follows Bitcoin and Ether for now.']);
   assert.equal(of('TSLA', '2026-09-01').status, 'unavailable', 'prices that could not be read are said as unavailable, never as nothing');
   assert.equal(of('MSFT', '2026-09-04').status, 'waiting', 'no close after the call yet');
   assert.deepEqual(b.series.map((p) => [p.date, p.value, p.benchmark]), [['2026-09-01', 10_000, 10_000], ['2026-09-02', 10_000, 10_100], ['2026-09-03', 10_040, 10_200], ['2026-09-04', 9_920, 9_900]]);
@@ -60,10 +60,35 @@ test('paper takes no order the real ticket would refuse: your caps, the orders a
   assert.equal(book([]).returnPct, null);
 });
 
-test('the record counts weeks and calls on stocks and funds since the first; the paper money is kept in whole dollars and checked', () => {
-  const calls = [{ ticker: 'NVDA', date: '2026-09-01', rating: 'Buy' }, { ticker: 'BTC-USD', date: '2026-08-01', rating: 'Buy' }, { ticker: 'AAPL', date: '2026-09-20', rating: 'Hold' }];
+test('Bitcoin and Ether are followed on paper in fractions, within the crypto limit, on every day of the week; other coins and indices are not', () => {
+  const c: Closes = {
+    ...closes,
+    'BTC-USD': rows(['2026-09-04', 80_000], ['2026-09-05', 82_000], ['2026-09-06', 82_000], ['2026-09-07', 70_000]),   // a Friday, then a weekend
+    'ETH-USD': rows(['2026-09-05', 3_000], ['2026-09-06', 3_000], ['2026-09-07', 3_000], ['2026-09-08', 3_100]),
+  };
+  const b = paperBook([
+    { ticker: 'BTC-USD', date: '2026-09-04', rating: 'Buy' }, { ticker: 'ETH-USD', date: '2026-09-05', rating: 'Buy' },
+    { ticker: 'ETH-USD', date: '2026-09-07', rating: 'Buy' }, { ticker: 'DOGE-USD', date: '2026-09-04', rating: 'Buy' }, { ticker: '^GSPC', date: '2026-09-04', rating: 'Buy' },
+  ], c, { startUsd: 10_000, trading: T, caps: C, today: '2026-09-08' });
+  const of = (t: string, d: string) => b.trades.find((x) => x.ticker === t && x.callDate === d)!;
+  assert.deepEqual([of('BTC-USD', '2026-09-04').status, of('BTC-USD', '2026-09-04').quantity, of('BTC-USD', '2026-09-04').price, of('BTC-USD', '2026-09-04').fillDate], ['filled', 0.006097, 82_000, '2026-09-05'],
+    "the first close after a Friday's call is Saturday's: $500 (the cap an order, and all the 5% crypto limit leaves) buys 0.006097 BTC");
+  assert.match(of('ETH-USD', '2026-09-05').why, /\$0\.0\d is under \$1\.00, the smallest crypto order/, 'Bitcoin used the crypto limit up: nothing is left for Ether');
+  const eth = of('ETH-USD', '2026-09-07');
+  assert.deepEqual([eth.status, eth.fillDate], ['filled', '2026-09-08'], 'after Bitcoin fell, the limit has room again');
+  const last = (t: string, d: string) => c[t]!.filter((r) => r.date <= d).at(-1)!.close;
+  const inCrypto = b.positions.reduce((a, p) => a + p.quantity * last(p.ticker, eth.fillDate!), 0), account = b.cash + inCrypto;
+  assert.ok(inCrypto <= 0.05 * account + 0.01, `crypto stays within 5% of the account on the day Ether was bought (${inCrypto.toFixed(2)} of ${account.toFixed(2)})`);
+  assert.ok(inCrypto > 0.049 * account, 'and Ether takes the room the limit leaves');
+  assert.deepEqual([of('DOGE-USD', '2026-09-04').status, of('^GSPC', '2026-09-04').status], ['skipped', 'skipped']);
+  assert.match(of('^GSPC', '2026-09-04').why, /An index, a future or a currency cannot be bought/);
+});
+
+test('the record counts weeks and calls on what paper follows since the first; the paper money is kept in whole dollars and checked', () => {
+  const calls = [{ ticker: 'NVDA', date: '2026-09-01', rating: 'Buy' }, { ticker: '^GSPC', date: '2026-08-01', rating: 'Buy' }, { ticker: 'AAPL', date: '2026-09-20', rating: 'Hold' }];
   assert.deepEqual(recordOf(calls, '2026-09-30'), { since: '2026-09-01', weeks: 4, calls: 2 });
   assert.deepEqual(recordOf(calls, '2026-09-27'), { since: '2026-09-01', weeks: 3, calls: 2 });
+  assert.deepEqual(recordOf([...calls, { ticker: 'BTC-USD', date: '2026-08-15', rating: 'Buy' }], '2026-09-30'), { since: '2026-08-15', weeks: 6, calls: 3 }, 'a Bitcoin call counts');
   assert.deepEqual(recordOf([], '2026-09-30'), { since: null, weeks: 0, calls: 0 });
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ta-paper-'));
   assert.equal(readPaperStart(dir), 10_000, 'ships at $10,000');
