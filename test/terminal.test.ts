@@ -376,6 +376,64 @@ test('what the person chose is remembered in desk-data, each in its own shape, a
   assert.equal((await call(term, 'POST', '/api/prefs', { body: { theme: 'light' }, token: false })).status, 401);
 });
 
+test('Start here is in the page\'s state: the whole market, the eleven sectors and the person\'s own names, each with the desk\'s latest call; and the watchlist by tier', async () => {
+  const empty = (await call(term, 'GET', '/api/state')).json();
+  assert.deepEqual(empty.startHere.map((t: any) => [t.tier, t.items.length]), [['market', 4], ['sectors', 11], ['names', 0]]);
+  assert.deepEqual(empty.watchTiers, []);
+  assert.deepEqual(empty.market, { symbols: ['SPY', 'QQQ', 'VT', 'BND'], asShipped: true, shipped: ['SPY', 'QQQ', 'VT', 'BND'], max: 8 });
+  for (const s of ['NVDA', 'XLE', 'BTC-USD', 'SPY']) await call(term, 'POST', '/api/watchlist', { body: { symbol: s } });
+  const j = new Journal(path.join(dir(), 'journal.md'));
+  j.storeDecision('XLE', '2026-10-09', '**Rating**: Underweight\n\n**Executive Summary**: Lighten up.');
+  j.storeDecision('BTC-USD', '2026-10-09', '**Rating**: Buy\n\n**Executive Summary**: A small coin position.');
+  const s = (await call(term, 'GET', '/api/state')).json();
+  assert.deepEqual(s.startHere.map((t: any) => t.tier), ['market', 'sectors', 'names', 'crypto']);
+  const xle = s.startHere[1].items.find((i: any) => i.symbol === 'XLE');
+  assert.deepEqual([xle.name, xle.call, xle.watched], ['Energy', { rating: 'Underweight', date: '2026-10-09' }, true]);
+  assert.equal(s.startHere[0].items.find((i: any) => i.symbol === 'QQQ').call, null, 'no call yet: none, never made up');
+  assert.deepEqual(s.watchTiers.map((t: any) => [t.tier, t.items.map((i: any) => i.symbol)]), [['market', ['SPY']], ['sectors', ['XLE']], ['names', ['NVDA']], ['crypto', ['BTC-USD']]]);
+  const coin = s.calls.find((c: any) => c.ticker === 'BTC-USD');
+  assert.deepEqual([coin.ticket, coin.paper], [false, true], 'a call on a coin offers no order ticket: it is followed on paper');
+  assert.deepEqual(s.calls.filter((c: any) => c.ticker === 'XLE').map((c: any) => c.ticket), [true]);
+});
+
+test('the whole-market funds are the person\'s to change, each a fund Yahoo prices, checked before it is kept; only Change… sets them', async () => {
+  const set = (symbols: unknown, o: Parameters<typeof call>[3] = {}) => call(term, 'POST', '/api/tiers/market', { body: { symbols }, ...o });
+  for (const [symbols, status, why] of [
+    [['SPY', 'BTC-USD'], 400, /BTC-USD is crypto/], [['XLK'], 400, /XLK is a sector fund/], [['^GSPC'], 400, /cannot be held/], [['../x'], 400, /not a ticker/],
+    [Array.from({ length: 9 }, (_, i) => `F${i}`), 400, /up to 8 funds/], ['SPY', 400, /up to 8 funds/], [['SPY', 'ZZZZ'], 422, /no price for ZZZZ/],
+  ] as const) {
+    const r = await set(symbols);
+    assert.deepEqual([r.status, why.test(r.json().error)], [status, true], JSON.stringify(symbols));
+  }
+  assert.equal(fs.existsSync(path.join(dir(), 'dashboard.json')), false, 'nothing refused is kept');
+  assert.equal((await set(['VTI'], { token: false })).status, 401);
+  assert.equal((await set(['VTI'], { headers: { origin: 'https://evil.example' } })).status, 403);
+  const v1 = (await call(term, 'GET', '/api/version')).json().version;
+  const ok = await set(['vti', 'VT', 'vti', 'DOWN']);
+  assert.deepEqual([ok.status, ok.json().market.symbols, ok.json().market.asShipped], [200, ['VTI', 'VT', 'DOWN'], false], 'each once; Yahoo down cannot be checked, so it is kept and shown unavailable');
+  assert.notEqual((await call(term, 'GET', '/api/version')).json().version, v1, 'the page hears of the change');
+  const s = (await call(term, 'GET', '/api/state')).json();
+  assert.deepEqual(s.startHere[0].items.map((i: any) => [i.symbol, i.name ?? null]), [['VTI', 'The whole US market'], ['VT', 'The whole world'], ['DOWN', null]]);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir(), 'dashboard.json'), 'utf8')).market, ['VTI', 'VT', 'DOWN']);
+  await call(term, 'POST', '/api/prefs', { body: { market: ['BND'], theme: 'light' } });
+  assert.deepEqual((await call(term, 'GET', '/api/prefs')).json().market, ['VTI', 'VT', 'DOWN'], 'the page\'s other choices never change the whole market');
+  assert.deepEqual((await set([])).json().market.symbols, [], 'none at all is the person\'s choice');
+  const back = (await set(['SPY', 'QQQ', 'VT', 'BND'])).json().market;
+  assert.deepEqual([back.symbols, back.asShipped], [['SPY', 'QQQ', 'VT', 'BND'], true]);
+  const kept = JSON.parse(fs.readFileSync(path.join(dir(), 'dashboard.json'), 'utf8'));
+  assert.deepEqual(['market' in kept, kept.theme], [false, 'light'], 'the shipped four are kept as no list, so a later version\'s four reach the person');
+});
+
+test('which tiers of the watchlist are folded away is remembered, each one a tier the page knows', async () => {
+  const saved = (await call(term, 'POST', '/api/prefs', { body: { folded: ['names', 'stocks', 'market', 'names', 3] } })).json();
+  assert.deepEqual(saved.folded, ['market', 'names']);
+  assert.deepEqual((await call(term, 'POST', '/api/prefs', { body: { folded: [] } })).json().folded, [], 'every tier open again');
+  assert.deepEqual((await call(term, 'POST', '/api/prefs', { body: { folded: 'all' } })).json().folded, [], 'not a list: what was kept stays');
+  assert.deepEqual(readPrefs(dir()).folded, []);
+  savePrefs(dir(), { folded: ['crypto'] });
+  assert.deepEqual(readPrefs(dir()).folded, ['crypto']);
+});
+
 test('Stop on the page stops the dashboard, from the page alone; a dashboard given no way to stop has no such door', async () => {
   assert.equal((await call(term, 'POST', '/api/stop', { body: {} })).status, 404);
   let stopped = 0;

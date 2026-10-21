@@ -57,7 +57,10 @@
   `/api/claim`; while it runs the key is kept in the private folder, `dashboard.json`, so `main.ts` can open the page
   again with a fresh link from `/api/claim/new`; strict CSP),
   `quotes.ts` (Yahoo prices), `search.ts` (Yahoo's matches for what is typed), `prefs.ts` (what the page remembers, in
-  `desk-data/dashboard.json`, each value checked), `state.ts` and `store.ts` (the desk's files and the watchlist; the
+  `desk-data/dashboard.json`, each value checked; the whole-market funds only through `/api/tiers/market`, which checks
+  each one's price first), `tiers.ts` (the world in tiers for "Start here" and the watchlist: the whole market, the
+  sector funds, single names and crypto, with every fund's and tier's name and meaning in plain words; the page draws
+  what it is sent and holds no tier rules of its own), `state.ts` and `store.ts` (the desk's files and the watchlist; the
   waiting list for the page, with each running stock's step), `main.ts` (the program: Stop, and Restart into an update on the person's press only, on the same address
   with `--port=N` and the same key, handed over in the new program's environment, never on a command line), and `ui/` (the
   page: `house.css` is the Madav House theme, `dashboard.css` only places its objects with tokens, `main.ts` and the

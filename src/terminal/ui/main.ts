@@ -2,9 +2,9 @@
 // scorecard worked out from them, the watchlist, the analyses waiting, and the person's Robinhood accounts on a page of
 // their own. A number that cannot be had is a dash. An order starts only from a ticket - one of the desk's calls
 // (Decide…) or the person's own (Trade…) - and is placed only on their Confirm, with trading switched on by them.
-import { api, ApiError, claimKey, hasKey, KEY_LOST, type CallDetail, type DeskState, type Depth, type History, type LinkInfo, type Market, type Match, type Prefs, type Caps, type PaperView, type PaperTrade, type QueueView, type QuoteResult, type Account, type AccountView, type Holding, type Order, type Recent, type Snapshot, type TicketOpen, type Check, type Review, type Placed, type Trading } from './api.js';
+import { api, ApiError, claimKey, hasKey, KEY_LOST, type CallDetail, type DeskState, type Depth, type History, type LinkInfo, type Market, type Match, type Prefs, type Caps, type PaperView, type PaperTrade, type QueueView, type QuoteResult, type Account, type AccountView, type Holding, type Order, type Recent, type Snapshot, type TicketOpen, type Check, type Review, type Placed, type Trading, type Tier, type TierItem, type TierView } from './api.js';
 import { heroChart, paperChart, sparkline } from './chart.js';
-import { barOn, clock, dayText, esc, labelled, money, num, opening, pct, plain, ratingTone, SECTION_NAMES, shortDay, tone } from './fmt.js';
+import { barOn, clock, dayText, esc, labelled, money, num, opening, pct, plain, ratingMeaning, ratingTone, SECTION_NAMES, shortDay, tone, WORDS } from './fmt.js';
 import { markdown } from './md.js';
 import { isCrypto } from '../../data/symbols.js';
 import type { Quote } from '../quotes.js';
@@ -13,6 +13,9 @@ const RANGES = ['1M', '3M', '6M', '1Y', '5Y'] as const;
 type Range = (typeof RANGES)[number];
 const OVER: Record<Range, string> = { '1M': 'the month', '3M': 'three months', '6M': 'six months', '1Y': 'the year', '5Y': 'five years' };
 const RATINGS = ['Buy', 'Overweight', 'Hold', 'Underweight', 'Sell'];
+/** The tiers, broadest first, as the desk sends them (terminal/tiers.ts). */
+const TIER_KEYS: readonly Tier[] = ['market', 'sectors', 'names', 'crypto'];
+type Call = DeskState['calls'][number];
 
 const S = {
   desk: null as DeskState | null,
@@ -103,12 +106,19 @@ function adopt(p: Prefs): void {
   Object.assign(P, {
     ...(p.theme ? { theme: p.theme } : {}), ...(p.side ? { side: p.side } : {}), ...(p.view ? { view: p.view } : {}), ...(p.symbol ? { symbol: p.symbol } : {}),
     range: S.range, kind: S.kind, layers: { ...S.layers }, recent: Array.isArray(p.recent) ? p.recent.slice(0, RECENT_MAX) : P.recent ?? [],
+    ...(Array.isArray(p.folded) ? { folded: TIER_KEYS.filter((t) => p.folded!.includes(t)) } : {}),
   });
 }
 
 // ---------- pieces ----------
-const ratingChip = (r: string) => `<span class="at-chip ${ratingTone(r)}">${esc(r)}</span>`;
-const changeChip = (q: Quote | null) => (q && q.changePct !== null ? `<span class="at-chip ${tone(q.changePct)}">${pct(q.changePct)}</span>` : '<span class="at-chip">—</span>');
+/** A rating as a chip; pointing at it says what it means. */
+const ratingChip = (r: string) => `<span class="at-chip ${ratingTone(r)}"${ratingMeaning(r) ? ` title="${esc(ratingMeaning(r))}"` : ''}>${esc(r)}</span>`;
+const changeChip = (q: Quote | null) => (q && q.changePct !== null ? `<span class="at-chip ${tone(q.changePct)}" title="${esc(WORDS.today)}">${pct(q.changePct)}</span>` : `<span class="at-chip" title="${esc(WORDS.today)}">—</span>`);
+/** In place of an order ticket for what Robinhood's agent doorway does not trade: a coin on paper, or one not followed at all. */
+const noTicketChip = (paper: boolean) => (paper ? `<span class="at-chip" title="${esc(WORDS.paper)}">on paper only</span>` : `<span class="at-chip" title="${esc(WORDS.noTicket)}">no order ticket</span>`);
+const robot = (sym: string) => `<button class="icon-btn" data-act="analyse" data-symbol="${esc(sym)}" title="Ask the desk to analyse ${esc(sym)}" aria-label="Ask the desk to analyse ${esc(sym)}"><svg class="g"><use href="#i-bot"/></svg></button>`;
+/** "SPY, QQQ, VT and BND". */
+const listWords = (xs: readonly string[]) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
 const priceText = (sym: string, q: Quote): string => {
   const unit = marketOf(sym)?.unit;
   return unit ? `${num(q.price)}${unit}` : isIndex(sym) ? num(q.price) : money(q.price, q.currency ?? 'USD');
@@ -600,7 +610,10 @@ async function loadHistory(): Promise<void> {
 // ---------- the desk's call, the queue ----------
 const resultChip = (c: { pending: boolean; alpha?: string | null }) => (c.pending ? '<span class="at-chip">not scored yet</span>' : `<span class="at-chip ${tone(parseFloat(c.alpha ?? ''))}">alpha ${esc(c.alpha ?? '—')}</span>`);
 const readButton = (ticker: string, date: string, words = 'Read') => `<button class="at-btn at-press" data-act="open-call" data-symbol="${esc(ticker)}" data-date="${esc(date)}"><svg class="g"><use href="#i-file"/></svg><span>${esc(words)}</span></button>`;
-const decideButton = (ticker: string, date: string) => `<button class="at-btn at-press primary" data-act="decide" data-symbol="${esc(ticker)}" data-date="${esc(date)}" title="An order ticket from this call, checked against your caps and by Robinhood"><span>Decide…</span></button>`;
+/** Decide… on a call: an order ticket from it. A call on a coin opens none, and says so instead. */
+const decideButton = (c: Pick<Call, 'ticker' | 'date' | 'ticket' | 'paper'>) => (c.ticket
+  ? `<button class="at-btn at-press primary" data-act="decide" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}" title="An order ticket from this call, checked against your caps and by Robinhood"><span>Decide…</span></button>`
+  : noTicketChip(c.paper));
 
 /** The desk's latest call on the stock being charted, as one bar under the chart: its rating, day, score, gist, and the
  *  two things to do with it. */
@@ -615,7 +628,7 @@ function renderCall(): void {
   }
   el.innerHTML = `${label}${ratingChip(c.rating)}<span class="at-quiet">${esc(dayText(c.date))}</span>${resultChip(c)}${paperChip(c.ticker, c.date)}
     <span class="ta-callbar-t ta-clamp" title="${esc(c.summary)}">${esc(c.summary)}</span>
-    <span class="ta-callbar-do">${readButton(c.ticker, c.date, 'Read the reasoning')}${decideButton(c.ticker, c.date)}</span>`;
+    <span class="ta-callbar-do">${readButton(c.ticker, c.date, 'Read the reasoning')}${decideButton(c)}</span>`;
 }
 
 // ---------- the analyses the person asked for: waiting, running, done or failed ----------
@@ -674,9 +687,9 @@ function renderStock(): void {
   const sym = S.symbol, d = S.desk;
   $('#sec-stock').classList.toggle('hide', !sym || isIndex(sym) || !d);
   if (!sym || isIndex(sym) || !d) return;
-  const q = quoteOf(sym);
+  const q = quoteOf(sym), it = tierItem(sym);
   $('#stockTitle').textContent = `Everything on ${sym}`;
-  $('#stockSub').textContent = `${nameOf(sym)}${q ? ` · ${priceText(sym, q)}${q.changePct === null ? '' : ` (${pct(q.changePct)} today)`} on Yahoo Finance, up to 15 min late` : ''} · the chart is above`;
+  $('#stockSub').textContent = `${nameOf(sym)}${it?.name && it.meaning ? ` (${it.name}: ${it.meaning})` : ''}${q ? ` · ${priceText(sym, q)}${q.changePct === null ? '' : ` (${pct(q.changePct)} today)`} on Yahoo Finance, up to 15 min late` : ''} · the chart is above`;
 
   // what the person holds of it, account by account, as the dashboard last read Robinhood
   let held: string;
@@ -711,29 +724,99 @@ function renderStock(): void {
     </div>
     <div class="at-card at-box"><div class="at-card-head"><h3>The desk's calls on it</h3></div>${latest ? `<p class="at-lede">${esc(latest.summary)}</p>` : ''}${list}</div>`;
 
-  $('#stockActions').innerHTML = `${isOpen(sym) ? openChip(sym) : `<button class="at-btn at-press" data-act="analyse" data-symbol="${esc(sym)}"><svg class="g"><use href="#i-bot"/></svg><span>Ask the desk to analyse</span></button>`}${isStock(sym) ? `<button class="at-btn at-press" data-act="trade" data-symbol="${esc(sym)}"><svg class="g"><use href="#i-trade"/></svg><span>Trade…</span></button>` : ''}${latest ? decideButton(sym, latest.date) : ''}`;
+  $('#stockActions').innerHTML = `${isOpen(sym) ? openChip(sym) : `<button class="at-btn at-press" data-act="analyse" data-symbol="${esc(sym)}"><svg class="g"><use href="#i-bot"/></svg><span>Ask the desk to analyse</span></button>`}${isStock(sym) ? `<button class="at-btn at-press" data-act="trade" data-symbol="${esc(sym)}"><svg class="g"><use href="#i-trade"/></svg><span>Trade…</span></button>` : ''}${latest ? decideButton(latest) : ''}`;
 }
 
 // ---------- watchlist, calls, scorecard ----------
+/** The watchlist by tier, broadest first, as the desk groups it; each tier's head folds it away, and the page remembers. */
 function renderWatch(): void {
-  const list = S.desk?.watchlist ?? [];
-  const rows = list.map((w) => {
-    const q = quoteOf(w.symbol), c = latestCall(w.symbol), queued = isOpen(w.symbol);
-    const err = S.quotes.get(w.symbol);
-    return `<tr class="ta-go ${w.symbol === S.symbol ? 'on' : ''}" data-act="select" data-symbol="${esc(w.symbol)}">
-      <td><button class="icon-btn ta-fav ${w.favourite ? 'on' : ''}" data-act="fav" data-symbol="${esc(w.symbol)}" aria-label="${w.favourite ? 'Remove' : 'Add'} ${esc(w.symbol)} ${w.favourite ? 'from' : 'to'} the side list"><svg class="g"><use href="#i-star"/></svg></button></td>
-      <td><div class="ta-tcell-name"><b>${esc(q?.name ?? w.symbol)}</b><small>${esc(w.symbol)}</small></div></td>
-      <td class="num"><span class="at-num">${q ? priceText(w.symbol, q) : '—'}</span></td>
+  const tiers = S.desk?.watchTiers ?? [], folded = new Set(P.folded ?? []);
+  const row = (i: TierItem): string => {
+    const q = quoteOf(i.symbol), c = i.call, queued = isOpen(i.symbol);
+    const err = S.quotes.get(i.symbol);
+    return `<tr class="ta-go ${i.symbol === S.symbol ? 'on' : ''}" data-act="select" data-symbol="${esc(i.symbol)}">
+      <td><button class="icon-btn ta-fav ${i.favourite ? 'on' : ''}" data-act="fav" data-symbol="${esc(i.symbol)}" aria-label="${i.favourite ? 'Remove' : 'Add'} ${esc(i.symbol)} ${i.favourite ? 'from' : 'to'} the side list"><svg class="g"><use href="#i-star"/></svg></button></td>
+      <td><div class="ta-tcell-name"${i.meaning ? ` title="${esc(i.meaning)}"` : ''}><b>${esc(i.name ?? q?.name ?? i.symbol)}</b><small>${esc(i.symbol)}</small></div></td>
+      <td class="num"><span class="at-num">${q ? priceText(i.symbol, q) : '—'}</span></td>
       <td class="num">${q ? changeChip(q) : `<span class="at-quiet" title="${esc(err && 'message' in err ? err.message : '')}">${err && 'error' in err ? (err.error === 'no-data' ? 'No data' : 'Unavailable') : '—'}</span>`}</td>
-      <td><div class="ta-tablespark" data-sp="${esc(w.symbol)}"></div></td>
-      <td>${c ? `${ratingChip(c.rating)} <span class="at-quiet">${esc(dayText(c.date))}</span>` : '<span class="at-quiet">no call yet</span>'}</td>
-      <td><span class="at-row">${queued ? openChip(w.symbol) : `<button class="icon-btn" data-act="analyse" data-symbol="${esc(w.symbol)}" title="Ask the desk to analyse ${esc(w.symbol)}" aria-label="Ask the desk to analyse ${esc(w.symbol)}"><svg class="g"><use href="#i-bot"/></svg></button>`}<button class="icon-btn" data-act="remove" data-symbol="${esc(w.symbol)}" title="Remove ${esc(w.symbol)}" aria-label="Remove ${esc(w.symbol)} from the watchlist"><svg class="g"><use href="#i-trash"/></svg></button></span></td></tr>`;
+      <td><div class="ta-tablespark" data-sp="${esc(i.symbol)}"></div></td>
+      <td><span class="at-row compact">${c ? `${ratingChip(c.rating)}<span class="at-quiet">${esc(dayText(c.date))}</span>` : `<span class="at-quiet" title="${esc(WORDS.call)}">no call yet</span>`}${i.ticket ? '' : noTicketChip(i.paper)}</span></td>
+      <td><span class="at-row">${queued ? openChip(i.symbol) : isIndex(i.symbol) ? '' : robot(i.symbol)}<button class="icon-btn" data-act="remove" data-symbol="${esc(i.symbol)}" title="Remove ${esc(i.symbol)}" aria-label="Remove ${esc(i.symbol)} from the watchlist"><svg class="g"><use href="#i-trash"/></svg></button></span></td></tr>`;
+  };
+  const groups = tiers.map((t) => {
+    const open = !folded.has(t.tier);
+    const head = `<tr class="ta-tier-row"><td colspan="7"><button class="ta-tier-fold" data-act="fold" data-tier="${esc(t.tier)}" aria-expanded="${open}" title="${open ? 'Fold this tier away' : 'Open this tier'}"><svg class="g"><use href="#i-chev-right"/></svg><b>${esc(t.name)}</b><span class="at-chip">${t.items.length}</span><span class="at-quiet">${esc(t.meaning)}</span></button></td></tr>`;
+    return `<tbody>${head}${open ? t.items.map(row).join('') : ''}</tbody>`;
   }).join('');
-  $('#watchTable').innerHTML = `<thead><tr><th></th><th>Stock</th><th class="num">Price</th><th class="num">Today</th><th>Today's moves</th><th>Latest call</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="7" class="ta-empty">Nothing on the watchlist yet. Type a stock above, for example NVDA, and press Add.</td></tr>'}</tbody>`;
-  for (const w of list) {
-    const q = quoteOf(w.symbol), el = document.querySelector<HTMLElement>(`[data-sp="${CSS.escape(w.symbol)}"]`);
-    if (q && el) sparkline(el, q.points, (q.changePct ?? 0) >= 0 ? 'ok' : 'bad', { width: 1.75 });
+  $('#watchTable').innerHTML = `<thead><tr><th></th><th>Name</th><th class="num">Price</th><th class="num">Today</th><th>Today's moves</th><th>Latest call</th><th></th></tr></thead>${groups || '<tbody><tr><td colspan="7" class="ta-empty">Nothing on the watchlist yet. Type a company or a fund above, for example NVDA or SPY, and press Add.</td></tr></tbody>'}`;
+  for (const t of tiers) {
+    if (folded.has(t.tier)) continue;
+    for (const i of t.items) {
+      const q = quoteOf(i.symbol), el = document.querySelector<HTMLElement>(`[data-sp="${CSS.escape(i.symbol)}"]`);
+      if (q && el) sparkline(el, q.points, (q.changePct ?? 0) >= 0 ? 'ok' : 'bad', { width: 1.75 });
+    }
   }
+}
+
+// ---------- start here: the world in tiers, broadest first ----------
+/** The whole-market funds are being changed: the field stays as typed while the page refreshes around it. */
+const MK = { editing: false };
+const EMPTY: Partial<Record<Tier, string>> = {
+  market: 'You chose no whole-market funds. Press Change… to add one, such as SPY.',
+  names: 'No single names on your watchlist yet: search a company above to add one. Bitcoin and Ether can be watched too, on paper only.',
+};
+
+/** One tile: its name in plain words, what it holds, today's move, the desk's latest call, and the robot. */
+function tierTile(i: TierItem): string {
+  const q = quoteOf(i.symbol);
+  const call = i.call ? `${ratingChip(i.call.rating)}<span class="at-quiet">${esc(dayText(i.call.date))}</span>` : `<span class="at-quiet" title="${esc(WORDS.call)}">no call yet</span>`;
+  const ask = isIndex(i.symbol) ? '' : isOpen(i.symbol) ? openChip(i.symbol) : robot(i.symbol);
+  return `<div class="at-tile at-box ta-tier-tile${i.symbol === S.symbol ? ' on' : ''}">
+    <button class="ta-tier-go" data-act="select" data-symbol="${esc(i.symbol)}" title="Chart ${esc(i.symbol)}">
+      <span class="ta-tier-top"><b class="at-tile-name">${esc(i.name ?? q?.name ?? i.symbol)}</b>${changeChip(q)}</span>
+      <span class="at-tile-sub">${esc(i.symbol)}${i.meaning ? ` · ${esc(i.meaning)}` : ''}</span>
+    </button>
+    <div class="at-tile-foot">${call}${i.ticket ? '' : noTicketChip(i.paper)}<span class="at-tail">${ask}</span></div>
+  </div>`;
+}
+
+function marketEditor(): string {
+  const m = S.desk!.market;
+  return `<div class="at-row">
+    <label class="at-field ta-grow"><span class="at-field-l">Up to ${m.max} broad funds, by ticker, separated by commas</span><input class="at-input at-box" id="mkInput" type="text" value="${esc(m.symbols.join(', '))}" maxlength="160" spellcheck="false" autocomplete="off"></label>
+    <button class="at-btn at-press primary" data-act="mk-save">Save</button><button class="at-btn at-press" data-act="mk-cancel">Cancel</button>${m.asShipped ? '' : `<button class="at-btn at-press" data-act="mk-shipped">Put back ${esc(listWords(m.shipped))}</button>`}
+  </div><p class="at-quiet">Each is checked with Yahoo Finance before it is kept. Sector funds and crypto have tiers of their own.</p>`;
+}
+
+function tierBlock(t: TierView): string {
+  const change = t.tier === 'market' && !MK.editing ? '<button class="at-btn at-press" data-act="mk-edit" title="Choose the broad funds this tier shows">Change…</button>' : '';
+  const head = `<div class="ta-tier-head"><h3>${esc(t.name)}</h3><p class="at-quiet">${esc(t.meaning)}</p>${change}</div>`;
+  const body = t.items.length ? `<div class="at-deck ta-tier-deck">${t.items.map(tierTile).join('')}</div>` : `<p class="at-quiet">${esc(EMPTY[t.tier] ?? '')}</p>`;
+  const more = t.more ? `<div class="at-row"><button class="at-btn at-press" data-act="goto" data-to="sec-watch">${t.more} more on your watchlist</button></div>` : '';
+  return `<div class="ta-tier">${head}${t.tier === 'market' && MK.editing ? marketEditor() : ''}${body}${more}</div>`;
+}
+
+function renderStart(): void {
+  const d = S.desk, el = $('#startHere');
+  if (!d) { el.innerHTML = '<p class="at-quiet">Reading the desk\'s files.</p>'; return; }
+  // What is being typed in the whole-market field survives the refresh around it.
+  const typing = document.getElementById('mkInput') as HTMLInputElement | null;
+  const kept = typing ? { value: typing.value, focus: document.activeElement === typing, from: typing.selectionStart, to: typing.selectionEnd } : null;
+  el.innerHTML = d.startHere.map(tierBlock).join('')
+    + `<p class="at-honest">${esc(WORDS.today)} A dash is a price Yahoo Finance did not give. ${esc(WORDS.call)} Buy and Overweight lean towards owning it, Hold keeps what is held, Underweight and Sell lean against it: point at a rating for what its ticket does. ${esc(WORDS.fund)} Nothing here is investment advice.</p>`;
+  const field = document.getElementById('mkInput') as HTMLInputElement | null;
+  if (kept && field) { field.value = kept.value; if (kept.focus) { field.focus(); field.setSelectionRange(kept.from, kept.to); } }
+}
+
+/** Keeps the whole-market funds the person typed, once the desk has checked each one's price. */
+async function saveMarketList(symbols: string[]): Promise<void> {
+  await run(async () => {
+    const { market } = await api.setMarket(symbols);
+    MK.editing = false;
+    await refreshState();
+    void refreshQuotes();
+    toast(market.symbols.length ? `The whole market now shows ${listWords(market.symbols)}.` : 'The whole market shows no funds now.');
+  });
 }
 
 function renderCalls(): void {
@@ -744,7 +827,7 @@ function renderCalls(): void {
     <td>${esc(dayText(c.date))}</td><td><b>${esc(c.ticker)}</b></td><td>${ratingChip(c.rating)}</td>
     <td><span class="at-row compact">${resultChip(c)}${paperChip(c.ticker, c.date)}</span></td>
     <td class="wrap"><span class="ta-clamp">${esc(c.summary)}</span></td>
-    <td><span class="at-row compact ta-row-do">${readButton(c.ticker, c.date)}${decideButton(c.ticker, c.date)}</span></td></tr>`).join('');
+    <td><span class="at-row compact ta-row-do">${readButton(c.ticker, c.date)}${decideButton(c)}</span></td></tr>`).join('');
   $('#callsTable').innerHTML = `<thead><tr><th>Date</th><th>Stock</th><th>Rating</th><th>Result</th><th class="wrap">In a few words</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="ta-empty">No calls yet. Ask the team to analyse a stock in Madav / Claude, and its call appears here.</td></tr>'}</tbody>`;
 }
 
@@ -849,7 +932,7 @@ async function openCall(symbol: string, date: string): Promise<void> {
         <span class="at-kicker">The portfolio manager's rating</span>
         <span class="at-verdict ${verdictClass(rating)}">${esc(rating)}</span>
         <p class="at-lede">${esc(meta?.summary ?? plain(c.decision).slice(0, 320))}</p>
-        <div class="at-row">${meta ? resultChip(meta) : ''}${decideButton(symbol, date)}${isStock(symbol) ? `<button class="at-btn at-press" data-act="trade" data-symbol="${esc(symbol)}"><svg class="g"><use href="#i-trade"/></svg><span>Trade…</span></button>` : ''}</div>
+        <div class="at-row">${meta ? resultChip(meta) + decideButton(meta) : ''}${isStock(symbol) ? `<button class="at-btn at-press" data-act="trade" data-symbol="${esc(symbol)}"><svg class="g"><use href="#i-trade"/></svg><span>Trade…</span></button>` : ''}</div>
       </div>
       <div class="ta-callhero-side"><span class="ta-spark-tall" id="callSpark"></span><p class="at-quiet" id="callSince">Reading the price since the call.</p></div>
     </div>
@@ -880,7 +963,7 @@ async function sinceCall(symbol: string, date: string): Promise<void> {
 
 // ---------- everything ----------
 function renderAll(): void {
-  renderSub(); renderFavs(); renderAccount(); renderToday(); renderControls(); renderHero(); renderCall(); renderStock(); renderAnalyses(); renderWatch(); renderCalls(); renderScore();
+  renderSub(); renderFavs(); renderAccount(); renderToday(); renderStart(); renderControls(); renderHero(); renderCall(); renderStock(); renderAnalyses(); renderWatch(); renderCalls(); renderScore();
 }
 
 /** Shows the desk or the account page; the side list marks where the person is. */
@@ -910,7 +993,7 @@ function select(sym: string, chosen = true, name = ''): void {
   if (!sym) return;
   S.symbol = sym; S.history = null; S.historyError = '';
   if (chosen) remember({ symbol: sym, recent: withRecent(sym, name) });
-  renderFavs(); renderControls(); renderHero(); renderCall(); renderStock(); renderWatch(); renderMarkets();
+  renderFavs(); renderControls(); renderHero(); renderCall(); renderStock(); renderStart(); renderWatch(); renderMarkets();
   void loadHistory();
   void refreshQuotes();
 }
@@ -930,8 +1013,8 @@ async function refreshState(): Promise<void> {
     noticeFinished(before, S.desk.queue);
     const pk = `${S.desk.today}|${S.desk.paper.startUsd}|${S.desk.calls.map((c) => `${c.ticker}${c.date}${c.rating}`).join(',')}`;
     if (pk !== PAPER.key) { PAPER.key = pk; void loadPaper(); }
-    const watch = S.desk.watchlist.map((w) => w.symbol);
-    const shown = (s: string | undefined): s is string => !!s && (watch.includes(s) || isIndex(s));
+    const watch = S.desk.watchlist.map((w) => w.symbol), tiered = new Set(tierSymbols());
+    const shown = (s: string | undefined): s is string => !!s && (watch.includes(s) || isIndex(s) || tiered.has(s));
     if (!shown(S.symbol)) {
       // The stock the person had on the chart last time, if it is still there; else the first starred, else the first.
       const first = shown(P.symbol) ? P.symbol : S.desk.watchlist.find((w) => w.favourite)?.symbol ?? watch[0] ?? '^GSPC';
@@ -941,12 +1024,19 @@ async function refreshState(): Promise<void> {
   } catch { S.lost = true; renderSub(); }
 }
 
+/** Every symbol "Start here" shows. */
+const tierSymbols = (): string[] => (S.desk?.startHere ?? []).flatMap((t) => t.items.map((i) => i.symbol));
+/** What the desk says of a symbol in its tiers (its plain name, what it holds, whether paper follows it), if it is in one. */
+const tierItem = (sym: string): TierItem | undefined => [...(S.desk?.startHere ?? []), ...(S.desk?.watchTiers ?? [])].flatMap((t) => t.items).find((i) => i.symbol === sym);
+
 async function refreshQuotes(): Promise<void> {
-  const want = [...new Set([...(S.desk?.watchlist.map((w) => w.symbol) ?? []), ...(S.symbol && !isIndex(S.symbol) ? [S.symbol] : [])])];
+  const want = [...new Set([...(S.desk?.watchlist.map((w) => w.symbol) ?? []), ...tierSymbols(), ...(S.symbol && !isIndex(S.symbol) ? [S.symbol] : [])])];
   if (!want.length) return;
   try {
-    for (const q of (await api.quotes(want)).quotes) S.quotes.set(q.symbol, q);
-    renderFavs(); renderHero(); renderWatch(); renderStock();
+    const batches: string[][] = [];
+    for (let i = 0; i < want.length; i += 30) batches.push(want.slice(i, i + 30));   // the desk answers 30 at a time
+    for (const r of await Promise.all(batches.map((b) => api.quotes(b)))) for (const q of r.quotes) S.quotes.set(q.symbol, q);
+    renderFavs(); renderHero(); renderStart(); renderWatch(); renderStock();
   } catch { /* the next round asks again */ }
 }
 
@@ -977,8 +1067,10 @@ function ask(sym: string): void {
 }
 function renderAsk(): void {
   const l = S.desk?.analyses.listener;
-  $('#askDialog').innerHTML = `<h2 id="askTitle">Analyse ${esc(ASK.symbol)}</h2>
-    <p class="at-lede">The desk's twelve agents read the price, the news, the mood and the accounts, argue both sides, and record a call you can read and decide on. It never places an order.</p>
+  const coin = isCrypto(ASK.symbol), it = tierItem(ASK.symbol);
+  const reads = coin ? 'the price, the news and the mood (a coin has no accounts to read)' : 'the price, the news, the mood and the accounts (for a fund: what it holds and what it costs to own)';
+  $('#askDialog').innerHTML = `<h2 id="askTitle">Analyse ${esc(it?.name ? `${it.name} (${ASK.symbol})` : ASK.symbol)}</h2>
+    <p class="at-lede">The desk's twelve agents read ${reads}, argue both sides, and record a call you can read and decide on. It never places an order${coin ? `: ${it?.paper === false ? 'among crypto, the desk follows only Bitcoin and Ether on paper' : 'a coin is followed on paper only'}` : ''}.</p>
     <div class="at-seg" role="radiogroup" aria-label="How deep">${DEPTH_ORDER.map((d) => `<button class="at-seg-b${d === ASK.depth ? ' on' : ''}" role="radio" aria-checked="${d === ASK.depth}" data-act="ask-depth" data-depth="${d}">${DEPTH_WORDS[d][0]}</button>`).join('')}</div>
     <p class="at-quiet">${esc(DEPTH_WORDS[ASK.depth][1])}</p>
     <p class="at-honest">${l ? `It runs by itself: ${esc(l.listener)} is listening.` : 'Nothing is listening on this computer yet, so it waits until a run starts: see Analyses you asked for.'}</p>
@@ -1024,6 +1116,17 @@ document.addEventListener('click', (e) => {
       toast('The dashboard is stopped. Ask the team to open it again any time.');
     }); break;
     case 'select': select(sym); break;
+    case 'fold': {
+      const t = el.dataset.tier as Tier;
+      if (!TIER_KEYS.includes(t)) break;
+      const f = new Set(P.folded ?? []);
+      if (f.has(t)) f.delete(t); else f.add(t);
+      remember({ folded: TIER_KEYS.filter((k) => f.has(k)) }); renderWatch(); break;
+    }
+    case 'mk-edit': MK.editing = true; renderStart(); document.getElementById('mkInput')?.focus(); break;
+    case 'mk-cancel': MK.editing = false; renderStart(); break;
+    case 'mk-save': void saveMarketList($<HTMLInputElement>('#mkInput').value.split(/[\s,]+/).filter(Boolean)); break;
+    case 'mk-shipped': void saveMarketList([...(S.desk?.market.shipped ?? [])]); break;
     case 'fav': void run(async () => { const on = !S.desk?.watchlist.find((w) => w.symbol === sym)?.favourite; await api.favourite(sym, on); await refreshState(); }); break;
     case 'remove': void run(async () => { await api.removeWatch(sym); await refreshState(); toast(`${sym} is off the watchlist.`); }); break;
     case 'analyse': ask(sym); break;
@@ -1070,6 +1173,13 @@ void loadTrading(); }); break;
 });
 
 document.addEventListener('input', (e) => { const id = (e.target as Element).id; if (id === 'tkQty' || id === 'tkLimit') ticketEdited(); });
+// In the whole-market field, Enter saves and Esc puts it away.
+document.addEventListener('keydown', (e) => {
+  const t = e.target as HTMLInputElement;
+  if (t.id !== 'mkInput') return;
+  if (e.key === 'Enter') { e.preventDefault(); void saveMarketList(t.value.split(/[\s,]+/).filter(Boolean)); }
+  else if (e.key === 'Escape') { e.preventDefault(); MK.editing = false; renderStart(); }
+});
 
 // ---------- finding a stock ----------
 // As the person types a name or a ticker, Yahoo Finance's matches drop down under the box: the ticker, the name, the
