@@ -3263,8 +3263,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path21) {
-      let input2 = path21;
+    function removeDotSegments(path22) {
+      let input2 = path22;
       const output2 = [];
       let nextSlash = -1;
       let len = 0;
@@ -3673,8 +3673,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path21 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path21 && path21 !== "/" ? path21 : void 0;
+        const path22 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path22 && path22 !== "/" ? path22 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -7187,12 +7187,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list2, fs17, exportName) {
+    function addFormats(ajv, list2, fs18, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list2)
-        ajv.addFormat(f, fs17[f]);
+        ajv.addFormat(f, fs18[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -7201,7 +7201,7 @@ var require_dist = __commonJS({
 });
 
 // src/tools/main.ts
-import path20 from "node:path";
+import path21 from "node:path";
 
 // node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
 import process2 from "node:process";
@@ -8023,10 +8023,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path21) {
-  if (!path21)
+function getElementAtPath(obj, path22) {
+  if (!path22)
     return obj;
-  return path21.reduce((acc, key) => acc?.[key], obj);
+  return path22.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -8366,11 +8366,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path21, issues) {
+function prefixIssues(path22, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path21);
+    iss.path.unshift(path22);
     return iss;
   });
 }
@@ -8832,16 +8832,16 @@ function flattenError(error62, mapper = (issue2) => issue2.message) {
 }
 function formatError(error62, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error63, path21 = []) => {
+  const processError = (error63, path22 = []) => {
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path21, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path22, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path21, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path22, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path21, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path22, ...issue2.path]);
       } else {
-        const fullpath = [...path21, ...issue2.path];
+        const fullpath = [...path22, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -8880,17 +8880,17 @@ function formatError(error62, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error62, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error63, path21 = []) => {
+  const processError = (error63, path22 = []) => {
     var _a3;
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path21, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path22, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path21, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path22, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path21, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path22, ...issue2.path]);
       } else {
-        const fullpath = [...path21, ...issue2.path];
+        const fullpath = [...path22, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -8929,8 +8929,8 @@ function treeifyError(error62, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path21 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path21) {
+  const path22 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path22) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -26068,13 +26068,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path21 = ref.slice(1).split("/").filter(Boolean);
-  if (path21.length === 0) {
+  const path22 = ref.slice(1).split("/").filter(Boolean);
+  if (path22.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path21[0] === defsKey) {
-    const key = path21[1] === void 0 ? void 0 : decodeJSONPointerSegment(path21[1]);
+  if (path22[0] === defsKey) {
+    const key = path22[1] === void 0 ? void 0 : decodeJSONPointerSegment(path22[1]);
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -28932,8 +28932,8 @@ function getErrorMap2() {
 
 // node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path21, errorMaps, issueData } = params;
-  const fullPath = [...path21, ...issueData.path || []];
+  const { data, path: path22, errorMaps, issueData } = params;
+  const fullPath = [...path22, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -29048,11 +29048,11 @@ var errorUtil;
 
 // node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path21, key) {
+  constructor(parent, value, path22, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path21;
+    this._path = path22;
     this._key = key;
   }
   get path() {
@@ -32603,11 +32603,11 @@ function normalizeObjectSchema(schema) {
   }
   return void 0;
 }
-function getDotPath(path21) {
-  if (path21.length === 0) {
+function getDotPath(path22) {
+  if (path22.length === 0) {
     return "object root";
   }
-  return path21.reduce((acc, seg, index) => {
+  return path22.reduce((acc, seg, index) => {
     if (index === 0) {
       return String(seg);
     }
@@ -37949,11 +37949,11 @@ function yahooSession() {
   });
   return session;
 }
-async function yahooJson(path21) {
+async function yahooJson(path22) {
   for (let attempt = 0; ; attempt++) {
     const s = await yahooSession();
     try {
-      return await getJson(`${HOSTS[1]}${path21}&crumb=${encodeURIComponent(s.crumb)}`, { headers: { Cookie: s.cookie } });
+      return await getJson(`${HOSTS[1]}${path22}&crumb=${encodeURIComponent(s.crumb)}`, { headers: { Cookie: s.cookie } });
     } catch (e) {
       if (attempt === 0 && /HTTP 401/.test(e.message)) {
         session = null;
@@ -38203,8 +38203,8 @@ async function financialStatement(raw, kind, freq, analysis2) {
 }
 
 // src/tools/desk.ts
-import fs16 from "node:fs";
-import path19 from "node:path";
+import fs17 from "node:fs";
+import path20 from "node:path";
 
 // src/desk/holdings.ts
 import fs8 from "node:fs";
@@ -38943,7 +38943,7 @@ async function openDashboard(root, opts = {}) {
 }
 
 // src/desk/routine.ts
-import path17 from "node:path";
+import path18 from "node:path";
 
 // src/desk/orders.ts
 import fs12 from "node:fs";
@@ -39115,21 +39115,86 @@ function queueTop(dir, screen, day3, ring, now = /* @__PURE__ */ new Date()) {
   return queued;
 }
 
+// src/desk/care.ts
+import fs15 from "node:fs";
+import path17 from "node:path";
+var RERATE_DAYS = 7;
+var RERATE_MAX = 3;
+var agoWords = (days) => days <= 0 ? "today" : days === 1 ? "yesterday" : `${days} days ago`;
+function viewOf(calls, symbol4, today2) {
+  let latest = null;
+  for (const c of calls) if (c.ticker === symbol4 && (!latest || c.date >= latest.date)) latest = c;
+  if (!latest) return null;
+  const days = Math.max(0, daysBetween(latest.date, today2));
+  return { rating: latest.rating, date: latest.date, days, ago: agoWords(days) };
+}
+var isStale = (v) => !v || v.days >= RERATE_DAYS;
+var rerateFile = (dir) => path17.join(dir, "rerate.json");
+function readRerate(dir) {
+  try {
+    const v = JSON.parse(fs15.readFileSync(rerateFile(dir), "utf8"));
+    if (typeof v.day !== "string" || !Array.isArray(v.symbols)) return null;
+    const dayOrNull = (x) => x === null || typeof x === "string";
+    return { day: v.day, symbols: v.symbols.filter((s) => typeof s?.symbol === "string" && dayOrNull(s.called) && dayOrNull(s.rating)) };
+  } catch {
+    return null;
+  }
+}
+var isMonday = (day3) => (/* @__PURE__ */ new Date(`${day3}T12:00:00Z`)).getUTCDay() === 1;
+function dueForRerate(dir, today2, now = /* @__PURE__ */ new Date()) {
+  const held = readHoldings(dir)?.positions ?? [];
+  if (!held.length) return [];
+  const calls = new Journal(path17.join(dir, "journal.md")).load();
+  const busy = new Set(readQueue(dir, now).filter((q) => q.state === "waiting" || q.state === "running").map((q) => q.symbol));
+  return [...new Set(held.map((p) => p.ticker))].filter((s) => !/[\^=]/.test(s) && !busy.has(s)).map((symbol4) => ({ symbol: symbol4, view: viewOf(calls, symbol4, today2) })).filter((x) => isStale(x.view)).sort((a, b) => (a.view?.date ?? "").localeCompare(b.view?.date ?? "")).map((x) => ({ symbol: x.symbol, called: x.view?.date ?? null, rating: x.view?.rating ?? null }));
+}
+function rerateWeekly(dir, today2, now = /* @__PURE__ */ new Date()) {
+  if (!isMonday(today2)) return [];
+  fs15.mkdirSync(dir, { recursive: true });
+  return withLock(rerateFile(dir), () => {
+    const kept = readRerate(dir);
+    if (kept?.day === today2) return kept.symbols;
+    const queued = [];
+    for (const due of dueForRerate(dir, today2, now)) {
+      if (queued.length >= RERATE_MAX) break;
+      try {
+        enqueue(dir, due.symbol, now.toISOString(), "shallow", now);
+        queued.push(due);
+      } catch (e) {
+        if (!(e instanceof QueueRefusal)) throw e;
+        break;
+      }
+    }
+    writeWhole(rerateFile(dir), JSON.stringify({ day: today2, symbols: queued }, null, 2) + "\n");
+    return queued;
+  });
+}
+
 // src/desk/routine.ts
 var DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 var weekday = (day3) => DAYS[(/* @__PURE__ */ new Date(`${day3}T12:00:00Z`)).getUTCDay()];
+var reratedToday = (dir, today2) => {
+  const r = readRerate(dir);
+  return new Map(r?.day === today2 ? r.symbols.map((s) => [s.symbol, s]) : []);
+};
+var lastView = (s) => s.called ? `its latest view: ${s.rating ?? "a call"} on ${s.called}` : "the desk has no view of it yet";
 function morningList(dir, today2, max, screen = null) {
-  const called = new Set(new Journal(path17.join(dir, "journal.md")).load().filter((e) => e.date === today2).map((e) => e.ticker));
+  const called = new Set(new Journal(path18.join(dir, "journal.md")).load().filter((e) => e.date === today2).map((e) => e.ticker));
   const queue2 = readQueue(dir), running = queue2.find((q) => q.state === "running")?.symbol ?? null;
   const wanted = [], seen = new Set(running ? [running] : []);
-  const add = (symbol4, why, queued) => {
+  const add = (symbol4, why2, queued) => {
     if (!seen.has(symbol4) && !called.has(symbol4)) {
       seen.add(symbol4);
-      wanted.push({ symbol: symbol4, why, queued });
+      wanted.push({ symbol: symbol4, why: why2, queued });
     }
   };
-  const bySwitch = new Set(screen?.queued?.day === today2 ? screen.queued.symbols : []);
-  for (const q of queue2) if (q.state === "waiting") add(q.symbol, bySwitch.has(q.symbol) ? `worth a look today, put on the list by the morning switch, ${q.depth ?? "shallow"} depth` : `asked for on the dashboard, ${q.depth ?? "the settings'"} depth`, true);
+  const bySwitch = new Set(screen?.queued?.day === today2 ? screen.queued.symbols : []), rerated = reratedToday(dir, today2);
+  const why = (q) => {
+    const r = rerated.get(q.symbol);
+    if (r) return `a holding re-rated this Monday (${lastView(r)}), ${q.depth ?? "shallow"} depth`;
+    return bySwitch.has(q.symbol) ? `worth a look today, put on the list by the morning switch, ${q.depth ?? "shallow"} depth` : `asked for on the dashboard, ${q.depth ?? "the settings'"} depth`;
+  };
+  for (const q of queue2) if (q.state === "waiting") add(q.symbol, why(q), true);
   for (const w of readWatchlist(dir)) if (w.favourite && !w.symbol.startsWith("^")) add(w.symbol, "a starred watchlist stock", false);
   return { analyse: wanted.slice(0, max), later: wanted.slice(max).map((w) => w.symbol), calledToday: [...called], running };
 }
@@ -39150,12 +39215,27 @@ function lookLines(look, today2) {
   out.push("   In step 4, give this list in a line or two, with its reasons.");
   return out;
 }
+function rerateLines(dir, today2) {
+  const held = readHoldings(dir), r = readRerate(dir), ran = r?.day === today2, done = ran ? r.symbols : [], due = dueForRerate(dir, today2);
+  const head2 = "   Monday's re-rating, of the holdings the desk sizes trades to";
+  if (!held) return ["", `${head2}: they are not known (the dashboard has not read Robinhood, and the person gave none), so nothing was re-rated. Say so at the end.`];
+  if (held.source === "robinhood" && !held.accounts?.some((a) => a.tradable)) return ["", `${head2}: the Agentic account is not among the accounts shown on the dashboard, so nothing was re-rated. Say so at the end.`];
+  if (!held.positions.length) return ["", `${head2}: nothing is held, so there is nothing to re-rate.`];
+  const out = [""], names = due.map((s) => s.symbol).join(", "), are = due.length === 1 ? "is" : "are";
+  if (done.length) out.push(`${head2}: ${done.map((s) => `${s.symbol} (${lastView(s)})`).join(", ")} ${done.length === 1 ? "was" : "were"} put on the waiting list at shallow depth, for a view under ${RERATE_DAYS} days old (at most ${RERATE_MAX} a Monday). ${done.length === 1 ? "It is" : "They are"} analysed in step 2 with the rest of the list.`);
+  else if (due.length && ran) out.push(`${head2}: ${names} ${are} due, but the waiting list is full, so nothing went on it. Say so at the end.`);
+  else if (due.length) out.push(`${head2}: ${names} ${are} due, but the re-rating could not put ${due.length === 1 ? "it" : "them"} on the waiting list today. Say so at the end.`);
+  else out.push(`${head2}: each has a view under ${RERATE_DAYS} days old, or is already on the waiting list. Nothing to re-rate.`);
+  if (done.length && due.length) out.push(`   Due as well, left for next Monday: ${due.map((s) => s.symbol).join(", ")}.`);
+  return out;
+}
 function morningBrief(dir, today2, max, look) {
   const day3 = weekday(today2), weekend = day3 === "Saturday" || day3 === "Sunday";
   const m2 = morningList(dir, today2, max, look?.screen ?? null);
   const lines = [`MORNING ROUTINE for ${day3} ${today2}.`];
   if (weekend) lines.push(`US markets do not open on a ${day3}: score past calls (step 1), then stop and say so. Analyse nothing unless the person asked for it in words.`);
   lines.push("", "1. Score past calls first: list_settlements, then record_outcome with a lesson for each READY call (the /settle playbook).");
+  if (day3 === "Monday") lines.push(...rerateLines(dir, today2));
   if (!weekend) lines.push(...lookLines(look, today2));
   if (m2.running) lines.push("", `   ${m2.running} is being analysed now by another run: leave it alone.`);
   if (!m2.analyse.length) lines.push("", "2. Nothing to analyse: no stock is waiting on the dashboard and no starred watchlist stock is without a call today. Say so.");
@@ -39168,12 +39248,12 @@ function morningBrief(dir, today2, max, look) {
   if (m2.calledToday.length) lines.push(`   Already called today, so not analysed again: ${m2.calledToday.join(", ")}.`);
   if (m2.analyse.some((a) => a.queued) || m2.later.length) lines.push("   Last, call end_queue_run once: stocks still waiting on the dashboard get another run.");
   lines.push("", `3. ${holdingsLine(dir)}`);
-  lines.push("", `4. Finish with a short plain list: each new call (stock, rating, one sentence of its executive summary), anything skipped and why, and any data that was unavailable. Then: decide on the dashboard ("Decide\u2026" on a call); only the person's own Confirm there places an order. Not investment advice.`);
+  lines.push("", `4. Finish with a short plain list: each new call (stock, rating, one sentence of its executive summary; for a re-rated holding, its new rating beside its last one), anything skipped and why, and any data that was unavailable. Then: decide on the dashboard ("Decide\u2026" on a call); only the person's own Confirm there places an order. A Sell or Underweight on a holding of the Agentic account shows there as "the desk says sell", with a Sell button that opens a ticket: nothing is ever sold by itself. Not investment advice.`);
   lines.push("", "No one may be watching: do not wait for an answer. If a step needs the person (for example no contact email is saved), skip what depends on it and say so at the end.");
   return lines.join("\n");
 }
 function eveningBrief(dir, today2, now) {
-  const calls = new Journal(path17.join(dir, "journal.md")).load();
+  const calls = new Journal(path18.join(dir, "journal.md")).load();
   const todays = calls.filter((e) => e.date === today2), pending = calls.filter((e) => e.pending).length;
   const orders = ordersOn(dir, now);
   const lines = [`EVENING WRAP-UP for ${weekday(today2)} ${today2}.`, "", "1. Score what is ready: list_settlements, then record_outcome with a lesson for each READY call (the /settle playbook).", ""];
@@ -39194,8 +39274,8 @@ function eveningBrief(dir, today2, now) {
 }
 
 // src/terminal/prefs.ts
-import fs15 from "node:fs";
-import path18 from "node:path";
+import fs16 from "node:fs";
+import path19 from "node:path";
 
 // src/desk/sectors.ts
 var SECTOR_FUNDS = {
@@ -39298,10 +39378,10 @@ function cleanPrefs(raw) {
   if (typeof r.morning === "boolean") out.morning = r.morning;
   return out;
 }
-var prefsFile = (dir) => path18.join(dir, "dashboard.json");
+var prefsFile = (dir) => path19.join(dir, "dashboard.json");
 function readPrefs(dir) {
   try {
-    return cleanPrefs(JSON.parse(fs15.readFileSync(prefsFile(dir), "utf8")));
+    return cleanPrefs(JSON.parse(fs16.readFileSync(prefsFile(dir), "utf8")));
   } catch {
     return {};
   }
@@ -39325,10 +39405,10 @@ async function act(run) {
 function registerDeskTools(server, root) {
   const dir = deskDataDir(root);
   const write = { readOnlyHint: false, openWorldHint: false };
-  const activeFile = path19.join(dir, "backtest", "active.json"), IDLE_MS = 2 * 36e5;
+  const activeFile = path20.join(dir, "backtest", "active.json"), IDLE_MS = 2 * 36e5;
   const getSweep = () => {
     try {
-      const a = JSON.parse(fs16.readFileSync(activeFile, "utf8"));
+      const a = JSON.parse(fs17.readFileSync(activeFile, "utf8"));
       if (typeof a.sweep === "string" && SWEEP_ID.test(a.sweep) && typeof a.at === "number" && Date.now() - a.at < IDLE_MS) return a.sweep;
     } catch {
     }
@@ -39336,10 +39416,10 @@ function registerDeskTools(server, root) {
   };
   const setSweep = (id) => {
     if (id === null) {
-      fs16.rmSync(activeFile, { force: true });
+      fs17.rmSync(activeFile, { force: true });
       return;
     }
-    fs16.mkdirSync(path19.dirname(activeFile), { recursive: true });
+    fs17.mkdirSync(path20.dirname(activeFile), { recursive: true });
     writeWhole(activeFile, JSON.stringify({ sweep: id, at: Date.now() }));
   };
   const ws = () => {
@@ -39438,10 +39518,10 @@ Rating: ${rating}`;
     if (!readContactEmail(root)) throw new NeedsEmail(ASK_FOR_EMAIL);
     const every = a.every_days ?? 7, dates = iterGrid(a.start_date, a.end_date, every), grid = cells(a.symbols, dates);
     const id = a.sweep_id ?? (/* @__PURE__ */ new Date()).toISOString().replace(/\D/g, "").slice(0, 14), w = workspaceOf(root, id);
-    fs16.mkdirSync(w.dir, { recursive: true });
+    fs17.mkdirSync(w.dir, { recursive: true });
     const recorded = new Set(journalOf(root, w).load().map((e) => `${e.ticker}|${e.date}`));
     const todo = grid.filter((c) => !recorded.has(`${c.symbol}|${c.date}`));
-    writeWhole(path19.join(w.dir, "sweep.json"), JSON.stringify({ symbols: [...new Set(grid.map((c) => c.symbol))], dates, every, cells: grid.length }));
+    writeWhole(path20.join(w.dir, "sweep.json"), JSON.stringify({ symbols: [...new Set(grid.map((c) => c.symbol))], dates, every, cells: grid.length }));
     setSweep(id);
     const symbols = new Set(grid.map((c) => c.symbol)).size;
     return [
@@ -39473,10 +39553,10 @@ Rating: ${rating}`;
     const id = a.sweep_id ?? getSweep();
     if (!id) throw new Error("no backtest is running: name the sweep to score");
     const w = workspaceOf(root, id);
-    if (!fs16.existsSync(path19.join(w.dir, "journal.md"))) throw new Error(`sweep ${id} has no recorded calls yet`);
+    if (!fs17.existsSync(path20.join(w.dir, "journal.md"))) throw new Error(`sweep ${id} has no recorded calls yet`);
     let meta3 = "";
     try {
-      const m2 = JSON.parse(fs16.readFileSync(path19.join(w.dir, "sweep.json"), "utf8"));
+      const m2 = JSON.parse(fs17.readFileSync(path20.join(w.dir, "sweep.json"), "utf8"));
       meta3 = ` of ${m2.cells} planned`;
     } catch {
     }
@@ -39487,7 +39567,7 @@ ${renderSummary(summarize(entries))}`;
   }));
   server.registerTool("routine_brief", {
     title: "Today's routine",
-    description: `What the morning routine should do today (score past calls; "Worth a look today", the same list the dashboard shows, worked out from prices if it was not this hour; then the stocks to analyse in order, within the person's limit) or what the evening wrap-up has to report (today's calls, the orders the dashboard sent and Robinhood's answer, what is still to be scored). It changes nothing but this: with the person's switch "Analyse the top three each market morning" on, the top three of the list go on the waiting list at shallow depth, once a market day. Call it first when asked to run the morning routine or the evening wrap-up.`,
+    description: `What the morning routine should do today (score past calls; on a Monday, re-rate the holdings whose view is a week old; "Worth a look today", the same list the dashboard shows, worked out from prices if it was not this hour; then the stocks to analyse in order, within the person's limit) or what the evening wrap-up has to report (today's calls, the orders the dashboard sent and Robinhood's answer, what is still to be scored). It changes nothing but the waiting list: on a Monday, up to three holdings with no view or one a week old or more go on it at shallow depth, once that Monday; and with the person's switch "Analyse the top three each market morning" on, the top three of the list go on it at shallow depth, once a market day. Call it first when asked to run the morning routine or the evening wrap-up.`,
     inputSchema: { kind: external_exports.enum(["morning", "evening"]).describe("morning: before the open; evening: after the close") },
     annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: true }
   }, async (a) => act(async () => {
@@ -39496,6 +39576,10 @@ ${renderSummary(summarize(entries))}`;
     const on = readPrefs(dir).morning === true, weekday2 = ![0, 6].includes((/* @__PURE__ */ new Date(`${day3}T12:00:00Z`)).getUTCDay());
     let look;
     if (weekday2) {
+      try {
+        rerateWeekly(dir, day3);
+      } catch {
+      }
       try {
         const { symbols, news } = screenUniverse(readWatchlist(dir), marketOf(dir));
         const worked = await screenToday(dir, symbols, news, day3);
@@ -39514,7 +39598,7 @@ ${renderSummary(summarize(entries))}`;
   }, async () => act(() => openDashboard(root)));
   const perRun = () => readSettings(root).routines.maxAnalyses;
   const depthWords = (d) => d ? `${d} (debate_rounds ${DEPTHS[d]} and risk_rounds ${DEPTHS[d]})` : "the settings' depth (leave the rounds out)";
-  const called = (sym2, d) => new Journal(path19.join(dir, "journal.md")).load().find((e) => e.ticker === sym2 && e.date === d);
+  const called = (sym2, d) => new Journal(path20.join(dir, "journal.md")).load().find((e) => e.ticker === sym2 && e.date === d);
   const queueAct = (run) => act(() => {
     try {
       return run();
@@ -39747,6 +39831,6 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root) {
 // src/tools/main.ts
 if (process.argv.includes("--check")) console.log(await deskCheck());
 else {
-  configure({ spacingMs: 250, cacheDir: path20.join(deskDataDir(process.cwd()), "cache") });
+  configure({ spacingMs: 250, cacheDir: path21.join(deskDataDir(process.cwd()), "cache") });
   await deskServer().connect(new StdioServerTransport());
 }

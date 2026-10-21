@@ -41,6 +41,9 @@ export const WORDS = {
   fund: 'A fund: a basket of many companies (or bonds) bought as one share.',
   paper: 'On paper: followed with pretend money only. Robinhood\'s agent doorway trades stocks and funds, so a coin never gets an order ticket.',
   noTicket: 'No order ticket: Robinhood\'s agent doorway trades stocks and funds, and among crypto the desk follows only Bitcoin and Ether on paper.',
+  stop: "Stop: the price under which the desk's trader proposed selling, to limit a loss. The dashboard watches it against Yahoo Finance's price and tells you when the price falls below it. Nothing is ever sold by itself.",
+  noView: "No view yet: the desk has not analysed it. Ask it to (the robot); in the Agentic account, Monday's morning routine rates it.",
+  rerating: "Re-rating: it is on the waiting list, so the desk analyses it again and its view is fresh. Monday's morning routine re-rates the Agentic account's holdings whose view is a week old.",
 } as const;
 
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

@@ -20554,141 +20554,6 @@ function saveAccountHoldings(dir, accounts, today2) {
   return { saved, leftOut };
 }
 
-// src/data/sec.ts
-var DAY_MS = 864e5;
-var cache2 = /* @__PURE__ */ new Map();
-function cached2(url2, timeoutMs) {
-  const hit = cache2.get(url2);
-  if (hit && Date.now() - hit.at < DAY_MS) return hit.value;
-  const value = getJson(url2, { timeoutMs });
-  cache2.set(url2, { at: Date.now(), value });
-  value.catch(() => cache2.delete(url2));
-  return value;
-}
-async function cikFor(symbol) {
-  const table = await cached2("https://www.sec.gov/files/company_tickers.json", 3e4);
-  const hit = Object.values(table).find((e) => e.ticker?.toUpperCase() === symbol.toUpperCase());
-  return hit ? String(hit.cik_str).padStart(10, "0") : null;
-}
-var submissions = (cik) => cached2(`https://data.sec.gov/submissions/CIK${cik}.json`, 3e4);
-function sectorOfSic(raw) {
-  const c = Number(raw);
-  if (!Number.isInteger(c) || c < 100) return null;
-  const in_ = (lo, hi) => c >= lo && c <= hi;
-  if (in_(100, 999)) return "Consumer Defensive";
-  if (in_(1e3, 1099) || in_(1400, 1499)) return "Basic Materials";
-  if (in_(1200, 1399)) return "Energy";
-  if (in_(1500, 1799)) return "Industrials";
-  if (in_(2e3, 2199)) return "Consumer Defensive";
-  if (in_(2200, 2399) || in_(2500, 2599)) return "Consumer Cyclical";
-  if (in_(2400, 2499) || in_(2600, 2699)) return "Basic Materials";
-  if (in_(2700, 2799)) return "Communication Services";
-  if (in_(2830, 2836)) return "Healthcare";
-  if (in_(2840, 2844)) return "Consumer Defensive";
-  if (in_(2800, 2899)) return "Basic Materials";
-  if (in_(2900, 2999)) return "Energy";
-  if (in_(3e3, 3099) || in_(3200, 3399)) return "Basic Materials";
-  if (in_(3100, 3199) || in_(3630, 3639) || in_(3710, 3716) || in_(3750, 3751) || in_(3900, 3999)) return "Consumer Cyclical";
-  if (in_(3570, 3579) || in_(3660, 3679)) return "Technology";
-  if (in_(3840, 3851)) return "Healthcare";
-  if (in_(3800, 3899)) return "Technology";
-  if (in_(3400, 3799)) return "Industrials";
-  if (in_(4e3, 4799)) return "Industrials";
-  if (in_(4800, 4899)) return "Communication Services";
-  if (in_(4950, 4959)) return "Industrials";
-  if (in_(4900, 4999)) return "Utilities";
-  if (c === 5122 || c === 5047) return "Healthcare";
-  if (in_(5140, 5149) || in_(5400, 5499) || c === 5331 || c === 5912) return "Consumer Defensive";
-  if (in_(5e3, 5199)) return "Industrials";
-  if (in_(5200, 5999)) return "Consumer Cyclical";
-  if (c === 6798 || in_(6500, 6599)) return "Real Estate";
-  if (in_(6e3, 6799)) return "Financial Services";
-  if (in_(7e3, 7299) || in_(7500, 7599) || in_(7900, 7999)) return "Consumer Cyclical";
-  if (in_(7310, 7319) || in_(7800, 7899)) return "Communication Services";
-  if (in_(7370, 7379)) return "Technology";
-  if (in_(7300, 7399)) return "Industrials";
-  if (in_(8e3, 8099)) return "Healthcare";
-  if (in_(8200, 8299)) return "Consumer Defensive";
-  if (in_(7600, 8999)) return "Industrials";
-  return null;
-}
-async function fundTickers() {
-  const t2 = await cached2("https://www.sec.gov/files/company_tickers_mf.json", 3e4);
-  const at = t2.fields?.indexOf("symbol") ?? 3;
-  return new Set((t2.data ?? []).map((r) => String(r[at] ?? "").toUpperCase()).filter(Boolean));
-}
-
-// src/data/company.ts
-function companySymbol(raw) {
-  const sym2 = normalizeSymbol(raw);
-  if (cryptoBase(raw) || /[\^=]/.test(sym2)) throw new NoData(`${sym2} is not a company: a crypto asset, index, future or currency pair has no company accounts`);
-  return sym2;
-}
-async function profileSector(raw) {
-  const sym2 = companySymbol(raw);
-  if ((await fundTickers()).has(sym2)) return { sector: null, fund: true };
-  const cik = await cikFor(sym2);
-  return { sector: cik ? sectorOfSic((await submissions(cik)).sic) : null, fund: false };
-}
-
-// src/desk/sectors.ts
-var SECTOR_FUNDS = {
-  XLK: "Technology",
-  XLF: "Financial Services",
-  XLV: "Healthcare",
-  XLE: "Energy",
-  XLI: "Industrials",
-  XLY: "Consumer Cyclical",
-  XLP: "Consumer Defensive",
-  XLU: "Utilities",
-  XLB: "Basic Materials",
-  XLRE: "Real Estate",
-  XLC: "Communication Services"
-};
-var MARKET_FUNDS = /* @__PURE__ */ new Set(["SPY", "VOO", "IVV", "VTI", "ITOT", "SCHB", "QQQ", "DIA", "IWM", "VT", "VXUS", "VEA", "VWO", "EFA", "BND", "AGG"]);
-var ownGroup = (symbol) => ({ name: `own:${symbol}`, label: `${symbol}, whose sector is not known, counted on its own` });
-var Sectors = class {
-  constructor(lookup = profileSector) {
-    this.lookup = lookup;
-  }
-  lookup;
-  known = /* @__PURE__ */ new Map();
-  /** The group of a symbol, if it was looked up already (for a check that must not wait). */
-  cached(symbol) {
-    return this.known.get(symbol);
-  }
-  async of(symbol) {
-    const hit = this.known.get(symbol);
-    if (hit) return hit;
-    let g;
-    if (MARKET_FUNDS.has(symbol)) g = { name: null, label: "a whole-market fund" };
-    else if (SECTOR_FUNDS[symbol]) g = { name: SECTOR_FUNDS[symbol], label: SECTOR_FUNDS[symbol] };
-    else if (isCrypto(symbol)) g = { name: "Crypto", label: "Crypto" };
-    else {
-      try {
-        const p = await this.lookup(symbol);
-        g = !p.fund && p.sector ? { name: p.sector, label: p.sector } : ownGroup(symbol);
-      } catch {
-        return ownGroup(symbol);
-      }
-    }
-    this.known.set(symbol, g);
-    return g;
-  }
-  /** Looks up every symbol at once, so a later sync check finds them all. */
-  async warm(symbols) {
-    await Promise.all([...new Set(symbols)].map((s) => this.of(s)));
-  }
-  /** The sector a buy of `symbol` falls in, and how much the account already holds in it, from what is held now. A
-   *  symbol not looked up yet counts on its own. */
-  context(symbol, positions) {
-    const g = this.known.get(symbol) ?? ownGroup(symbol);
-    const same = (s) => (this.known.get(s) ?? ownGroup(s)).name === g.name;
-    const heldUsd = g.name === null ? 0 : positions.filter((p) => same(p.symbol)).reduce((a, p) => a + p.quantity * (p.price ?? 0), 0);
-    return { ...g, heldUsd: Math.round(heldUsd * 100) / 100 };
-  }
-};
-
 // src/desk/journal.ts
 import fs11 from "node:fs";
 import path10 from "node:path";
@@ -20851,102 +20716,9 @@ ${e.reflection || e.decision.slice(0, 300) + (e.decision.length > 300 ? "..." : 
   }
 };
 
-// src/terminal/state.ts
-import fs16 from "node:fs";
-import path15 from "node:path";
-
-// src/desk/runs.ts
+// src/desk/queue.ts
 import fs12 from "node:fs";
 import path11 from "node:path";
-var SECTIONS = ["market", "sentiment", "news", "fundamentals", "bull", "bear", "research_plan", "trader", "aggressive", "conservative", "neutral", "decision"];
-var DEBATES = { investment_debate: ["bull", "bear"], risk_debate: ["aggressive", "conservative", "neutral"] };
-var TURNS = new Set(Object.values(DEBATES).flat());
-var folder = (dir, ticker, date4) => path11.join(dir, "runs", `${safeSymbol(ticker).replace(/\^/g, "IDX_").replace(/=/g, "_EQ_")}_${date4}`);
-var runFile = (dir, ticker, date4) => path11.join(folder(dir, ticker, date4), "run.json");
-function load(dir, ticker, date4) {
-  try {
-    return JSON.parse(fs12.readFileSync(runFile(dir, ticker, date4), "utf8"));
-  } catch {
-    return { ticker: safeSymbol(ticker), date: date4, startedAt: (/* @__PURE__ */ new Date()).toISOString(), log: [] };
-  }
-}
-var isSection = (s) => SECTIONS.includes(s);
-function progress(dir, ticker, date4) {
-  const out = {};
-  for (const e of load(dir, ticker, date4).log) out[e.section] = (out[e.section] ?? 0) + 1;
-  return out;
-}
-var savedPlan = (dir, ticker, date4) => load(dir, ticker, date4).plan;
-function stepWords(dir, ticker, date4) {
-  const plan = savedPlan(dir, ticker, date4);
-  const steps = Array.isArray(plan?.steps) ? plan.steps.filter((s) => isSection(String(s.section)) && Number.isInteger(s.turn)) : [];
-  if (!steps.length) return "starting";
-  const done = progress(dir, ticker, date4), next = steps.find((s) => (done[s.section] ?? 0) < s.turn);
-  if (!next) return "recording the call";
-  const analysts = steps.filter((s) => ["market", "sentiment", "news", "fundamentals"].includes(s.section));
-  const of = (n) => Number.isInteger(n) ? ` of ${n}` : "";
-  switch (next.section) {
-    case "market":
-    case "sentiment":
-    case "news":
-    case "fundamentals":
-      return `analysts reading: ${analysts.filter((s) => (done[s.section] ?? 0) >= 1).length} of ${analysts.length} done`;
-    case "bull":
-    case "bear":
-      return `debate round ${next.turn}${of(plan?.debateRounds)}`;
-    case "research_plan":
-      return "the research manager is weighing the debate";
-    case "trader":
-      return "the trader is drafting the plan";
-    case "aggressive":
-    case "conservative":
-    case "neutral":
-      return `risk round ${next.turn}${of(plan?.riskRounds)}`;
-    default:
-      return "the portfolio manager is deciding";
-  }
-}
-function sectionsOf(dir, ticker, date4) {
-  const out = {};
-  for (const e of load(dir, ticker, date4).log) (out[e.section] ??= []).push(e.text);
-  return out;
-}
-var hasReport = (dir, ticker, date4) => fs12.existsSync(path11.join(folder(dir, ticker, date4), "complete_report.md"));
-
-// src/desk/backtest.ts
-var DIRECTION = { Buy: 1, Overweight: 1, Hold: 0, Underweight: -1, Sell: -1 };
-var alphaOf = (e) => {
-  const t2 = (e.alpha ?? "").trim().replace(/%$/, "");
-  const v = /^[+-]?\d+(\.\d+)?$/.test(t2) ? Number(t2) : NaN;
-  return Number.isFinite(v) ? v / 100 : null;
-};
-function summarize(entries) {
-  const resolved = entries.filter((e) => !e.pending && e.rating !== REVIEW2).map((e) => ({ e, a: alphaOf(e) })).filter((x) => x.a !== null);
-  const byRating = {};
-  for (const rating of new Set(resolved.map((x) => x.e.rating))) {
-    const alphas = resolved.filter((x) => x.e.rating === rating).map((x) => x.a), dir = DIRECTION[rating] ?? 0;
-    byRating[rating] = { count: alphas.length, hitRate: dir ? alphas.filter((a) => a * dir > 0).length / alphas.length : null, meanAlpha: alphas.reduce((s, a) => s + a, 0) / alphas.length };
-  }
-  const unscored = entries.filter((e) => e.rating === REVIEW2).length;
-  const windows = [...new Set(resolved.map((x) => x.e.holding).filter((h) => !!h && h.endsWith("d")).map((h) => `${h.slice(0, -1)} trading days`))].sort();
-  return { resolved: resolved.length, pending: entries.length - resolved.length - unscored, unscored, byRating, holding: windows.join(", ") || "the configured window" };
-}
-var pctText = (v) => `${v >= 0 ? "+" : "-"}${(Math.abs(v) * 100).toFixed(2)}%`;
-function renderSummary(s) {
-  const lines = [`Resolved cells: ${s.resolved} \xB7 pending: ${s.pending}${s.unscored ? ` \xB7 unscored: ${s.unscored}` : ""}`];
-  for (const [rating, sc] of Object.entries(s.byRating)) {
-    lines.push(`- ${rating}: n=${sc.count}, ${sc.hitRate !== null ? `called the direction ${Math.round(sc.hitRate * 100)}%` : "no direction claimed"}, mean alpha ${pctText(sc.meanAlpha)} vs the benchmark`);
-  }
-  lines.push("");
-  if (s.pending) lines.push("Pending cells are not scored above; settle them when their window has traded.");
-  if (s.unscored) lines.push("Unscored cells had no readable rating (Needs review): they count neither for nor against the desk.");
-  lines.push(`Alpha is measured over ${s.holding} after each analysis date. One model sampling per cell, and text feeds are not archived, so these figures are indicative rather than repeatable. A handful of cells proves nothing: a hit rate over fewer than about 30 calls per rating is noise.`);
-  return lines.join("\n");
-}
-
-// src/desk/queue.ts
-import fs13 from "node:fs";
-import path12 from "node:path";
 var DEPTHS = { shallow: 1, medium: 3, deep: 5 };
 var isDepth = (v) => typeof v === "string" && Object.hasOwn(DEPTHS, v);
 var depthOfRounds = (rounds) => rounds >= 5 ? "deep" : rounds >= 3 ? "medium" : "shallow";
@@ -20961,9 +20733,9 @@ var QueueRefusal = class extends Error {
   }
   code;
 };
-var queueFile = (dir) => path12.join(dir, "queue.json");
-var doorbellFile = (dir) => path12.join(dir, "doorbell.json");
-var listenerFile = (dir) => path12.join(dir, "listener.json");
+var queueFile = (dir) => path11.join(dir, "queue.json");
+var doorbellFile = (dir) => path11.join(dir, "doorbell.json");
+var listenerFile = (dir) => path11.join(dir, "listener.json");
 var iso = (v) => typeof v === "string" && v.length <= 40 && !Number.isNaN(Date.parse(v)) ? v : void 0;
 var day = (v) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : void 0;
 var words2 = (v, max) => {
@@ -21001,10 +20773,10 @@ function settled(item, now, note) {
   }
   return now.getTime() - started > STALE_MS2 ? { ...item, state: "failed", reason: STALE_REASON, endedAt: now.toISOString() } : item;
 }
-function load2(dir, now) {
+function load(dir, now) {
   let raw = [];
   try {
-    raw = JSON.parse(fs13.readFileSync(queueFile(dir), "utf8"));
+    raw = JSON.parse(fs12.readFileSync(queueFile(dir), "utf8"));
   } catch {
   }
   const seen = /* @__PURE__ */ new Set(), out = [], note = readListener(dir, now);
@@ -21024,14 +20796,14 @@ function trimmed(list2) {
 }
 function change(dir, now, edit) {
   const file4 = queueFile(dir);
-  fs13.mkdirSync(dir, { recursive: true });
+  fs12.mkdirSync(dir, { recursive: true });
   return withLock(file4, () => {
-    const { list: list2, result } = edit(load2(dir, now));
+    const { list: list2, result } = edit(load(dir, now));
     writeWhole(file4, JSON.stringify(trimmed(list2), null, 2) + "\n");
     return result;
   });
 }
-var readQueue = (dir, now = /* @__PURE__ */ new Date()) => load2(dir, now);
+var readQueue = (dir, now = /* @__PURE__ */ new Date()) => load(dir, now);
 var waitingIn = (list2) => list2.filter((i) => i.state === "waiting");
 function enqueue(dir, raw, at, depth, now = /* @__PURE__ */ new Date()) {
   const symbol = safeSymbol(raw);
@@ -21058,14 +20830,14 @@ function dequeue(dir, raw, now = /* @__PURE__ */ new Date()) {
 }
 function ringDoorbell(dir, why, now = /* @__PURE__ */ new Date()) {
   const bell = { at: now.toISOString(), waiting: waitingIn(readQueue(dir, now)).length, why };
-  fs13.mkdirSync(dir, { recursive: true });
+  fs12.mkdirSync(dir, { recursive: true });
   writeWhole(doorbellFile(dir), JSON.stringify(bell, null, 2) + "\n");
   return bell;
 }
 var LISTENER_FRESH_MS = 3 * 6e4;
 function readListener(dir, now = /* @__PURE__ */ new Date()) {
   try {
-    const v = JSON.parse(fs13.readFileSync(listenerFile(dir), "utf8"));
+    const v = JSON.parse(fs12.readFileSync(listenerFile(dir), "utf8"));
     const listener = words2(v.listener ?? v.listening, 40), since = iso(v.since), beat = iso(v.beat) ?? iso(v.checked) ?? since;
     if (!listener || !since || !beat) return null;
     const note = { listener, since, beat, fresh: now.getTime() - Date.parse(beat) <= LISTENER_FRESH_MS };
@@ -21086,7 +20858,300 @@ function readListener(dir, now = /* @__PURE__ */ new Date()) {
 }
 function removeListener(dir, pid) {
   if (pid !== void 0 && readListener(dir)?.pid !== pid) return;
-  fs13.rmSync(listenerFile(dir), { force: true });
+  fs12.rmSync(listenerFile(dir), { force: true });
+}
+
+// src/desk/runs.ts
+import fs13 from "node:fs";
+import path12 from "node:path";
+var SECTIONS = ["market", "sentiment", "news", "fundamentals", "bull", "bear", "research_plan", "trader", "aggressive", "conservative", "neutral", "decision"];
+var DEBATES = { investment_debate: ["bull", "bear"], risk_debate: ["aggressive", "conservative", "neutral"] };
+var TURNS = new Set(Object.values(DEBATES).flat());
+var folder = (dir, ticker, date4) => path12.join(dir, "runs", `${safeSymbol(ticker).replace(/\^/g, "IDX_").replace(/=/g, "_EQ_")}_${date4}`);
+var runFile = (dir, ticker, date4) => path12.join(folder(dir, ticker, date4), "run.json");
+function load2(dir, ticker, date4) {
+  try {
+    return JSON.parse(fs13.readFileSync(runFile(dir, ticker, date4), "utf8"));
+  } catch {
+    return { ticker: safeSymbol(ticker), date: date4, startedAt: (/* @__PURE__ */ new Date()).toISOString(), log: [] };
+  }
+}
+var isSection = (s) => SECTIONS.includes(s);
+function progress(dir, ticker, date4) {
+  const out = {};
+  for (const e of load2(dir, ticker, date4).log) out[e.section] = (out[e.section] ?? 0) + 1;
+  return out;
+}
+var savedPlan = (dir, ticker, date4) => load2(dir, ticker, date4).plan;
+function stepWords(dir, ticker, date4) {
+  const plan = savedPlan(dir, ticker, date4);
+  const steps = Array.isArray(plan?.steps) ? plan.steps.filter((s) => isSection(String(s.section)) && Number.isInteger(s.turn)) : [];
+  if (!steps.length) return "starting";
+  const done = progress(dir, ticker, date4), next = steps.find((s) => (done[s.section] ?? 0) < s.turn);
+  if (!next) return "recording the call";
+  const analysts = steps.filter((s) => ["market", "sentiment", "news", "fundamentals"].includes(s.section));
+  const of = (n) => Number.isInteger(n) ? ` of ${n}` : "";
+  switch (next.section) {
+    case "market":
+    case "sentiment":
+    case "news":
+    case "fundamentals":
+      return `analysts reading: ${analysts.filter((s) => (done[s.section] ?? 0) >= 1).length} of ${analysts.length} done`;
+    case "bull":
+    case "bear":
+      return `debate round ${next.turn}${of(plan?.debateRounds)}`;
+    case "research_plan":
+      return "the research manager is weighing the debate";
+    case "trader":
+      return "the trader is drafting the plan";
+    case "aggressive":
+    case "conservative":
+    case "neutral":
+      return `risk round ${next.turn}${of(plan?.riskRounds)}`;
+    default:
+      return "the portfolio manager is deciding";
+  }
+}
+function sectionsOf(dir, ticker, date4) {
+  const out = {};
+  for (const e of load2(dir, ticker, date4).log) (out[e.section] ??= []).push(e.text);
+  return out;
+}
+var hasReport = (dir, ticker, date4) => fs13.existsSync(path12.join(folder(dir, ticker, date4), "complete_report.md"));
+
+// src/desk/care.ts
+var RERATE_DAYS = 7;
+var agoWords = (days) => days <= 0 ? "today" : days === 1 ? "yesterday" : `${days} days ago`;
+function viewOf(calls, symbol, today2) {
+  let latest = null;
+  for (const c of calls) if (c.ticker === symbol && (!latest || c.date >= latest.date)) latest = c;
+  if (!latest) return null;
+  const days = Math.max(0, daysBetween(latest.date, today2));
+  return { rating: latest.rating, date: latest.date, days, ago: agoWords(days) };
+}
+var isStale = (v) => !v || v.days >= RERATE_DAYS;
+var saysSell = (rating) => rating === "Sell" || rating === "Underweight";
+var deskSymbol = (symbol, kind) => kind === "crypto" ? normalizeSymbol(/USD/i.test(symbol) ? symbol : `${symbol}-USD`) : symbol;
+function stopOf(text2) {
+  const m = /\*\*Stop[ -]?Loss:?\*\*:?[ \t]*([^\n]*)/i.exec(text2);
+  if (!m) return null;
+  const words4 = m[1].replace(/\*\*/g, "").replace(/`/g, "").trim().slice(0, 200);
+  const n = /^(?:US)?\$?\s*(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?/.exec(words4);
+  if (!n) return { level: null, words: words4 };
+  const rest = words4.slice(n[0].length).trim();
+  if (/^(?:[%×*+/=−]|[-–]\s*\d|x\s*\d|x\s|times\b|atr\b)/i.test(rest)) return { level: null, words: words4 };
+  const level = Number(`${n[1].replace(/,/g, "")}${n[2] ?? ""}`);
+  return Number.isFinite(level) && level > 0 && level < 1e7 ? { level, words: words4 } : { level: null, words: words4 };
+}
+function stopIn(dir, ticker, date4) {
+  try {
+    const t2 = sectionsOf(dir, ticker, date4).trader?.at(-1);
+    return t2 ? stopOf(t2) : null;
+  } catch {
+    return null;
+  }
+}
+function careOf(o) {
+  const open4 = new Map(o.queue.filter((q) => q.state === "waiting" || q.state === "running").map((q) => [q.symbol, q.state]));
+  return o.views.flatMap((v) => v.holdings.map((h) => {
+    const desk = deskSymbol(h.symbol, h.kind), view = viewOf(o.calls, desk, o.today), agentic = v.account.agentic;
+    const stop = agentic && view ? o.stop(desk, view.date) : null;
+    let sell = null;
+    if (agentic && view && saysSell(view.rating)) {
+      const b = o.bought(desk);
+      sell = { action: actionOf(view.rating, o.trading), ticket: o.ticketable(desk), early: b && b.heldDays < o.caps.minHoldDays ? { ...b, minHoldDays: o.caps.minHoldDays } : null };
+    }
+    return {
+      account: v.account.key,
+      agentic,
+      symbol: h.symbol,
+      desk,
+      view,
+      stale: isStale(view),
+      rerating: open4.get(desk) ?? null,
+      stop: stop && view ? { ...stop, date: view.date } : null,
+      price: null,
+      below: false,
+      sell
+    };
+  }));
+}
+var toWatch = (care) => [...new Set(care.filter((c) => c.agentic && c.stop?.level != null).map((c) => c.desk))];
+function watched(care, prices) {
+  return care.map((c) => {
+    const level = c.agentic ? c.stop?.level ?? null : null, p = level === null ? void 0 : prices.get(c.desk);
+    return p && level !== null ? { ...c, price: p, below: p.value < level } : c;
+  });
+}
+
+// src/data/sec.ts
+var DAY_MS = 864e5;
+var cache2 = /* @__PURE__ */ new Map();
+function cached2(url2, timeoutMs) {
+  const hit = cache2.get(url2);
+  if (hit && Date.now() - hit.at < DAY_MS) return hit.value;
+  const value = getJson(url2, { timeoutMs });
+  cache2.set(url2, { at: Date.now(), value });
+  value.catch(() => cache2.delete(url2));
+  return value;
+}
+async function cikFor(symbol) {
+  const table = await cached2("https://www.sec.gov/files/company_tickers.json", 3e4);
+  const hit = Object.values(table).find((e) => e.ticker?.toUpperCase() === symbol.toUpperCase());
+  return hit ? String(hit.cik_str).padStart(10, "0") : null;
+}
+var submissions = (cik) => cached2(`https://data.sec.gov/submissions/CIK${cik}.json`, 3e4);
+function sectorOfSic(raw) {
+  const c = Number(raw);
+  if (!Number.isInteger(c) || c < 100) return null;
+  const in_ = (lo, hi) => c >= lo && c <= hi;
+  if (in_(100, 999)) return "Consumer Defensive";
+  if (in_(1e3, 1099) || in_(1400, 1499)) return "Basic Materials";
+  if (in_(1200, 1399)) return "Energy";
+  if (in_(1500, 1799)) return "Industrials";
+  if (in_(2e3, 2199)) return "Consumer Defensive";
+  if (in_(2200, 2399) || in_(2500, 2599)) return "Consumer Cyclical";
+  if (in_(2400, 2499) || in_(2600, 2699)) return "Basic Materials";
+  if (in_(2700, 2799)) return "Communication Services";
+  if (in_(2830, 2836)) return "Healthcare";
+  if (in_(2840, 2844)) return "Consumer Defensive";
+  if (in_(2800, 2899)) return "Basic Materials";
+  if (in_(2900, 2999)) return "Energy";
+  if (in_(3e3, 3099) || in_(3200, 3399)) return "Basic Materials";
+  if (in_(3100, 3199) || in_(3630, 3639) || in_(3710, 3716) || in_(3750, 3751) || in_(3900, 3999)) return "Consumer Cyclical";
+  if (in_(3570, 3579) || in_(3660, 3679)) return "Technology";
+  if (in_(3840, 3851)) return "Healthcare";
+  if (in_(3800, 3899)) return "Technology";
+  if (in_(3400, 3799)) return "Industrials";
+  if (in_(4e3, 4799)) return "Industrials";
+  if (in_(4800, 4899)) return "Communication Services";
+  if (in_(4950, 4959)) return "Industrials";
+  if (in_(4900, 4999)) return "Utilities";
+  if (c === 5122 || c === 5047) return "Healthcare";
+  if (in_(5140, 5149) || in_(5400, 5499) || c === 5331 || c === 5912) return "Consumer Defensive";
+  if (in_(5e3, 5199)) return "Industrials";
+  if (in_(5200, 5999)) return "Consumer Cyclical";
+  if (c === 6798 || in_(6500, 6599)) return "Real Estate";
+  if (in_(6e3, 6799)) return "Financial Services";
+  if (in_(7e3, 7299) || in_(7500, 7599) || in_(7900, 7999)) return "Consumer Cyclical";
+  if (in_(7310, 7319) || in_(7800, 7899)) return "Communication Services";
+  if (in_(7370, 7379)) return "Technology";
+  if (in_(7300, 7399)) return "Industrials";
+  if (in_(8e3, 8099)) return "Healthcare";
+  if (in_(8200, 8299)) return "Consumer Defensive";
+  if (in_(7600, 8999)) return "Industrials";
+  return null;
+}
+async function fundTickers() {
+  const t2 = await cached2("https://www.sec.gov/files/company_tickers_mf.json", 3e4);
+  const at = t2.fields?.indexOf("symbol") ?? 3;
+  return new Set((t2.data ?? []).map((r) => String(r[at] ?? "").toUpperCase()).filter(Boolean));
+}
+
+// src/data/company.ts
+function companySymbol(raw) {
+  const sym2 = normalizeSymbol(raw);
+  if (cryptoBase(raw) || /[\^=]/.test(sym2)) throw new NoData(`${sym2} is not a company: a crypto asset, index, future or currency pair has no company accounts`);
+  return sym2;
+}
+async function profileSector(raw) {
+  const sym2 = companySymbol(raw);
+  if ((await fundTickers()).has(sym2)) return { sector: null, fund: true };
+  const cik = await cikFor(sym2);
+  return { sector: cik ? sectorOfSic((await submissions(cik)).sic) : null, fund: false };
+}
+
+// src/desk/sectors.ts
+var SECTOR_FUNDS = {
+  XLK: "Technology",
+  XLF: "Financial Services",
+  XLV: "Healthcare",
+  XLE: "Energy",
+  XLI: "Industrials",
+  XLY: "Consumer Cyclical",
+  XLP: "Consumer Defensive",
+  XLU: "Utilities",
+  XLB: "Basic Materials",
+  XLRE: "Real Estate",
+  XLC: "Communication Services"
+};
+var MARKET_FUNDS = /* @__PURE__ */ new Set(["SPY", "VOO", "IVV", "VTI", "ITOT", "SCHB", "QQQ", "DIA", "IWM", "VT", "VXUS", "VEA", "VWO", "EFA", "BND", "AGG"]);
+var ownGroup = (symbol) => ({ name: `own:${symbol}`, label: `${symbol}, whose sector is not known, counted on its own` });
+var Sectors = class {
+  constructor(lookup = profileSector) {
+    this.lookup = lookup;
+  }
+  lookup;
+  known = /* @__PURE__ */ new Map();
+  /** The group of a symbol, if it was looked up already (for a check that must not wait). */
+  cached(symbol) {
+    return this.known.get(symbol);
+  }
+  async of(symbol) {
+    const hit = this.known.get(symbol);
+    if (hit) return hit;
+    let g;
+    if (MARKET_FUNDS.has(symbol)) g = { name: null, label: "a whole-market fund" };
+    else if (SECTOR_FUNDS[symbol]) g = { name: SECTOR_FUNDS[symbol], label: SECTOR_FUNDS[symbol] };
+    else if (isCrypto(symbol)) g = { name: "Crypto", label: "Crypto" };
+    else {
+      try {
+        const p = await this.lookup(symbol);
+        g = !p.fund && p.sector ? { name: p.sector, label: p.sector } : ownGroup(symbol);
+      } catch {
+        return ownGroup(symbol);
+      }
+    }
+    this.known.set(symbol, g);
+    return g;
+  }
+  /** Looks up every symbol at once, so a later sync check finds them all. */
+  async warm(symbols) {
+    await Promise.all([...new Set(symbols)].map((s) => this.of(s)));
+  }
+  /** The sector a buy of `symbol` falls in, and how much the account already holds in it, from what is held now. A
+   *  symbol not looked up yet counts on its own. */
+  context(symbol, positions) {
+    const g = this.known.get(symbol) ?? ownGroup(symbol);
+    const same = (s) => (this.known.get(s) ?? ownGroup(s)).name === g.name;
+    const heldUsd = g.name === null ? 0 : positions.filter((p) => same(p.symbol)).reduce((a, p) => a + p.quantity * (p.price ?? 0), 0);
+    return { ...g, heldUsd: Math.round(heldUsd * 100) / 100 };
+  }
+};
+
+// src/terminal/state.ts
+import fs16 from "node:fs";
+import path15 from "node:path";
+
+// src/desk/backtest.ts
+var DIRECTION = { Buy: 1, Overweight: 1, Hold: 0, Underweight: -1, Sell: -1 };
+var alphaOf = (e) => {
+  const t2 = (e.alpha ?? "").trim().replace(/%$/, "");
+  const v = /^[+-]?\d+(\.\d+)?$/.test(t2) ? Number(t2) : NaN;
+  return Number.isFinite(v) ? v / 100 : null;
+};
+function summarize(entries) {
+  const resolved = entries.filter((e) => !e.pending && e.rating !== REVIEW2).map((e) => ({ e, a: alphaOf(e) })).filter((x) => x.a !== null);
+  const byRating = {};
+  for (const rating of new Set(resolved.map((x) => x.e.rating))) {
+    const alphas = resolved.filter((x) => x.e.rating === rating).map((x) => x.a), dir = DIRECTION[rating] ?? 0;
+    byRating[rating] = { count: alphas.length, hitRate: dir ? alphas.filter((a) => a * dir > 0).length / alphas.length : null, meanAlpha: alphas.reduce((s, a) => s + a, 0) / alphas.length };
+  }
+  const unscored = entries.filter((e) => e.rating === REVIEW2).length;
+  const windows = [...new Set(resolved.map((x) => x.e.holding).filter((h) => !!h && h.endsWith("d")).map((h) => `${h.slice(0, -1)} trading days`))].sort();
+  return { resolved: resolved.length, pending: entries.length - resolved.length - unscored, unscored, byRating, holding: windows.join(", ") || "the configured window" };
+}
+var pctText = (v) => `${v >= 0 ? "+" : "-"}${(Math.abs(v) * 100).toFixed(2)}%`;
+function renderSummary(s) {
+  const lines = [`Resolved cells: ${s.resolved} \xB7 pending: ${s.pending}${s.unscored ? ` \xB7 unscored: ${s.unscored}` : ""}`];
+  for (const [rating, sc] of Object.entries(s.byRating)) {
+    lines.push(`- ${rating}: n=${sc.count}, ${sc.hitRate !== null ? `called the direction ${Math.round(sc.hitRate * 100)}%` : "no direction claimed"}, mean alpha ${pctText(sc.meanAlpha)} vs the benchmark`);
+  }
+  lines.push("");
+  if (s.pending) lines.push("Pending cells are not scored above; settle them when their window has traded.");
+  if (s.unscored) lines.push("Unscored cells had no readable rating (Needs review): they count neither for nor against the desk.");
+  lines.push(`Alpha is measured over ${s.holding} after each analysis date. One model sampling per cell, and text feeds are not archived, so these figures are indicative rather than repeatable. A handful of cells proves nothing: a hit rate over fewer than about 30 calls per rating is noise.`);
+  return lines.join("\n");
 }
 
 // src/terminal/store.ts
@@ -21223,9 +21288,9 @@ function tiersOf(watchlist, market, calls) {
     const was = latest.get(c.ticker);
     if (!was || c.date > was.date) latest.set(c.ticker, { rating: c.rating, date: c.date });
   }
-  const watched = new Map(watchlist.map((w) => [w.symbol, w]));
+  const watched2 = new Map(watchlist.map((w) => [w.symbol, w]));
   const item = (symbol) => {
-    const w = watched.get(symbol), p = PLAIN[symbol];
+    const w = watched2.get(symbol), p = PLAIN[symbol];
     return {
       symbol,
       ...p ? { name: p.name, meaning: p.meaning } : {},
@@ -21915,7 +21980,7 @@ function shareHoldings(dir, snap, day2) {
     currency: v.portfolio?.currency,
     ...v.portfolio?.cash == null ? {} : { cash: v.portfolio.cash },
     ...v.portfolio?.buyingPower == null ? {} : { buyingPower: v.portfolio.buyingPower },
-    positions: v.holdings.map((h) => ({ ticker: h.symbol, quantity: h.quantity, ...h.averageCost == null ? {} : { averagePrice: h.averageCost } }))
+    positions: v.holdings.map((h) => ({ ticker: deskSymbol(h.symbol, h.kind), quantity: h.quantity, ...h.averageCost == null ? {} : { averagePrice: h.averageCost } }))
   })), day2);
   return true;
 }
@@ -22062,6 +22127,24 @@ async function startTerminal(opts) {
     if (!weatherMemo || weatherMemo.day !== day2 || Date.now() - weatherMemo.at > SCREEN_MS) weatherMemo = { at: Date.now(), day: day2, value: weatherNow(day2) };
     return weatherMemo.value;
   };
+  const care = async (day2) => {
+    const snap = robinhood.snapshot(), now = /* @__PURE__ */ new Date();
+    if (!snap) return { at: null, holdings: [] };
+    const held = careOf({
+      views: snap.views,
+      calls: callsOf(),
+      queue: readQueue(dir, now),
+      today: day2,
+      trading: readSettings(root2).trading,
+      caps: robinhood.trading().caps,
+      stop: (ticker, date4) => stopIn(dir, ticker, date4),
+      bought: (symbol) => lastBuy(dir, symbol, now),
+      ticketable
+    });
+    const prices = /* @__PURE__ */ new Map();
+    for (const q of await Promise.all(toWatch(held).map(quote))) if (!("error" in q)) prices.set(q.symbol, { value: q.price, asOf: q.asOf });
+    return { at: snap.at, holdings: watched(held, prices) };
+  };
   const queued = (job) => {
     try {
       return job();
@@ -22122,6 +22205,7 @@ async function startTerminal(opts) {
       if (p === "/api/trading") return json(res, 200, { ...robinhood.trading(), placedToday: placedToday(dir, /* @__PURE__ */ new Date()) });
       if (p === "/api/robinhood/accounts") return json(res, 200, await askRobinhood(() => robinhood.accounts()));
       if (p === "/api/robinhood/snapshot") return json(res, 200, { snapshot: robinhood.snapshot(), chosen: robinhood.chosen() });
+      if (p === "/api/care") return json(res, 200, await care(day2));
       if (p === "/api/quotes") {
         const list2 = [...new Set((url2.searchParams.get("symbols") ?? "").split(",").map((s) => s.trim()).filter(Boolean))].slice(0, 30);
         return json(res, 200, { quotes: await Promise.all(list2.map(quote)) });

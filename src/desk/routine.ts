@@ -9,6 +9,7 @@ import { ordersOn } from './orders.js';
 import { readWatchlist } from '../terminal/store.js';
 import { readQueue } from './queue.js';
 import { TOP_QUEUED, type Screen } from './screen.js';
+import { dueForRerate, readRerate, RERATE_DAYS, RERATE_MAX, type Rerate } from './care.js';
 
 /** "Worth a look today" as the morning reads it: the screen (null when it could not be worked out, with why), and whether
  *  the person's switch "Analyse the top three each market morning" is on. */
@@ -18,16 +19,28 @@ export type Kind = 'morning' | 'evening';
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const weekday = (day: string): string => DAYS[new Date(`${day}T12:00:00Z`).getUTCDay()]!;
 
-/** What the morning routine analyses, in order: what the person asked for on the dashboard and is still waiting first (at
- *  the depth they asked), then their starred watchlist stocks, leaving out any already called today or being analysed
- *  now, at most `max` in all. */
+/** Today's re-rating as Monday's routine put it on the waiting list, by symbol. */
+const reratedToday = (dir: string, today: string): Map<string, Rerate['symbols'][number]> => {
+  const r = readRerate(dir);
+  return new Map(r?.day === today ? r.symbols.map((s) => [s.symbol, s]) : []);
+};
+const lastView = (s: Rerate['symbols'][number]): string => (s.called ? `its latest view: ${s.rating ?? 'a call'} on ${s.called}` : 'the desk has no view of it yet');
+
+/** What the morning routine analyses, in order: what is waiting on the dashboard first (asked for there, re-rated on a
+ *  Monday or put there by the morning switch, each at its depth), then the person's starred watchlist stocks, leaving
+ *  out any already called today or being analysed now, at most `max` in all. */
 export function morningList(dir: string, today: string, max: number, screen: Screen | null = null): { analyse: Array<{ symbol: string; why: string; queued: boolean }>; later: string[]; calledToday: string[]; running: string | null } {
   const called = new Set(new Journal(path.join(dir, 'journal.md')).load().filter((e) => e.date === today).map((e) => e.ticker));
   const queue = readQueue(dir), running = queue.find((q) => q.state === 'running')?.symbol ?? null;
   const wanted: Array<{ symbol: string; why: string; queued: boolean }> = [], seen = new Set<string>(running ? [running] : []);
   const add = (symbol: string, why: string, queued: boolean) => { if (!seen.has(symbol) && !called.has(symbol)) { seen.add(symbol); wanted.push({ symbol, why, queued }); } };
-  const bySwitch = new Set(screen?.queued?.day === today ? screen.queued.symbols : []);
-  for (const q of queue) if (q.state === 'waiting') add(q.symbol, bySwitch.has(q.symbol) ? `worth a look today, put on the list by the morning switch, ${q.depth ?? 'shallow'} depth` : `asked for on the dashboard, ${q.depth ?? "the settings'"} depth`, true);
+  const bySwitch = new Set(screen?.queued?.day === today ? screen.queued.symbols : []), rerated = reratedToday(dir, today);
+  const why = (q: { symbol: string; depth?: string }): string => {
+    const r = rerated.get(q.symbol);
+    if (r) return `a holding re-rated this Monday (${lastView(r)}), ${q.depth ?? 'shallow'} depth`;
+    return bySwitch.has(q.symbol) ? `worth a look today, put on the list by the morning switch, ${q.depth ?? 'shallow'} depth` : `asked for on the dashboard, ${q.depth ?? "the settings'"} depth`;
+  };
+  for (const q of queue) if (q.state === 'waiting') add(q.symbol, why(q), true);
   for (const w of readWatchlist(dir)) if (w.favourite && !w.symbol.startsWith('^')) add(w.symbol, 'a starred watchlist stock', false);
   return { analyse: wanted.slice(0, max), later: wanted.slice(max).map((w) => w.symbol), calledToday: [...called], running };
 }
@@ -56,12 +69,29 @@ function lookLines(look: MorningLook | undefined, today: string): string[] {
   return out;
 }
 
+/** Monday's re-rating in the brief: what went on the waiting list and why, or why nothing did. */
+function rerateLines(dir: string, today: string): string[] {
+  const held = readHoldings(dir), r = readRerate(dir), ran = r?.day === today, done = ran ? r.symbols : [], due = dueForRerate(dir, today);
+  const head = "   Monday's re-rating, of the holdings the desk sizes trades to";
+  if (!held) return ['', `${head}: they are not known (the dashboard has not read Robinhood, and the person gave none), so nothing was re-rated. Say so at the end.`];
+  if (held.source === 'robinhood' && !held.accounts?.some((a) => a.tradable)) return ['', `${head}: the Agentic account is not among the accounts shown on the dashboard, so nothing was re-rated. Say so at the end.`];
+  if (!held.positions.length) return ['', `${head}: nothing is held, so there is nothing to re-rate.`];
+  const out = [''], names = due.map((s) => s.symbol).join(', '), are = due.length === 1 ? 'is' : 'are';
+  if (done.length) out.push(`${head}: ${done.map((s) => `${s.symbol} (${lastView(s)})`).join(', ')} ${done.length === 1 ? 'was' : 'were'} put on the waiting list at shallow depth, for a view under ${RERATE_DAYS} days old (at most ${RERATE_MAX} a Monday). ${done.length === 1 ? 'It is' : 'They are'} analysed in step 2 with the rest of the list.`);
+  else if (due.length && ran) out.push(`${head}: ${names} ${are} due, but the waiting list is full, so nothing went on it. Say so at the end.`);
+  else if (due.length) out.push(`${head}: ${names} ${are} due, but the re-rating could not put ${due.length === 1 ? 'it' : 'them'} on the waiting list today. Say so at the end.`);
+  else out.push(`${head}: each has a view under ${RERATE_DAYS} days old, or is already on the waiting list. Nothing to re-rate.`);
+  if (done.length && due.length) out.push(`   Due as well, left for next Monday: ${due.map((s) => s.symbol).join(', ')}.`);
+  return out;
+}
+
 export function morningBrief(dir: string, today: string, max: number, look?: MorningLook): string {
   const day = weekday(today), weekend = day === 'Saturday' || day === 'Sunday';
   const m = morningList(dir, today, max, look?.screen ?? null);
   const lines = [`MORNING ROUTINE for ${day} ${today}.`];
   if (weekend) lines.push(`US markets do not open on a ${day}: score past calls (step 1), then stop and say so. Analyse nothing unless the person asked for it in words.`);
   lines.push('', '1. Score past calls first: list_settlements, then record_outcome with a lesson for each READY call (the /settle playbook).');
+  if (day === 'Monday') lines.push(...rerateLines(dir, today));
   if (!weekend) lines.push(...lookLines(look, today));
   if (m.running) lines.push('', `   ${m.running} is being analysed now by another run: leave it alone.`);
   if (!m.analyse.length) lines.push('', '2. Nothing to analyse: no stock is waiting on the dashboard and no starred watchlist stock is without a call today. Say so.');
@@ -74,7 +104,7 @@ export function morningBrief(dir: string, today: string, max: number, look?: Mor
   if (m.calledToday.length) lines.push(`   Already called today, so not analysed again: ${m.calledToday.join(', ')}.`);
   if (m.analyse.some((a) => a.queued) || m.later.length) lines.push('   Last, call end_queue_run once: stocks still waiting on the dashboard get another run.');
   lines.push('', `3. ${holdingsLine(dir)}`);
-  lines.push('', '4. Finish with a short plain list: each new call (stock, rating, one sentence of its executive summary), anything skipped and why, and any data that was unavailable. Then: decide on the dashboard ("Decide…" on a call); only the person\'s own Confirm there places an order. Not investment advice.');
+  lines.push('', '4. Finish with a short plain list: each new call (stock, rating, one sentence of its executive summary; for a re-rated holding, its new rating beside its last one), anything skipped and why, and any data that was unavailable. Then: decide on the dashboard ("Decide…" on a call); only the person\'s own Confirm there places an order. A Sell or Underweight on a holding of the Agentic account shows there as "the desk says sell", with a Sell button that opens a ticket: nothing is ever sold by itself. Not investment advice.');
   lines.push('', 'No one may be watching: do not wait for an answer. If a step needs the person (for example no contact email is saved), skip what depends on it and say so at the end.');
   return lines.join('\n');
 }

@@ -92,6 +92,17 @@
   a sign-in, no credit, a busy service); `main.ts` is the program, logging to `desk-data/watcher.log`.
 - `src/desk/routine.ts` - the morning and evening briefs the routines run from (desk tool `routine_brief`, skill
   `/routine`, the team's playbook); `src/desk/orders.ts` - the dashboard's log of the orders it sent.
+- `src/desk/care.ts` - care for what is held, and it never sells. `viewOf` is a holding's latest call and its age;
+  `stopOf` reads the trader's labelled line `**Stop Loss**` as one price level alone (a sum, a percentage or "not
+  provided" is no level, never guessed at), from the trader's part of the call's run (`stopIn`); `careOf` joins each
+  holding of the accounts shown with its view, "re-rating" while it is on the waiting list, and in the Agentic account
+  alone its stop and, for a Sell or Underweight, "the desk says sell" (the action the person's settings give the rating,
+  whether a ticket can open, the shortest hold); `watched` holds each stop against Yahoo Finance's price (the dashboard's
+  `/api/care`; the page draws what it is sent and tells a new fall below a stop once). `rerateWeekly` is Monday's
+  re-rating from `routine_brief`: up to three of the holdings the desk sizes trades to (`holdings.ts` positions), with no
+  view or one a week old, the stalest first, go on the waiting list at shallow depth, once that Monday
+  (`desk-data/rerate.json`), with no doorbell. A coin held is named as the desk calls it (BTC as BTC-USD), also in what
+  the agents see.
 - `src/desk/screen.ts` - "Worth a look today": `signalsOf` reads a symbol's daily rows into plain signals (a move of 3%
   or more, volume twice its 20-day average, a 52-week high or low by the calendar, a close across the 50- or 200-day
   average, news today), `rank` keeps five, `screenToday` works them out at most once an hour over `tiers.ts`

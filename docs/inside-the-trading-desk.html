@@ -396,7 +396,8 @@ p { text-wrap: pretty; }
 .tchip .sk { width: 22px; }
 .tchip .ic { color: var(--accent); }
 .wl li.wl-h { font-size: var(--size-tiny); color: var(--text-3); }
-.pn.morning { grid-column: 1 / -1; }
+.pn.morning, .pn.care { grid-column: 1 / -1; }
+.pn.care { border-color: color-mix(in srgb, var(--down) 40%, var(--line)); }
 .mhalves { grid-template-columns: repeat(2, minmax(0, 1fr)); border-radius: var(--radius-small); box-shadow: none; }
 .mhalf { display: flex; flex-direction: column; gap: 7px; padding: 8px 10px; font-size: var(--size-tiny); color: var(--text-2); }
 .mhalf > b { font-family: var(--font-title); font-size: 12.5px; font-weight: 600; color: var(--text); }
@@ -487,7 +488,7 @@ p { text-wrap: pretty; }
   .rate b { flex: 0 0 96px; }
   .drawers, .checks, .facts { grid-template-columns: minmax(0, 1fr); }
   .win-main { grid-template-columns: minmax(0, 1fr); }
-  .pn.today, .pn.start, .pn.morning, .pn.markets, .pn.chart, .pn.watch, .pn.calls, .pn.acct-pn, .pn.ticket { grid-column: 1; }
+  .pn.today, .pn.care, .pn.start, .pn.morning, .pn.markets, .pn.chart, .pn.watch, .pn.calls, .pn.acct-pn, .pn.ticket { grid-column: 1; }
   .tier-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
   .mhalves { grid-template-columns: minmax(0, 1fr); }
   .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -763,7 +764,7 @@ p { text-wrap: pretty; }
         <div class="joined agents n1">
           <article class="agent edge c-desk">
             <div class="agent-h"><span class="icbox"><svg class="ic"><use href="#i-target"/></svg></span><div><p class="agent-name">Trader</p><p class="agent-id">trader</p></div></div>
-            <p class="agent-role">Turns the plan into a proposal: when to enter, where to stop a loss, and how much to buy or sell.</p>
+            <p class="agent-role">Turns the plan into a proposal: when to enter, where to stop a loss (one price, which the dashboard then watches for you), and how much to buy or sell.</p>
             <dl><dt>Reads</dt><dd>The investment plan, the checked price table, your holdings</dd><dt>Writes</dt><dd>The trade proposal</dd></dl>
           </article>
         </div>
@@ -863,7 +864,7 @@ p { text-wrap: pretty; }
           </div></li>
           <li class="step c-desk"><span class="badge">6</span><div class="step-body">
             <div class="step-h"><p class="step-title">The trade proposal</p><span class="at-chip c-desk"><i></i>Trader</span></div>
-            <p>Entry, stop and size, from the plan, the checked price table and your holdings.</p>
+            <p>Entry, stop and size, from the plan, the checked price table and your holdings. The stop is one price, which the dashboard watches.</p>
             <p class="why"><b>Why it matters.</b> The plan becomes something specific enough to test.</p>
           </div></li>
           <li class="step c-desk"><span class="badge">7</span><div class="step-body">
@@ -925,7 +926,7 @@ p { text-wrap: pretty; }
       </div>
     </div>
 
-    <div class="at-box aside"><svg class="ic"><use href="#i-clock"/></svg><span><b>The routines run this same line for you.</b> The morning routine scores past calls, reads what is worth a look today (and, with your morning switch on, puts its top three on the waiting list), then analyses what is waiting and your starred stocks (at most five), and lists the new calls to decide on. The evening wrap-up scores what is ready and reports the day's calls and orders. Neither places an order.</span></div>
+    <div class="at-box aside"><svg class="ic"><use href="#i-clock"/></svg><span><b>The routines run this same line for you.</b> The morning routine scores past calls, on a Monday puts up to three of your holdings whose view is a week old on the waiting list to be re-rated, reads what is worth a look today (and, with your morning switch on, puts its top three on the waiting list), then analyses what is waiting and your starred stocks (at most five), and lists the new calls to decide on. The evening wrap-up scores what is ready and reports the day's calls and orders. Neither places an order.</span></div>
   </section>
 
   <!-- 5 -->
@@ -944,7 +945,7 @@ p { text-wrap: pretty; }
             <li><b>Reports</b><span>A folder per analysis: a page per agent and the complete report.</span></li>
             <li><b>Watchlist</b><span>Your stocks, and which ones you starred.</span></li>
             <li><b>Analyses you asked for</b><span>Each stock you asked for on the dashboard, at the depth you chose: waiting, being analysed, done with its rating, or failed with why.</span></li>
-            <li><b>Holdings</b><span>What you hold, as the dashboard last read it from Robinhood.</span></li>
+            <li><b>Holdings</b><span>What you hold, as the dashboard last read it from Robinhood; and which of them Monday's routine put on the list to re-rate.</span></li>
             <li><b>Orders log</b><span>Each order the dashboard sent, from a call or your own, and what Robinhood answered.</span></li>
             <li><b>Worth a look today</b><span>The morning's list and its reasons, worked out at most once an hour, so the dashboard and the morning routine read the same one.</span></li>
             <li><b>Your dashboard</b><span>Where you left it: the page, the stock, the chart, the stocks you looked at last, your whole-market funds, and whether your morning switch is on. Never an order.</span></li>
@@ -1087,6 +1088,10 @@ p { text-wrap: pretty; }
           <div class="at-box pn today"><p class="pn-h">Your desk today <small>a press opens each</small></p>
             <div class="joined kpis"><span class="kpi-mini c-rh"><b>Your accounts</b><span class="sk" style="width:64%"></span>gain since bought</span><span class="kpi-mini c-desk"><b>Agentic buying power</b><span class="sk" style="width:52%"></span>trading on or off</span><span class="kpi-mini c-src"><b>S&amp;P 500 today</b><span class="sk" style="width:58%"></span>with a small chart</span><span class="kpi-mini c-you"><b>The desk's calls</b><span class="sk" style="width:40%"></span>latest, waiting, scored</span></div>
           </div>
+          <div class="at-box pn care"><p class="pn-h">What you hold needs a look <small>only when something does · in the Agentic account · nothing sells by itself</small></p>
+            <div class="callrow"><span class="sk"></span><span class="rchip c-bear">below its stop</span><span class="dec">Read the call</span></div>
+            <div class="callrow"><span class="sk" style="max-width:62%"></span><span class="rchip c-bear">the desk says sell</span><span class="dec">Sell…</span></div>
+          </div>
           <div class="at-box pn start"><p class="pn-h">Start here <small>broadest first · today's move, the desk's latest call, the robot</small></p>
             <div class="tier-row"><b>The whole market</b><div class="tchips"><span class="tchip">S&amp;P 500<span class="sk"></span></span><span class="tchip">Nasdaq 100<span class="sk"></span></span><span class="tchip">The whole world<span class="sk"></span></span><span class="tchip">US bonds<span class="sk"></span></span><span class="tchip">yours to change</span></div></div>
             <div class="tier-row"><b>Sectors</b><div class="tchips"><span class="tchip">Technology</span><span class="tchip">Financials</span><span class="tchip">Health care</span><span class="tchip">Energy</span><span class="tchip">Industrials</span><span class="tchip">Consumer discretionary</span><span class="tchip">Consumer staples</span><span class="tchip">Utilities</span><span class="tchip">Materials</span><span class="tchip">Real estate</span><span class="tchip">Communication</span></div></div>
@@ -1134,8 +1139,8 @@ p { text-wrap: pretty; }
           </div>
           <div class="at-box pn acct-pn"><p class="pn-h">Your account <small>from Robinhood</small></p>
             <div class="joined acards">
-              <div class="acard edge c-rh"><b>Agentic</b>may trade, on your Confirm<span class="sk"></span><span class="sk" style="width:60%"></span></div>
-              <div class="acard"><b>Main</b>view only<span class="sk"></span><span class="sk" style="width:70%"></span></div>
+              <div class="acard edge c-rh"><b>Agentic</b>may trade, on your Confirm · each holding with the desk's view, its stop and Sell…<span class="sk"></span><span class="sk" style="width:60%"></span></div>
+              <div class="acard"><b>Main</b>view only · the desk's view, for your information<span class="sk"></span><span class="sk" style="width:70%"></span></div>
             </div>
           </div>
           <div class="at-box pn ticket"><p class="pn-h">Order ticket <small>for the Agentic account</small></p>
@@ -1151,8 +1156,8 @@ p { text-wrap: pretty; }
       <div class="feat edge c-you"><span class="icbox"><svg class="ic"><use href="#i-star"/></svg></span><b>Watchlist and analyses</b><p>Grouped by tier, each folding away. The robot asks the desk to analyse a stock or a fund, as deep as you choose; each shows waiting, the step it is on, its rating or why it failed.</p></div>
       <div class="feat edge c-src"><span class="icbox"><svg class="ic"><use href="#i-sun"/></svg></span><b>This morning</b><p>The market weather in three plain lines (trend, mood, rates), and up to five worth a look today, each with its reason. A switch, off as shipped, sends the top three to analysis.</p></div>
       <div class="feat edge c-desk"><span class="icbox"><svg class="ic"><use href="#i-target"/></svg></span><b>Calls and your paper record</b><p>Each call in two lines, and in full with every agent's part; each followed on paper at its ticket's size against the S&amp;P 500, and how it scored.</p></div>
-      <div class="feat edge c-rh"><span class="icbox"><svg class="ic"><use href="#i-bank"/></svg></span><b>Your account</b><p>In the side list and on its own page: value, cash, buying power and gain in colour, each holding's share, orders, the trading switch and your caps.</p></div>
-      <div class="feat edge c-you"><span class="icbox"><svg class="ic"><use href="#i-send"/></svg></span><b>Order tickets</b><p>Decide… from a call, or Trade… for your own: checked against your caps, reviewed by Robinhood, placed only on your Confirm.</p></div>
+      <div class="feat edge c-rh"><span class="icbox"><svg class="ic"><use href="#i-bank"/></svg></span><b>Your account and what you hold</b><p>Value, cash, buying power and gain; beside each holding, the desk's view ("Overweight, 3 days ago"). In the Agentic account, its stop is watched and a Sell is marked.</p></div>
+      <div class="feat edge c-you"><span class="icbox"><svg class="ic"><use href="#i-send"/></svg></span><b>Order tickets</b><p>Decide… from a call, Sell… on a holding the desk says to sell, or Trade… for your own: checked against your caps, reviewed by Robinhood, placed only on your Confirm. Nothing is ever sold by itself.</p></div>
     </div>
     <div class="joined facts">
       <span><svg class="ic sm"><use href="#i-lock"/></svg>On this computer only; a fresh key each start, given only to the browser it opens</span>

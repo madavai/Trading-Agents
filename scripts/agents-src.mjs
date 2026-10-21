@@ -202,8 +202,10 @@ The request gives what the person holds, or says it is not provided: use it for 
 
 Write these sections, in this order, starting with the action on its own line:
 - **Action**: exactly one of Buy / Hold / Sell. A research recommendation of Overweight is a Buy and Underweight is a Sell, sized by how strong the case is; conflict alone is not a Hold.
-- **Reasoning**: why, against the plan and the price structure (two to four sentences)
-- **Entry Price**, **Stop Loss**, **Position Sizing**: when you can state them, otherwise "not provided"
+- **Reasoning**: why, against the plan and the price structure (two to four sentences), with the sums behind the entry and the stop
+- **Entry Price**: one price level alone, for example 189.50, or "not provided"
+- **Stop Loss**: one price level alone, below the price now, for example 185.30, or "not provided". This is the level under which the position should be sold to limit the loss: the dashboard watches the price and tells the person when it falls below it (it never sells by itself). Give one whenever the person holds the stock or the action is Buy; write the level alone on this line, never a sum, a percentage or a range.
+- **Position Sizing**: when you can state it, otherwise "not provided"
 
 End with the line: FINAL TRANSACTION PROPOSAL: **BUY**, **HOLD** or **SELL** (capitals). Save it as section "trader".`,
   },

@@ -19,8 +19,12 @@ Only you, on the dashboard, and only when all of these hold:
   switches itself off and the page says why, even in the middle of sending an order;
 - you pressed Confirm on the words of that exact order ("Confirm: Buy 1 NVDA at $182.40").
 
-The same holds whether the ticket comes from one of the desk's calls ("Decide…") or is your own ("Trade…", a stock you
-chose, starting at one share): your own order gets no way around any of it, and the desk's log records it as yours.
+The same holds whether the ticket comes from one of the desk's calls ("Decide…", or "Sell…" beside a holding the desk
+says to sell, which opens that call's own ticket) or is your own ("Trade…", a stock you chose, starting at one share):
+your own order gets no way around any of it, and the desk's log records it as yours.
+
+Nothing is ever sold by itself. The stop the desk's trader proposes is only watched: when the price falls below it, the
+dashboard says so and marks the holding, and never places a stop order. A Sell or Underweight on a holding only marks it.
 
 Crypto and indices never reach Robinhood: Robinhood's agent doorway trades stocks and funds, so the dashboard refuses a
 ticket for a coin or an index when it opens and again before Robinhood checks or places it. Bitcoin and Ether calls are
@@ -91,6 +95,10 @@ order tool.
   (and its news search for your companies and coins), and asks Polymarket's public search for its odds on the Federal
   Reserve, at most once an hour. The list is kept in `desk-data/screen.json`. The switch "Analyse the top 3 each market
   morning" ships off; on, it only puts those stocks on the waiting list, never an order.
+- To watch the stops in the Agentic account, the dashboard asks Yahoo Finance for the price of each holding there that
+  has one (by ticker only, never a quantity or an account), as often as it refreshes its other prices.
+- On a Monday the morning routine puts up to three of the holdings the desk sizes trades to on the waiting list, to be
+  re-rated, and notes which in `desk-data/rerate.json`: never an order.
 - For the sector limit, the dashboard asks the SEC for the industry of the stocks you trade and hold and for its list of
   funds (by ticker only, never a quantity or an account).
 - The desk always introduces itself by its own name, never as a web browser. Yahoo Finance gives its company data only

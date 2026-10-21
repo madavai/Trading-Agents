@@ -12,7 +12,7 @@
     {
       "name": "morning-routine",
       "title": "Morning routine",
-      "description": "On weekday mornings: scores past calls, analyses what is waiting and your starred stocks, and lists the new calls to decide on. It never places an order.",
+      "description": "On weekday mornings: scores past calls, analyses what is waiting and your starred stocks (on Mondays also re-rates what you hold when the desk's view of it is a week old), and lists the new calls to decide on. It never places an order.",
       "agent": "trading-desk",
       "prompt": "Run the morning routine.",
       "cron": "0 8 * * 1-5"

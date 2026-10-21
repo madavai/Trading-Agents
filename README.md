@@ -25,7 +25,8 @@ to open that part of the guide. They follow your light or dark theme.
 > [!NOTE]
 > **Every part is built** - the desk check, the free data tools, the twelve-agent team with its scoring and lessons,
 > back-testing, the dashboard with your Robinhood accounts, order tickets with Robinhood's own check, placing an order
-> on your Confirm, the morning and evening routines, and the trading-desk team in Madav's Agent Studio.
+> on your Confirm, care for what you hold (the desk's view beside each holding, its stop watched, sells you confirm),
+> the morning and evening routines, and the trading-desk team in Madav's Agent Studio.
 > **Being proven now, on a real computer:** a full analysis with company accounts, the dashboard with a real Robinhood
 > account, and a first real order. Until that is done, keep trading switched off, or keep orders to one share with
 > Robinhood's phone approval on.
@@ -128,7 +129,8 @@ the team's "talk" switch shows these messages in the Messages panel; with it off
    checked against your caps; beside a stock's price, "Trade…" opens your own ticket instead, buy or sell, starting at
    one share. Either way "Review with Robinhood" is Robinhood's own dry run, and with trading switched on (by you, on
    the dashboard), "Place order…" then "Confirm: Buy 1 NVDA at $182.40" sends exactly that order. Trading ships
-   switched off.
+   switched off. When the desk rates something you hold in the Agentic account Sell or Underweight, "Sell…" beside the
+   holding opens that call's ticket. Nothing is ever sold by itself.
 </details>
 
 ## Where everything is kept
@@ -173,6 +175,9 @@ the team's "talk" switch shows these messages in the Messages panel; with it off
   that folder, and on Windows the dashboard locks it to your own account, so no other account on this computer can
   open it; the real protection is that agents get no free shell or file access outside this folder without your
   approval, so **never run this folder with permission checks bypassed**.
+- Nothing is ever sold by itself. A stop is a price the desk's trader proposed: the dashboard watches it and tells you
+  when the price falls below it, and never places a stop order. A Sell or Underweight on something you hold opens a
+  ticket only on your press, with the same caps, Robinhood's check and your Confirm.
 - A source that cannot be reached is reported as unavailable, never as "no news". No number is invented.
 
 ## Where you decide: the dashboard
@@ -180,7 +185,7 @@ the team's "talk" switch shows these messages in the Messages panel; with it off
 <a href="https://madavai.github.io/Trading-Agents/inside-the-trading-desk.html#dashboard">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/dashboard-dark.webp">
-  <img alt="The dashboard: a side list with your account at the top and the desk's sections below; Your desk today, Start here with the whole market, the eleven sectors and your own names, This morning with the market weather and what is worth a look today, the markets, a full-width chart, the watchlist by tier, the desk's calls, your accounts, and the order ticket from Decide… or Trade… to your Confirm." src="docs/readme/dashboard-light.webp">
+  <img alt="The dashboard: a side list with your account at the top and the desk's sections below; Your desk today, What you hold needs a look (shown only when something does), Start here with the whole market, the eleven sectors and your own names, This morning with the market weather and what is worth a look today, the markets, a full-width chart, the watchlist by tier, the desk's calls, your accounts with the desk's view beside each holding, and the order ticket from Decide…, Sell… or Trade… to your Confirm." src="docs/readme/dashboard-light.webp">
 </picture>
 </a>
 
@@ -231,6 +236,27 @@ Under the list, the switch **"Analyse the top 3 each market morning"** is off as
 three that were not already called today go on the waiting list at shallow depth, once each weekday, and run when
 something is listening; each analysis uses your Claude plan, like a chat. The morning routine reads the same list.
 
+### What you hold: the desk's view, its stop, and sells you confirm
+On "Your account", each holding has a column for the desk's latest view of it and how old that view is, such as
+"Overweight, 3 days ago", or "no view yet"; its marks (below) show on the stock's own page too. What the desk proposes is for the
+Agentic account alone, the one account it may trade in; in your other accounts the view is there for your information.
+
+In the Agentic account the desk takes care of what you hold:
+- **Re-rating.** A view a week old or more is due again. On a Monday the morning routine puts up to three such
+  holdings (those with no view first, then the oldest) on the waiting list at shallow depth, within its limit of five a
+  morning. Meanwhile they show "re-rating".
+- **Its stop.** The desk's trader writes the price under which it would sell to limit a loss. The dashboard watches
+  Yahoo Finance's price (up to 15 minutes late) against it. When the price falls below, a notice says so, and the
+  holding is marked "below its stop" for as long as it stays there. Nothing is sold: it is a prompt to look, and the
+  decision is yours.
+- **"The desk says sell".** When the latest call on a holding is Sell or Underweight, it is marked so, with a Sell…
+  button. It opens that call's ticket: everything held for a Sell, half for an Underweight (as your settings say), only
+  after your shortest hold, with your caps, Robinhood's dry run and your Confirm. A coin is never sold from here:
+  Robinhood's agent doorway trades stocks and funds.
+
+When a holding is below its stop or the desk says to sell it, it also shows at the top of the desk, under "What you hold
+needs a look", with the reason and what you can do. Nothing reaches you outside the dashboard (no email, no phone).
+
 ### Your paper record
 Before you risk money, every call the desk makes on a stock, a fund, Bitcoin or Ether is followed on paper, and after
 Start here and This morning the dashboard shows what that would have done: one sentence, a line of the paper money against the S&P 500 from the same start, and how
@@ -275,7 +301,8 @@ The trading-desk team has two routines, which Madav's scheduler can start for yo
   over an hour old; with your morning switch on, its top three join the waiting list at shallow depth), then analyses
   what you asked for on the dashboard and your starred watchlist stocks (at most 5 a morning, set in
   `desk-settings.json` under `routines`), and ends with the new calls to decide on and the list worth a look. On a
-  weekend it only scores past calls.
+  Monday it first puts up to three of your holdings whose view is a week old (or that have none) on the waiting list,
+  to be re-rated at shallow depth. On a weekend it only scores past calls.
 - **Evening wrap-up**: scores what is ready and tells you the day's calls, the orders the dashboard sent and what
   Robinhood answered.
 
