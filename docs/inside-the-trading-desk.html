@@ -439,6 +439,26 @@ p { text-wrap: pretty; }
 .facts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .facts span { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 11px 12px; font-size: var(--size-small); font-weight: 500; color: var(--text-2); text-align: center; }
 .facts .ic { color: var(--text-3); }
+/* get started on the dashboard, and the first month it walks through */
+.win-n { margin-left: auto; font-family: var(--font); font-size: var(--size-tiny); color: var(--text-3); }
+.pn.guide { grid-column: 1 / -1; border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.gsteps { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.gsteps li { display: flex; align-items: flex-start; gap: 8px; font-size: var(--size-tiny); line-height: 1.35; color: var(--text-2); }
+.gsteps .tick { flex: none; font-family: var(--font-title); font-size: var(--size-tiny); font-weight: 600; background: var(--tint); color: var(--text-2); }
+.gsteps li.done .tick { background: var(--up-t); color: var(--up); }
+.month { display: flex; flex-direction: column; gap: 14px; padding: 18px; }
+.month-head { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 12px; align-items: start; }
+.month-head b { display: block; font-family: var(--font-title); font-weight: 600; font-size: 16px; margin-bottom: 4px; }
+.month-head p { font-size: var(--size-body); color: var(--text-2); }
+.month-steps { grid-template-columns: repeat(5, minmax(0, 1fr)); box-shadow: none; }
+.month-steps li { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; box-shadow: inset 0 2px 0 var(--accent); }
+.month-steps li:last-child { box-shadow: inset 0 2px 0 var(--up); }
+.month-steps .when { font-size: var(--size-tiny); font-weight: 500; color: var(--desk-ink); }
+.month-steps b { font-family: var(--font-title); font-weight: 600; font-size: 14px; line-height: 1.25; }
+.month-steps p { font-size: var(--size-small); color: var(--text-2); }
+.month-foot { display: flex; align-items: flex-start; gap: 8px; font-size: var(--size-small); color: var(--text-2); }
+.month-foot .ic { color: var(--accent); margin-top: 2px; }
+.month-foot b { color: var(--text); font-weight: 600; }
 
 .built { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
 .built-mark { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-title); font-weight: 500; font-size: 13px; color: var(--text-2); white-space: nowrap; }
@@ -460,6 +480,9 @@ p { text-wrap: pretty; }
   .station, .phase { grid-template-columns: minmax(0, 1fr); gap: 14px; }
   .leaves { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .feats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .gsteps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .month-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .month-steps li:last-child { grid-column: 1 / -1; }
   .key { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .doors { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
   .d-agents, .d-x, .door, .d-rh { grid-column: 1; grid-row: auto; }
@@ -488,7 +511,8 @@ p { text-wrap: pretty; }
   .rate b { flex: 0 0 96px; }
   .drawers, .checks, .facts { grid-template-columns: minmax(0, 1fr); }
   .win-main { grid-template-columns: minmax(0, 1fr); }
-  .pn.today, .pn.care, .pn.start, .pn.morning, .pn.markets, .pn.chart, .pn.watch, .pn.calls, .pn.acct-pn, .pn.ticket { grid-column: 1; }
+  .pn.guide, .pn.today, .pn.care, .pn.start, .pn.morning, .pn.markets, .pn.chart, .pn.watch, .pn.calls, .pn.acct-pn, .pn.ticket { grid-column: 1; }
+  .gsteps, .month-steps { grid-template-columns: minmax(0, 1fr); }
   .tier-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
   .mhalves { grid-template-columns: minmax(0, 1fr); }
   .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -948,8 +972,8 @@ p { text-wrap: pretty; }
             <li><b>Holdings</b><span>What you hold, as the dashboard last read it from Robinhood; and which of them Monday's routine put on the list to re-rate.</span></li>
             <li><b>Orders log</b><span>Each order the dashboard sent, from a call or your own, and what Robinhood answered.</span></li>
             <li><b>Worth a look today</b><span>The morning's list and its reasons, worked out at most once an hour, so the dashboard and the morning routine read the same one.</span></li>
-            <li><b>Your dashboard</b><span>Where you left it: the page, the stock, the chart, the stocks you looked at last, your whole-market funds, and whether your morning switch is on. Never an order.</span></li>
-            <li><b>Your email</b><span>For the SEC, and only the SEC.</span></li>
+            <li><b>Your dashboard</b><span>Where you left it: the page, the stock, the chart, the stocks you looked at last, your whole-market funds, whether your morning switch is on, and whether Get started is open. Never an order.</span></li>
+            <li><b>Your email</b><span>For the SEC, and only the SEC: given once, in a chat or on the dashboard, and never shown back in full.</span></li>
             <li><b>Paper money</b><span>What your paper record starts with ($10,000 as shipped). The record itself is worked out from the journal and closing prices each time.</span></li>
             <li><b>Back-tests</b><span>Kept in journals of their own, apart from your real calls.</span></li>
           </ul>
@@ -1062,7 +1086,7 @@ p { text-wrap: pretty; }
   <section class="chapter" id="dashboard">
     <div class="ch-head">
       <div class="ch-title"><p class="kicker">And finally, the dashboard</p><h2>Where you decide</h2></div>
-      <p>A page that runs on your own computer, in the Madav House theme. The team opens it for you when you ask ("open the dashboard"). Your account sits at the top of its side list, which folds away to give the page the whole width. Its shape is shown here without figures; yours fills it with real ones.</p>
+      <p>A page that runs on your own computer, in the Madav House theme. The team opens it for you when you ask ("open the dashboard"). Your account sits at the top of its side list, which folds away to give the page the whole width. On a first visit it opens on Get started, and every trading word on it explains itself when you point at it. Its shape is shown here without figures; yours fills it with real ones.</p>
     </div>
     <figure class="window" aria-label="The dashboard's layout">
       <div class="win-top"><i></i><i></i><i></i><span>Trading Agents, on this computer</span></div>
@@ -1075,6 +1099,8 @@ p { text-wrap: pretty; }
           <li><svg class="ic sm"><use href="#i-bank"/></svg>Main<span class="sk win-v"></span></li>
           <li class="win-lh">The desk</li>
           <li class="on"><svg class="ic sm"><use href="#i-grid"/></svg>Overview</li>
+          <li><svg class="ic sm"><use href="#i-clip"/></svg>Get started<span class="win-n">2 of 5</span></li>
+          <li><svg class="ic sm"><use href="#i-book"/></svg>What does this mean?</li>
           <li><svg class="ic sm"><use href="#i-compass"/></svg>Start here</li>
           <li><svg class="ic sm"><use href="#i-sun"/></svg>This morning</li>
           <li><svg class="ic sm"><use href="#i-target"/></svg>Scorecard</li>
@@ -1085,6 +1111,15 @@ p { text-wrap: pretty; }
           <li><svg class="ic sm"><use href="#i-flag"/></svg>The desk's calls</li>
         </ul>
         <div class="win-main">
+          <div class="at-box pn guide"><p class="pn-h">Get started <small>on a first visit · each step ticks itself off · Put away</small></p>
+            <ol class="gsteps">
+              <li class="done"><span class="tick"><svg class="ic sm"><use href="#i-check"/></svg></span>Your email for the SEC</li>
+              <li class="done"><span class="tick"><svg class="ic sm"><use href="#i-check"/></svg></span>Three to five names, the whole market, a sector</li>
+              <li><span class="tick">3</span>Analyse them, shallow; run automatically</li>
+              <li><span class="tick">4</span>Read your first calls</li>
+              <li><span class="tick">5</span>Four weeks on paper, then the scorecard</li>
+            </ol>
+          </div>
           <div class="at-box pn today"><p class="pn-h">Your desk today <small>a press opens each</small></p>
             <div class="joined kpis"><span class="kpi-mini c-rh"><b>Your accounts</b><span class="sk" style="width:64%"></span>gain since bought</span><span class="kpi-mini c-desk"><b>Agentic buying power</b><span class="sk" style="width:52%"></span>trading on or off</span><span class="kpi-mini c-src"><b>S&amp;P 500 today</b><span class="sk" style="width:58%"></span>with a small chart</span><span class="kpi-mini c-you"><b>The desk's calls</b><span class="sk" style="width:40%"></span>latest, waiting, scored</span></div>
           </div>
@@ -1163,6 +1198,20 @@ p { text-wrap: pretty; }
       <span><svg class="ic sm"><use href="#i-lock"/></svg>On this computer only; a fresh key each start, given only to the browser it opens</span>
       <span><svg class="ic sm"><use href="#i-clock"/></svg>Market prices up to 15 minutes late</span>
       <span><svg class="ic sm"><use href="#i-sun"/></svg>Light and dark · opens where you left it</span>
+    </div>
+    <div class="at-box month" id="first-month">
+      <div class="month-head">
+        <span class="icbox c-you"><svg class="ic"><use href="#i-clip"/></svg></span>
+        <div><b>Your first month</b><p>What Get started walks a newcomer through on the dashboard, one step at a time. Each step ticks itself off from the desk's own records, wherever it is done: on the page, or by asking the desk in a chat. It suggests the whole market and a sector or two, never a company: the names are yours.</p></div>
+      </div>
+      <ol class="joined month-steps">
+        <li><span class="when">Day one</span><b>1 · Your email for the SEC</b><p>Once, in the field on the dashboard or in a chat. Kept on this computer, sent to the SEC alone, and never shown back in full.</p></li>
+        <li><span class="when">Day one</span><b>2 · Pick what you know</b><p>Three to five companies you know, plus the whole market and one or two sectors you understand.</p></li>
+        <li><span class="when">Day one</span><b>3 · Ask the desk, shallow</b><p>One press asks for every pick at shallow depth, the quickest; another switches on running automatically.</p></li>
+        <li><span class="when">The first calls</span><b>4 · Read them</b><p>With Buy, Hold, Sell and alpha explained beside them. A call is research, not a promise.</p></li>
+        <li><span class="when">Weeks one to four</span><b>5 · Follow them on paper</b><p>Pretend money follows every call against the S&amp;P 500. After four weeks, read the scorecard, good or bad: money and Robinhood stay your decision.</p></li>
+      </ol>
+      <p class="month-foot"><svg class="ic sm"><use href="#i-book"/></svg><span><b>What does this mean?</b> About thirty trading words, each in one plain line, from Buy to the weekly loss limit. Point at a dotted word on the dashboard and the same line appears there.</span></p>
     </div>
   </section>
 

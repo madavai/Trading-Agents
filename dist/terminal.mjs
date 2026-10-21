@@ -7346,6 +7346,12 @@ function readContactEmail(root2) {
     return "";
   }
 }
+function saveContactEmail(root2, raw) {
+  const email2 = checkEmail(raw);
+  fs.mkdirSync(deskDataDir(root2), { recursive: true });
+  fs.writeFileSync(file(root2), JSON.stringify({ email: email2 }, null, 2) + "\n");
+  return email2;
+}
 
 // src/check/probes.ts
 var MAX_BYTES = 64 * 1024;
@@ -7817,6 +7823,7 @@ var PAPER_START_USD = 1e4;
 var PAPER_MIN = 100;
 var PAPER_MAX = 1e7;
 var RECORD_WEEKS = 4;
+var RECORD_WORDS = `${["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"][RECORD_WEEKS] ?? RECORD_WEEKS} ${RECORD_WEEKS === 1 ? "week" : "weeks"}`;
 var cents2 = (n) => Math.round(n * 100) / 100;
 var PAPER_CRYPTO = /* @__PURE__ */ new Set(["BTC-USD", "ETH-USD"]);
 var followed = (ticker) => !/[\^=]/.test(ticker) && (!isCrypto(ticker) || PAPER_CRYPTO.has(ticker));
@@ -21357,6 +21364,9 @@ function cleanPrefs(raw) {
   if (market) out.market = market;
   if (Array.isArray(r.folded)) out.folded = TIERS.filter((t2) => r.folded.includes(t2));
   if (typeof r.morning === "boolean") out.morning = r.morning;
+  const guide = one(r.guide, ["open", "away"]);
+  if (guide) out.guide = guide;
+  if (typeof r.readCall === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.readCall)) out.readCall = r.readCall;
   return out;
 }
 var prefsFile = (dir) => path14.join(dir, "dashboard.json");
@@ -21379,6 +21389,31 @@ function savePrefs(dir, change3, drop = []) {
 }
 var marketOf = (dir) => readPrefs(dir).market ?? [...SHIPPED_MARKET];
 var saveMarket = (dir, list2) => (isShipped(list2) ? savePrefs(dir, {}, ["market"]) : savePrefs(dir, { market: list2 })).market ?? [...SHIPPED_MARKET];
+
+// src/terminal/guide.ts
+var NAMES_TO_PICK = 3;
+function maskEmail(email2) {
+  const at = email2.lastIndexOf("@");
+  return at > 0 ? `${email2[0]}\u2026${email2.slice(at)}` : "";
+}
+function guideOf(f) {
+  const picked = /* @__PURE__ */ new Set([...f.watchlist.map((w) => w.symbol), ...f.queue.map((q) => q.symbol), ...f.calls.map((c) => c.ticker)]);
+  const tiers = [...picked].filter((s) => !s.startsWith("^")).map((s) => tierOf(s, f.market));
+  const names = tiers.filter((t2) => t2 === "names").length, market = tiers.includes("market"), sector = tiers.includes("sectors");
+  const asked = (/* @__PURE__ */ new Set([...f.queue.map((q) => q.symbol), ...f.calls.map((c) => c.ticker)])).size;
+  const automatic = f.listener ?? (f.autorun ? "Claude Code" : "");
+  const latest = [...f.calls].sort((a, b) => b.date.localeCompare(a.date))[0] ?? null;
+  const steps = {
+    email: { done: !!f.email, saved: f.email ? maskEmail(f.email) : "" },
+    picks: { done: names >= NAMES_TO_PICK && market && sector, names, need: NAMES_TO_PICK, market, sector },
+    analyse: { done: asked > 0 && !!automatic, asked, automatic },
+    read: { done: f.readCall, calls: f.calls.length, latest: latest ? { ticker: latest.ticker, date: latest.date, rating: latest.rating } : null },
+    paper: { done: f.record.weeks >= RECORD_WEEKS, weeks: f.record.weeks, need: RECORD_WEEKS, words: RECORD_WORDS }
+  };
+  const first = f.pref === void 0 && f.calls.length === 0;
+  const done = Object.values(steps).filter((s) => s.done).length;
+  return { show: f.pref === "open" || first, first, done, of: 5, ...steps };
+}
 
 // src/terminal/state.ts
 var marketView = (dir) => {
@@ -21409,7 +21444,8 @@ function versionOf(root2) {
     for (const d of fs16.readdirSync(runs)) latest = Math.max(latest, Number(stamp(path15.join(runs, d, "run.json"))));
   } catch {
   }
-  const timely = `${listenerOf(dir) ? "L" : "n"}${readQueue(dir).map((i) => i.state[0]).join("")}|${readPrefs(dir).market?.join(",") ?? "shipped"}`;
+  const p = readPrefs(dir);
+  const timely = `${listenerOf(dir) ? "L" : "n"}${readQueue(dir).map((i) => i.state[0]).join("")}|${p.market?.join(",") ?? "shipped"}|${p.guide ?? ""}${p.readCall ? "r" : ""}${p.autorun ? "a" : ""}|${today()}`;
   return [stamp(path15.join(dir, "journal.md")), stamp(path15.join(dir, "watchlist.json")), stamp(path15.join(dir, "queue.json")), latest, stamp(path15.join(dir, "contact.json")), stamp(path15.join(dir, "listener.json")), stamp(path15.join(dir, "paper.json")), timely].join("-");
 }
 function queueOf(dir, now = /* @__PURE__ */ new Date()) {
@@ -21438,19 +21474,23 @@ function stateOf(root2, day2) {
   })).reverse().sort((a, b) => b.date.localeCompare(a.date));
   const summary = summarize(entries), watchlist = readWatchlist(dir), market = marketView(dir);
   const { startHere, watch } = tiersOf(watchlist, market.symbols, calls);
+  const queue2 = queueOf(dir), listener = listenerOf(dir), prefs = readPrefs(dir), email2 = readContactEmail(root2);
+  const record2 = recordOf(entries.map((e) => ({ ticker: e.ticker, date: e.date, rating: e.rating })), day2);
+  const guide = guideOf({ email: email2, watchlist, market: market.symbols, queue: queue2, calls, listener: listener?.listener ?? null, autorun: prefs.autorun === true, readCall: !!prefs.readCall, record: record2, ...prefs.guide ? { pref: prefs.guide } : {} });
   return {
     version: versionOf(root2),
     today: day2,
     watchlist,
-    queue: queueOf(dir),
+    queue: queue2,
     calls,
     startHere,
     watchTiers: watch,
     market,
+    guide,
     record: { summary, text: renderSummary(summary), benchmarkNote: `Each call is judged after ${s.scoring.holdingPeriodDays} trading days against its market's index.` },
-    desk: { emailSaved: !!readContactEmail(root2), tradingEnabled: false, holdingDays: s.scoring.holdingPeriodDays },
-    analyses: { depth: depthOfRounds(s.analysis.debateRounds), perRun: s.routines.maxAnalyses, listener: listenerOf(dir) },
-    paper: { ...recordOf(entries.map((e) => ({ ticker: e.ticker, date: e.date, rating: e.rating })), day2), startUsd: readPaperStart(dir), minWeeks: RECORD_WEEKS }
+    desk: { emailSaved: !!email2, tradingEnabled: false, holdingDays: s.scoring.holdingPeriodDays },
+    analyses: { depth: depthOfRounds(s.analysis.debateRounds), perRun: s.routines.maxAnalyses, listener },
+    paper: { ...record2, startUsd: readPaperStart(dir), minWeeks: RECORD_WEEKS, minWords: RECORD_WORDS }
   };
 }
 function callOf(root2, ticker, date4) {
@@ -22020,6 +22060,7 @@ var KEY = /^[0-9a-f]{48}$/;
 var CLAIM = /^[0-9a-f]{36}$/;
 async function startTerminal(opts) {
   const { root: root2, assets } = opts, dir = deskDataDir(root2), deskId = deskIdOf(root2);
+  configure({ contact: readSettings(root2).sources.contact, secEmail: () => readContactEmail(root2) });
   const token = opts.key && KEY.test(opts.key) ? opts.key : crypto6.randomBytes(24).toString("hex");
   const code2 = opts.code ?? [], build = fingerprint(code2);
   let updated = false, restarting = false;
@@ -22223,6 +22264,7 @@ async function startTerminal(opts) {
       if (p === "/api/call") {
         const c = callOf(root2, sym2.toUpperCase(), url2.searchParams.get("date") ?? "");
         if (!c) throw new Refused2(404, "no such call");
+        if (!readPrefs(dir).readCall) savePrefs(dir, { readCall: day2 });
         return json(res, 200, c);
       }
       throw new Refused2(404, "not found");
@@ -22283,7 +22325,17 @@ async function startTerminal(opts) {
       delete b.autorun;
       delete b.market;
       delete b.morning;
+      delete b.readCall;
       return json(res, 200, savePrefs(dir, b));
+    }
+    if (p === "/api/contact" && method === "POST") {
+      let email2;
+      try {
+        email2 = saveContactEmail(root2, typeof b.email === "string" ? b.email : "");
+      } catch (e) {
+        throw new Refused2(400, e.message);
+      }
+      return json(res, 200, { saved: maskEmail(email2) });
     }
     if (p === "/api/screen/morning" && method === "POST") {
       if (typeof b.on !== "boolean") throw new Refused2(400, "say on or off");
@@ -22423,7 +22475,7 @@ async function startTerminal(opts) {
       if (b.on === false) return json(res, 200, robinhood.setTrading(false));
       if (b.on !== true || b.confirm !== "switch trading on") throw new Refused2(400, "to switch trading on, confirm it on the page");
       const record2 = recordOf(callsOf(), day2);
-      if (record2.weeks < RECORD_WEEKS && b.understood !== true) throw new Refused2(400, `the desk has ${record2.weeks} ${record2.weeks === 1 ? "week" : "weeks"} and ${record2.calls} ${record2.calls === 1 ? "call" : "calls"} of record, under four weeks: confirm on the page that you understand`);
+      if (record2.weeks < RECORD_WEEKS && b.understood !== true) throw new Refused2(400, `the desk has ${record2.weeks} ${record2.weeks === 1 ? "week" : "weeks"} and ${record2.calls} ${record2.calls === 1 ? "call" : "calls"} of record, under ${RECORD_WORDS}: confirm on the page that you understand`);
       return json(res, 200, robinhood.setTrading(true));
     }
     if (p === "/api/robinhood/refresh" && method === "POST") {

@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { RATINGS, REVIEW } from '../src/desk/rating.js';
 import { SECTOR_FUNDS } from '../src/desk/sectors.js';
 import { cleanMarket, marketSymbol, MAX_MARKET, PLAIN, SHIPPED_MARKET, START_NAMES, TIER_WORDS, TIERS, tierOf, tiersOf } from '../src/terminal/tiers.js';
-import { ratingMeaning, WORDS } from '../src/terminal/ui/fmt.js';
+import { ratingMeaning } from '../src/terminal/ui/fmt.js';
+import { GLOSSARY, means, type TermKey } from '../src/terminal/ui/glossary.js';
 import type { WatchItem } from '../src/terminal/store.js';
 
 const watch = (symbol: string, favourite = false): WatchItem => ({ symbol, favourite, addedOn: '2026-10-01' });
@@ -65,5 +66,5 @@ test('every word "Start here" uses has a one-line meaning: each tier, each broad
   for (const s of [...Object.keys(SECTOR_FUNDS), ...SHIPPED_MARKET, 'BTC-USD', 'ETH-USD']) assert.ok(PLAIN[s]?.name && PLAIN[s]!.meaning, s);
   for (const r of [...RATINGS, REVIEW]) assert.match(ratingMeaning(r), new RegExp(`^${r}: `), r);
   assert.equal(ratingMeaning('Maybe'), '', 'a rating the desk does not use has no meaning made up for it');
-  for (const w of Object.values(WORDS)) assert.match(w, /^[A-Z][^:]*: /);
+  for (const k of Object.keys(GLOSSARY) as TermKey[]) assert.match(means(k), /^[^:]+: \S/, k);
 });

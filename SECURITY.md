@@ -79,15 +79,24 @@ order tool.
   nothing about the number even to someone who knows the number.
 - The desk's own records (journal, reports, watchlist, holdings, the log of orders sent) stay in this folder's
   `desk-data`, which git never commits.
-- Your email goes to the SEC alone, which asks every reader of its filings for one.
+- Your email goes to the SEC alone, which asks every reader of its filings for one. You give it to the desk in a chat or
+  in the field in Get started on the dashboard; either way it is checked first (an address that reaches a person,
+  never a made-up example, and nothing that could split a request in two), kept in `desk-data/contact.json`, and sent
+  only with requests to the SEC (the dashboard's own sector look-ups included). The dashboard never shows it back in
+  full: only its first letter and its domain.
 - The dashboard answers on this computer's own address only, so nothing on the internet can reach it, and every request
   for data needs a key made each time it starts. The key is in no page it serves: the dashboard opens your browser on a
   one-time link, which the page swaps for the key once, within two minutes, and then keeps for itself. A page opened by
   hand has no key and says so; opening the dashboard again (run /terminal) opens a page that has one.
 - What the dashboard remembers between visits (light or dark, the side list, the page and the stock you were on, the
-  chart's settings, the stocks you looked at last, your whole-market funds and which watchlist tiers you folded) is kept
-  in `desk-data/dashboard.json`, each value checked before it is kept. Nothing about an order is ever remembered: every
-  ticket starts afresh.
+  chart's settings, the stocks you looked at last, your whole-market funds, which watchlist tiers you folded, whether
+  Get started is open, and the day you first opened a call in full, which the dashboard notes itself when it shows you
+  one and the page cannot set) is kept in `desk-data/dashboard.json`, each value checked before it is kept. Nothing
+  about an order is ever remembered: every ticket starts afresh.
+- Get started's ticks are read from the desk's own records (the email saved, the watchlist, the waiting list and who
+  listens for it, the journal, the paper record). It suggests the whole market and one or two sectors, never a company,
+  and its only buttons save your email, add to your watchlist, ask for analyses and switch on running them: none places
+  an order or connects anything.
 - After an update the dashboard offers Restart at the top of the page: new code on this computer runs only after your
   press, and never while an order is being sent. Stop, at the top right of the page, closes it.
 - The search box sends what you type to Yahoo Finance's public search, which suggests matching stocks.
@@ -100,7 +109,7 @@ order tool.
 - On a Monday the morning routine puts up to three of the holdings the desk sizes trades to on the waiting list, to be
   re-rated, and notes which in `desk-data/rerate.json`: never an order.
 - For the sector limit, the dashboard asks the SEC for the industry of the stocks you trade and hold and for its list of
-  funds (by ticker only, never a quantity or an account).
+  funds (by ticker only, never a quantity or an account), with your email as the SEC asks.
 - The desk always introduces itself by its own name, never as a web browser. Yahoo Finance gives its company data only
   to browsers, so for a company that does not file with the SEC that data is unavailable; everything about a US
   company comes from the SEC's own filings.
