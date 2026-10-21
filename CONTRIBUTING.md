@@ -56,13 +56,17 @@
   - `doorbell.json`: `{ at, waiting, why: "press"|"more" }`, written when the person presses Analyse, Retry or Run now,
     and by `end_queue_run` when stocks still wait. A runner starts a run when `at` changes, and never because the
     waiting list changed.
-  - `listener.json`: `{ listener, since, beat, pid?, lastRun?: { at, result } }`, kept by whoever listens, its `beat`
-    renewed at least once a minute (older than three minutes: not believed). The dashboard says who listens from it.
+  - `listener.json`: `{ listener, since, beat, pid?, lastRun?: { started?, at, result } }`, kept by whoever listens, its
+    `beat` renewed at least once a minute (older than three minutes: not believed). The dashboard says who listens from
+    it. `lastRun` is the last run: when it started and ended, and what it did or why it stopped, in plain words. With
+    `started`, a stock that run left running reads as failed at once, with the listener's words as its reason (without
+    it, only after two hours).
 - `src/watch/` - the desk's own listener for Claude Code (`node dist/watch.mjs`): `watcher.ts` keeps the contract above
   (a short wait so several presses make one run, one run at a time with at most one owed, no run when nothing waits,
   stopping when its note is taken away, and making way for an update between runs); `claude.ts` finds Claude Code
-  without a shell and runs it with the fixed words and options in `RUN_ARGS`, never from a project file;
-  `main.ts` is the program, logging to `desk-data/watcher.log`.
+  without a shell and runs it with the fixed words and options in `RUN_ARGS`, never from a project file, and
+  `stopReason` turns its last words, when it stops early, into the stock's reason (its usage limit and when it resets,
+  a sign-in, no credit, a busy service); `main.ts` is the program, logging to `desk-data/watcher.log`.
 - `src/desk/routine.ts` - the morning and evening briefs the routines run from (desk tool `routine_brief`, skill
   `/routine`, the team's playbook); `src/desk/orders.ts` - the dashboard's log of the orders it sent.
 - `src/desk/ticket.ts` - the order ticket: sizing from the person's settings and every cap check, on real figures only,
@@ -88,6 +92,8 @@
 
 ## Rules
 - TypeScript, ESM, Node 22, `node:test`. No Python, here or in anything the desk runs.
+- The desk's day is New York's (`data/dates.ts` `today` and `marketDay`), never the computer's or UTC's: every "today"
+  goes through them.
 - No agent ever gets an order tool. Orders come only from the person's Confirm in the dashboard, checked against the
   ticket they confirmed and their caps. The guard hook and its test keep this true.
 - The Robinhood sign-in never leaves `~/.trading-agents`, is never printed, and is never given to an agent.

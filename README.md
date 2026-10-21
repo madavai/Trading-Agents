@@ -218,7 +218,12 @@ Something has to run them. The page says who is listening:
 - **By hand**: ask the desk to "analyse what is waiting" in a chat, or type `/analyse` with no stock.
 
 A run of the waiting list never asks you anything: what it cannot do (for example, no email saved for the SEC yet) is
-marked failed with the reason, for you to fix and Retry.
+marked failed with the reason, for you to fix and Retry. When the run itself stops early, the stock it was on says why
+at once, in plain words: for example "Claude Code's weekly usage limit was reached; it resets 6am (America/Chicago).
+Press Retry after that." On the same day, Retry carries on from the step it stopped at.
+
+The desk counts days by New York's calendar, the market's own, wherever your computer is: an analysis run on an
+American evening is dated that day, not the next.
 
 ## Routines
 The trading-desk team has two routines, which Madav's scheduler can start for you:

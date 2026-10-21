@@ -36,6 +36,23 @@ function findClaude(env = process.env, platform = process.platform, exists = (p)
   for (const d of [...dirs, p.join(home, ".local", "bin"), p.join(home, ".claude", "local")]) if (exists(p.join(d, "claude"))) return { command: p.join(d, "claude"), args: [] };
   return null;
 }
+function stopReason(output) {
+  const lines = output.slice(-4e3).split(/\r?\n/).map((l) => l.trim()).filter(Boolean).reverse();
+  for (const line of lines) {
+    if (/hit your .*limit|usage limit|limit reached/i.test(line)) {
+      const kind = /\b(\d+-hour|weekly|daily|monthly|session)\b/i.exec(line)?.[1]?.toLowerCase();
+      const at = /\|(\d{10})\b/.exec(line)?.[1];
+      const resets = at ? new Date(Number(at) * 1e3).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" }) : /\bresets?\s+(?:at\s+)?([^·∙|]{1,60})/i.exec(line)?.[1]?.replace(/[^\w\s:,./()+-]/g, "").trim().replace(/[.,]+$/, "");
+      return `Claude Code's ${kind ? `${kind} ` : ""}usage limit was reached${resets ? `; it resets ${resets}` : ""}. Press Retry after that.`;
+    }
+    if (/not logged in|\/login\b|invalid api key|oauth token (has )?expired|authentication_error/i.test(line)) return "Claude Code is not signed in on this computer: open Claude Code, sign in, then press Retry.";
+    if (/credit balance is too low/i.test(line)) return "Claude Code's account has no credit left: add some, then press Retry.";
+    if (/overloaded|\b529\b/i.test(line)) return "Claude's service was too busy to answer: press Retry in a few minutes.";
+    const api = /API Error:?\s*(\d{3})/i.exec(line)?.[1];
+    if (api) return `Claude's service answered with an error (${api}): press Retry in a while.`;
+  }
+  return null;
+}
 function runClaude(cmd, root2, log2, timeoutMs = 3 * 60 * 6e4, args = RUN_ARGS) {
   return new Promise((resolve) => {
     let timedOut = false;
@@ -226,9 +243,12 @@ function itemOf(v) {
   if (state === "failed") out.reason = reason ?? "no reason was given";
   return out;
 }
-function settled(item, now) {
+function settled(item, now, note) {
   if (item.state !== "running") return item;
-  const started = Date.parse(item.startedAt ?? item.requestedAt);
+  const last = note?.lastRun, started = Date.parse(item.startedAt ?? item.requestedAt);
+  if (last?.started && Date.parse(last.started) <= started && started <= Date.parse(last.at)) {
+    return { ...item, state: "failed", reason: words(`${note.listener}'s run ended before this stock was finished: ${last.result}`, 300), endedAt: last.at };
+  }
   return now.getTime() - started > STALE_MS2 ? { ...item, state: "failed", reason: STALE_REASON, endedAt: now.toISOString() } : item;
 }
 function load(dir2, now) {
@@ -237,12 +257,12 @@ function load(dir2, now) {
     raw = JSON.parse(fs3.readFileSync(queueFile(dir2), "utf8"));
   } catch {
   }
-  const seen = /* @__PURE__ */ new Set(), out = [];
+  const seen = /* @__PURE__ */ new Set(), out = [], note = readListener(dir2, now);
   for (const v of Array.isArray(raw) ? raw : []) {
     const item = itemOf(v);
     if (!item || seen.has(item.symbol)) continue;
     seen.add(item.symbol);
-    out.push(settled(item, now));
+    out.push(settled(item, now, note));
   }
   return out;
 }
@@ -292,8 +312,8 @@ function readListener(dir2, now = /* @__PURE__ */ new Date()) {
     if (!listener || !since || !beat) return null;
     const note = { listener, since, beat, fresh: now.getTime() - Date.parse(beat) <= LISTENER_FRESH_MS };
     if (Number.isInteger(v.pid) && v.pid > 0) note.pid = v.pid;
-    const last = v.lastRun, lastAt = iso(last?.at), result = words(last?.result, 200);
-    if (lastAt && result) note.lastRun = { at: lastAt, result };
+    const last = v.lastRun, lastAt = iso(last?.at), result = words(last?.result, 200), started = iso(last?.started);
+    if (lastAt && result) note.lastRun = { ...started && Date.parse(started) <= Date.parse(lastAt) ? { started } : {}, at: lastAt, result };
     return note;
   } catch {
     return null;
@@ -344,10 +364,11 @@ function watch(o) {
     } catch (e) {
       trouble = e.message;
     }
-    for (const i of readQueue(o.dir)) if (i.state === "running" && (i.startedAt ?? "") >= start) finishItem(o.dir, i.symbol, { reason: "the run stopped before this stock was finished: press Retry" });
+    const why = trouble || "the run stopped before this stock was finished: press Retry";
+    for (const i of readQueue(o.dir)) if (i.state === "running" && (i.startedAt ?? "") >= start) finishItem(o.dir, i.symbol, { reason: why });
     const ended = readQueue(o.dir).filter((i) => (i.endedAt ?? "") >= start);
     const d = ended.filter((i) => i.state === "done").length, f = ended.filter((i) => i.state === "failed").length;
-    note.lastRun = { at: now().toISOString(), result: `${d} analysed, ${f} failed${trouble ? `; ${trouble}` : ""}` };
+    note.lastRun = { started: start, at: now().toISOString(), result: `${d} analysed, ${f} failed${trouble ? `; ${trouble}` : ""}` };
     running = false;
     beat();
     if (owed) {
@@ -427,12 +448,17 @@ try {
       log(`
 === ${(/* @__PURE__ */ new Date()).toISOString()} a run of the waiting list starts ===
 `);
-      const r = await runClaude(claude, root, log);
+      let said = "";
+      const r = await runClaude(claude, root, (t) => {
+        log(t);
+        said = (said + t).slice(-8e3);
+      });
       log(`
 === ${(/* @__PURE__ */ new Date()).toISOString()} the run ended${r.timedOut ? " (stopped after three hours)" : ""}, code ${r.code ?? "none"} ===
 `);
-      if (r.timedOut) return "the run took over three hours and was stopped";
-      return r.code === 0 ? void 0 : "Claude Code did not finish the run: see desk-data/watcher.log";
+      if (r.timedOut) return "the run took over three hours and was stopped: press Retry";
+      if (r.code === 0) return void 0;
+      return stopReason(said) ?? "Claude Code stopped before the run was finished (its words are in desk-data/watcher.log): press Retry";
     }
   });
 } catch (e) {

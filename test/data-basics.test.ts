@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { cryptoBase, normalizeSymbol, safeSymbol } from '../src/data/symbols.js';
-import { analysisDate, asOf, parseDate, window } from '../src/data/dates.js';
+import { analysisDate, asOf, parseDate, today, window } from '../src/data/dates.js';
 import { atr, bollinger, ema, macd, mfi, rsi, sma, vwma } from '../src/data/indicators.js';
 
 test('broker and chart-site symbols map to the ones the data uses', () => {
@@ -20,6 +20,18 @@ test('dates are held to the analysis date, and a future analysis is refused', ()
   assert.equal(asOf('2026-12-01', '2026-10-09'), '2026-10-09');
   assert.deepEqual(window('2026-09-01', '2026-12-01', '2026-10-09'), ['2026-09-01', '2026-10-09']);
   assert.deepEqual(window('2026-11-01', '2026-11-08', '2026-10-09'), ['2026-10-02', '2026-10-09']);
+  delete process.env.TRADING_AGENTS_TODAY;
+});
+
+test("the desk's day is New York's: an evening in America is still that day, wherever the computer is", () => {
+  assert.equal(today(new Date('2026-10-21T03:46:00Z')), '2026-10-20', '11:46 pm in New York on the 20th, already the 21st in UTC');
+  assert.equal(today(new Date('2026-10-21T04:00:00Z')), '2026-10-21', 'midnight in New York (summer time)');
+  assert.equal(today(new Date('2026-12-01T04:30:00Z')), '2026-11-30', 'winter time: New York is five hours behind');
+  assert.equal(today(new Date('2026-10-21T14:00:00Z')), '2026-10-21');
+  process.env.TRADING_AGENTS_TODAY = '2026-10-12';
+  assert.equal(today(), '2026-10-12', 'the tests still set today');
+  assert.equal(today(new Date('2026-10-21T03:46:00Z')), '2026-10-20', 'a given moment is its own day');
+  assert.throws(() => analysisDate('2026-10-13'), /New York's day/);
   delete process.env.TRADING_AGENTS_TODAY;
 });
 

@@ -37219,8 +37219,10 @@ function compute(name, bars) {
 
 // src/data/dates.ts
 var DAY = 864e5;
-function today() {
-  return process.env.TRADING_AGENTS_TODAY || (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+var marketDay = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+function today(now) {
+  if (!now && process.env.TRADING_AGENTS_TODAY) return process.env.TRADING_AGENTS_TODAY;
+  return marketDay(now ?? /* @__PURE__ */ new Date());
 }
 function parseDate(value, what = "date") {
   const v = String(value ?? "").trim();
@@ -37232,7 +37234,7 @@ function parseDate(value, what = "date") {
 }
 function analysisDate(value) {
   const d = parseDate(value, "analysis date");
-  if (d > today()) throw new Error(`the analysis date ${d} is in the future (today is ${today()})`);
+  if (d > today()) throw new Error(`the analysis date ${d} is in the future (today is ${today()}, New York's day, the market's: use it or an earlier day)`);
   return d;
 }
 var isHistorical = (date5) => date5 < today();
@@ -38435,6 +38437,7 @@ var QueueRefusal = class extends Error {
 };
 var queueFile = (dir) => path12.join(dir, "queue.json");
 var doorbellFile = (dir) => path12.join(dir, "doorbell.json");
+var listenerFile = (dir) => path12.join(dir, "listener.json");
 var iso = (v) => typeof v === "string" && v.length <= 40 && !Number.isNaN(Date.parse(v)) ? v : void 0;
 var day = (v) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : void 0;
 var words = (v, max) => {
@@ -38464,9 +38467,12 @@ function itemOf(v) {
   if (state === "failed") out.reason = reason2 ?? "no reason was given";
   return out;
 }
-function settled(item, now) {
+function settled(item, now, note) {
   if (item.state !== "running") return item;
-  const started = Date.parse(item.startedAt ?? item.requestedAt);
+  const last = note?.lastRun, started = Date.parse(item.startedAt ?? item.requestedAt);
+  if (last?.started && Date.parse(last.started) <= started && started <= Date.parse(last.at)) {
+    return { ...item, state: "failed", reason: words(`${note.listener}'s run ended before this stock was finished: ${last.result}`, 300), endedAt: last.at };
+  }
   return now.getTime() - started > STALE_MS2 ? { ...item, state: "failed", reason: STALE_REASON, endedAt: now.toISOString() } : item;
 }
 function load2(dir, now) {
@@ -38475,12 +38481,12 @@ function load2(dir, now) {
     raw = JSON.parse(fs11.readFileSync(queueFile(dir), "utf8"));
   } catch {
   }
-  const seen = /* @__PURE__ */ new Set(), out = [];
+  const seen = /* @__PURE__ */ new Set(), out = [], note = readListener(dir, now);
   for (const v of Array.isArray(raw) ? raw : []) {
     const item = itemOf(v);
     if (!item || seen.has(item.symbol)) continue;
     seen.add(item.symbol);
-    out.push(settled(item, now));
+    out.push(settled(item, now, note));
   }
   return out;
 }
@@ -38536,6 +38542,20 @@ function ringDoorbell(dir, why, now = /* @__PURE__ */ new Date()) {
   return bell;
 }
 var LISTENER_FRESH_MS = 3 * 6e4;
+function readListener(dir, now = /* @__PURE__ */ new Date()) {
+  try {
+    const v = JSON.parse(fs11.readFileSync(listenerFile(dir), "utf8"));
+    const listener = words(v.listener, 40), since = iso(v.since), beat = iso(v.beat) ?? since;
+    if (!listener || !since || !beat) return null;
+    const note = { listener, since, beat, fresh: now.getTime() - Date.parse(beat) <= LISTENER_FRESH_MS };
+    if (Number.isInteger(v.pid) && v.pid > 0) note.pid = v.pid;
+    const last = v.lastRun, lastAt = iso(last?.at), result = words(last?.result, 200), started = iso(last?.started);
+    if (lastAt && result) note.lastRun = { ...started && Date.parse(started) <= Date.parse(lastAt) ? { started } : {}, at: lastAt, result };
+    return note;
+  } catch {
+    return null;
+  }
+}
 
 // src/desk/settle.ts
 var pct2 = (v) => `${v >= 0 ? "+" : "-"}${(Math.abs(v) * 100).toFixed(1)}%`;
@@ -38635,7 +38655,6 @@ import path16 from "node:path";
 import fs12 from "node:fs";
 import path14 from "node:path";
 var file4 = (dir) => path14.join(dir, "orders.jsonl");
-var marketDay = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(d);
 function readOrders(dir) {
   try {
     return fs12.readFileSync(file4(dir), "utf8").split("\n").flatMap((l) => {
@@ -39000,7 +39019,7 @@ ${renderSummary(summarize(entries))}`;
     },
     annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false }
   }, async (a) => act(() => {
-    const h = saveHoldings(dir, { cash: a.cash, currency: a.currency, positions: a.positions.map((p) => ({ ticker: p.ticker, quantity: p.quantity, averagePrice: p.average_price })) }, (/* @__PURE__ */ new Date()).toISOString().slice(0, 10));
+    const h = saveHoldings(dir, { cash: a.cash, currency: a.currency, positions: a.positions.map((p) => ({ ticker: p.ticker, quantity: p.quantity, averagePrice: p.average_price })) }, today());
     return h.positions.length ? `Saved ${h.positions.length} position(s)${h.cash !== void 0 ? ` and cash ${h.cash}` : ""}.` : `Saved: the person holds nothing${h.cash !== void 0 ? `, with cash ${h.cash}` : ""}.`;
   }));
   server.registerTool("clear_holdings", {

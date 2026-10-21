@@ -8,7 +8,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { deskDataDir } from '../paths.js';
-import { findClaude, runClaude } from './claude.js';
+import { findClaude, runClaude, stopReason } from './claude.js';
 import { AlreadyListening, watch } from './watcher.js';
 
 const root = process.cwd(), dir = deskDataDir(root), logFile = path.join(dir, 'watcher.log');
@@ -39,10 +39,12 @@ try {
     dir, listener: 'Claude Code', retire: () => print() !== born,
     run: async () => {
       log(`\n=== ${new Date().toISOString()} a run of the waiting list starts ===\n`);
-      const r = await runClaude(claude, root, log);
+      let said = '';   // its last words, for why it stopped
+      const r = await runClaude(claude, root, (t) => { log(t); said = (said + t).slice(-8000); });
       log(`\n=== ${new Date().toISOString()} the run ended${r.timedOut ? ' (stopped after three hours)' : ''}, code ${r.code ?? 'none'} ===\n`);
-      if (r.timedOut) return 'the run took over three hours and was stopped';
-      return r.code === 0 ? undefined : 'Claude Code did not finish the run: see desk-data/watcher.log';
+      if (r.timedOut) return 'the run took over three hours and was stopped: press Retry';
+      if (r.code === 0) return undefined;
+      return stopReason(said) ?? 'Claude Code stopped before the run was finished (its words are in desk-data/watcher.log): press Retry';
     },
   });
 } catch (e) {

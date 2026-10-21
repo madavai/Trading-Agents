@@ -36,6 +36,29 @@ export function findClaude(env: NodeJS.ProcessEnv = process.env, platform: NodeJ
   return null;
 }
 
+/** Why a run of Claude Code stopped early, in plain words for the waiting list, from the last words it printed: its usage
+ *  limit (and when it resets, in its own words), a sign-in it needs, no credit left, or its service too busy. Null when
+ *  its words say nothing the desk knows. */
+export function stopReason(output: string): string | null {
+  const lines = output.slice(-4000).split(/\r?\n/).map((l) => l.trim()).filter(Boolean).reverse();
+  for (const line of lines) {
+    if (/hit your .*limit|usage limit|limit reached/i.test(line)) {
+      const kind = /\b(\d+-hour|weekly|daily|monthly|session)\b/i.exec(line)?.[1]?.toLowerCase();
+      const at = /\|(\d{10})\b/.exec(line)?.[1];
+      const resets = at
+        ? new Date(Number(at) * 1000).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })
+        : /\bresets?\s+(?:at\s+)?([^·∙|]{1,60})/i.exec(line)?.[1]?.replace(/[^\w\s:,./()+-]/g, '').trim().replace(/[.,]+$/, '');
+      return `Claude Code's ${kind ? `${kind} ` : ''}usage limit was reached${resets ? `; it resets ${resets}` : ''}. Press Retry after that.`;
+    }
+    if (/not logged in|\/login\b|invalid api key|oauth token (has )?expired|authentication_error/i.test(line)) return 'Claude Code is not signed in on this computer: open Claude Code, sign in, then press Retry.';
+    if (/credit balance is too low/i.test(line)) return "Claude Code's account has no credit left: add some, then press Retry.";
+    if (/overloaded|\b529\b/i.test(line)) return "Claude's service was too busy to answer: press Retry in a few minutes.";
+    const api = /API Error:?\s*(\d{3})/i.exec(line)?.[1];
+    if (api) return `Claude's service answered with an error (${api}): press Retry in a while.`;
+  }
+  return null;
+}
+
 /** One run of the team in `root`. Its words go to `log`; a run longer than `timeoutMs` (three hours) is stopped. */
 export function runClaude(cmd: Command, root: string, log: (text: string) => void, timeoutMs = 3 * 60 * 60_000, args: readonly string[] = RUN_ARGS): Promise<{ code: number | null; timedOut: boolean }> {
   return new Promise((resolve) => {
