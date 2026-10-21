@@ -3263,8 +3263,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path19) {
-      let input2 = path19;
+    function removeDotSegments(path21) {
+      let input2 = path21;
       const output2 = [];
       let nextSlash = -1;
       let len = 0;
@@ -3673,8 +3673,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path19 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path19 && path19 !== "/" ? path19 : void 0;
+        const path21 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path21 && path21 !== "/" ? path21 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -7187,12 +7187,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list2, fs15, exportName) {
+    function addFormats(ajv, list2, fs17, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list2)
-        ajv.addFormat(f, fs15[f]);
+        ajv.addFormat(f, fs17[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -7201,7 +7201,7 @@ var require_dist = __commonJS({
 });
 
 // src/tools/main.ts
-import path18 from "node:path";
+import path20 from "node:path";
 
 // node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
 import process2 from "node:process";
@@ -8023,10 +8023,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path19) {
-  if (!path19)
+function getElementAtPath(obj, path21) {
+  if (!path21)
     return obj;
-  return path19.reduce((acc, key) => acc?.[key], obj);
+  return path21.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -8366,11 +8366,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path19, issues) {
+function prefixIssues(path21, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path19);
+    iss.path.unshift(path21);
     return iss;
   });
 }
@@ -8832,16 +8832,16 @@ function flattenError(error62, mapper = (issue2) => issue2.message) {
 }
 function formatError(error62, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error63, path19 = []) => {
+  const processError = (error63, path21 = []) => {
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path19, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path21, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path19, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path21, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path19, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path21, ...issue2.path]);
       } else {
-        const fullpath = [...path19, ...issue2.path];
+        const fullpath = [...path21, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -8880,17 +8880,17 @@ function formatError(error62, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error62, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error63, path19 = []) => {
+  const processError = (error63, path21 = []) => {
     var _a3;
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path19, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path21, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path19, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path21, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path19, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path21, ...issue2.path]);
       } else {
-        const fullpath = [...path19, ...issue2.path];
+        const fullpath = [...path21, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -8929,8 +8929,8 @@ function treeifyError(error62, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path19 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path19) {
+  const path21 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path21) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -12281,7 +12281,7 @@ function isRecursive(inst, stack, resolve) {
     return PROVEN;
   stack.add(inst);
   let result = NONE;
-  const check2 = (child) => {
+  const check3 = (child) => {
     if (result !== PROVEN && child?._zod) {
       const answer2 = isRecursive(child, stack, resolve);
       if (answer2 > result)
@@ -12310,32 +12310,32 @@ function isRecursive(inst, stack, resolve) {
     case "object": {
       const raw = rawShape(def);
       merge2(raw ? shape(raw, true) : ASSUMED);
-      check2(def.catchall);
+      check3(def.catchall);
       break;
     }
     case "array":
-      check2(def.element);
+      check3(def.element);
       break;
     case "tuple":
       for (const el of def.items)
-        check2(el);
-      check2(def.rest);
+        check3(el);
+      check3(def.rest);
       break;
     case "record":
     case "map":
-      check2(def.keyType);
-      check2(def.valueType);
+      check3(def.keyType);
+      check3(def.valueType);
       break;
     case "set":
-      check2(def.valueType);
+      check3(def.valueType);
       break;
     case "union":
       for (const el of def.options)
-        check2(el);
+        check3(el);
       break;
     case "intersection":
-      check2(def.left);
-      check2(def.right);
+      check3(def.left);
+      check3(def.right);
       break;
     case "optional":
     case "nullable":
@@ -12346,15 +12346,15 @@ function isRecursive(inst, stack, resolve) {
     case "nonoptional":
     case "promise":
     case "success":
-      check2(def.innerType);
+      check3(def.innerType);
       break;
     case "pipe":
-      check2(def.in);
-      check2(def.out);
+      check3(def.in);
+      check3(def.out);
       break;
     case "function":
-      check2(def.input);
-      check2(def.output);
+      check3(def.input);
+      check3(def.output);
       break;
     // `$ZodLazy` caches its inner on the def, so a resolved edge is followed exactly
     case "lazy": {
@@ -12395,10 +12395,10 @@ function isRecursive(inst, stack, resolve) {
         if (!value || typeof value !== "object")
           continue;
         if (value._zod)
-          check2(value);
+          check3(value);
         else if (Array.isArray(value))
           for (const el of value)
-            check2(el);
+            check3(el);
       }
     }
   }
@@ -12823,7 +12823,7 @@ function az_default() {
 }
 
 // node_modules/zod/v4/locales/be.js
-function getBelarusianPlural(count, one, few, many) {
+function getBelarusianPlural(count, one3, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
   const lastTwoDigits = absCount % 100;
@@ -12831,7 +12831,7 @@ function getBelarusianPlural(count, one, few, many) {
     return many;
   }
   if (lastDigit === 1) {
-    return one;
+    return one3;
   }
   if (lastDigit >= 2 && lastDigit <= 4) {
     return few;
@@ -15471,8 +15471,8 @@ function hu_default() {
 }
 
 // node_modules/zod/v4/locales/hy.js
-function getArmenianPlural(count, one, many) {
-  return Math.abs(count) === 1 ? one : many;
+function getArmenianPlural(count, one3, many) {
+  return Math.abs(count) === 1 ? one3 : many;
 }
 function withDefiniteArticle(word) {
   if (!word)
@@ -18210,7 +18210,7 @@ function ro_default() {
 }
 
 // node_modules/zod/v4/locales/ru.js
-function getRussianPlural(count, one, few, many) {
+function getRussianPlural(count, one3, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
   const lastTwoDigits = absCount % 100;
@@ -18218,7 +18218,7 @@ function getRussianPlural(count, one, few, many) {
     return many;
   }
   if (lastDigit === 1) {
-    return one;
+    return one3;
   }
   if (lastDigit >= 2 && lastDigit <= 4) {
     return few;
@@ -20344,8 +20344,8 @@ function generateChecks(doc, ctx, schema, accessor) {
   if (!schemaChecks || schemaChecks.length === 0)
     return accessor;
   let currentAccessor = accessor;
-  for (const check2 of schemaChecks) {
-    const def = check2._zod.def;
+  for (const check3 of schemaChecks) {
+    const def = check3._zod.def;
     if (def.when && !WHEN_DEFAULTED_CHECKS.has(def.check)) {
       throw new ZodCompileUnsupportedError(`check with a custom "when" condition`);
     }
@@ -20393,7 +20393,7 @@ function generateChecks(doc, ctx, schema, accessor) {
         currentAccessor = generateStringFormatCheck(doc, ctx, def, currentAccessor);
         break;
       case "custom":
-        currentAccessor = generateCustomRefineCheck(doc, ctx, check2, currentAccessor);
+        currentAccessor = generateCustomRefineCheck(doc, ctx, check3, currentAccessor);
         break;
       case "bigint_format":
         generateBigIntFormatCheck(doc, def, currentAccessor);
@@ -20409,7 +20409,7 @@ function generateChecks(doc, ctx, schema, accessor) {
         break;
       case "overwrite": {
         const newAccessor = newVar(ctx);
-        generateOverwriteCheck(doc, ctx, check2, currentAccessor, newAccessor);
+        generateOverwriteCheck(doc, ctx, check3, currentAccessor, newAccessor);
         currentAccessor = newAccessor;
         break;
       }
@@ -20532,8 +20532,8 @@ function generatePropertyCheck(doc, ctx, def, accessor) {
   const propAccessor = `${accessor}[${JSON.stringify(def.property)}]`;
   generateCheck(doc, ctx, def.schema, propAccessor);
 }
-function generateOverwriteCheck(doc, ctx, check2, currentAccessor, newAccessor) {
-  const tx = check2._zod.def.tx;
+function generateOverwriteCheck(doc, ctx, check3, currentAccessor, newAccessor) {
+  const tx = check3._zod.def.tx;
   if (!tx) {
     throw new ZodCompileUnsupportedError("overwrite check without a transform function");
   }
@@ -20549,8 +20549,8 @@ function throwAsync() {
 function pushIssue(issue2) {
   this.issues.push(issue2);
 }
-function generateCustomRefineCheck(doc, ctx, check2, accessor) {
-  const def = check2._zod.def;
+function generateCustomRefineCheck(doc, ctx, check3, accessor) {
+  const def = check3._zod.def;
   if (def.fn) {
     if (isAsyncFunction(def.fn)) {
       throw new ZodCompileAsyncError("z.compile: async .refine() predicates are not supported");
@@ -20563,11 +20563,11 @@ function generateCustomRefineCheck(doc, ctx, check2, accessor) {
     doc.write(`if (!${resVar}) return INVALID;`);
     return accessor;
   }
-  if (check2._zod.check) {
-    if (isAsyncFunction(check2._zod.check)) {
+  if (check3._zod.check) {
+    if (isAsyncFunction(check3._zod.check)) {
       throw new ZodCompileAsyncError("z.compile: async .superRefine() / check functions are not supported");
     }
-    const checkFn = check2._zod.check;
+    const checkFn = check3._zod.check;
     const helperFn = (value) => {
       const fakePayload = { value, issues: [], addIssue: pushIssue };
       const result = checkFn(fakePayload);
@@ -21189,8 +21189,8 @@ function generateNullableCheck(doc, ctx, schema, accessor, buildsValue = true) {
   return outputVar;
 }
 function generateSizeGate(doc, schema, size) {
-  for (const [max, check2] of sizeCaps(schema._zod.def.checks)) {
-    doc.write(`if (${size} > ${numericOperand(max, check2._zod.def.check)}) return INVALID;`);
+  for (const [max, check3] of sizeCaps(schema._zod.def.checks)) {
+    doc.write(`if (${size} > ${numericOperand(max, check3._zod.def.check)}) return INVALID;`);
   }
 }
 function generateArrayCheck(doc, ctx, schema, accessor, buildsValue = true) {
@@ -24490,8 +24490,8 @@ var ZodType = /* @__PURE__ */ $constructor("ZodType", (inst, def) => {
     reg.add(this, meta3);
     return this;
   },
-  refine(check2, params) {
-    return this.check(refine(check2, params));
+  refine(check3, params) {
+    return this.check(refine(check3, params));
   },
   superRefine(refinement, params) {
     return this.check(superRefine(refinement, params));
@@ -26068,13 +26068,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path19 = ref.slice(1).split("/").filter(Boolean);
-  if (path19.length === 0) {
+  const path21 = ref.slice(1).split("/").filter(Boolean);
+  if (path21.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path19[0] === defsKey) {
-    const key = path19[1] === void 0 ? void 0 : decodeJSONPointerSegment(path19[1]);
+  if (path21[0] === defsKey) {
+    const key = path21[1] === void 0 ? void 0 : decodeJSONPointerSegment(path21[1]);
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -28932,8 +28932,8 @@ function getErrorMap2() {
 
 // node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path19, errorMaps, issueData } = params;
-  const fullPath = [...path19, ...issueData.path || []];
+  const { data, path: path21, errorMaps, issueData } = params;
+  const fullPath = [...path21, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -29048,11 +29048,11 @@ var errorUtil;
 
 // node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path19, key) {
+  constructor(parent, value, path21, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path19;
+    this._path = path21;
     this._key = key;
   }
   get path() {
@@ -29230,7 +29230,7 @@ var ZodType2 = class {
     const result = await (isAsync(maybeAsyncResult) ? maybeAsyncResult : Promise.resolve(maybeAsyncResult));
     return handleResult(ctx, result);
   }
-  refine(check2, message) {
+  refine(check3, message) {
     const getIssueProperties = (val) => {
       if (typeof message === "string" || typeof message === "undefined") {
         return { message };
@@ -29241,7 +29241,7 @@ var ZodType2 = class {
       }
     };
     return this._refinement((val, ctx) => {
-      const result = check2(val);
+      const result = check3(val);
       const setError = () => ctx.addIssue({
         code: ZodIssueCode2.custom,
         ...getIssueProperties(val)
@@ -29264,9 +29264,9 @@ var ZodType2 = class {
       }
     });
   }
-  refinement(check2, refinementData) {
+  refinement(check3, refinementData) {
     return this._refinement((val, ctx) => {
-      if (!check2(val)) {
+      if (!check3(val)) {
         ctx.addIssue(typeof refinementData === "function" ? refinementData(val, ctx) : refinementData);
         return false;
       } else {
@@ -29488,70 +29488,70 @@ var ZodString2 = class _ZodString2 extends ZodType2 {
     }
     const status = new ParseStatus();
     let ctx = void 0;
-    for (const check2 of this._def.checks) {
-      if (check2.kind === "min") {
-        if (input2.data.length < check2.value) {
+    for (const check3 of this._def.checks) {
+      if (check3.kind === "min") {
+        if (input2.data.length < check3.value) {
           ctx = this._getOrReturnCtx(input2, ctx);
           addIssueToContext(ctx, {
             code: ZodIssueCode2.too_small,
-            minimum: check2.value,
+            minimum: check3.value,
             type: "string",
             inclusive: true,
             exact: false,
-            message: check2.message
+            message: check3.message
           });
           status.dirty();
         }
-      } else if (check2.kind === "max") {
-        if (input2.data.length > check2.value) {
+      } else if (check3.kind === "max") {
+        if (input2.data.length > check3.value) {
           ctx = this._getOrReturnCtx(input2, ctx);
           addIssueToContext(ctx, {
             code: ZodIssueCode2.too_big,
-            maximum: check2.value,
+            maximum: check3.value,
             type: "string",
             inclusive: true,
             exact: false,
-            message: check2.message
+            message: check3.message
           });
           status.dirty();
         }
-      } else if (check2.kind === "length") {
-        const tooBig = input2.data.length > check2.value;
-        const tooSmall = input2.data.length < check2.value;
+      } else if (check3.kind === "length") {
+        const tooBig = input2.data.length > check3.value;
+        const tooSmall = input2.data.length < check3.value;
         if (tooBig || tooSmall) {
           ctx = this._getOrReturnCtx(input2, ctx);
           if (tooBig) {
             addIssueToContext(ctx, {
               code: ZodIssueCode2.too_big,
-              maximum: check2.value,
+              maximum: check3.value,
               type: "string",
               inclusive: true,
               exact: true,
-              message: check2.message
+              message: check3.message
             });
           } else if (tooSmall) {
             addIssueToContext(ctx, {
               code: ZodIssueCode2.too_small,
-              minimum: check2.value,
+              minimum: check3.value,
               type: "string",
               inclusive: true,
               exact: true,
-              message: check2.message
+              message: check3.message
             });
           }
           status.dirty();
         }
-      } else if (check2.kind === "email") {
+      } else if (check3.kind === "email") {
         if (!emailRegex.test(input2.data)) {
           ctx = this._getOrReturnCtx(input2, ctx);
           addIssueToContext(ctx, {
             validation: "email",
             code: ZodIssueCode2.invalid_string,
-            message: check2.message
+            message: check3.message
           });
           status.dirty();
         }
-      } else if (check2.kind === "emoji") {
+      } else if (check3.kind === "emoji") {
         if (!emojiRegex) {
           emojiRegex = new RegExp(_emojiRegex, "u");
         }
@@ -29560,61 +29560,61 @@ var ZodString2 = class _ZodString2 extends ZodType2 {
           addIssueToContext(ctx, {
             validation: "emoji",
             code: ZodIssueCode2.invalid_string,
-            message: check2.message
+            message: check3.message
           });
           status.dirty();
         }
-      } else if (check2.kind === "uuid") {
+      } else if (check3.kind === "uuid") {
         if (!uuidRegex.test(input2.data)) {
           ctx = this._getOrReturnCtx(input2, ctx);
           addIssueToContext(ctx, {
             validation: "uuid",
             code: ZodIssueCode2.invalid_string,
-            message: check2.message
+            message: check3.message
           });
           status.dirty();
         }
-      } else if (check2.kind === "nanoid") {
+      } else if (check3.kind === "nanoid") {
         if (!nanoidRegex.test(input2.data)) {
           ctx = this._getOrReturnCtx(input2, ctx);
           addIssueToContext(ctx, {
             validation: "nanoid",
             code: ZodIssueCode2.invalid_string,
-            message: check2.message
+            message: check3.message
           });
           status.dirty();
         }
-      } else if (check2.kind === "cuid") {
+      } else if (check3.kind === "cuid") {
         if (!cuidRegex.test(input2.data)) {
           ctx = this._getOrReturnCtx(input2, ctx);
           addIssueToContext(ctx, {
             validation: "cuid",
             code: ZodIssueCode2.invalid_string,
-            message: check2.message
+            message: check3.message
           });
           status.dirty();
         }
-      } else if (check2.kind === "cuid2") {
+      } else if (check3.kind === "cuid2") {
         if (!cuid2Regex.test(input2.data)) {
           ctx = this._getOrReturnCtx(input2, ctx);
           addIssueToContext(ctx, {
             validation: "cuid2",
             code: ZodIssueCode2.invalid_string,
-            message: check2.message
+            message: check3.message
           });
           status.dirty();
         }
-      } else if (check2.kind === "ulid") {
+      } else if (check3.kind === "ulid") {
         if (!ulidRegex.test(input2.data)) {
           ctx = this._getOrReturnCtx(input2, ctx);
           addIssueToContext(ctx, {
             validation: "ulid",
             code: ZodIssueCode2.invalid_string,
-            message: check2.message
+            message: check3.message
           });
           status.dirty();
         }
-      } else if (check2.kind === "url") {
+      } else if (check3.kind === "url") {
         try {
           new URL(input2.data);
         } catch {
@@ -29622,153 +29622,153 @@ var ZodString2 = class _ZodString2 extends ZodType2 {
           addIssueToContext(ctx, {
             validation: "url",
             code: ZodIssueCode2.invalid_string,
-            message: check2.message
+            message: check3.message
           });
           status.dirty();
         }
-      } else if (check2.kind === "regex") {
-        check2.regex.lastIndex = 0;
-        const testResult = check2.regex.test(input2.data);
+      } else if (check3.kind === "regex") {
+        check3.regex.lastIndex = 0;
+        const testResult = check3.regex.test(input2.data);
         if (!testResult) {
           ctx = this._getOrReturnCtx(input2, ctx);
           addIssueToContext(ctx, {
             validation: "regex",
             code: ZodIssueCode2.invalid_string,
-            message: check2.message
+            message: check3.message
           });
           status.dirty();
         }
-      } else if (check2.kind === "trim") {
+      } else if (check3.kind === "trim") {
         input2.data = input2.data.trim();
-      } else if (check2.kind === "includes") {
-        if (!input2.data.includes(check2.value, check2.position)) {
+      } else if (check3.kind === "includes") {
+        if (!input2.data.includes(check3.value, check3.position)) {
           ctx = this._getOrReturnCtx(input2, ctx);
           addIssueToContext(ctx, {
             code: ZodIssueCode2.invalid_string,
-            validation: { includes: check2.value, position: check2.position },
-            message: check2.message
+            validation: { includes: check3.value, position: check3.position },
+            message: check3.message
           });
           status.dirty();
         }
-      } else if (check2.kind === "toLowerCase") {
+      } else if (check3.kind === "toLowerCase") {
         input2.data = input2.data.toLowerCase();
-      } else if (check2.kind === "toUpperCase") {
+      } else if (check3.kind === "toUpperCase") {
         input2.data = input2.data.toUpperCase();
-      } else if (check2.kind === "startsWith") {
-        if (!input2.data.startsWith(check2.value)) {
+      } else if (check3.kind === "startsWith") {
+        if (!input2.data.startsWith(check3.value)) {
           ctx = this._getOrReturnCtx(input2, ctx);
           addIssueToContext(ctx, {
             code: ZodIssueCode2.invalid_string,
-            validation: { startsWith: check2.value },
-            message: check2.message
+            validation: { startsWith: check3.value },
+            message: check3.message
           });
           status.dirty();
         }
-      } else if (check2.kind === "endsWith") {
-        if (!input2.data.endsWith(check2.value)) {
+      } else if (check3.kind === "endsWith") {
+        if (!input2.data.endsWith(check3.value)) {
           ctx = this._getOrReturnCtx(input2, ctx);
           addIssueToContext(ctx, {
             code: ZodIssueCode2.invalid_string,
-            validation: { endsWith: check2.value },
-            message: check2.message
+            validation: { endsWith: check3.value },
+            message: check3.message
           });
           status.dirty();
         }
-      } else if (check2.kind === "datetime") {
-        const regex = datetimeRegex(check2);
+      } else if (check3.kind === "datetime") {
+        const regex = datetimeRegex(check3);
         if (!regex.test(input2.data)) {
           ctx = this._getOrReturnCtx(input2, ctx);
           addIssueToContext(ctx, {
             code: ZodIssueCode2.invalid_string,
             validation: "datetime",
-            message: check2.message
+            message: check3.message
           });
           status.dirty();
         }
-      } else if (check2.kind === "date") {
+      } else if (check3.kind === "date") {
         const regex = dateRegex;
         if (!regex.test(input2.data)) {
           ctx = this._getOrReturnCtx(input2, ctx);
           addIssueToContext(ctx, {
             code: ZodIssueCode2.invalid_string,
             validation: "date",
-            message: check2.message
+            message: check3.message
           });
           status.dirty();
         }
-      } else if (check2.kind === "time") {
-        const regex = timeRegex(check2);
+      } else if (check3.kind === "time") {
+        const regex = timeRegex(check3);
         if (!regex.test(input2.data)) {
           ctx = this._getOrReturnCtx(input2, ctx);
           addIssueToContext(ctx, {
             code: ZodIssueCode2.invalid_string,
             validation: "time",
-            message: check2.message
+            message: check3.message
           });
           status.dirty();
         }
-      } else if (check2.kind === "duration") {
+      } else if (check3.kind === "duration") {
         if (!durationRegex.test(input2.data)) {
           ctx = this._getOrReturnCtx(input2, ctx);
           addIssueToContext(ctx, {
             validation: "duration",
             code: ZodIssueCode2.invalid_string,
-            message: check2.message
+            message: check3.message
           });
           status.dirty();
         }
-      } else if (check2.kind === "ip") {
-        if (!isValidIP(input2.data, check2.version)) {
+      } else if (check3.kind === "ip") {
+        if (!isValidIP(input2.data, check3.version)) {
           ctx = this._getOrReturnCtx(input2, ctx);
           addIssueToContext(ctx, {
             validation: "ip",
             code: ZodIssueCode2.invalid_string,
-            message: check2.message
+            message: check3.message
           });
           status.dirty();
         }
-      } else if (check2.kind === "jwt") {
-        if (!isValidJWT2(input2.data, check2.alg)) {
+      } else if (check3.kind === "jwt") {
+        if (!isValidJWT2(input2.data, check3.alg)) {
           ctx = this._getOrReturnCtx(input2, ctx);
           addIssueToContext(ctx, {
             validation: "jwt",
             code: ZodIssueCode2.invalid_string,
-            message: check2.message
+            message: check3.message
           });
           status.dirty();
         }
-      } else if (check2.kind === "cidr") {
-        if (!isValidCidr(input2.data, check2.version)) {
+      } else if (check3.kind === "cidr") {
+        if (!isValidCidr(input2.data, check3.version)) {
           ctx = this._getOrReturnCtx(input2, ctx);
           addIssueToContext(ctx, {
             validation: "cidr",
             code: ZodIssueCode2.invalid_string,
-            message: check2.message
+            message: check3.message
           });
           status.dirty();
         }
-      } else if (check2.kind === "base64") {
+      } else if (check3.kind === "base64") {
         if (!base64Regex.test(input2.data)) {
           ctx = this._getOrReturnCtx(input2, ctx);
           addIssueToContext(ctx, {
             validation: "base64",
             code: ZodIssueCode2.invalid_string,
-            message: check2.message
+            message: check3.message
           });
           status.dirty();
         }
-      } else if (check2.kind === "base64url") {
+      } else if (check3.kind === "base64url") {
         if (!base64urlRegex.test(input2.data)) {
           ctx = this._getOrReturnCtx(input2, ctx);
           addIssueToContext(ctx, {
             validation: "base64url",
             code: ZodIssueCode2.invalid_string,
-            message: check2.message
+            message: check3.message
           });
           status.dirty();
         }
       } else {
-        util.assertNever(check2);
+        util.assertNever(check3);
       }
     }
     return { status: status.value, value: input2.data };
@@ -29780,10 +29780,10 @@ var ZodString2 = class _ZodString2 extends ZodType2 {
       ...errorUtil.errToObj(message)
     });
   }
-  _addCheck(check2) {
+  _addCheck(check3) {
     return new _ZodString2({
       ...this._def,
-      checks: [...this._def.checks, check2]
+      checks: [...this._def.checks, check3]
     });
   }
   email(message) {
@@ -30048,67 +30048,67 @@ var ZodNumber2 = class _ZodNumber extends ZodType2 {
     }
     let ctx = void 0;
     const status = new ParseStatus();
-    for (const check2 of this._def.checks) {
-      if (check2.kind === "int") {
+    for (const check3 of this._def.checks) {
+      if (check3.kind === "int") {
         if (!util.isInteger(input2.data)) {
           ctx = this._getOrReturnCtx(input2, ctx);
           addIssueToContext(ctx, {
             code: ZodIssueCode2.invalid_type,
             expected: "integer",
             received: "float",
-            message: check2.message
+            message: check3.message
           });
           status.dirty();
         }
-      } else if (check2.kind === "min") {
-        const tooSmall = check2.inclusive ? input2.data < check2.value : input2.data <= check2.value;
+      } else if (check3.kind === "min") {
+        const tooSmall = check3.inclusive ? input2.data < check3.value : input2.data <= check3.value;
         if (tooSmall) {
           ctx = this._getOrReturnCtx(input2, ctx);
           addIssueToContext(ctx, {
             code: ZodIssueCode2.too_small,
-            minimum: check2.value,
+            minimum: check3.value,
             type: "number",
-            inclusive: check2.inclusive,
+            inclusive: check3.inclusive,
             exact: false,
-            message: check2.message
+            message: check3.message
           });
           status.dirty();
         }
-      } else if (check2.kind === "max") {
-        const tooBig = check2.inclusive ? input2.data > check2.value : input2.data >= check2.value;
+      } else if (check3.kind === "max") {
+        const tooBig = check3.inclusive ? input2.data > check3.value : input2.data >= check3.value;
         if (tooBig) {
           ctx = this._getOrReturnCtx(input2, ctx);
           addIssueToContext(ctx, {
             code: ZodIssueCode2.too_big,
-            maximum: check2.value,
+            maximum: check3.value,
             type: "number",
-            inclusive: check2.inclusive,
+            inclusive: check3.inclusive,
             exact: false,
-            message: check2.message
+            message: check3.message
           });
           status.dirty();
         }
-      } else if (check2.kind === "multipleOf") {
-        if (floatSafeRemainder2(input2.data, check2.value) !== 0) {
+      } else if (check3.kind === "multipleOf") {
+        if (floatSafeRemainder2(input2.data, check3.value) !== 0) {
           ctx = this._getOrReturnCtx(input2, ctx);
           addIssueToContext(ctx, {
             code: ZodIssueCode2.not_multiple_of,
-            multipleOf: check2.value,
-            message: check2.message
+            multipleOf: check3.value,
+            message: check3.message
           });
           status.dirty();
         }
-      } else if (check2.kind === "finite") {
+      } else if (check3.kind === "finite") {
         if (!Number.isFinite(input2.data)) {
           ctx = this._getOrReturnCtx(input2, ctx);
           addIssueToContext(ctx, {
             code: ZodIssueCode2.not_finite,
-            message: check2.message
+            message: check3.message
           });
           status.dirty();
         }
       } else {
-        util.assertNever(check2);
+        util.assertNever(check3);
       }
     }
     return { status: status.value, value: input2.data };
@@ -30139,10 +30139,10 @@ var ZodNumber2 = class _ZodNumber extends ZodType2 {
       ]
     });
   }
-  _addCheck(check2) {
+  _addCheck(check3) {
     return new _ZodNumber({
       ...this._def,
-      checks: [...this._def.checks, check2]
+      checks: [...this._def.checks, check3]
     });
   }
   int(message) {
@@ -30277,45 +30277,45 @@ var ZodBigInt2 = class _ZodBigInt extends ZodType2 {
     }
     let ctx = void 0;
     const status = new ParseStatus();
-    for (const check2 of this._def.checks) {
-      if (check2.kind === "min") {
-        const tooSmall = check2.inclusive ? input2.data < check2.value : input2.data <= check2.value;
+    for (const check3 of this._def.checks) {
+      if (check3.kind === "min") {
+        const tooSmall = check3.inclusive ? input2.data < check3.value : input2.data <= check3.value;
         if (tooSmall) {
           ctx = this._getOrReturnCtx(input2, ctx);
           addIssueToContext(ctx, {
             code: ZodIssueCode2.too_small,
             type: "bigint",
-            minimum: check2.value,
-            inclusive: check2.inclusive,
-            message: check2.message
+            minimum: check3.value,
+            inclusive: check3.inclusive,
+            message: check3.message
           });
           status.dirty();
         }
-      } else if (check2.kind === "max") {
-        const tooBig = check2.inclusive ? input2.data > check2.value : input2.data >= check2.value;
+      } else if (check3.kind === "max") {
+        const tooBig = check3.inclusive ? input2.data > check3.value : input2.data >= check3.value;
         if (tooBig) {
           ctx = this._getOrReturnCtx(input2, ctx);
           addIssueToContext(ctx, {
             code: ZodIssueCode2.too_big,
             type: "bigint",
-            maximum: check2.value,
-            inclusive: check2.inclusive,
-            message: check2.message
+            maximum: check3.value,
+            inclusive: check3.inclusive,
+            message: check3.message
           });
           status.dirty();
         }
-      } else if (check2.kind === "multipleOf") {
-        if (input2.data % check2.value !== BigInt(0)) {
+      } else if (check3.kind === "multipleOf") {
+        if (input2.data % check3.value !== BigInt(0)) {
           ctx = this._getOrReturnCtx(input2, ctx);
           addIssueToContext(ctx, {
             code: ZodIssueCode2.not_multiple_of,
-            multipleOf: check2.value,
-            message: check2.message
+            multipleOf: check3.value,
+            message: check3.message
           });
           status.dirty();
         }
       } else {
-        util.assertNever(check2);
+        util.assertNever(check3);
       }
     }
     return { status: status.value, value: input2.data };
@@ -30355,10 +30355,10 @@ var ZodBigInt2 = class _ZodBigInt extends ZodType2 {
       ]
     });
   }
-  _addCheck(check2) {
+  _addCheck(check3) {
     return new _ZodBigInt({
       ...this._def,
-      checks: [...this._def.checks, check2]
+      checks: [...this._def.checks, check3]
     });
   }
   positive(message) {
@@ -30478,35 +30478,35 @@ var ZodDate2 = class _ZodDate extends ZodType2 {
     }
     const status = new ParseStatus();
     let ctx = void 0;
-    for (const check2 of this._def.checks) {
-      if (check2.kind === "min") {
-        if (input2.data.getTime() < check2.value) {
+    for (const check3 of this._def.checks) {
+      if (check3.kind === "min") {
+        if (input2.data.getTime() < check3.value) {
           ctx = this._getOrReturnCtx(input2, ctx);
           addIssueToContext(ctx, {
             code: ZodIssueCode2.too_small,
-            message: check2.message,
+            message: check3.message,
             inclusive: true,
             exact: false,
-            minimum: check2.value,
+            minimum: check3.value,
             type: "date"
           });
           status.dirty();
         }
-      } else if (check2.kind === "max") {
-        if (input2.data.getTime() > check2.value) {
+      } else if (check3.kind === "max") {
+        if (input2.data.getTime() > check3.value) {
           ctx = this._getOrReturnCtx(input2, ctx);
           addIssueToContext(ctx, {
             code: ZodIssueCode2.too_big,
-            message: check2.message,
+            message: check3.message,
             inclusive: true,
             exact: false,
-            maximum: check2.value,
+            maximum: check3.value,
             type: "date"
           });
           status.dirty();
         }
       } else {
-        util.assertNever(check2);
+        util.assertNever(check3);
       }
     }
     return {
@@ -30514,10 +30514,10 @@ var ZodDate2 = class _ZodDate extends ZodType2 {
       value: new Date(input2.data.getTime())
     };
   }
-  _addCheck(check2) {
+  _addCheck(check3) {
     return new _ZodDate({
       ...this._def,
-      checks: [...this._def.checks, check2]
+      checks: [...this._def.checks, check3]
     });
   }
   min(minDate, message) {
@@ -32603,11 +32603,11 @@ function normalizeObjectSchema(schema) {
   }
   return void 0;
 }
-function getDotPath(path19) {
-  if (path19.length === 0) {
+function getDotPath(path21) {
+  if (path21.length === 0) {
     return "object root";
   }
-  return path19.reduce((acc, seg, index) => {
+  return path21.reduce((acc, seg, index) => {
     if (index === 0) {
       return String(seg);
     }
@@ -32813,38 +32813,38 @@ function parseBigintDef(def, refs) {
   };
   if (!def.checks)
     return res;
-  for (const check2 of def.checks) {
-    switch (check2.kind) {
+  for (const check3 of def.checks) {
+    switch (check3.kind) {
       case "min":
         if (refs.target === "jsonSchema7") {
-          if (check2.inclusive) {
-            setResponseValueAndErrors(res, "minimum", check2.value, check2.message, refs);
+          if (check3.inclusive) {
+            setResponseValueAndErrors(res, "minimum", check3.value, check3.message, refs);
           } else {
-            setResponseValueAndErrors(res, "exclusiveMinimum", check2.value, check2.message, refs);
+            setResponseValueAndErrors(res, "exclusiveMinimum", check3.value, check3.message, refs);
           }
         } else {
-          if (!check2.inclusive) {
+          if (!check3.inclusive) {
             res.exclusiveMinimum = true;
           }
-          setResponseValueAndErrors(res, "minimum", check2.value, check2.message, refs);
+          setResponseValueAndErrors(res, "minimum", check3.value, check3.message, refs);
         }
         break;
       case "max":
         if (refs.target === "jsonSchema7") {
-          if (check2.inclusive) {
-            setResponseValueAndErrors(res, "maximum", check2.value, check2.message, refs);
+          if (check3.inclusive) {
+            setResponseValueAndErrors(res, "maximum", check3.value, check3.message, refs);
           } else {
-            setResponseValueAndErrors(res, "exclusiveMaximum", check2.value, check2.message, refs);
+            setResponseValueAndErrors(res, "exclusiveMaximum", check3.value, check3.message, refs);
           }
         } else {
-          if (!check2.inclusive) {
+          if (!check3.inclusive) {
             res.exclusiveMaximum = true;
           }
-          setResponseValueAndErrors(res, "maximum", check2.value, check2.message, refs);
+          setResponseValueAndErrors(res, "maximum", check3.value, check3.message, refs);
         }
         break;
       case "multipleOf":
-        setResponseValueAndErrors(res, "multipleOf", check2.value, check2.message, refs);
+        setResponseValueAndErrors(res, "multipleOf", check3.value, check3.message, refs);
         break;
     }
   }
@@ -32900,15 +32900,15 @@ var integerDateParser = (def, refs) => {
   if (refs.target === "openApi3") {
     return res;
   }
-  for (const check2 of def.checks) {
-    switch (check2.kind) {
+  for (const check3 of def.checks) {
+    switch (check3.kind) {
       case "min":
         setResponseValueAndErrors(
           res,
           "minimum",
-          check2.value,
+          check3.value,
           // This is in milliseconds
-          check2.message,
+          check3.message,
           refs
         );
         break;
@@ -32916,9 +32916,9 @@ var integerDateParser = (def, refs) => {
         setResponseValueAndErrors(
           res,
           "maximum",
-          check2.value,
+          check3.value,
           // This is in milliseconds
-          check2.message,
+          check3.message,
           refs
         );
         break;
@@ -33064,118 +33064,118 @@ function parseStringDef(def, refs) {
     type: "string"
   };
   if (def.checks) {
-    for (const check2 of def.checks) {
-      switch (check2.kind) {
+    for (const check3 of def.checks) {
+      switch (check3.kind) {
         case "min":
-          setResponseValueAndErrors(res, "minLength", typeof res.minLength === "number" ? Math.max(res.minLength, check2.value) : check2.value, check2.message, refs);
+          setResponseValueAndErrors(res, "minLength", typeof res.minLength === "number" ? Math.max(res.minLength, check3.value) : check3.value, check3.message, refs);
           break;
         case "max":
-          setResponseValueAndErrors(res, "maxLength", typeof res.maxLength === "number" ? Math.min(res.maxLength, check2.value) : check2.value, check2.message, refs);
+          setResponseValueAndErrors(res, "maxLength", typeof res.maxLength === "number" ? Math.min(res.maxLength, check3.value) : check3.value, check3.message, refs);
           break;
         case "email":
           switch (refs.emailStrategy) {
             case "format:email":
-              addFormat(res, "email", check2.message, refs);
+              addFormat(res, "email", check3.message, refs);
               break;
             case "format:idn-email":
-              addFormat(res, "idn-email", check2.message, refs);
+              addFormat(res, "idn-email", check3.message, refs);
               break;
             case "pattern:zod":
-              addPattern2(res, zodPatterns.email, check2.message, refs);
+              addPattern2(res, zodPatterns.email, check3.message, refs);
               break;
           }
           break;
         case "url":
-          addFormat(res, "uri", check2.message, refs);
+          addFormat(res, "uri", check3.message, refs);
           break;
         case "uuid":
-          addFormat(res, "uuid", check2.message, refs);
+          addFormat(res, "uuid", check3.message, refs);
           break;
         case "regex":
-          addPattern2(res, check2.regex, check2.message, refs);
+          addPattern2(res, check3.regex, check3.message, refs);
           break;
         case "cuid":
-          addPattern2(res, zodPatterns.cuid, check2.message, refs);
+          addPattern2(res, zodPatterns.cuid, check3.message, refs);
           break;
         case "cuid2":
-          addPattern2(res, zodPatterns.cuid2, check2.message, refs);
+          addPattern2(res, zodPatterns.cuid2, check3.message, refs);
           break;
         case "startsWith":
-          addPattern2(res, RegExp(`^${escapeLiteralCheckValue(check2.value, refs)}`), check2.message, refs);
+          addPattern2(res, RegExp(`^${escapeLiteralCheckValue(check3.value, refs)}`), check3.message, refs);
           break;
         case "endsWith":
-          addPattern2(res, RegExp(`${escapeLiteralCheckValue(check2.value, refs)}$`), check2.message, refs);
+          addPattern2(res, RegExp(`${escapeLiteralCheckValue(check3.value, refs)}$`), check3.message, refs);
           break;
         case "datetime":
-          addFormat(res, "date-time", check2.message, refs);
+          addFormat(res, "date-time", check3.message, refs);
           break;
         case "date":
-          addFormat(res, "date", check2.message, refs);
+          addFormat(res, "date", check3.message, refs);
           break;
         case "time":
-          addFormat(res, "time", check2.message, refs);
+          addFormat(res, "time", check3.message, refs);
           break;
         case "duration":
-          addFormat(res, "duration", check2.message, refs);
+          addFormat(res, "duration", check3.message, refs);
           break;
         case "length":
-          setResponseValueAndErrors(res, "minLength", typeof res.minLength === "number" ? Math.max(res.minLength, check2.value) : check2.value, check2.message, refs);
-          setResponseValueAndErrors(res, "maxLength", typeof res.maxLength === "number" ? Math.min(res.maxLength, check2.value) : check2.value, check2.message, refs);
+          setResponseValueAndErrors(res, "minLength", typeof res.minLength === "number" ? Math.max(res.minLength, check3.value) : check3.value, check3.message, refs);
+          setResponseValueAndErrors(res, "maxLength", typeof res.maxLength === "number" ? Math.min(res.maxLength, check3.value) : check3.value, check3.message, refs);
           break;
         case "includes": {
-          addPattern2(res, RegExp(escapeLiteralCheckValue(check2.value, refs)), check2.message, refs);
+          addPattern2(res, RegExp(escapeLiteralCheckValue(check3.value, refs)), check3.message, refs);
           break;
         }
         case "ip": {
-          if (check2.version !== "v6") {
-            addFormat(res, "ipv4", check2.message, refs);
+          if (check3.version !== "v6") {
+            addFormat(res, "ipv4", check3.message, refs);
           }
-          if (check2.version !== "v4") {
-            addFormat(res, "ipv6", check2.message, refs);
+          if (check3.version !== "v4") {
+            addFormat(res, "ipv6", check3.message, refs);
           }
           break;
         }
         case "base64url":
-          addPattern2(res, zodPatterns.base64url, check2.message, refs);
+          addPattern2(res, zodPatterns.base64url, check3.message, refs);
           break;
         case "jwt":
-          addPattern2(res, zodPatterns.jwt, check2.message, refs);
+          addPattern2(res, zodPatterns.jwt, check3.message, refs);
           break;
         case "cidr": {
-          if (check2.version !== "v6") {
-            addPattern2(res, zodPatterns.ipv4Cidr, check2.message, refs);
+          if (check3.version !== "v6") {
+            addPattern2(res, zodPatterns.ipv4Cidr, check3.message, refs);
           }
-          if (check2.version !== "v4") {
-            addPattern2(res, zodPatterns.ipv6Cidr, check2.message, refs);
+          if (check3.version !== "v4") {
+            addPattern2(res, zodPatterns.ipv6Cidr, check3.message, refs);
           }
           break;
         }
         case "emoji":
-          addPattern2(res, zodPatterns.emoji(), check2.message, refs);
+          addPattern2(res, zodPatterns.emoji(), check3.message, refs);
           break;
         case "ulid": {
-          addPattern2(res, zodPatterns.ulid, check2.message, refs);
+          addPattern2(res, zodPatterns.ulid, check3.message, refs);
           break;
         }
         case "base64": {
           switch (refs.base64Strategy) {
             case "format:binary": {
-              addFormat(res, "binary", check2.message, refs);
+              addFormat(res, "binary", check3.message, refs);
               break;
             }
             case "contentEncoding:base64": {
-              setResponseValueAndErrors(res, "contentEncoding", "base64", check2.message, refs);
+              setResponseValueAndErrors(res, "contentEncoding", "base64", check3.message, refs);
               break;
             }
             case "pattern:zod": {
-              addPattern2(res, zodPatterns.base64, check2.message, refs);
+              addPattern2(res, zodPatterns.base64, check3.message, refs);
               break;
             }
           }
           break;
         }
         case "nanoid": {
-          addPattern2(res, zodPatterns.nanoid, check2.message, refs);
+          addPattern2(res, zodPatterns.nanoid, check3.message, refs);
         }
         case "toLowerCase":
         case "toUpperCase":
@@ -33183,7 +33183,7 @@ function parseStringDef(def, refs) {
           break;
         default:
           /* @__PURE__ */ ((_) => {
-          })(check2);
+          })(check3);
       }
     }
   }
@@ -33553,42 +33553,42 @@ function parseNumberDef(def, refs) {
   };
   if (!def.checks)
     return res;
-  for (const check2 of def.checks) {
-    switch (check2.kind) {
+  for (const check3 of def.checks) {
+    switch (check3.kind) {
       case "int":
         res.type = "integer";
-        addErrorMessage(res, "type", check2.message, refs);
+        addErrorMessage(res, "type", check3.message, refs);
         break;
       case "min":
         if (refs.target === "jsonSchema7") {
-          if (check2.inclusive) {
-            setResponseValueAndErrors(res, "minimum", check2.value, check2.message, refs);
+          if (check3.inclusive) {
+            setResponseValueAndErrors(res, "minimum", check3.value, check3.message, refs);
           } else {
-            setResponseValueAndErrors(res, "exclusiveMinimum", check2.value, check2.message, refs);
+            setResponseValueAndErrors(res, "exclusiveMinimum", check3.value, check3.message, refs);
           }
         } else {
-          if (!check2.inclusive) {
+          if (!check3.inclusive) {
             res.exclusiveMinimum = true;
           }
-          setResponseValueAndErrors(res, "minimum", check2.value, check2.message, refs);
+          setResponseValueAndErrors(res, "minimum", check3.value, check3.message, refs);
         }
         break;
       case "max":
         if (refs.target === "jsonSchema7") {
-          if (check2.inclusive) {
-            setResponseValueAndErrors(res, "maximum", check2.value, check2.message, refs);
+          if (check3.inclusive) {
+            setResponseValueAndErrors(res, "maximum", check3.value, check3.message, refs);
           } else {
-            setResponseValueAndErrors(res, "exclusiveMaximum", check2.value, check2.message, refs);
+            setResponseValueAndErrors(res, "exclusiveMaximum", check3.value, check3.message, refs);
           }
         } else {
-          if (!check2.inclusive) {
+          if (!check3.inclusive) {
             res.exclusiveMaximum = true;
           }
-          setResponseValueAndErrors(res, "maximum", check2.value, check2.message, refs);
+          setResponseValueAndErrors(res, "maximum", check3.value, check3.message, refs);
         }
         break;
       case "multipleOf":
-        setResponseValueAndErrors(res, "multipleOf", check2.value, check2.message, refs);
+        setResponseValueAndErrors(res, "multipleOf", check3.value, check3.message, refs);
         break;
     }
   }
@@ -37316,6 +37316,7 @@ function normalizeSymbol(raw) {
   if (sh) return `${sh[1]}.SS`;
   return s;
 }
+var isCrypto = (raw) => cryptoBase(raw) !== null;
 function safeSymbol(raw) {
   const s = normalizeSymbol(raw);
   if (!/^[A-Z0-9.\-=^]{1,20}$/.test(s)) throw new Error(`"${raw}" is not a ticker symbol this desk can look up`);
@@ -37487,15 +37488,15 @@ function gap(found, from, to, subject) {
   return `No ${subject} between ${from} and ${to} in Yahoo Finance's search results. Search returns a sample, so this is not proof that nothing happened.`;
 }
 async function companyNews(raw, analysis2, lookBackDays, limit) {
-  const day3 = analysisDate(analysis2), sym = normalizeSymbol(raw), from = addDays(day3, -lookBackDays);
-  const all = await search(sym, Math.max(limit * 2, 20));
+  const day3 = analysisDate(analysis2), sym2 = normalizeSymbol(raw), from = addDays(day3, -lookBackDays);
+  const all = await search(sym2, Math.max(limit * 2, 20));
   const untagged = all.length > 0 && all.every((a) => a.tickers.length === 0);
-  const found = untagged ? all : all.filter((a) => a.tickers.includes(sym));
-  if (!found.length) throw new Unavailable(`Yahoo Finance's search has no articles tagged ${sym} (it tags few listings outside the US)`);
+  const found = untagged ? all : all.filter((a) => a.tickers.includes(sym2));
+  if (!found.length) throw new Unavailable(`Yahoo Finance's search has no articles tagged ${sym2} (it tags few listings outside the US)`);
   const list2 = found.filter((a) => inWindow(a, from, day3)).sort((a, b) => b.time.localeCompare(a.time)).slice(0, limit);
-  if (!list2.length) return gap(found, from, day3, `news about ${sym}`);
-  const how = untagged ? `matched by Yahoo's search for "${sym}", not tagged: check each is about this company` : `tagged ${sym}`;
-  return [`News about ${sym}, ${from} to ${day3} (${list2.length} article${list2.length === 1 ? "" : "s"} ${how}; headlines only)`, "", render2(list2)].join("\n");
+  if (!list2.length) return gap(found, from, day3, `news about ${sym2}`);
+  const how = untagged ? `matched by Yahoo's search for "${sym2}", not tagged: check each is about this company` : `tagged ${sym2}`;
+  return [`News about ${sym2}, ${from} to ${day3} (${list2.length} article${list2.length === 1 ? "" : "s"} ${how}; headlines only)`, "", render2(list2)].join("\n");
 }
 async function worldNews(analysis2, lookBackDays, limit, queries) {
   const day3 = analysisDate(analysis2), from = addDays(day3, -lookBackDays);
@@ -37523,8 +37524,8 @@ var clip = (s, n2) => s.length > n2 ? `${s.slice(0, n2 - 1)}\u2026` : s;
 var decode3 = (s) => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;|&#x27;/g, "'").replace(/&amp;/g, "&");
 var plain = (html) => decode3(decode3(html).replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
 async function stocktwits(raw, from, to, limit) {
-  const base = cryptoBase(raw), sym = base ? `${base}.X` : normalizeSymbol(raw);
-  const j = await getJson(`https://api.stocktwits.com/api/2/streams/symbol/${encodeURIComponent(sym)}.json`);
+  const base = cryptoBase(raw), sym2 = base ? `${base}.X` : normalizeSymbol(raw);
+  const j = await getJson(`https://api.stocktwits.com/api/2/streams/symbol/${encodeURIComponent(sym2)}.json`);
   return (j.messages ?? []).filter((m2) => m2.body && m2.created_at).map((m2) => ({ time: m2.created_at.slice(0, 16).replace("T", " "), text: clip(m2.body.replace(/\s+/g, " ").trim(), 280), tag: m2.entities?.sentiment?.basic ?? void 0 })).filter((p) => p.time.slice(0, 10) >= from && p.time.slice(0, 10) <= to).slice(0, limit);
 }
 function parseAtom(xml) {
@@ -37546,13 +37547,13 @@ function subredditsFor(raw, stock, crypto2) {
   return own2[base] ? [own2[base], ...crypto2] : crypto2;
 }
 async function socialPosts(raw, analysis2, opts) {
-  const day3 = analysisDate(analysis2), from = addDays(day3, -opts.lookBackDays), sym = normalizeSymbol(raw);
+  const day3 = analysisDate(analysis2), from = addDays(day3, -opts.lookBackDays), sym2 = normalizeSymbol(raw);
   const subs = subredditsFor(raw, opts.subreddits, opts.cryptoSubreddits);
   const [tw, rd] = await Promise.allSettled([stocktwits(raw, from, day3, opts.stocktwitsLimit), reddit(raw, from, day3, subs)]);
-  const out = [`Posts about ${sym}, ${from} to ${day3}. Both sources serve only recent posts, so a past window can be empty for that reason alone.`, ""];
+  const out = [`Posts about ${sym2}, ${from} to ${day3}. Both sources serve only recent posts, so a past window can be empty for that reason alone.`, ""];
   out.push("### StockTwits (retail traders; each author may tag a message Bullish or Bearish)");
   if (tw.status === "rejected") out.push(`StockTwits unavailable: ${tw.reason.message}. This is not a quiet crowd.`);
-  else if (!tw.value.length) out.push(`No StockTwits messages about ${sym} in this window that the stream still serves.`);
+  else if (!tw.value.length) out.push(`No StockTwits messages about ${sym2} in this window that the stream still serves.`);
   else {
     const bull = tw.value.filter((p) => p.tag === "Bullish").length, bear = tw.value.filter((p) => p.tag === "Bearish").length, tagged = bull + bear;
     out.push(`${tw.value.length} messages: ${bull} Bullish, ${bear} Bearish, ${tw.value.length - tagged} untagged${tagged ? ` (${Math.round(bull / tagged * 100)}/${Math.round(bear / tagged * 100)} among the tagged)` : ""}.`);
@@ -37560,7 +37561,7 @@ async function socialPosts(raw, analysis2, opts) {
   }
   out.push("", `### Reddit (${subs.map((s) => `r/${s}`).join(", ")}; no vote or comment counts in the feed)`);
   if (rd.status === "rejected") out.push(`Reddit unavailable: ${rd.reason.message}. This is not a quiet crowd.`);
-  else if (!rd.value.length) out.push(`No Reddit posts about ${sym} in these communities in this window that the feed still serves.`);
+  else if (!rd.value.length) out.push(`No Reddit posts about ${sym2} in these communities in this window that the feed still serves.`);
   else out.push(`${rd.value.length} posts.`, ...rd.value.slice(0, 25).map((p) => `- ${p.time} UTC \xB7 r/${p.where || "?"}: ${p.title}${p.text ? ` - ${p.text}` : ""}`));
   return out.join("\n");
 }
@@ -37928,11 +37929,11 @@ async function secInsiders(symbol4, cik, asOf, days = 90, limit = 25) {
 }
 
 // src/data/company.ts
-var filer = (sym) => cikFor(sym).catch(() => null);
+var filer = (sym2) => cikFor(sym2).catch(() => null);
 function companySymbol(raw) {
-  const sym = normalizeSymbol(raw);
-  if (cryptoBase(raw) || /[\^=]/.test(sym)) throw new NoData(`${sym} is not a company: a crypto asset, index, future or currency pair has no company accounts`);
-  return sym;
+  const sym2 = normalizeSymbol(raw);
+  if (cryptoBase(raw) || /[\^=]/.test(sym2)) throw new NoData(`${sym2} is not a company: a crypto asset, index, future or currency pair has no company accounts`);
+  return sym2;
 }
 var session = null;
 function yahooSession() {
@@ -37948,11 +37949,11 @@ function yahooSession() {
   });
   return session;
 }
-async function yahooJson(path19) {
+async function yahooJson(path21) {
   for (let attempt = 0; ; attempt++) {
     const s = await yahooSession();
     try {
-      return await getJson(`${HOSTS[1]}${path19}&crumb=${encodeURIComponent(s.crumb)}`, { headers: { Cookie: s.cookie } });
+      return await getJson(`${HOSTS[1]}${path21}&crumb=${encodeURIComponent(s.crumb)}`, { headers: { Cookie: s.cookie } });
     } catch (e) {
       if (attempt === 0 && /HTTP 401/.test(e.message)) {
         session = null;
@@ -37962,10 +37963,10 @@ async function yahooJson(path19) {
     }
   }
 }
-async function summary(sym, modules) {
-  const j = await yahooJson(`/v10/finance/quoteSummary/${encodeURIComponent(sym)}?modules=${modules}`);
+async function summary(sym2, modules) {
+  const j = await yahooJson(`/v10/finance/quoteSummary/${encodeURIComponent(sym2)}?modules=${modules}`);
   const r = j.quoteSummary?.result?.[0];
-  if (!r) throw new NoData(`Yahoo Finance has no company data for ${sym}${j.quoteSummary?.error?.description ? ` (${j.quoteSummary.error.description})` : ""}`);
+  if (!r) throw new NoData(`Yahoo Finance has no company data for ${sym2}${j.quoteSummary?.error?.description ? ` (${j.quoteSummary.error.description})` : ""}`);
   return r;
 }
 var MAIN_UNIT = { GBp: "GBP", GBX: "GBP", ZAc: "ZAR", ILA: "ILS" };
@@ -37977,7 +37978,7 @@ var MONTHS = ["January", "February", "March", "April", "May", "June", "July", "A
 var units = (facts, unit) => facts?.units?.[unit] ?? [];
 var fixed = (n2, d = 2) => n2.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
 var whole = (n2) => Math.round(n2).toLocaleString("en-US");
-async function secOverview(sym, cik, day3) {
+async function secOverview(sym2, cik, day3) {
   const [s, facts] = await Promise.all([submissions(cik), companyFacts(cik)]);
   const g = facts.facts?.["us-gaap"] ?? {}, dei = facts.facts?.dei ?? {};
   const lines = [];
@@ -37987,7 +37988,7 @@ async function secOverview(sym, cik, day3) {
   if (fy && Number(fy[1]) >= 1 && Number(fy[1]) <= 12) lines.push(`Fiscal year ends: ${Number(fy[2])} ${MONTHS[Number(fy[1]) - 1]}`);
   let close = null;
   try {
-    const h = await history(sym, day3), last = h.bars.at(-1);
+    const h = await history(sym2, day3), last = h.bars.at(-1);
     close = { date: last.date, close: Math.round(last.close * 100) / 100, currency: h.meta.currency };
   } catch {
   }
@@ -38016,13 +38017,13 @@ async function secOverview(sym, cik, day3) {
     if (close && usd && close.close > 0) lines.push(`Dividend yield (derived: that \xF7 close): ${fixed(dps.value / close.close * 100)}%`);
   } else lines.push("Dividends per share: not among its filed figures (many companies pay none)");
   lines.push("Unavailable from official free sources: forward estimates (forward P/E, PEG), analysts' price targets and beta.");
-  return [`Company profile and valuation for ${sym}, from its SEC filings as they stood on ${day3} and the desk's checked closing price. Every multiple is derived here from those filed figures and that price, and shows what it came from; nothing is an estimate.`, "", ...lines].join("\n");
+  return [`Company profile and valuation for ${sym2}, from its SEC filings as they stood on ${day3} and the desk's checked closing price. Every multiple is derived here from those filed figures and that price, and shows what it came from; nothing is an estimate.`, "", ...lines].join("\n");
 }
 async function companyOverview(raw, analysis2) {
-  const day3 = analysisDate(analysis2), sym = companySymbol(raw), cik = await filer(sym);
-  if (cik) return secOverview(sym, cik, day3);
-  if (isHistorical(day3)) return `Company profile and ratios for ${sym} are withheld for ${day3}: Yahoo Finance serves them only as they stand today. Market value, multiples, the 52-week range and the past year's income move with today's price, and even the name, sector and industry are today's; they would put later knowledge into an analysis of ${day3}. Use get_financial_statement, which serves a US filer's accounts as filed by then.`;
-  const r = await summary(sym, "price,summaryProfile,summaryDetail,defaultKeyStatistics,financialData");
+  const day3 = analysisDate(analysis2), sym2 = companySymbol(raw), cik = await filer(sym2);
+  if (cik) return secOverview(sym2, cik, day3);
+  if (isHistorical(day3)) return `Company profile and ratios for ${sym2} are withheld for ${day3}: Yahoo Finance serves them only as they stand today. Market value, multiples, the 52-week range and the past year's income move with today's price, and even the name, sector and industry are today's; they would put later knowledge into an analysis of ${day3}. Use get_financial_statement, which serves a US filer's accounts as filed by then.`;
+  const r = await summary(sym2, "price,summaryProfile,summaryDetail,defaultKeyStatistics,financialData");
   const p = r.price ?? {}, d = r.summaryDetail ?? {}, k = r.defaultKeyStatistics ?? {}, f = r.financialData ?? {};
   const quote = p.currency, main = quote ? MAIN_UNIT[quote] ?? quote : void 0, reported = f.financialCurrency;
   const de = has(f.debtToEquity) ? `${Number(f.debtToEquity.raw.toFixed(2))}% (${(f.debtToEquity.raw / 100).toFixed(2)}x)` : null;
@@ -38057,19 +38058,19 @@ async function companyOverview(raw, analysis2) {
     ["Book Value per Share", money(k.bookValue, main)]
   ];
   const lines = fields.filter(([, v]) => v !== null && v !== void 0 && v !== "").map(([l, v]) => `${l}: ${v}`);
-  if (!lines.length) throw new NoData(`Yahoo Finance has no profile or ratios for ${sym}`);
-  return [`Company profile and ratios for ${sym}, from Yahoo Finance as they stand today (${day3}). TTM is the last twelve months; a field Yahoo does not give is left out.`, "", ...lines].join("\n");
+  if (!lines.length) throw new NoData(`Yahoo Finance has no profile or ratios for ${sym2}`);
+  return [`Company profile and ratios for ${sym2}, from Yahoo Finance as they stand today (${day3}). TTM is the last twelve months; a field Yahoo does not give is left out.`, "", ...lines].join("\n");
 }
 async function insiderTransactions(raw, analysis2, limit = 30) {
-  const day3 = analysisDate(analysis2), sym = companySymbol(raw), cik = await filer(sym);
-  if (cik) return secInsiders(sym, cik, day3);
-  if (isHistorical(day3)) return `Insider transactions for ${sym} are withheld for ${day3}: Yahoo Finance dates a trade by when it happened, not by when its filing made it public (up to two business days later), so it cannot show which trades were known on ${day3}.`;
-  const r = await summary(sym, "insiderTransactions");
+  const day3 = analysisDate(analysis2), sym2 = companySymbol(raw), cik = await filer(sym2);
+  if (cik) return secInsiders(sym2, cik, day3);
+  if (isHistorical(day3)) return `Insider transactions for ${sym2} are withheld for ${day3}: Yahoo Finance dates a trade by when it happened, not by when its filing made it public (up to two business days later), so it cannot show which trades were known on ${day3}.`;
+  const r = await summary(sym2, "insiderTransactions");
   const list2 = (r.insiderTransactions?.transactions ?? []).filter((t) => has(t.startDate)).sort((a, b) => b.startDate.raw - a.startDate.raw).slice(0, limit);
-  if (!list2.length) return `No insider transactions reported for ${sym} by Yahoo Finance. Many listings have none.`;
+  if (!list2.length) return `No insider transactions reported for ${sym2} by Yahoo Finance. Many listings have none.`;
   const n2 = (v) => has(v) ? v.raw.toLocaleString("en-US") : null;
   return [
-    `Insider transactions for ${sym} from Yahoo Finance (the latest ${list2.length}, newest first). Each is dated by the trade; its filing follows within two business days.`,
+    `Insider transactions for ${sym2} from Yahoo Finance (the latest ${list2.length}, newest first). Each is dated by the trade; its filing follows within two business days.`,
     "",
     ...list2.map((t) => `- ${new Date(t.startDate.raw * 1e3).toISOString().slice(0, 10)} \xB7 ${t.filerName ?? "unnamed"}${t.filerRelation ? ` (${t.filerRelation})` : ""}: ${t.transactionText || "no description"}${n2(t.shares) ? ` \xB7 ${n2(t.shares)} shares` : ""}${n2(t.value) ? ` \xB7 value ${n2(t.value)}` : ""}${t.ownership === "I" ? " \xB7 held indirectly" : ""}`)
   ].join("\n");
@@ -38088,11 +38089,11 @@ var FUND_SECTORS = {
   utilities: "Utilities"
 };
 async function fundProfile(raw, analysis2, topN = 10) {
-  const day3 = analysisDate(analysis2), sym = companySymbol(raw);
-  if (isHistorical(day3)) return `The fund profile of ${sym} is withheld for ${day3}: Yahoo Finance serves it only as it stands today. Today's holdings and their weights carry the prices of every day since ${day3}, and its size and yearly cost may have changed; they would put later knowledge into an analysis of ${day3}. Say the profile is unavailable for a past day.`;
-  const r = await summary(sym, "price,quoteType,fundProfile,topHoldings,summaryDetail,defaultKeyStatistics");
+  const day3 = analysisDate(analysis2), sym2 = companySymbol(raw);
+  if (isHistorical(day3)) return `The fund profile of ${sym2} is withheld for ${day3}: Yahoo Finance serves it only as it stands today. Today's holdings and their weights carry the prices of every day since ${day3}, and its size and yearly cost may have changed; they would put later knowledge into an analysis of ${day3}. Say the profile is unavailable for a past day.`;
+  const r = await summary(sym2, "price,quoteType,fundProfile,topHoldings,summaryDetail,defaultKeyStatistics");
   const type = r.quoteType?.quoteType ?? "";
-  if (type !== "ETF" && type !== "MUTUALFUND") throw new NoData(`${sym} is not a fund (Yahoo Finance lists it as ${type ? type.toLowerCase() : "not a fund"}): use the company tools instead`);
+  if (type !== "ETF" && type !== "MUTUALFUND") throw new NoData(`${sym2} is not a fund (Yahoo Finance lists it as ${type ? type.toLowerCase() : "not a fund"}): use the company tools instead`);
   const p = r.price ?? {}, d = r.summaryDetail ?? {}, k = r.defaultKeyStatistics ?? {}, f = r.fundProfile ?? {}, fees = f.feesExpensesInvestment ?? {}, t = r.topHoldings ?? {};
   const main = p.currency ? MAIN_UNIT[p.currency] ?? p.currency : void 0;
   const inception = has(k.fundInceptionDate) ? new Date(k.fundInceptionDate.raw * 1e3).toISOString().slice(0, 10) : null;
@@ -38125,7 +38126,7 @@ async function fundProfile(raw, analysis2, topN = 10) {
   } else lines.push("", "Top holdings: unavailable (Yahoo Finance does not give them)");
   const sectors = (t.sectorWeightings ?? []).flatMap((w) => Object.entries(w)).filter(([, v]) => has(v) && v.raw > 0).sort((a, b) => b[1].raw - a[1].raw);
   if (sectors.length) lines.push("", `By sector: ${sectors.map(([n2, v]) => `${FUND_SECTORS[n2] ?? n2.replace(/_/g, " ")} ${percent(v)}`).join(", ")}`);
-  return [`Fund profile for ${sym}, from Yahoo Finance as it stands today (${day3}). A fund has no company accounts or insider trades of its own: what it holds and what it costs to own are its fundamentals.`, "", ...lines].join("\n");
+  return [`Fund profile for ${sym2}, from Yahoo Finance as it stands today (${day3}). A fund has no company accounts or insider trades of its own: what it holds and what it costs to own are its fundamentals.`, "", ...lines].join("\n");
 }
 var YAHOO_LINES = {
   balance_sheet: ["TotalAssets", "CurrentAssets", "CashAndCashEquivalents", "TotalLiabilitiesNetMinorityInterest", "CurrentLiabilities", "StockholdersEquity"],
@@ -38152,9 +38153,9 @@ function yahooTable(j, kind, freq) {
   return { columns: ends, rows: lines.map((l) => ({ label: l.label, unit: l.unit, cells: ends.map((e) => l.values.get(e) ?? null) })) };
 }
 var epoch2 = (date5) => Math.floor(Date.parse(`${date5}T00:00:00Z`) / 1e3);
-async function yahooStatement(sym, kind, freq, day3) {
+async function yahooStatement(sym2, kind, freq, day3) {
   const types = YAHOO_LINES[kind].map((n2) => freq + n2).join(",");
-  const j = await yahooJson(`/ws/fundamentals-timeseries/v1/finance/timeseries/${encodeURIComponent(sym)}?symbol=${encodeURIComponent(sym)}&type=${types}&period1=${epoch2(addDays(day3, -6 * 366))}&period2=${epoch2(addDays(day3, 1))}`);
+  const j = await yahooJson(`/ws/fundamentals-timeseries/v1/finance/timeseries/${encodeURIComponent(sym2)}?symbol=${encodeURIComponent(sym2)}&type=${types}&period1=${epoch2(addDays(day3, -6 * 366))}&period2=${epoch2(addDays(day3, 1))}`);
   return yahooTable(j, kind, freq);
 }
 function renderTable(t, head2, note) {
@@ -38179,22 +38180,22 @@ var reason = (e) => {
   return /sec\.gov refused \(HTTP 403\)/.test(m2) && m2.includes("[no contact email was sent]") ? `${m2}: ${ASK_FOR_EMAIL}` : m2;
 };
 async function financialStatement(raw, kind, freq, analysis2) {
-  const day3 = analysisDate(analysis2), sym = companySymbol(raw), title = STATEMENTS[kind].title;
+  const day3 = analysisDate(analysis2), sym2 = companySymbol(raw), title = STATEMENTS[kind].title;
   let secFailure;
   try {
-    const t = await secStatement(sym, kind, freq, day3);
+    const t = await secStatement(sym2, kind, freq, day3);
     const q4 = kind !== "balance_sheet" && freq === "quarterly" ? " A fourth quarter is never derived: it is filed only inside the annual figure." : "";
-    return renderTable(t, `${title} for ${sym} (${freq}), as filed with the SEC on or before ${day3}`, `Each figure is the latest filing of it by that day; a restatement counts only from the day it was filed.${q4}`);
+    return renderTable(t, `${title} for ${sym2} (${freq}), as filed with the SEC on or before ${day3}`, `Each figure is the latest filing of it by that day; a restatement counts only from the day it was filed.${q4}`);
   } catch (e) {
     secFailure = e;
   }
   if (isHistorical(day3)) {
     if (!(secFailure instanceof NoData)) throw new Unavailable(`the SEC, the only source of accounts as filed by ${day3}, could not answer (${reason(secFailure)})`);
-    return `${title} for ${sym} is withheld for ${day3}: ${reason(secFailure)}, and the other source, Yahoo Finance, dates a statement by the period it covers, not by when it was filed, so it cannot show which figures were public on ${day3}.`;
+    return `${title} for ${sym2} is withheld for ${day3}: ${reason(secFailure)}, and the other source, Yahoo Finance, dates a statement by the period it covers, not by when it was filed, so it cannot show which figures were public on ${day3}.`;
   }
   try {
-    const t = await yahooStatement(sym, kind, freq, day3);
-    return renderTable(t, `${title} for ${sym} (${freq}), from Yahoo Finance as it stands today`, `Not from the SEC (${reason(secFailure)}). Yahoo gives money spent, such as capital expenditure, as a negative figure.`);
+    const t = await yahooStatement(sym2, kind, freq, day3);
+    return renderTable(t, `${title} for ${sym2} (${freq}), from Yahoo Finance as it stands today`, `Not from the SEC (${reason(secFailure)}). Yahoo gives money spent, such as capital expenditure, as a negative figure.`);
   } catch (e) {
     const both = `SEC: ${reason(secFailure)}; Yahoo Finance: ${e.message}`;
     throw secFailure instanceof NoData && e instanceof NoData ? new NoData(both) : new Unavailable(both);
@@ -38202,8 +38203,8 @@ async function financialStatement(raw, kind, freq, analysis2) {
 }
 
 // src/tools/desk.ts
-import fs14 from "node:fs";
-import path17 from "node:path";
+import fs16 from "node:fs";
+import path19 from "node:path";
 
 // src/desk/holdings.ts
 import fs8 from "node:fs";
@@ -38594,8 +38595,8 @@ function deleteRun(dir, ticker, date5) {
 // src/desk/scoring.ts
 function resolveBenchmark(ticker, s) {
   if (s.benchmark.trim()) return normalizeSymbol(s.benchmark);
-  const sym = normalizeSymbol(ticker);
-  const suffix = Object.keys(s.benchmarks).filter(Boolean).sort((a, b) => b.length - a.length).find((x) => sym.endsWith(x.toUpperCase()));
+  const sym2 = normalizeSymbol(ticker);
+  const suffix = Object.keys(s.benchmarks).filter(Boolean).sort((a, b) => b.length - a.length).find((x) => sym2.endsWith(x.toUpperCase()));
   return suffix ? s.benchmarks[suffix] : s.benchmarks[""] ?? "SPY";
 }
 var closeOn = (bars, date5) => [...bars].reverse().find((b) => b.date <= date5).close;
@@ -38695,6 +38696,7 @@ import fs11 from "node:fs";
 import path12 from "node:path";
 var DEPTHS = { shallow: 1, medium: 3, deep: 5 };
 var isDepth = (v) => typeof v === "string" && Object.hasOwn(DEPTHS, v);
+var MAX_OPEN = 20;
 var MAX_FINISHED = 20;
 var STALE_MS2 = 2 * 60 * 6e4;
 var STALE_REASON = "the run did not finish (it stopped, or took over two hours): press Retry";
@@ -38763,8 +38765,8 @@ function load2(dir, now) {
 var open2 = (i) => i.state === "waiting" || i.state === "running";
 function trimmed(list2) {
   const finished = list2.filter((i) => !open2(i)).sort((a, b) => (b.endedAt ?? "").localeCompare(a.endedAt ?? ""));
-  const keep2 = new Set(finished.slice(0, MAX_FINISHED));
-  return list2.filter((i) => open2(i) || keep2.has(i));
+  const keep3 = new Set(finished.slice(0, MAX_FINISHED));
+  return list2.filter((i) => open2(i) || keep3.has(i));
 }
 function change2(dir, now, edit) {
   const file5 = queueFile(dir);
@@ -38777,6 +38779,21 @@ function change2(dir, now, edit) {
 }
 var readQueue = (dir, now = /* @__PURE__ */ new Date()) => load2(dir, now);
 var waitingIn = (list2) => list2.filter((i) => i.state === "waiting");
+function enqueue(dir, raw, at, depth, now = /* @__PURE__ */ new Date()) {
+  const symbol4 = safeSymbol(raw);
+  return change2(dir, now, (list2) => {
+    const was = list2.find((i) => i.symbol === symbol4);
+    if (was?.state === "running") return { list: list2, result: list2 };
+    if (was?.state === "waiting") {
+      const next2 = list2.map((i) => i === was ? { ...i, ...depth ? { depth } : {} } : i);
+      return { list: next2, result: next2 };
+    }
+    const rest = list2.filter((i) => i !== was);
+    if (rest.filter(open2).length >= MAX_OPEN) throw new QueueRefusal("FULL", `${MAX_OPEN} analyses are already waiting: let them run first`);
+    const next = [...rest, { symbol: symbol4, requestedAt: at, state: "waiting", ...depth ? { depth } : {} }];
+    return { list: next, result: next };
+  });
+}
 function startItem(dir, raw, date5, now = /* @__PURE__ */ new Date()) {
   const symbol4 = safeSymbol(raw);
   return change2(dir, now, (list2) => {
@@ -38899,11 +38916,11 @@ async function runningOn(root, timeoutMs = 700) {
 }
 async function openDashboard(root, opts = {}) {
   const already = await runningOn(root);
-  const words2 = (port, started) => `The dashboard ${started ? "has started and opened" : "was already running and has opened"} in the person's browser (http://127.0.0.1:${port}/ , this computer only). The page it opened is the one to use: it was given the dashboard's key, and the address typed into another browser opens a page without one. It stays open until the person presses Stop on it. Everything on it - connecting Robinhood, choosing accounts, the trading switch and caps, and every order's Review, Place and Confirm - is the person's own to press: never press it for them or reach the page yourself.`;
+  const words3 = (port, started) => `The dashboard ${started ? "has started and opened" : "was already running and has opened"} in the person's browser (http://127.0.0.1:${port}/ , this computer only). The page it opened is the one to use: it was given the dashboard's key, and the address typed into another browser opens a page without one. It stays open until the person presses Stop on it. Everything on it - connecting Robinhood, choosing accounts, the trading switch and caps, and every order's Review, Place and Confirm - is the person's own to press: never press it for them or reach the page yourself.`;
   if (already) {
     if (!opts.noOpen) spawn(process.execPath, [path13.join(root, "dist", "terminal.mjs")], { cwd: root, detached: true, stdio: "ignore", windowsHide: true }).on("error", () => {
     }).unref();
-    return words2(already, false);
+    return words3(already, false);
   }
   const child = spawn(process.execPath, [path13.join(root, "dist", "terminal.mjs"), ...opts.noOpen ? ["--no-open"] : []], { cwd: root, detached: true, stdio: "ignore", windowsHide: true });
   child.on("error", () => {
@@ -38912,14 +38929,14 @@ async function openDashboard(root, opts = {}) {
   const end = Date.now() + (opts.waitMs ?? 15e3);
   while (Date.now() < end) {
     const port = await runningOn(root, 400);
-    if (port) return words2(port, true);
+    if (port) return words3(port, true);
     await new Promise((r) => setTimeout(r, 300));
   }
   return "DATA_UNAVAILABLE: the dashboard did not answer within 15 seconds. Ask the person to run /terminal, or `node dist/terminal.mjs` in this folder, and to tell you what it prints.";
 }
 
 // src/desk/routine.ts
-import path16 from "node:path";
+import path17 from "node:path";
 
 // src/desk/orders.ts
 import fs12 from "node:fs";
@@ -38956,11 +38973,146 @@ var isWatch = (v) => !!v && typeof v.symbol === "string" && typeof v.favourite =
 var watchFile = (dir) => path15.join(dir, "watchlist.json");
 var readWatchlist = (dir) => read(watchFile(dir), isWatch);
 
+// src/desk/screen.ts
+import fs14 from "node:fs";
+import path16 from "node:path";
+var MOVE_PCT = 3;
+var VOLUME_TIMES = 2;
+var USUAL_DAYS = 20;
+var SHOWN2 = 5;
+var TOP_QUEUED = 3;
+var SCREEN_MS = 60 * 6e4;
+var one = (n2) => (Math.round(n2 * 10) / 10).toFixed(1);
+function signalsOf(bars, newsToday = null) {
+  const signals = [], n2 = bars.length, last = bars[n2 - 1], prev = bars[n2 - 2];
+  if (!last) return { signals, movePct: null };
+  const movePct = prev && prev.close > 0 ? (last.close / prev.close - 1) * 100 : null;
+  if (movePct !== null && Math.abs(movePct) >= MOVE_PCT) signals.push({ kind: "move", words: `${movePct >= 0 ? "rose" : "fell"} ${one(Math.abs(movePct))}%` });
+  const usual = bars.slice(Math.max(0, n2 - 1 - USUAL_DAYS), n2 - 1).map((b) => b.volume).filter((v) => v > 0);
+  if (usual.length >= USUAL_DAYS / 2 && last.volume > 0) {
+    const times = last.volume / (usual.reduce((a, v) => a + v, 0) / usual.length);
+    if (times >= VOLUME_TIMES) signals.push({ kind: "volume", words: `${one(times)} times its usual volume` });
+  }
+  const yearAgo = addDays(last.date, -365), year = bars.slice(0, n2 - 1).filter((b) => b.date >= yearAgo);
+  if (bars[0] && bars[0].date <= addDays(last.date, -350) && year.length) {
+    if (last.high > Math.max(...year.map((b) => b.high))) signals.push({ kind: "high", words: "a new 52-week high" });
+    if (last.low < Math.min(...year.map((b) => b.low))) signals.push({ kind: "low", words: "a new 52-week low" });
+  }
+  if (prev) {
+    const closes = bars.map((b) => b.close);
+    for (const days of [50, 200]) {
+      const ma = sma(closes, days), now = ma[n2 - 1], before = ma[n2 - 2];
+      if (now == null || before == null) continue;
+      if (prev.close <= before && last.close > now) signals.push({ kind: days === 50 ? "above50" : "above200", words: `crossed above its ${days}-day average` });
+      if (prev.close >= before && last.close < now) signals.push({ kind: days === 50 ? "below50" : "below200", words: `crossed below its ${days}-day average` });
+    }
+  }
+  if (newsToday !== null && newsToday > 0) signals.push({ kind: "news", words: `in the news today (${newsToday} ${newsToday === 1 ? "article" : "articles"})` });
+  return { signals, movePct };
+}
+function whyOf(signals) {
+  const move = signals.find((s) => s.kind === "move"), volume = signals.find((s) => s.kind === "volume");
+  const parts = [
+    move && volume ? `${move.words} on ${volume.words}` : move ? move.words : volume ? `traded ${volume.words}` : "",
+    ...signals.filter((s) => s.kind !== "move" && s.kind !== "volume").map((s) => s.words)
+  ].filter(Boolean);
+  const line2 = parts.join(", ");
+  return line2.charAt(0).toUpperCase() + line2.slice(1);
+}
+function rank(candidates) {
+  return candidates.map((c) => {
+    const s = signalsOf(c.bars, c.news);
+    return { symbol: c.symbol, signals: s.signals, movePct: s.movePct, why: whyOf(s.signals), session: c.bars[c.bars.length - 1]?.date ?? "" };
+  }).filter((p) => p.signals.length > 0).sort((a, b) => b.signals.length - a.signals.length || Math.abs(b.movePct ?? 0) - Math.abs(a.movePct ?? 0) || a.symbol.localeCompare(b.symbol)).slice(0, SHOWN2);
+}
+async function inTurn(items, width, job) {
+  const out = new Array(items.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(width, items.length) }, async () => {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await job(items[i]);
+    }
+  }));
+  return out;
+}
+async function newsOn(symbol4, day3) {
+  try {
+    return (await search(symbol4, 12)).filter((a) => a.tickers.includes(symbol4) && marketDay(/* @__PURE__ */ new Date(`${a.time.replace(" ", "T")}:00Z`)) === day3).length;
+  } catch {
+    return null;
+  }
+}
+async function workScreen(symbols, news, day3, now = /* @__PURE__ */ new Date()) {
+  const list2 = [...new Set(symbols)].filter((s) => !/[\^=]/.test(s));
+  const read2 = await inTurn(list2, 4, async (symbol4) => {
+    try {
+      const bars = (await daily(symbol4, addDays(day3, -400), day3)).bars;
+      if (!bars.length || bars[bars.length - 1].date < addDays(day3, -7)) return { symbol: symbol4, bars: null, news: null };
+      return { symbol: symbol4, bars, news: news.has(symbol4) ? await newsOn(symbol4, day3) : null };
+    } catch {
+      return { symbol: symbol4, bars: null, news: null };
+    }
+  });
+  return {
+    day: day3,
+    at: now.toISOString(),
+    looked: list2.length,
+    unavailable: read2.filter((r) => !r.bars).map((r) => r.symbol),
+    picks: rank(read2.filter((r) => !!r.bars))
+  };
+}
+var screenFile = (dir) => path16.join(dir, "screen.json");
+function readScreen(dir) {
+  try {
+    const v = JSON.parse(fs14.readFileSync(screenFile(dir), "utf8"));
+    if (typeof v.day !== "string" || typeof v.at !== "string" || !Array.isArray(v.picks)) return null;
+    return v;
+  } catch {
+    return null;
+  }
+}
+function keep2(dir, s) {
+  fs14.mkdirSync(dir, { recursive: true });
+  withLock(screenFile(dir), () => writeWhole(screenFile(dir), JSON.stringify(s, null, 2) + "\n"));
+  return s;
+}
+async function screenToday(dir, symbols, news, day3, now = /* @__PURE__ */ new Date(), work = workScreen) {
+  const kept = readScreen(dir);
+  if (kept && kept.day === day3 && now.getTime() - Date.parse(kept.at) < SCREEN_MS) return kept;
+  const fresh = await work(symbols, news, day3, now);
+  return keep2(dir, { ...fresh, ...kept?.queued?.day === day3 ? { queued: kept.queued } : {} });
+}
+var isWeekday = (day3) => {
+  const w = (/* @__PURE__ */ new Date(`${day3}T12:00:00Z`)).getUTCDay();
+  return w !== 0 && w !== 6;
+};
+function queueTop(dir, screen, day3, ring, now = /* @__PURE__ */ new Date()) {
+  if (!isWeekday(day3) || screen.day !== day3 || screen.queued?.day === day3 || readScreen(dir)?.queued?.day === day3) return [];
+  const called = new Set(new Journal(path16.join(dir, "journal.md")).load().filter((e) => e.date === day3).map((e) => e.ticker));
+  const busy = new Set(readQueue(dir, now).filter((q) => q.state === "waiting" || q.state === "running").map((q) => q.symbol));
+  const queued = [];
+  for (const p of screen.picks) {
+    if (queued.length >= TOP_QUEUED) break;
+    if (called.has(p.symbol) || busy.has(p.symbol)) continue;
+    try {
+      enqueue(dir, p.symbol, now.toISOString(), "shallow", now);
+      queued.push(p.symbol);
+    } catch (e) {
+      if (!(e instanceof QueueRefusal)) throw e;
+      break;
+    }
+  }
+  keep2(dir, { ...screen, queued: { day: day3, symbols: queued } });
+  if (queued.length && ring) ringDoorbell(dir, "press", now);
+  return queued;
+}
+
 // src/desk/routine.ts
 var DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 var weekday = (day3) => DAYS[(/* @__PURE__ */ new Date(`${day3}T12:00:00Z`)).getUTCDay()];
-function morningList(dir, today2, max) {
-  const called = new Set(new Journal(path16.join(dir, "journal.md")).load().filter((e) => e.date === today2).map((e) => e.ticker));
+function morningList(dir, today2, max, screen = null) {
+  const called = new Set(new Journal(path17.join(dir, "journal.md")).load().filter((e) => e.date === today2).map((e) => e.ticker));
   const queue2 = readQueue(dir), running = queue2.find((q) => q.state === "running")?.symbol ?? null;
   const wanted = [], seen = new Set(running ? [running] : []);
   const add = (symbol4, why, queued) => {
@@ -38969,7 +39121,8 @@ function morningList(dir, today2, max) {
       wanted.push({ symbol: symbol4, why, queued });
     }
   };
-  for (const q of queue2) if (q.state === "waiting") add(q.symbol, `asked for on the dashboard, ${q.depth ?? "the settings'"} depth`, true);
+  const bySwitch = new Set(screen?.queued?.day === today2 ? screen.queued.symbols : []);
+  for (const q of queue2) if (q.state === "waiting") add(q.symbol, bySwitch.has(q.symbol) ? `worth a look today, put on the list by the morning switch, ${q.depth ?? "shallow"} depth` : `asked for on the dashboard, ${q.depth ?? "the settings'"} depth`, true);
   for (const w of readWatchlist(dir)) if (w.favourite && !w.symbol.startsWith("^")) add(w.symbol, "a starred watchlist stock", false);
   return { analyse: wanted.slice(0, max), later: wanted.slice(max).map((w) => w.symbol), calledToday: [...called], running };
 }
@@ -38978,12 +39131,25 @@ var holdingsLine = (dir) => {
   if (!h) return "Holdings: not provided. The analyses say so; they do not assume a flat book.";
   return h.source === "robinhood" ? `Holdings: as the dashboard last read them from Robinhood, on ${h.savedOn}. The team never reads Robinhood itself; for fresher figures the person presses "Refresh from Robinhood" on the dashboard.` : `Holdings: as the person gave them, on ${h.savedOn}.`;
 };
-function morningBrief(dir, today2, max) {
+function lookLines(look, today2) {
+  if (!look) return [];
+  if (!look.screen) return ["", `   Worth a look today: unavailable (${look.failed ?? "it could not be worked out"}). Say so at the end.`];
+  const s = look.screen, out = ["", `   Worth a look today, from Yahoo Finance's prices at ${s.at.slice(11, 16)} UTC (figures only, never a forecast; ${s.looked} looked at):`];
+  if (!s.picks.length) out.push("   - nothing stood out: no move of 3% or more, no volume twice its usual, no 52-week high or low, no cross of an average, no news today.");
+  for (const p of s.picks) out.push(`   - ${p.symbol}: ${p.why}.`);
+  if (s.unavailable.length) out.push(`   Could not be read: ${s.unavailable.join(", ")}.`);
+  const queued = s.queued?.day === today2 ? s.queued.symbols : [];
+  out.push(look.on ? `   The person's switch "Analyse the top ${TOP_QUEUED} each market morning" is on${queued.length ? `: ${queued.join(", ")} ${queued.length === 1 ? "was" : "were"} put on the waiting list at shallow depth, and ${queued.length === 1 ? "is" : "are"} analysed in step 2` : ": nothing more went on the waiting list today"}.` : `   The person's switch "Analyse the top ${TOP_QUEUED} each market morning" is off: this list is for the person to read, not for you to analyse.`);
+  out.push("   In step 4, give this list in a line or two, with its reasons.");
+  return out;
+}
+function morningBrief(dir, today2, max, look) {
   const day3 = weekday(today2), weekend = day3 === "Saturday" || day3 === "Sunday";
-  const m2 = morningList(dir, today2, max);
+  const m2 = morningList(dir, today2, max, look?.screen ?? null);
   const lines = [`MORNING ROUTINE for ${day3} ${today2}.`];
   if (weekend) lines.push(`US markets do not open on a ${day3}: score past calls (step 1), then stop and say so. Analyse nothing unless the person asked for it in words.`);
   lines.push("", "1. Score past calls first: list_settlements, then record_outcome with a lesson for each READY call (the /settle playbook).");
+  if (!weekend) lines.push(...lookLines(look, today2));
   if (m2.running) lines.push("", `   ${m2.running} is being analysed now by another run: leave it alone.`);
   if (!m2.analyse.length) lines.push("", "2. Nothing to analyse: no stock is waiting on the dashboard and no starred watchlist stock is without a call today. Say so.");
   else {
@@ -39000,7 +39166,7 @@ function morningBrief(dir, today2, max) {
   return lines.join("\n");
 }
 function eveningBrief(dir, today2, now) {
-  const calls = new Journal(path16.join(dir, "journal.md")).load();
+  const calls = new Journal(path17.join(dir, "journal.md")).load();
   const todays = calls.filter((e) => e.date === today2), pending = calls.filter((e) => e.pending).length;
   const orders = ordersOn(dir, now);
   const lines = [`EVENING WRAP-UP for ${weekday(today2)} ${today2}.`, "", "1. Score what is ready: list_settlements, then record_outcome with a lesson for each READY call (the /settle playbook).", ""];
@@ -39020,6 +39186,121 @@ function eveningBrief(dir, today2, now) {
   return lines.join("\n");
 }
 
+// src/terminal/prefs.ts
+import fs15 from "node:fs";
+import path18 from "node:path";
+
+// src/desk/sectors.ts
+var SECTOR_FUNDS = {
+  XLK: "Technology",
+  XLF: "Financial Services",
+  XLV: "Healthcare",
+  XLE: "Energy",
+  XLI: "Industrials",
+  XLY: "Consumer Cyclical",
+  XLP: "Consumer Defensive",
+  XLU: "Utilities",
+  XLB: "Basic Materials",
+  XLRE: "Real Estate",
+  XLC: "Communication Services"
+};
+var MARKET_FUNDS = /* @__PURE__ */ new Set(["SPY", "VOO", "IVV", "VTI", "ITOT", "SCHB", "QQQ", "DIA", "IWM", "VT", "VXUS", "VEA", "VWO", "EFA", "BND", "AGG"]);
+
+// src/terminal/tiers.ts
+var TIERS = ["market", "sectors", "names", "crypto"];
+var SHIPPED_MARKET = ["SPY", "QQQ", "VT", "BND"];
+var MAX_MARKET = 8;
+function marketSymbol(raw) {
+  if (typeof raw !== "string") throw new Error("a ticker is a word, such as SPY");
+  const s = safeSymbol(raw);
+  if (isCrypto(s)) throw new Error(`${s} is crypto, which has a tier of its own`);
+  if (/[\^=]/.test(s)) throw new Error(`${s} is an index, a future or a currency, which cannot be held: choose a fund that follows it, such as SPY`);
+  if (SECTOR_FUNDS[s]) throw new Error(`${s} is a sector fund, already among the sectors`);
+  return s;
+}
+function cleanMarket(raw) {
+  if (!Array.isArray(raw)) return void 0;
+  const out = [];
+  for (const v of raw) {
+    if (out.length >= MAX_MARKET) break;
+    try {
+      const s = marketSymbol(v);
+      if (!out.includes(s)) out.push(s);
+    } catch {
+    }
+  }
+  return out;
+}
+function tierOf(symbol4, market = SHIPPED_MARKET) {
+  if (isCrypto(symbol4)) return "crypto";
+  if (SECTOR_FUNDS[symbol4]) return "sectors";
+  if (symbol4.startsWith("^") || MARKET_FUNDS.has(symbol4) || market.includes(symbol4)) return "market";
+  return "names";
+}
+function screenUniverse(watchlist, market) {
+  const symbols = [.../* @__PURE__ */ new Set([...market, ...Object.keys(SECTOR_FUNDS), ...watchlist.map((w) => w.symbol)])];
+  return { symbols, news: new Set(watchlist.map((w) => w.symbol).filter((s) => {
+    const t = tierOf(s, market);
+    return t === "names" || t === "crypto";
+  })) };
+}
+
+// src/terminal/prefs.ts
+var MAX_RECENT = 6;
+var one2 = (v, of) => of.includes(v) ? v : void 0;
+var sym = (v) => {
+  try {
+    return typeof v === "string" ? safeSymbol(v) : void 0;
+  } catch {
+    return void 0;
+  }
+};
+var words2 = (v, or) => (typeof v === "string" ? v.replace(/<[^>]*>/g, "").replace(/[<>]/g, "").replace(/\s+/g, " ").trim().slice(0, 80) : "") || or;
+function cleanPrefs(raw) {
+  const r = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+  const out = {};
+  const theme = one2(r.theme, ["light", "dark"]);
+  if (theme) out.theme = theme;
+  const side = one2(r.side, ["open", "folded"]);
+  if (side) out.side = side;
+  const view = one2(r.view, ["overview", "account"]);
+  if (view) out.view = view;
+  const symbol4 = sym(r.symbol);
+  if (symbol4) out.symbol = symbol4;
+  const range = one2(r.range, ["1M", "3M", "6M", "1Y", "5Y"]);
+  if (range) out.range = range;
+  const kind = one2(r.kind, ["area", "candles"]);
+  if (kind) out.kind = kind;
+  const l = r.layers;
+  if (l && typeof l === "object" && ["ma50", "ma200", "vol"].every((k) => typeof l[k] === "boolean")) out.layers = { ma50: l.ma50, ma200: l.ma200, vol: l.vol };
+  if (Array.isArray(r.recent)) {
+    const seen = /* @__PURE__ */ new Set(), recent = [];
+    for (const x of r.recent) {
+      const s = sym(x?.symbol);
+      if (!s || seen.has(s)) continue;
+      seen.add(s);
+      recent.push({ symbol: s, name: words2(x.name, s) });
+      if (recent.length >= MAX_RECENT) break;
+    }
+    out.recent = recent;
+  }
+  if (typeof r.autorun === "boolean") out.autorun = r.autorun;
+  const market = cleanMarket(r.market);
+  if (market) out.market = market;
+  if (Array.isArray(r.folded)) out.folded = TIERS.filter((t) => r.folded.includes(t));
+  if (typeof r.morning === "boolean") out.morning = r.morning;
+  return out;
+}
+var prefsFile = (dir) => path18.join(dir, "dashboard.json");
+function readPrefs(dir) {
+  try {
+    return cleanPrefs(JSON.parse(fs15.readFileSync(prefsFile(dir), "utf8")));
+  } catch {
+    return {};
+  }
+}
+var marketOf = (dir) => readPrefs(dir).market ?? [...SHIPPED_MARKET];
+
 // src/tools/desk.ts
 var text = (t) => ({ content: [{ type: "text", text: t }] });
 var symbol2 = external_exports.string().min(1).max(20).describe("The ticker as the plan gives it");
@@ -39037,10 +39318,10 @@ async function act(run) {
 function registerDeskTools(server, root) {
   const dir = deskDataDir(root);
   const write = { readOnlyHint: false, openWorldHint: false };
-  const activeFile = path17.join(dir, "backtest", "active.json"), IDLE_MS = 2 * 36e5;
+  const activeFile = path19.join(dir, "backtest", "active.json"), IDLE_MS = 2 * 36e5;
   const getSweep = () => {
     try {
-      const a = JSON.parse(fs14.readFileSync(activeFile, "utf8"));
+      const a = JSON.parse(fs16.readFileSync(activeFile, "utf8"));
       if (typeof a.sweep === "string" && SWEEP_ID.test(a.sweep) && typeof a.at === "number" && Date.now() - a.at < IDLE_MS) return a.sweep;
     } catch {
     }
@@ -39048,10 +39329,10 @@ function registerDeskTools(server, root) {
   };
   const setSweep = (id) => {
     if (id === null) {
-      fs14.rmSync(activeFile, { force: true });
+      fs16.rmSync(activeFile, { force: true });
       return;
     }
-    fs14.mkdirSync(path17.dirname(activeFile), { recursive: true });
+    fs16.mkdirSync(path19.dirname(activeFile), { recursive: true });
     writeWhole(activeFile, JSON.stringify({ sweep: id, at: Date.now() }));
   };
   const ws = () => {
@@ -39100,12 +39381,12 @@ function registerDeskTools(server, root) {
     inputSchema: { symbol: symbol2, analysis_date: day2 },
     annotations: write
   }, async (a) => act(() => {
-    const d = analysisDate(a.analysis_date), sym = safeSymbol(a.symbol), plan = savedPlan(ws().dir, sym, d);
-    if (!progress(ws().dir, sym, d)["decision"]) throw new Error(`the portfolio manager's decision is not saved yet for ${sym} on ${d}`);
-    const rating = parseRating(readSections(ws().dir, sym, d, ["decision"]));
+    const d = analysisDate(a.analysis_date), sym2 = safeSymbol(a.symbol), plan = savedPlan(ws().dir, sym2, d);
+    if (!progress(ws().dir, sym2, d)["decision"]) throw new Error(`the portfolio manager's decision is not saved yet for ${sym2} on ${d}`);
+    const rating = parseRating(readSections(ws().dir, sym2, d, ["decision"]));
     const header = [`Rating: ${rating}`, `Generated: ${(/* @__PURE__ */ new Date()).toISOString().slice(0, 16).replace("T", " ")} UTC`];
     if (plan?.analysts) header.push(`Analysts: ${plan.analysts.join(", ")}; research debate rounds ${plan.debateRounds}, risk debate rounds ${plan.riskRounds}; language ${plan.language}`, `Judged after ${plan.holdingDays} trading days against ${plan.benchmark}`);
-    const file5 = writeReport(ws().dir, sym, d, header);
+    const file5 = writeReport(ws().dir, sym2, d, header);
     return `Report written: ${file5}
 Rating: ${rating}`;
   }));
@@ -39115,13 +39396,13 @@ Rating: ${rating}`;
     inputSchema: { symbol: symbol2, analysis_date: day2, rating: external_exports.enum(RATINGS).optional() },
     annotations: write
   }, async (a) => act(() => {
-    const d = analysisDate(a.analysis_date), sym = safeSymbol(a.symbol);
-    const decision = readSections(ws().dir, sym, d, ["decision"]);
-    if (!progress(ws().dir, sym, d)["decision"]) throw new Error(`the portfolio manager's decision is not saved yet for ${sym} on ${d}`);
+    const d = analysisDate(a.analysis_date), sym2 = safeSymbol(a.symbol);
+    const decision = readSections(ws().dir, sym2, d, ["decision"]);
+    if (!progress(ws().dir, sym2, d)["decision"]) throw new Error(`the portfolio manager's decision is not saved yet for ${sym2} on ${d}`);
     const body = decision.replace(/^## [^\n]*\n/, "");
-    const r = journalOf(root, ws()).storeDecision(sym, d, body, a.rating ?? void 0);
+    const r = journalOf(root, ws()).storeDecision(sym2, d, body, a.rating ?? void 0);
     const rating = a.rating ?? parseRating(body);
-    return r === "stored" ? `Recorded: ${sym} on ${d}, ${rating}, pending. It is scored after ${readSettings(root).scoring.holdingPeriodDays} trading days.` : `${sym} on ${d} is already in the journal; nothing changed.`;
+    return r === "stored" ? `Recorded: ${sym2} on ${d}, ${rating}, pending. It is scored after ${readSettings(root).scoring.holdingPeriodDays} trading days.` : `${sym2} on ${d} is already in the journal; nothing changed.`;
   }));
   server.registerTool("list_settlements", {
     title: "Pending calls",
@@ -39150,10 +39431,10 @@ Rating: ${rating}`;
     if (!readContactEmail(root)) throw new NeedsEmail(ASK_FOR_EMAIL);
     const every = a.every_days ?? 7, dates = iterGrid(a.start_date, a.end_date, every), grid = cells(a.symbols, dates);
     const id = a.sweep_id ?? (/* @__PURE__ */ new Date()).toISOString().replace(/\D/g, "").slice(0, 14), w = workspaceOf(root, id);
-    fs14.mkdirSync(w.dir, { recursive: true });
+    fs16.mkdirSync(w.dir, { recursive: true });
     const recorded = new Set(journalOf(root, w).load().map((e) => `${e.ticker}|${e.date}`));
     const todo = grid.filter((c) => !recorded.has(`${c.symbol}|${c.date}`));
-    writeWhole(path17.join(w.dir, "sweep.json"), JSON.stringify({ symbols: [...new Set(grid.map((c) => c.symbol))], dates, every, cells: grid.length }));
+    writeWhole(path19.join(w.dir, "sweep.json"), JSON.stringify({ symbols: [...new Set(grid.map((c) => c.symbol))], dates, every, cells: grid.length }));
     setSweep(id);
     const symbols = new Set(grid.map((c) => c.symbol)).size;
     return [
@@ -39185,10 +39466,10 @@ Rating: ${rating}`;
     const id = a.sweep_id ?? getSweep();
     if (!id) throw new Error("no backtest is running: name the sweep to score");
     const w = workspaceOf(root, id);
-    if (!fs14.existsSync(path17.join(w.dir, "journal.md"))) throw new Error(`sweep ${id} has no recorded calls yet`);
+    if (!fs16.existsSync(path19.join(w.dir, "journal.md"))) throw new Error(`sweep ${id} has no recorded calls yet`);
     let meta3 = "";
     try {
-      const m2 = JSON.parse(fs14.readFileSync(path17.join(w.dir, "sweep.json"), "utf8"));
+      const m2 = JSON.parse(fs16.readFileSync(path19.join(w.dir, "sweep.json"), "utf8"));
       meta3 = ` of ${m2.cells} planned`;
     } catch {
     }
@@ -39199,12 +39480,25 @@ ${renderSummary(summarize(entries))}`;
   }));
   server.registerTool("routine_brief", {
     title: "Today's routine",
-    description: "What the morning routine should do today (score past calls, then the stocks to analyse in order, within the person's limit) or what the evening wrap-up has to report (today's calls, the orders the dashboard sent and Robinhood's answer, what is still to be scored). Read-only; read from the desk's own files. Call it first when asked to run the morning routine or the evening wrap-up.",
+    description: `What the morning routine should do today (score past calls; "Worth a look today", the same list the dashboard shows, worked out from prices if it was not this hour; then the stocks to analyse in order, within the person's limit) or what the evening wrap-up has to report (today's calls, the orders the dashboard sent and Robinhood's answer, what is still to be scored). It changes nothing but this: with the person's switch "Analyse the top three each market morning" on, the top three of the list go on the waiting list at shallow depth, once a market day. Call it first when asked to run the morning routine or the evening wrap-up.`,
     inputSchema: { kind: external_exports.enum(["morning", "evening"]).describe("morning: before the open; evening: after the close") },
-    annotations: { readOnlyHint: true, openWorldHint: false }
-  }, async (a) => act(() => {
+    annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: true }
+  }, async (a) => act(async () => {
     const day3 = today();
-    return a.kind === "morning" ? morningBrief(dir, day3, readSettings(root).routines.maxAnalyses) : eveningBrief(dir, day3, /* @__PURE__ */ new Date());
+    if (a.kind === "evening") return eveningBrief(dir, day3, /* @__PURE__ */ new Date());
+    const on = readPrefs(dir).morning === true, weekday2 = ![0, 6].includes((/* @__PURE__ */ new Date(`${day3}T12:00:00Z`)).getUTCDay());
+    let look;
+    if (weekday2) {
+      try {
+        const { symbols, news } = screenUniverse(readWatchlist(dir), marketOf(dir));
+        const worked = await screenToday(dir, symbols, news, day3);
+        if (on) queueTop(dir, worked, day3, false);
+        look = { screen: readScreen(dir) ?? worked, on };
+      } catch (e) {
+        look = { screen: null, failed: e.message, on };
+      }
+    }
+    return morningBrief(dir, day3, readSettings(root).routines.maxAnalyses, look);
   }));
   server.registerTool("open_dashboard", {
     title: "Open the dashboard",
@@ -39213,7 +39507,7 @@ ${renderSummary(summarize(entries))}`;
   }, async () => act(() => openDashboard(root)));
   const perRun = () => readSettings(root).routines.maxAnalyses;
   const depthWords = (d) => d ? `${d} (debate_rounds ${DEPTHS[d]} and risk_rounds ${DEPTHS[d]})` : "the settings' depth (leave the rounds out)";
-  const called = (sym, d) => new Journal(path17.join(dir, "journal.md")).load().find((e) => e.ticker === sym && e.date === d);
+  const called = (sym2, d) => new Journal(path19.join(dir, "journal.md")).load().find((e) => e.ticker === sym2 && e.date === d);
   const queueAct = (run) => act(() => {
     try {
       return run();
@@ -39245,13 +39539,13 @@ ${renderSummary(summarize(entries))}`;
     annotations: write
   }, async (a) => queueAct(() => {
     if (ws().sweep) return `BUSY: a backtest sweep (${ws().sweep}) is running; the waiting list runs only on the live desk. Stop and say so.`;
-    const sym = safeSymbol(a.symbol), d = today(), done = called(sym, d);
+    const sym2 = safeSymbol(a.symbol), d = today(), done = called(sym2, d);
     if (done) {
-      finishItem(dir, sym, { rating: done.rating });
-      return `ALREADY: ${sym} was already called today (${done.rating}); it is marked done. Take the next.`;
+      finishItem(dir, sym2, { rating: done.rating });
+      return `ALREADY: ${sym2} was already called today (${done.rating}); it is marked done. Take the next.`;
     }
-    const item = startItem(dir, sym, d);
-    return `START: ${sym} is marked as being analysed. Plan it with analysis date ${d}, depth ${depthWords(item.depth)}. When its call is recorded, call finish_queue_item; if it cannot be finished, call finish_queue_item with failed_because.`;
+    const item = startItem(dir, sym2, d);
+    return `START: ${sym2} is marked as being analysed. Plan it with analysis date ${d}, depth ${depthWords(item.depth)}. When its call is recorded, call finish_queue_item; if it cannot be finished, call finish_queue_item with failed_because.`;
   }));
   server.registerTool("finish_queue_item", {
     title: "Finish a waiting analysis",
@@ -39259,15 +39553,15 @@ ${renderSummary(summarize(entries))}`;
     inputSchema: { symbol: symbol2, failed_because: external_exports.string().min(3).max(300).optional() },
     annotations: write
   }, async (a) => queueAct(() => {
-    const sym = safeSymbol(a.symbol);
+    const sym2 = safeSymbol(a.symbol);
     if (a.failed_because) {
-      finishItem(dir, sym, { reason: a.failed_because });
-      return `Marked failed: ${sym}. The person sees why on the dashboard and can press Retry.`;
+      finishItem(dir, sym2, { reason: a.failed_because });
+      return `Marked failed: ${sym2}. The person sees why on the dashboard and can press Retry.`;
     }
-    const item = readQueue(dir).find((i) => i.symbol === sym), call = called(sym, item?.date ?? today());
-    if (!call) throw new Error(`no call for ${sym} on ${item?.date ?? today()} is recorded yet: call record_decision first, or pass failed_because`);
-    finishItem(dir, sym, { rating: call.rating });
-    return `Marked done: ${sym}, ${call.rating}. The dashboard shows it.`;
+    const item = readQueue(dir).find((i) => i.symbol === sym2), call = called(sym2, item?.date ?? today());
+    if (!call) throw new Error(`no call for ${sym2} on ${item?.date ?? today()} is recorded yet: call record_decision first, or pass failed_because`);
+    finishItem(dir, sym2, { rating: call.rating });
+    return `Marked done: ${sym2}, ${call.rating}. The dashboard shows it.`;
   }));
   server.registerTool("end_queue_run", {
     title: "End a run of the waiting list",
@@ -39445,6 +39739,6 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root) {
 // src/tools/main.ts
 if (process.argv.includes("--check")) console.log(await deskCheck());
 else {
-  configure({ spacingMs: 250, cacheDir: path18.join(deskDataDir(process.cwd()), "cache") });
+  configure({ spacingMs: 250, cacheDir: path20.join(deskDataDir(process.cwd()), "cache") });
   await deskServer().connect(new StdioServerTransport());
 }

@@ -3263,8 +3263,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path20) {
-      let input = path20;
+    function removeDotSegments(path21) {
+      let input = path21;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3673,8 +3673,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path20 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path20 && path20 !== "/" ? path20 : void 0;
+        const path21 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path21 && path21 !== "/" ? path21 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -7187,12 +7187,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list2, fs20, exportName) {
+    function addFormats(ajv, list2, fs21, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list2)
-        ajv.addFormat(f, fs20[f]);
+        ajv.addFormat(f, fs21[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -7305,9 +7305,9 @@ var require_content_type = __commonJS({
 });
 
 // src/terminal/main.ts
-import fs19 from "node:fs";
+import fs20 from "node:fs";
 import http3 from "node:http";
-import path19 from "node:path";
+import path20 from "node:path";
 import { spawn as spawn2 } from "node:child_process";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
@@ -7522,9 +7522,9 @@ async function getJson(url2, opts = {}) {
 
 // src/terminal/server.ts
 import crypto6 from "node:crypto";
-import fs18 from "node:fs";
+import fs19 from "node:fs";
 import http2 from "node:http";
-import path18 from "node:path";
+import path19 from "node:path";
 import { fileURLToPath } from "node:url";
 
 // src/data/dates.ts
@@ -8501,10 +8501,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj4, path20) {
-  if (!path20)
+function getElementAtPath(obj4, path21) {
+  if (!path21)
     return obj4;
-  return path20.reduce((acc, key) => acc?.[key], obj4);
+  return path21.reduce((acc, key) => acc?.[key], obj4);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -8844,11 +8844,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path20, issues) {
+function prefixIssues(path21, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path20);
+    iss.path.unshift(path21);
     return iss;
   });
 }
@@ -9309,16 +9309,16 @@ function flattenError(error2, mapper = (issue2) => issue2.message) {
 }
 function formatError(error2, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error3, path20 = []) => {
+  const processError = (error3, path21 = []) => {
     for (const issue2 of error3.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path20, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path21, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path20, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path21, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path20, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path21, ...issue2.path]);
       } else {
-        const fullpath = [...path20, ...issue2.path];
+        const fullpath = [...path21, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -21019,8 +21019,8 @@ function load2(dir, now) {
 var open2 = (i) => i.state === "waiting" || i.state === "running";
 function trimmed(list2) {
   const finished = list2.filter((i) => !open2(i)).sort((a, b) => (b.endedAt ?? "").localeCompare(a.endedAt ?? ""));
-  const keep2 = new Set(finished.slice(0, MAX_FINISHED));
-  return list2.filter((i) => open2(i) || keep2.has(i));
+  const keep3 = new Set(finished.slice(0, MAX_FINISHED));
+  return list2.filter((i) => open2(i) || keep3.has(i));
 }
 function change(dir, now, edit) {
   const file4 = queueFile(dir);
@@ -21203,6 +21203,13 @@ function tierOf(symbol, market = SHIPPED_MARKET) {
   if (symbol.startsWith("^") || MARKET_FUNDS.has(symbol) || market.includes(symbol)) return "market";
   return "names";
 }
+function screenUniverse(watchlist, market) {
+  const symbols = [.../* @__PURE__ */ new Set([...market, ...Object.keys(SECTOR_FUNDS), ...watchlist.map((w) => w.symbol)])];
+  return { symbols, news: new Set(watchlist.map((w) => w.symbol).filter((s) => {
+    const t2 = tierOf(s, market);
+    return t2 === "names" || t2 === "crypto";
+  })) };
+}
 function tiersOf(watchlist, market, calls) {
   const latest = /* @__PURE__ */ new Map();
   for (const c of calls) {
@@ -21277,6 +21284,7 @@ function cleanPrefs(raw) {
   const market = cleanMarket(r.market);
   if (market) out.market = market;
   if (Array.isArray(r.folded)) out.folded = TIERS.filter((t2) => r.folded.includes(t2));
+  if (typeof r.morning === "boolean") out.morning = r.morning;
   return out;
 }
 var prefsFile = (dir) => path14.join(dir, "dashboard.json");
@@ -21333,8 +21341,8 @@ function versionOf(root2) {
   return [stamp(path15.join(dir, "journal.md")), stamp(path15.join(dir, "watchlist.json")), stamp(path15.join(dir, "queue.json")), latest, stamp(path15.join(dir, "contact.json")), stamp(path15.join(dir, "listener.json")), stamp(path15.join(dir, "paper.json")), timely].join("-");
 }
 function queueOf(dir, now = /* @__PURE__ */ new Date()) {
-  const rank = { running: 0, waiting: 1, done: 2, failed: 2 };
-  return readQueue(dir, now).map((i) => i.state === "running" && i.date ? { ...i, progress: stepWords(dir, i.symbol, i.date) } : i).sort((a, b) => rank[a.state] - rank[b.state] || (rank[a.state] === 2 ? (b.endedAt ?? "").localeCompare(a.endedAt ?? "") : 0));
+  const rank2 = { running: 0, waiting: 1, done: 2, failed: 2 };
+  return readQueue(dir, now).map((i) => i.state === "running" && i.date ? { ...i, progress: stepWords(dir, i.symbol, i.date) } : i).sort((a, b) => rank2[a.state] - rank2[b.state] || (rank2[a.state] === 2 ? (b.endedAt ?? "").localeCompare(a.endedAt ?? "") : 0));
 }
 function listenerOf(dir, now = /* @__PURE__ */ new Date()) {
   const n = readListener(dir, now);
@@ -21574,16 +21582,16 @@ async function history2(raw, range) {
   const s = await daily(symbol, from, end);
   if (!s.bars.length) throw new NoData(`Yahoo Finance has no daily prices for ${symbol}`);
   const m50 = compute("close_50_sma", s.bars), m200 = compute("close_200_sma", s.bars), cut = addDays(end, -RANGES[range]);
-  const keep2 = s.bars.map((b, i) => ({ b, i })).filter(({ b }) => b.date >= cut);
+  const keep3 = s.bars.map((b, i) => ({ b, i })).filter(({ b }) => b.date >= cut);
   const round = (v) => v === null || v === void 0 ? null : Math.round(v * 1e4) / 1e4;
   return {
     symbol,
     name: s.meta.name,
     currency: s.meta.currency,
     range,
-    bars: keep2.map(({ b }) => ({ date: b.date, open: round(b.open), high: round(b.high), low: round(b.low), close: round(b.close), volume: b.volume })),
-    ma50: keep2.map(({ i }) => round(m50[i])),
-    ma200: keep2.map(({ i }) => round(m200[i]))
+    bars: keep3.map(({ b }) => ({ date: b.date, open: round(b.open), high: round(b.high), low: round(b.low), close: round(b.close), volume: b.volume })),
+    ma50: keep3.map(({ i }) => round(m50[i])),
+    ma200: keep3.map(({ i }) => round(m200[i]))
   };
 }
 var MARKETS = [
@@ -21640,12 +21648,224 @@ function findSymbols(raw) {
   return value;
 }
 
-// src/watch/claude.ts
+// src/desk/screen.ts
 import fs17 from "node:fs";
-import os3 from "node:os";
 import path16 from "node:path";
-function findClaude(env = process.env, platform = process.platform, exists = (p) => fs17.existsSync(p)) {
-  const p = platform === "win32" ? path16.win32 : path16.posix;
+
+// src/data/news.ts
+var stamp2 = (epoch2) => new Date(epoch2 * 1e3).toISOString().slice(0, 16).replace("T", " ");
+async function search(q, count) {
+  const qs = `q=${encodeURIComponent(q)}&newsCount=${count}&quotesCount=0&enableFuzzyQuery=false`;
+  let last;
+  for (const host of HOSTS) {
+    try {
+      const j = await getJson(`${host}/v1/finance/search?${qs}`);
+      return (j.news ?? []).filter((n) => n.title && n.providerPublishTime).map((n) => ({ title: n.title, publisher: n.publisher ?? "unknown", link: n.link ?? "", time: stamp2(n.providerPublishTime), tickers: (n.relatedTickers ?? []).map((t2) => t2.toUpperCase()) }));
+    } catch (e) {
+      last = e;
+    }
+  }
+  throw last;
+}
+
+// src/desk/screen.ts
+var MOVE_PCT = 3;
+var VOLUME_TIMES = 2;
+var USUAL_DAYS = 20;
+var SHOWN2 = 5;
+var TOP_QUEUED = 3;
+var SCREEN_MS = 60 * 6e4;
+var one2 = (n) => (Math.round(n * 10) / 10).toFixed(1);
+function signalsOf(bars, newsToday = null) {
+  const signals = [], n = bars.length, last = bars[n - 1], prev = bars[n - 2];
+  if (!last) return { signals, movePct: null };
+  const movePct = prev && prev.close > 0 ? (last.close / prev.close - 1) * 100 : null;
+  if (movePct !== null && Math.abs(movePct) >= MOVE_PCT) signals.push({ kind: "move", words: `${movePct >= 0 ? "rose" : "fell"} ${one2(Math.abs(movePct))}%` });
+  const usual = bars.slice(Math.max(0, n - 1 - USUAL_DAYS), n - 1).map((b) => b.volume).filter((v) => v > 0);
+  if (usual.length >= USUAL_DAYS / 2 && last.volume > 0) {
+    const times = last.volume / (usual.reduce((a, v) => a + v, 0) / usual.length);
+    if (times >= VOLUME_TIMES) signals.push({ kind: "volume", words: `${one2(times)} times its usual volume` });
+  }
+  const yearAgo = addDays(last.date, -365), year = bars.slice(0, n - 1).filter((b) => b.date >= yearAgo);
+  if (bars[0] && bars[0].date <= addDays(last.date, -350) && year.length) {
+    if (last.high > Math.max(...year.map((b) => b.high))) signals.push({ kind: "high", words: "a new 52-week high" });
+    if (last.low < Math.min(...year.map((b) => b.low))) signals.push({ kind: "low", words: "a new 52-week low" });
+  }
+  if (prev) {
+    const closes = bars.map((b) => b.close);
+    for (const days of [50, 200]) {
+      const ma = sma(closes, days), now = ma[n - 1], before = ma[n - 2];
+      if (now == null || before == null) continue;
+      if (prev.close <= before && last.close > now) signals.push({ kind: days === 50 ? "above50" : "above200", words: `crossed above its ${days}-day average` });
+      if (prev.close >= before && last.close < now) signals.push({ kind: days === 50 ? "below50" : "below200", words: `crossed below its ${days}-day average` });
+    }
+  }
+  if (newsToday !== null && newsToday > 0) signals.push({ kind: "news", words: `in the news today (${newsToday} ${newsToday === 1 ? "article" : "articles"})` });
+  return { signals, movePct };
+}
+function whyOf(signals) {
+  const move = signals.find((s) => s.kind === "move"), volume = signals.find((s) => s.kind === "volume");
+  const parts = [
+    move && volume ? `${move.words} on ${volume.words}` : move ? move.words : volume ? `traded ${volume.words}` : "",
+    ...signals.filter((s) => s.kind !== "move" && s.kind !== "volume").map((s) => s.words)
+  ].filter(Boolean);
+  const line = parts.join(", ");
+  return line.charAt(0).toUpperCase() + line.slice(1);
+}
+function rank(candidates) {
+  return candidates.map((c) => {
+    const s = signalsOf(c.bars, c.news);
+    return { symbol: c.symbol, signals: s.signals, movePct: s.movePct, why: whyOf(s.signals), session: c.bars[c.bars.length - 1]?.date ?? "" };
+  }).filter((p) => p.signals.length > 0).sort((a, b) => b.signals.length - a.signals.length || Math.abs(b.movePct ?? 0) - Math.abs(a.movePct ?? 0) || a.symbol.localeCompare(b.symbol)).slice(0, SHOWN2);
+}
+async function inTurn(items, width, job) {
+  const out = new Array(items.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(width, items.length) }, async () => {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await job(items[i]);
+    }
+  }));
+  return out;
+}
+async function newsOn(symbol, day2) {
+  try {
+    return (await search(symbol, 12)).filter((a) => a.tickers.includes(symbol) && marketDay(/* @__PURE__ */ new Date(`${a.time.replace(" ", "T")}:00Z`)) === day2).length;
+  } catch {
+    return null;
+  }
+}
+async function workScreen(symbols, news, day2, now = /* @__PURE__ */ new Date()) {
+  const list2 = [...new Set(symbols)].filter((s) => !/[\^=]/.test(s));
+  const read2 = await inTurn(list2, 4, async (symbol) => {
+    try {
+      const bars = (await daily(symbol, addDays(day2, -400), day2)).bars;
+      if (!bars.length || bars[bars.length - 1].date < addDays(day2, -7)) return { symbol, bars: null, news: null };
+      return { symbol, bars, news: news.has(symbol) ? await newsOn(symbol, day2) : null };
+    } catch {
+      return { symbol, bars: null, news: null };
+    }
+  });
+  return {
+    day: day2,
+    at: now.toISOString(),
+    looked: list2.length,
+    unavailable: read2.filter((r) => !r.bars).map((r) => r.symbol),
+    picks: rank(read2.filter((r) => !!r.bars))
+  };
+}
+var screenFile = (dir) => path16.join(dir, "screen.json");
+function readScreen(dir) {
+  try {
+    const v = JSON.parse(fs17.readFileSync(screenFile(dir), "utf8"));
+    if (typeof v.day !== "string" || typeof v.at !== "string" || !Array.isArray(v.picks)) return null;
+    return v;
+  } catch {
+    return null;
+  }
+}
+function keep2(dir, s) {
+  fs17.mkdirSync(dir, { recursive: true });
+  withLock(screenFile(dir), () => writeWhole(screenFile(dir), JSON.stringify(s, null, 2) + "\n"));
+  return s;
+}
+async function screenToday(dir, symbols, news, day2, now = /* @__PURE__ */ new Date(), work = workScreen) {
+  const kept = readScreen(dir);
+  if (kept && kept.day === day2 && now.getTime() - Date.parse(kept.at) < SCREEN_MS) return kept;
+  const fresh = await work(symbols, news, day2, now);
+  return keep2(dir, { ...fresh, ...kept?.queued?.day === day2 ? { queued: kept.queued } : {} });
+}
+var isWeekday = (day2) => {
+  const w = (/* @__PURE__ */ new Date(`${day2}T12:00:00Z`)).getUTCDay();
+  return w !== 0 && w !== 6;
+};
+function queueTop(dir, screen, day2, ring, now = /* @__PURE__ */ new Date()) {
+  if (!isWeekday(day2) || screen.day !== day2 || screen.queued?.day === day2 || readScreen(dir)?.queued?.day === day2) return [];
+  const called = new Set(new Journal(path16.join(dir, "journal.md")).load().filter((e) => e.date === day2).map((e) => e.ticker));
+  const busy = new Set(readQueue(dir, now).filter((q) => q.state === "waiting" || q.state === "running").map((q) => q.symbol));
+  const queued = [];
+  for (const p of screen.picks) {
+    if (queued.length >= TOP_QUEUED) break;
+    if (called.has(p.symbol) || busy.has(p.symbol)) continue;
+    try {
+      enqueue(dir, p.symbol, now.toISOString(), "shallow", now);
+      queued.push(p.symbol);
+    } catch (e) {
+      if (!(e instanceof QueueRefusal)) throw e;
+      break;
+    }
+  }
+  keep2(dir, { ...screen, queued: { day: day2, symbols: queued } });
+  if (queued.length && ring) ringDoorbell(dir, "press", now);
+  return queued;
+}
+
+// src/desk/weather.ts
+var MEANING = {
+  trend: "The S&P 500 against its 50- and 200-day averages: above both is rising, between them mixed, below both falling. It tells where the market has been, not where it goes next.",
+  mood: "The VIX is how much the market expects prices to swing over the next month: under 15 calm, 15 to 25 normal, over 25 wild.",
+  rates: "What prediction markets price for the Federal Reserve's next interest-rate decision, not a forecast of ours. Lower rates tend to help share prices; higher rates tend to weigh on them."
+};
+var whole2 = (n) => n.toLocaleString("en-US", { maximumFractionDigits: 0 });
+var dayWords = (iso2) => {
+  const [y, m, d] = iso2.split("-");
+  return `${Number(d)} ${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][Number(m) - 1]} ${y}`;
+};
+var unavailable = (key, name, why) => ({ key, name, state: null, tone: "", words: `Unavailable: ${why}.`, meaning: MEANING[key] });
+function trendOf(bars) {
+  const closes = bars.map((b) => b.close), n = closes.length;
+  const ma50 = sma(closes, 50)[n - 1], ma200 = sma(closes, 200)[n - 1], last = closes[n - 1];
+  if (last === void 0 || ma50 == null || ma200 == null) return unavailable("trend", "Trend", "too few days of S&P 500 prices for its 200-day average");
+  const above = (ma) => last > ma ? "above" : "below";
+  const [state, tone] = last > ma50 && last > ma200 ? ["Rising", "ok"] : last < ma50 && last < ma200 ? ["Falling", "bad"] : ["Mixed", "warn"];
+  return { key: "trend", name: "Trend", state, tone, words: `The S&P 500 closed at ${whole2(last)} on ${dayWords(bars[n - 1].date)}, ${above(ma50)} its 50-day average (${whole2(ma50)}) and ${above(ma200)} its 200-day average (${whole2(ma200)}).`, meaning: MEANING.trend };
+}
+function moodOf(bars) {
+  const last = bars[bars.length - 1];
+  if (!last) return unavailable("mood", "Mood", "no VIX figure came from Yahoo Finance");
+  const v = last.close, [state, tone] = v < 15 ? ["Calm", "ok"] : v <= 25 ? ["Normal", ""] : ["Wild", "bad"];
+  return { key: "mood", name: "Mood", state, tone, words: `The VIX closed at ${v.toFixed(1)} on ${dayWords(last.date)}.`, meaning: MEANING.mood };
+}
+function outcomeWords(title) {
+  if (/no change/i.test(title)) return { words: "no change", way: "none" };
+  const m = /(\d+)\s*(\+?)\s*bps?\s*(decrease|cut|increase|hike|rise)/i.exec(title);
+  if (!m) return { words: title.toLowerCase(), way: "none" };
+  const cut = /decrease|cut/i.test(m[3]), size = `${Number((Number(m[1]) / 100).toFixed(2))}%`;
+  return { words: `${cut ? "a cut" : "a rise"} of ${size}${m[2] ? " or more" : ""}`, way: cut ? "cut" : "rise" };
+}
+function ratesOf(events, now = /* @__PURE__ */ new Date()) {
+  const next = events.filter((e) => /^fed decision in /i.test(e.title ?? "") && !e.closed && e.endDate && Date.parse(e.endDate) > now.getTime()).sort((a, b) => Date.parse(a.endDate) - Date.parse(b.endDate))[0];
+  const list2 = (s) => {
+    try {
+      const v = JSON.parse(s ?? "[]");
+      return Array.isArray(v) ? v.map(String) : [];
+    } catch {
+      return [];
+    }
+  };
+  const odds = (next?.markets ?? []).filter((m) => m.groupItemTitle && !m.closed && m.active !== false).map((m) => ({ ...outcomeWords(m.groupItemTitle), p: Number(list2(m.outcomePrices)[0]) })).filter((o) => Number.isFinite(o.p)).sort((a, b) => b.p - a.p);
+  const top = odds[0];
+  if (!next || !top) return unavailable("rates", "Rates", "Polymarket has no open market on the Federal Reserve's next decision");
+  const [state, tone] = top.way === "cut" ? ["A cut", "ok"] : top.way === "rise" ? ["A rise", "warn"] : ["No change", ""];
+  const pct2 = (p) => `${Math.round(p * 100)}%`, second = odds[1] && odds[1].p >= 0.1 ? ` and ${odds[1].words} at ${pct2(odds[1].p)}` : "";
+  return { key: "rates", name: "Rates", state, tone, words: `For the Federal Reserve's next decision, by ${dayWords(marketDay(new Date(next.endDate)))}, Polymarket's crowd puts ${top.words} at ${pct2(top.p)}${second}.`, meaning: MEANING.rates };
+}
+async function weatherNow(day2, now = /* @__PURE__ */ new Date()) {
+  const [trend, mood, rates] = await Promise.all([
+    daily("^GSPC", addDays(day2, -400), day2).then((s) => trendOf(s.bars), () => unavailable("trend", "Trend", "Yahoo Finance did not answer for the S&P 500")),
+    daily("^VIX", addDays(day2, -14), day2).then((s) => moodOf(s.bars), () => unavailable("mood", "Mood", "Yahoo Finance did not answer for the VIX")),
+    getJson("https://gamma-api.polymarket.com/public-search?q=fed%20decision&limit_per_type=20").then((j) => ratesOf(j.events ?? [], now), () => unavailable("rates", "Rates", "Polymarket did not answer"))
+  ]);
+  return { at: now.toISOString(), lines: [trend, mood, rates] };
+}
+
+// src/watch/claude.ts
+import fs18 from "node:fs";
+import os3 from "node:os";
+import path17 from "node:path";
+function findClaude(env = process.env, platform = process.platform, exists = (p) => fs18.existsSync(p)) {
+  const p = platform === "win32" ? path17.win32 : path17.posix;
   const dirs = (env.PATH ?? env.Path ?? "").split(platform === "win32" ? ";" : ":").filter(Boolean);
   const home = env.USERPROFILE ?? env.HOME ?? os3.homedir();
   if (platform === "win32") {
@@ -21664,18 +21884,18 @@ function findClaude(env = process.env, platform = process.platform, exists = (p)
 
 // src/terminal/launch.ts
 import crypto5 from "node:crypto";
-import path17 from "node:path";
+import path18 from "node:path";
 var PORTS = [47615, 47625];
-var deskIdOf = (root2) => crypto5.createHash("sha256").update(path17.resolve(root2)).digest("hex").slice(0, 12);
+var deskIdOf = (root2) => crypto5.createHash("sha256").update(path18.resolve(root2)).digest("hex").slice(0, 12);
 
 // src/terminal/server.ts
 var TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".woff2": "font/woff2", ".svg": "image/svg+xml" };
-function loadAssets(dir = path18.join(path18.dirname(fileURLToPath(import.meta.url)), "terminal")) {
+function loadAssets(dir = path19.join(path19.dirname(fileURLToPath(import.meta.url)), "terminal")) {
   const out = /* @__PURE__ */ new Map();
-  const add = (rel) => out.set(`/${rel.replace(/\\/g, "/")}`, { type: TYPES[path18.extname(rel)] ?? "application/octet-stream", body: fs18.readFileSync(path18.join(dir, rel)) });
+  const add = (rel) => out.set(`/${rel.replace(/\\/g, "/")}`, { type: TYPES[path19.extname(rel)] ?? "application/octet-stream", body: fs19.readFileSync(path19.join(dir, rel)) });
   for (const f of ["index.html", "app.js", "app.css"]) add(f);
   try {
-    for (const f of fs18.readdirSync(path18.join(dir, "fonts"))) if (f.endsWith(".woff2")) add(`fonts/${f}`);
+    for (const f of fs19.readdirSync(path19.join(dir, "fonts"))) if (f.endsWith(".woff2")) add(`fonts/${f}`);
   } catch {
   }
   return out;
@@ -21716,7 +21936,7 @@ function fingerprint(files) {
   const h = crypto6.createHash("sha256");
   for (const f of files) {
     try {
-      h.update(fs18.readFileSync(f));
+      h.update(fs19.readFileSync(f));
     } catch {
       h.update(`missing ${f}`);
     }
@@ -21785,16 +22005,16 @@ async function startTerminal(opts) {
     });
     req.on("error", reject);
   });
-  const callsOf = () => new Journal(path18.join(dir, "journal.md")).load().map((e) => ({ ticker: e.ticker, date: e.date, rating: e.rating }));
+  const callsOf = () => new Journal(path19.join(dir, "journal.md")).load().map((e) => ({ ticker: e.ticker, date: e.date, rating: e.rating }));
   let paperMemo = null;
   const paper = async (today2) => {
     const calls = callsOf(), caps = robinhood.trading().caps, startUsd = readPaperStart(dir), trading = readSettings(root2).trading;
-    let stamp2 = "0";
+    let stamp3 = "0";
     try {
-      stamp2 = String(fs18.statSync(path18.join(dir, "journal.md")).mtimeMs);
+      stamp3 = String(fs19.statSync(path19.join(dir, "journal.md")).mtimeMs);
     } catch {
     }
-    const key = `${stamp2}|${startUsd}|${JSON.stringify(caps)}|${today2}`;
+    const key = `${stamp3}|${startUsd}|${JSON.stringify(caps)}|${today2}`;
     if (!paperMemo || paperMemo.key !== key || Date.now() - paperMemo.at > 10 * 6e4) {
       const record2 = recordOf(calls, today2), closes = {};
       if (record2.since) {
@@ -21819,6 +22039,21 @@ async function startTerminal(opts) {
   const limited = async (c) => {
     await sectors.warm([c.symbol, ...(c.positions ?? []).map((p) => p.symbol)]);
     return limitedNow(c);
+  };
+  let screening = null;
+  const screenNow = async (day2) => {
+    const { symbols, news } = screenUniverse(readWatchlist(dir), marketOf(dir));
+    screening ??= screenToday(dir, symbols, news, day2).finally(() => {
+      screening = null;
+    });
+    const worked = await screening, on = readPrefs(dir).morning === true;
+    const queued2 = on ? queueTop(dir, worked, day2, true) : [];
+    return { screen: readScreen(dir) ?? worked, morning: { on, top: TOP_QUEUED }, queued: queued2 };
+  };
+  let weatherMemo = null;
+  const weather = (day2) => {
+    if (!weatherMemo || weatherMemo.day !== day2 || Date.now() - weatherMemo.at > SCREEN_MS) weatherMemo = { at: Date.now(), day: day2, value: weatherNow(day2) };
+    return weatherMemo.value;
   };
   const queued = (job) => {
     try {
@@ -21865,6 +22100,8 @@ async function startTerminal(opts) {
       if (p === "/api/version") return json(res, 200, { version: versionOf(root2), build, update: updated, restarting });
       if (p === "/api/prefs") return json(res, 200, readPrefs(dir));
       if (p === "/api/paper") return json(res, 200, await paper(day2));
+      if (p === "/api/screen") return json(res, 200, await screenNow(day2));
+      if (p === "/api/weather") return json(res, 200, { weather: await weather(day2) });
       if (p === "/api/search") {
         const q = (url2.searchParams.get("q") ?? "").trim();
         if (!QUERY.test(q)) throw new Refused2(400, "type a name or a ticker, in at most 40 letters");
@@ -21913,7 +22150,7 @@ async function startTerminal(opts) {
     if (p === "/api/queue" && method === "POST") {
       const symbol = safeSymbol(name), d = b.depth === void 0 ? depthOfRounds(readSettings(root2).analysis.debateRounds) : b.depth;
       if (!isDepth(d)) throw new Refused2(400, "the depth is shallow, medium or deep");
-      const call = new Journal(path18.join(dir, "journal.md")).load().find((e) => e.ticker === symbol && e.date === day2);
+      const call = new Journal(path19.join(dir, "journal.md")).load().find((e) => e.ticker === symbol && e.date === day2);
       if (call) throw new Refused2(409, `${symbol} was already analysed today (${call.rating}): its call is in the journal. Ask again tomorrow`);
       queued(() => enqueue(dir, symbol, (/* @__PURE__ */ new Date()).toISOString(), d));
       ringDoorbell(dir, "press");
@@ -21954,7 +22191,14 @@ async function startTerminal(opts) {
     if (p === "/api/prefs" && method === "POST") {
       delete b.autorun;
       delete b.market;
+      delete b.morning;
       return json(res, 200, savePrefs(dir, b));
+    }
+    if (p === "/api/screen/morning" && method === "POST") {
+      if (typeof b.on !== "boolean") throw new Refused2(400, "say on or off");
+      savePrefs(dir, { morning: b.on });
+      const kept = readScreen(dir), queued2 = b.on && kept ? queueTop(dir, kept, day2, true) : [];
+      return json(res, 200, { morning: { on: b.on, top: TOP_QUEUED }, queued: queued2 });
     }
     if (p === "/api/tiers/market" && method === "POST") {
       if (!Array.isArray(b.symbols) || b.symbols.length > MAX_MARKET) throw new Refused2(400, `choose up to ${MAX_MARKET} funds for the whole market`);
@@ -22011,7 +22255,7 @@ async function startTerminal(opts) {
     }
     if (p === "/api/ticket" && method === "POST") {
       const symbol = safeSymbol(typeof b.symbol === "string" ? b.symbol : ""), date4 = typeof b.date === "string" ? b.date : "";
-      const call = new Journal(path18.join(dir, "journal.md")).load().find((e) => e.ticker === symbol && e.date === date4);
+      const call = new Journal(path19.join(dir, "journal.md")).load().find((e) => e.ticker === symbol && e.date === date4);
       if (!call) throw new Refused2(404, "no such call");
       tradable(symbol);
       const trading = readSettings(root2).trading, { caps } = robinhood.trading();
@@ -22128,21 +22372,21 @@ async function startTerminal(opts) {
   }
   if (!port) throw new Error(`no free port from ${PORTS[0]} to ${PORTS[1]} on this computer`);
   const keyFile = opts.keyFile ?? dashboardKeyFile();
-  const keep2 = (change3) => {
+  const keep3 = (change3) => {
     try {
       let keys = {};
       try {
-        const v = JSON.parse(fs18.readFileSync(keyFile, "utf8"));
+        const v = JSON.parse(fs19.readFileSync(keyFile, "utf8"));
         if (v && typeof v === "object" && !Array.isArray(v)) keys = v;
       } catch {
       }
       change3(keys);
       if (Object.keys(keys).length) writePrivate(keyFile, JSON.stringify(keys, null, 2) + "\n");
-      else fs18.rmSync(keyFile, { force: true });
+      else fs19.rmSync(keyFile, { force: true });
     } catch {
     }
   };
-  keep2((keys) => {
+  keep3((keys) => {
     keys[deskId] = { port, key: token };
   });
   if (opts.listen && readPrefs(dir).autorun && !listenerOf(dir) && (opts.listen.claude ?? (() => !!findClaude()))()) {
@@ -22178,7 +22422,7 @@ async function startTerminal(opts) {
     deskId,
     claim: claim2,
     close: () => new Promise((resolve) => {
-      keep2((keys) => {
+      keep3((keys) => {
         delete keys[deskId];
       });
       clearInterval(sweep);
@@ -22230,7 +22474,7 @@ var running = (port) => new Promise((resolve) => {
 async function openingLink(port) {
   const plain = `http://127.0.0.1:${port}/`;
   try {
-    const keys = JSON.parse(fs19.readFileSync(dashboardKeyFile(), "utf8"));
+    const keys = JSON.parse(fs20.readFileSync(dashboardKeyFile(), "utf8"));
     const mine = keys[deskIdOf(root)];
     if (!mine || mine.port !== port || typeof mine.key !== "string") return plain;
     const r = await fetch(`${plain}api/claim/new`, { method: "POST", headers: { "x-desk-token": mine.key, "content-type": "application/json" }, body: "{}" });
@@ -22252,7 +22496,7 @@ if (!again) {
   }
 }
 var self = fileURLToPath2(import.meta.url);
-var code = [self, ...["index.html", "app.js", "app.css"].map((f) => path19.join(path19.dirname(self), "terminal", f))];
+var code = [self, ...["index.html", "app.js", "app.css"].map((f) => path20.join(path20.dirname(self), "terminal", f))];
 var t = null;
 var quit = () => {
   void (t?.close() ?? Promise.resolve()).then(() => process.exit(0));
@@ -22268,7 +22512,7 @@ var restart = () => {
 configure({ spacingMs: 250 });
 var quick = Number(process.env.TRADING_AGENTS_UPDATE_MS) || void 0;
 var listen = { start: () => {
-  spawn2(process.execPath, [path19.join(path19.dirname(self), "watch.mjs")], { cwd: root, detached: true, stdio: "ignore", windowsHide: true }).on("error", () => {
+  spawn2(process.execPath, [path20.join(path20.dirname(self), "watch.mjs")], { cwd: root, detached: true, stdio: "ignore", windowsHide: true }).on("error", () => {
   }).unref();
 } };
 var base = { root, assets: loadAssets(), code, restart, stop: quit, listen, ...quick ? { updateCheckMs: quick } : {} };

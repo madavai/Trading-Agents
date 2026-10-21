@@ -10,7 +10,8 @@ import { logOrder, ordersOn, placedToday } from '../src/desk/orders.js';
 import { saveAccountHoldings, saveHoldings } from '../src/desk/holdings.js';
 import { Journal } from '../src/desk/journal.js';
 import { addWatch, setFavourite } from '../src/terminal/store.js';
-import { enqueue, startItem } from '../src/desk/queue.js';
+import { enqueue, readQueue, startItem } from '../src/desk/queue.js';
+import { chartFetch, series } from './chart.js';
 import { readSettings } from '../src/settings.js';
 import { deskServer } from '../src/tools/server.js';
 
@@ -78,18 +79,23 @@ test('the evening reports today\'s calls and the orders the dashboard sent, with
   assert.match(eveningBrief(desk().dir, '2026-10-19', now), /made no call today[\s\S]*sent no order today/);
 });
 
-test('the routine brief is a read-only desk tool, and the morning limit is the person\'s setting, held between 1 and 20', async () => {
+test('the routine brief is a desk tool that changes nothing but what the person\'s morning switch asks, and the morning limit is the person\'s setting, held between 1 and 20', async () => {
   const { root, dir } = desk();
   fs.writeFileSync(path.join(root, 'desk-settings.json'), JSON.stringify({ routines: { maxAnalyses: 1 } }));
   for (const s of ['AAPL', 'MSFT']) { addWatch(dir, s, '2026-10-16'); setFavourite(dir, s, true); }
   process.env.TRADING_AGENTS_TODAY = '2026-10-19';
+  const asked: string[] = [];
   const [a, b] = InMemoryTransport.createLinkedPair();
-  await deskServer(root).connect(a);
+  await deskServer(root, chartFetch(() => series('2026-10-19', 300), asked)).connect(a);
   const client = new Client({ name: 'test', version: '0' }); await client.connect(b);
   const tool = (await client.listTools()).tools.find((t) => t.name === 'routine_brief')!;
-  assert.equal(tool.annotations?.readOnlyHint, true);
+  assert.deepEqual([tool.annotations?.readOnlyHint, tool.annotations?.openWorldHint], [false, true], 'it reads prices, and may put the top three on the waiting list');
   const text = ((await client.callTool({ name: 'routine_brief', arguments: { kind: 'morning' } })) as { content: Array<{ text: string }> }).content[0]!.text;
   assert.match(text, /1 of at most 1 a morning[\s\S]*1\. AAPL[\s\S]*over the limit of 1: MSFT/);
+  assert.match(text, /Worth a look today, from Yahoo Finance's prices at \d\d:\d\d UTC \(figures only, never a forecast; 17 looked at\)/);
+  assert.match(text, /is off: this list is for the person to read, not for you to analyse/);
+  assert.ok(asked.some((u) => u.includes('/chart/XLK')), 'the same list the dashboard shows: the sectors too');
+  assert.equal(readQueue(dir).length, 0, 'with the switch off, nothing goes on the waiting list');
   await client.close();
   assert.equal(readSettings('.').routines.maxAnalyses, 5);
   for (const [v, want] of [[0, 5], [50, 5], [2.5, 5], [20, 20]] as const) { fs.writeFileSync(path.join(root, 'desk-settings.json'), JSON.stringify({ routines: { maxAnalyses: v } })); assert.equal(readSettings(root).routines.maxAnalyses, want, String(v)); }

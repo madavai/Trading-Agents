@@ -4,7 +4,12 @@
 // since stopped and started afresh, has no key, and says so rather than guessing.
 import type { DeskState, MarketView } from '../state.js';
 import type { Tier, TierItem, TierView } from '../tiers.js';
-export type { MarketView, Tier, TierItem, TierView };
+import type { Pick as Worth, Screen } from '../../desk/screen.js';
+import type { Weather, WeatherLine } from '../../desk/weather.js';
+/** One stock worth a look today (desk/screen.ts Pick; renamed so it does not hide TypeScript's own Pick). */
+export type { MarketView, Tier, TierItem, TierView, Worth, Screen, Weather, WeatherLine };
+/** The morning switch as the page shows it: on or off, and how many it puts on the waiting list. */
+export interface Morning { on: boolean; top: number }
 import type { History, QuoteResult } from '../quotes.js';
 import type { WatchItem } from '../store.js';
 import type { ListenerView, QueueView } from '../state.js';
@@ -84,6 +89,12 @@ export const api = {
   search: (query: string) => call<{ matches: Match[] }>('GET', `/api/search?${q({ q: query })}`),
   prefs: () => call<Prefs>('GET', '/api/prefs'),
   savePrefs: (p: Prefs) => call<Prefs>('POST', '/api/prefs', p),
+  /** "Worth a look today", worked out at most once an hour; `queued` is what the morning switch just put on the waiting list. */
+  screen: () => call<{ screen: Screen; morning: Morning; queued: string[] }>('GET', '/api/screen'),
+  /** "Market weather": the trend, the mood and the rates, worked out at most once an hour. */
+  weather: () => call<{ weather: Weather }>('GET', '/api/weather'),
+  /** "Analyse the top three each market morning", on or off. */
+  setMorning: (on: boolean) => call<{ morning: Morning; queued: string[] }>('POST', '/api/screen/morning', { on }),
   /** The whole-market funds on "Start here"; the desk checks each has a price before it keeps the list. */
   setMarket: (symbols: string[]) => call<{ market: MarketView }>('POST', '/api/tiers/market', { symbols }),
   stop: () => call<{ stopping: boolean }>('POST', '/api/stop', {}),

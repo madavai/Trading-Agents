@@ -89,6 +89,13 @@ export function tierOf(symbol: string, market: readonly string[] = SHIPPED_MARKE
   return 'names';
 }
 
+/** What "Worth a look today" looks at: the whole-market funds, the eleven sector funds and the watchlist; news is read
+ *  for the single names and the coins alone (a fund is seldom in the news by its ticker). */
+export function screenUniverse(watchlist: readonly WatchItem[], market: readonly string[]): { symbols: string[]; news: Set<string> } {
+  const symbols = [...new Set([...market, ...Object.keys(SECTOR_FUNDS), ...watchlist.map((w) => w.symbol)])];
+  return { symbols, news: new Set(watchlist.map((w) => w.symbol).filter((s) => { const t = tierOf(s, market); return t === 'names' || t === 'crypto'; })) };
+}
+
 export interface TierItem {
   symbol: string;
   /** Its name in plain words and what it holds, for a fund or a coin in PLAIN; else none, and the page names it as Yahoo does. */

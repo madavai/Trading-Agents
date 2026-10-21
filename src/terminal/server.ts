@@ -32,9 +32,11 @@ import { VERSION } from '../version.js';
 import { callOf, listenerOf, marketView, queueOf, stateOf, versionOf } from './state.js';
 import { clearQuotes, history, isRange, MARKETS, quote } from './quotes.js';
 import { findSymbols, QUERY } from './search.js';
-import { readPrefs, saveMarket, savePrefs } from './prefs.js';
-import { marketSymbol, MAX_MARKET } from './tiers.js';
-import { addWatch, removeWatch, setFavourite } from './store.js';
+import { marketOf, readPrefs, saveMarket, savePrefs } from './prefs.js';
+import { marketSymbol, MAX_MARKET, screenUniverse } from './tiers.js';
+import { addWatch, readWatchlist, removeWatch, setFavourite } from './store.js';
+import { queueTop, readScreen, SCREEN_MS, screenToday, TOP_QUEUED, type Screen } from '../desk/screen.js';
+import { weatherNow, type Weather } from '../desk/weather.js';
 import { dequeue, depthOfRounds, enqueue, isDepth, QueueRefusal, readQueue, removeListener, ringDoorbell, waitingIn } from '../desk/queue.js';
 import { findClaude } from '../watch/claude.js';
 
@@ -214,6 +216,23 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
   };
   const limited = async (c: TicketContext): Promise<TicketContext> => { await sectors.warm([c.symbol, ...(c.positions ?? []).map((p) => p.symbol)]); return limitedNow(c); };
 
+  // "Worth a look today" and "Market weather": each worked out at most once an hour, once however many pages ask. With
+  // the person's morning switch on, the top three of the screen go on the waiting list once a market day, and the
+  // doorbell rings for whoever listens.
+  let screening: Promise<Screen> | null = null;
+  const screenNow = async (day: string) => {
+    const { symbols, news } = screenUniverse(readWatchlist(dir), marketOf(dir));
+    screening ??= screenToday(dir, symbols, news, day).finally(() => { screening = null; });
+    const worked = await screening, on = readPrefs(dir).morning === true;
+    const queued = on ? queueTop(dir, worked, day, true) : [];
+    return { screen: readScreen(dir) ?? worked, morning: { on, top: TOP_QUEUED }, queued };
+  };
+  let weatherMemo: { at: number; day: string; value: Promise<Weather> } | null = null;
+  const weather = (day: string): Promise<Weather> => {
+    if (!weatherMemo || weatherMemo.day !== day || Date.now() - weatherMemo.at > SCREEN_MS) weatherMemo = { at: Date.now(), day, value: weatherNow(day) };
+    return weatherMemo.value;
+  };
+
   /** A change to the waiting list; what the list refuses (full, or a stock being analysed now) is said in its own words. */
   const queued = <T>(job: () => T): T => { try { return job(); } catch (e) { if (e instanceof QueueRefusal) throw new Refused(409, e.message); throw e; } };
 
@@ -257,6 +276,8 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
       if (p === '/api/version') return json(res, 200, { version: versionOf(root), build, update: updated, restarting });
       if (p === '/api/prefs') return json(res, 200, readPrefs(dir));
       if (p === '/api/paper') return json(res, 200, await paper(day));
+      if (p === '/api/screen') return json(res, 200, await screenNow(day));
+      if (p === '/api/weather') return json(res, 200, { weather: await weather(day) });
       if (p === '/api/search') {
         const q = (url.searchParams.get('q') ?? '').trim();
         if (!QUERY.test(q)) throw new Refused(400, 'type a name or a ticker, in at most 40 letters');
@@ -330,7 +351,15 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
       for (const until = Date.now() + 8_000; Date.now() < until; await new Promise((r) => setTimeout(r, 200))) { const l = listenerOf(dir); if (l) return json(res, 200, { listener: l }); }
       throw new Refused(502, 'the listener did not start: see desk-data/watcher.log, or start it yourself with node dist/watch.mjs');
     }
-    if (p === '/api/prefs' && method === 'POST') { delete b.autorun; delete b.market; return json(res, 200, savePrefs(dir, b)); }   // only the switch sets autorun, only Change… the whole market
+    if (p === '/api/prefs' && method === 'POST') { delete b.autorun; delete b.market; delete b.morning; return json(res, 200, savePrefs(dir, b)); }   // only their own switches set autorun and morning, only Change… the whole market
+    // "Analyse the top three each market morning": the person's switch, off as shipped. Switched on, today's top three (if
+    // the screen was worked out today) go on the waiting list at once, and then once each market day.
+    if (p === '/api/screen/morning' && method === 'POST') {
+      if (typeof b.on !== 'boolean') throw new Refused(400, 'say on or off');
+      savePrefs(dir, { morning: b.on });
+      const kept = readScreen(dir), queued = b.on && kept ? queueTop(dir, kept, day, true) : [];
+      return json(res, 200, { morning: { on: b.on, top: TOP_QUEUED }, queued });
+    }
     // The whole-market funds on "Start here": the person's own list, each a fund or a stock Yahoo has a price for, checked
     // before it is kept. The shipped four put back are kept as no list, so a later version's four reach the person.
     if (p === '/api/tiers/market' && method === 'POST') {
