@@ -245,7 +245,7 @@ b, strong { font-weight: var(--weight-semibold); }
       <span class="kicker accent" id="kick">The whole walk</span>
       <h1 class="page-title" id="title">Trading Agents <em>walk.</em></h1>
       <p class="page-sub" id="sub" hidden></p>
-      <p class="page-sub" id="lede">Every part of the Trading Agents desk, checked by hand on your own setup: the team in Agent Studio, the analyses, the dashboard, your Robinhood accounts, deciding on a call, the guard rails, placing an order, the routines and the safety rules. Pick a section on the left, or work top to bottom. Each test says where to go, what to do and what you should see.</p>
+      <p class="page-sub" id="lede">Every part of the Trading Agents desk, checked by hand on your own setup: the team in Agent Studio, the analyses, the dashboard and your first month on it, your Robinhood accounts, deciding on a call, the paper record and the guard rails, placing an order, care for what you hold, the routines and the safety rules. Pick a section on the left, or work top to bottom. Each test says where to go, what to do and what you should see.</p>
     </div>
     <dl class="facts box" id="how">
       <div><dt>Mark each test</dt><dd>Pass, Fail or Skip. A note helps, above all on a fail: what you saw, or paste the words.</dd></div>
@@ -657,7 +657,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "Press \"Yes, switch trading on\"."],
       "see": [
         "\"Switch trading on?\" with the warning first.",
-        "With under four weeks: \"That is under 4 weeks: too little to tell whether the desk's calls are any good. Read your paper record first.\" \"Yes, switch trading on\" appears only after \"I understand\", which turns into \"You understand\".",
+        "With under four weeks: \"That is under four weeks: too little to tell whether the desk's calls are any good. Read your paper record first.\" \"Yes, switch trading on\" appears only after \"I understand\", which turns into \"You understand\".",
         "\"Trading is switched on. Every order still needs your Confirm.\" The top of the page says \"Trading on\", the side list \"Trading is on\" and the card \"On since <date>\"."] },
     { "id": "F3", "title": "Place one share", "tags": ["Real money","Market hours","Optional"], "changed": "2026-10-21",
       "where": "Dashboard: a Buy call, \"Decide…\"",
@@ -925,7 +925,7 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "One sentence: \"No calls yet: the paper record starts with the desk's first call …\", or \"Following the desk on paper since <day>: …\", with the paper money against the S&P 500 over the same days.",
         "A line chart: \"The solid line is the paper money; the dashed one is the S&P 500 from the same start.\"",
-        "\"N weeks and M calls of record\", and \"On paper now: …\"."] },
+        "\"N weeks and M calls of record\", and \"Positions on paper now: …\"."] },
     { "id": "L2", "title": "Paper badges on calls", "tags": [], "changed": "2026-10-21",
       "where": "Dashboard: The desk's calls",
       "do": [
@@ -954,7 +954,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "Press \"Switch trading on…\", read it, then press \"Cancel\"."],
       "see": [
         "\"The desk has N weeks and M calls of record on paper.\"",
-        "With under four weeks: \"That is under 4 weeks: too little to tell whether the desk's calls are any good. Read your paper record first.\", and \"I understand\" before \"Yes, switch trading on\" appears.",
+        "With under four weeks: \"That is under four weeks: too little to tell whether the desk's calls are any good. Read your paper record first.\", and \"I understand\" before \"Yes, switch trading on\" appears.",
         "Cancel leaves trading off."] }
   ] },
   { "id": "M", "name": "Your caps and guard rails",
@@ -1041,6 +1041,62 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "Up to three Agentic holdings with no view or a view a week old go on the waiting list at shallow depth, once that Monday, and show \"re-rating\" until done.",
         "Their view is fresh afterwards."] }
+  ] },
+  { "id": "O", "name": "Your first month: Get started",
+    "sub": "A newcomer's safe first month in five steps on the dashboard, each ticked off from the desk's own records, and every trading word explained in one plain line.",
+    "tests": [
+    { "id": "O1", "title": "Get started opens on a first visit", "tags": ["Optional"], "changed": "2026-10-21",
+      "where": "Dashboard, on a desk with no calls yet",
+      "do": [
+        "On a fresh copy of the project (no calls yet), open the dashboard.",
+        "Let the first call arrive, then reload the page."],
+      "see": [
+        "\"Get started\" opens at the top: \"A safe first month, one step at a time. Each step ticks itself off when it is done, wherever you do it: here, or by asking the desk in a chat.\"",
+        "Five numbered steps, \"N of 5 done\", \"What does this mean?\" and \"Put away\".",
+        "It stays open after the first call arrives. A desk that already has calls does not open it by itself."] },
+    { "id": "O2", "title": "Put away, and open it again", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: Get started, then the side list",
+      "do": [
+        "Press \"Put away\".",
+        "Press \"Get started\" in the side list."],
+      "see": [
+        "\"Get started is put away. The side list opens it again any time.\"",
+        "The side list shows \"Get started\" with how many steps are done (for example \"2 of 5\"); pressing it opens the guide again."] },
+    { "id": "O3", "title": "Your email, on the dashboard", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: Get started, step 1",
+      "do": [
+        "Before any email is saved, read the line under the dashboard's title.",
+        "In step 1, type \"x\" and press Save. Then type your own email and press Save.",
+        "Press \"Change…\", then Cancel."],
+      "see": [
+        "Without an email: \"The desk has no contact email yet, which the SEC asks for before the first analysis: give it in Get started (in the side list), or to the desk in a chat.\"",
+        "\"x\" is refused: it is not an email address. Your own: \"Saved: … The desk sends it to the SEC alone.\", showing only its first letter and its domain, never the whole address.",
+        "Step 1 ticks itself off: \"Saved: … · sent to the SEC alone\", with \"Change…\". The desk check then names your email as the contact for the SEC (A4)."] },
+    { "id": "O4", "title": "The steps tick themselves off", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: Get started, steps 2 to 5",
+      "do": [
+        "Add three companies to your watchlist; on Start here, press + on a whole-market fund and on a sector fund.",
+        "In step 3, press \"Ask for your N picks, shallow\", and switch on running automatically.",
+        "When a call arrives, open it with \"Read the call on …\"."],
+      "see": [
+        "Step 2's chips turn green, \"3 of 3 names\", \"the whole market ✓\" and \"a sector ✓\", and it says \"done\".",
+        "Step 3: your picks wait at shallow depth (\"… are waiting to be analysed, at shallow depth.\"), then \"N asked for\" and \"runs by itself: Claude Code\" (or Madav).",
+        "Step 4 ticks once you open a call in full, with Buy, Hold, Sell and alpha explained beside it. Step 5 counts the weeks on paper, \"N of 4 weeks\", and ticks at four.",
+        "A step done by asking the desk in a chat ticks off the same way."] },
+    { "id": "O5", "title": "What does this mean?", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: the side list, then anywhere on the page",
+      "do": [
+        "Press \"What does this mean?\" in the side list.",
+        "Close it, then point at a dotted word on the page (alpha, cap, stop, paper) and at a rating."],
+      "see": [
+        "Every trading word in one plain line, in groups, the ratings first (Buy, Overweight, Hold, Underweight, Sell, Needs review), ending \"Nothing here is investment advice.\"",
+        "Pointing at a dotted word or a rating shows the same line beside it."] },
+    { "id": "O6", "title": "+ on Start here", "tags": [], "changed": "2026-10-21",
+      "where": "Dashboard: Start here",
+      "do": [
+        "Press + on a fund you do not watch."],
+      "see": [
+        "\"… is on the watchlist.\": it joins your watchlist under its tier, and that tile's + goes away."] }
   ] }
  ]
 }
