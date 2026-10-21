@@ -26,7 +26,8 @@ import type { Placed } from '../../robinhood/order.js';
 import type { Match } from '../search.js';
 import type { Prefs, Recent } from '../prefs.js';
 import type { Caps } from '../../settings.js';
-export type { Match, Prefs, Recent, Caps };
+import type { HoldingCare } from '../../desk/care.js';
+export type { Match, Prefs, Recent, Caps, HoldingCare };
 export type Trading = TradingState;
 export type { Placed };
 /** An open ticket; own: the person's own order for a stock they chose, not one of the desk's calls. */
@@ -119,6 +120,8 @@ export const api = {
   accounts: () => call<{ accounts: Account[]; chosen: string[] }>('GET', '/api/robinhood/accounts'),
   chooseAccounts: (show: string[]) => call<{ chosen: string[] }>('POST', '/api/robinhood/accounts', { show }),
   snapshot: () => call<{ snapshot: Snapshot | null; chosen: string[] }>('GET', '/api/robinhood/snapshot'),
+  /** Each holding of the last read with the desk's view of it; in the Agentic account, its stop watched and a sell marked. */
+  care: () => call<{ at: string | null; holdings: HoldingCare[] }>('GET', '/api/care'),
   openTicket: (symbol: string, date: string) => call<TicketOpen>('POST', '/api/ticket', { symbol, date }),
   openOwnTicket: (symbol: string, side: 'buy' | 'sell') => call<TicketOpen>('POST', '/api/ticket/own', { symbol, side }),
   checkTicket: (id: string, quantity: number, limitPrice: number) => call<{ checks: Check[] }>('POST', '/api/ticket/check', { id, quantity, limitPrice }),

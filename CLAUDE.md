@@ -25,9 +25,9 @@ In a chat here:
   desk's own listener, `node dist/watch.mjs`) run it by themselves. An order is placed only by the person's own Confirm there, with trading
   switched on by them. It remembers where the person left it, offers Restart after an update (new code runs only on
   the person's press) and has its own Stop.
-- `/routine morning|evening`: the morning routine (score past calls, analyse what is waiting and the starred
-  watchlist stocks, list the new calls to decide on) or the evening wrap-up (score what is ready, report the day's
-  calls and orders). Madav's scheduler can start them as the trading-desk team. They never place an order.
+- `/routine morning|evening`: the morning routine (score past calls, on a Monday re-rate up to three holdings whose
+  view is a week old, analyse what is waiting and the starred watchlist stocks, list the new calls to decide on) or the
+  evening wrap-up (score what is ready, report the day's calls and orders). Madav's scheduler can start them as the trading-desk team. They never place an order.
 
 ## Rules for every agent in this folder
 - Never place, change or cancel an order, and never use a broker connection or Robinhood's site. Orders come only from

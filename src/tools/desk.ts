@@ -24,6 +24,7 @@ import { failureText, NoData, Unavailable } from '../data/http.js';
 import { openDashboard } from '../terminal/launch.js';
 import { eveningBrief, morningBrief, type MorningLook } from '../desk/routine.js';
 import { queueTop, readScreen, screenToday } from '../desk/screen.js';
+import { rerateWeekly } from '../desk/care.js';
 import { marketOf, readPrefs } from '../terminal/prefs.js';
 import { readWatchlist } from '../terminal/store.js';
 import { screenUniverse } from '../terminal/tiers.js';
@@ -192,7 +193,7 @@ export function registerDeskTools(server: McpServer, root: string): void {
 
   server.registerTool('routine_brief', {
     title: "Today's routine",
-    description: "What the morning routine should do today (score past calls; \"Worth a look today\", the same list the dashboard shows, worked out from prices if it was not this hour; then the stocks to analyse in order, within the person's limit) or what the evening wrap-up has to report (today's calls, the orders the dashboard sent and Robinhood's answer, what is still to be scored). It changes nothing but this: with the person's switch \"Analyse the top three each market morning\" on, the top three of the list go on the waiting list at shallow depth, once a market day. Call it first when asked to run the morning routine or the evening wrap-up.",
+    description: "What the morning routine should do today (score past calls; on a Monday, re-rate the holdings whose view is a week old; \"Worth a look today\", the same list the dashboard shows, worked out from prices if it was not this hour; then the stocks to analyse in order, within the person's limit) or what the evening wrap-up has to report (today's calls, the orders the dashboard sent and Robinhood's answer, what is still to be scored). It changes nothing but the waiting list: on a Monday, up to three holdings with no view or one a week old or more go on it at shallow depth, once that Monday; and with the person's switch \"Analyse the top three each market morning\" on, the top three of the list go on it at shallow depth, once a market day. Call it first when asked to run the morning routine or the evening wrap-up.",
     inputSchema: { kind: z.enum(['morning', 'evening']).describe('morning: before the open; evening: after the close') },
     annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: true },
   }, async (a) => act(async () => {
@@ -201,6 +202,7 @@ export function registerDeskTools(server: McpServer, root: string): void {
     const on = readPrefs(dir).morning === true, weekday = ![0, 6].includes(new Date(`${day}T12:00:00Z`).getUTCDay());
     let look: MorningLook | undefined;
     if (weekday) {
+      try { rerateWeekly(dir, day); } catch { /* the brief says the holdings due were not put on the list */ }   // Monday's re-rating first: what is held comes before what is worth a look
       try {
         const { symbols, news } = screenUniverse(readWatchlist(dir), marketOf(dir));
         const worked = await screenToday(dir, symbols, news, day);

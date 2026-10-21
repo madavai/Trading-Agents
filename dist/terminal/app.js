@@ -91,6 +91,8 @@
     accounts: () => call("GET", "/api/robinhood/accounts"),
     chooseAccounts: (show) => call("POST", "/api/robinhood/accounts", { show }),
     snapshot: () => call("GET", "/api/robinhood/snapshot"),
+    /** Each holding of the last read with the desk's view of it; in the Agentic account, its stop watched and a sell marked. */
+    care: () => call("GET", "/api/care"),
     openTicket: (symbol, date) => call("POST", "/api/ticket", { symbol, date }),
     openOwnTicket: (symbol, side) => call("POST", "/api/ticket/own", { symbol, side }),
     checkTicket: (id, quantity, limitPrice) => call("POST", "/api/ticket/check", { id, quantity, limitPrice }),
@@ -135,7 +137,10 @@
     call: "The desk's call: its twelve agents' rating, from Buy to Sell, on the day they analysed it.",
     fund: "A fund: a basket of many companies (or bonds) bought as one share.",
     paper: "On paper: followed with pretend money only. Robinhood's agent doorway trades stocks and funds, so a coin never gets an order ticket.",
-    noTicket: "No order ticket: Robinhood's agent doorway trades stocks and funds, and among crypto the desk follows only Bitcoin and Ether on paper."
+    noTicket: "No order ticket: Robinhood's agent doorway trades stocks and funds, and among crypto the desk follows only Bitcoin and Ether on paper.",
+    stop: "Stop: the price under which the desk's trader proposed selling, to limit a loss. The dashboard watches it against Yahoo Finance's price and tells you when the price falls below it. Nothing is ever sold by itself.",
+    noView: "No view yet: the desk has not analysed it. Ask it to (the robot); in the Agentic account, Monday's morning routine rates it.",
+    rerating: "Re-rating: it is on the waiting list, so the desk analyses it again and its view is fresh. Monday's morning routine re-rates the Agentic account's holdings whose view is a week old."
   };
   var MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   var dayText = (iso) => {
@@ -663,6 +668,66 @@
   }
   var signedMoney = (n, cur = "USD") => `${n >= 0 ? "+" : ""}${money(n, cur)}`;
   var sideWord = (s) => s === "buy" ? "Buy" : s === "sell" ? "Sell" : s ?? "\u2014";
+  var CARE = { holdings: [], noticed: /* @__PURE__ */ new Set() };
+  var careFor = (account, symbol) => CARE.holdings.find((c) => c.account === account && c.symbol === symbol);
+  var belowWords = (c) => c.price && c.stop?.level != null ? `${c.desk} is at ${money(c.price.value)} on Yahoo Finance (${clock(c.price.asOf)}, up to 15 minutes late), below the stop of ${money(c.stop.level)} the desk's trader proposed on ${dayText(c.stop.date)}. Nothing is sold by itself: selling is your decision.` : "";
+  var sellWords = (c) => {
+    if (!c.sell || !c.view) return "";
+    const e = c.sell.early;
+    return `The desk rated ${c.desk} ${c.view.rating} ${c.view.ago}; your settings make that "${c.sell.action}".${e ? ` It was bought here on ${dayText(e.boughtOn)}, ${e.heldDays} trading day(s) ago, under your shortest hold of ${e.minHoldDays}: its ticket proposes no sell before then.` : ""}${c.sell.ticket ? " Sell\u2026 opens its ticket: checked against your caps and by Robinhood, and sent only on your Confirm." : " Robinhood's agent doorway trades stocks and funds only: a coin is sold in the Robinhood app, if you decide to."}`;
+  };
+  var sellButton = (c) => c.sell?.ticket && c.view ? `<button class="at-btn at-press" data-act="decide" data-symbol="${esc(c.desk)}" data-date="${esc(c.view.date)}" title="${esc(`An order ticket from the desk's ${c.view.rating} call: ${c.sell.action}`)}">Sell\u2026</button>` : "";
+  function careMarks(c) {
+    const parts = [];
+    if (c.rerating) parts.push(`<span class="at-chip accent" title="${esc(`${WORDS.rerating}${c.rerating === "running" ? " It is being analysed now." : ""}`)}">re-rating</span>`);
+    if (c.below) parts.push(`<span class="at-chip danger" title="${esc(belowWords(c))}">below its stop</span>`);
+    else if (c.stop?.level != null) parts.push(`<small class="at-quiet" title="${esc(WORDS.stop)}">stop ${money(c.stop.level)}</small>`);
+    if (c.sell) parts.push(`<span class="at-chip danger" title="${esc(sellWords(c))}">the desk says sell</span>`, sellButton(c));
+    return parts.join(" ");
+  }
+  function careCell(c) {
+    if (!c) return '<span class="at-quiet">\u2014</span>';
+    const view2 = c.view ? `${ratingChip(c.view.rating)} <small class="at-quiet" title="${esc(`The desk's call of ${dayText(c.view.date)}${c.stale ? ": a week old or more" : ""}`)}">${esc(c.view.ago)}</small>` : `<small class="at-quiet" title="${esc(WORDS.noView)}">no view yet</small>`;
+    return `${view2} ${careMarks(c)}`.trim();
+  }
+  function renderCare() {
+    const items = CARE.holdings.filter((c) => c.agentic && (c.below || c.sell));
+    $("#sec-care").classList.toggle("hide", !items.length);
+    if (!items.length) return;
+    $("#careSub").textContent = "In the Agentic account, as Robinhood was last read \xB7 nothing is ever sold by itself: every sale is your own Confirm on a ticket";
+    const rows = items.map((c) => {
+      const chips = `${c.below ? '<span class="at-chip danger">below its stop</span>' : ""}${c.sell ? ' <span class="at-chip danger">the desk says sell</span>' : ""}`;
+      const words = [c.below ? belowWords(c) : "", c.sell ? sellWords(c) : ""].filter(Boolean).map((w) => `<span>${esc(w)}</span>`).join(" ");
+      const own = c.below && !c.sell && isStock(c.desk) ? `<button class="at-btn at-press" data-act="trade" data-side="sell" data-symbol="${esc(c.desk)}" title="${esc(`Your own sell order for ${c.desk}: one share to start; change the shares before Robinhood checks it`)}">Sell\u2026</button>` : "";
+      return `<tr><td><b>${esc(c.desk)}</b></td><td class="wrap">${chips}</td><td class="wrap">${words}</td><td><span class="at-row">${c.view ? readButton(c.desk, c.view.date, "Read the call") : ""}${sellButton(c)}${own}</span></td></tr>`;
+    }).join("");
+    $("#careTable").innerHTML = `<thead><tr><th>Holding</th><th>Mark</th><th class="wrap">Why</th><th></th></tr></thead><tbody>${rows}</tbody>`;
+  }
+  async function loadCare() {
+    if (!signedIn() || !A.snapshot) {
+      CARE.holdings = [];
+      renderCare();
+      return;
+    }
+    try {
+      CARE.holdings = (await api.care()).holdings;
+    } catch {
+      return;
+    }
+    for (const c of CARE.holdings) {
+      const key2 = `${c.account}|${c.desk}|${c.stop?.level ?? ""}`;
+      if (!c.below) {
+        CARE.noticed.delete(key2);
+        continue;
+      }
+      if (CARE.noticed.has(key2)) continue;
+      CARE.noticed.add(key2);
+      toast(`${c.desk} is below its stop of ${money(c.stop?.level)}: ${money(c.price?.value)} on Yahoo Finance. Nothing is sold by itself.`, "bad");
+    }
+    renderCare();
+    renderViews();
+    renderStock();
+  }
   function viewCard(v, at) {
     const a = v.account, cur = v.portfolio?.currency ?? "USD", p = v.portfolio;
     const stocks = v.holdings.filter((h) => h.kind === "stock").length, coins = v.holdings.filter((h) => h.kind === "crypto").length;
@@ -678,9 +743,10 @@
     const share = (h) => h.value === null || !total ? null : h.value / total * 100;
     const rows = v.holdings.map((h) => {
       const s = share(h);
-      return `<tr><td><b>${esc(h.symbol)}</b>${h.kind === "crypto" ? ' <small class="at-quiet">crypto</small>' : ""}</td><td class="num">${num(h.quantity, h.quantity % 1 ? 4 : 0)}</td><td class="num">${money(h.averageCost, cur)}</td><td class="num">${money(h.price, cur)}</td><td class="num">${money(h.value, cur)}</td><td><span class="ta-share">${s === null ? "\u2014" : `<progress class="at-bar" max="100" value="${s.toFixed(1)}" aria-label="${s.toFixed(1)}% of the account"></progress><small>${s.toFixed(1)}%</small>`}</span></td><td class="num">${h.gainPct === null ? "\u2014" : `<span class="at-chip ${tone(h.gainPct)}">${pct(h.gainPct)}</span>`}</td></tr>`;
+      return `<tr><td><b>${esc(h.symbol)}</b>${h.kind === "crypto" ? ' <small class="at-quiet">crypto</small>' : ""}</td><td class="num">${num(h.quantity, h.quantity % 1 ? 4 : 0)}</td><td class="num">${money(h.averageCost, cur)}</td><td class="num">${money(h.price, cur)}</td><td class="num">${money(h.value, cur)}</td><td><span class="ta-share">${s === null ? "\u2014" : `<progress class="at-bar" max="100" value="${s.toFixed(1)}" aria-label="${s.toFixed(1)}% of the account"></progress><small>${s.toFixed(1)}%</small>`}</span></td><td class="num">${h.gainPct === null ? "\u2014" : `<span class="at-chip ${tone(h.gainPct)}">${pct(h.gainPct)}</span>`}</td><td class="wrap">${careCell(careFor(a.key, h.symbol))}</td></tr>`;
     }).join("");
-    const table = v.holdings.length ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>Holding</th><th class="num">Quantity</th><th class="num">Average cost</th><th class="num">Price now</th><th class="num">Value</th><th>Share of the account</th><th class="num">Since bought</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="at-quiet">Nothing is held in this account.</p>';
+    const care = a.agentic ? `<p class="at-quiet">The desk's view is its latest call on each holding. A stop is the desk's trader's, watched against Yahoo Finance's price (up to 15 minutes late). Nothing is ever sold by itself: Sell\u2026 opens a ticket that Robinhood checks and you confirm.</p>` : `<p class="at-quiet">The desk's view is shown for your information: it proposes orders for the Agentic account alone.</p>`;
+    const table = v.holdings.length ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>Holding</th><th class="num">Quantity</th><th class="num">Average cost</th><th class="num">Price now</th><th class="num">Value</th><th>Share of the account</th><th class="num">Since bought</th><th class="wrap">The desk's view</th></tr></thead><tbody>${rows}</tbody></table></div>${care}` : '<p class="at-quiet">Nothing is held in this account.</p>';
     let agentic = "";
     if (a.agentic) {
       const ap = v.approvals;
@@ -732,6 +798,7 @@
       return;
     }
     renderViews();
+    void loadCare();
     if (!A.snapshot && A.chosen.length && !A.triedOnce) {
       A.triedOnce = true;
       void readAccounts();
@@ -753,6 +820,7 @@
       renderViews();
       renderCall();
       renderStock();
+      void loadCare();
     }
   }
   async function openPicker() {
@@ -1161,7 +1229,8 @@
     else {
       const rows = A.snapshot.views.flatMap((v) => v.holdings.filter((h) => h.symbol === sym).map((h) => {
         const cur = v.portfolio?.currency ?? "USD";
-        return `<div><dt>${esc(v.account.label)} \xB7 ${v.account.agentic ? "Agentic" : "view only"}</dt><dd>${num(h.quantity, h.quantity % 1 ? 4 : 0)} at ${money(h.averageCost, cur)} average \xB7 now ${money(h.value, cur)}${h.gainPct === null ? "" : ` <span class="at-chip ${tone(h.gainPct)}">${pct(h.gainPct)}</span>`}</dd></div>`;
+        const c = careFor(v.account.key, h.symbol), marks = c ? careMarks(c) : "";
+        return `<div><dt>${esc(v.account.label)} \xB7 ${v.account.agentic ? "Agentic" : "view only"}</dt><dd>${num(h.quantity, h.quantity % 1 ? 4 : 0)} at ${money(h.averageCost, cur)} average \xB7 now ${money(h.value, cur)}${h.gainPct === null ? "" : ` <span class="at-chip ${tone(h.gainPct)}">${pct(h.gainPct)}</span>`}${marks ? ` ${marks}` : ""}</dd></div>`;
       }));
       held = rows.length ? `<dl class="at-facts ruled at-box">${rows.join("")}</dl><p class="at-quiet">Valued at Robinhood's live price, read at ${esc(clock(A.snapshot.at))}.</p>` : `<p class="at-quiet">Not held in the accounts you show.</p>`;
     }
@@ -1561,6 +1630,7 @@
         select(first, false);
       }
       renderAll();
+      if (A.snapshot) void loadCare();
     } catch {
       S.lost = true;
       renderSub();
@@ -1951,8 +2021,10 @@
           A.snapshot = null;
           A.chosen = [];
           A.picking = false;
+          CARE.holdings = [];
           renderAccount();
           renderViews();
+          renderCare();
           toast("The saved Robinhood sign-in is deleted from this computer.");
         });
         break;
@@ -2212,7 +2284,7 @@
   }
   async function prices() {
     if (life.noKey) return;
-    if (!document.hidden) await Promise.all([refreshQuotes(), refreshMarkets()]);
+    if (!document.hidden) await Promise.all([refreshQuotes(), refreshMarkets(), ...A.snapshot ? [loadCare()] : []]);
     const open = isQuote(marketOf("^GSPC")?.quote) && marketOf("^GSPC").quote.open || [...S.quotes.values()].some((q2) => isQuote(q2) && q2.open && !q2.symbol.includes("-"));
     setTimeout(() => void prices(), open ? 3e4 : 12e4);
   }

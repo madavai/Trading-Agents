@@ -20,6 +20,7 @@ import { dashboardKeyFile, deskDataDir, robinhoodFile } from '../paths.js';
 import { writePrivate } from '../private.js';
 import { Link, plainFailure, type Snapshot } from '../robinhood/link.js';
 import { saveAccountHoldings } from '../desk/holdings.js';
+import { careOf, deskSymbol, stopIn, toWatch, watched, type HoldingCare } from '../desk/care.js';
 import { lastBuy, logOrder, placedToday } from '../desk/orders.js';
 import { Sectors } from '../desk/sectors.js';
 export { placedToday };
@@ -33,7 +34,7 @@ import { callOf, listenerOf, marketView, queueOf, stateOf, versionOf } from './s
 import { clearQuotes, history, isRange, MARKETS, quote } from './quotes.js';
 import { findSymbols, QUERY } from './search.js';
 import { marketOf, readPrefs, saveMarket, savePrefs } from './prefs.js';
-import { marketSymbol, MAX_MARKET, screenUniverse } from './tiers.js';
+import { marketSymbol, MAX_MARKET, screenUniverse, ticketable } from './tiers.js';
 import { addWatch, readWatchlist, removeWatch, setFavourite } from './store.js';
 import { queueTop, readScreen, SCREEN_MS, screenToday, TOP_QUEUED, type Screen } from '../desk/screen.js';
 import { weatherNow, type Weather } from '../desk/weather.js';
@@ -56,13 +57,13 @@ export function loadAssets(dir: string = path.join(path.dirname(fileURLToPath(im
 
 /** Gives the desk's agents what the dashboard read, so their analyses size trades to the real accounts. Only a read in
  *  which every account's holdings came back whole is kept: a half-read account would tell the agents "no position" where
- *  there may be one. */
+ *  there may be one. A coin is named as the desk analyses it (BTC as BTC-USD). */
 export function shareHoldings(dir: string, snap: Snapshot, day: string): boolean {
   if (!snap.views.length || snap.views.some((v) => v.problems.some((x) => /held/.test(x)) || v.unread > 0)) return false;
   saveAccountHoldings(dir, snap.views.map((v) => ({
     label: v.account.label, tradable: v.account.agentic, currency: v.portfolio?.currency,
     ...(v.portfolio?.cash == null ? {} : { cash: v.portfolio.cash }), ...(v.portfolio?.buyingPower == null ? {} : { buyingPower: v.portfolio.buyingPower }),
-    positions: v.holdings.map((h) => ({ ticker: h.symbol, quantity: h.quantity, ...(h.averageCost == null ? {} : { averagePrice: h.averageCost }) })),
+    positions: v.holdings.map((h) => ({ ticker: deskSymbol(h.symbol, h.kind), quantity: h.quantity, ...(h.averageCost == null ? {} : { averagePrice: h.averageCost }) })),
   })), day);
   return true;
 }
@@ -233,6 +234,19 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
     return weatherMemo.value;
   };
 
+  // Care for what the person holds: the accounts as last read from Robinhood, each holding with the desk's latest view of
+  // it; in the Agentic account alone, the trader's stop watched against Yahoo Finance's price and a Sell or Underweight
+  // marked. Nothing is ever sold from here: a mark opens a ticket only on the person's press.
+  const care = async (day: string): Promise<{ at: string | null; holdings: HoldingCare[] }> => {
+    const snap = robinhood.snapshot(), now = new Date();
+    if (!snap) return { at: null, holdings: [] };
+    const held = careOf({ views: snap.views, calls: callsOf(), queue: readQueue(dir, now), today: day, trading: readSettings(root).trading, caps: robinhood.trading().caps,
+      stop: (ticker, date) => stopIn(dir, ticker, date), bought: (symbol) => lastBuy(dir, symbol, now), ticketable });
+    const prices = new Map<string, { value: number; asOf: string }>();
+    for (const q of await Promise.all(toWatch(held).map(quote))) if (!('error' in q)) prices.set(q.symbol, { value: q.price, asOf: q.asOf });
+    return { at: snap.at, holdings: watched(held, prices) };
+  };
+
   /** A change to the waiting list; what the list refuses (full, or a stock being analysed now) is said in its own words. */
   const queued = <T>(job: () => T): T => { try { return job(); } catch (e) { if (e instanceof QueueRefusal) throw new Refused(409, e.message); throw e; } };
 
@@ -287,6 +301,7 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
       if (p === '/api/trading') return json(res, 200, { ...robinhood.trading(), placedToday: placedToday(dir, new Date()) });
       if (p === '/api/robinhood/accounts') return json(res, 200, await askRobinhood(() => robinhood.accounts()));
       if (p === '/api/robinhood/snapshot') return json(res, 200, { snapshot: robinhood.snapshot(), chosen: robinhood.chosen() });
+      if (p === '/api/care') return json(res, 200, await care(day));
       if (p === '/api/quotes') {
         const list = [...new Set((url.searchParams.get('symbols') ?? '').split(',').map((s) => s.trim()).filter(Boolean))].slice(0, 30);
         return json(res, 200, { quotes: await Promise.all(list.map(quote)) });

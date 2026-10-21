@@ -2,7 +2,7 @@
 // scorecard worked out from them, the watchlist, the analyses waiting, and the person's Robinhood accounts on a page of
 // their own. A number that cannot be had is a dash. An order starts only from a ticket - one of the desk's calls
 // (Decide…) or the person's own (Trade…) - and is placed only on their Confirm, with trading switched on by them.
-import { api, ApiError, claimKey, hasKey, KEY_LOST, type CallDetail, type DeskState, type Depth, type History, type LinkInfo, type Market, type Match, type Prefs, type Caps, type PaperView, type PaperTrade, type QueueView, type QuoteResult, type Account, type AccountView, type Holding, type Order, type Recent, type Snapshot, type TicketOpen, type Check, type Review, type Placed, type Trading, type Tier, type TierItem, type TierView, type Worth, type Screen, type Weather, type WeatherLine } from './api.js';
+import { api, ApiError, claimKey, hasKey, KEY_LOST, type CallDetail, type DeskState, type Depth, type History, type LinkInfo, type Market, type Match, type Prefs, type Caps, type PaperView, type PaperTrade, type QueueView, type QuoteResult, type Account, type AccountView, type Holding, type Order, type Recent, type Snapshot, type TicketOpen, type Check, type Review, type Placed, type Trading, type Tier, type TierItem, type TierView, type Worth, type Screen, type Weather, type WeatherLine, type HoldingCare } from './api.js';
 import { heroChart, paperChart, sparkline } from './chart.js';
 import { barOn, clock, dayText, esc, labelled, money, num, opening, pct, plain, ratingMeaning, ratingTone, SECTION_NAMES, shortDay, tone, WORDS } from './fmt.js';
 import { markdown } from './md.js';
@@ -257,6 +257,70 @@ function gainOf(hs: readonly Holding[]): { cost: number; value: number } | null 
 const signedMoney = (n: number, cur = 'USD') => `${n >= 0 ? '+' : ''}${money(n, cur)}`;
 const sideWord = (s: string | null) => (s === 'buy' ? 'Buy' : s === 'sell' ? 'Sell' : s ?? '—');
 
+// ---------- care for what is held: the desk's view beside each holding; in the Agentic account, its stop and a sell ----------
+// The desk works it out (desk/care.ts) and the page draws what it is sent. A price under a stop is told once as a notice
+// while the page is open, and stays marked for as long as it lasts. Nothing here sells: a mark opens a ticket on a press.
+const CARE = { holdings: [] as HoldingCare[], noticed: new Set<string>() };
+const careFor = (account: string, symbol: string): HoldingCare | undefined => CARE.holdings.find((c) => c.account === account && c.symbol === symbol);
+const belowWords = (c: HoldingCare): string => c.price && c.stop?.level != null
+  ? `${c.desk} is at ${money(c.price.value)} on Yahoo Finance (${clock(c.price.asOf)}, up to 15 minutes late), below the stop of ${money(c.stop.level)} the desk's trader proposed on ${dayText(c.stop.date)}. Nothing is sold by itself: selling is your decision.`
+  : '';
+const sellWords = (c: HoldingCare): string => {
+  if (!c.sell || !c.view) return '';
+  const e = c.sell.early;
+  return `The desk rated ${c.desk} ${c.view.rating} ${c.view.ago}; your settings make that "${c.sell.action}".${e ? ` It was bought here on ${dayText(e.boughtOn)}, ${e.heldDays} trading day(s) ago, under your shortest hold of ${e.minHoldDays}: its ticket proposes no sell before then.` : ''}${c.sell.ticket ? ' Sell… opens its ticket: checked against your caps and by Robinhood, and sent only on your Confirm.' : " Robinhood's agent doorway trades stocks and funds only: a coin is sold in the Robinhood app, if you decide to."}`;
+};
+const sellButton = (c: HoldingCare): string => (c.sell?.ticket && c.view
+  ? `<button class="at-btn at-press" data-act="decide" data-symbol="${esc(c.desk)}" data-date="${esc(c.view.date)}" title="${esc(`An order ticket from the desk's ${c.view.rating} call: ${c.sell.action}`)}">Sell…</button>` : '');
+
+/** What the desk's view of a holding asks: re-rating, below its stop (else the stop it watches), the desk says sell. */
+function careMarks(c: HoldingCare): string {
+  const parts: string[] = [];
+  if (c.rerating) parts.push(`<span class="at-chip accent" title="${esc(`${WORDS.rerating}${c.rerating === 'running' ? ' It is being analysed now.' : ''}`)}">re-rating</span>`);
+  if (c.below) parts.push(`<span class="at-chip danger" title="${esc(belowWords(c))}">below its stop</span>`);
+  else if (c.stop?.level != null) parts.push(`<small class="at-quiet" title="${esc(WORDS.stop)}">stop ${money(c.stop.level)}</small>`);
+  if (c.sell) parts.push(`<span class="at-chip danger" title="${esc(sellWords(c))}">the desk says sell</span>`, sellButton(c));
+  return parts.join(' ');
+}
+/** Beside a holding: the desk's latest view and its age ("Overweight 3 days ago"), then its marks. */
+function careCell(c: HoldingCare | undefined): string {
+  if (!c) return '<span class="at-quiet">—</span>';
+  const view = c.view
+    ? `${ratingChip(c.view.rating)} <small class="at-quiet" title="${esc(`The desk's call of ${dayText(c.view.date)}${c.stale ? ': a week old or more' : ''}`)}">${esc(c.view.ago)}</small>`
+    : `<small class="at-quiet" title="${esc(WORDS.noView)}">no view yet</small>`;
+  return `${view} ${careMarks(c)}`.trim();
+}
+
+/** "What you hold needs a look", at the top of the desk: the Agentic account's holdings below their stop or that the desk
+ *  says to sell, each with its reason and what can be done. Hidden when there is none. */
+function renderCare(): void {
+  const items = CARE.holdings.filter((c) => c.agentic && (c.below || c.sell));
+  $('#sec-care').classList.toggle('hide', !items.length);
+  if (!items.length) return;
+  $('#careSub').textContent = 'In the Agentic account, as Robinhood was last read · nothing is ever sold by itself: every sale is your own Confirm on a ticket';
+  const rows = items.map((c) => {
+    const chips = `${c.below ? '<span class="at-chip danger">below its stop</span>' : ''}${c.sell ? ' <span class="at-chip danger">the desk says sell</span>' : ''}`;
+    const words = [c.below ? belowWords(c) : '', c.sell ? sellWords(c) : ''].filter(Boolean).map((w) => `<span>${esc(w)}</span>`).join(' ');
+    const own = c.below && !c.sell && isStock(c.desk) ? `<button class="at-btn at-press" data-act="trade" data-side="sell" data-symbol="${esc(c.desk)}" title="${esc(`Your own sell order for ${c.desk}: one share to start; change the shares before Robinhood checks it`)}">Sell…</button>` : '';
+    return `<tr><td><b>${esc(c.desk)}</b></td><td class="wrap">${chips}</td><td class="wrap">${words}</td><td><span class="at-row">${c.view ? readButton(c.desk, c.view.date, 'Read the call') : ''}${sellButton(c)}${own}</span></td></tr>`;
+  }).join('');
+  $('#careTable').innerHTML = `<thead><tr><th>Holding</th><th>Mark</th><th class="wrap">Why</th><th></th></tr></thead><tbody>${rows}</tbody>`;
+}
+
+/** Asks the desk for the care of each holding: after a read of the accounts, a change in the desk's calls, and with the prices. */
+async function loadCare(): Promise<void> {
+  if (!signedIn() || !A.snapshot) { CARE.holdings = []; renderCare(); return; }
+  try { CARE.holdings = (await api.care()).holdings; } catch { return; }
+  for (const c of CARE.holdings) {
+    const key = `${c.account}|${c.desk}|${c.stop?.level ?? ''}`;
+    if (!c.below) { CARE.noticed.delete(key); continue; }   // so a later fall is told again
+    if (CARE.noticed.has(key)) continue;
+    CARE.noticed.add(key);
+    toast(`${c.desk} is below its stop of ${money(c.stop?.level)}: ${money(c.price?.value)} on Yahoo Finance. Nothing is sold by itself.`, 'bad');
+  }
+  renderCare(); renderViews(); renderStock();
+}
+
 function viewCard(v: AccountView, at: string): string {
   const a = v.account, cur = v.portfolio?.currency ?? 'USD', p = v.portfolio;
   const stocks = v.holdings.filter((h) => h.kind === 'stock').length, coins = v.holdings.filter((h) => h.kind === 'crypto').length;
@@ -270,9 +334,12 @@ function viewCard(v: AccountView, at: string): string {
     ${kpi({ tone: 'merged', icon: 'i-pie', name: 'Holdings', value: String(v.holdings.length), line: `${stocks} ${stocks === 1 ? 'stock' : 'stocks'}${coins ? ` · ${coins} crypto` : ''}` })}</div>`;
   const total = p?.total ?? null;
   const share = (h: Holding) => (h.value === null || !total ? null : (h.value / total) * 100);
-  const rows = v.holdings.map((h: Holding) => { const s = share(h); return `<tr><td><b>${esc(h.symbol)}</b>${h.kind === 'crypto' ? ' <small class="at-quiet">crypto</small>' : ''}</td><td class="num">${num(h.quantity, h.quantity % 1 ? 4 : 0)}</td><td class="num">${money(h.averageCost, cur)}</td><td class="num">${money(h.price, cur)}</td><td class="num">${money(h.value, cur)}</td><td><span class="ta-share">${s === null ? '—' : `<progress class="at-bar" max="100" value="${s.toFixed(1)}" aria-label="${s.toFixed(1)}% of the account"></progress><small>${s.toFixed(1)}%</small>`}</span></td><td class="num">${h.gainPct === null ? '—' : `<span class="at-chip ${tone(h.gainPct)}">${pct(h.gainPct)}</span>`}</td></tr>`; }).join('');
+  const rows = v.holdings.map((h: Holding) => { const s = share(h); return `<tr><td><b>${esc(h.symbol)}</b>${h.kind === 'crypto' ? ' <small class="at-quiet">crypto</small>' : ''}</td><td class="num">${num(h.quantity, h.quantity % 1 ? 4 : 0)}</td><td class="num">${money(h.averageCost, cur)}</td><td class="num">${money(h.price, cur)}</td><td class="num">${money(h.value, cur)}</td><td><span class="ta-share">${s === null ? '—' : `<progress class="at-bar" max="100" value="${s.toFixed(1)}" aria-label="${s.toFixed(1)}% of the account"></progress><small>${s.toFixed(1)}%</small>`}</span></td><td class="num">${h.gainPct === null ? '—' : `<span class="at-chip ${tone(h.gainPct)}">${pct(h.gainPct)}</span>`}</td><td class="wrap">${careCell(careFor(a.key, h.symbol))}</td></tr>`; }).join('');
+  const care = a.agentic
+    ? "<p class=\"at-quiet\">The desk's view is its latest call on each holding. A stop is the desk's trader's, watched against Yahoo Finance's price (up to 15 minutes late). Nothing is ever sold by itself: Sell… opens a ticket that Robinhood checks and you confirm.</p>"
+    : "<p class=\"at-quiet\">The desk's view is shown for your information: it proposes orders for the Agentic account alone.</p>";
   const table = v.holdings.length
-    ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>Holding</th><th class="num">Quantity</th><th class="num">Average cost</th><th class="num">Price now</th><th class="num">Value</th><th>Share of the account</th><th class="num">Since bought</th></tr></thead><tbody>${rows}</tbody></table></div>`
+    ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>Holding</th><th class="num">Quantity</th><th class="num">Average cost</th><th class="num">Price now</th><th class="num">Value</th><th>Share of the account</th><th class="num">Since bought</th><th class="wrap">The desk's view</th></tr></thead><tbody>${rows}</tbody></table></div>${care}`
     : '<p class="at-quiet">Nothing is held in this account.</p>';
   let agentic = '';
   if (a.agentic) {
@@ -316,7 +383,7 @@ function renderViews(): void {
 async function loadSnapshot(): Promise<void> {
   if (!signedIn()) { renderViews(); return; }
   try { const r = await api.snapshot(); A.snapshot = r.snapshot; A.chosen = r.chosen; } catch { return; }
-  renderViews();
+  renderViews(); void loadCare();
   if (!A.snapshot && A.chosen.length && !A.triedOnce) { A.triedOnce = true; void readAccounts(); }
 }
 
@@ -324,7 +391,7 @@ async function readAccounts(): Promise<void> {
   if (A.reading) return;
   A.reading = true; renderViews();
   try { const r = await api.readAccounts(); A.snapshot = r.snapshot; A.chosen = r.chosen; A.shared = r.holdingsShared; } catch (e) { toast(say(e), 'bad'); }
-  finally { A.reading = false; renderViews(); renderCall(); renderStock(); }
+  finally { A.reading = false; renderViews(); renderCall(); renderStock(); void loadCare(); }
 }
 
 async function openPicker(): Promise<void> {
@@ -698,7 +765,8 @@ function renderStock(): void {
   else {
     const rows = A.snapshot.views.flatMap((v) => v.holdings.filter((h) => h.symbol === sym).map((h) => {
       const cur = v.portfolio?.currency ?? 'USD';
-      return `<div><dt>${esc(v.account.label)} · ${v.account.agentic ? 'Agentic' : 'view only'}</dt><dd>${num(h.quantity, h.quantity % 1 ? 4 : 0)} at ${money(h.averageCost, cur)} average · now ${money(h.value, cur)}${h.gainPct === null ? '' : ` <span class="at-chip ${tone(h.gainPct)}">${pct(h.gainPct)}</span>`}</dd></div>`;
+      const c = careFor(v.account.key, h.symbol), marks = c ? careMarks(c) : '';
+      return `<div><dt>${esc(v.account.label)} · ${v.account.agentic ? 'Agentic' : 'view only'}</dt><dd>${num(h.quantity, h.quantity % 1 ? 4 : 0)} at ${money(h.averageCost, cur)} average · now ${money(h.value, cur)}${h.gainPct === null ? '' : ` <span class="at-chip ${tone(h.gainPct)}">${pct(h.gainPct)}</span>`}${marks ? ` ${marks}` : ''}</dd></div>`;
     }));
     held = rows.length ? `<dl class="at-facts ruled at-box">${rows.join('')}</dl><p class="at-quiet">Valued at Robinhood's live price, read at ${esc(clock(A.snapshot.at))}.</p>` : `<p class="at-quiet">Not held in the accounts you show.</p>`;
   }
@@ -1071,6 +1139,7 @@ async function refreshState(): Promise<void> {
       select(first, false);
     }
     renderAll();
+    if (A.snapshot) void loadCare();   // a new call or a change on the waiting list changes what is said beside a holding
   } catch { S.lost = true; renderSub(); }
 }
 
@@ -1219,7 +1288,7 @@ document.addEventListener('click', (e) => {
     case 'rh-connect': void run(async () => { S.rh = await api.connectRobinhood(); renderAccount(); toast("Robinhood's sign-in page is opening in your browser."); void refreshRobinhood();
 void loadTrading(); }); break;
     case 'rh-check': void run(async () => { S.rh = await api.checkRobinhood(); renderAccount(); void loadSnapshot(); toast(S.rh.state === 'connected' ? 'Robinhood answered: the connection works.' : S.rh.message, S.rh.state === 'connected' ? 'ok' : 'bad'); }); break;
-    case 'rh-forget': void run(async () => { S.rh = await api.disconnectRobinhood(); A.snapshot = null; A.chosen = []; A.picking = false; renderAccount(); renderViews(); toast('The saved Robinhood sign-in is deleted from this computer.'); }); break;
+    case 'rh-forget': void run(async () => { S.rh = await api.disconnectRobinhood(); A.snapshot = null; A.chosen = []; A.picking = false; CARE.holdings = []; renderAccount(); renderViews(); renderCare(); toast('The saved Robinhood sign-in is deleted from this computer.'); }); break;
     case 'acc-pick': void openPicker(); break;
     case 'acc-toggle': { const k = el.dataset.key ?? ''; if (A.pick.has(k)) A.pick.delete(k); else A.pick.add(k); renderViews(); break; }
     case 'acc-cancel': A.picking = false; renderViews(); break;
@@ -1396,7 +1465,7 @@ async function updating(): Promise<void> {
 // Prices are asked for every 30 seconds while a market is open and every 2 minutes after: Yahoo is a free service and is not hammered.
 async function prices(): Promise<void> {
   if (life.noKey) return;
-  if (!document.hidden) await Promise.all([refreshQuotes(), refreshMarkets()]);
+  if (!document.hidden) await Promise.all([refreshQuotes(), refreshMarkets(), ...(A.snapshot ? [loadCare()] : [])]);   // the stop watch keeps time with the prices
   const open = isQuote(marketOf('^GSPC')?.quote) && (marketOf('^GSPC')!.quote as Quote).open || [...S.quotes.values()].some((q) => isQuote(q) && q.open && !q.symbol.includes('-'));
   setTimeout(() => void prices(), open ? 30_000 : 120_000);
 }
