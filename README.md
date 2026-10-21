@@ -188,6 +188,15 @@ at last. The dashboard opens where you left it (the page, the stock, the chart's
 browser. After an update it offers Restart at the top of the page, and one press opens the new version where you were;
 Stop, at the top right, closes it.
 
+### Your paper record
+Before you risk money, every call the desk makes on a stock or a fund is followed on paper, and the dashboard opens on
+what that would have done: one sentence, a line of the paper money against the S&P 500 from the same start, and how
+many weeks and calls stand behind it. Each call is sized exactly as its order ticket would size it (the rating, a full
+position of 10%, your caps), takes no order the real ticket would refuse, and fills at the first closing price after
+the call's day. No costs are counted. The paper money starts at $10,000; change it on the scorecard. Each call shows a
+small "paper" badge with what it did. Switching trading on with under four weeks of record shows that record first and
+asks you to press "I understand". Crypto and indices are not followed on paper yet.
+
 ### Analyses that run by themselves
 Press the robot beside any stock, choose how deep (shallow, medium or deep; your settings' depth is chosen first) and
 press "Ask the desk". The stock joins **Analyses you asked for**, where each one shows where it stands: waiting, being

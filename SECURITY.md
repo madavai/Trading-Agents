@@ -5,7 +5,8 @@ Trading Agents can place real orders with real money, so it is built so that onl
 ## Who can place an order
 Only you, on the dashboard, and only when all of these hold:
 - you switched trading on yourself (it ships off; the switch is kept beside your Robinhood sign-in, in your private
-  Trading Agents folder in your home folder, which agents are refused);
+  Trading Agents folder in your home folder, which agents are refused). With under four weeks of the desk's record on
+  paper, switching it on also shows you that record and asks you to press "I understand" first;
 - the order is for the Agentic account, Robinhood's separate account for agent trading, which you fund yourself;
 - Robinhood checked that exact order (its own dry run) with no alerts, in the last five minutes, and nothing changed since;
 - every one of your caps passes, checked again on figures read from Robinhood just before sending. The caps are yours

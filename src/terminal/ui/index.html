@@ -62,12 +62,12 @@
         <nav class="at-list" aria-label="Sections">
           <div class="at-lh"><span>The desk</span></div>
           <button class="at-li" data-act="goto" data-to="top" id="navOverview" aria-current="page"><svg class="g"><use href="#i-grid"/></svg><span class="at-li-t">Overview</span></button>
+          <button class="at-li" data-act="goto" data-to="sec-score"><svg class="g"><use href="#i-target"/></svg><span class="at-li-t">Scorecard</span></button>
           <button class="at-li" data-act="goto" data-to="sec-chart"><svg class="g"><use href="#i-candle"/></svg><span class="at-li-t">Chart</span></button>
           <button class="at-li" data-act="goto" data-to="sec-stock"><svg class="g"><use href="#i-file"/></svg><span class="at-li-t">Stock page</span></button>
           <button class="at-li" data-act="goto" data-to="sec-watch"><svg class="g"><use href="#i-star"/></svg><span class="at-li-t">Watchlist</span></button>
           <button class="at-li" data-act="goto" data-to="sec-analyses"><svg class="g"><use href="#i-bot"/></svg><span class="at-li-t">Analyses</span></button>
           <button class="at-li" data-act="goto" data-to="sec-calls"><svg class="g"><use href="#i-check"/></svg><span class="at-li-t">The desk's calls</span></button>
-          <button class="at-li" data-act="goto" data-to="sec-score"><svg class="g"><use href="#i-target"/></svg><span class="at-li-t">Scorecard</span></button>
         </nav>
       </div>
       <div class="at-side-scroll">
@@ -82,12 +82,12 @@
       <button class="icon-btn" data-act="view" data-view="account" aria-label="Your account" title="Your account"><svg class="g"><use href="#i-wallet"/></svg><span class="at-dot" id="railDot"></span></button>
       <span class="ta-rail-rule"></span>
       <button class="icon-btn" data-act="goto" data-to="top" aria-label="Overview" title="Overview"><svg class="g"><use href="#i-grid"/></svg></button>
+      <button class="icon-btn" data-act="goto" data-to="sec-score" aria-label="Scorecard" title="Scorecard"><svg class="g"><use href="#i-target"/></svg></button>
       <button class="icon-btn" data-act="goto" data-to="sec-chart" aria-label="Chart" title="Chart"><svg class="g"><use href="#i-candle"/></svg></button>
       <button class="icon-btn" data-act="goto" data-to="sec-stock" aria-label="Stock page" title="Stock page"><svg class="g"><use href="#i-file"/></svg></button>
       <button class="icon-btn" data-act="goto" data-to="sec-watch" aria-label="Watchlist" title="Watchlist"><svg class="g"><use href="#i-star"/></svg></button>
       <button class="icon-btn" data-act="goto" data-to="sec-analyses" aria-label="Analyses" title="Analyses"><svg class="g"><use href="#i-bot"/></svg></button>
       <button class="icon-btn" data-act="goto" data-to="sec-calls" aria-label="The desk's calls" title="The desk's calls"><svg class="g"><use href="#i-check"/></svg></button>
-      <button class="icon-btn" data-act="goto" data-to="sec-score" aria-label="Scorecard" title="Scorecard"><svg class="g"><use href="#i-target"/></svg></button>
     </aside>
 
     <div class="main-col">
@@ -133,6 +133,12 @@
 
           <section class="at-section" id="sec-today" aria-label="Your desk today">
             <div class="at-deck ta-deck-4" id="todayDeck"></div>
+          </section>
+
+          <section class="at-section" id="sec-score">
+            <div class="at-sect-head"><div class="at-head-words"><h2>How the desk is doing</h2><p id="scoreSub"></p></div><div class="at-head-tail" id="paperDo"></div></div>
+            <div class="at-card at-box" id="paperCard"></div>
+            <div class="at-card at-box" id="score"></div>
           </section>
 
           <section class="at-section" id="sec-markets">
@@ -194,10 +200,6 @@
             <div class="at-box at-tablewrap" id="callsWrap"><table class="at-table fill" id="callsTable"></table></div>
           </section>
 
-          <section class="at-section" id="sec-score">
-            <div class="at-sect-head"><div class="at-head-words"><h2>How the desk is doing</h2><p id="scoreSub"></p></div></div>
-            <div class="at-card at-box" id="score"></div>
-          </section>
 
           <p class="at-honest">Prices come from Yahoo Finance and may be up to 15 minutes late. Nothing here is investment advice. <span id="tradeFoot">This page places no order: trading is switched off.</span></p>
         </div>

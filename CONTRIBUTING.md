@@ -66,6 +66,10 @@
 - `src/desk/routine.ts` - the morning and evening briefs the routines run from (desk tool `routine_brief`, skill
   `/routine`, the team's playbook); `src/desk/orders.ts` - the dashboard's log of the orders it sent.
 - `src/desk/ticket.ts` - the order ticket: sizing from the person's settings and every cap check, on real figures only.
+- `src/desk/paper.ts` - the paper book: every live call on a stock or a fund sized by `propose` and held to `check` as
+  its ticket would be, filled at the first close after the call's day, valued daily against SPY; worked out afresh from
+  the journal and Yahoo's daily closes (the dashboard's `/api/paper`, kept ten minutes). Only the starting money is
+  kept (`desk-data/paper.json`). `recordOf` is the record (weeks, calls) the trading switch's four-week press uses.
 - `desk-settings.json` - the desk's settings (read and checked by `src/settings.ts`, trading part included, but never
   the caps: those are the person's own, beside the trading switch); `docs/design/` - the dashboard's design reference.
 - `docs/inside-the-trading-desk.html` - the visual guide (GitHub Pages serves `docs/` from `main`). The README shows it

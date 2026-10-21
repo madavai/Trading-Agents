@@ -89,7 +89,11 @@
     reviewTicket: (id, quantity, limitPrice) => call("POST", "/api/ticket/review", { id, quantity, limitPrice }),
     placeTicket: (id, confirm) => call("POST", "/api/ticket/place", { id, confirm }),
     trading: () => call("GET", "/api/trading"),
-    setTrading: (on) => call("POST", "/api/trading", on ? { on, confirm: "switch trading on" } : { on }),
+    /** Switching on with under four weeks of record also says the person understood that. */
+    setTrading: (on, understood = false) => call("POST", "/api/trading", on ? { on, confirm: "switch trading on", ...understood ? { understood } : {} } : { on }),
+    /** The paper book: every call followed at its ticket's size, against the S&P 500. */
+    paper: () => call("GET", "/api/paper"),
+    setPaperStart: (startUsd) => call("POST", "/api/paper", { startUsd }),
     /** The person's caps, kept beside the trading switch; the desk checks them before keeping them. */
     setCaps: (caps) => call("POST", "/api/trading", { caps }),
     readAccounts: () => call("POST", "/api/robinhood/refresh", {})
@@ -206,6 +210,23 @@
     const pts = values.map((v, i) => [pad + i / (values.length - 1) * (W - pad * 2), pad + (1 - (v - lo) / span) * (H - pad * 2)]);
     const line = smooth(pts), last = pts[pts.length - 1];
     el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><path d="${line} L${last[0]},${H} L${pts[0][0]},${H} Z" fill="url(#g-${t})"/><path d="${line}" class="ln s-${t}" stroke-width="${opts.width ?? 2}"/>` + (opts.dot ? `<circle cx="${last[0]}" cy="${last[1]}" r="3.5" class="dot f-${t}"/>` : "") + `</svg>`;
+  }
+  function paperChart(el, series) {
+    if (series.length < 2) {
+      el.replaceChildren();
+      return;
+    }
+    const W = el.clientWidth || 640, H = el.clientHeight || 180, R = 64, T2 = 10, B = 24, pw = W - R, ph = H - T2 - B;
+    const vals = series.flatMap((p) => p.benchmark === null ? [p.value] : [p.value, p.benchmark]);
+    const lo = Math.min(...vals), hi = Math.max(...vals), pad = (hi - lo) * 0.08 || hi * 0.01 || 1, a = lo - pad, b = hi + pad;
+    const x = (i) => i / (series.length - 1) * pw, y = (v) => T2 + (1 - (v - a) / (b - a)) * ph;
+    let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Paper value against the S&amp;P 500">`;
+    for (const v of niceTicks(a, b, 3)) s += `<line x1="0" x2="${pw}" y1="${y(v)}" y2="${y(v)}" class="ch-grid"/><text x="${pw + 8}" y="${y(v) + 4}" class="ch-axis">$${Math.round(v).toLocaleString("en-US")}</text>`;
+    const bench = series.map((p, i) => p.benchmark === null ? null : [x(i), y(p.benchmark)]).filter((p) => p !== null);
+    if (bench.length > 1) s += `<path d="${smooth(bench)}" class="ma ma200"/>`;
+    s += `<path d="${smooth(series.map((p, i) => [x(i), y(p.value)]))}" class="ln s-accent" stroke-width="2"/>`;
+    s += `<text x="0" y="${H - 6}" class="ch-axis">${esc(shortDay(series[0].date))}</text><text x="${pw}" y="${H - 6}" text-anchor="end" class="ch-axis">${esc(shortDay(series.at(-1).date))}</text></svg>`;
+    el.innerHTML = s;
   }
   var monthYear = (iso) => (/* @__PURE__ */ new Date(`${iso}T00:00:00Z`)).toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
   function barsOf(h) {
@@ -719,7 +740,9 @@
     }
     renderViews();
   }
-  var TR = { state: null, asking: false };
+  var TR = { state: null, asking: false, understood: false };
+  var young = () => !!S.desk && S.desk.paper.weeks < S.desk.paper.minWeeks;
+  var recordLine = () => S.desk ? `<p class="at-quiet">The desk has ${esc(weeksWords(S.desk.paper))} of record on paper.</p>` : "";
   var tradingOn = () => TR.state?.on === true;
   function renderTrading() {
     const on = tradingOn();
@@ -756,10 +779,11 @@
     <p class="at-lede">You can place an order from a ticket, from one of the desk's calls (Decide\u2026) or your own (Trade\u2026), in the Agentic account only, within your caps, after Robinhood's check and your Confirm.</p>
     <div class="at-row">${rhButton("tr-off", "Switch trading off")}</div>`;
     if (!TR.asking) return `<div class="at-card-head"><h3>Trading</h3><span class="at-chip">Off</span></div>
-    <p class="at-lede">With trading off, a ticket can be checked by Robinhood but never placed.</p><div class="at-row">${rhButton("tr-ask", "Switch trading on\u2026")}</div>`;
+    <p class="at-lede">With trading off, a ticket can be checked by Robinhood but never placed.</p>${recordLine()}<div class="at-row">${rhButton("tr-ask", "Switch trading on\u2026")}</div>`;
     return `<div class="at-card-head"><h3>Switch trading on?</h3></div>
     <p class="at-lede">From then on, a ticket you open, from one of the desk's calls or your own, can place a real order with real money in your Agentic account. Every order still needs Robinhood's check with no alerts, your caps, and your own Confirm naming the exact order. Keep Robinhood's approval on your phone switched on until you trust the desk. This is not investment advice.</p>
-    <div class="at-row">${rhButton("tr-on", "Yes, switch trading on", { primary: true })}${rhButton("tr-cancel", "Cancel")}</div>`;
+    ${recordLine()}${young() ? `<p class="at-honest bad">That is under ${S.desk?.paper.minWeeks ?? 4} weeks: too little to tell whether the desk's calls are any good. Read your paper record first.</p><div class="at-row">${TR.understood ? '<span class="at-chip ok">You understand</span>' : rhButton("tr-understood", "I understand")}</div>` : ""}
+    <div class="at-row">${young() && !TR.understood ? "" : rhButton("tr-on", "Yes, switch trading on", { primary: true })}${rhButton("tr-cancel", "Cancel")}</div>`;
   }
   async function loadTrading() {
     try {
@@ -1038,7 +1062,7 @@
       el.innerHTML = `${label}<span class="at-quiet ta-callbar-t">No call on ${esc(sym)} yet${isOpen(sym) ? ": it is asked for, see Analyses you asked for" : ". Ask the desk to analyse it, above"}.</span>`;
       return;
     }
-    el.innerHTML = `${label}${ratingChip(c.rating)}<span class="at-quiet">${esc(dayText(c.date))}</span>${resultChip(c)}
+    el.innerHTML = `${label}${ratingChip(c.rating)}<span class="at-quiet">${esc(dayText(c.date))}</span>${resultChip(c)}${paperChip(c.ticker, c.date)}
     <span class="ta-callbar-t ta-clamp" title="${esc(c.summary)}">${esc(c.summary)}</span>
     <span class="ta-callbar-do">${readButton(c.ticker, c.date, "Read the reasoning")}${decideButton(c.ticker, c.date)}</span>`;
   }
@@ -1144,14 +1168,54 @@
     $("#callsSub").textContent = d.calls.length ? `${d.calls.length} recorded \xB7 each is scored ${d.desk.holdingDays} trading days later against its market's index` : "Every analysis the team records appears here";
     const rows = d.calls.map((c) => `<tr class="ta-go" data-act="open-call" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}" title="Press to read the call in full">
     <td>${esc(dayText(c.date))}</td><td><b>${esc(c.ticker)}</b></td><td>${ratingChip(c.rating)}</td>
-    <td>${resultChip(c)}</td>
+    <td><span class="at-row compact">${resultChip(c)}${paperChip(c.ticker, c.date)}</span></td>
     <td class="wrap"><span class="ta-clamp">${esc(c.summary)}</span></td>
     <td><span class="at-row compact ta-row-do">${readButton(c.ticker, c.date)}${decideButton(c.ticker, c.date)}</span></td></tr>`).join("");
     $("#callsTable").innerHTML = `<thead><tr><th>Date</th><th>Stock</th><th>Rating</th><th>Result</th><th class="wrap">In a few words</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="ta-empty">No calls yet. Ask the team to analyse a stock in Madav / Claude, and its call appears here.</td></tr>'}</tbody>`;
   }
+  var PAPER = { book: null, key: "", editing: false, failed: false };
+  var tradeOf = (ticker, date) => PAPER.book?.trades.find((t) => t.ticker === ticker && t.callDate === date);
+  var PAPER_WORDS = { filled: "paper", none: "paper: no order", waiting: "paper: next close", unavailable: "paper: prices unavailable", skipped: "not on paper" };
+  function paperChip(ticker, date) {
+    const t = tradeOf(ticker, date);
+    if (!t) return "";
+    if (t.status === "filled" && t.side === "buy") return `<span class="at-chip ${tone(t.sincePct === void 0 ? null : t.sincePct)}" title="${esc(t.why)}">paper ${t.sincePct === void 0 ? "bought" : pct(t.sincePct * 100)}</span>`;
+    if (t.status === "filled") return `<span class="at-chip" title="${esc(t.why)}">paper: sold ${esc(String(t.quantity ?? ""))}</span>`;
+    return `<span class="at-chip" title="${esc(t.why)}">${esc(PAPER_WORDS[t.status])}</span>`;
+  }
+  async function loadPaper() {
+    try {
+      PAPER.book = await api.paper();
+      PAPER.failed = false;
+    } catch {
+      PAPER.failed = true;
+    }
+    renderPaper();
+    renderCalls();
+    renderCall();
+  }
+  var weeksWords = (r) => `${r.weeks} ${r.weeks === 1 ? "week" : "weeks"} and ${r.calls} ${r.calls === 1 ? "call" : "calls"}`;
+  function renderPaper() {
+    const d = S.desk, b = PAPER.book;
+    if (!d) return;
+    const start = d.paper.startUsd;
+    $("#paperDo").innerHTML = PAPER.editing ? `<span class="at-row"><label class="at-field"><span class="at-field-l">Paper money to start with, $</span><input class="at-input at-box" id="paperStart" type="number" min="100" max="10000000" step="100" inputmode="numeric" value="${start}"></label><button class="at-btn at-press primary" data-act="paper-save">Save</button><button class="at-btn at-press" data-act="paper-cancel">Cancel</button></span>` : `<span class="at-row"><span class="at-quiet">Paper money ${esc(money(start))}</span><button class="at-btn at-press" data-act="paper-edit">Change\u2026</button></span>`;
+    let lede;
+    if (!d.paper.since) lede = "No calls yet: the paper record starts with the desk's first call on a stock or a fund.";
+    else if (!b) lede = PAPER.failed ? "The paper record could not be worked out just now: Yahoo Finance did not answer. It tries again in a moment." : "Working out the paper record from the closing prices.";
+    else if (b.series.length < 2 || b.returnPct === null) lede = `Following the desk on paper since ${dayText(b.since ?? d.paper.since)}: nothing has filled yet. A call fills at the first closing price after its day.`;
+    else lede = `Following the desk on paper since ${dayText(b.since ?? d.paper.since)}: ${pct(b.returnPct * 100)} (${money(b.value)} from ${money(b.startUsd)}), ${b.benchmarkPct === null ? "the S&P 500 unavailable" : `the S&P 500 ${pct(b.benchmarkPct * 100)}`} over the same days.`;
+    const held = b?.positions.length ? `<p class="at-quiet">On paper now: ${b.positions.map((p) => `${esc(p.ticker)} ${p.quantity}`).join(", ")}, and ${esc(money(b.cash))} in cash.</p>` : "";
+    $("#paperCard").innerHTML = `<div class="at-card-head"><h3>Your paper record</h3><span class="at-chip">${esc(weeksWords(d.paper))} of record</span></div>
+    <p class="at-lede">${esc(lede)}</p>${b && b.series.length > 1 ? '<div class="ta-spark-tall" id="paperChart"></div><p class="at-quiet">The solid line is the paper money; the dashed one is the S&amp;P 500 from the same start.</p>' : ""}${held}
+    <p class="at-honest">Every call on a stock or a fund is followed as its order ticket would size it, and fills at the first closing price after its day. No costs are counted (Robinhood charges no commission). A few weeks of record are noise, not proof, and nothing here is investment advice.</p>`;
+    const el = document.getElementById("paperChart");
+    if (el && b) paperChart(el, b.series);
+  }
   function renderScore() {
     const d = S.desk;
     if (!d) return;
+    renderPaper();
     const r = d.record.summary, pctOf = (v) => `${v >= 0 ? "+" : "\u2212"}${Math.abs(v * 100).toFixed(1)}%`;
     $("#scoreSub").textContent = `${r.resolved} scored \xB7 ${r.pending} waiting${r.unscored ? ` \xB7 ${r.unscored} unreadable` : ""}`;
     const names = [...RATINGS.filter((x) => r.byRating[x]), ...Object.keys(r.byRating).filter((x) => !RATINGS.includes(x))];
@@ -1317,6 +1381,11 @@
       S.desk = await api.state();
       S.lost = false;
       noticeFinished(before, S.desk.queue);
+      const pk = `${S.desk.today}|${S.desk.paper.startUsd}|${S.desk.calls.map((c) => `${c.ticker}${c.date}${c.rating}`).join(",")}`;
+      if (pk !== PAPER.key) {
+        PAPER.key = pk;
+        void loadPaper();
+      }
       const watch = S.desk.watchlist.map((w) => w.symbol);
       const shown = (s) => !!s && (watch.includes(s) || isIndex(s));
       if (!shown(S.symbol)) {
@@ -1582,7 +1651,28 @@
         break;
       case "tr-ask":
         TR.asking = true;
+        TR.understood = false;
         renderAccount();
+        break;
+      case "tr-understood":
+        TR.understood = true;
+        renderAccount();
+        break;
+      case "paper-edit":
+        PAPER.editing = true;
+        renderPaper();
+        break;
+      case "paper-cancel":
+        PAPER.editing = false;
+        renderPaper();
+        break;
+      case "paper-save":
+        void run(async () => {
+          PAPER.book = await api.setPaperStart(Number($("#paperStart").value));
+          PAPER.editing = false;
+          await refreshState();
+          toast("The paper record is worked out again with the new starting money.");
+        });
         break;
       case "tr-cancel":
         TR.asking = false;
@@ -1590,8 +1680,9 @@
         break;
       case "tr-on":
         void run(async () => {
-          TR.state = await api.setTrading(true);
+          TR.state = await api.setTrading(true, TR.understood);
           TR.asking = false;
+          TR.understood = false;
           renderTrading();
           renderAccount();
           toast("Trading is switched on. Every order still needs your Confirm.");

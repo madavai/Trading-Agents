@@ -50,6 +50,23 @@ export function sparkline(el: HTMLElement, values: number[], t: Tone, opts: { do
     + (opts.dot ? `<circle cx="${last[0]}" cy="${last[1]}" r="3.5" class="dot f-${t}"/>` : '') + `</svg>`;
 }
 
+/** The paper book against the S&P 500: two lines on one scale, the paper one in the accent, the index dashed, the value
+ *  labels on the right and the first and last days underneath. Fewer than two days draws nothing. */
+export function paperChart(el: HTMLElement, series: ReadonlyArray<{ date: string; value: number; benchmark: number | null }>): void {
+  if (series.length < 2) { el.replaceChildren(); return; }
+  const W = el.clientWidth || 640, H = el.clientHeight || 180, R = 64, T = 10, B = 24, pw = W - R, ph = H - T - B;
+  const vals = series.flatMap((p) => (p.benchmark === null ? [p.value] : [p.value, p.benchmark]));
+  const lo = Math.min(...vals), hi = Math.max(...vals), pad = (hi - lo) * 0.08 || hi * 0.01 || 1, a = lo - pad, b = hi + pad;
+  const x = (i: number) => (i / (series.length - 1)) * pw, y = (v: number) => T + (1 - (v - a) / (b - a)) * ph;
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Paper value against the S&amp;P 500">`;
+  for (const v of niceTicks(a, b, 3)) s += `<line x1="0" x2="${pw}" y1="${y(v)}" y2="${y(v)}" class="ch-grid"/><text x="${pw + 8}" y="${y(v) + 4}" class="ch-axis">$${Math.round(v).toLocaleString('en-US')}</text>`;
+  const bench = series.map((p, i) => (p.benchmark === null ? null : [x(i), y(p.benchmark)] as Pt)).filter((p): p is Pt => p !== null);
+  if (bench.length > 1) s += `<path d="${smooth(bench)}" class="ma ma200"/>`;
+  s += `<path d="${smooth(series.map((p, i) => [x(i), y(p.value)] as Pt))}" class="ln s-accent" stroke-width="2"/>`;
+  s += `<text x="0" y="${H - 6}" class="ch-axis">${esc(shortDay(series[0]!.date))}</text><text x="${pw}" y="${H - 6}" text-anchor="end" class="ch-axis">${esc(shortDay(series.at(-1)!.date))}</text></svg>`;
+  el.innerHTML = s;
+}
+
 interface Bar { date: string; label: string; o: number; h: number; l: number; c: number; v: number }
 export interface HeroOptions { kind: 'area' | 'candles'; layers: { ma50: boolean; ma200: boolean; vol: boolean } }
 export interface HeroInfo { first: number; last: number; hasAverages: boolean }
