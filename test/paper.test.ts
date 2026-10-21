@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { paperBook, readPaperStart, recordOf, savePaperStart, type Closes } from '../src/desk/paper.js';
 import { DEFAULT_CAPS, DEFAULTS } from '../src/settings.js';
+import { Sectors } from '../src/desk/sectors.js';
 
 const T = DEFAULTS.trading, C = DEFAULT_CAPS;   // a full position is 10%; $500 an order, 10% a stock, 3 orders a day
 const rows = (...pairs: Array<[string, number]>) => pairs.map(([date, close]) => ({ date, close }));
@@ -18,11 +19,14 @@ const book = (calls: Array<{ ticker: string; date: string; rating: string }>, o:
   paperBook(calls, o.c ?? closes, { startUsd: o.startUsd ?? 10_000, trading: T, caps: o.caps ?? C, today: '2026-09-04' });
 
 test('every call is followed as its ticket would size it, filled at the first close after its day, against the S&P 500 from the same start', () => {
-  const b = book([
+  const calls = [
     { ticker: 'NVDA', date: '2026-09-01', rating: 'Buy' }, { ticker: 'AAPL', date: '2026-09-01', rating: 'Hold' },
     { ticker: 'BTC-USD', date: '2026-09-01', rating: 'Buy' }, { ticker: 'TSLA', date: '2026-09-01', rating: 'Buy' },
     { ticker: 'NVDA', date: '2026-09-03', rating: 'Sell' }, { ticker: 'MSFT', date: '2026-09-04', rating: 'Buy' },
-  ]);
+  ];
+  const held = book(calls).trades.find((x) => x.ticker === 'NVDA' && x.callDate === '2026-09-03')!;
+  assert.deepEqual([held.status, /shortest hold is 5, so the desk proposes no sell yet/.test(held.why)], ['none', true], 'with the shipped shortest hold, a sell two trading days after the buy is not taken');
+  const b = book(calls, { caps: { ...C, minHoldDays: 0 } });
   const of = (t: string, d: string) => b.trades.find((x) => x.ticker === t && x.callDate === d)!;
   assert.deepEqual([of('NVDA', '2026-09-01').status, of('NVDA', '2026-09-01').quantity, of('NVDA', '2026-09-01').price, of('NVDA', '2026-09-01').fillDate], ['filled', 4, 110, '2026-09-02'], "10% of $10,000 is $1,000; the $500 cap makes it $500: four shares at the next day's close of $110");
   assert.ok(Math.abs(of('NVDA', '2026-09-01').sincePct! - (90 / 110 - 1)) < 1e-12, 'and how it has done since, at the latest close');
@@ -38,7 +42,7 @@ test('every call is followed as its ticket would size it, filled at the first cl
   assert.equal(b.trades[0]!.ticker, 'MSFT', 'newest call first, as the page lists them');
 });
 
-test('paper takes no order the real ticket would refuse: your caps, the orders a day, what is held to sell', () => {
+test('paper takes no order the real ticket would refuse: your caps, the orders a day, what is held to sell, your sector limit', async () => {
   const twice = book([{ ticker: 'NVDA', date: '2026-09-01', rating: 'Buy' }, { ticker: 'NVDA', date: '2026-09-02', rating: 'Buy' }], { caps: { ...C, perStockPercent: 5 } });
   const second = twice.trades.find((t) => t.callDate === '2026-09-02')!;
   assert.equal(second.status, 'none');
@@ -47,6 +51,11 @@ test('paper takes no order the real ticket would refuse: your caps, the orders a
   assert.deepEqual(busy.trades.filter((t) => t.status === 'filled').length, 3);
   assert.match(busy.trades.find((t) => t.status === 'none')!.why, /3 of your 3 orders a day used/);
   assert.match(book([{ ticker: 'NVDA', date: '2026-09-01', rating: 'Sell' }]).trades[0]!.why, /holds none to sell/);
+  const tech = new Sectors(async (s) => ({ sector: s === 'MSFT' || s === 'AAPL' ? 'Technology' : null, fund: false }));
+  await tech.warm(['NVDA', 'AAPL', 'MSFT']);
+  const crowded = paperBook(['AAPL', 'MSFT'].map((ticker) => ({ ticker, date: '2026-09-01', rating: 'Buy' })), closes, { startUsd: 5_000, trading: T, caps: { ...C, perStockPercent: 100, perSectorPercent: 10 }, today: '2026-09-04', sectors: tech });
+  assert.deepEqual(crowded.trades.map((t) => [t.ticker, t.status]).sort(), [['AAPL', 'filled'], ['MSFT', 'none']], 'paper keeps your sector limit too');
+  assert.match(crowded.trades.find((t) => t.ticker === 'MSFT')!.why, /Sector Technology would be 16\.1% of the account; your limit is 10%/);
   assert.deepEqual(book([]).series, [], 'no calls, no record');
   assert.equal(book([]).returnPct, null);
 });

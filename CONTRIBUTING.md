@@ -65,7 +65,13 @@
   `main.ts` is the program, logging to `desk-data/watcher.log`.
 - `src/desk/routine.ts` - the morning and evening briefs the routines run from (desk tool `routine_brief`, skill
   `/routine`, the team's playbook); `src/desk/orders.ts` - the dashboard's log of the orders it sent.
-- `src/desk/ticket.ts` - the order ticket: sizing from the person's settings and every cap check, on real figures only.
+- `src/desk/ticket.ts` - the order ticket: sizing from the person's settings and every cap check, on real figures only,
+  the guard rails included (`sector`, `cryptoHeldUsd`, `boughtOn`/`heldDays` in its context; a `Check` with `ask`
+  passes but needs the person's "Sell anyway", which the server requires at Review and Place).
+- `src/desk/sectors.ts` - a symbol's sector for the sector limit: the S&P sector funds and the whole-market funds by
+  table, else the company's profile (`data/company.ts` `profileSector`), an unknown one counted on its own; looked up
+  once per run of the dashboard. The weekly loss limit is `robinhood/link.ts` `noteValue`, with the account's values day
+  by day in `values.json` beside the sign-in.
 - `src/desk/paper.ts` - the paper book: every live call on a stock or a fund sized by `propose` and held to `check` as
   its ticket would be, filled at the first close after the call's day, valued daily against SPY; worked out afresh from
   the journal and Yahoo's daily closes (the dashboard's `/api/paper`, kept ten minutes). Only the starting money is

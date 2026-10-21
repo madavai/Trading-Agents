@@ -154,10 +154,15 @@ the team's "talk" switch shows these messages in the Messages panel; with it off
   Robinhood's dry-run check, and one that places a single limit order. The last is used only when trading is switched
   on (by you), on a ticket Robinhood checked with no alerts in the last five minutes and unchanged since, after your
   Confirm naming the exact order, and after every cap is checked again on fresh figures. A ticket sends one order.
-- Your caps are yours alone: $500 an order, 10% of the account in one stock and 3 orders a day as shipped. You change
-  them on the dashboard's "Your account" page, beside the trading switch, and they are kept with it in your private
-  folder, where agents are refused, never in the project's files. A cap out of range falls back to the shipped value,
-  never to a larger one. A full position is 10% of the account (`desk-settings.json` under `trading`).
+- Your caps and guard rails are yours alone. As shipped: $500 an order, 10% of the account in one stock, 30% in one
+  sector, 5% in crypto, 3 orders a day; trading switches itself off after a 5% fall in a week (from the week's
+  highest value, with the reason on the page); and a stock bought here is held at least 5 trading days before the desk
+  proposes selling it (your own early sell takes one more press). You change them on the dashboard's "Your account"
+  page, beside the trading switch, and they are kept with it in your private folder, where agents are refused, never
+  in the project's files. A value out of range falls back to the shipped one, never to a larger one. A sector comes
+  from the company's own profile; whole-market funds count towards none, the S&P sector funds towards theirs, and a
+  stock whose sector is not known counts as its own. Paper follows the same rules. A full position is 10% of the
+  account (`desk-settings.json` under `trading`).
 - Robinhood only lets agents trade in its separate Agentic account, which you fund yourself. Keep Robinhood's own
   "trade approvals" on until you trust the desk: then every order also waits for your OK on your phone.
 - Your Robinhood sign-in stays in `~/.trading-agents` on your computer, never in this repository. Agents are refused

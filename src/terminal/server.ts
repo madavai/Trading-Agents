@@ -20,7 +20,8 @@ import { dashboardKeyFile, deskDataDir, robinhoodFile } from '../paths.js';
 import { writePrivate } from '../private.js';
 import { Link, plainFailure, type Snapshot } from '../robinhood/link.js';
 import { saveAccountHoldings } from '../desk/holdings.js';
-import { logOrder, placedToday } from '../desk/orders.js';
+import { lastBuy, logOrder, placedToday } from '../desk/orders.js';
+import { Sectors } from '../desk/sectors.js';
 export { placedToday };
 import { check, passes, propose, proposeOwn, type Check, type Order, type Proposal, type TicketContext } from '../desk/ticket.js';
 import type { Review } from '../robinhood/review.js';
@@ -109,6 +110,8 @@ export interface TerminalOptions {
   /** Starts the desk's own listener (`node dist/watch.mjs`) for "Run automatically with Claude Code"; `claude` says
    *  whether Claude Code is on this computer. Without it the page offers no such switch. */
   listen?: { start: () => void; claude?: () => boolean };
+  /** Where a stock's sector is looked up (Yahoo Finance's profiles, unless the tests say otherwise). */
+  sectors?: Sectors;
 }
 
 /** The listener the switch starts calls itself this, in its note. */
@@ -188,10 +191,20 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
           try { closes[s] = (await daily(s, from, today)).bars.map((r) => ({ date: r.date, close: r.close })); } catch { /* left out: said as unavailable */ }
         }));
       }
-      paperMemo = { key, at: Date.now(), book: paperBook(calls, closes, { startUsd, trading, caps, today }) };
+      await sectors.warm(calls.filter((c) => followed(c.ticker)).map((c) => c.ticker));
+      paperMemo = { key, at: Date.now(), book: paperBook(calls, closes, { startUsd, trading, caps, today, sectors }) };
     }
     return { ...paperMemo.book, record: recordOf(calls, today) };
   };
+
+  // The guard rails' facts for a ticket: the stock's sector and what the account already holds in it (from each holding's
+  // own profile, looked up once and remembered), and when the stock was last bought here, for the shortest hold.
+  const sectors = opts.sectors ?? new Sectors();
+  const limitedNow = (c: TicketContext): TicketContext => {
+    const positions = c.positions ?? [], bought = lastBuy(dir, c.symbol, new Date());
+    return { ...c, sector: sectors.context(c.symbol, positions), ...(bought ? bought : {}) };
+  };
+  const limited = async (c: TicketContext): Promise<TicketContext> => { await sectors.warm([c.symbol, ...(c.positions ?? []).map((p) => p.symbol)]); return limitedNow(c); };
 
   /** A change to the waiting list; what the list refuses (full, or a stock being analysed now) is said in its own words. */
   const queued = <T>(job: () => T): T => { try { return job(); } catch (e) { if (e instanceof QueueRefusal) throw new Refused(409, e.message); throw e; } };
@@ -199,7 +212,7 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
   // Robinhood's failures are told in plain words; one of the person's own choices that is refused says why.
   const askRobinhood = async <T>(job: () => Promise<T>): Promise<T> => {
     try { return await job(); } catch (e) {
-      const m = e instanceof Error ? e.message : '', own = /not one of your Robinhood accounts|show your Agentic account|not the Agentic account|not complete, so it was not sent|no longer passes on Robinhood's latest figures|trading is switched off/.test(m);
+      const m = e instanceof Error ? e.message : '', own = /not one of your Robinhood accounts|show your Agentic account|not the Agentic account|not complete, so it was not sent|no longer passes on Robinhood's latest figures|trading is switched off|trading switched itself off/.test(m);
       throw new Refused(own ? 400 : 502, own ? m : plainFailure(e));
     }
   };
@@ -346,7 +359,7 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
       const call = new Journal(path.join(dir, 'journal.md')).load().find((e) => e.ticker === symbol && e.date === date);
       if (!call) throw new Refused(404, 'no such call');
       const trading = readSettings(root).trading, { caps } = robinhood.trading();
-      const context: TicketContext = { ...(await askRobinhood(() => robinhood.ticketContext(symbol))), rating: call.rating, callDate: call.date };
+      const context: TicketContext = await limited({ ...(await askRobinhood(() => robinhood.ticketContext(symbol))), rating: call.rating, callDate: call.date });
       const t = opened(false, context, propose(context, trading, caps), trading, caps);
       return json(res, 200, { id: t.id, own: false, context, proposal: t.proposal, checks: t.checks, caps });
     }
@@ -359,7 +372,7 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
       const side = b.side === 'buy' || b.side === 'sell' ? b.side : null;
       if (!side) throw new Refused(400, 'say whether to buy or to sell');
       const trading = readSettings(root).trading, { caps } = robinhood.trading();
-      const context: TicketContext = { ...(await askRobinhood(() => robinhood.ticketContext(symbol))), rating: '', callDate: '' };
+      const context: TicketContext = await limited({ ...(await askRobinhood(() => robinhood.ticketContext(symbol))), rating: '', callDate: '' });
       const t = opened(true, context, proposeOwn(context, side, trading), trading, caps);
       return json(res, 200, { id: t.id, own: true, context, proposal: t.proposal, checks: t.checks, caps });
     }
@@ -376,6 +389,7 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
       const o = edited(t, b), checks = check(o, t.context, readSettings(root).trading, robinhood.trading().caps);
       t.order = o; t.checks = checks; t.review = null; t.reviewedAt = 0;
       if (!passes(checks)) throw new Refused(400, 'the order does not pass every check, so it was not sent to Robinhood');
+      if (checks.some((c) => c.ask) && b.early !== true) throw new Refused(400, `${o.symbol} was bought here under your shortest hold: press "Sell anyway" to go on`);
       t.review = await askRobinhood(() => robinhood.review(o));
       t.reviewedAt = Date.now();
       return json(res, 200, { checks, review: t.review, confirm: confirmWords(o), trading: robinhood.trading() });
@@ -391,10 +405,11 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
       if (Date.now() - t.reviewedAt > REVIEW_MS) throw new Refused(400, "Robinhood's check is more than five minutes old: review the order again");
       if (!t.review.answered || t.review.alerts.length) throw new Refused(400, 'Robinhood raised alerts on this order, so it cannot be placed');
       if (b.confirm !== confirmWords(t.order)) throw new Refused(400, 'the confirmation does not name this order: nothing was sent');
+      if (t.checks.some((c) => c.ask) && b.early !== true) throw new Refused(400, `${t.order.symbol} was bought here under your shortest hold: press "Sell anyway" to go on`);
       const order = t.order, trading = readSettings(root).trading, sentToday = placedToday(dir, new Date());
       t.placing = true;
       try {
-        const { placed } = await askRobinhood(() => robinhood.placeChecked(order, t.refId, (fresh) => check(order, { ...fresh, rating: t.context.rating, callDate: t.context.callDate, ordersToday: Math.max(fresh.ordersToday, sentToday) }, trading, tr.caps)));
+        const { placed } = await askRobinhood(() => robinhood.placeChecked(order, t.refId, (fresh) => check(order, limitedNow({ ...fresh, rating: t.context.rating, callDate: t.context.callDate, ordersToday: Math.max(fresh.ordersToday, sentToday) }), trading, tr.caps)));
         t.placed = placed;
         logOrder(dir, { at: new Date().toISOString(), symbol: order.symbol, side: order.side, quantity: order.quantity, limitPrice: order.limitPrice, timeInForce: order.timeInForce, ...(t.own ? { own: true as const } : { call: { date: t.context.callDate, rating: t.context.rating } }), ticket: t.id, robinhood: { answered: placed.answered, approvalRequired: placed.approvalRequired, orderId: placed.orderId, state: placed.state, error: placed.error } });
         return json(res, 200, { placed });

@@ -31,3 +31,20 @@ export function readOrders(dir: string): SentOrder[] {
 export const ordersOn = (dir: string, now: Date): SentOrder[] => readOrders(dir).filter((o) => marketDay(new Date(o.at)) === marketDay(now));
 /** How many orders the dashboard sent today, whatever Robinhood's own list says yet. */
 export const placedToday = (dir: string, now: Date): number => ordersOn(dir, now).length;
+
+/** Trading days (weekdays) after `from` up to and including `to`, both YYYY-MM-DD: 0 on the same day. Holidays are not
+ *  known here, so a week with one counts a day more. */
+export function tradingDaysBetween(from: string, to: string): number {
+  let n = 0;
+  for (let d = Date.parse(`${from}T12:00:00Z`) + 86_400_000; d <= Date.parse(`${to}T12:00:00Z`); d += 86_400_000) { const w = new Date(d).getUTCDay(); if (w !== 0 && w !== 6) n++; }
+  return n;
+}
+
+/** When the dashboard last bought a stock that Robinhood took, as New York's day, and how many trading days ago: for the
+ *  shortest hold. Nothing when it never bought it here. */
+export function lastBuy(dir: string, symbol: string, now: Date): { boughtOn: string; heldDays: number } | null {
+  const buy = readOrders(dir).filter((o) => o.symbol === symbol && o.side === 'buy' && o.robinhood.answered).at(-1);
+  if (!buy) return null;
+  const boughtOn = marketDay(new Date(buy.at));
+  return { boughtOn, heldDays: tradingDaysBetween(boughtOn, marketDay(now)) };
+}

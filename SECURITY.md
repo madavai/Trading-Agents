@@ -9,9 +9,14 @@ Only you, on the dashboard, and only when all of these hold:
   paper, switching it on also shows you that record and asks you to press "I understand" first;
 - the order is for the Agentic account, Robinhood's separate account for agent trading, which you fund yourself;
 - Robinhood checked that exact order (its own dry run) with no alerts, in the last five minutes, and nothing changed since;
-- every one of your caps passes, checked again on figures read from Robinhood just before sending. The caps are yours
-  alone: you set them on the dashboard, beside the trading switch, and they are kept with it in your private folder,
-  never in the project's files, which anything working in this folder could edit;
+- every one of your caps and guard rails passes, checked again on figures read from Robinhood just before sending: the
+  most an order costs, the most in one stock, one sector and crypto, the orders a day, and the shortest hold (an early
+  sell of a stock bought here takes one more press from you). The caps are yours alone: you set them on the dashboard,
+  beside the trading switch, and they are kept with it in your private folder, never in the project's files, which
+  anything working in this folder could edit;
+- the weekly loss limit has not tripped: every time the dashboard reads the Agentic account it notes its value (in your
+  private folder, day by day), and when the value falls your limit below its highest of the last seven days, trading
+  switches itself off and the page says why, even in the middle of sending an order;
 - you pressed Confirm on the words of that exact order ("Confirm: Buy 1 NVDA at $182.40").
 
 The same holds whether the ticket comes from one of the desk's calls ("Decide…") or is your own ("Trade…", a stock you
@@ -71,6 +76,8 @@ order tool.
 - After an update the dashboard offers Restart at the top of the page: new code on this computer runs only after your
   press, and never while an order is being sent. Stop, at the top right of the page, closes it.
 - The search box sends what you type to Yahoo Finance's public search, which suggests matching stocks.
+- For the sector limit, the dashboard asks Yahoo Finance for the sector of the stocks you trade and hold (their ticker
+  only, never a quantity or an account).
 
 ## Limits
 - Any program on this computer, under any user account on it, can reach the dashboard's address and read its page the

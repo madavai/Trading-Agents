@@ -11,6 +11,8 @@ import { Refused } from '../src/robinhood/reader.js';
 import { Link } from '../src/robinhood/link.js';
 import { openSession } from '../src/robinhood/connect.js';
 import { Journal } from '../src/desk/journal.js';
+import { DEFAULT_CAPS, type Caps } from '../src/settings.js';
+import { logOrder } from '../src/desk/orders.js';
 import { confirmWords, placedToday, startTerminal, type Assets, type TerminalOptions } from '../src/terminal/server.js';
 import { accountTools, AGENTIC, fakeRobinhood, MAIN, type Fake } from './fake-robinhood.js';
 
@@ -61,13 +63,13 @@ const approves = (url: URL) => { void (async () => { const r = await fetch(url, 
 
 /** A desk with a signed-in, chosen Agentic account. `caps` are set the way the person sets them, beside the switch; the
  *  project's settings file is given wide-open caps, which must never be read. */
-async function desk(caps?: { perOrderUsd: number; perStockPercent: number; ordersPerDay: number }, more: Partial<TerminalOptions> = {}) {
-  const o = { placed: [] as Array<Record<string, unknown>>, reviewed: [] as Array<Record<string, unknown>>, agenticBuyingPower: '2500.00' };
+async function desk(caps?: Partial<Caps>, more: Partial<TerminalOptions> = {}) {
+  const o = { placed: [] as Array<Record<string, unknown>>, reviewed: [] as Array<Record<string, unknown>>, agenticBuyingPower: '2500.00', agenticPositions: [] as unknown[] };
   fake = await fakeRobinhood((calls) => accountTools(calls, o));
   const port = await freePort(), file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ta-pl-')), 'sign-in.json');
   await (await openSession(file, { signIn: true, url: fake.url, port, open: approves })).close();
   const link = new Link(file, { url: fake.url, port });
-  if (caps) link.setCaps(caps);
+  if (caps) link.setCaps({ ...DEFAULT_CAPS, ...caps });
   const { accounts } = await link.accounts();
   await link.choose(accounts.filter((a) => !a.deactivated).map((a) => a.key));
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ta-pl-term-')), dir = path.join(root, 'desk-data');
@@ -90,7 +92,7 @@ test('an order is placed only with trading switched on, after Robinhood\'s clean
     assert.match(young.json().error, /^the desk has 0 weeks and 1 call of record, under four weeks: confirm on the page that you understand$/);
     assert.equal((await post('/api/trading', { on: true, confirm: 'switch trading on', understood: true })).json().on, true);
     const kept = JSON.parse(fs.readFileSync(path.join(path.dirname(file), 'trading.json'), 'utf8'));
-    assert.deepEqual([kept.on, kept.caps], [true, { perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 3 }], 'the switch and the caps are kept together beside the sign-in, where agents are refused');
+    assert.deepEqual([kept.on, kept.caps], [true, DEFAULT_CAPS], 'the switch and the caps are kept together beside the sign-in, where agents are refused');
 
     assert.match((await post('/api/ticket/place', { id: t.id, confirm: confirmWords(ORDER) })).json().error, /have Robinhood check this order first/);
     const reviewed = (await post('/api/ticket/review', { id: t.id, quantity: 1, limitPrice: 182.4 })).json();
@@ -144,6 +146,50 @@ test('the person\'s own order takes the same road: one share to start, stocks on
   } finally { await term.close(); }
 });
 
+test('the weekly loss limit: the account\'s value is noted on every read, and a fall past the limit switches trading off with its reason, even while an order is being sent', async () => {
+  const { o, file, term, post, ticket, link } = await desk();
+  try {
+    const now = new Date(), yesterday = new Date(now.getTime() - 86_400_000);
+    link.setTrading(true);
+    assert.equal(link.noteValue(2_600, yesterday).on, true, 'a small fall is fine');
+    assert.equal(link.noteValue(2_550, now).on, true, '1.9% below the week\'s high of $2,600: under 5%');
+    const t = await ticket();
+    await post('/api/ticket/review', { id: t.id, quantity: 1, limitPrice: 182.4 });
+    link.noteValue(2_700, now);   // a higher reading today: the week's high is now $2,700
+    const sent = await post('/api/ticket/place', { id: t.id, confirm: 'Buy 1 NVDA at $182.40' });
+    assert.equal(sent.status, 400, 'reading the account just before sending found $2,500, 7.4% below $2,700');
+    assert.match(sent.json().error, /^trading switched itself off: The Agentic account fell 7\.4% below its highest value of the last seven days \(\$2,700\.00 on \d{4}-\d{2}-\d{2}, now \$2,500\.00\), past your weekly limit of 5%/);
+    assert.deepEqual(o.placed, [], 'nothing was sent');
+    const state = link.trading();
+    assert.equal(state.on, false);
+    assert.match(state.offBecause!.words, /A large withdrawal can do this too/);
+    const kept = JSON.parse(fs.readFileSync(path.join(path.dirname(file), 'values.json'), 'utf8')) as Array<{ day: string; high: number; last: number }>;
+    assert.deepEqual(kept.map((d) => [d.high, d.last]), [[2_600, 2_600], [2_700, 2_500]], 'one entry a day: its highest and its latest reading, in the private folder');
+    assert.equal((await post('/api/trading', { on: true, confirm: 'switch trading on', understood: true })).json().offBecause, null, 'switching it back on clears the reason');
+    link.forget();
+    assert.equal(fs.existsSync(path.join(path.dirname(file), 'values.json')), false, 'disconnecting forgets the account\'s values');
+  } finally { await term.close(); }
+});
+
+test('the shortest hold: the desk proposes no early sell of a stock bought here, and your own early sell takes one more press', async () => {
+  const { o, dir, term, post, link } = await desk();
+  try {
+    o.agenticPositions = [{ symbol: 'NVDA', quantity: '3.0000', average_buy_price: '170.00' }];
+    logOrder(dir, { at: new Date(Date.now() - 86_400_000).toISOString(), symbol: 'NVDA', side: 'buy', quantity: 3, limitPrice: 170, robinhood: { answered: true, approvalRequired: false, orderId: 'x', state: 'filled', error: null } });
+    link.setTrading(true);
+    const own = (await post('/api/ticket/own', { symbol: 'NVDA', side: 'sell' })).json();
+    assert.equal(own.proposal.order.quantity, 1);
+    const ask = own.checks.find((c: { ask?: boolean }) => c.ask);
+    assert.match(ask.words, /^NVDA was bought here on \d{4}-\d{2}-\d{2}, [01] trading day\(s\) ago, under your shortest hold of 5: selling it now takes one more press$/);
+    assert.match((await post('/api/ticket/review', { id: own.id, quantity: 1, limitPrice: 182.4 })).json().error, /bought here under your shortest hold: press "Sell anyway" to go on/);
+    assert.deepEqual(o.reviewed, [], 'not even sent for Robinhood\'s check');
+    assert.equal((await post('/api/ticket/review', { id: own.id, quantity: 1, limitPrice: 182.4, early: true })).status, 200);
+    assert.match((await post('/api/ticket/place', { id: own.id, confirm: 'Sell 1 NVDA at $182.40' })).json().error, /press "Sell anyway"/, 'and again at Place');
+    assert.equal((await post('/api/ticket/place', { id: own.id, confirm: 'Sell 1 NVDA at $182.40', early: true })).status, 200);
+    assert.equal(o.placed.length, 1);
+  } finally { await term.close(); }
+});
+
 test('every cap is checked again on Robinhood\'s latest figures just before sending; the desk\'s own log counts toward orders a day', async () => {
   const { o, term, post, ticket, link } = await desk({ perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 1 });
   try {
@@ -172,13 +218,13 @@ test('the caps are the person\'s own: kept beside the trading switch, changed on
   const { file, term, post, link } = await desk();
   try {
     const first = (await post('/api/ticket', { symbol: 'NVDA', date: '2026-10-15' })).json();
-    assert.deepEqual(first.caps, { perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 3 }, 'the shipped caps, not the wide-open ones written into desk-settings.json');
-    assert.equal((await post('/api/trading', { caps: { perOrderUsd: 50_000_000, perStockPercent: 10, ordersPerDay: 3 } })).status, 400, 'out of range');
-    assert.equal((await post('/api/trading', { caps: { perOrderUsd: 300, perStockPercent: 10, ordersPerDay: 2.5 } })).status, 400, 'orders a day are whole');
-    assert.equal((await post('/api/trading', { caps: { perOrderUsd: 300 } })).status, 400, 'all three or nothing');
-    const set = (await post('/api/trading', { caps: { perOrderUsd: 300, perStockPercent: 10, ordersPerDay: 2 } })).json();
-    assert.deepEqual([set.on, set.caps], [false, { perOrderUsd: 300, perStockPercent: 10, ordersPerDay: 2 }]);
-    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(path.dirname(file), 'trading.json'), 'utf8')), { on: false, caps: { perOrderUsd: 300, perStockPercent: 10, ordersPerDay: 2 } });
+    assert.deepEqual(first.caps, DEFAULT_CAPS, 'the shipped caps, not the wide-open ones written into desk-settings.json');
+    assert.equal((await post('/api/trading', { caps: { ...DEFAULT_CAPS, perOrderUsd: 50_000_000 } })).status, 400, 'out of range');
+    assert.equal((await post('/api/trading', { caps: { ...DEFAULT_CAPS, ordersPerDay: 2.5 } })).status, 400, 'orders a day are whole');
+    assert.equal((await post('/api/trading', { caps: { perOrderUsd: 300 } })).status, 400, 'every limit or nothing');
+    const set = (await post('/api/trading', { caps: { ...DEFAULT_CAPS, perOrderUsd: 300, ordersPerDay: 2 } })).json();
+    assert.deepEqual([set.on, set.caps], [false, { ...DEFAULT_CAPS, perOrderUsd: 300, ordersPerDay: 2 }]);
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(path.dirname(file), 'trading.json'), 'utf8')), { on: false, caps: { ...DEFAULT_CAPS, perOrderUsd: 300, ordersPerDay: 2 } });
     const next = (await post('/api/ticket', { symbol: 'NVDA', date: '2026-10-15' })).json();
     assert.deepEqual([next.caps.perOrderUsd, next.proposal.order.quantity], [300, 1]);
     const words = (await post('/api/ticket/check', { id: next.id, quantity: 2, limitPrice: 182.4 })).json().checks.map((c: { words: string }) => c.words).join(' | ');
@@ -186,7 +232,7 @@ test('the caps are the person\'s own: kept beside the trading switch, changed on
     assert.match(words, /0 of your 2 orders a day used/);
     assert.equal((await post('/api/trading', { on: true, confirm: 'switch trading on', understood: true })).json().caps.perOrderUsd, 300, 'switching on keeps the caps');
     link.forget();
-    assert.deepEqual(link.trading(), { on: false, since: null, caps: { perOrderUsd: 300, perStockPercent: 10, ordersPerDay: 2 } }, 'disconnecting switches trading off and keeps the caps: they are the person\'s rules, not Robinhood\'s');
+    assert.deepEqual(link.trading(), { on: false, since: null, caps: { ...DEFAULT_CAPS, perOrderUsd: 300, ordersPerDay: 2 }, offBecause: null }, 'disconnecting switches trading off and keeps the caps: they are the person\'s rules, not Robinhood\'s');
   } finally { await term.close(); }
 });
 

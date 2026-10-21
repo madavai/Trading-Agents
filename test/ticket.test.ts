@@ -8,6 +8,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { check, passes, propose, proposeOwn, type Order, type TicketContext } from '../src/desk/ticket.js';
 import { capsFrom, capsOf, DEFAULT_CAPS, DEFAULTS, readSettings, tradingOf } from '../src/settings.js';
+import { Sectors } from '../src/desk/sectors.js';
 import { parseReview, Reviewer } from '../src/robinhood/review.js';
 import { Refused } from '../src/robinhood/reader.js';
 import { Link } from '../src/robinhood/link.js';
@@ -29,12 +30,49 @@ test('the trading settings are read and checked: out of range falls back to what
   assert.ok(!('caps' in (JSON.parse(fs.readFileSync('desk-settings.json', 'utf8')) as { trading: object }).trading), 'the shipped settings file carries no caps');
 });
 
-test('the caps as kept fall back to the shipped ones, never larger; as typed they are all three taken or refused', () => {
-  assert.deepEqual(capsOf({ perOrderUsd: -5, perStockPercent: 20, ordersPerDay: 2.5 }), { perOrderUsd: 500, perStockPercent: 20, ordersPerDay: 3 });
+test('the caps and guard rails as kept fall back to the shipped ones, never larger; as typed they are all taken or all refused', () => {
+  assert.deepEqual(capsOf({ perOrderUsd: -5, perStockPercent: 20, ordersPerDay: 2.5 }), { ...C, perStockPercent: 20 }, 'an older file with three caps: the guard rails are the shipped ones');
   assert.deepEqual(capsOf(undefined), C);
-  assert.deepEqual(capsOf({ perOrderUsd: 100_001, perStockPercent: 101, ordersPerDay: 51 }), C);
-  assert.deepEqual(capsFrom({ perOrderUsd: 300.456, perStockPercent: 7.25, ordersPerDay: 2 }), { perOrderUsd: 300.46, perStockPercent: 7.3, ordersPerDay: 2 });
-  for (const bad of [{ perOrderUsd: 300, perStockPercent: 10 }, { perOrderUsd: 0, perStockPercent: 10, ordersPerDay: 3 }, { perOrderUsd: 300, perStockPercent: 10, ordersPerDay: 2.5 }, { perOrderUsd: '300', perStockPercent: 10, ordersPerDay: 3 }, { perOrderUsd: 100_001, perStockPercent: 10, ordersPerDay: 3 }, null]) assert.equal(capsFrom(bad), null, JSON.stringify(bad));
+  assert.deepEqual(C, { perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 3, perSectorPercent: 30, cryptoPercent: 5, weeklyLossPercent: 5, minHoldDays: 5 });
+  assert.deepEqual(capsOf({ perOrderUsd: 100_001, perStockPercent: 101, ordersPerDay: 51, perSectorPercent: 0, cryptoPercent: 101, weeklyLossPercent: 51, minHoldDays: 2.5 }), C);
+  assert.deepEqual(capsFrom({ ...C, perOrderUsd: 300.456, perStockPercent: 7.25, ordersPerDay: 2, cryptoPercent: 0, minHoldDays: 0 }), { ...C, perOrderUsd: 300.46, perStockPercent: 7.3, ordersPerDay: 2, cryptoPercent: 0, minHoldDays: 0 }, 'no crypto at all, and no shortest hold, are choices too');
+  for (const bad of [{ perOrderUsd: 300, perStockPercent: 10, ordersPerDay: 3 }, { ...C, perOrderUsd: 0 }, { ...C, ordersPerDay: 2.5 }, { ...C, perOrderUsd: '300' }, { ...C, perOrderUsd: 100_001 }, { ...C, perSectorPercent: 0 }, { ...C, weeklyLossPercent: 60 }, { ...C, minHoldDays: 1.5 }, null]) assert.equal(capsFrom(bad), null, JSON.stringify(bad));
+});
+
+test('a sector comes from the fund tables or the company\'s own profile; anything unknown counts on its own, and a failed lookup is asked again', async () => {
+  let asked = 0, down = true;
+  const s = new Sectors(async (sym) => { asked++; if (sym === 'FAIL' && down) throw new Error('Yahoo did not answer'); return sym === 'ARKK' ? { sector: null, fund: true } : { sector: sym === 'FAIL' ? 'Energy' : 'Technology', fund: false }; });
+  assert.deepEqual([await s.of('XLK'), await s.of('SPY'), await s.of('AAPL'), await s.of('ARKK'), await s.of('BTC-USD')].map((g) => g.name), ['Technology', null, 'Technology', 'own:ARKK', 'Crypto']);
+  assert.equal(asked, 2, 'the sector and market funds, and crypto, are known without asking');
+  assert.equal((await s.of('FAIL')).name, 'own:FAIL', 'a lookup that fails counts on its own');
+  down = false;
+  assert.equal((await s.of('FAIL')).name, 'Energy', 'and is asked again next time');
+  await s.of('AAPL'); assert.equal(asked, 4, 'a sector found is remembered');
+  const c = s.context('AAPL', [{ symbol: 'XLK', quantity: 10, price: 200 }, { symbol: 'AAPL', quantity: 2, price: 250 }, { symbol: 'SPY', quantity: 1, price: 600 }, { symbol: 'NEW', quantity: 5, price: 10 }]);
+  assert.deepEqual(c, { name: 'Technology', label: 'Technology', heldUsd: 2_500 }, 'a sector fund counts towards its sector; a whole-market fund and a stock not looked up do not');
+  assert.equal(s.context('SPY', [{ symbol: 'SPY', quantity: 1, price: 600 }]).heldUsd, 0);
+});
+
+test('the guard rails on a ticket: one sector, crypto, and the shortest hold, each said in plain words', () => {
+  const buy: Order = { symbol: 'NVDA', side: 'buy', quantity: 2, limitPrice: 182.4, timeInForce: 'gfd' };
+  const big = ctx({ accountValue: 10_000, buyingPower: 10_000 });
+  const words = (o: Order, c: TicketContext) => check(o, c, T, C).map((x) => x.words).join(' | ');
+  assert.match(words(buy, { ...big, sector: { name: 'Technology', label: 'Technology', heldUsd: 2_500 } }), /Sector Technology would be 28\.6% of the account; your limit is 30%/);
+  assert.equal(passes(check(buy, { ...big, sector: { name: 'Technology', label: 'Technology', heldUsd: 2_800 } }, T, C)), false, 'over 30% in one sector');
+  assert.match(words(buy, big), /Sector NVDA.*counted on its own|Sector not known, so counted as a sector of its own would be 3\.6%/, 'a sector not known counts as its own');
+  assert.match(words({ ...buy, symbol: 'SPY' }, { ...big, symbol: 'SPY', sector: { name: null, label: 'a whole-market fund', heldUsd: 0 } }), /SPY is a whole-market fund: it counts towards no sector/);
+  assert.equal(passes(check({ ...buy, symbol: 'BTC-USD', limitPrice: 182.4 }, { ...big, symbol: 'BTC-USD', cryptoHeldUsd: 300 }, T, C)), false, 'crypto at most 5%: $300 held and $364.80 more is 6.6%');
+  assert.match(words({ ...buy, symbol: 'BTC-USD' }, { ...big, symbol: 'BTC-USD', cryptoHeldUsd: 100 }), /Crypto would be 4\.6% of the account; your limit is 5%/);
+  const sell: Order = { ...buy, side: 'sell', quantity: 1 };
+  const young = { ...big, held: 2, boughtOn: '2026-10-13', heldDays: 2 };
+  const early = check(sell, young, T, C);
+  assert.equal(passes(early), true, 'your own early sell still works');
+  assert.deepEqual(early.filter((x) => x.ask).map((x) => x.words), ['NVDA was bought here on 2026-10-13, 2 trading day(s) ago, under your shortest hold of 5: selling it now takes one more press']);
+  assert.equal(check(sell, { ...young, heldDays: 5 }, T, C).some((x) => x.ask), false, 'held five trading days: nothing more to press');
+  assert.equal(propose({ ...young, rating: 'Sell' }, T, C).order, null, 'the desk proposes no sell under the shortest hold');
+  assert.match(propose({ ...young, rating: 'Sell' }, T, C).why.at(-1)!, /bought here on 2026-10-13, 2 trading day\(s\) ago: your shortest hold is 5, so the desk proposes no sell yet/);
+  assert.equal(propose({ ...young, rating: 'Sell', heldDays: 6 }, T, C).order?.quantity, 2);
+  assert.equal(propose({ ...young, rating: 'Sell' }, T, { ...C, minHoldDays: 0 }).order?.quantity, 2, 'a shortest hold of 0 is no hold');
 });
 
 test('the person\'s own ticket starts at one whole share at the live price, sells only what is held, and is held to every check', () => {
