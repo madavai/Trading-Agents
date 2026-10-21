@@ -388,7 +388,14 @@ p { text-wrap: pretty; }
 .pn { display: flex; flex-direction: column; gap: 8px; padding: 12px; min-width: 0; }
 .pn-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-family: var(--font-title); font-weight: 600; font-size: 13.5px; }
 .pn-h small { font-family: var(--font); font-weight: 400; font-size: var(--size-tiny); color: var(--text-3); }
-.pn.markets { grid-column: 1 / -1; }
+.pn.markets, .pn.start { grid-column: 1 / -1; }
+.tier-row { display: grid; grid-template-columns: 116px minmax(0, 1fr); align-items: center; gap: 10px; }
+.tier-row > b { font-family: var(--font-title); font-size: 12.5px; font-weight: 600; }
+.tchips { display: flex; flex-wrap: wrap; gap: 6px; }
+.tchip { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--radius-small); background: var(--panel); font-size: var(--size-tiny); color: var(--text-2); }
+.tchip .sk { width: 22px; }
+.tchip .ic { color: var(--accent); }
+.wl li.wl-h { font-size: var(--size-tiny); color: var(--text-3); }
 .pn.chart { grid-column: 1 / 5; }
 .pn.watch { grid-column: 5 / -1; }
 .pn.calls { grid-column: 1 / 4; }
@@ -471,7 +478,8 @@ p { text-wrap: pretty; }
   .rate b { flex: 0 0 96px; }
   .drawers, .checks, .facts { grid-template-columns: minmax(0, 1fr); }
   .win-main { grid-template-columns: minmax(0, 1fr); }
-  .pn.today, .pn.markets, .pn.chart, .pn.watch, .pn.calls, .pn.acct-pn, .pn.ticket { grid-column: 1; }
+  .pn.today, .pn.start, .pn.markets, .pn.chart, .pn.watch, .pn.calls, .pn.acct-pn, .pn.ticket { grid-column: 1; }
+  .tier-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
   .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .hero-words { padding: 24px 20px 20px; }
@@ -1055,6 +1063,7 @@ p { text-wrap: pretty; }
           <li><svg class="ic sm"><use href="#i-bank"/></svg>Main<span class="sk win-v"></span></li>
           <li class="win-lh">The desk</li>
           <li class="on"><svg class="ic sm"><use href="#i-grid"/></svg>Overview</li>
+          <li><svg class="ic sm"><use href="#i-compass"/></svg>Start here</li>
           <li><svg class="ic sm"><use href="#i-target"/></svg>Scorecard</li>
           <li><svg class="ic sm"><use href="#i-chart"/></svg>Chart</li>
           <li><svg class="ic sm"><use href="#i-ledger"/></svg>Stock page</li>
@@ -1065,6 +1074,11 @@ p { text-wrap: pretty; }
         <div class="win-main">
           <div class="at-box pn today"><p class="pn-h">Your desk today <small>a press opens each</small></p>
             <div class="joined kpis"><span class="kpi-mini c-rh"><b>Your accounts</b><span class="sk" style="width:64%"></span>gain since bought</span><span class="kpi-mini c-desk"><b>Agentic buying power</b><span class="sk" style="width:52%"></span>trading on or off</span><span class="kpi-mini c-src"><b>S&amp;P 500 today</b><span class="sk" style="width:58%"></span>with a small chart</span><span class="kpi-mini c-you"><b>The desk's calls</b><span class="sk" style="width:40%"></span>latest, waiting, scored</span></div>
+          </div>
+          <div class="at-box pn start"><p class="pn-h">Start here <small>broadest first · today's move, the desk's latest call, the robot</small></p>
+            <div class="tier-row"><b>The whole market</b><div class="tchips"><span class="tchip">S&amp;P 500<span class="sk"></span></span><span class="tchip">Nasdaq 100<span class="sk"></span></span><span class="tchip">The whole world<span class="sk"></span></span><span class="tchip">US bonds<span class="sk"></span></span><span class="tchip">yours to change</span></div></div>
+            <div class="tier-row"><b>Sectors</b><div class="tchips"><span class="tchip">Technology</span><span class="tchip">Financials</span><span class="tchip">Health care</span><span class="tchip">Energy</span><span class="tchip">Industrials</span><span class="tchip">Consumer discretionary</span><span class="tchip">Consumer staples</span><span class="tchip">Utilities</span><span class="tchip">Materials</span><span class="tchip">Real estate</span><span class="tchip">Communication</span></div></div>
+            <div class="tier-row"><b>Single names</b><div class="tchips"><span class="tchip"><svg class="ic sm"><use href="#i-star"/></svg>yours, starred first<span class="sk"></span></span><span class="tchip">Bitcoin and Ether on paper only</span></div></div>
           </div>
           <div class="at-box pn markets"><p class="pn-h">Markets <small>Yahoo Finance</small></p>
             <div class="joined tiles"><span class="tile">S&amp;P 500<span class="sk" style="width:70%"></span></span><span class="tile">Nasdaq<span class="sk" style="width:60%"></span></span><span class="tile">Dow<span class="sk" style="width:66%"></span></span><span class="tile">VIX<span class="sk" style="width:48%"></span></span><span class="tile">10-year yield<span class="sk" style="width:55%"></span></span><span class="tile">Bitcoin<span class="sk" style="width:72%"></span></span></div>
@@ -1078,11 +1092,13 @@ p { text-wrap: pretty; }
               <g style="fill: var(--line-strong)"><rect x="8" y="108" width="10" height="12"/><rect x="48" y="112" width="10" height="8"/><rect x="88" y="106" width="10" height="14"/><rect x="128" y="111" width="10" height="9"/><rect x="168" y="109" width="10" height="11"/><rect x="208" y="105" width="10" height="15"/><rect x="248" y="110" width="10" height="10"/><rect x="288" y="107" width="10" height="13"/><rect x="328" y="111" width="10" height="9"/><rect x="368" y="106" width="10" height="14"/></g>
             </svg>
           </div>
-          <div class="at-box pn watch"><p class="pn-h">Watchlist</p>
+          <div class="at-box pn watch"><p class="pn-h">Watchlist <small>by tier · each folds away</small></p>
             <ul class="wl">
+              <li class="wl-h">The whole market</li>
+              <li><svg class="ic sm"><use href="#i-star"/></svg><span class="sk" style="max-width:76%"></span><svg class="ic sm bot"><use href="#i-bot"/></svg></li>
+              <li class="wl-h">Single names</li>
               <li><svg class="ic sm star"><use href="#i-star"/></svg><span class="sk"></span><svg class="ic sm bot"><use href="#i-bot"/></svg></li>
               <li><svg class="ic sm"><use href="#i-star"/></svg><span class="sk" style="max-width:70%"></span><svg class="ic sm bot"><use href="#i-bot"/></svg></li>
-              <li><svg class="ic sm"><use href="#i-star"/></svg><span class="sk" style="max-width:82%"></span><svg class="ic sm bot"><use href="#i-bot"/></svg></li>
             </ul>
           </div>
           <div class="at-box pn calls"><p class="pn-h">The desk's calls</p>
@@ -1104,11 +1120,11 @@ p { text-wrap: pretty; }
     </figure>
     <div class="joined feats">
       <div class="feat edge c-desk"><span class="icbox"><svg class="ic"><use href="#i-grid"/></svg></span><b>Your desk today</b><p>Four tiles at the top: your accounts with their gain since bought, Agentic buying power, the S&amp;P 500 today, and the desk's calls.</p></div>
-      <div class="feat edge c-src"><span class="icbox"><svg class="ic"><use href="#i-chart"/></svg></span><b>Markets and chart</b><p>Six market tiles, and any stock across the whole width: area or candles, averages, volume and its key figures underneath.</p></div>
-      <div class="feat edge c-you"><span class="icbox"><svg class="ic"><use href="#i-star"/></svg></span><b>Watchlist and analyses</b><p>Pick a stock from the matches as you type and star it. The robot asks the desk to analyse it, as deep as you choose; each shows waiting, the step it is on, its rating or why it failed.</p></div>
+      <div class="feat edge c-you"><span class="icbox"><svg class="ic"><use href="#i-compass"/></svg></span><b>Start here</b><p>First on the page, broadest first: the whole market (four funds, yours to change), the eleven sectors in plain words, and your own names, each with today's move and the desk's latest call.</p></div>
+      <div class="feat edge c-src"><span class="icbox"><svg class="ic"><use href="#i-chart"/></svg></span><b>Markets, chart and stock page</b><p>Six market tiles; any stock or fund across the whole width, with averages and volume; and its own page: what you hold, your orders on it, each call and its score.</p></div>
+      <div class="feat edge c-you"><span class="icbox"><svg class="ic"><use href="#i-star"/></svg></span><b>Watchlist and analyses</b><p>Grouped by tier, each folding away. The robot asks the desk to analyse a stock or a fund, as deep as you choose; each shows waiting, the step it is on, its rating or why it failed.</p></div>
       <div class="feat edge c-desk"><span class="icbox"><svg class="ic"><use href="#i-flag"/></svg></span><b>The desk's calls</b><p>Each call in two lines; in full, a coloured summary, the price since the call and every agent's part as a card.</p></div>
-      <div class="feat edge c-desk"><span class="icbox"><svg class="ic"><use href="#i-target"/></svg></span><b>Your paper record</b><p>First on the page: every call on a stock, a fund, Bitcoin or Ether followed on paper at its ticket's size, against the S&amp;P 500, and how each call scored. Crypto stays on paper, within your crypto limit.</p></div>
-      <div class="feat edge c-you"><span class="icbox"><svg class="ic"><use href="#i-ledger"/></svg></span><b>Stock page</b><p>Everything on one stock: what you hold with Buy… and Sell…, your orders on it, and each call with its score.</p></div>
+      <div class="feat edge c-desk"><span class="icbox"><svg class="ic"><use href="#i-target"/></svg></span><b>Your paper record</b><p>Every call on a stock, a fund, Bitcoin or Ether followed on paper at its ticket's size, against the S&amp;P 500, and how each call scored. Crypto stays on paper, within your crypto limit.</p></div>
       <div class="feat edge c-rh"><span class="icbox"><svg class="ic"><use href="#i-bank"/></svg></span><b>Your account</b><p>In the side list and on its own page: value, cash, buying power and gain in colour, each holding's share, orders, the trading switch and your caps.</p></div>
       <div class="feat edge c-you"><span class="icbox"><svg class="ic"><use href="#i-send"/></svg></span><b>Order tickets</b><p>Decide… from a call, or Trade… for your own: checked against your caps, reviewed by Robinhood, placed only on your Confirm.</p></div>
     </div>

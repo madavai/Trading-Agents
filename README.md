@@ -118,10 +118,10 @@ the team's "talk" switch shows these messages in the Messages panel; with it off
    rating, how often the direction was right and the mean alpha. It is slow and uses a lot of model time, and for past
    dates only prices, indicators, economic figures and what US companies filed with the SEC (accounts, valuation,
    insider trades) are as known then: news, posts and odds are recent-only, so they are thin.
-2. **You see.** Ask the team to open the dashboard, or type `/terminal`: a page on your own computer with the markets,
-   a chart of any stock (area or candles, 50- and 200-day averages, volume), your watchlist, a page per stock, the
-   desk's calls with their full reasoning, and how the desk has scored. The agents see your chosen holdings when they
-   analyse.
+2. **You see.** Ask the team to open the dashboard, or type `/terminal`: a page on your own computer that starts with
+   the whole market, the eleven sectors and your own names side by side, then the markets, a chart of any stock (area
+   or candles, 50- and 200-day averages, volume), your watchlist by tier, a page per stock, the desk's calls with their
+   full reasoning, and how the desk has scored. The agents see your chosen holdings when they analyse.
 3. **You decide and trade.** On a call, "Decide…" opens a ticket for the Agentic account, sized by your settings and
    checked against your caps; beside a stock's price, "Trade…" opens your own ticket instead, buy or sell, starting at
    one share. Either way "Review with Robinhood" is Robinhood's own dry run, and with trading switched on (by you, on
@@ -178,7 +178,7 @@ the team's "talk" switch shows these messages in the Messages panel; with it off
 <a href="https://madavai.github.io/Trading-Agents/inside-the-trading-desk.html#dashboard">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/dashboard-dark.webp">
-  <img alt="The dashboard: a side list with your account at the top and the desk's sections below; Your desk today, the markets, a full-width chart, the watchlist, the desk's calls, your accounts, and the order ticket from Decide… or Trade… to your Confirm." src="docs/readme/dashboard-light.webp">
+  <img alt="The dashboard: a side list with your account at the top and the desk's sections below; Your desk today, Start here with the whole market, the eleven sectors and your own names, the markets, a full-width chart, the watchlist by tier, the desk's calls, your accounts, and the order ticket from Decide… or Trade… to your Confirm." src="docs/readme/dashboard-light.webp">
 </picture>
 </a>
 
@@ -195,9 +195,26 @@ at last. The dashboard opens where you left it (the page, the stock, the chart's
 browser. After an update it offers Restart at the top of the page, and one press opens the new version where you were;
 Stop, at the top right, closes it.
 
+### Start here: the whole market first
+The first section of the dashboard shows the world in tiers, broadest first, because the broadest risk is the steadiest:
+- **The whole market**: as shipped, four funds: SPY (the S&P 500), QQQ (the Nasdaq 100), VT (the whole world) and BND
+  (US bonds). Press Change… to choose your own, up to eight funds or stocks; each is checked with Yahoo Finance before
+  it is kept, and "Put back" brings the four back. Sector funds and crypto are refused there: they have tiers of their own.
+- **Sectors**: the eleven S&P sector funds, from XLK (technology) to XLC (communication), each named in plain words with
+  what it holds.
+- **Single names**: the companies on your watchlist, starred first (twelve here at most; the rest are in the watchlist).
+- **Crypto**: Bitcoin and Ether when you watch them. They are followed on paper only: a coin never opens an order
+  ticket, and its calls say "on paper only" where a stock's say Decide….
+
+Each tile shows today's move (a dash when Yahoo Finance gave none), the desk's latest call with its date or "no call
+yet", and the robot, which asks the desk to analyse a fund as readily as a stock (for a fund it reads what it holds and
+what it costs). Every trading word has its meaning beside it: under each tier, at the foot of the section, and on each
+rating when you point at it. The watchlist further down is grouped the same way; press a tier's name to fold it away,
+and the dashboard remembers which you folded.
+
 ### Your paper record
-Before you risk money, every call the desk makes on a stock, a fund, Bitcoin or Ether is followed on paper, and the dashboard opens on
-what that would have done: one sentence, a line of the paper money against the S&P 500 from the same start, and how
+Before you risk money, every call the desk makes on a stock, a fund, Bitcoin or Ether is followed on paper, and right
+after Start here the dashboard shows what that would have done: one sentence, a line of the paper money against the S&P 500 from the same start, and how
 many weeks and calls stand behind it. Each call is sized exactly as its order ticket would size it (the rating, a full
 position of 10%, your caps), takes no order the real ticket would refuse, and fills at the first closing price after
 the call's day. No costs are counted. The paper money starts at $10,000; change it on the scorecard. Each call shows a

@@ -47,6 +47,7 @@
     <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
     <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/></symbol>
     <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 2 10 5-10 5L2 7z"/><path d="m2 12 10 5 10-5"/><path d="m2 17 10 5 10-5"/></symbol>
   </defs>
 </svg>
 
@@ -62,6 +63,7 @@
         <nav class="at-list" aria-label="Sections">
           <div class="at-lh"><span>The desk</span></div>
           <button class="at-li" data-act="goto" data-to="top" id="navOverview" aria-current="page"><svg class="g"><use href="#i-grid"/></svg><span class="at-li-t">Overview</span></button>
+          <button class="at-li" data-act="goto" data-to="sec-start"><svg class="g"><use href="#i-layers"/></svg><span class="at-li-t">Start here</span></button>
           <button class="at-li" data-act="goto" data-to="sec-score"><svg class="g"><use href="#i-target"/></svg><span class="at-li-t">Scorecard</span></button>
           <button class="at-li" data-act="goto" data-to="sec-chart"><svg class="g"><use href="#i-candle"/></svg><span class="at-li-t">Chart</span></button>
           <button class="at-li" data-act="goto" data-to="sec-stock"><svg class="g"><use href="#i-file"/></svg><span class="at-li-t">Stock page</span></button>
@@ -82,6 +84,7 @@
       <button class="icon-btn" data-act="view" data-view="account" aria-label="Your account" title="Your account"><svg class="g"><use href="#i-wallet"/></svg><span class="at-dot" id="railDot"></span></button>
       <span class="ta-rail-rule"></span>
       <button class="icon-btn" data-act="goto" data-to="top" aria-label="Overview" title="Overview"><svg class="g"><use href="#i-grid"/></svg></button>
+      <button class="icon-btn" data-act="goto" data-to="sec-start" aria-label="Start here" title="Start here"><svg class="g"><use href="#i-layers"/></svg></button>
       <button class="icon-btn" data-act="goto" data-to="sec-score" aria-label="Scorecard" title="Scorecard"><svg class="g"><use href="#i-target"/></svg></button>
       <button class="icon-btn" data-act="goto" data-to="sec-chart" aria-label="Chart" title="Chart"><svg class="g"><use href="#i-candle"/></svg></button>
       <button class="icon-btn" data-act="goto" data-to="sec-stock" aria-label="Stock page" title="Stock page"><svg class="g"><use href="#i-file"/></svg></button>
@@ -135,6 +138,11 @@
             <div class="at-deck ta-deck-4" id="todayDeck"></div>
           </section>
 
+          <section class="at-section" id="sec-start">
+            <div class="at-sect-head"><div class="at-head-words"><h2>Start here</h2><p>The whole market first, then its parts, then single companies: the broadest risk is the steadiest. Press one to chart it · the robot asks the desk to analyse it</p></div></div>
+            <div class="at-card at-box ta-tiers" id="startHere"></div>
+          </section>
+
           <section class="at-section" id="sec-score">
             <div class="at-sect-head"><div class="at-head-words"><h2>How the desk is doing</h2><p id="scoreSub"></p></div><div class="at-head-tail" id="paperDo"></div></div>
             <div class="at-card at-box" id="paperCard"></div>
@@ -186,7 +194,7 @@
           </section>
 
           <section class="at-section" id="sec-watch">
-            <div class="at-sect-head"><div class="at-head-words"><h2>Watchlist</h2><p>Press a row to chart it · the star keeps it in the side list · the robot asks the desk to analyse it</p></div></div>
+            <div class="at-sect-head"><div class="at-head-words"><h2>Watchlist</h2><p>Grouped by tier, broadest first; press a tier's name to fold it away · press a row to chart it · the star keeps it in the side list · the robot asks the desk to analyse it</p></div></div>
             <div class="at-box at-tablewrap" id="watchWrap"><table class="at-table fill" id="watchTable"></table></div>
           </section>
 
