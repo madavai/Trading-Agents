@@ -52,9 +52,10 @@ affiliated with them.
 
 You need Node 22 or later (Madav needs it too). No keys and no installs; only your email, once.
 
-**If the team was changed by mistake:** saving the trading-desk team in Agent Studio can rewrite the project's agent
-files. The desk check notices and names them; ask the team to "reset the team" and, on your yes, it puts them back
-exactly as the project ships them.
+**To go back to the project's team:** ask the team to "reset the team". On your yes it writes the desk's agent files
+again exactly as the project ships them, and Madav goes back to them too, undoing changes made in Agent Studio (the
+model, permissions and effort you chose there stay yours). The desk check also names any agent file that differs
+from the project's version.
 
 ## Where the information comes from
 
@@ -217,7 +218,8 @@ notice says so wherever you are on the page. One stock is analysed at a time, at
 in `desk-settings.json`); the rest wait for the next run, which is asked for by itself.
 
 Something has to run them. The page says who is listening:
-- **Madav**: switch on its "Run automatically when the dashboard asks" routine, once.
+- **Madav**: switch on its "Run automatically when the dashboard asks" routine, once. The project ships it, off; it
+  watches the dashboard's doorbell and runs the trading-desk team as you set it up in Madav.
 - **Claude Code**: press "Run automatically with Claude Code" on the dashboard. It starts the desk's own listener
   (`node dist/watch.mjs`), which runs the trading-desk team with Claude Code on this computer whenever you ask for an
   analysis, and keeps a log in `desk-data/watcher.log`. It stays on until you switch it off, and starts again with
@@ -240,9 +242,14 @@ The trading-desk team has two routines, which Madav's scheduler can start for yo
 - **Evening wrap-up**: scores what is ready and tells you the day's calls, the orders the dashboard sent and what
   Robinhood answered.
 
-To schedule one in Madav: Routines, new routine, run as **trading-desk**, the words "Run the morning routine" (or
-"Run the evening wrap-up"), on weekdays at the time you choose. In a chat here: `/routine morning`. Neither ever
-places an order, and the team reads your holdings as the dashboard last read them from Robinhood.
+The project ships them to Madav (`.claude/routines.json`), beside "Run automatically when the dashboard asks": in
+Madav's Routines list you find **Morning routine** (8:00 on weekdays) and **Evening wrap-up** (17:00 on weekdays), on
+your computer's clock, each off until you switch it on. Change the times there; your version stays yours. In a chat
+here: `/routine morning`. Neither ever places an order, and the team reads your holdings as the dashboard last read
+them from Robinhood.
+
+Switching a routine on approves the desk as it stands. When an update changes the desk's agents, playbooks or settings,
+Madav pauses the desk's routines until you switch them on again, so nothing new runs without your yes.
 
 ## Not financial advice
 Trading Agents is a personal, open-source project for learning and research. It is not a financial service, and no one

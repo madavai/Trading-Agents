@@ -48,7 +48,7 @@ export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetc
 
   server.registerTool('reset_team', {
     title: 'Reset the team',
-    description: 'Put the desk\'s twelve agents, the trading-desk team\'s file and its line-up back exactly as the project ships them, when they were changed (a save in Madav\'s Agent Studio can do it). Only after the person asked for it and confirmed it in this conversation. It writes only those files in this folder and cannot change Madav\'s own saved settings for the team.',
+    description: 'Put the desk\'s twelve agents, the trading-desk team\'s file and its line-up back exactly as the project ships them: each file is written again, even one that already matches, which also brings Madav back to the project\'s version of the team in place of changes made in its Agent Studio. Only after the person asked for it and confirmed it in this conversation. It writes only those files in this folder; the model, permissions and effort the person chose in Madav stay theirs.',
     inputSchema: { confirmed: z.literal(true).describe('true: the person confirmed this reset in this conversation') },
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
   }, async () => {
@@ -56,10 +56,11 @@ export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetc
     try { wrote = resetAgentFiles(root, await shippedAgentFiles(source)); } catch (e) {
       return text(`The team could not be reset: ${(e as Error).message}. Nothing was changed.`);
     }
-    if (!wrote.length) return text('The desk\'s agents and the trading-desk team already match the project\'s version. Nothing was changed.');
+    const madav = 'Madav goes back to the project\'s version of the team too, in place of changes made in its Agent Studio; the model, permissions and effort chosen there stay as they are. If Madav runs the desk\'s routines, it pauses them until they are switched on again in Madav.';
+    if (!wrote.length) return text(['The desk\'s agent files already matched the project\'s version on this computer; each was written again as the project ships it.', madav].join('\n'));
     return text([
-      `Put back as the project ships them: ${listed(wrote.map(plainName))}.`,
-      'They take effect from the next conversation or run. Madav keeps its own saved settings for the team, which this cannot change: until Madav can reset them itself, do not press Save on the trading-desk team in Agent Studio, or it may write its settings into these files again.',
+      `Put back as the project ships them: ${listed(wrote.map(plainName))}; the others were written again too.`,
+      `They take effect from the next conversation or run. ${madav}`,
     ].join('\n'));
   });
 

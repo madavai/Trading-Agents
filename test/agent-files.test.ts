@@ -42,13 +42,20 @@ test('the desk check names each agent file a save changed, and the reset puts ba
   assert.deepEqual(drift, { changed: [`${AG}/bull-researcher.md`, `${AG}/trading-desk.team.json`], missing: [`${AG}/trader.md`] });
   const line = agentsLine(drift);
   assert.equal(line.ok, false);
-  assert.match(line.text, /^3 of the desk's agent files differ from the project's version \(bull-researcher, the team's line-up and trader\)\. A save in Madav's Agent Studio can do this\. Ask the desk to reset the team/);
+  assert.match(line.text, /^3 of the desk's agent files differ from the project's version \(bull-researcher, the team's line-up and trader\)\. An edit, or an older version of Madav, can do this\. Ask the desk to reset the team/);
 
   assert.deepEqual(resetAgentFiles(root, shipped), [`${AG}/bull-researcher.md`, `${AG}/trading-desk.team.json`, `${AG}/trader.md`]);
   assert.deepEqual(driftOf(root, shipped), { changed: [], missing: [] });
   for (const [p, text] of shipped) assert.equal(fs.readFileSync(path.join(root, p), 'utf8'), text, p);
   assert.equal(fs.readFileSync(path.join(root, AG, 'my-own.md'), 'utf8'), 'mine', 'the person\'s own agent is left alone');
-  assert.deepEqual(resetAgentFiles(root, shipped), [], 'a second reset has nothing to do');
+  // Madav keeps Agent Studio's changes inside itself and returns to the project's version when a file is written after
+  // them: so even with nothing differing on disk, a reset writes every desk file again.
+  const old = new Date('2026-01-01T00:00:00Z');
+  for (const p of shipped.keys()) fs.utimesSync(path.join(root, p), old, old);
+  fs.utimesSync(path.join(root, AG, 'my-own.md'), old, old);
+  assert.deepEqual(resetAgentFiles(root, shipped), [], 'a second reset finds nothing differing');
+  for (const p of shipped.keys()) assert.ok(fs.statSync(path.join(root, p)).mtimeMs > old.getTime(), `${p} is written again all the same`);
+  assert.equal(fs.statSync(path.join(root, AG, 'my-own.md')).mtimeMs, old.getTime(), 'and the person\'s own agent is still not touched');
 });
 
 test('a line ending turned by a Windows checkout is not a change', async () => {
@@ -57,7 +64,7 @@ test('a line ending turned by a Windows checkout is not a change', async () => {
   assert.deepEqual(driftOf(root, shipped), { changed: [], missing: [] });
 });
 
-test('reset_team acts only on the person\'s confirmation, says what it put back, and warns about Madav\'s own settings', async () => {
+test('reset_team acts only on the person\'s confirmation, says what it put back, and that Madav goes back to the project\'s team too', async () => {
   const root = clone();
   saveInMadav(root);
   const [a, b] = InMemoryTransport.createLinkedPair();
@@ -73,11 +80,12 @@ test('reset_team acts only on the person\'s confirmation, says what it put back,
   assert.equal(driftOf(root, await shippedAgentFiles(repo)).changed.length, 2, 'without a confirmation nothing is written');
 
   const done = await call({ confirmed: true });
-  assert.match(done, /^Put back as the project ships them: bull-researcher, the team's line-up and trader\./);
+  assert.match(done, /^Put back as the project ships them: bull-researcher, the team's line-up and trader; the others were written again too\./);
   assert.match(done, /take effect from the next conversation or run/);
-  assert.match(done, /do not press Save on the trading-desk team in Agent Studio/);
+  assert.match(done, /Madav goes back to the project's version of the team too, in place of changes made in its Agent Studio; the model, permissions and effort chosen there stay as they are/);
+  assert.doesNotMatch(done, /do not press Save/, 'a save in Agent Studio no longer writes these files');
   assert.deepEqual(driftOf(root, await shippedAgentFiles(repo)), { changed: [], missing: [] });
-  assert.match(await call({ confirmed: true }), /already match the project's version\. Nothing was changed\./);
+  assert.match(await call({ confirmed: true }), /^The desk's agent files already matched the project's version on this computer; each was written again as the project ships it\.\nMadav goes back/);
   await client.close();
 });
 

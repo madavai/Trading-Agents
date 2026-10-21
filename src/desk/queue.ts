@@ -210,22 +210,33 @@ export interface ListenerNote {
   beat: string;
   /** The desk's own watcher writes its process id, to know the note is its own. */
   pid?: number;
-  /** The last run: when it started and ended, and what it did or why it stopped, in plain words. With `started`, a stock
-   *  that run left "running" reads as failed with these words at once. */
+  /** The last run: when it started and ended (`at`; for a note that gives no end time, when it started), and what it did
+   *  or why it stopped, in plain words. With `started`, a stock that run left "running" reads as failed with these words
+   *  at once. */
   lastRun?: { started?: string; at: string; result: string };
 }
 export const LISTENER_FRESH_MS = 3 * 60_000;
 
-/** The listener's note, checked; `fresh` says whether its heartbeat is recent enough to believe it still listens. */
+/** The listener's note, checked; `fresh` says whether its heartbeat is recent enough to believe it still listens. Two
+ *  shapes are read: the desk's own (above), and Madav's for a routine it runs (`listening` for who, `checked` for the
+ *  heartbeat, and a last run whose `at` is when it started, `ended` how: finished, failed or stopped, and `endedAt`, when
+ *  it gives it, when). Without an end time a run's stock is left to the two-hour rule. */
 export function readListener(dir: string, now: Date = new Date()): (ListenerNote & { fresh: boolean }) | null {
   try {
     const v = JSON.parse(fs.readFileSync(listenerFile(dir), 'utf8')) as Record<string, unknown>;
-    const listener = words(v.listener, 40), since = iso(v.since), beat = iso(v.beat) ?? since;
+    const listener = words(v.listener ?? v.listening, 40), since = iso(v.since), beat = iso(v.beat) ?? iso(v.checked) ?? since;
     if (!listener || !since || !beat) return null;
     const note: ListenerNote & { fresh: boolean } = { listener, since, beat, fresh: now.getTime() - Date.parse(beat) <= LISTENER_FRESH_MS };
     if (Number.isInteger(v.pid) && (v.pid as number) > 0) note.pid = v.pid as number;
-    const last = v.lastRun as Record<string, unknown> | undefined, lastAt = iso(last?.at), result = words(last?.result, 200), started = iso(last?.started);
-    if (lastAt && result) note.lastRun = { ...(started && Date.parse(started) <= Date.parse(lastAt) ? { started } : {}), at: lastAt, result };
+    const last = v.lastRun as Record<string, unknown> | undefined;
+    if (typeof last?.ended === 'string') {
+      const began = iso(last.at), ended = iso(last.endedAt), how = ({ failed: 'failed', stopped: 'stopped' } as Record<string, string>)[last.ended];
+      const result = words([how, words(last.result, 200)].filter(Boolean).join(': '), 200) ?? 'finished';
+      if (began) note.lastRun = ended && Date.parse(began) <= Date.parse(ended) ? { started: began, at: ended, result } : { at: began, result };
+    } else {
+      const lastAt = iso(last?.at), result = words(last?.result, 200), started = iso(last?.started);
+      if (lastAt && result) note.lastRun = { ...(started && Date.parse(started) <= Date.parse(lastAt) ? { started } : {}), at: lastAt, result };
+    }
     return note;
   } catch { return null; }
 }

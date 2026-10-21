@@ -39,8 +39,16 @@
   `scripts/team-src.mjs`: the team's playbook is the /analyse, /settle and /backtest skills, so after editing a skill run
   `npm run agents` again. The team gets no shell: it opens the dashboard with the desk tool `open_dashboard`.
   `scripts/team-files.mjs` is the one list of these files and their text: `npm run agents` writes it, the desk check
-  compares the folder with it (a save in Agent Studio can rewrite the files), and the desk tool `reset_team` writes it
-  back on the person's confirmed yes (`src/desk/agent-files.ts`), touching no other file.
+  compares the folder with it (an edit, or an older Madav, can change the files), and the desk tool `reset_team` writes it
+  back on the person's confirmed yes (`src/desk/agent-files.ts`), every file each time, even one that matches: Madav
+  keeps Agent Studio's changes inside itself and returns to the project's version of a file when that file is written.
+  Touches no other file. Agent files never set `permissionMode` (Madav ignores it in routine runs; the person's choice
+  rules), and each agent's name is in one file only (a name in two files is not started); a test keeps both true.
+- `.claude/routines.json` - the routines the project ships to Madav, each off until the person switches it on: the
+  waiting list (`watch` the doorbell, `listener` the note, the same words as the desk's own listener, `RUN_WORDS`), and
+  the morning and evening routines (`cron`). Madav reads it and never writes it. A change under `.claude`, to
+  `.mcp.json` or to `CLAUDE.md` pauses the routines until the person switches them on again, so nothing written at run
+  time may live there.
 - `src/private.ts` - the one way anything is written into the person's private folder (`paths.ts` `homeDir`): whole,
   and locked to their own account on every system (the file mode on Linux and macOS; on Windows an access list naming
   their account and the system alone, by `icacls`). The desk check reports who can open the folder (`lockState`).
@@ -69,7 +77,10 @@
     `beat` renewed at least once a minute (older than three minutes: not believed). The dashboard says who listens from
     it. `lastRun` is the last run: when it started and ended, and what it did or why it stopped, in plain words. With
     `started`, a stock that run left running reads as failed at once, with the listener's words as its reason (without
-    it, only after two hours).
+    it, only after two hours). Madav's routine writes the same note in its own words, which `readListener` reads too:
+    `{ listening, routine, since, checked, running, lastRun?: { at, ended: "finished"|"failed"|"stopped", endedAt?,
+    result } }`, where `checked` is the heartbeat and `lastRun.at` is when the run started (`endedAt`, when given,
+    when it ended).
 - `src/watch/` - the desk's own listener for Claude Code (`node dist/watch.mjs`): `watcher.ts` keeps the contract above
   (a short wait so several presses make one run, one run at a time with at most one owed, no run when nothing waits,
   stopping when its note is taken away, and making way for an update between runs); `claude.ts` finds Claude Code

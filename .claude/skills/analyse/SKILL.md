@@ -67,7 +67,7 @@ A run of the waiting list is often started with nobody watching: by a routine, o
    - Once its call is recorded, call `finish_queue_item` with the symbol alone: the dashboard shows it done, with its rating.
    - If it cannot be finished, call `finish_queue_item` with `failed_because`: one plain sentence the person reads, saying what went wrong and what to do, then go on with the next. If the plan answers NEEDS_EMAIL, do not ask: fail it with "the desk needs your email for the SEC: give it in a chat, then press Retry", and stop the run, since every stock would fail the same way. A step that fails twice: fail it with which step and why.
 3. Call `end_queue_run` once, at the end, however the run stopped. If stocks are still waiting, it asks for another run.
-4. Reply with one line per stock (the ticker, and its rating or why it failed), then the line `end_queue_run` gave. Nothing here is investment advice, and the desk never trades: the person decides on the dashboard.
+4. Reply with one line per stock (the ticker, and its rating or why it failed), then the line `end_queue_run` gave, then that nothing here is investment advice and the desk never trades: the person decides on the dashboard. End with one short line on its own, the count of this run, for example `2 analysed, 0 failed` (a routine shows the last line as the run's result).
 
 ## Never
 - Never call a broker connection, open Robinhood's site, or call a tool that trades or moves money. Agents in this folder have no such tool, and the guard refuses one.
