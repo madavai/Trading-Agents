@@ -2,8 +2,8 @@
 // scorecard worked out from them, the watchlist, the analyses waiting, and the person's Robinhood accounts on a page of
 // their own. A number that cannot be had is a dash. An order starts only from a ticket - one of the desk's calls
 // (Decide…) or the person's own (Trade…) - and is placed only on their Confirm, with trading switched on by them.
-import { api, ApiError, claimKey, hasKey, KEY_LOST, type CallDetail, type DeskState, type Depth, type History, type LinkInfo, type Market, type Match, type Prefs, type QueueView, type QuoteResult, type Account, type AccountView, type Holding, type Order, type Recent, type Snapshot, type TicketOpen, type Check, type Review, type Placed, type Trading } from './api.js';
-import { heroChart, sparkline } from './chart.js';
+import { api, ApiError, claimKey, hasKey, KEY_LOST, type CallDetail, type DeskState, type Depth, type History, type LinkInfo, type Market, type Match, type Prefs, type PaperView, type PaperTrade, type QueueView, type QuoteResult, type Account, type AccountView, type Holding, type Order, type Recent, type Snapshot, type TicketOpen, type Check, type Review, type Placed, type Trading } from './api.js';
+import { heroChart, paperChart, sparkline } from './chart.js';
 import { barOn, clock, dayText, esc, labelled, money, num, opening, pct, plain, ratingTone, SECTION_NAMES, shortDay, tone } from './fmt.js';
 import { markdown } from './md.js';
 import { isCrypto } from '../../data/symbols.js';
@@ -329,7 +329,10 @@ async function openPicker(): Promise<void> {
 }
 
 // ---------- the trading switch: the person's alone, off until they switch it on ----------
-const TR = { state: null as (Trading & { placedToday?: number }) | null, asking: false };
+const TR = { state: null as (Trading & { placedToday?: number }) | null, asking: false, understood: false };
+/** The desk's record on paper, in one line beside the switch; under four weeks it is young. */
+const young = () => !!S.desk && S.desk.paper.weeks < S.desk.paper.minWeeks;
+const recordLine = () => (S.desk ? `<p class="at-quiet">The desk has ${esc(weeksWords(S.desk.paper))} of record on paper.</p>` : '');
 const tradingOn = () => TR.state?.on === true;
 
 function renderTrading(): void {
@@ -372,10 +375,11 @@ function switchBlock(): string {
     <p class="at-lede">You can place an order from a ticket, from one of the desk's calls (Decide…) or your own (Trade…), in the Agentic account only, within your caps, after Robinhood's check and your Confirm.</p>
     <div class="at-row">${rhButton('tr-off', 'Switch trading off')}</div>`;
   if (!TR.asking) return `<div class="at-card-head"><h3>Trading</h3><span class="at-chip">Off</span></div>
-    <p class="at-lede">With trading off, a ticket can be checked by Robinhood but never placed.</p><div class="at-row">${rhButton('tr-ask', 'Switch trading on…')}</div>`;
+    <p class="at-lede">With trading off, a ticket can be checked by Robinhood but never placed.</p>${recordLine()}<div class="at-row">${rhButton('tr-ask', 'Switch trading on…')}</div>`;
   return `<div class="at-card-head"><h3>Switch trading on?</h3></div>
     <p class="at-lede">From then on, a ticket you open, from one of the desk's calls or your own, can place a real order with real money in your Agentic account. Every order still needs Robinhood's check with no alerts, your caps, and your own Confirm naming the exact order. Keep Robinhood's approval on your phone switched on until you trust the desk. This is not investment advice.</p>
-    <div class="at-row">${rhButton('tr-on', 'Yes, switch trading on', { primary: true })}${rhButton('tr-cancel', 'Cancel')}</div>`;
+    ${recordLine()}${young() ? `<p class="at-honest bad">That is under ${S.desk?.paper.minWeeks ?? 4} weeks: too little to tell whether the desk's calls are any good. Read your paper record first.</p><div class="at-row">${TR.understood ? '<span class="at-chip ok">You understand</span>' : rhButton('tr-understood', 'I understand')}</div>` : ''}
+    <div class="at-row">${young() && !TR.understood ? '' : rhButton('tr-on', 'Yes, switch trading on', { primary: true })}${rhButton('tr-cancel', 'Cancel')}</div>`;
 }
 
 async function loadTrading(): Promise<void> {
@@ -602,7 +606,7 @@ function renderCall(): void {
     el.innerHTML = `${label}<span class="at-quiet ta-callbar-t">No call on ${esc(sym)} yet${isOpen(sym) ? ': it is asked for, see Analyses you asked for' : '. Ask the desk to analyse it, above'}.</span>`;
     return;
   }
-  el.innerHTML = `${label}${ratingChip(c.rating)}<span class="at-quiet">${esc(dayText(c.date))}</span>${resultChip(c)}
+  el.innerHTML = `${label}${ratingChip(c.rating)}<span class="at-quiet">${esc(dayText(c.date))}</span>${resultChip(c)}${paperChip(c.ticker, c.date)}
     <span class="ta-callbar-t ta-clamp" title="${esc(c.summary)}">${esc(c.summary)}</span>
     <span class="ta-callbar-do">${readButton(c.ticker, c.date, 'Read the reasoning')}${decideButton(c.ticker, c.date)}</span>`;
 }
@@ -731,15 +735,53 @@ function renderCalls(): void {
   $('#callsSub').textContent = d.calls.length ? `${d.calls.length} recorded · each is scored ${d.desk.holdingDays} trading days later against its market's index` : 'Every analysis the team records appears here';
   const rows = d.calls.map((c) => `<tr class="ta-go" data-act="open-call" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}" title="Press to read the call in full">
     <td>${esc(dayText(c.date))}</td><td><b>${esc(c.ticker)}</b></td><td>${ratingChip(c.rating)}</td>
-    <td>${resultChip(c)}</td>
+    <td><span class="at-row compact">${resultChip(c)}${paperChip(c.ticker, c.date)}</span></td>
     <td class="wrap"><span class="ta-clamp">${esc(c.summary)}</span></td>
     <td><span class="at-row compact ta-row-do">${readButton(c.ticker, c.date)}${decideButton(c.ticker, c.date)}</span></td></tr>`).join('');
   $('#callsTable').innerHTML = `<thead><tr><th>Date</th><th>Stock</th><th>Rating</th><th>Result</th><th class="wrap">In a few words</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="ta-empty">No calls yet. Ask the team to analyse a stock in Madav / Claude, and its call appears here.</td></tr>'}</tbody>`;
 }
 
+// ---------- the paper record: every call followed with no money at stake ----------
+const PAPER = { book: null as PaperView | null, key: '', editing: false, failed: false };
+const tradeOf = (ticker: string, date: string): PaperTrade | undefined => PAPER.book?.trades.find((t) => t.ticker === ticker && t.callDate === date);
+const PAPER_WORDS: Record<PaperTrade['status'], string> = { filled: 'paper', none: 'paper: no order', waiting: 'paper: next close', unavailable: 'paper: prices unavailable', skipped: 'not on paper' };
+/** A call's paper badge: what following it on paper did. */
+function paperChip(ticker: string, date: string): string {
+  const t = tradeOf(ticker, date);
+  if (!t) return '';
+  if (t.status === 'filled' && t.side === 'buy') return `<span class="at-chip ${tone(t.sincePct === undefined ? null : t.sincePct)}" title="${esc(t.why)}">paper ${t.sincePct === undefined ? 'bought' : pct(t.sincePct * 100)}</span>`;
+  if (t.status === 'filled') return `<span class="at-chip" title="${esc(t.why)}">paper: sold ${esc(String(t.quantity ?? ''))}</span>`;
+  return `<span class="at-chip" title="${esc(t.why)}">${esc(PAPER_WORDS[t.status])}</span>`;
+}
+async function loadPaper(): Promise<void> {
+  try { PAPER.book = await api.paper(); PAPER.failed = false; } catch { PAPER.failed = true; }
+  renderPaper(); renderCalls(); renderCall();
+}
+const weeksWords = (r: { weeks: number; calls: number }) => `${r.weeks} ${r.weeks === 1 ? 'week' : 'weeks'} and ${r.calls} ${r.calls === 1 ? 'call' : 'calls'}`;
+function renderPaper(): void {
+  const d = S.desk, b = PAPER.book;
+  if (!d) return;
+  const start = d.paper.startUsd;
+  $('#paperDo').innerHTML = PAPER.editing
+    ? `<span class="at-row"><label class="at-field"><span class="at-field-l">Paper money to start with, $</span><input class="at-input at-box" id="paperStart" type="number" min="100" max="10000000" step="100" inputmode="numeric" value="${start}"></label><button class="at-btn at-press primary" data-act="paper-save">Save</button><button class="at-btn at-press" data-act="paper-cancel">Cancel</button></span>`
+    : `<span class="at-row"><span class="at-quiet">Paper money ${esc(money(start))}</span><button class="at-btn at-press" data-act="paper-edit">Change…</button></span>`;
+  let lede: string;
+  if (!d.paper.since) lede = "No calls yet: the paper record starts with the desk's first call on a stock or a fund.";
+  else if (!b) lede = PAPER.failed ? 'The paper record could not be worked out just now: Yahoo Finance did not answer. It tries again in a moment.' : 'Working out the paper record from the closing prices.';
+  else if (b.series.length < 2 || b.returnPct === null) lede = `Following the desk on paper since ${dayText(b.since ?? d.paper.since)}: nothing has filled yet. A call fills at the first closing price after its day.`;
+  else lede = `Following the desk on paper since ${dayText(b.since ?? d.paper.since)}: ${pct(b.returnPct * 100)} (${money(b.value)} from ${money(b.startUsd)}), ${b.benchmarkPct === null ? 'the S&P 500 unavailable' : `the S&P 500 ${pct(b.benchmarkPct * 100)}`} over the same days.`;
+  const held = b?.positions.length ? `<p class="at-quiet">On paper now: ${b.positions.map((p) => `${esc(p.ticker)} ${p.quantity}`).join(', ')}, and ${esc(money(b.cash))} in cash.</p>` : '';
+  $('#paperCard').innerHTML = `<div class="at-card-head"><h3>Your paper record</h3><span class="at-chip">${esc(weeksWords(d.paper))} of record</span></div>
+    <p class="at-lede">${esc(lede)}</p>${b && b.series.length > 1 ? '<div class="ta-spark-tall" id="paperChart"></div><p class="at-quiet">The solid line is the paper money; the dashed one is the S&amp;P 500 from the same start.</p>' : ''}${held}
+    <p class="at-honest">Every call on a stock or a fund is followed as its order ticket would size it, and fills at the first closing price after its day. No costs are counted (Robinhood charges no commission). A few weeks of record are noise, not proof, and nothing here is investment advice.</p>`;
+  const el = document.getElementById('paperChart');
+  if (el && b) paperChart(el, b.series);
+}
+
 function renderScore(): void {
   const d = S.desk;
   if (!d) return;
+  renderPaper();
   const r = d.record.summary, pctOf = (v: number) => `${v >= 0 ? '+' : '−'}${Math.abs(v * 100).toFixed(1)}%`;
   $('#scoreSub').textContent = `${r.resolved} scored · ${r.pending} waiting${r.unscored ? ` · ${r.unscored} unreadable` : ''}`;
   const names = [...RATINGS.filter((x) => r.byRating[x]), ...Object.keys(r.byRating).filter((x) => !RATINGS.includes(x))];
@@ -879,6 +921,8 @@ async function refreshState(): Promise<void> {
     const before = S.desk?.queue;
     S.desk = await api.state(); S.lost = false;
     noticeFinished(before, S.desk.queue);
+    const pk = `${S.desk.today}|${S.desk.paper.startUsd}|${S.desk.calls.map((c) => `${c.ticker}${c.date}${c.rating}`).join(',')}`;
+    if (pk !== PAPER.key) { PAPER.key = pk; void loadPaper(); }
     const watch = S.desk.watchlist.map((w) => w.symbol);
     const shown = (s: string | undefined): s is string => !!s && (watch.includes(s) || isIndex(s));
     if (!shown(S.symbol)) {
@@ -993,9 +1037,13 @@ document.addEventListener('click', (e) => {
     case 'tk-place': T.confirming = true; renderTicketDyn(); break;
     case 'tk-back': T.confirming = false; renderTicketDyn(); break;
     case 'tk-confirm': void placeTicket(); break;
-    case 'tr-ask': TR.asking = true; renderAccount(); break;
+    case 'tr-ask': TR.asking = true; TR.understood = false; renderAccount(); break;
+    case 'tr-understood': TR.understood = true; renderAccount(); break;
+    case 'paper-edit': PAPER.editing = true; renderPaper(); break;
+    case 'paper-cancel': PAPER.editing = false; renderPaper(); break;
+    case 'paper-save': void run(async () => { PAPER.book = await api.setPaperStart(Number($<HTMLInputElement>('#paperStart').value)); PAPER.editing = false; await refreshState(); toast('The paper record is worked out again with the new starting money.'); }); break;
     case 'tr-cancel': TR.asking = false; renderAccount(); break;
-    case 'tr-on': void run(async () => { TR.state = await api.setTrading(true); TR.asking = false; renderTrading(); renderAccount(); toast('Trading is switched on. Every order still needs your Confirm.'); }); break;
+    case 'tr-on': void run(async () => { TR.state = await api.setTrading(true, TR.understood); TR.asking = false; TR.understood = false; renderTrading(); renderAccount(); toast('Trading is switched on. Every order still needs your Confirm.'); }); break;
     case 'tr-off': void run(async () => { TR.state = await api.setTrading(false); renderTrading(); renderAccount(); renderTicketDyn(); toast('Trading is switched off.'); }); break;
     case 'caps-edit': CAPS.editing = true; renderAccount(); break;
     case 'caps-cancel': CAPS.editing = false; renderAccount(); break;

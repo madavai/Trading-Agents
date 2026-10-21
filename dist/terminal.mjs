@@ -3263,8 +3263,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path19) {
-      let input = path19;
+    function removeDotSegments(path20) {
+      let input = path20;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3673,8 +3673,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path19 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path19 && path19 !== "/" ? path19 : void 0;
+        const path20 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path20 && path20 !== "/" ? path20 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -7187,12 +7187,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list2, fs19, exportName) {
+    function addFormats(ajv, list2, fs20, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list2)
-        ajv.addFormat(f, fs19[f]);
+        ajv.addFormat(f, fs20[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -7305,9 +7305,9 @@ var require_content_type = __commonJS({
 });
 
 // src/terminal/main.ts
-import fs18 from "node:fs";
+import fs19 from "node:fs";
 import http3 from "node:http";
-import path18 from "node:path";
+import path19 from "node:path";
 import { spawn as spawn2 } from "node:child_process";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
@@ -7522,9 +7522,9 @@ async function getJson(url2, opts = {}) {
 
 // src/terminal/server.ts
 import crypto6 from "node:crypto";
-import fs17 from "node:fs";
+import fs18 from "node:fs";
 import http2 from "node:http";
-import path17 from "node:path";
+import path18 from "node:path";
 import { fileURLToPath } from "node:url";
 
 // src/data/dates.ts
@@ -7533,6 +7533,7 @@ function today() {
   return process.env.TRADING_AGENTS_TODAY || (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
 }
 var addDays = (date4, days) => new Date(Date.parse(`${date4}T00:00:00Z`) + days * DAY).toISOString().slice(0, 10);
+var daysBetween = (from, to) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY);
 
 // src/data/symbols.ts
 var FOREX = /* @__PURE__ */ new Set(["USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD", "CNY", "CNH", "HKD", "SGD", "SEK", "NOK", "DKK", "PLN", "MXN", "ZAR", "TRY", "INR", "KRW", "BRL", "RUB", "THB"]);
@@ -7655,14 +7656,230 @@ async function daily(raw, from, to) {
 }
 var clearCache = () => cache.clear();
 
+// src/desk/paper.ts
+import fs4 from "node:fs";
+import path4 from "node:path";
+
+// src/desk/ticket.ts
+var money = (n) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+var cents = (n) => Math.round(n * 100) / 100;
+var actionOf = (rating, t2) => t2.ratingToOrder[rating] ?? "no order";
+function propose(c, t2, caps) {
+  const action = actionOf(c.rating, t2), why = [];
+  const none = (reason) => ({ action, order: null, why: [...why, reason] });
+  if (action === "no order") return none(`The desk rated ${c.symbol} ${c.rating}: your settings place no order for that rating.`);
+  if (c.price === null || c.price <= 0) return none(`Robinhood gave no live price for ${c.symbol}, so no order can be sized.`);
+  const limitPrice = cents(c.price);
+  why.push(`Limit price: Robinhood's live price, ${money(limitPrice)}. You can change it.`);
+  if (action === "sell half of what is held" || action === "sell everything held") {
+    if (c.held <= 0) return none(`The desk rated ${c.symbol} ${c.rating}, but the Agentic account holds none to sell.`);
+    const quantity2 = Math.floor(action === "sell everything held" ? c.held : c.held / 2);
+    if (quantity2 < 1) return none(`The Agentic account holds ${c.held} share(s); half of that is less than one whole share, and a limit order sells whole shares only.`);
+    why.push(`${action === "sell everything held" ? "Everything held" : "Half of what is held"}: ${quantity2} of ${c.held} share(s), whole shares only.`);
+    return { action, order: { symbol: c.symbol, side: "sell", quantity: quantity2, limitPrice, timeInForce: t2.orderDefaults.timeInForce }, why };
+  }
+  if (c.accountValue === null || c.accountValue <= 0) return none("Robinhood gave no total value for the Agentic account, so a position cannot be sized.");
+  if (c.buyingPower === null) return none("Robinhood gave no buying power for the Agentic account, so a buy cannot be sized.");
+  const share = action === "buy a full position" ? t2.fullPositionPercent : t2.fullPositionPercent / 2;
+  const target = c.accountValue * share / 100;
+  why.push(`${action === "buy a full position" ? "A full position" : "Half a position"}: ${share}% of the account's ${money(c.accountValue)} is ${money(target)}.`);
+  let amount = target;
+  if (amount > caps.perOrderUsd) {
+    amount = caps.perOrderUsd;
+    why.push(`Your cap of ${money(caps.perOrderUsd)} an order makes it ${money(amount)}.`);
+  }
+  if (amount > c.buyingPower) {
+    amount = c.buyingPower;
+    why.push(`Buying power is ${money(c.buyingPower)}, so at most that.`);
+  }
+  const quantity = Math.floor(amount / limitPrice);
+  if (quantity < 1) return none(`${money(amount)} buys less than one share at ${money(limitPrice)}, and a limit order buys whole shares only.`);
+  why.push(`${money(amount)} \xF7 ${money(limitPrice)}, rounded down: ${quantity} share(s).`);
+  return { action, order: { symbol: c.symbol, side: "buy", quantity, limitPrice, timeInForce: t2.orderDefaults.timeInForce }, why };
+}
+function proposeOwn(c, side, t2) {
+  const action = side === "buy" ? "your own buy" : "your own sell";
+  const none = (reason) => ({ action, order: null, why: [reason] });
+  if (c.price === null || c.price <= 0) return none(`Robinhood gave no live price for ${c.symbol}, so no order can be priced.`);
+  if (side === "sell" && c.held <= 0) return none(`The Agentic account holds no ${c.symbol} to sell.`);
+  if (side === "sell" && c.held < 1) return none(`The Agentic account holds ${c.held} of a share of ${c.symbol}; a limit order sells whole shares only.`);
+  const limitPrice = cents(c.price);
+  const why = [`Your own order: one whole share to start, at Robinhood's live price of ${money(limitPrice)}. Change the shares and the limit price below.`];
+  if (side === "sell") why.push(`The Agentic account holds ${c.held} share(s) of ${c.symbol}.`);
+  return { action, order: { symbol: c.symbol, side, quantity: 1, limitPrice, timeInForce: t2.orderDefaults.timeInForce }, why };
+}
+function check(o, c, t2, caps) {
+  const out = [];
+  const add = (ok, words4) => out.push({ ok, words: words4 });
+  add(Number.isInteger(o.quantity) && o.quantity >= 1 && o.quantity <= 1e5, Number.isInteger(o.quantity) && o.quantity >= 1 ? `${o.quantity} whole share(s)` : "The quantity must be a whole number of shares, at least one");
+  const priceOk = Number.isFinite(o.limitPrice) && o.limitPrice > 0 && cents(o.limitPrice) === o.limitPrice;
+  add(priceOk, priceOk ? `Limit price ${money(o.limitPrice)}` : "The limit price must be above zero, in dollars and cents");
+  if (!out.every((x) => x.ok)) return out;
+  if (c.price !== null && c.price > 0) {
+    const off = Math.abs(o.limitPrice / c.price - 1) * 100;
+    add(off <= 10, off <= 10 ? `${off.toFixed(1)}% from Robinhood's live price` : `${off.toFixed(1)}% from Robinhood's live price of ${money(c.price)}: more than 10% away, which looks like a typing slip`);
+  } else add(false, `Robinhood gave no live price for ${o.symbol} to check the limit against`);
+  const cost = cents(o.quantity * o.limitPrice);
+  if (o.side === "buy") {
+    add(cost <= caps.perOrderUsd, cost <= caps.perOrderUsd ? `${money(cost)} is within your cap of ${money(caps.perOrderUsd)} an order` : `${money(cost)} is over your cap of ${money(caps.perOrderUsd)} an order`);
+    if (c.buyingPower === null) add(false, "Robinhood gave no buying power for the Agentic account");
+    else add(cost <= c.buyingPower, cost <= c.buyingPower ? `Buying power ${money(c.buyingPower)} covers it` : `Buying power is ${money(c.buyingPower)}: not enough`);
+    if (c.accountValue === null || c.accountValue <= 0) add(false, "Robinhood gave no total value for the Agentic account to check your per-stock cap");
+    else {
+      const after = (c.held + o.quantity) * o.limitPrice / c.accountValue * 100;
+      add(after <= caps.perStockPercent, `${o.symbol} would be ${after.toFixed(1)}% of the account; your cap is ${caps.perStockPercent}%`);
+    }
+  } else add(o.quantity <= c.held, o.quantity <= c.held ? `Selling ${o.quantity} of the ${c.held} held` : `Only ${c.held} share(s) are held in the Agentic account`);
+  add(c.ordersToday < caps.ordersPerDay, `${c.ordersToday} of your ${caps.ordersPerDay} orders a day used`);
+  return out;
+}
+var passes = (checks) => checks.length > 0 && checks.every((x) => x.ok);
+
+// src/desk/paper.ts
+var PAPER_START_USD = 1e4;
+var PAPER_MIN = 100;
+var PAPER_MAX = 1e7;
+var RECORD_WEEKS = 4;
+var cents2 = (n) => Math.round(n * 100) / 100;
+var followed = (ticker) => !/[\^=]/.test(ticker) && !isCrypto(ticker);
+function recordOf(calls, today2) {
+  const mine = calls.filter((c) => followed(c.ticker) && c.date <= today2);
+  const since = mine.map((c) => c.date).sort()[0] ?? null;
+  return { since, weeks: since ? Math.floor(daysBetween(since, today2) / 7) : 0, calls: mine.length };
+}
+var closeOn = (rows, date4) => {
+  let last = null;
+  for (const r of rows ?? []) {
+    if (r.date > date4) break;
+    last = r.close;
+  }
+  return last;
+};
+function paperBook(calls, closes, o) {
+  const benchmark = o.benchmark ?? "SPY";
+  const ordered = [...calls].filter((c) => c.date <= o.today).sort((a, b) => a.date.localeCompare(b.date));
+  const trades = [];
+  const fills = [];
+  for (const c of ordered) {
+    const base2 = { ticker: c.ticker, callDate: c.date, rating: c.rating };
+    if (!followed(c.ticker)) {
+      trades.push({ ...base2, status: "skipped", why: "Paper follows stocks and funds; crypto and indices come later." });
+      continue;
+    }
+    if (actionOf(c.rating, o.trading) === "no order") {
+      trades.push({ ...base2, status: "none", why: `A ${c.rating} call asks for no order.` });
+      continue;
+    }
+    const rows = closes[c.ticker];
+    if (!rows) {
+      trades.push({ ...base2, status: "unavailable", why: `Prices for ${c.ticker} could not be read just now.` });
+      continue;
+    }
+    const next2 = rows.find((r) => r.date > c.date && r.date <= o.today);
+    if (!next2) {
+      trades.push({ ...base2, status: "waiting", why: "Waits for the first closing price after the call." });
+      continue;
+    }
+    const t2 = { ...base2, status: "none", why: "" };
+    trades.push(t2);
+    fills.push({ trade: t2, date: next2.date, price: next2.close });
+  }
+  fills.sort((a, b) => a.date.localeCompare(b.date));
+  let cash = o.startUsd;
+  const held = /* @__PURE__ */ new Map();
+  const worth = (date4) => {
+    let v = cash;
+    for (const [ticker, h] of held) v += h.quantity * (closeOn(closes[ticker], date4) ?? h.cost / (h.quantity || 1));
+    return v;
+  };
+  const apply = (f, ordersThatDay) => {
+    const h = held.get(f.trade.ticker) ?? { quantity: 0, cost: 0 };
+    const context = { symbol: f.trade.ticker, rating: f.trade.rating, callDate: f.trade.callDate, accountValue: cents2(worth(f.date)), buyingPower: cents2(cash), held: h.quantity, price: f.price, ordersToday: ordersThatDay };
+    const p = propose(context, o.trading, o.caps);
+    if (!p.order) {
+      f.trade.why = p.why.at(-1) ?? "No order.";
+      return;
+    }
+    const failing = check(p.order, context, o.trading, o.caps);
+    if (!passes(failing)) {
+      f.trade.why = `Its order would not pass: ${failing.filter((x) => !x.ok).map((x) => x.words).join("; ")}.`;
+      return;
+    }
+    const { side, quantity, limitPrice } = p.order, amount = cents2(quantity * limitPrice);
+    if (side === "buy") {
+      cash = cents2(cash - amount);
+      held.set(f.trade.ticker, { quantity: h.quantity + quantity, cost: cents2(h.cost + amount) });
+    } else {
+      const left = h.quantity - quantity;
+      cash = cents2(cash + amount);
+      if (left > 0) held.set(f.trade.ticker, { quantity: left, cost: cents2(h.cost * (left / h.quantity)) });
+      else held.delete(f.trade.ticker);
+    }
+    Object.assign(f.trade, { status: "filled", side, quantity, price: limitPrice, fillDate: f.date, why: `${side === "buy" ? "Bought" : "Sold"} ${quantity} at the close of ${f.date}.` });
+  };
+  const since = ordered.find((c) => followed(c.ticker))?.date ?? null;
+  const bench = closes[benchmark] ?? [];
+  const days = since ? [.../* @__PURE__ */ new Set([...bench.map((r) => r.date), ...fills.map((f) => f.date)])].filter((d) => d >= since && d <= o.today).sort() : [];
+  const benchStart = since ? closeOn(bench, days[0] ?? since) : null;
+  const series = [];
+  let next = 0;
+  for (const d of days) {
+    let that = 0;
+    while (next < fills.length && fills[next].date <= d) apply(fills[next++], that++);
+    const b = closeOn(bench, d);
+    series.push({ date: d, value: cents2(worth(d)), benchmark: b !== null && benchStart ? cents2(o.startUsd * b / benchStart) : null });
+  }
+  while (next < fills.length) apply(fills[next++], 0);
+  const latest = series.at(-1)?.date ?? o.today;
+  const positions = [...held].map(([ticker, h]) => {
+    const price = closeOn(closes[ticker], latest) ?? h.cost / h.quantity;
+    return { ticker, quantity: h.quantity, cost: h.cost, price, value: cents2(h.quantity * price) };
+  });
+  for (const t2 of trades) if (t2.status === "filled" && t2.side === "buy" && t2.price) {
+    const now = closeOn(closes[t2.ticker], latest);
+    if (now !== null) t2.sincePct = now / t2.price - 1;
+  }
+  const value = cents2(cash + positions.reduce((a, p) => a + p.value, 0));
+  const lastBench = series.at(-1)?.benchmark ?? null;
+  return {
+    startUsd: o.startUsd,
+    since,
+    cash,
+    value,
+    positions,
+    series,
+    trades: trades.reverse(),
+    // newest call first, as the page lists them
+    returnPct: since ? value / o.startUsd - 1 : null,
+    benchmarkPct: lastBench !== null ? lastBench / o.startUsd - 1 : null,
+    benchmark
+  };
+}
+var paperFile = (dir) => path4.join(dir, "paper.json");
+var whole = (v) => Number.isInteger(v) && v >= PAPER_MIN && v <= PAPER_MAX ? v : null;
+function readPaperStart(dir) {
+  try {
+    return whole(JSON.parse(fs4.readFileSync(paperFile(dir), "utf8")).startUsd) ?? PAPER_START_USD;
+  } catch {
+    return PAPER_START_USD;
+  }
+}
+function savePaperStart(dir, raw) {
+  const v = whole(raw);
+  if (v === null) throw new Error(`the paper money is a whole number of dollars from $${PAPER_MIN} to $${PAPER_MAX.toLocaleString("en-US")}`);
+  fs4.mkdirSync(dir, { recursive: true });
+  writeWhole(paperFile(dir), JSON.stringify({ startUsd: v }, null, 2) + "\n");
+  return v;
+}
+
 // src/private.ts
 import { spawnSync } from "node:child_process";
-import fs4 from "node:fs";
+import fs5 from "node:fs";
 import os2 from "node:os";
-import path4 from "node:path";
+import path5 from "node:path";
 var SYSTEM = "*S-1-5-18";
 var owner = null;
-var windowsTool = (exe) => path4.join(process.env.SystemRoot ?? process.env.windir ?? "C:\\Windows", "System32", exe);
+var windowsTool = (exe) => path5.join(process.env.SystemRoot ?? process.env.windir ?? "C:\\Windows", "System32", exe);
 function ownerOnWindows() {
   if (owner) return owner;
   const r = spawnSync(windowsTool("whoami.exe"), ["/user", "/fo", "csv", "/nh"], { encoding: "utf8", windowsHide: true, timeout: 5e3 });
@@ -7677,13 +7894,13 @@ var lockArgs = (target, folder2, who) => {
 function lockDown(target) {
   let folder2;
   try {
-    folder2 = fs4.statSync(target).isDirectory();
+    folder2 = fs5.statSync(target).isDirectory();
   } catch {
     return false;
   }
   if (process.platform !== "win32") {
     try {
-      fs4.chmodSync(target, folder2 ? 448 : 384);
+      fs5.chmodSync(target, folder2 ? 448 : 384);
       return true;
     } catch {
       return false;
@@ -7694,22 +7911,22 @@ function lockDown(target) {
 }
 var lockedFolders = /* @__PURE__ */ new Set();
 function writePrivate(file4, text2) {
-  const folder2 = path4.dirname(file4);
-  fs4.mkdirSync(folder2, { recursive: true, mode: 448 });
+  const folder2 = path5.dirname(file4);
+  fs5.mkdirSync(folder2, { recursive: true, mode: 448 });
   if (!lockedFolders.has(folder2)) {
     lockDown(folder2);
     lockedFolders.add(folder2);
   }
   const tmp = `${file4}.${process.pid}.tmp`;
-  fs4.writeFileSync(tmp, text2, { mode: 384 });
-  fs4.renameSync(tmp, file4);
+  fs5.writeFileSync(tmp, text2, { mode: 384 });
+  fs5.renameSync(tmp, file4);
   lockDown(file4);
 }
 
 // src/robinhood/link.ts
 import crypto4 from "node:crypto";
-import fs7 from "node:fs";
-import path6 from "node:path";
+import fs8 from "node:fs";
+import path7 from "node:path";
 
 // src/robinhood/account.ts
 import crypto from "node:crypto";
@@ -7839,8 +8056,8 @@ async function readAccount(reader, account, ids) {
 }
 
 // src/settings.ts
-import fs5 from "node:fs";
-import path5 from "node:path";
+import fs6 from "node:fs";
+import path6 from "node:path";
 var ANALYSTS = ["market", "sentiment", "news", "fundamentals"];
 var ACTIONS = ["buy a full position", "buy half a position", "no order", "sell half of what is held", "sell everything held"];
 var DEFAULT_CAPS = { perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 3 };
@@ -7883,7 +8100,7 @@ function capsOf(raw) {
 }
 function capsFrom(raw) {
   const c = raw && typeof raw === "object" ? raw : {}, r = CAP_RANGES;
-  const n = (v, [lo, hi], whole = false) => typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi && (!whole || Number.isInteger(v)) ? v : null;
+  const n = (v, [lo, hi], whole2 = false) => typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi && (!whole2 || Number.isInteger(v)) ? v : null;
   const perOrderUsd = n(c.perOrderUsd, r.perOrderUsd), perStockPercent = n(c.perStockPercent, r.perStockPercent), ordersPerDay = n(c.ordersPerDay, r.ordersPerDay, true);
   return perOrderUsd === null || perStockPercent === null || ordersPerDay === null ? null : { perOrderUsd: Math.round(perOrderUsd * 100) / 100, perStockPercent: Math.round(perStockPercent * 10) / 10, ordersPerDay };
 }
@@ -7909,7 +8126,7 @@ function languageName(v, fallback = "English") {
 function readSettings(root2) {
   let raw = {};
   try {
-    raw = JSON.parse(fs5.readFileSync(path5.join(root2, "desk-settings.json"), "utf8"));
+    raw = JSON.parse(fs6.readFileSync(path6.join(root2, "desk-settings.json"), "utf8"));
   } catch {
   }
   const a = { ...DEFAULTS.analysis, ...raw.analysis }, s = { ...DEFAULTS.scoring, ...raw.scoring }, j = { ...DEFAULTS.journal, ...raw.journal };
@@ -8177,10 +8394,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj4, path19) {
-  if (!path19)
+function getElementAtPath(obj4, path20) {
+  if (!path20)
     return obj4;
-  return path19.reduce((acc, key) => acc?.[key], obj4);
+  return path20.reduce((acc, key) => acc?.[key], obj4);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -8520,11 +8737,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path19, issues) {
+function prefixIssues(path20, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path19);
+    iss.path.unshift(path20);
     return iss;
   });
 }
@@ -8985,16 +9202,16 @@ function flattenError(error2, mapper = (issue2) => issue2.message) {
 }
 function formatError(error2, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error3, path19 = []) => {
+  const processError = (error3, path20 = []) => {
     for (const issue2 of error3.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path19, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path20, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path19, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path20, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path19, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path20, ...issue2.path]);
       } else {
-        const fullpath = [...path19, ...issue2.path];
+        const fullpath = [...path20, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -17977,10 +18194,10 @@ function redirectTarget(response, requestUrl) {
     return void 0;
   }
 }
-function followWithinOrigin(baseFetch, url2, init, response, followed = 0) {
+function followWithinOrigin(baseFetch, url2, init, response, followed2 = 0) {
   const target = redirectTarget(response, url2);
   const keepsMethod = response.status === 307 || response.status === 308 || (init?.method ?? "GET").toUpperCase() === "GET";
-  if (!target || followed === MAX_REDIRECTS || !keepsMethod) {
+  if (!target || followed2 === MAX_REDIRECTS || !keepsMethod) {
     return void 0;
   }
   const from = new URL(url2);
@@ -17988,7 +18205,7 @@ function followWithinOrigin(baseFetch, url2, init, response, followed = 0) {
   if (addsUserinfo || !isWithinOrigin(from, target)) {
     return void 0;
   }
-  return Promise.resolve(response.body?.cancel()).then(() => baseFetch(target, { ...init, redirect: "manual" })).then((next) => followWithinOrigin(baseFetch, target, init, next, followed + 1) ?? next);
+  return Promise.resolve(response.body?.cancel()).then(() => baseFetch(target, { ...init, redirect: "manual" })).then((next) => followWithinOrigin(baseFetch, target, init, next, followed2 + 1) ?? next);
 }
 var followingFetches = /* @__PURE__ */ new WeakSet();
 function fetchLeavingRedirects(baseFetch) {
@@ -19217,9 +19434,9 @@ var StreamableHTTPClientTransport = class {
       const fetchFn = this._fetch ?? fetch;
       const init = { method: "GET", headers, signal: this._abortController?.signal };
       let response = await fetchFn(this._url, this._followRedirects ? init : { ...init, redirect: "manual" });
-      const followed = this._followRedirects ? void 0 : followWithinOrigin(fetchFn, this._url, init, response);
-      if (followed) {
-        response = await followed;
+      const followed2 = this._followRedirects ? void 0 : followWithinOrigin(fetchFn, this._url, init, response);
+      if (followed2) {
+        response = await followed2;
       }
       if (!response.ok) {
         await response.body?.cancel();
@@ -19540,10 +19757,10 @@ var StreamableHTTPClientTransport = class {
 
 // src/robinhood/store.ts
 import crypto3 from "node:crypto";
-import fs6 from "node:fs";
+import fs7 from "node:fs";
 function readSaved(file4) {
   try {
-    return JSON.parse(fs6.readFileSync(file4, "utf8"));
+    return JSON.parse(fs7.readFileSync(file4, "utf8"));
   } catch {
     return {};
   }
@@ -19916,11 +20133,11 @@ var Link = class {
   refreshing = null;
   /** Which accounts the person ticked, kept beside the sign-in as keys (never account numbers). */
   get choiceFile() {
-    return path6.join(path6.dirname(this.file), "accounts.json");
+    return path7.join(path7.dirname(this.file), "accounts.json");
   }
   chosen() {
     try {
-      const v = JSON.parse(fs7.readFileSync(this.choiceFile, "utf8"));
+      const v = JSON.parse(fs8.readFileSync(this.choiceFile, "utf8"));
       return Array.isArray(v.show) ? v.show.filter((k) => typeof k === "string") : [];
     } catch {
       return [];
@@ -19937,11 +20154,11 @@ var Link = class {
   /** The secret the account fingerprints are made with: random, made once on this computer and kept beside the sign-in.
    *  Without it a fingerprint says nothing about the account number, even to someone who knows the number. */
   get secretFile() {
-    return path6.join(path6.dirname(this.file), "secrets.json");
+    return path7.join(path7.dirname(this.file), "secrets.json");
   }
   secret() {
     try {
-      const v = JSON.parse(fs7.readFileSync(this.secretFile, "utf8"));
+      const v = JSON.parse(fs8.readFileSync(this.secretFile, "utf8"));
       if (typeof v.fingerprint === "string" && /^[0-9a-f]{64}$/.test(v.fingerprint)) return v.fingerprint;
     } catch {
     }
@@ -20006,12 +20223,12 @@ var Link = class {
   /** Whether the person has switched trading on, on the dashboard, and their caps. Kept together beside the sign-in, where
    *  agents are refused: a cap missing or out of range is the shipped one, never a larger one. */
   get switchFile() {
-    return path6.join(path6.dirname(this.file), "trading.json");
+    return path7.join(path7.dirname(this.file), "trading.json");
   }
   trading() {
     let v = {};
     try {
-      v = JSON.parse(fs7.readFileSync(this.switchFile, "utf8"));
+      v = JSON.parse(fs8.readFileSync(this.switchFile, "utf8"));
     } catch {
     }
     return { on: v.on === true, since: v.on === true && typeof v.since === "string" ? v.since : null, caps: capsOf(v.caps) };
@@ -20146,9 +20363,9 @@ var Link = class {
   }
   /** Deletes the saved sign-in. Robinhood is not told; the person can also end the access on Robinhood's side. */
   forget() {
-    fs7.rmSync(this.file, { force: true });
-    fs7.rmSync(this.choiceFile, { force: true });
-    if (fs7.existsSync(this.switchFile)) this.setTrading(false);
+    fs8.rmSync(this.file, { force: true });
+    fs8.rmSync(this.choiceFile, { force: true });
+    if (fs8.existsSync(this.switchFile)) this.setTrading(false);
     this.last = null;
     this.last_snapshot = null;
     this.known = null;
@@ -20158,9 +20375,9 @@ var Link = class {
 };
 
 // src/desk/holdings.ts
-import fs8 from "node:fs";
-import path7 from "node:path";
-var file2 = (dir) => path7.join(dir, "holdings.json");
+import fs9 from "node:fs";
+import path8 from "node:path";
+var file2 = (dir) => path8.join(dir, "holdings.json");
 var finite = (v) => typeof v === "number" && Number.isFinite(v) ? v : void 0;
 function saveAccountHoldings(dir, accounts, today2) {
   let leftOut = 0;
@@ -20186,23 +20403,23 @@ function saveAccountHoldings(dir, accounts, today2) {
   }));
   const tradable = clean.find((a) => a.tradable);
   const saved = { positions: tradable?.positions ?? [], ...tradable?.cash === void 0 ? {} : { cash: tradable.cash }, ...tradable?.currency ? { currency: tradable.currency } : {}, source: "robinhood", savedOn: today2, accounts: clean };
-  fs8.mkdirSync(dir, { recursive: true });
+  fs9.mkdirSync(dir, { recursive: true });
   writeWhole(file2(dir), JSON.stringify(saved, null, 2) + "\n");
   return { saved, leftOut };
 }
 
 // src/desk/orders.ts
-import fs9 from "node:fs";
-import path8 from "node:path";
-var file3 = (dir) => path8.join(dir, "orders.jsonl");
+import fs10 from "node:fs";
+import path9 from "node:path";
+var file3 = (dir) => path9.join(dir, "orders.jsonl");
 var marketDay = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(d);
 function logOrder(dir, line) {
-  fs9.mkdirSync(dir, { recursive: true });
-  fs9.appendFileSync(file3(dir), JSON.stringify(line) + "\n");
+  fs10.mkdirSync(dir, { recursive: true });
+  fs10.appendFileSync(file3(dir), JSON.stringify(line) + "\n");
 }
 function readOrders(dir) {
   try {
-    return fs9.readFileSync(file3(dir), "utf8").split("\n").flatMap((l) => {
+    return fs10.readFileSync(file3(dir), "utf8").split("\n").flatMap((l) => {
       try {
         const v = JSON.parse(l);
         return v && typeof v.at === "string" && typeof v.symbol === "string" && v.robinhood ? [v] : [];
@@ -20217,84 +20434,9 @@ function readOrders(dir) {
 var ordersOn = (dir, now) => readOrders(dir).filter((o) => marketDay(new Date(o.at)) === marketDay(now));
 var placedToday = (dir, now) => ordersOn(dir, now).length;
 
-// src/desk/ticket.ts
-var money = (n) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-var cents = (n) => Math.round(n * 100) / 100;
-var actionOf = (rating, t2) => t2.ratingToOrder[rating] ?? "no order";
-function propose(c, t2, caps) {
-  const action = actionOf(c.rating, t2), why = [];
-  const none = (reason) => ({ action, order: null, why: [...why, reason] });
-  if (action === "no order") return none(`The desk rated ${c.symbol} ${c.rating}: your settings place no order for that rating.`);
-  if (c.price === null || c.price <= 0) return none(`Robinhood gave no live price for ${c.symbol}, so no order can be sized.`);
-  const limitPrice = cents(c.price);
-  why.push(`Limit price: Robinhood's live price, ${money(limitPrice)}. You can change it.`);
-  if (action === "sell half of what is held" || action === "sell everything held") {
-    if (c.held <= 0) return none(`The desk rated ${c.symbol} ${c.rating}, but the Agentic account holds none to sell.`);
-    const quantity2 = Math.floor(action === "sell everything held" ? c.held : c.held / 2);
-    if (quantity2 < 1) return none(`The Agentic account holds ${c.held} share(s); half of that is less than one whole share, and a limit order sells whole shares only.`);
-    why.push(`${action === "sell everything held" ? "Everything held" : "Half of what is held"}: ${quantity2} of ${c.held} share(s), whole shares only.`);
-    return { action, order: { symbol: c.symbol, side: "sell", quantity: quantity2, limitPrice, timeInForce: t2.orderDefaults.timeInForce }, why };
-  }
-  if (c.accountValue === null || c.accountValue <= 0) return none("Robinhood gave no total value for the Agentic account, so a position cannot be sized.");
-  if (c.buyingPower === null) return none("Robinhood gave no buying power for the Agentic account, so a buy cannot be sized.");
-  const share = action === "buy a full position" ? t2.fullPositionPercent : t2.fullPositionPercent / 2;
-  const target = c.accountValue * share / 100;
-  why.push(`${action === "buy a full position" ? "A full position" : "Half a position"}: ${share}% of the account's ${money(c.accountValue)} is ${money(target)}.`);
-  let amount = target;
-  if (amount > caps.perOrderUsd) {
-    amount = caps.perOrderUsd;
-    why.push(`Your cap of ${money(caps.perOrderUsd)} an order makes it ${money(amount)}.`);
-  }
-  if (amount > c.buyingPower) {
-    amount = c.buyingPower;
-    why.push(`Buying power is ${money(c.buyingPower)}, so at most that.`);
-  }
-  const quantity = Math.floor(amount / limitPrice);
-  if (quantity < 1) return none(`${money(amount)} buys less than one share at ${money(limitPrice)}, and a limit order buys whole shares only.`);
-  why.push(`${money(amount)} \xF7 ${money(limitPrice)}, rounded down: ${quantity} share(s).`);
-  return { action, order: { symbol: c.symbol, side: "buy", quantity, limitPrice, timeInForce: t2.orderDefaults.timeInForce }, why };
-}
-function proposeOwn(c, side, t2) {
-  const action = side === "buy" ? "your own buy" : "your own sell";
-  const none = (reason) => ({ action, order: null, why: [reason] });
-  if (c.price === null || c.price <= 0) return none(`Robinhood gave no live price for ${c.symbol}, so no order can be priced.`);
-  if (side === "sell" && c.held <= 0) return none(`The Agentic account holds no ${c.symbol} to sell.`);
-  if (side === "sell" && c.held < 1) return none(`The Agentic account holds ${c.held} of a share of ${c.symbol}; a limit order sells whole shares only.`);
-  const limitPrice = cents(c.price);
-  const why = [`Your own order: one whole share to start, at Robinhood's live price of ${money(limitPrice)}. Change the shares and the limit price below.`];
-  if (side === "sell") why.push(`The Agentic account holds ${c.held} share(s) of ${c.symbol}.`);
-  return { action, order: { symbol: c.symbol, side, quantity: 1, limitPrice, timeInForce: t2.orderDefaults.timeInForce }, why };
-}
-function check(o, c, t2, caps) {
-  const out = [];
-  const add = (ok, words4) => out.push({ ok, words: words4 });
-  add(Number.isInteger(o.quantity) && o.quantity >= 1 && o.quantity <= 1e5, Number.isInteger(o.quantity) && o.quantity >= 1 ? `${o.quantity} whole share(s)` : "The quantity must be a whole number of shares, at least one");
-  const priceOk = Number.isFinite(o.limitPrice) && o.limitPrice > 0 && cents(o.limitPrice) === o.limitPrice;
-  add(priceOk, priceOk ? `Limit price ${money(o.limitPrice)}` : "The limit price must be above zero, in dollars and cents");
-  if (!out.every((x) => x.ok)) return out;
-  if (c.price !== null && c.price > 0) {
-    const off = Math.abs(o.limitPrice / c.price - 1) * 100;
-    add(off <= 10, off <= 10 ? `${off.toFixed(1)}% from Robinhood's live price` : `${off.toFixed(1)}% from Robinhood's live price of ${money(c.price)}: more than 10% away, which looks like a typing slip`);
-  } else add(false, `Robinhood gave no live price for ${o.symbol} to check the limit against`);
-  const cost = cents(o.quantity * o.limitPrice);
-  if (o.side === "buy") {
-    add(cost <= caps.perOrderUsd, cost <= caps.perOrderUsd ? `${money(cost)} is within your cap of ${money(caps.perOrderUsd)} an order` : `${money(cost)} is over your cap of ${money(caps.perOrderUsd)} an order`);
-    if (c.buyingPower === null) add(false, "Robinhood gave no buying power for the Agentic account");
-    else add(cost <= c.buyingPower, cost <= c.buyingPower ? `Buying power ${money(c.buyingPower)} covers it` : `Buying power is ${money(c.buyingPower)}: not enough`);
-    if (c.accountValue === null || c.accountValue <= 0) add(false, "Robinhood gave no total value for the Agentic account to check your per-stock cap");
-    else {
-      const after = (c.held + o.quantity) * o.limitPrice / c.accountValue * 100;
-      add(after <= caps.perStockPercent, `${o.symbol} would be ${after.toFixed(1)}% of the account; your cap is ${caps.perStockPercent}%`);
-    }
-  } else add(o.quantity <= c.held, o.quantity <= c.held ? `Selling ${o.quantity} of the ${c.held} held` : `Only ${c.held} share(s) are held in the Agentic account`);
-  add(c.ordersToday < caps.ordersPerDay, `${c.ordersToday} of your ${caps.ordersPerDay} orders a day used`);
-  return out;
-}
-var passes = (checks) => checks.length > 0 && checks.every((x) => x.ok);
-
 // src/desk/journal.ts
-import fs10 from "node:fs";
-import path9 from "node:path";
+import fs11 from "node:fs";
+import path10 from "node:path";
 
 // src/desk/rating.ts
 var RATINGS = ["Buy", "Overweight", "Hold", "Underweight", "Sell"];
@@ -20360,13 +20502,13 @@ var Journal = class {
   maxResolved;
   read() {
     try {
-      return fs10.readFileSync(this.file, "utf8");
+      return fs11.readFileSync(this.file, "utf8");
     } catch {
       return "";
     }
   }
   write(text2) {
-    fs10.mkdirSync(path9.dirname(this.file), { recursive: true });
+    fs11.mkdirSync(path10.dirname(this.file), { recursive: true });
     writeWhole(this.file, text2);
   }
   blocks() {
@@ -20381,7 +20523,7 @@ var Journal = class {
   /** Adds a pending entry. One entry per stock and day, settled or not: a re-run must not count the same call twice. */
   storeDecision(ticker, date4, decision, rating) {
     checkTag(ticker, date4);
-    fs10.mkdirSync(path9.dirname(this.file), { recursive: true });
+    fs11.mkdirSync(path10.dirname(this.file), { recursive: true });
     return withLock(this.file, () => {
       if (this.load().some((e) => e.date === date4 && e.ticker === ticker)) return "exists";
       const r = rating && RATINGS.includes(rating) ? rating : parseRating(decision);
@@ -20455,20 +20597,20 @@ ${e.reflection || e.decision.slice(0, 300) + (e.decision.length > 300 ? "..." : 
 };
 
 // src/terminal/state.ts
-import fs14 from "node:fs";
-import path13 from "node:path";
+import fs15 from "node:fs";
+import path14 from "node:path";
 
 // src/desk/runs.ts
-import fs11 from "node:fs";
-import path10 from "node:path";
+import fs12 from "node:fs";
+import path11 from "node:path";
 var SECTIONS = ["market", "sentiment", "news", "fundamentals", "bull", "bear", "research_plan", "trader", "aggressive", "conservative", "neutral", "decision"];
 var DEBATES = { investment_debate: ["bull", "bear"], risk_debate: ["aggressive", "conservative", "neutral"] };
 var TURNS = new Set(Object.values(DEBATES).flat());
-var folder = (dir, ticker, date4) => path10.join(dir, "runs", `${safeSymbol(ticker).replace(/\^/g, "IDX_").replace(/=/g, "_EQ_")}_${date4}`);
-var runFile = (dir, ticker, date4) => path10.join(folder(dir, ticker, date4), "run.json");
+var folder = (dir, ticker, date4) => path11.join(dir, "runs", `${safeSymbol(ticker).replace(/\^/g, "IDX_").replace(/=/g, "_EQ_")}_${date4}`);
+var runFile = (dir, ticker, date4) => path11.join(folder(dir, ticker, date4), "run.json");
 function load(dir, ticker, date4) {
   try {
-    return JSON.parse(fs11.readFileSync(runFile(dir, ticker, date4), "utf8"));
+    return JSON.parse(fs12.readFileSync(runFile(dir, ticker, date4), "utf8"));
   } catch {
     return { ticker: safeSymbol(ticker), date: date4, startedAt: (/* @__PURE__ */ new Date()).toISOString(), log: [] };
   }
@@ -20514,7 +20656,7 @@ function sectionsOf(dir, ticker, date4) {
   for (const e of load(dir, ticker, date4).log) (out[e.section] ??= []).push(e.text);
   return out;
 }
-var hasReport = (dir, ticker, date4) => fs11.existsSync(path10.join(folder(dir, ticker, date4), "complete_report.md"));
+var hasReport = (dir, ticker, date4) => fs12.existsSync(path11.join(folder(dir, ticker, date4), "complete_report.md"));
 
 // src/desk/backtest.ts
 var DIRECTION = { Buy: 1, Overweight: 1, Hold: 0, Underweight: -1, Sell: -1 };
@@ -20548,8 +20690,8 @@ function renderSummary(s) {
 }
 
 // src/desk/queue.ts
-import fs12 from "node:fs";
-import path11 from "node:path";
+import fs13 from "node:fs";
+import path12 from "node:path";
 var DEPTHS = { shallow: 1, medium: 3, deep: 5 };
 var isDepth = (v) => typeof v === "string" && Object.hasOwn(DEPTHS, v);
 var depthOfRounds = (rounds) => rounds >= 5 ? "deep" : rounds >= 3 ? "medium" : "shallow";
@@ -20564,9 +20706,9 @@ var QueueRefusal = class extends Error {
   }
   code;
 };
-var queueFile = (dir) => path11.join(dir, "queue.json");
-var doorbellFile = (dir) => path11.join(dir, "doorbell.json");
-var listenerFile = (dir) => path11.join(dir, "listener.json");
+var queueFile = (dir) => path12.join(dir, "queue.json");
+var doorbellFile = (dir) => path12.join(dir, "doorbell.json");
+var listenerFile = (dir) => path12.join(dir, "listener.json");
 var iso = (v) => typeof v === "string" && v.length <= 40 && !Number.isNaN(Date.parse(v)) ? v : void 0;
 var day = (v) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : void 0;
 var words2 = (v, max) => {
@@ -20604,7 +20746,7 @@ function settled(item, now) {
 function load2(dir, now) {
   let raw = [];
   try {
-    raw = JSON.parse(fs12.readFileSync(queueFile(dir), "utf8"));
+    raw = JSON.parse(fs13.readFileSync(queueFile(dir), "utf8"));
   } catch {
   }
   const seen = /* @__PURE__ */ new Set(), out = [];
@@ -20624,7 +20766,7 @@ function trimmed(list2) {
 }
 function change(dir, now, edit) {
   const file4 = queueFile(dir);
-  fs12.mkdirSync(dir, { recursive: true });
+  fs13.mkdirSync(dir, { recursive: true });
   return withLock(file4, () => {
     const { list: list2, result } = edit(load2(dir, now));
     writeWhole(file4, JSON.stringify(trimmed(list2), null, 2) + "\n");
@@ -20658,14 +20800,14 @@ function dequeue(dir, raw, now = /* @__PURE__ */ new Date()) {
 }
 function ringDoorbell(dir, why, now = /* @__PURE__ */ new Date()) {
   const bell = { at: now.toISOString(), waiting: waitingIn(readQueue(dir, now)).length, why };
-  fs12.mkdirSync(dir, { recursive: true });
+  fs13.mkdirSync(dir, { recursive: true });
   writeWhole(doorbellFile(dir), JSON.stringify(bell, null, 2) + "\n");
   return bell;
 }
 var LISTENER_FRESH_MS = 3 * 6e4;
 function readListener(dir, now = /* @__PURE__ */ new Date()) {
   try {
-    const v = JSON.parse(fs12.readFileSync(listenerFile(dir), "utf8"));
+    const v = JSON.parse(fs13.readFileSync(listenerFile(dir), "utf8"));
     const listener = words2(v.listener, 40), since = iso(v.since), beat = iso(v.beat) ?? since;
     if (!listener || !since || !beat) return null;
     const note = { listener, since, beat, fresh: now.getTime() - Date.parse(beat) <= LISTENER_FRESH_MS };
@@ -20679,23 +20821,23 @@ function readListener(dir, now = /* @__PURE__ */ new Date()) {
 }
 function removeListener(dir, pid) {
   if (pid !== void 0 && readListener(dir)?.pid !== pid) return;
-  fs12.rmSync(listenerFile(dir), { force: true });
+  fs13.rmSync(listenerFile(dir), { force: true });
 }
 
 // src/terminal/store.ts
-import fs13 from "node:fs";
-import path12 from "node:path";
+import fs14 from "node:fs";
+import path13 from "node:path";
 var MAX_WATCH = 50;
 var read = (file4, ok) => {
   try {
-    const v = JSON.parse(fs13.readFileSync(file4, "utf8"));
+    const v = JSON.parse(fs14.readFileSync(file4, "utf8"));
     return Array.isArray(v) ? v.filter(ok) : [];
   } catch {
     return [];
   }
 };
 function change2(file4, edit, ok) {
-  fs13.mkdirSync(path12.dirname(file4), { recursive: true });
+  fs14.mkdirSync(path13.dirname(file4), { recursive: true });
   return withLock(file4, () => {
     const next = edit(read(file4, ok));
     writeWhole(file4, JSON.stringify(next, null, 2) + "\n");
@@ -20703,7 +20845,7 @@ function change2(file4, edit, ok) {
   });
 }
 var isWatch = (v) => !!v && typeof v.symbol === "string" && typeof v.favourite === "boolean";
-var watchFile = (dir) => path12.join(dir, "watchlist.json");
+var watchFile = (dir) => path13.join(dir, "watchlist.json");
 var readWatchlist = (dir) => read(watchFile(dir), isWatch);
 function addWatch(dir, raw, onDay) {
   const symbol = safeSymbol(raw);
@@ -20738,20 +20880,20 @@ function summaryOf(decision) {
 }
 var stamp = (file4) => {
   try {
-    return String(fs14.statSync(file4).mtimeMs);
+    return String(fs15.statSync(file4).mtimeMs);
   } catch {
     return "0";
   }
 };
 function versionOf(root2) {
-  const dir = deskDataDir(root2), runs = path13.join(dir, "runs");
+  const dir = deskDataDir(root2), runs = path14.join(dir, "runs");
   let latest = 0;
   try {
-    for (const d of fs14.readdirSync(runs)) latest = Math.max(latest, Number(stamp(path13.join(runs, d, "run.json"))));
+    for (const d of fs15.readdirSync(runs)) latest = Math.max(latest, Number(stamp(path14.join(runs, d, "run.json"))));
   } catch {
   }
   const timely = `${listenerOf(dir) ? "L" : "n"}${readQueue(dir).map((i) => i.state[0]).join("")}`;
-  return [stamp(path13.join(dir, "journal.md")), stamp(path13.join(dir, "watchlist.json")), stamp(path13.join(dir, "queue.json")), latest, stamp(path13.join(dir, "contact.json")), stamp(path13.join(dir, "listener.json")), timely].join("-");
+  return [stamp(path14.join(dir, "journal.md")), stamp(path14.join(dir, "watchlist.json")), stamp(path14.join(dir, "queue.json")), latest, stamp(path14.join(dir, "contact.json")), stamp(path14.join(dir, "listener.json")), stamp(path14.join(dir, "paper.json")), timely].join("-");
 }
 function queueOf(dir, now = /* @__PURE__ */ new Date()) {
   const rank = { running: 0, waiting: 1, done: 2, failed: 2 };
@@ -20763,7 +20905,7 @@ function listenerOf(dir, now = /* @__PURE__ */ new Date()) {
 }
 function stateOf(root2, day2) {
   const dir = deskDataDir(root2), s = readSettings(root2);
-  const entries = new Journal(path13.join(dir, "journal.md")).load();
+  const entries = new Journal(path14.join(dir, "journal.md")).load();
   const calls = entries.map((e) => ({
     date: e.date,
     ticker: e.ticker,
@@ -20784,11 +20926,12 @@ function stateOf(root2, day2) {
     calls,
     record: { summary, text: renderSummary(summary), benchmarkNote: `Each call is judged after ${s.scoring.holdingPeriodDays} trading days against its market's index.` },
     desk: { emailSaved: !!readContactEmail(root2), tradingEnabled: false, holdingDays: s.scoring.holdingPeriodDays },
-    analyses: { depth: depthOfRounds(s.analysis.debateRounds), perRun: s.routines.maxAnalyses, listener: listenerOf(dir) }
+    analyses: { depth: depthOfRounds(s.analysis.debateRounds), perRun: s.routines.maxAnalyses, listener: listenerOf(dir) },
+    paper: { ...recordOf(entries.map((e) => ({ ticker: e.ticker, date: e.date, rating: e.rating })), day2), startUsd: readPaperStart(dir), minWeeks: RECORD_WEEKS }
   };
 }
 function callOf(root2, ticker, date4) {
-  const dir = deskDataDir(root2), e = new Journal(path13.join(dir, "journal.md")).load().find((x) => x.ticker === ticker && x.date === date4);
+  const dir = deskDataDir(root2), e = new Journal(path14.join(dir, "journal.md")).load().find((x) => x.ticker === ticker && x.date === date4);
   if (!e) return null;
   return { decision: e.decision, sections: sectionsOf(dir, ticker, date4), hasReport: hasReport(dir, ticker, date4) };
 }
@@ -21055,8 +21198,8 @@ function findSymbols(raw) {
 }
 
 // src/terminal/prefs.ts
-import fs15 from "node:fs";
-import path14 from "node:path";
+import fs16 from "node:fs";
+import path15 from "node:path";
 var MAX_RECENT = 6;
 var one = (v, of) => of.includes(v) ? v : void 0;
 var sym = (v) => {
@@ -21098,17 +21241,17 @@ function cleanPrefs(raw) {
   if (typeof r.autorun === "boolean") out.autorun = r.autorun;
   return out;
 }
-var prefsFile = (dir) => path14.join(dir, "dashboard.json");
+var prefsFile = (dir) => path15.join(dir, "dashboard.json");
 function readPrefs(dir) {
   try {
-    return cleanPrefs(JSON.parse(fs15.readFileSync(prefsFile(dir), "utf8")));
+    return cleanPrefs(JSON.parse(fs16.readFileSync(prefsFile(dir), "utf8")));
   } catch {
     return {};
   }
 }
 function savePrefs(dir, change3) {
   const file4 = prefsFile(dir);
-  fs15.mkdirSync(dir, { recursive: true });
+  fs16.mkdirSync(dir, { recursive: true });
   return withLock(file4, () => {
     const next = cleanPrefs({ ...readPrefs(dir), ...cleanPrefs(change3) });
     writeWhole(file4, JSON.stringify(next, null, 2) + "\n");
@@ -21117,11 +21260,11 @@ function savePrefs(dir, change3) {
 }
 
 // src/watch/claude.ts
-import fs16 from "node:fs";
+import fs17 from "node:fs";
 import os3 from "node:os";
-import path15 from "node:path";
-function findClaude(env = process.env, platform = process.platform, exists = (p) => fs16.existsSync(p)) {
-  const p = platform === "win32" ? path15.win32 : path15.posix;
+import path16 from "node:path";
+function findClaude(env = process.env, platform = process.platform, exists = (p) => fs17.existsSync(p)) {
+  const p = platform === "win32" ? path16.win32 : path16.posix;
   const dirs = (env.PATH ?? env.Path ?? "").split(platform === "win32" ? ";" : ":").filter(Boolean);
   const home = env.USERPROFILE ?? env.HOME ?? os3.homedir();
   if (platform === "win32") {
@@ -21140,18 +21283,18 @@ function findClaude(env = process.env, platform = process.platform, exists = (p)
 
 // src/terminal/launch.ts
 import crypto5 from "node:crypto";
-import path16 from "node:path";
+import path17 from "node:path";
 var PORTS = [47615, 47625];
-var deskIdOf = (root2) => crypto5.createHash("sha256").update(path16.resolve(root2)).digest("hex").slice(0, 12);
+var deskIdOf = (root2) => crypto5.createHash("sha256").update(path17.resolve(root2)).digest("hex").slice(0, 12);
 
 // src/terminal/server.ts
 var TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".woff2": "font/woff2", ".svg": "image/svg+xml" };
-function loadAssets(dir = path17.join(path17.dirname(fileURLToPath(import.meta.url)), "terminal")) {
+function loadAssets(dir = path18.join(path18.dirname(fileURLToPath(import.meta.url)), "terminal")) {
   const out = /* @__PURE__ */ new Map();
-  const add = (rel) => out.set(`/${rel.replace(/\\/g, "/")}`, { type: TYPES[path17.extname(rel)] ?? "application/octet-stream", body: fs17.readFileSync(path17.join(dir, rel)) });
+  const add = (rel) => out.set(`/${rel.replace(/\\/g, "/")}`, { type: TYPES[path18.extname(rel)] ?? "application/octet-stream", body: fs18.readFileSync(path18.join(dir, rel)) });
   for (const f of ["index.html", "app.js", "app.css"]) add(f);
   try {
-    for (const f of fs17.readdirSync(path17.join(dir, "fonts"))) if (f.endsWith(".woff2")) add(`fonts/${f}`);
+    for (const f of fs18.readdirSync(path18.join(dir, "fonts"))) if (f.endsWith(".woff2")) add(`fonts/${f}`);
   } catch {
   }
   return out;
@@ -21188,7 +21331,7 @@ function fingerprint(files) {
   const h = crypto6.createHash("sha256");
   for (const f of files) {
     try {
-      h.update(fs17.readFileSync(f));
+      h.update(fs18.readFileSync(f));
     } catch {
       h.update(`missing ${f}`);
     }
@@ -21257,6 +21400,31 @@ async function startTerminal(opts) {
     });
     req.on("error", reject);
   });
+  const callsOf = () => new Journal(path18.join(dir, "journal.md")).load().map((e) => ({ ticker: e.ticker, date: e.date, rating: e.rating }));
+  let paperMemo = null;
+  const paper = async (today2) => {
+    const calls = callsOf(), caps = robinhood.trading().caps, startUsd = readPaperStart(dir), trading = readSettings(root2).trading;
+    let stamp2 = "0";
+    try {
+      stamp2 = String(fs18.statSync(path18.join(dir, "journal.md")).mtimeMs);
+    } catch {
+    }
+    const key = `${stamp2}|${startUsd}|${JSON.stringify(caps)}|${today2}`;
+    if (!paperMemo || paperMemo.key !== key || Date.now() - paperMemo.at > 10 * 6e4) {
+      const record2 = recordOf(calls, today2), closes = {};
+      if (record2.since) {
+        const from = addDays(record2.since, -7);
+        await Promise.all([.../* @__PURE__ */ new Set([...calls.filter((c) => followed(c.ticker)).map((c) => c.ticker), "SPY"])].map(async (s) => {
+          try {
+            closes[s] = (await daily(s, from, today2)).bars.map((r) => ({ date: r.date, close: r.close }));
+          } catch {
+          }
+        }));
+      }
+      paperMemo = { key, at: Date.now(), book: paperBook(calls, closes, { startUsd, trading, caps, today: today2 }) };
+    }
+    return { ...paperMemo.book, record: recordOf(calls, today2) };
+  };
   const queued = (job) => {
     try {
       return job();
@@ -21301,6 +21469,7 @@ async function startTerminal(opts) {
       if (p === "/api/state") return json(res, 200, stateOf(root2, day2));
       if (p === "/api/version") return json(res, 200, { version: versionOf(root2), build, update: updated, restarting });
       if (p === "/api/prefs") return json(res, 200, readPrefs(dir));
+      if (p === "/api/paper") return json(res, 200, await paper(day2));
       if (p === "/api/search") {
         const q = (url2.searchParams.get("q") ?? "").trim();
         if (!QUERY.test(q)) throw new Refused2(400, "type a name or a ticker, in at most 40 letters");
@@ -21349,7 +21518,7 @@ async function startTerminal(opts) {
     if (p === "/api/queue" && method === "POST") {
       const symbol = safeSymbol(name), d = b.depth === void 0 ? depthOfRounds(readSettings(root2).analysis.debateRounds) : b.depth;
       if (!isDepth(d)) throw new Refused2(400, "the depth is shallow, medium or deep");
-      const call = new Journal(path17.join(dir, "journal.md")).load().find((e) => e.ticker === symbol && e.date === day2);
+      const call = new Journal(path18.join(dir, "journal.md")).load().find((e) => e.ticker === symbol && e.date === day2);
       if (call) throw new Refused2(409, `${symbol} was already analysed today (${call.rating}): its call is in the journal. Ask again tomorrow`);
       queued(() => enqueue(dir, symbol, (/* @__PURE__ */ new Date()).toISOString(), d));
       ringDoorbell(dir, "press");
@@ -21391,6 +21560,15 @@ async function startTerminal(opts) {
       delete b.autorun;
       return json(res, 200, savePrefs(dir, b));
     }
+    if (p === "/api/paper" && method === "POST") {
+      try {
+        savePaperStart(dir, b.startUsd);
+      } catch (e) {
+        throw new Refused2(400, e.message);
+      }
+      paperMemo = null;
+      return json(res, 200, await paper(day2));
+    }
     if (p === "/api/stop" && method === "POST") {
       if (!opts.stop) throw new Refused2(404, "not found");
       const stop = opts.stop;
@@ -21421,7 +21599,7 @@ async function startTerminal(opts) {
     }
     if (p === "/api/ticket" && method === "POST") {
       const symbol = safeSymbol(typeof b.symbol === "string" ? b.symbol : ""), date4 = typeof b.date === "string" ? b.date : "";
-      const call = new Journal(path17.join(dir, "journal.md")).load().find((e) => e.ticker === symbol && e.date === date4);
+      const call = new Journal(path18.join(dir, "journal.md")).load().find((e) => e.ticker === symbol && e.date === date4);
       if (!call) throw new Refused2(404, "no such call");
       const trading = readSettings(root2).trading, { caps } = robinhood.trading();
       const context = { ...await askRobinhood(() => robinhood.ticketContext(symbol)), rating: call.rating, callDate: call.date };
@@ -21492,6 +21670,8 @@ async function startTerminal(opts) {
       }
       if (b.on === false) return json(res, 200, robinhood.setTrading(false));
       if (b.on !== true || b.confirm !== "switch trading on") throw new Refused2(400, "to switch trading on, confirm it on the page");
+      const record2 = recordOf(callsOf(), day2);
+      if (record2.weeks < RECORD_WEEKS && b.understood !== true) throw new Refused2(400, `the desk has ${record2.weeks} ${record2.weeks === 1 ? "week" : "weeks"} and ${record2.calls} ${record2.calls === 1 ? "call" : "calls"} of record, under four weeks: confirm on the page that you understand`);
       return json(res, 200, robinhood.setTrading(true));
     }
     if (p === "/api/robinhood/refresh" && method === "POST") {
@@ -21535,13 +21715,13 @@ async function startTerminal(opts) {
     try {
       let keys = {};
       try {
-        const v = JSON.parse(fs17.readFileSync(keyFile, "utf8"));
+        const v = JSON.parse(fs18.readFileSync(keyFile, "utf8"));
         if (v && typeof v === "object" && !Array.isArray(v)) keys = v;
       } catch {
       }
       change3(keys);
       if (Object.keys(keys).length) writePrivate(keyFile, JSON.stringify(keys, null, 2) + "\n");
-      else fs17.rmSync(keyFile, { force: true });
+      else fs18.rmSync(keyFile, { force: true });
     } catch {
     }
   };
@@ -21633,7 +21813,7 @@ var running = (port) => new Promise((resolve) => {
 async function openingLink(port) {
   const plain = `http://127.0.0.1:${port}/`;
   try {
-    const keys = JSON.parse(fs18.readFileSync(dashboardKeyFile(), "utf8"));
+    const keys = JSON.parse(fs19.readFileSync(dashboardKeyFile(), "utf8"));
     const mine = keys[deskIdOf(root)];
     if (!mine || mine.port !== port || typeof mine.key !== "string") return plain;
     const r = await fetch(`${plain}api/claim/new`, { method: "POST", headers: { "x-desk-token": mine.key, "content-type": "application/json" }, body: "{}" });
@@ -21655,7 +21835,7 @@ if (!again) {
   }
 }
 var self = fileURLToPath2(import.meta.url);
-var code = [self, ...["index.html", "app.js", "app.css"].map((f) => path18.join(path18.dirname(self), "terminal", f))];
+var code = [self, ...["index.html", "app.js", "app.css"].map((f) => path19.join(path19.dirname(self), "terminal", f))];
 var t = null;
 var quit = () => {
   void (t?.close() ?? Promise.resolve()).then(() => process.exit(0));
@@ -21671,7 +21851,7 @@ var restart = () => {
 configure({ spacingMs: 250 });
 var quick = Number(process.env.TRADING_AGENTS_UPDATE_MS) || void 0;
 var listen = { start: () => {
-  spawn2(process.execPath, [path18.join(path18.dirname(self), "watch.mjs")], { cwd: root, detached: true, stdio: "ignore", windowsHide: true }).on("error", () => {
+  spawn2(process.execPath, [path19.join(path19.dirname(self), "watch.mjs")], { cwd: root, detached: true, stdio: "ignore", windowsHide: true }).on("error", () => {
   }).unref();
 } };
 var base = { root, assets: loadAssets(), code, restart, stop: quit, listen, ...quick ? { updateCheckMs: quick } : {} };

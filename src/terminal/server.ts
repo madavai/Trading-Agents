@@ -12,7 +12,9 @@ import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { today } from '../data/dates.js';
-import { clearCache } from '../data/yahoo.js';
+import { clearCache, daily } from '../data/yahoo.js';
+import { addDays } from '../data/dates.js';
+import { followed, paperBook, readPaperStart, recordOf, RECORD_WEEKS, savePaperStart, type Closes, type PaperBook } from '../desk/paper.js';
 import { isCrypto, safeSymbol } from '../data/symbols.js';
 import { dashboardKeyFile, deskDataDir, robinhoodFile } from '../paths.js';
 import { writePrivate } from '../private.js';
@@ -169,6 +171,28 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
     req.on('error', reject);
   });
 
+  // The paper book: worked out from the live journal and daily closes, at the person's caps (beside the trading switch),
+  // and kept for ten minutes, or until the journal, the starting money or the caps change.
+  const callsOf = () => new Journal(path.join(dir, 'journal.md')).load().map((e) => ({ ticker: e.ticker, date: e.date, rating: e.rating }));
+  let paperMemo: { key: string; at: number; book: PaperBook } | null = null;
+  const paper = async (today: string): Promise<PaperBook & { record: ReturnType<typeof recordOf> }> => {
+    const calls = callsOf(), caps = robinhood.trading().caps, startUsd = readPaperStart(dir), trading = readSettings(root).trading;
+    let stamp = '0';
+    try { stamp = String(fs.statSync(path.join(dir, 'journal.md')).mtimeMs); } catch { /* no journal yet */ }
+    const key = `${stamp}|${startUsd}|${JSON.stringify(caps)}|${today}`;
+    if (!paperMemo || paperMemo.key !== key || Date.now() - paperMemo.at > 10 * 60_000) {
+      const record = recordOf(calls, today), closes: Closes = {};
+      if (record.since) {
+        const from = addDays(record.since, -7);
+        await Promise.all([...new Set([...calls.filter((c) => followed(c.ticker)).map((c) => c.ticker), 'SPY'])].map(async (s) => {
+          try { closes[s] = (await daily(s, from, today)).bars.map((r) => ({ date: r.date, close: r.close })); } catch { /* left out: said as unavailable */ }
+        }));
+      }
+      paperMemo = { key, at: Date.now(), book: paperBook(calls, closes, { startUsd, trading, caps, today }) };
+    }
+    return { ...paperMemo.book, record: recordOf(calls, today) };
+  };
+
   /** A change to the waiting list; what the list refuses (full, or a stock being analysed now) is said in its own words. */
   const queued = <T>(job: () => T): T => { try { return job(); } catch (e) { if (e instanceof QueueRefusal) throw new Refused(409, e.message); throw e; } };
 
@@ -211,6 +235,7 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
       if (p === '/api/state') return json(res, 200, stateOf(root, day));
       if (p === '/api/version') return json(res, 200, { version: versionOf(root), build, update: updated, restarting });
       if (p === '/api/prefs') return json(res, 200, readPrefs(dir));
+      if (p === '/api/paper') return json(res, 200, await paper(day));
       if (p === '/api/search') {
         const q = (url.searchParams.get('q') ?? '').trim();
         if (!QUERY.test(q)) throw new Refused(400, 'type a name or a ticker, in at most 40 letters');
@@ -285,6 +310,11 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
       throw new Refused(502, 'the listener did not start: see desk-data/watcher.log, or start it yourself with node dist/watch.mjs');
     }
     if (p === '/api/prefs' && method === 'POST') { delete b.autorun; return json(res, 200, savePrefs(dir, b)); }   // only the switch sets autorun
+    if (p === '/api/paper' && method === 'POST') {
+      try { savePaperStart(dir, b.startUsd); } catch (e) { throw new Refused(400, (e as Error).message); }
+      paperMemo = null;
+      return json(res, 200, await paper(day));
+    }
     if (p === '/api/stop' && method === 'POST') {
       if (!opts.stop) throw new Refused(404, 'not found');
       const stop = opts.stop;
@@ -379,6 +409,9 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
       }
       if (b.on === false) return json(res, 200, robinhood.setTrading(false));
       if (b.on !== true || b.confirm !== 'switch trading on') throw new Refused(400, 'to switch trading on, confirm it on the page');
+      // Under four weeks of record, the person sees the record first and says they understand: never a block.
+      const record = recordOf(callsOf(), day);
+      if (record.weeks < RECORD_WEEKS && b.understood !== true) throw new Refused(400, `the desk has ${record.weeks} ${record.weeks === 1 ? 'week' : 'weeks'} and ${record.calls} ${record.calls === 1 ? 'call' : 'calls'} of record, under four weeks: confirm on the page that you understand`);
       return json(res, 200, robinhood.setTrading(true));
     }
     if (p === '/api/robinhood/refresh' && method === 'POST') {

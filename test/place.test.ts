@@ -85,7 +85,10 @@ test('an order is placed only with trading switched on, after Robinhood\'s clean
     const t = await ticket();
     assert.equal((await post('/api/ticket/place', { id: t.id, confirm: confirmWords(ORDER) })).status, 403, 'trading is off');
     assert.equal((await post('/api/trading', { on: true })).status, 400, 'switching on needs the page\'s confirmation');
-    assert.equal((await post('/api/trading', { on: true, confirm: 'switch trading on' })).json().on, true);
+    const young = await post('/api/trading', { on: true, confirm: 'switch trading on' });
+    assert.equal(young.status, 400, 'under four weeks of record, the person sees the record and says they understand');
+    assert.match(young.json().error, /^the desk has 0 weeks and 1 call of record, under four weeks: confirm on the page that you understand$/);
+    assert.equal((await post('/api/trading', { on: true, confirm: 'switch trading on', understood: true })).json().on, true);
     const kept = JSON.parse(fs.readFileSync(path.join(path.dirname(file), 'trading.json'), 'utf8'));
     assert.deepEqual([kept.on, kept.caps], [true, { perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 3 }], 'the switch and the caps are kept together beside the sign-in, where agents are refused');
 
@@ -181,7 +184,7 @@ test('the caps are the person\'s own: kept beside the trading switch, changed on
     const words = (await post('/api/ticket/check', { id: next.id, quantity: 2, limitPrice: 182.4 })).json().checks.map((c: { words: string }) => c.words).join(' | ');
     assert.match(words, /\$364\.80 is over your cap of \$300\.00 an order/);
     assert.match(words, /0 of your 2 orders a day used/);
-    assert.equal((await post('/api/trading', { on: true, confirm: 'switch trading on' })).json().caps.perOrderUsd, 300, 'switching on keeps the caps');
+    assert.equal((await post('/api/trading', { on: true, confirm: 'switch trading on', understood: true })).json().caps.perOrderUsd, 300, 'switching on keeps the caps');
     link.forget();
     assert.deepEqual(link.trading(), { on: false, since: null, caps: { perOrderUsd: 300, perStockPercent: 10, ordersPerDay: 2 } }, 'disconnecting switches trading off and keeps the caps: they are the person\'s rules, not Robinhood\'s');
   } finally { await term.close(); }
@@ -190,7 +193,7 @@ test('the caps are the person\'s own: kept beside the trading switch, changed on
 test('switching off, or disconnecting, stops any order; disconnecting switches trading off', async () => {
   const { o, link, term, post, ticket } = await desk();
   try {
-    assert.equal((await post('/api/trading', { on: true, confirm: 'switch trading on' })).status, 200);
+    assert.equal((await post('/api/trading', { on: true, confirm: 'switch trading on', understood: true })).status, 200);
     const t = await ticket();
     await post('/api/ticket/review', { id: t.id, quantity: 1, limitPrice: 182.4 });
     assert.equal((await post('/api/trading', { on: false })).json().on, false);

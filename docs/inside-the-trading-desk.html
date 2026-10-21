@@ -585,7 +585,7 @@ p { text-wrap: pretty; }
         <div class="link c-desk"><span class="lbl">save</span><span class="wire"><span class="pulse" style="--d:.5s"></span></span></div>
         <div class="lane c-store">
           <div class="lane-h"><span class="icbox"><svg class="ic"><use href="#i-book"/></svg></span><div><p class="lane-name">The records</p><p class="lane-sub">In the project, on this computer</p></div></div>
-          <ul><li>Journal of calls</li><li>Full reports</li><li>Watchlist</li><li>Analyses asked for</li><li>Your holdings</li><li>Orders log</li></ul>
+          <ul><li>Journal of calls</li><li>Full reports</li><li>Watchlist</li><li>Analyses asked for</li><li>Paper money</li><li>Your holdings</li><li>Orders log</li></ul>
         </div>
         <div class="link c-you"><span class="lbl">show</span><span class="wire two"><span class="pulse" style="--d:1s"></span></span></div>
         <div class="lane c-you">
@@ -930,6 +930,7 @@ p { text-wrap: pretty; }
             <li><b>Orders log</b><span>Each order the dashboard sent, from a call or your own, and what Robinhood answered.</span></li>
             <li><b>Your dashboard</b><span>Where you left it: the page, the stock, the chart, the stocks you looked at last. Never an order.</span></li>
             <li><b>Your email</b><span>For the SEC, and only the SEC.</span></li>
+            <li><b>Paper money</b><span>What your paper record starts with ($10,000 as shipped). The record itself is worked out from the journal and closing prices each time.</span></li>
             <li><b>Back-tests</b><span>Kept in journals of their own, apart from your real calls.</span></li>
           </ul>
         </article>
@@ -1024,7 +1025,7 @@ p { text-wrap: pretty; }
       <div class="checks-box edge c-rh">
         <p class="checks-h"><span class="icbox"><svg class="ic"><use href="#i-lock"/></svg></span>Before the place door opens, all of these must hold</p>
         <ul class="checks">
-          <li><span class="tick"><svg class="ic sm"><use href="#i-check"/></svg></span><span>You switched trading on yourself. It ships off.</span></li>
+          <li><span class="tick"><svg class="ic sm"><use href="#i-check"/></svg></span><span>You switched trading on yourself, after seeing the desk's record on paper. It ships off.</span></li>
           <li><span class="tick"><svg class="ic sm"><use href="#i-check"/></svg></span><span>Robinhood checked this exact order with no alerts, less than five minutes ago.</span></li>
           <li><span class="tick"><svg class="ic sm"><use href="#i-check"/></svg></span><span>Nothing in the order changed since that check.</span></li>
           <li><span class="tick"><svg class="ic sm"><use href="#i-check"/></svg></span><span>Every cap passes again, on figures just read from Robinhood.</span></li>
@@ -1053,12 +1054,12 @@ p { text-wrap: pretty; }
           <li><svg class="ic sm"><use href="#i-bank"/></svg>Main<span class="sk win-v"></span></li>
           <li class="win-lh">The desk</li>
           <li class="on"><svg class="ic sm"><use href="#i-grid"/></svg>Overview</li>
+          <li><svg class="ic sm"><use href="#i-target"/></svg>Scorecard</li>
           <li><svg class="ic sm"><use href="#i-chart"/></svg>Chart</li>
           <li><svg class="ic sm"><use href="#i-ledger"/></svg>Stock page</li>
           <li><svg class="ic sm"><use href="#i-star"/></svg>Watchlist</li>
           <li><svg class="ic sm"><use href="#i-bot"/></svg>Analyses</li>
           <li><svg class="ic sm"><use href="#i-flag"/></svg>The desk's calls</li>
-          <li><svg class="ic sm"><use href="#i-target"/></svg>Scorecard</li>
         </ul>
         <div class="win-main">
           <div class="at-box pn today"><p class="pn-h">Your desk today <small>a press opens each</small></p>
@@ -1105,7 +1106,7 @@ p { text-wrap: pretty; }
       <div class="feat edge c-src"><span class="icbox"><svg class="ic"><use href="#i-chart"/></svg></span><b>Markets and chart</b><p>Six market tiles, and any stock across the whole width: area or candles, averages, volume and its key figures underneath.</p></div>
       <div class="feat edge c-you"><span class="icbox"><svg class="ic"><use href="#i-star"/></svg></span><b>Watchlist and analyses</b><p>Pick a stock from the matches as you type and star it. The robot asks the desk to analyse it, as deep as you choose; each shows waiting, the step it is on, its rating or why it failed.</p></div>
       <div class="feat edge c-desk"><span class="icbox"><svg class="ic"><use href="#i-flag"/></svg></span><b>The desk's calls</b><p>Each call in two lines; in full, a coloured summary, the price since the call and every agent's part as a card.</p></div>
-      <div class="feat edge c-desk"><span class="icbox"><svg class="ic"><use href="#i-target"/></svg></span><b>How the desk is doing</b><p>The scorecard: calls scored against their index, and those still waiting.</p></div>
+      <div class="feat edge c-desk"><span class="icbox"><svg class="ic"><use href="#i-target"/></svg></span><b>Your paper record</b><p>First on the page: every call followed on paper at its ticket's size, against the S&amp;P 500, and how each call scored.</p></div>
       <div class="feat edge c-you"><span class="icbox"><svg class="ic"><use href="#i-ledger"/></svg></span><b>Stock page</b><p>Everything on one stock: what you hold with Buy… and Sell…, your orders on it, and each call with its score.</p></div>
       <div class="feat edge c-rh"><span class="icbox"><svg class="ic"><use href="#i-bank"/></svg></span><b>Your account</b><p>In the side list and on its own page: value, cash, buying power and gain in colour, each holding's share, orders, the trading switch and your caps.</p></div>
       <div class="feat edge c-you"><span class="icbox"><svg class="ic"><use href="#i-send"/></svg></span><b>Order tickets</b><p>Decide… from a call, or Trade… for your own: checked against your caps, reviewed by Robinhood, placed only on your Confirm.</p></div>

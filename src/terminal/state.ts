@@ -7,6 +7,7 @@ import { Journal, type Entry } from '../desk/journal.js';
 import { hasReport, sectionsOf, stepWords } from '../desk/runs.js';
 import { renderSummary, summarize, type Summary } from '../desk/backtest.js';
 import { depthOfRounds, readListener, readQueue, type Depth, type QueueItem } from '../desk/queue.js';
+import { readPaperStart, recordOf, RECORD_WEEKS, type PaperRecord } from '../desk/paper.js';
 import { readSettings } from '../settings.js';
 import { deskDataDir } from '../paths.js';
 import { readWatchlist, type WatchItem } from './store.js';
@@ -26,6 +27,9 @@ export interface DeskState {
   desk: { emailSaved: boolean; tradingEnabled: boolean; holdingDays: number };
   /** The depth the page offers first (the settings'), how many one run analyses, and who listens for the doorbell. */
   analyses: { depth: Depth; perRun: number; listener: ListenerView | null };
+  /** How much record the desk has on paper, the paper money it starts with, and the weeks under which switching trading
+   *  on asks for one extra press. The paper book itself, with its prices, is /api/paper. */
+  paper: PaperRecord & { startUsd: number; minWeeks: number };
 }
 
 /** Markdown's marks taken out, so a few words read as words: bold, slanted, code, headings, list marks, table bars. */
@@ -57,7 +61,7 @@ export function versionOf(root: string): string {
   // Two things change with time alone, not with a file: a listener whose heartbeat stopped, and a run that died. Both are
   // part of the fingerprint, so the page hears of them too.
   const timely = `${listenerOf(dir) ? 'L' : 'n'}${readQueue(dir).map((i) => i.state[0]).join('')}`;
-  return [stamp(path.join(dir, 'journal.md')), stamp(path.join(dir, 'watchlist.json')), stamp(path.join(dir, 'queue.json')), latest, stamp(path.join(dir, 'contact.json')), stamp(path.join(dir, 'listener.json')), timely].join('-');
+  return [stamp(path.join(dir, 'journal.md')), stamp(path.join(dir, 'watchlist.json')), stamp(path.join(dir, 'queue.json')), latest, stamp(path.join(dir, 'contact.json')), stamp(path.join(dir, 'listener.json')), stamp(path.join(dir, 'paper.json')), timely].join('-');
 }
 
 /** The waiting list for the page: running first, then waiting in order, then finished, newest first. */
@@ -86,6 +90,7 @@ export function stateOf(root: string, day: string): DeskState {
     record: { summary, text: renderSummary(summary), benchmarkNote: `Each call is judged after ${s.scoring.holdingPeriodDays} trading days against its market's index.` },
     desk: { emailSaved: !!readContactEmail(root), tradingEnabled: false, holdingDays: s.scoring.holdingPeriodDays },
     analyses: { depth: depthOfRounds(s.analysis.debateRounds), perRun: s.routines.maxAnalyses, listener: listenerOf(dir) },
+    paper: { ...recordOf(entries.map((e) => ({ ticker: e.ticker, date: e.date, rating: e.rating })), day), startUsd: readPaperStart(dir), minWeeks: RECORD_WEEKS },
   };
 }
 

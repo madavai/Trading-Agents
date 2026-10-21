@@ -193,6 +193,27 @@ test('an analysis asked for on the page waits at its depth, rings for whoever li
   await client.close();
 });
 
+test('the paper record: every call followed at its ticket size from the closing prices, the starting money changeable, the record on the page', async () => {
+  const empty = (await call(term, 'GET', '/api/paper')).json();
+  assert.deepEqual([empty.since, empty.series, empty.record], [null, [], { since: null, weeks: 0, calls: 0 }]);
+  new Journal(path.join(dir(), 'journal.md')).storeDecision('NVDA', '2026-09-01', '**Rating**: Buy\n\n**Executive Summary**: Buy.');
+  new Journal(path.join(dir(), 'journal.md')).storeDecision('AAPL', '2026-09-02', '**Rating**: Hold\n\n**Executive Summary**: Hold.');
+  const book = (await call(term, 'GET', '/api/paper')).json();
+  assert.equal(book.since, '2026-09-01');
+  const nvda = book.trades.find((t: any) => t.ticker === 'NVDA');
+  assert.deepEqual([nvda.status, nvda.side], ['filled', 'buy']);
+  assert.ok(nvda.fillDate > '2026-09-01', 'filled at the first close after the call');
+  assert.equal(book.trades.find((t: any) => t.ticker === 'AAPL').status, 'none');
+  assert.ok(book.series.length > 20 && book.series[0].benchmark === 10_000, 'a value a day since the first call, the S&P 500 from the same start');
+  assert.deepEqual(book.record, { since: '2026-09-01', weeks: 5, calls: 2 });
+  const state = (await call(term, 'GET', '/api/state')).json();
+  assert.deepEqual(state.paper, { since: '2026-09-01', weeks: 5, calls: 2, startUsd: 10_000, minWeeks: 4 }, 'the page has the record without asking for prices');
+  assert.match((await call(term, 'POST', '/api/paper', { body: { startUsd: 50 } })).json().error, /whole number of dollars from \$100/);
+  assert.equal((await call(term, 'POST', '/api/paper', { body: { startUsd: 20_000 } })).json().startUsd, 20_000);
+  assert.equal((await call(term, 'GET', '/api/state')).json().paper.startUsd, 20_000);
+  assert.equal((await call(term, 'GET', '/api/paper', { token: false })).status, 401);
+});
+
 test('"Run automatically with Claude Code": started and stopped from the page, remembered across starts, and never over another listener', async () => {
   assert.equal((await call(term, 'POST', '/api/listen', { body: { on: true } })).status, 404, 'a dashboard given no way to start it has no switch');
   let started = 0, claude = true;

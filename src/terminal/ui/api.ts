@@ -7,6 +7,10 @@ import type { History, QuoteResult } from '../quotes.js';
 import type { WatchItem } from '../store.js';
 import type { ListenerView, QueueView } from '../state.js';
 import type { Depth } from '../../desk/queue.js';
+import type { PaperBook, PaperRecord, PaperTrade } from '../../desk/paper.js';
+/** The paper book, with the record it stands on. */
+export type PaperView = PaperBook & { record: PaperRecord };
+export type { PaperTrade };
 import type { LinkInfo, Snapshot, TradingState } from '../../robinhood/link.js';
 import type { Account, AccountView, Holding, Order } from '../../robinhood/account.js';
 import type { Check, Proposal, TicketContext } from '../../desk/ticket.js';
@@ -106,7 +110,11 @@ export const api = {
   reviewTicket: (id: string, quantity: number, limitPrice: number) => call<{ checks: Check[]; review: Review; confirm: string; trading: Trading }>('POST', '/api/ticket/review', { id, quantity, limitPrice }),
   placeTicket: (id: string, confirm: string) => call<{ placed: Placed }>('POST', '/api/ticket/place', { id, confirm }),
   trading: () => call<Trading & { placedToday: number }>('GET', '/api/trading'),
-  setTrading: (on: boolean) => call<Trading>('POST', '/api/trading', on ? { on, confirm: 'switch trading on' } : { on }),
+  /** Switching on with under four weeks of record also says the person understood that. */
+  setTrading: (on: boolean, understood = false) => call<Trading>('POST', '/api/trading', on ? { on, confirm: 'switch trading on', ...(understood ? { understood } : {}) } : { on }),
+  /** The paper book: every call followed at its ticket's size, against the S&P 500. */
+  paper: () => call<PaperView>('GET', '/api/paper'),
+  setPaperStart: (startUsd: number) => call<PaperView>('POST', '/api/paper', { startUsd }),
   /** The person's caps, kept beside the trading switch; the desk checks them before keeping them. */
   setCaps: (caps: Caps) => call<Trading>('POST', '/api/trading', { caps }),
   readAccounts: () => call<{ snapshot: Snapshot; chosen: string[]; holdingsShared: boolean }>('POST', '/api/robinhood/refresh', {}),
