@@ -613,8 +613,8 @@ p { text-wrap: pretty; }
     </div>
     <div class="joined src-grid">
       <article class="src edge c-src">
-        <div class="src-h"><span class="icbox"><svg class="ic"><use href="#i-chart"/></svg></span><div><p class="src-name">Yahoo Finance</p><p class="src-kind">Prices, news and company data</p></div></div>
-        <p>Daily prices for charts and indicators, company and world news, a company's profile, ratios and insider trades, and a fund's holdings and yearly cost.</p>
+        <div class="src-h"><span class="icbox"><svg class="ic"><use href="#i-chart"/></svg></span><div><p class="src-name">Yahoo Finance</p><p class="src-kind">Prices and news</p></div></div>
+        <p>Daily prices for charts and indicators, and company and world news. It gives its company and fund data only to web browsers, and the desk keeps its own name, so that data is mostly unavailable.</p>
         <p class="note"><svg class="ic sm"><use href="#i-clock"/></svg><span>Prices can be up to 15 minutes late. It has no official free service: the desk reads the public pages its website uses, for personal use.</span></p>
       </article>
       <article class="src edge c-src">
@@ -639,7 +639,7 @@ p { text-wrap: pretty; }
       </article>
       <article class="src edge c-src">
         <div class="src-h"><span class="icbox"><svg class="ic"><use href="#i-ledger"/></svg></span><div><p class="src-name">SEC EDGAR</p><p class="src-kind">Company filings</p></div></div>
-        <p>A US company's accounts exactly as filed: revenue, profit, cash and debt, quarter by quarter.</p>
+        <p>A US company's accounts exactly as filed, its shares and dividends for its valuation, its industry, and every trade its insiders report (Form 4). Each is dated by its filing, so a past day reads what was known then.</p>
         <p class="note"><svg class="ic sm"><use href="#i-key"/></svg><span>The SEC asks every reader for a contact email, so the desk sends yours, to the SEC alone.</span></p>
       </article>
       <article class="src wide edge c-rh">
@@ -655,12 +655,12 @@ p { text-wrap: pretty; }
           <tr><th scope="col">Source</th><th scope="col">Market<small>analyst</small></th><th scope="col">Sentiment<small>analyst</small></th><th scope="col">News<small>analyst</small></th><th scope="col">Fundamentals<small>analyst</small></th><th scope="col">Trader<small>agent</small></th><th scope="col">Dashboard<small>yours</small></th></tr>
         </thead>
         <tbody>
-          <tr><th scope="row">Yahoo Finance</th><td><span class="cell c-src">prices, indicators</span></td><td><span class="cell c-src">headlines</span></td><td><span class="cell c-src">company and world news</span></td><td><span class="cell c-src">profile, ratios, insider trades; a fund's holdings and yearly cost</span></td><td><span class="cell c-src">checked price table</span></td><td><span class="cell c-src">markets, charts</span></td></tr>
+          <tr><th scope="row">Yahoo Finance</th><td><span class="cell c-src">prices, indicators</span></td><td><span class="cell c-src">headlines</span></td><td><span class="cell c-src">company and world news</span></td><td><span class="cell c-src">a fund's holdings and yearly cost, when given</span></td><td><span class="cell c-src">checked price table</span></td><td><span class="cell c-src">markets, charts</span></td></tr>
           <tr><th scope="row">StockTwits</th><td><span class="none" aria-label="no"></span></td><td><span class="cell c-src">traders' posts</span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td></tr>
           <tr><th scope="row">Reddit</th><td><span class="none" aria-label="no"></span></td><td><span class="cell c-src">forum posts</span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td></tr>
           <tr><th scope="row">FRED</th><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="cell c-src">economic figures</span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td></tr>
           <tr><th scope="row">Polymarket</th><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="cell c-src">odds</span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td></tr>
-          <tr><th scope="row">SEC EDGAR</th><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="cell c-src">filed accounts</span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td></tr>
+          <tr><th scope="row">SEC EDGAR</th><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="cell c-src">filed accounts, valuation, insider trades</span></td><td><span class="none" aria-label="no"></span></td><td><span class="cell c-src">industry, for the sector limit</span></td></tr>
           <tr><th scope="row">Robinhood</th><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="cell c-rh">your accounts</span></td></tr>
         </tbody>
       </table>
@@ -706,7 +706,7 @@ p { text-wrap: pretty; }
           <article class="agent edge c-desk">
             <div class="agent-h"><span class="icbox"><svg class="ic"><use href="#i-ledger"/></svg></span><div><p class="agent-name">Fundamentals analyst</p><p class="agent-id">fundamentals-analyst</p></div></div>
             <p class="agent-role">Checks the business itself: its accounts as filed, its ratios, and who inside the company is buying or selling; for a fund, what it holds and what it costs to own. Not used for a coin.</p>
-            <dl><dt>Reads</dt><dd>SEC filings, Yahoo profile, ratios, insider trades; for a fund, what it holds and what it costs each year</dd><dt>Writes</dt><dd>The fundamentals report</dd></dl>
+            <dl><dt>Reads</dt><dd>SEC filings: accounts, valuation and insider trades; for a fund, what it holds and what it costs each year</dd><dt>Writes</dt><dd>The fundamentals report</dd></dl>
           </article>
         </div>
       </div>

@@ -1,6 +1,7 @@
 // Which sector a stock or a fund counts towards, for the sector limit. The eleven S&P sector funds count towards their
-// sector; the common whole-market funds count towards none; anything else takes its sector from its own profile, and a
-// fund or a stock whose sector cannot be told counts as a sector of its own, so missing data never hides a concentration.
+// sector; the common whole-market funds count towards none; anything else takes its sector from the industry code its
+// filer gave the SEC (data/company.ts profileSector), and a fund or a stock whose sector cannot be told counts as a
+// sector of its own, so missing data never hides a concentration.
 import { isCrypto } from '../data/symbols.js';
 import { profileSector } from '../data/company.js';
 

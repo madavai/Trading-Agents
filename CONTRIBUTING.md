@@ -7,8 +7,13 @@
 
 ## Layout
 - `src/tools/` - the desk tool server, the one MCP server this folder gives the engine (`.mcp.json`).
-- `src/data/` - the free sources, each held to the analysis date. `company.ts` is a company's accounts, profile, ratios
-  and insider trades, and `fundProfile` (tool `get_fund_profile`) a fund's in their place: what it holds, what it costs
+- `src/data/` - the free sources, each held to the analysis date, official ones first. `company.ts` is a company's
+  accounts, profile, valuation and insider trades: for a US filer all from the SEC as filed by the analysis date
+  (`sec.ts`: statements, `submissions` for name and industry code, `sectorOfSic`, `trailingYear` for the last twelve
+  months no filing states, `sharesOutstanding` from the cover page; `insiders.ts`: each Form 4 read from its own XML),
+  the valuation worked out with the checked close; Yahoo Finance only for a company that does not file with the SEC,
+  today only (Yahoo refuses its company data to the desk's honest name, so this is mostly unavailable). The desk never
+  calls itself a browser. `fundProfile` (tool `get_fund_profile`) is a fund's in their place: what it holds, what it costs
   each year and its size, with the cost, size and holdings named as unavailable when Yahoo does not give them, and the
   whole profile withheld for a past day.
 - `src/check/` - the desk check: this computer, and the free data sources.
@@ -80,7 +85,8 @@
   the crypto limit in place of a sector's. The dashboard's server refuses crypto and indices (`tradable`) when a ticket
   opens and again at Review and Place, before Robinhood is asked anything.
 - `src/desk/sectors.ts` - a symbol's sector for the sector limit: the S&P sector funds and the whole-market funds by
-  table, else the company's profile (`data/company.ts` `profileSector`), an unknown one counted on its own; looked up
+  table, else the SEC (`data/company.ts` `profileSector`: a fund if in the SEC's funds list, else the sector of its
+  industry code), an unknown one counted on its own; looked up
   once per run of the dashboard. The weekly loss limit is `robinhood/link.ts` `noteValue`, with the account's values day
   by day in `values.json` beside the sign-in.
 - `src/desk/paper.ts` - the paper book: every live call on a stock, a fund or a coin in `PAPER_CRYPTO` (Bitcoin and
