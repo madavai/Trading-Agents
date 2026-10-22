@@ -4626,7 +4626,7 @@ var require_core = __commonJS({
       errorsText(errors = this.errors, { separator = ", ", dataVar = "data" } = {}) {
         if (!errors || errors.length === 0)
           return "No errors";
-        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text3, msg) => text3 + separator + msg);
+        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text4, msg) => text4 + separator + msg);
       }
       $dataMetaSchema(metaSchema, keywordsJsonPointers) {
         const rules = this.RULES.all;
@@ -16556,8 +16556,8 @@ function ko_default() {
 }
 
 // node_modules/zod/v4/locales/lt.js
-var capitalizeFirstCharacter = (text3) => {
-  return text3.charAt(0).toUpperCase() + text3.slice(1);
+var capitalizeFirstCharacter = (text4) => {
+  return text4.charAt(0).toUpperCase() + text4.slice(1);
 };
 function getUnitTypeFromNumber(number4) {
   const abs = Math.abs(number4);
@@ -36821,19 +36821,19 @@ async function shippedAgentFiles(source) {
 }
 function driftOf(root, shipped) {
   const changed = [], missing = [];
-  for (const [p, text3] of shipped) {
+  for (const [p, text4] of shipped) {
     const file5 = path5.join(root, p);
     if (!fs4.existsSync(file5)) missing.push(p);
-    else if (fs4.readFileSync(file5, "utf8").replace(/\r\n/g, "\n") !== text3) changed.push(p);
+    else if (fs4.readFileSync(file5, "utf8").replace(/\r\n/g, "\n") !== text4) changed.push(p);
   }
   return { changed, missing };
 }
 function resetAgentFiles(root, shipped) {
   const { changed, missing } = driftOf(root, shipped);
-  for (const [p, text3] of shipped) {
+  for (const [p, text4] of shipped) {
     const file5 = path5.join(root, p);
     fs4.mkdirSync(path5.dirname(file5), { recursive: true });
-    fs4.writeFileSync(file5, text3);
+    fs4.writeFileSync(file5, text4);
   }
   return [...changed, ...missing];
 }
@@ -36942,10 +36942,10 @@ function withLock(file5, run, waitMs = 15e3) {
     }
   }
 }
-function writeWhole(file5, text3) {
+function writeWhole(file5, text4) {
   const temp = `${file5}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
   try {
-    fs6.writeFileSync(temp, text3);
+    fs6.writeFileSync(temp, text4);
     fs6.renameSync(temp, file5);
   } catch (e) {
     try {
@@ -37011,11 +37011,11 @@ function readCache(url2) {
     return null;
   }
 }
-function writeCache(url2, text3) {
+function writeCache(url2, text4) {
   if (!cacheDir) return;
   try {
     fs7.mkdirSync(cacheDir, { recursive: true });
-    writeWhole(path7.join(cacheDir, `${keyOf(url2)}.txt`), text3);
+    writeWhole(path7.join(cacheDir, `${keyOf(url2)}.txt`), text4);
   } catch {
   }
 }
@@ -37052,15 +37052,15 @@ async function getText(url2, opts = {}) {
       await sleep(Math.min(2e4, wait));
       continue;
     }
-    const text3 = await res.text();
+    const text4 = await res.text();
     if (res.status === 404) throw new NoData(`${host} has nothing at that address (HTTP 404)`);
     if (!res.ok) {
       const sec = /(^|\.)sec\.gov$/.test(new URL(url2).hostname);
-      const said = res.status === 403 || res.status === 429 ? excerpt(text3) : "";
+      const said = res.status === 403 || res.status === 429 ? excerpt(text4) : "";
       throw new Unavailable(`${host} refused (HTTP ${res.status})${said ? `, saying "${said}"` : ""}${res.status === 429 ? "; it is rate-limiting this computer, so try again in a few minutes" : ""}${sec ? emailNow().trim() ? " [a contact email was sent]" : " [no contact email was sent]" : ""}`);
     }
-    writeCache(url2, text3);
-    return text3;
+    writeCache(url2, text4);
+    return text4;
   }
 }
 async function getCookies(url2) {
@@ -37075,9 +37075,9 @@ async function getCookies(url2) {
   return res.headers.getSetCookie().map((c) => c.split(";")[0]).join("; ");
 }
 async function getJson(url2, opts = {}) {
-  const text3 = await getText(url2, opts);
+  const text4 = await getText(url2, opts);
   try {
-    return JSON.parse(text3);
+    return JSON.parse(text4);
   } catch {
     throw new Unavailable(`${new URL(url2).host} answered with something that is not data`);
   }
@@ -37621,13 +37621,13 @@ async function economicSeries(indicator, analysis2, lookBackDays = 365) {
   if (past) obs = obs.filter((o) => addDays(o.date, lag) <= day3);
   obs = obs.filter((o) => o.date >= addDays(day3, -Math.max(30, Math.min(3650, lookBackDays))));
   if (!obs.length) throw new NoData(`FRED has no ${id} values published by ${day3} in this window`);
-  const first = obs[0], last = obs[obs.length - 1], change3 = last.value - first.value, pct3 = first.value ? change3 / Math.abs(first.value) * 100 : 0;
+  const first = obs[0], last = obs[obs.length - 1], change3 = last.value - first.value, pct4 = first.value ? change3 / Math.abs(first.value) * 100 : 0;
   const fmt2 = (v) => Math.abs(v) >= 1e3 ? v.toLocaleString("en-US", { maximumFractionDigits: 1 }) : v.toFixed(2);
   const lines = [
     `## ${known?.[1] ?? id} - FRED series ${id}`,
     "",
     `- Latest value known by ${day3}: ${fmt2(last.value)} (for ${last.date})`,
-    `- Change since ${first.date}: ${change3 >= 0 ? "+" : ""}${fmt2(change3)} (${pct3 >= 0 ? "+" : ""}${pct3.toFixed(1)}%)`,
+    `- Change since ${first.date}: ${change3 >= 0 ? "+" : ""}${fmt2(change3)} (${pct4 >= 0 ? "+" : ""}${pct4.toFixed(1)}%)`,
     past ? `- A past analysis date: values are kept only if published by ${day3} (a ${lag}-day release lag for this series), and are today's revised figures; first releases may have differed slightly.` : "- Values as published today, revisions included.",
     "",
     "Date | Value",
@@ -37808,6 +37808,16 @@ function sectorOfSic(raw) {
   if (in_(7600, 8999)) return "Industrials";
   return null;
 }
+async function fundOf(symbol4) {
+  const t = await cached2("https://www.sec.gov/files/company_tickers_mf.json", 3e4);
+  const col = (name, fallback) => {
+    const i = t.fields?.indexOf(name) ?? -1;
+    return i >= 0 ? i : fallback;
+  };
+  const row = (t.data ?? []).find((r) => String(r[col("symbol", 3)] ?? "").toUpperCase() === symbol4.toUpperCase());
+  const series = String(row?.[col("seriesId", 1)] ?? ""), cls = String(row?.[col("classId", 2)] ?? "");
+  return row && /^\d+$/.test(String(row[col("cik", 0)])) && /^S\d{9}$/.test(series) ? { cik: String(row[col("cik", 0)]).padStart(10, "0"), series, cls } : null;
+}
 var ANNUAL = (f) => ANNUAL_FORMS.some((p) => (f.form ?? "").startsWith(p));
 var span = (f) => f.start ? daysBetween(f.start, f.end) : 0;
 function knownBy(list2, asOf) {
@@ -37926,8 +37936,8 @@ async function secInsiders(symbol4, cik, asOf, days = 90, limit = 25) {
   }
   const market = (code) => trades.filter((t) => t.code === code);
   const total = (list2) => {
-    const shares = list2.reduce((a, t) => a + t.shares, 0), value = list2.reduce((a, t) => a + t.shares * (t.price ?? 0), 0), planned = list2.filter((t) => t.plan).length;
-    return list2.length ? `${list2.length} (${fmt(shares)} shares, about ${fmt(value)} USD at their own prices${planned ? `; ${planned} under a pre-arranged 10b5-1 plan` : ""})` : "none";
+    const shares2 = list2.reduce((a, t) => a + t.shares, 0), value = list2.reduce((a, t) => a + t.shares * (t.price ?? 0), 0), planned = list2.filter((t) => t.plan).length;
+    return list2.length ? `${list2.length} (${fmt(shares2)} shares, about ${fmt(value)} USD at their own prices${planned ? `; ${planned} under a pre-arranged 10b5-1 plan` : ""})` : "none";
   };
   const buys = market("P"), sales = market("S"), other = trades.length - buys.length - sales.length;
   const lines = trades.map((t) => `- ${t.date} (made public ${t.filed}) \xB7 ${t.owner} (${t.role}): ${CODES[t.code] ?? `transaction ${t.code} of`} ${fmt(t.shares, 4)} shares${t.price ? ` at ${fmt(t.price, 4)}` : ", no price"}${t.after !== null ? ` \xB7 holds ${fmt(t.after, 4)} after` : ""}${t.indirect ? ` \xB7 indirectly (${t.indirect})` : ""}${t.plan ? " \xB7 under a 10b5-1 plan" : ""}`);
@@ -37939,6 +37949,155 @@ async function secInsiders(symbol4, cik, asOf, days = 90, limit = 25) {
     "",
     ...lines.length ? lines : ["(these filings list no trades in shares, only options or holdings)"]
   ].join("\n");
+}
+
+// src/data/nport.ts
+var ACCESSION = /^\d{10}-\d{2}-\d{6}$/;
+var DAY2 = /^\d{4}-\d{2}-\d{2}$/;
+var text = (xml, tag) => decode4(blocks(xml, tag)[0] ?? "").replace(/\s+/g, " ").trim();
+var attr = (xml, tag, name) => decode4(new RegExp(`<${tag}\\s[^>]*\\b${name}="([^"]*)"`).exec(xml)?.[1] ?? "").trim();
+var num3 = (v) => v === "" || !Number.isFinite(Number(v)) ? null : Number(v);
+function parseReport(xml, cls) {
+  const gen = blocks(xml, "genInfo")[0], info = blocks(xml, "fundInfo")[0];
+  const asOf = gen ? text(gen, "repPdDate") : "", netAssets = info ? num3(text(info, "netAssets")) : null;
+  if (!gen || !DAY2.test(asOf) || netAssets === null) throw new Unavailable("the SEC answered with something that is not a fund's portfolio report");
+  const holdings = blocks(xml, "invstOrSec").map((h) => ({
+    name: text(h, "name") || text(h, "title") || "unnamed",
+    pct: num3(text(h, "pctVal")) ?? 0,
+    asset: text(h, "assetCat") || attr(h, "assetConditional", "assetCat") || "OTHER",
+    issuer: text(h, "issuerCat") || attr(h, "issuerConditional", "issuerCat") || "OTHER",
+    country: text(h, "invCountry"),
+    maturity: DAY2.test(text(h, "maturityDt")) ? text(h, "maturityDt") : null,
+    coupon: num3(text(h, "annualizedRt"))
+  }));
+  const rows = [...xml.matchAll(/<monthlyTotReturn\s([^>]*)\/?>/g)].map((m2) => m2[1]);
+  const row = rows.find((r) => cls && r.includes(`classId="${cls}"`)) ?? (rows.length === 1 ? rows[0] : void 0);
+  const returns = row ? ["rtn1", "rtn2", "rtn3"].map((k) => num3(new RegExp(`\\b${k}="([^"]*)"`).exec(row)?.[1] ?? "")) : null;
+  return {
+    series: text(gen, "seriesName").replace(/\((?:R|TM)\)/g, "").replace(/\s+/g, " ").trim() || text(gen, "regName"),
+    registrant: text(gen, "regName"),
+    asOf,
+    netAssets,
+    holdings,
+    returns: returns && returns.every((r) => r !== null) ? returns : null
+  };
+}
+async function filings(cik, series) {
+  let list2;
+  if (series) {
+    const atom = await getText(`https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${series}&type=NPORT-P&dateb=&owner=include&count=40&output=atom`, { timeoutMs: 3e4 });
+    list2 = blocks(atom, "entry").map((e) => ({ form: text(e, "filing-type"), accession: text(e, "accession-number"), filed: text(e, "filing-date") }));
+  } else {
+    const r = (await submissions(cik)).filings?.recent ?? {};
+    list2 = (r.form ?? []).map((form, i) => ({ form, accession: r.accessionNumber?.[i] ?? "", filed: r.filingDate?.[i] ?? "" }));
+  }
+  return list2.filter((f) => f.form === "NPORT-P" && ACCESSION.test(f.accession) && DAY2.test(f.filed)).sort((a, b) => b.filed.localeCompare(a.filed));
+}
+async function latestReport(sym2, day3) {
+  const fund = await fundOf(sym2), cik = fund?.cik ?? await cikFor(sym2);
+  if (!cik) return null;
+  const all = await filings(cik, fund?.series ?? null);
+  if (!all.length) return null;
+  const pick2 = all.find((f) => f.filed <= day3);
+  if (!pick2) throw new NoData(`${sym2}'s first portfolio report to the SEC (form N-PORT) was filed on ${all.at(-1).filed}, after ${day3}`);
+  const xml = await getText(`https://www.sec.gov/Archives/edgar/data/${Number(cik)}/${pick2.accession.replace(/-/g, "")}/primary_doc.xml`, { timeoutMs: 6e4 });
+  return { ...parseReport(xml, fund?.cls ?? null), filed: pick2.filed };
+}
+var ASSETS = {
+  EC: "stocks",
+  EP: "preferred stocks",
+  DBT: "bonds and other debt",
+  "ABS-MBS": "mortgage-backed bonds",
+  "ABS-ASBS": "asset-backed bonds",
+  "ABS-CBDO": "collateralised debt",
+  "ABS-O": "other asset-backed bonds",
+  STIV: "cash and money-market funds",
+  RE: "real estate",
+  LON: "loans",
+  COMM: "commodities",
+  SN: "structured notes",
+  DCO: "derivatives",
+  DCR: "derivatives",
+  DE: "derivatives",
+  DFE: "derivatives",
+  DIR: "derivatives",
+  DO: "derivatives",
+  OTHER: "other"
+};
+var ISSUERS = {
+  CORP: "companies",
+  UST: "the US Treasury",
+  USGA: "US government agencies",
+  USGSE: "US government-sponsored enterprises (such as Fannie Mae)",
+  MUN: "US states and cities",
+  NUSS: "governments outside the US",
+  RF: "other funds",
+  PF: "private funds",
+  OTHER: "other"
+};
+var MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+var regions = null;
+var country = (code) => {
+  if (!/^[A-Z]{2}$/.test(code)) return "not given";
+  try {
+    regions ??= new Intl.DisplayNames(["en"], { type: "region" });
+    return regions.of(code) ?? code;
+  } catch {
+    return code;
+  }
+};
+var pct = (n2) => `${n2.toFixed(2)}%`;
+var signed = (n2) => `${n2 >= 0 ? "+" : ""}${n2.toFixed(2)}%`;
+function shares(list2, key) {
+  const m2 = /* @__PURE__ */ new Map();
+  for (const h of list2) {
+    const k = key(h), was = m2.get(k) ?? [0, 0];
+    m2.set(k, [was[0] + h.pct, was[1] + 1]);
+  }
+  return [...m2].map(([k, [p, n2]]) => [k, p, n2]).filter(([, p]) => Math.abs(p) >= 5e-3).sort((a, b) => b[1] - a[1]);
+}
+function renderReport(sym2, day3, r, topN = 10) {
+  const lines = [
+    `Fund profile for ${sym2}, from its portfolio report to the SEC (form N-PORT, filed ${r.filed}): what it held on ${r.asOf}, ${daysBetween(r.asOf, day3)} days before ${day3}. Funds make each quarter's last month public about two months later, so this is the latest anyone could read by ${day3}. A fund has no company accounts or insider trades of its own: what it holds and what it costs are its fundamentals.`,
+    "",
+    `Name: ${r.series}`,
+    ...r.registrant && r.registrant.toLowerCase() !== r.series.toLowerCase() ? [`Filed by: ${r.registrant}`] : [],
+    `Net assets (its size): ${Math.round(r.netAssets).toLocaleString("en-US")} USD on ${r.asOf}`,
+    `Holdings: ${r.holdings.length.toLocaleString("en-US")} lines`,
+    `Held in: ${shares(r.holdings, (h) => ASSETS[h.asset] ?? h.asset).map(([k, p]) => `${k} ${pct(p)}`).join(", ") || "not given"}`,
+    `Issued by: ${shares(r.holdings, (h) => ISSUERS[h.issuer] ?? h.issuer).map(([k, p]) => `${k} ${pct(p)}`).join(", ") || "not given"}`
+  ];
+  const where = shares(r.holdings, (h) => country(h.country));
+  if (where.length) {
+    const us = where.find(([k]) => k === "United States")?.[1] ?? 0, total = where.reduce((a, [, p]) => a + p, 0);
+    lines.push(`Countries: ${where.slice(0, 5).map(([k, p]) => `${k} ${pct(p)}`).join(", ")}${where.length > 5 ? `, and ${where.length - 5} more` : ""} (outside the US together: ${pct(total - us)})`);
+  }
+  const bonds = r.holdings.filter((h) => h.maturity && h.pct > 0);
+  const weight = bonds.reduce((a, h) => a + h.pct, 0);
+  if (weight >= 1) {
+    const years = bonds.reduce((a, h) => a + h.pct * Math.max(0, daysBetween(r.asOf, h.maturity)) / 365.25, 0) / weight;
+    const paying = bonds.filter((h) => h.coupon !== null), w2 = paying.reduce((a, h) => a + h.pct, 0);
+    const coupon = w2 ? paying.reduce((a, h) => a + h.pct * h.coupon, 0) / w2 : null;
+    lines.push(`Bonds (${pct(weight)} of the fund): on average ${years.toFixed(1)} years to repayment${coupon !== null ? ` and ${coupon.toFixed(2)}% yearly interest` : ""}, weighted by value (worked out here from each bond's maturity and rate)`);
+  }
+  if (r.returns) {
+    const end = /* @__PURE__ */ new Date(`${r.asOf}T12:00:00Z`), month = (back) => {
+      const d = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() - back, 15));
+      return `${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+    };
+    lines.push(`Its own total return by month, as it reported it: ${r.returns.map((v, i) => `${month(2 - i)} ${signed(v)}`).join(", ")}`);
+  } else lines.push("Its own monthly returns: not in this report");
+  lines.push("Yearly cost (expense ratio): unavailable (no official free source gives it in a form the desk can read; the fund's prospectus states it)");
+  const top = shares(r.holdings, (h) => h.name).slice(0, topN);
+  if (top.length) {
+    const together = top.reduce((a, [, p]) => a + p, 0);
+    lines.push(
+      "",
+      `Top ${top.length} holdings, by issuer (${pct(together)} of the fund together; an issuer's several lines, such as two classes of shares or many bonds, added up):`,
+      ...top.map(([k, p, n2]) => `- ${k}${n2 > 1 ? ` (${n2.toLocaleString("en-US")} lines)` : ""}: ${pct(p)}`)
+    );
+  }
+  return lines.join("\n");
 }
 
 // src/data/company.ts
@@ -37987,7 +38146,7 @@ var has = (v) => typeof v?.raw === "number" && Number.isFinite(v.raw);
 var money = (v, currency) => has(v) ? `${v.raw.toLocaleString("en-US", { maximumFractionDigits: 2 })}${currency ? ` ${currency}` : ""}` : null;
 var plain2 = (v) => has(v) ? String(Number(v.raw.toFixed(4))) : null;
 var percent = (v) => has(v) ? `${(v.raw * 100).toFixed(2)}%` : null;
-var MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+var MONTHS2 = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 var units = (facts, unit) => facts?.units?.[unit] ?? [];
 var fixed = (n2, d = 2) => n2.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
 var whole = (n2) => Math.round(n2).toLocaleString("en-US");
@@ -37998,7 +38157,7 @@ async function secOverview(sym2, cik, day3) {
   if (s.name) lines.push(`Name: ${s.name}`);
   if (s.sic) lines.push(`Industry (the SEC's code ${s.sic}): ${s.sicDescription || "not named"}`, `Sector (worked out from that code, so approximate): ${sectorOfSic(s.sic) ?? "not known"}`);
   const fy = /^(\d\d)(\d\d)$/.exec(s.fiscalYearEnd ?? "");
-  if (fy && Number(fy[1]) >= 1 && Number(fy[1]) <= 12) lines.push(`Fiscal year ends: ${Number(fy[2])} ${MONTHS[Number(fy[1]) - 1]}`);
+  if (fy && Number(fy[1]) >= 1 && Number(fy[1]) <= 12) lines.push(`Fiscal year ends: ${Number(fy[2])} ${MONTHS2[Number(fy[1]) - 1]}`);
   let close = null;
   try {
     const h = await history(sym2, day3), last = h.bars.at(-1);
@@ -38009,11 +38168,11 @@ async function secOverview(sym2, cik, day3) {
   lines.push(close ? `Close: ${fixed(close.close)} ${close.currency ?? ""} on ${close.date} (the checked price table's latest row on or before ${day3})`.replace("  ", " ") : "Close: unavailable (the prices could not be read), so no multiple can be worked out");
   const cover = sharesOutstanding(units(dei.EntityCommonStockSharesOutstanding, "shares"), day3);
   const average = cover ? null : averageDilutedShares(units(g.WeightedAverageNumberOfDilutedSharesOutstanding, "shares"), day3);
-  const shares = cover ?? average, which = average ? "average diluted shares" : "shares";
+  const shares2 = cover ?? average, which = average ? "average diluted shares" : "shares";
   if (cover) lines.push(`Shares outstanding: ${whole(cover.shares)} (counted on ${cover.end}, filed ${cover.filed})`);
   else if (average) lines.push(`Shares outstanding: no single count on a cover page filed by then (a company with more than one class of shares gives one per class there, which the SEC's data leaves out). In its place, the weighted average diluted shares from its accounts for ${average.start} to ${average.end}: ${whole(average.shares)} (filed ${average.filed}), so the figures worked out from it are close, not exact`);
   else lines.push("Shares outstanding: unavailable (not on a cover page filed by then)");
-  if (shares && close && usd) lines.push(`Market value (derived: ${which} \xD7 close): ${whole(shares.shares * close.close)} USD`);
+  if (shares2 && close && usd) lines.push(`Market value (derived: ${which} \xD7 close): ${whole(shares2.shares * close.close)} USD`);
   const eps = trailingYear(units(g.EarningsPerShareDiluted, "USD/shares"), day3);
   if (eps) {
     lines.push(`Diluted EPS, last twelve months (derived from ${eps.parts}): ${fixed(eps.value)} USD`);
@@ -38022,8 +38181,8 @@ async function secOverview(sym2, cik, day3) {
   const equity = latestBalance(units(g.StockholdersEquity, "USD"), day3);
   if (equity) {
     lines.push(`Stockholders' equity: ${whole(equity.val)} USD (at ${equity.end}, filed ${equity.filed})`);
-    if (shares && shares.shares > 0) {
-      const bv = equity.val / shares.shares;
+    if (shares2 && shares2.shares > 0) {
+      const bv = equity.val / shares2.shares;
       lines.push(`Book value per share (derived: equity \xF7 ${which}): ${fixed(bv)} USD`);
       if (close && usd && bv > 0) lines.push(`Price to book (derived: close \xF7 that): ${fixed(close.close / bv)}`);
     }
@@ -38107,6 +38266,9 @@ var FUND_SECTORS = {
 };
 async function fundProfile(raw, analysis2, topN = 10) {
   const day3 = analysisDate(analysis2), sym2 = companySymbol(raw);
+  const report = await latestReport(sym2, day3);
+  if (report) return renderReport(sym2, day3, report, topN);
+  if (await cikFor(sym2)) throw new NoData(`${sym2} reports to the SEC as a company or a trust, not as a fund that lists its holdings (form N-PORT): for a company, use the company tools; a trust that holds gold or bitcoin holds just that`);
   if (isHistorical(day3)) return `The fund profile of ${sym2} is withheld for ${day3}: Yahoo Finance serves it only as it stands today. Today's holdings and their weights carry the prices of every day since ${day3}, and its size and yearly cost may have changed; they would put later knowledge into an analysis of ${day3}. Say the profile is unavailable for a past day.`;
   const r = await summary(sym2, "price,quoteType,fundProfile,topHoldings,summaryDetail,defaultKeyStatistics");
   const type = r.quoteType?.quoteType ?? "";
@@ -38227,7 +38389,7 @@ import path20 from "node:path";
 import fs8 from "node:fs";
 import path8 from "node:path";
 var file3 = (dir) => path8.join(dir, "holdings.json");
-var num3 = (v, what) => {
+var num4 = (v, what) => {
   if (typeof v !== "number" || !Number.isFinite(v)) throw new Error(`${what} must be a number`);
   return v;
 };
@@ -38238,13 +38400,13 @@ function saveHoldings(dir, input2, today2, source = "person") {
     const ticker = safeSymbol(p.ticker);
     if (seen.has(ticker)) throw new Error(`${ticker} is listed twice: give one total quantity`);
     seen.add(ticker);
-    const quantity = num3(p.quantity, `the quantity of ${ticker}`);
+    const quantity = num4(p.quantity, `the quantity of ${ticker}`);
     if (quantity === 0) throw new Error(`${ticker} has a quantity of 0: leave it out`);
-    const averagePrice = p.averagePrice === void 0 ? void 0 : num3(p.averagePrice, `the average price of ${ticker}`);
+    const averagePrice = p.averagePrice === void 0 ? void 0 : num4(p.averagePrice, `the average price of ${ticker}`);
     if (averagePrice !== void 0 && averagePrice <= 0) throw new Error(`the average price of ${ticker} must be above 0`);
     return { ticker, quantity, ...averagePrice === void 0 ? {} : { averagePrice } };
   });
-  const cash = input2.cash === void 0 ? void 0 : num3(input2.cash, "cash");
+  const cash = input2.cash === void 0 ? void 0 : num4(input2.cash, "cash");
   if (cash !== void 0 && cash < 0) throw new Error("cash cannot be negative");
   const currency = input2.currency?.trim().toUpperCase();
   if (currency !== void 0 && !/^[A-Z]{3}$/.test(currency)) throw new Error(`"${input2.currency}" is not a three-letter currency such as USD`);
@@ -38304,9 +38466,9 @@ var LABEL = /(?<![a-z])rating\b[^:\-\u2010-\u2015]*[:\-\u2010-\u2015][\s*]*(\w+)
 var OWN = "(?:(?:final|our|overall|my|recommended|updated|revised|new|current)\\s+)*";
 var LINE = new RegExp(`^\\s*(?<item>(?:[-+*\\u2022]|\\d+[.)])\\s+)?[\\s*_#]*${OWN}rating[^\\w:\\-\\u2010-\\u2015]*[:\\-\\u2010-\\u2015][\\s*]*(?<value>\\w+)`, "i");
 var SCALE = /rating\s*(scale|options|legend)/i;
-function extractRating(text3) {
-  if (!text3) return null;
-  const lines = text3.normalize("NFKC").split(/\r?\n/).filter((l) => l.trim() && !SCALE.test(l));
+function extractRating(text4) {
+  if (!text4) return null;
+  const lines = text4.normalize("NFKC").split(/\r?\n/).filter((l) => l.trim() && !SCALE.test(l));
   const first = lines.find((l) => !l.trimStart().startsWith("#") || LINE.test(l)) ?? "";
   const m2 = LINE.exec(first);
   const opening = m2 && SET.has(m2.groups.value.toLowerCase()) ? m2 : null;
@@ -38320,7 +38482,7 @@ function extractRating(text3) {
   const found = own2.length ? own2 : labels;
   return found.length && new Set(found).size === 1 ? found[0] : null;
 }
-var parseRating = (text3) => extractRating(text3) ?? REVIEW;
+var parseRating = (text4) => extractRating(text4) ?? REVIEW;
 
 // src/desk/backtest.ts
 var MAX_CELLS = 100;
@@ -38379,10 +38541,10 @@ import path10 from "node:path";
 import fs9 from "node:fs";
 import path9 from "node:path";
 var SEPARATOR = "\n\n<!-- ENTRY_END -->\n\n";
-var pct = (v) => `${v >= 0 ? "+" : "-"}${(Math.abs(v) * 100).toFixed(1)}%`;
+var pct2 = (v) => `${v >= 0 ? "+" : "-"}${(Math.abs(v) * 100).toFixed(1)}%`;
 var MARK = /<!--\s*ENTRY_END\s*-->/i;
-function keep(text3) {
-  let s = text3;
+function keep(text4) {
+  let s = text4;
   while (MARK.test(s)) s = s.replace(MARK, "");
   return s.replace(/^([ \t]*)(DECISION|REFLECTION):/gim, "$1$2 -").trim();
 }
@@ -38419,9 +38581,9 @@ var Journal = class {
       return "";
     }
   }
-  write(text3) {
+  write(text4) {
     fs9.mkdirSync(path9.dirname(this.file), { recursive: true });
-    writeWhole(this.file, text3);
+    writeWhole(this.file, text4);
   }
   blocks() {
     return this.read().split(SEPARATOR).filter((b) => b.trim());
@@ -38455,7 +38617,7 @@ ${keep(decision)}${SEPARATOR}`);
         const e = parse3(block);
         if (done || !e || !e.pending || e.date !== date5 || e.ticker !== ticker) return block;
         done = true;
-        return `[${date5} | ${ticker} | ${e.rating} | ${pct(raw)} | ${pct(alpha)} | ${holdingDays}d | resolved:${resolution}]
+        return `[${date5} | ${ticker} | ${e.rating} | ${pct2(raw)} | ${pct2(alpha)} | ${holdingDays}d | resolved:${resolution}]
 
 DECISION:
 ${e.decision}
@@ -38558,8 +38720,8 @@ function startRun(dir, ticker, date5, plan) {
     r.plan = plan;
   });
 }
-function saveSection(dir, ticker, date5, section, text3) {
-  const t = text3.trim();
+function saveSection(dir, ticker, date5, section, text4) {
+  const t = text4.trim();
   if (!t) throw new Error("there is nothing to save: the text is empty");
   if (t.length > MAX_CHARS) throw new Error(`the text is ${t.length} characters; the most one section holds is ${MAX_CHARS}`);
   let turns = 0;
@@ -38876,8 +39038,8 @@ ${lessons}` : "Lessons from past calls: none yet (no earlier call has been settl
 }
 
 // src/desk/settle.ts
-var pct2 = (v) => `${v >= 0 ? "+" : "-"}${(Math.abs(v) * 100).toFixed(1)}%`;
-var line = (o, e) => `${e.ticker} ${pct2(o.raw)} from ${o.entry} to ${o.exit} (${o.holdingDays} trading days); ${o.benchmark} ${pct2(o.benchmarkReturn)}; alpha ${pct2(o.alpha)}`;
+var pct3 = (v) => `${v >= 0 ? "+" : "-"}${(Math.abs(v) * 100).toFixed(1)}%`;
+var line = (o, e) => `${e.ticker} ${pct3(o.raw)} from ${o.entry} to ${o.exit} (${o.holdingDays} trading days); ${o.benchmark} ${pct3(o.benchmarkReturn)}; alpha ${pct3(o.alpha)}`;
 var MAX_REFLECTION = 1200;
 async function dueSettlements(journal, scoring, ticker) {
   const pending = journal.pending().filter((e) => !ticker || e.ticker === ticker);
@@ -38903,14 +39065,14 @@ ${e.decision}`);
   return [`${pending.length} pending call(s), ${ready} ready to settle. Settle a ready one with record_outcome, using only the figures shown here.`, "", ...out].join("\n\n");
 }
 async function settleOne(journal, scoring, ticker, date5, reflection) {
-  const text3 = reflection.trim();
-  if (!text3) throw new Error("the lesson is empty: write 2 to 4 plain sentences");
-  if (text3.length > MAX_REFLECTION) throw new Error(`the lesson is ${text3.length} characters; keep it under ${MAX_REFLECTION}`);
+  const text4 = reflection.trim();
+  if (!text4) throw new Error("the lesson is empty: write 2 to 4 plain sentences");
+  if (text4.length > MAX_REFLECTION) throw new Error(`the lesson is ${text4.length} characters; keep it under ${MAX_REFLECTION}`);
   const e = journal.pending().find((x) => x.ticker === ticker && x.date === date5);
   if (!e) throw new Error(`there is no pending call on ${ticker} for ${date5}`);
   const o = await measure(ticker, date5, resolveBenchmark(ticker, scoring), scoring.holdingPeriodDays);
   if (!o) return `NOT_YET: the ${scoring.holdingPeriodDays}-trading-day window after ${date5} has not finished, so ${ticker} stays pending.`;
-  return journal.recordOutcome(ticker, date5, o.raw, o.alpha, o.holdingDays, text3, o.exit) ? `Settled: ${line(o, e)}. The lesson is kept and will be read by later analyses from ${o.exit} on.` : `${ticker} on ${date5} was settled by another run already.`;
+  return journal.recordOutcome(ticker, date5, o.raw, o.alpha, o.holdingDays, text4, o.exit) ? `Settled: ${line(o, e)}. The lesson is kept and will be read by later analyses from ${o.exit} on.` : `${ticker} on ${date5} was settled by another run already.`;
 }
 
 // src/terminal/launch.ts
@@ -39420,17 +39582,17 @@ function readPrefs(dir) {
 var marketOf = (dir) => readPrefs(dir).market ?? [...SHIPPED_MARKET];
 
 // src/tools/desk.ts
-var text = (t) => ({ content: [{ type: "text", text: t }] });
+var text2 = (t) => ({ content: [{ type: "text", text: t }] });
 var symbol2 = external_exports.string().min(1).max(20).describe("The ticker as the plan gives it");
 var day2 = external_exports.string().describe("The analysis date, YYYY-MM-DD");
 var DEBATES2 = ["investment_debate", "risk_debate"];
 async function act(run) {
   try {
-    return text(await run());
+    return text2(await run());
   } catch (e) {
-    if (e instanceof NeedsEmail) return text(`NEEDS_EMAIL: ${e.message}`);
-    if (e instanceof Unavailable || e instanceof NoData) return text(failureText(e, "this desk record"));
-    return text(`INPUT_ERROR: ${e.message}. Correct it and call again.`);
+    if (e instanceof NeedsEmail) return text2(`NEEDS_EMAIL: ${e.message}`);
+    if (e instanceof Unavailable || e instanceof NoData) return text2(failureText(e, "this desk record"));
+    return text2(`INPUT_ERROR: ${e.message}. Correct it and call again.`);
   }
 }
 function registerDeskTools(server, root) {
@@ -39716,14 +39878,14 @@ ${renderSummary(summarize(entries))}`;
 }
 
 // src/tools/server.ts
-var text2 = (t) => ({ content: [{ type: "text", text: t }] });
+var text3 = (t) => ({ content: [{ type: "text", text: t }] });
 async function answer(what, run) {
   try {
-    return text2(await run());
+    return text3(await run());
   } catch (e) {
     const err = e;
-    if (/YYYY-MM-DD|in the future|not a ticker|not a series name/.test(err.message)) return text2(`INPUT_ERROR: ${err.message}. Correct it and call again.`);
-    return text2(failureText(e, what));
+    if (/YYYY-MM-DD|in the future|not a ticker|not a series name/.test(err.message)) return text3(`INPUT_ERROR: ${err.message}. Correct it and call again.`);
+    return text3(failureText(e, what));
   }
 }
 var symbol3 = external_exports.string().min(1).max(20).describe("The ticker as the instrument context gives it, e.g. NVDA, 7203.T, BTC-USD");
@@ -39738,7 +39900,7 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root) {
     title: "Desk check",
     description: "Check that this computer is ready for the Trading Agents desk: Node, the desk data folder, whether a Robinhood sign-in is saved, whether the desk's agents and team are as the project ships them, and whether each free data source answers. Read-only; it sends no order and reads no secret.",
     annotations: READ
-  }, async () => text2(await deskCheck(root, fetchImpl2, source)));
+  }, async () => text3(await deskCheck(root, fetchImpl2, source)));
   server.registerTool("reset_team", {
     title: "Reset the team",
     description: "Put the desk's twelve agents, the trading-desk team's file and its line-up back exactly as the project ships them: each file is written again, even one that already matches, which also brings Madav back to the project's version of the team in place of changes made in its Agent Studio. Only after the person asked for it and confirmed it in this conversation. It writes only those files in this folder; the model, permissions and effort the person chose in Madav stay theirs.",
@@ -39749,11 +39911,11 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root) {
     try {
       wrote = resetAgentFiles(root, await shippedAgentFiles(source));
     } catch (e) {
-      return text2(`The team could not be reset: ${e.message}. Nothing was changed.`);
+      return text3(`The team could not be reset: ${e.message}. Nothing was changed.`);
     }
     const madav = "Madav goes back to the project's version of the team too, in place of changes made in its Agent Studio; the model, permissions and effort chosen there stay as they are. If Madav runs the desk's routines, it pauses them until they are switched on again in Madav.";
-    if (!wrote.length) return text2(["The desk's agent files already matched the project's version on this computer; each was written again as the project ships it.", madav].join("\n"));
-    return text2([
+    if (!wrote.length) return text3(["The desk's agent files already matched the project's version on this computer; each was written again as the project ships it.", madav].join("\n"));
+    return text3([
       `Put back as the project ships them: ${listed(wrote.map(plainName))}; the others were written again too.`,
       `They take effect from the next conversation or run. ${madav}`
     ].join("\n"));
@@ -39766,9 +39928,9 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root) {
   }, async (a) => {
     try {
       const email3 = saveContactEmail(root, a.email);
-      return text2(`Saved. The SEC will see ${email3} as the contact for this desk's requests; no other source sees it.`);
+      return text3(`Saved. The SEC will see ${email3} as the contact for this desk's requests; no other source sees it.`);
     } catch (e) {
-      return text2(`INPUT_ERROR: ${e.message}. Ask the person for their own email address and call again.`);
+      return text3(`INPUT_ERROR: ${e.message}. Ask the person for their own email address and call again.`);
     }
   });
   server.registerTool("get_instrument", {
@@ -39851,7 +40013,7 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root) {
   }, async (a) => answer("insider transactions of " + a.symbol, () => insiderTransactions(a.symbol, a.analysis_date)));
   server.registerTool("get_fund_profile", {
     title: "Fund profile",
-    description: "For a fund (an ETF or a mutual fund, as get_instrument says), its fundamentals in place of company accounts: what it holds (top holdings, sectors, stocks against bonds), what it costs to own each year, its size, yield, family, category and start date, from Yahoo Finance as they stand today. What Yahoo does not give is said as unavailable. Withheld for a past analysis date.",
+    description: "For a fund (an ETF or a mutual fund, as get_instrument says), its fundamentals in place of company accounts, from the latest portfolio report it had filed with the SEC by the analysis date (form N-PORT; a past date reads what was public then): its size, what it holds (largest holdings by issuer, stocks against bonds and cash, issuers, countries, for bonds their years to repayment and interest), and its own monthly returns, with the day its holdings are from. Its yearly cost has no official free source and is said as unavailable. A fund outside the US falls back to Yahoo Finance, today only.",
     inputSchema: { symbol: symbol3, analysis_date: analysis },
     annotations: READ
   }, async (a) => answer("fund profile of " + a.symbol, () => fundProfile(a.symbol, a.analysis_date)));

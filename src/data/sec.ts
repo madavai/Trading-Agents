@@ -197,6 +197,16 @@ export async function fundTickers(): Promise<ReadonlySet<string>> {
   return new Set((t.data ?? []).map((r) => String(r[at] ?? '').toUpperCase()).filter(Boolean));
 }
 
+/** A fund's place at the SEC from its ticker: the registrant that files for it, and the series (the fund itself, one of
+ *  the many a trust may file for) and share class it reports as. Null when it is not in the SEC's list of funds. */
+export async function fundOf(symbol: string): Promise<{ cik: string; series: string; cls: string } | null> {
+  const t = await cached<{ fields?: string[]; data?: unknown[][] }>('https://www.sec.gov/files/company_tickers_mf.json', 30_000);
+  const col = (name: string, fallback: number) => { const i = t.fields?.indexOf(name) ?? -1; return i >= 0 ? i : fallback; };
+  const row = (t.data ?? []).find((r) => String(r[col('symbol', 3)] ?? '').toUpperCase() === symbol.toUpperCase());
+  const series = String(row?.[col('seriesId', 1)] ?? ''), cls = String(row?.[col('classId', 2)] ?? '');
+  return row && /^\d+$/.test(String(row[col('cik', 0)])) && /^S\d{9}$/.test(series) ? { cik: String(row[col('cik', 0)]).padStart(10, '0'), series, cls } : null;
+}
+
 // ---------- figures as filed, for valuation ----------
 const ANNUAL = (f: Fact) => ANNUAL_FORMS.some((p) => (f.form ?? '').startsWith(p));
 const span = (f: Fact) => (f.start ? daysBetween(f.start, f.end) : 0);

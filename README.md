@@ -123,8 +123,8 @@ the team's "talk" switch shows these messages in the Messages panel; with it off
 
 1. **Agents analyse.** Ask the trading-desk team in Agent Studio ("analyse NVDA"), type `/analyse NVDA` in a chat, or
    press the robot beside a stock on the dashboard (see "Analyses that run by themselves" below).
-   Four analysts (price and indicators, mood, news, company accounts or, for a fund, what it holds and what it costs
-   each year), a bull and a bear, a research manager, a trader,
+   Four analysts (price and indicators, mood, news, company accounts or, for a fund, what it holds, from its own
+   reports to the SEC), a bull and a bear, a research manager, a trader,
    three risk voices and a portfolio manager work in turn, from free public data, and give a rating. Each call is scored
    a few trading days later against its market's index (`/settle`), and the lessons go into later analyses.
    `/backtest NVDA,AAPL 2026-06-01 2026-08-01` runs the team over past dates in a journal of its own and reports, by
@@ -250,8 +250,8 @@ The first section of the dashboard shows the world in tiers, broadest first, bec
   ticket, and its calls say "on paper only" where a stock's say Decide….
 
 Each tile shows today's move (a dash when Yahoo Finance gave none), the desk's latest call with its date or "no call
-yet", the robot, which asks the desk to analyse a fund as readily as a stock (for a fund it reads what it holds and
-what it costs), and + to add it to your watchlist. Every trading word has its meaning beside it: under each tier, at the
+yet", the robot, which asks the desk to analyse a fund as readily as a stock (for a fund it reads what it holds, from
+its reports to the SEC), and + to add it to your watchlist. Every trading word has its meaning beside it: under each tier, at the
 foot of the section, and on each rating and dotted word when you point at it. The watchlist further down is grouped the
 same way; press a tier's name to fold it away, and the dashboard remembers which you folded.
 
