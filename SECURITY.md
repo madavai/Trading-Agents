@@ -112,7 +112,8 @@ order tool.
   funds (by ticker only, never a quantity or an account), with your email as the SEC asks.
 - The desk always introduces itself by its own name, never as a web browser. Yahoo Finance gives its company data only
   to browsers, so for a company that does not file with the SEC that data is unavailable; everything about a US
-  company comes from the SEC's own filings.
+  company comes from the SEC's own filings, and what a US fund holds from its own reports to the SEC (form N-PORT,
+  asked for by the fund's ticker and its SEC numbers only, with your email as the SEC asks).
 
 ## Limits
 - Any program on this computer, under any user account on it, can reach the dashboard's address and read its page the

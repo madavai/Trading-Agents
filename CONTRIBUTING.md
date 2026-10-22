@@ -13,9 +13,12 @@
   months no filing states, `sharesOutstanding` from the cover page; `insiders.ts`: each Form 4 read from its own XML),
   the valuation worked out with the checked close; Yahoo Finance only for a company that does not file with the SEC,
   today only (Yahoo refuses its company data to the desk's honest name, so this is mostly unavailable). The desk never
-  calls itself a browser. `fundProfile` (tool `get_fund_profile`) is a fund's in their place: what it holds, what it costs
-  each year and its size, with the cost, size and holdings named as unavailable when Yahoo does not give them, and the
-  whole profile withheld for a past day.
+  calls itself a browser. `fundProfile` (tool `get_fund_profile`) is a fund's in their place, from `nport.ts`: the latest
+  portfolio report (form N-PORT) the fund had filed by the analysis day, found by its series (`fundOf`, from the SEC's
+  fund list, then the SEC's list of that series' reports) or, for an ETF set up as a trust such as SPY, by its own
+  filings; its size, lines added up by issuer, assets, issuers, countries, bonds' years and interest, its own monthly
+  returns, and the day its holdings are from. Amendments are not read. The yearly cost has no official free source and
+  is said as unavailable; a fund the SEC does not list falls back to Yahoo, today only.
 - `src/check/` - the desk check: this computer, and the free data sources.
 - `src/robinhood/` - the connection to Robinhood's Trading MCP: sign-in (OAuth, kept in `~/.trading-agents`), and reads.
   `rules.ts` says what a Robinhood tool is (read, order or other) by its name and Robinhood's own read-only label;

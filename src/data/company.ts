@@ -11,6 +11,7 @@ import { cryptoBase, normalizeSymbol } from './symbols.js';
 import { history, HOSTS } from './yahoo.js';
 import { cikFor, companyFacts, fundTickers, latestBalance, sectorOfSic, secStatement, sharesOutstanding, SHOWN, STATEMENTS, submissions, trailingYear, type Fact, type Frequency, type Statement, type Table } from './sec.js';
 import { secInsiders } from './insiders.js';
+import { latestReport, renderReport } from './nport.js';
 import { ASK_FOR_EMAIL } from '../contact.js';
 
 /** The filer's CIK, or null when the SEC does not list it (or its list could not be read). */
@@ -203,6 +204,11 @@ const FUND_SECTORS: Record<string, string> = {
  *  later prices into it. */
 export async function fundProfile(raw: string, analysis: string, topN = 10): Promise<string> {
   const day = analysisDate(analysis), sym = companySymbol(raw);
+  // A US fund reports what it holds to the SEC (form N-PORT), dated by the day it was filed: official, and right for a
+  // past day too. Yahoo, as it stands today, is left for a fund that does not report there (one outside the US).
+  const report = await latestReport(sym, day);
+  if (report) return renderReport(sym, day, report, topN);
+  if (await cikFor(sym)) throw new NoData(`${sym} reports to the SEC as a company or a trust, not as a fund that lists its holdings (form N-PORT): for a company, use the company tools; a trust that holds gold or bitcoin holds just that`);
   if (isHistorical(day)) return `The fund profile of ${sym} is withheld for ${day}: Yahoo Finance serves it only as it stands today. Today's holdings and their weights carry the prices of every day since ${day}, and its size and yearly cost may have changed; they would put later knowledge into an analysis of ${day}. Say the profile is unavailable for a past day.`;
   const r = await summary(sym, 'price,quoteType,fundProfile,topHoldings,summaryDetail,defaultKeyStatistics');
   const type = r.quoteType?.quoteType ?? '';
