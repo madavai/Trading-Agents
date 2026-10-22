@@ -5,8 +5,8 @@ import fs from 'node:fs';
 // The Trading Agents walk (docs/trading-agents-walk.html) is the hands-on test of the whole desk. Every pull request that
 // changes what a person can do or see adds or updates its tests (CONTRIBUTING.md); these keep it sound.
 
-type Test = { id: string; title: string; where: string; tags?: string[]; do: string[]; see: string[]; changed: string };
-type Section = { id: string; name: string; sub: string; tests: Test[] };
+type Test = { id: string; title: string; about: string; where: string; tags?: string[]; do: string[]; see: string[]; changed: string };
+type Section = { id: string; name: string; sub: string; about: string; before?: string; tests: Test[] };
 type Walk = { version: string; updated: string; sections: Section[] };
 
 const PAGE = 'docs/trading-agents-walk.html';
@@ -33,6 +33,8 @@ test('the walk is the version the project ships, dated, with every section named
   for (const s of walk.sections) {
     assert.match(s.id, /^[A-Z]$/, `section ${s.id} is one capital letter`);
     assert.ok(filled(s.name) && filled(s.sub), `section ${s.id} has a name and a line under it`);
+    assert.ok(filled(s.about), `section ${s.id} says what this part of the desk does, for someone new to it`);
+    assert.ok(s.before === undefined || filled(s.before), `section ${s.id}: "before" is left out or says what is needed`);
     assert.ok(s.tests.length > 0, `section ${s.id} has tests`);
   }
 });
@@ -47,6 +49,15 @@ test('every test has a unique id in its section, where it happens, steps and wha
       assert.ok(!seen.has(t.id), `${t.id} is used once`);
       seen.add(t.id);
       assert.ok(filled(t.title), `${t.id} has a title`);
+      assert.ok(filled(t.about), `${t.id} says what this part does, in plain words`);
+      for (const line of [...t.do, ...t.see]) {
+        // [[words]] is a prompt to copy: each one closed, and nothing inside it that the page would read as markup
+        const bare = line.replace(/\[\[([^\]]+?)\]\]/g, (_, words: string) => {
+          assert.doesNotMatch(words, /`|\[|\]/, `${t.id}: the prompt "${words}" holds no backtick or bracket`);
+          return '';
+        });
+        assert.doesNotMatch(bare, /\[\[|\]\]/, `${t.id}: every [[prompt]] is opened and closed`);
+      }
       assert.ok(filled(t.where), `${t.id} says where it happens`);
       assert.ok(Array.isArray(t.do) && t.do.length > 0 && t.do.every(filled), `${t.id} has steps`);
       assert.ok(Array.isArray(t.see) && t.see.length > 0 && t.see.every(filled), `${t.id} says what you should see`);

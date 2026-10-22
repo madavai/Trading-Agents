@@ -143,14 +143,18 @@
 - `docs/inside-the-trading-desk.html` - the visual guide (GitHub Pages serves `docs/` from `main`). The README shows it
   as pictures in `docs/readme/`, light and dark: after the guide changes, `node scripts/readme-pictures.mjs` takes
   them again with a hidden Chrome or Edge (it downloads and installs nothing).
-- `docs/trading-agents-walk.html` - the Trading Agents walk: the hands-on test of the whole desk, section by section,
-  that the person walks on their own setup and marks Pass, Fail or Skip (kept in their browser, or in the page's own
-  record when it is opened on claude.ai). Its tests are one JSON block in the page (`<script type="application/json"
-  id="walk">`): a section is a letter, a name and a line; a test is `id` (the section's letter and the next free
-  number, never reused or renumbered), `title`, `where`, `tags` (`Market hours`, `Real money`, `Optional`, `Later`), `do`
-  (the steps), `see` (what the person should see, in the page's own words) and `changed` (the day its steps last
-  changed: a mark made before it counts as still to do). `updated` is the latest `changed`, and `version` follows
-  `package.json`. `test/walk.test.ts` keeps it sound.
+- `docs/trading-agents-walk.html` - the Trading Agents walk: the whole desk, section by section, for two readers at
+  once: someone who just cloned the project and learns it by trying it, and the person testing a change, who marks
+  each test Pass, Fail or Skip (kept in their browser, or in the page's own record when it is opened on claude.ai). Its
+  tests are one JSON block in the page (`<script type="application/json" id="walk">`). A section is `id` (a letter),
+  `name`, `sub` (one line), `about` (what this part of the desk does, for a newcomer) and `before` (what is needed
+  first; optional). A test is `id` (the section's letter and the next free number, never reused or renumbered),
+  `title`, `about` (what this part does and why, in plain words), `where` (the path to it, steps joined by ›), `tags`
+  (`Market hours`, `Real money`, `Optional`, `Later`), `do` (the steps), `see` (what the person should see, in the
+  page's own words) and `changed` (the day its steps last changed: a mark made before it counts as still to do). In
+  `do` and `see`, `[[words]]` is a prompt the person types (the page copies it on a press). NVIDIA (NVDA) is the walk's
+  example company. `updated` is the latest `changed`, and `version` follows `package.json`. `test/walk.test.ts` keeps
+  it sound.
 - `test/fake-robinhood.ts` - a pretend Robinhood for the tests: an MCP door that wants a sign-in, with read tools and
   order tools, recording every call. Its sign-in is the MCP library's own demo server (`test/fake-sign-in-server.ts`,
   a side process). The guard refuses any file that spells out the sign-in's token field names, so tests reach the
