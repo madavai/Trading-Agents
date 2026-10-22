@@ -1,5 +1,8 @@
 # Contributing
 
+New to the project, or carrying it on in a new session? Read [HANDOFF.md](HANDOFF.md) first: who decides, what is
+built, which decisions stand, every document, and what is pending.
+
 ## Build and test
 - Node 22 or later. `npm ci`, then `npm test` (type check, then Node's own test runner on the compiled tests).
 - `npm run build` bundles each program into one file in `dist/`. **`dist/` is committed** so that a person who clones the
