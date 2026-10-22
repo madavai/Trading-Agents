@@ -54,6 +54,9 @@ affiliated with them.
 
 You need Node 22 or later (Madav needs it too). No keys and no installs; only your email, once.
 
+**To learn the whole desk by trying it**, follow **[the Trading Agents walk](https://madavai.github.io/Trading-Agents/trading-agents-walk.html)**:
+each part explained in plain words, with the exact words to give the team and what you should see.
+
 **New to trading?** Open the dashboard: on your first visit, **Get started** walks you through a safe first month in
 five steps, each ticked off by itself as you do it, and **What does this mean?** explains every trading word in one
 line (see [Your first month](#your-first-month-get-started)).
@@ -386,9 +389,10 @@ design reference (open it in a browser; the prices in it are made up).
   are taken from it by `node scripts/readme-pictures.mjs` (with Chrome or Edge); take them again after the guide
   changes.
 - **[The Trading Agents walk](https://madavai.github.io/Trading-Agents/trading-agents-walk.html)**
-  (`docs/trading-agents-walk.html`): every part of the desk, checked by hand on your own setup, section by section.
-  Mark each test Pass, Fail or Skip with a note; your marks stay in your browser between visits, and "Copy results"
-  gives them to whoever helps you fix what failed.
+  (`docs/trading-agents-walk.html`): every part of the desk, section by section, to learn it by trying it or to check
+  it after a change. Each test says what that part does, where to go, the exact words to type (press them to copy)
+  and what you should see, with NVIDIA as the example. Mark each test Pass, Fail or Skip with a note; your marks stay
+  in your browser between visits, and "Copy results" gives them to whoever helps you fix what failed.
 - `SECURITY.md`: who can place an order, what agents can and cannot do, where your data stays, and how to report a
   problem.
 - `CONTRIBUTING.md`: building, testing and the project's own rules.
