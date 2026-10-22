@@ -103,7 +103,7 @@ order tool.
 - "This morning" asks Yahoo Finance for the daily prices of the whole-market funds, the sector funds and your watchlist
   (and its news search for your companies and coins), and asks Polymarket's public search for its odds on the Federal
   Reserve, at most once an hour. The list is kept in `desk-data/screen.json`. The switch "Analyse the top 3 each market
-  morning" ships off; on, it only puts those stocks on the waiting list, never an order.
+  morning" ships off and starts the next market morning once switched on; it only puts those stocks on the waiting list, never an order.
 - To watch the stops in the Agentic account, the dashboard asks Yahoo Finance for the price of each holding there that
   has one (by ticker only, never a quantity or an account), as often as it refreshes its other prices.
 - On a Monday the morning routine puts up to three of the holdings the desk sizes trades to on the waiting list, to be

@@ -21372,6 +21372,7 @@ function cleanPrefs(raw) {
   if (market) out.market = market;
   if (Array.isArray(r.folded)) out.folded = TIERS.filter((t2) => r.folded.includes(t2));
   if (typeof r.morning === "boolean") out.morning = r.morning;
+  if (typeof r.morningFrom === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.morningFrom)) out.morningFrom = r.morningFrom;
   const guide = one(r.guide, ["open", "away"]);
   if (guide) out.guide = guide;
   if (typeof r.readCall === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.readCall)) out.readCall = r.readCall;
@@ -21900,8 +21901,16 @@ var isWeekday = (day2) => {
   const w = (/* @__PURE__ */ new Date(`${day2}T12:00:00Z`)).getUTCDay();
   return w !== 0 && w !== 6;
 };
-function queueTop(dir, screen, day2, ring, now = /* @__PURE__ */ new Date()) {
-  if (!isWeekday(day2) || screen.day !== day2 || screen.queued?.day === day2 || readScreen(dir)?.queued?.day === day2) return [];
+var MORNING_ENDS = 12;
+var newYorkHour = (now) => Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "2-digit", hourCycle: "h23" }).format(now));
+function nextMarketDay(day2) {
+  let d = addDays(day2, 1);
+  while (!isWeekday(d)) d = addDays(d, 1);
+  return d;
+}
+function queueTop(dir, screen, day2, ring, now = /* @__PURE__ */ new Date(), from = "") {
+  if (!isWeekday(day2) || day2 < from || newYorkHour(now) >= MORNING_ENDS) return [];
+  if (screen.day !== day2 || screen.queued?.day === day2 || readScreen(dir)?.queued?.day === day2) return [];
   const called = new Set(new Journal(path16.join(dir, "journal.md")).load().filter((e) => e.date === day2).map((e) => e.ticker));
   const busy = new Set(readQueue(dir, now).filter((q) => q.state === "waiting" || q.state === "running").map((q) => q.symbol));
   const queued = [];
@@ -22167,9 +22176,9 @@ async function startTerminal(opts) {
     screening ??= screenToday(dir, symbols, news, day2).finally(() => {
       screening = null;
     });
-    const worked = await screening, on = readPrefs(dir).morning === true;
-    const queued2 = on ? queueTop(dir, worked, day2, true) : [];
-    return { screen: readScreen(dir) ?? worked, morning: { on, top: TOP_QUEUED }, queued: queued2 };
+    const worked = await screening, prefs = readPrefs(dir), on = prefs.morning === true;
+    const queued2 = on ? queueTop(dir, worked, day2, true, /* @__PURE__ */ new Date(), prefs.morningFrom) : [];
+    return { screen: readScreen(dir) ?? worked, morning: { on, top: TOP_QUEUED, from: on ? prefs.morningFrom : void 0 }, queued: queued2 };
   };
   let weatherMemo = null;
   const weather = (day2) => {
@@ -22333,6 +22342,7 @@ async function startTerminal(opts) {
       delete b.autorun;
       delete b.market;
       delete b.morning;
+      delete b.morningFrom;
       delete b.readCall;
       return json(res, 200, savePrefs(dir, b));
     }
@@ -22347,9 +22357,9 @@ async function startTerminal(opts) {
     }
     if (p === "/api/screen/morning" && method === "POST") {
       if (typeof b.on !== "boolean") throw new Refused2(400, "say on or off");
-      savePrefs(dir, { morning: b.on });
-      const kept = readScreen(dir), queued2 = b.on && kept ? queueTop(dir, kept, day2, true) : [];
-      return json(res, 200, { morning: { on: b.on, top: TOP_QUEUED }, queued: queued2 });
+      const from = b.on ? nextMarketDay(day2) : void 0;
+      savePrefs(dir, b.on ? { morning: true, morningFrom: from } : { morning: false }, b.on ? [] : ["morningFrom"]);
+      return json(res, 200, { morning: { on: b.on, top: TOP_QUEUED, from }, queued: [] });
     }
     if (p === "/api/tiers/market" && method === "POST") {
       if (!Array.isArray(b.symbols) || b.symbols.length > MAX_MARKET) throw new Refused2(400, `choose up to ${MAX_MARKET} funds for the whole market`);

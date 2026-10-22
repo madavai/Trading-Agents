@@ -206,7 +206,7 @@ export function registerDeskTools(server: McpServer, root: string): void {
       try {
         const { symbols, news } = screenUniverse(readWatchlist(dir), marketOf(dir));
         const worked = await screenToday(dir, symbols, news, day);
-        if (on) queueTop(dir, worked, day, false);   // the routine analyses what waits itself: no doorbell
+        if (on) queueTop(dir, worked, day, false, new Date(), readPrefs(dir).morningFrom);   // the routine analyses what waits itself: no doorbell
         look = { screen: readScreen(dir) ?? worked, on };
       } catch (e) { look = { screen: null, failed: (e as Error).message, on }; }
     }

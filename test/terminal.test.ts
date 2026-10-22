@@ -480,13 +480,19 @@ test('"Worth a look today" is worked out from figures at most once an hour, kept
   await call(term, 'POST', '/api/prefs', { body: { morning: true } });
   assert.equal(readPrefs(dir()).morning, undefined, "the page's other choices never switch it on");
   new Journal(path.join(dir(), 'journal.md')).storeDecision('XLE', '2026-10-12', '**Rating**: Hold\n\n**Executive Summary**: x.');
+  // The real afternoon of 2026-10-21: switched on at 4:19pm, it queued three stocks at once. Now it queues nothing and starts
+  // the next market day, whatever hour the page looks.
   const on = (await sw(true)).json();
-  assert.deepEqual([on.morning, on.queued], [{ on: true, top: 3 }, ['TSLA', 'NVDA']], 'switched on: today\'s top three at once, but not XLE, already called today');
-  assert.deepEqual((await call(term, 'GET', '/api/state')).json().queue.map((q: any) => [q.symbol, q.state, q.depth]), [['TSLA', 'waiting', 'shallow'], ['NVDA', 'waiting', 'shallow']]);
-  assert.ok(readDoorbell(dir()), 'the doorbell rings for whoever listens');
-  assert.deepEqual((await call(term, 'GET', '/api/screen')).json().queued, [], 'once a day');
+  assert.deepEqual([on.morning, on.queued], [{ on: true, top: 3, from: '2026-10-13' }, []], 'switched on: nothing now; it starts the next market day');
+  assert.deepEqual((await call(term, 'GET', '/api/state')).json().queue, [], 'nothing was put on the waiting list');
+  assert.equal(readDoorbell(dir()), null, 'and no doorbell rang');
+  assert.deepEqual([readPrefs(dir()).morning, readPrefs(dir()).morningFrom], [true, '2026-10-13']);
+  const seen = (await call(term, 'GET', '/api/screen')).json();
+  assert.deepEqual([seen.morning, seen.queued], [{ on: true, top: 3, from: '2026-10-13' }, []], 'the page asking again, the same day, queues nothing either');
+  await call(term, 'POST', '/api/prefs', { body: { morningFrom: '2000-01-01' } });
+  assert.equal(readPrefs(dir()).morningFrom, '2026-10-13', "the page's other choices never move the day it starts");
   assert.deepEqual((await sw(false)).json(), { morning: { on: false, top: 3 }, queued: [] });
-  assert.equal(readPrefs(dir()).morning, false);
+  assert.deepEqual([readPrefs(dir()).morning, readPrefs(dir()).morningFrom], [false, undefined]);
 });
 
 test('"Market weather": the trend, the mood and the rates, each from figures, and a source that fails leaves its own line unavailable', async () => {

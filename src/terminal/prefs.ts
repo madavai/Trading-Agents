@@ -24,8 +24,11 @@ export interface Prefs {
   /** The tiers of the watchlist folded away. */
   folded?: Tier[];
   /** "Analyse the top three each market morning" is on (off as shipped): the top three of "Worth a look today" go on the
-   *  waiting list at shallow depth once each market day (desk/screen.ts queueTop). Set only by that switch. */
+   *  waiting list at shallow depth once each market morning (desk/screen.ts queueTop). Set only by that switch. */
   morning?: boolean;
+  /** The first market day the switch may queue: the weekday after the one it was switched on, so switching it on never
+   *  puts anything on the list at once. Set only by that switch. */
+  morningFrom?: string;
   /** "Get started" is open (it opened by itself on a first visit, or the person reopened it) or put away. */
   guide?: 'open' | 'away';
   /** The day the person first opened one of the desk's calls in full: the guide's fourth step. Set only by the dashboard
@@ -65,6 +68,7 @@ export function cleanPrefs(raw: unknown): Prefs {
   const market = cleanMarket(r.market); if (market) out.market = market;
   if (Array.isArray(r.folded)) out.folded = TIERS.filter((t) => (r.folded as unknown[]).includes(t));
   if (typeof r.morning === 'boolean') out.morning = r.morning;
+  if (typeof r.morningFrom === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.morningFrom)) out.morningFrom = r.morningFrom;
   const guide = one(r.guide, ['open', 'away'] as const); if (guide) out.guide = guide;
   if (typeof r.readCall === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.readCall)) out.readCall = r.readCall;
   return out;

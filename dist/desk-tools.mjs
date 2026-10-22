@@ -39280,8 +39280,11 @@ var isWeekday = (day3) => {
   const w = (/* @__PURE__ */ new Date(`${day3}T12:00:00Z`)).getUTCDay();
   return w !== 0 && w !== 6;
 };
-function queueTop(dir, screen, day3, ring, now = /* @__PURE__ */ new Date()) {
-  if (!isWeekday(day3) || screen.day !== day3 || screen.queued?.day === day3 || readScreen(dir)?.queued?.day === day3) return [];
+var MORNING_ENDS = 12;
+var newYorkHour = (now) => Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "2-digit", hourCycle: "h23" }).format(now));
+function queueTop(dir, screen, day3, ring, now = /* @__PURE__ */ new Date(), from = "") {
+  if (!isWeekday(day3) || day3 < from || newYorkHour(now) >= MORNING_ENDS) return [];
+  if (screen.day !== day3 || screen.queued?.day === day3 || readScreen(dir)?.queued?.day === day3) return [];
   const called = new Set(new Journal(path16.join(dir, "journal.md")).load().filter((e) => e.date === day3).map((e) => e.ticker));
   const busy = new Set(readQueue(dir, now).filter((q) => q.state === "waiting" || q.state === "running").map((q) => q.symbol));
   const queued = [];
@@ -39566,6 +39569,7 @@ function cleanPrefs(raw) {
   if (market) out.market = market;
   if (Array.isArray(r.folded)) out.folded = TIERS.filter((t) => r.folded.includes(t));
   if (typeof r.morning === "boolean") out.morning = r.morning;
+  if (typeof r.morningFrom === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.morningFrom)) out.morningFrom = r.morningFrom;
   const guide = one2(r.guide, ["open", "away"]);
   if (guide) out.guide = guide;
   if (typeof r.readCall === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.readCall)) out.readCall = r.readCall;
@@ -39776,7 +39780,7 @@ ${renderSummary(summarize(entries))}`;
       try {
         const { symbols, news } = screenUniverse(readWatchlist(dir), marketOf(dir));
         const worked = await screenToday(dir, symbols, news, day3);
-        if (on) queueTop(dir, worked, day3, false);
+        if (on) queueTop(dir, worked, day3, false, /* @__PURE__ */ new Date(), readPrefs(dir).morningFrom);
         look = { screen: readScreen(dir) ?? worked, on };
       } catch (e) {
         look = { screen: null, failed: e.message, on };
