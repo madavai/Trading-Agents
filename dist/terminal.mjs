@@ -8176,7 +8176,9 @@ var DEFAULTS = {
     newsLookbackDays: 7,
     companyNewsLimit: 20,
     worldNewsLimit: 10,
-    worldNewsSearches: ["Federal Reserve interest rates inflation", "S&P 500 earnings GDP economic outlook", "geopolitical risk trade war sanctions", "ECB Bank of England BOJ central bank policy", "oil commodities supply chain energy"],
+    // The news Yahoo files under the market's own symbols: US stocks, the 10-year Treasury yield, oil, gold, the euro. Its
+    // search finds no news under topic words such as "Federal Reserve".
+    worldNewsSearches: ["^GSPC", "^TNX", "CL=F", "GC=F", "EURUSD=X"],
     stocktwitsLimit: 30,
     subreddits: ["wallstreetbets", "stocks", "investing"],
     cryptoSubreddits: ["CryptoCurrency", "CryptoMarkets"]
@@ -8237,6 +8239,11 @@ function languageName(v, fallback = "English") {
   const s = typeof v === "string" ? v.trim() : "";
   return new RegExp("^\\p{L}[\\p{L} ()\\-]{0,38}$", "u").test(s) ? s : fallback;
 }
+var OLD_WORLD_SEARCHES = ["Federal Reserve interest rates inflation", "S&P 500 earnings GDP economic outlook", "geopolitical risk trade war sanctions", "ECB Bank of England BOJ central bank policy", "oil commodities supply chain energy"];
+function searchesOf(v) {
+  const list2 = Array.isArray(v) ? v.filter((x) => typeof x === "string" && x.trim() !== "").map((x) => x.trim()).slice(0, 10) : [];
+  return !list2.length || list2.join("\n") === OLD_WORLD_SEARCHES.join("\n") ? [...DEFAULTS.analysis.worldNewsSearches] : list2;
+}
 function readSettings(root2) {
   let raw = {};
   try {
@@ -8253,6 +8260,7 @@ function readSettings(root2) {
       debateRounds: int(a.debateRounds, 1, 5, 1),
       riskRounds: int(a.riskRounds, 1, 5, 1),
       analysts: analysts.length ? analysts : [...ANALYSTS],
+      worldNewsSearches: searchesOf(a.worldNewsSearches),
       managerModel: typeof a.managerModel === "string" && /^[\w.\-[\]]{0,60}$/.test(a.managerModel.trim()) ? a.managerModel.trim() : ""
     },
     scoring: {

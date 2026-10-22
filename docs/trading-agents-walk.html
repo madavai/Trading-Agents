@@ -276,7 +276,7 @@ b, strong { font-weight: var(--weight-semibold); }
 <script type="application/json" id="walk">
 {
  "version": "0.9.0",
- "updated": "2026-10-21",
+ "updated": "2026-10-22",
  "sections": [
   { "id": "A", "name": "Getting started in Agent Studio",
     "sub": "The agents and the team are where Agent Studio reads them, the desk check is green, and \"reset the team\" brings back the project's version.",
@@ -406,7 +406,21 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "Messages only when one analyst finds something another should weigh: at most two short ones each, pointing at a source or a date, never a figure of their own. There may be none.",
         "Each message sent is noted in the sender's report.",
-        "With \"talk\" off, the team works in silence."] }
+        "With \"talk\" off, the team works in silence."] },
+    { "id": "B11", "title": "A company with two kinds of shares", "tags": [], "changed": "2026-10-22",
+      "where": "Dashboard: a META (or GOOGL) call's Fundamentals report",
+      "do": [
+        "Analyse META at Shallow and open its Fundamentals report."],
+      "see": [
+        "\"Shares outstanding: no single count on a cover page filed by then …\", then \"In its place, the weighted average diluted shares from its accounts for …\", with the dates and the number.",
+        "A market value and a price to book worked out from it (\"average diluted shares × close\"), not \"unavailable\"."] },
+    { "id": "B12", "title": "World news arrives", "tags": [], "changed": "2026-10-22",
+      "where": "Dashboard: any new call's News report",
+      "do": [
+        "Run a new analysis on a weekday and open its News report."],
+      "see": [
+        "A world news part with the last few days' market headlines (the stock market, interest rates, oil, gold, the dollar and euro), from publishers such as Reuters, AP or Yahoo Finance.",
+        "Not \"Yahoo Finance search returned no world/economic news\"."] }
   ] },
   { "id": "C", "name": "The dashboard",
     "sub": "The page on your own computer: markets, charts, watchlist, the desk's calls, the scorecard and a page per stock.",
@@ -913,7 +927,15 @@ b, strong { font-weight: var(--weight-semibold); }
       "do": [
         "Ask for an analysis late in the evening, after 8pm New York time, and look at the date of its call."],
       "see": [
-        "The call is dated that day in New York, not the next day."] }
+        "The call is dated that day in New York, not the next day."] },
+    { "id": "K8", "title": "It runs at the depth you chose", "tags": [], "changed": "2026-10-22",
+      "where": "Dashboard: the robot beside a stock, then the call's reasoning",
+      "do": [
+        "Ask the desk for a stock at Shallow and let it run by itself.",
+        "When it is done, open the call's reasoning."],
+      "see": [
+        "One turn each for the bull and the bear, and one for each of the three risk voices: the depth you chose, even if the team's lead planned more.",
+        "A Shallow run takes clearly less time than the Medium one in B7."] }
   ] },
   { "id": "L", "name": "Your paper record",
     "sub": "Before you risk money: every call followed on paper against the S&P 500 from the same start, and four weeks of it before trading.",

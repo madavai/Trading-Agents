@@ -36731,7 +36731,9 @@ var DEFAULTS = {
     newsLookbackDays: 7,
     companyNewsLimit: 20,
     worldNewsLimit: 10,
-    worldNewsSearches: ["Federal Reserve interest rates inflation", "S&P 500 earnings GDP economic outlook", "geopolitical risk trade war sanctions", "ECB Bank of England BOJ central bank policy", "oil commodities supply chain energy"],
+    // The news Yahoo files under the market's own symbols: US stocks, the 10-year Treasury yield, oil, gold, the euro. Its
+    // search finds no news under topic words such as "Federal Reserve".
+    worldNewsSearches: ["^GSPC", "^TNX", "CL=F", "GC=F", "EURUSD=X"],
     stocktwitsLimit: 30,
     subreddits: ["wallstreetbets", "stocks", "investing"],
     cryptoSubreddits: ["CryptoCurrency", "CryptoMarkets"]
@@ -36773,6 +36775,11 @@ function languageName(v, fallback = "English") {
   const s = typeof v === "string" ? v.trim() : "";
   return new RegExp("^\\p{L}[\\p{L} ()\\-]{0,38}$", "u").test(s) ? s : fallback;
 }
+var OLD_WORLD_SEARCHES = ["Federal Reserve interest rates inflation", "S&P 500 earnings GDP economic outlook", "geopolitical risk trade war sanctions", "ECB Bank of England BOJ central bank policy", "oil commodities supply chain energy"];
+function searchesOf(v) {
+  const list2 = Array.isArray(v) ? v.filter((x) => typeof x === "string" && x.trim() !== "").map((x) => x.trim()).slice(0, 10) : [];
+  return !list2.length || list2.join("\n") === OLD_WORLD_SEARCHES.join("\n") ? [...DEFAULTS.analysis.worldNewsSearches] : list2;
+}
 function readSettings(root) {
   let raw = {};
   try {
@@ -36789,6 +36796,7 @@ function readSettings(root) {
       debateRounds: int2(a.debateRounds, 1, 5, 1),
       riskRounds: int2(a.riskRounds, 1, 5, 1),
       analysts: analysts.length ? analysts : [...ANALYSTS],
+      worldNewsSearches: searchesOf(a.worldNewsSearches),
       managerModel: typeof a.managerModel === "string" && /^[\w.\-[\]]{0,60}$/.test(a.managerModel.trim()) ? a.managerModel.trim() : ""
     },
     scoring: {
@@ -37516,7 +37524,7 @@ async function worldNews(analysis2, lookBackDays, limit, queries) {
 (${failed} of ${queries.length} searches could not be run: Yahoo Finance did not answer them.)` : "";
   if (!list2.length) return gap(all, from, day3, "world and economic news") + note;
   const past = isHistorical(day3) ? " Search favours recent articles, so a past window may be thin." : "";
-  return [`World and economic news, ${from} to ${day3}, from ${queries.length} searches: ${queries.join("; ")}.${past}`, "", render2(list2)].join("\n") + note;
+  return [`World and economic news, ${from} to ${day3}, from the news filed under ${queries.join(", ")}.${past}`, "", render2(list2)].join("\n") + note;
 }
 
 // src/data/social.ts
@@ -37825,6 +37833,11 @@ function trailingYear(list2, asOf) {
 function latestBalance(list2, asOf) {
   return knownBy(list2, asOf).filter((f) => !f.start).sort((a, b) => b.end.localeCompare(a.end) || b.filed.localeCompare(a.filed))[0] ?? null;
 }
+function averageDilutedShares(list2, asOf) {
+  const known = knownBy(list2, asOf).filter((f) => f.start && f.val > 0), quarters = known.filter((f) => span(f) >= 80 && span(f) <= 100);
+  const top = (quarters.length ? quarters : known).sort((a, b) => b.end.localeCompare(a.end) || span(a) - span(b))[0];
+  return top ? { shares: top.val, start: top.start, end: top.end, filed: top.filed } : null;
+}
 function sharesOutstanding(list2, asOf) {
   const known = list2.filter((f) => f.filed <= asOf).sort((a, b) => b.filed.localeCompare(a.filed) || b.end.localeCompare(a.end));
   const top = known[0];
@@ -37994,9 +38007,13 @@ async function secOverview(sym2, cik, day3) {
   }
   const usd = !close?.currency || close.currency === "USD";
   lines.push(close ? `Close: ${fixed(close.close)} ${close.currency ?? ""} on ${close.date} (the checked price table's latest row on or before ${day3})`.replace("  ", " ") : "Close: unavailable (the prices could not be read), so no multiple can be worked out");
-  const shares = sharesOutstanding(units(dei.EntityCommonStockSharesOutstanding, "shares"), day3);
-  lines.push(shares ? `Shares outstanding: ${whole(shares.shares)} (counted on ${shares.end}, filed ${shares.filed})` : "Shares outstanding: unavailable (not on a cover page filed by then)");
-  if (shares && close && usd) lines.push(`Market value (derived: shares \xD7 close): ${whole(shares.shares * close.close)} USD`);
+  const cover = sharesOutstanding(units(dei.EntityCommonStockSharesOutstanding, "shares"), day3);
+  const average = cover ? null : averageDilutedShares(units(g.WeightedAverageNumberOfDilutedSharesOutstanding, "shares"), day3);
+  const shares = cover ?? average, which = average ? "average diluted shares" : "shares";
+  if (cover) lines.push(`Shares outstanding: ${whole(cover.shares)} (counted on ${cover.end}, filed ${cover.filed})`);
+  else if (average) lines.push(`Shares outstanding: no single count on a cover page filed by then (a company with more than one class of shares gives one per class there, which the SEC's data leaves out). In its place, the weighted average diluted shares from its accounts for ${average.start} to ${average.end}: ${whole(average.shares)} (filed ${average.filed}), so the figures worked out from it are close, not exact`);
+  else lines.push("Shares outstanding: unavailable (not on a cover page filed by then)");
+  if (shares && close && usd) lines.push(`Market value (derived: ${which} \xD7 close): ${whole(shares.shares * close.close)} USD`);
   const eps = trailingYear(units(g.EarningsPerShareDiluted, "USD/shares"), day3);
   if (eps) {
     lines.push(`Diluted EPS, last twelve months (derived from ${eps.parts}): ${fixed(eps.value)} USD`);
@@ -38007,7 +38024,7 @@ async function secOverview(sym2, cik, day3) {
     lines.push(`Stockholders' equity: ${whole(equity.val)} USD (at ${equity.end}, filed ${equity.filed})`);
     if (shares && shares.shares > 0) {
       const bv = equity.val / shares.shares;
-      lines.push(`Book value per share (derived: equity \xF7 shares): ${fixed(bv)} USD`);
+      lines.push(`Book value per share (derived: equity \xF7 ${which}): ${fixed(bv)} USD`);
       if (close && usd && bv > 0) lines.push(`Price to book (derived: close \xF7 that): ${fixed(close.close / bv)}`);
     }
   }
@@ -38592,105 +38609,6 @@ function deleteRun(dir, ticker, date5) {
   fs10.rmSync(folder(dir, ticker, date5), { recursive: true, force: true });
 }
 
-// src/desk/scoring.ts
-function resolveBenchmark(ticker, s) {
-  if (s.benchmark.trim()) return normalizeSymbol(s.benchmark);
-  const sym2 = normalizeSymbol(ticker);
-  const suffix = Object.keys(s.benchmarks).filter(Boolean).sort((a, b) => b.length - a.length).find((x) => sym2.endsWith(x.toUpperCase()));
-  return suffix ? s.benchmarks[suffix] : s.benchmarks[""] ?? "SPY";
-}
-var closeOn = (bars, date5) => [...bars].reverse().find((b) => b.date <= date5).close;
-async function measure(ticker, tradeDate, benchmark, holdingDays) {
-  const end = addDays(tradeDate, Math.round(holdingDays * 7 / 5) + 7);
-  const stock = (await daily(ticker, tradeDate, end)).bars;
-  if (stock.length <= holdingDays) return null;
-  const entry = stock[0].date, exit = stock[holdingDays].date;
-  if (exit >= today()) return null;
-  const bench = (await daily(benchmark, addDays(tradeDate, -7), end)).bars;
-  if (!bench.length || bench[0].date > entry || bench[bench.length - 1].date < exit) return null;
-  const raw = stock[holdingDays].close / stock[0].close - 1;
-  const benchmarkReturn = closeOn(bench, exit) / closeOn(bench, entry) - 1;
-  return { raw, alpha: raw - benchmarkReturn, benchmarkReturn, holdingDays, entry, exit, benchmark };
-}
-
-// src/desk/plan.ts
-var NeedsEmail = class extends Error {
-  name = "NeedsEmail";
-};
-var ANALYST_SECTION = { market: "market", sentiment: "sentiment", news: "news", fundamentals: "fundamentals" };
-var journalOf = (root, ws = workspaceOf(root)) => journalIn(root, ws);
-function kindOf(raw, symbol4) {
-  if (cryptoBase(raw)) return "crypto";
-  return /[\^=]/.test(symbol4) ? "other" : "stock";
-}
-function stepsFor(analysts, debateRounds, riskRounds) {
-  const steps = analysts.map((a) => ({ section: ANALYST_SECTION[a], turn: 1 }));
-  for (let t = 1; t <= debateRounds; t++) steps.push({ section: "bull", turn: t }, { section: "bear", turn: t });
-  steps.push({ section: "research_plan", turn: 1 }, { section: "trader", turn: 1 });
-  for (let t = 1; t <= riskRounds; t++) steps.push({ section: "aggressive", turn: t }, { section: "conservative", turn: t }, { section: "neutral", turn: t });
-  steps.push({ section: "decision", turn: 1 });
-  return steps;
-}
-function buildPlan(root, req, ws = workspaceOf(root)) {
-  if (!readContactEmail(root)) throw new NeedsEmail(ASK_FOR_EMAIL);
-  const s = readSettings(root), dir = ws.dir;
-  const symbol4 = safeSymbol(req.symbol), day3 = analysisDate(req.analysisDate), notes = [];
-  const kind = kindOf(req.symbol, symbol4);
-  if (req.restart) deleteRun(dir, symbol4, day3);
-  const done = progress(dir, symbol4, day3), saved = savedPlan(dir, symbol4, day3);
-  const resumed = Object.keys(done).length > 0 && !!saved?.analysts;
-  let analysts, debateRounds, riskRounds, language;
-  if (resumed) {
-    ({ analysts, debateRounds, riskRounds, language } = saved);
-    notes.push(`Resuming the run started earlier for ${symbol4} on ${day3}, with its original plan (${analysts.join(", ")}; ${debateRounds} debate and ${riskRounds} risk round(s); ${language}). To start over, plan again with restart.`);
-  } else {
-    if (req.analysts) {
-      const unknown2 = req.analysts.filter((a) => !ANALYSTS.includes(a));
-      if (unknown2.length) throw new Error(`unknown analyst ${unknown2.join(", ")}; choose from ${ANALYSTS.join(", ")}`);
-      analysts = ANALYSTS.filter((a) => req.analysts.includes(a));
-      if (!analysts.length) throw new Error(`name at least one analyst from ${ANALYSTS.join(", ")}`);
-      if (kind !== "stock" && analysts.includes("fundamentals")) throw new Error(`the fundamentals analyst is not available for ${symbol4}: a ${kind === "crypto" ? "crypto asset" : "index, future or currency pair"} has no company accounts`);
-    } else {
-      analysts = s.analysis.analysts.filter((a) => kind === "stock" || a !== "fundamentals");
-      if (kind !== "stock" && s.analysis.analysts.includes("fundamentals")) notes.push(`${symbol4} is ${kind === "crypto" ? "a crypto asset" : "not a company"}, so there is no fundamentals analyst: it has no company accounts.`);
-      if (!analysts.length) throw new Error(`none of the settings' analysts is available for ${symbol4}`);
-    }
-    for (const [name, v] of [["debate rounds", req.debateRounds], ["risk rounds", req.riskRounds]]) if (v !== void 0 && !(Number.isInteger(v) && v >= 1 && v <= 5)) throw new Error(`${name} must be a whole number from 1 to 5`);
-    debateRounds = req.debateRounds ?? s.analysis.debateRounds;
-    riskRounds = req.riskRounds ?? s.analysis.riskRounds;
-    if (req.language !== void 0 && languageName(req.language, "") === "") throw new Error(`"${req.language}" is not a language name`);
-    language = req.language !== void 0 ? languageName(req.language) : s.analysis.outputLanguage;
-  }
-  const benchmark = resolveBenchmark(symbol4, s.scoring);
-  const plan = { symbol: symbol4, analysisDate: day3, kind, analysts, debateRounds, riskRounds, language, managerModel: s.analysis.managerModel, benchmark, holdingDays: s.scoring.holdingPeriodDays, steps: [], notes };
-  plan.steps = stepsFor(analysts, debateRounds, riskRounds).map((st) => ({ ...st, done: (done[st.section] ?? 0) >= st.turn }));
-  if (!resumed) startRun(dir, symbol4, day3, plan);
-  const lessons = journalOf(root, ws).pastContext(symbol4, isHistorical(day3) ? { asOf: day3 } : {});
-  return { plan, holdings: renderHoldings(readHoldings(deskDataDir(root)), symbol4), lessons, resumed };
-}
-function renderPlan({ plan: p, holdings, lessons, resumed }) {
-  const next = p.steps.find((x) => !x.done);
-  const step = (x) => `${x.section}${x.turn > 1 || p.steps.filter((y) => y.section === x.section).length > 1 ? ` (turn ${x.turn})` : ""}`;
-  return [
-    `Analysis plan for ${p.symbol} on ${p.analysisDate}${isHistorical(p.analysisDate) ? " (a past day: use only what was known by then)" : ""}`,
-    `Instrument: ${p.kind === "stock" ? "a stock or fund" : p.kind === "crypto" ? "a crypto asset, not a company" : "an index, future or currency pair, not a company"}`,
-    `Analysts: ${p.analysts.join(", ")}`,
-    `Debate rounds: ${p.debateRounds} (bull and bear each speak ${p.debateRounds} time(s)); risk rounds: ${p.riskRounds} (each of the three risk voices speaks ${p.riskRounds} time(s))`,
-    `Report language: ${p.language}${p.language.toLowerCase() === "english" ? "" : " (the labelled lines **Rating**, **Action**, **Recommendation** keep their English words)"}`,
-    `Manager model: ${p.managerModel || "the same as everyone else"}`,
-    `Judged after ${p.holdingDays} trading days against ${p.benchmark}`,
-    ...p.notes.length ? ["", ...p.notes.map((n2) => `Note: ${n2}`)] : [],
-    "",
-    `Steps${resumed ? " (resuming)" : ""}: ${p.steps.map((x) => `${x.done ? "[done] " : ""}${step(x)}`).join(" -> ")}`,
-    next ? `Next step: ${step(next)}` : "Every step is done: write the report and record the decision.",
-    "",
-    holdings,
-    "",
-    lessons ? `Lessons from past calls:
-${lessons}` : "Lessons from past calls: none yet (no earlier call has been settled)."
-  ].join("\n");
-}
-
 // src/desk/queue.ts
 import fs11 from "node:fs";
 import path12 from "node:path";
@@ -38849,6 +38767,112 @@ function readListener(dir, now = /* @__PURE__ */ new Date()) {
   } catch {
     return null;
   }
+}
+
+// src/desk/scoring.ts
+function resolveBenchmark(ticker, s) {
+  if (s.benchmark.trim()) return normalizeSymbol(s.benchmark);
+  const sym2 = normalizeSymbol(ticker);
+  const suffix = Object.keys(s.benchmarks).filter(Boolean).sort((a, b) => b.length - a.length).find((x) => sym2.endsWith(x.toUpperCase()));
+  return suffix ? s.benchmarks[suffix] : s.benchmarks[""] ?? "SPY";
+}
+var closeOn = (bars, date5) => [...bars].reverse().find((b) => b.date <= date5).close;
+async function measure(ticker, tradeDate, benchmark, holdingDays) {
+  const end = addDays(tradeDate, Math.round(holdingDays * 7 / 5) + 7);
+  const stock = (await daily(ticker, tradeDate, end)).bars;
+  if (stock.length <= holdingDays) return null;
+  const entry = stock[0].date, exit = stock[holdingDays].date;
+  if (exit >= today()) return null;
+  const bench = (await daily(benchmark, addDays(tradeDate, -7), end)).bars;
+  if (!bench.length || bench[0].date > entry || bench[bench.length - 1].date < exit) return null;
+  const raw = stock[holdingDays].close / stock[0].close - 1;
+  const benchmarkReturn = closeOn(bench, exit) / closeOn(bench, entry) - 1;
+  return { raw, alpha: raw - benchmarkReturn, benchmarkReturn, holdingDays, entry, exit, benchmark };
+}
+
+// src/desk/plan.ts
+var NeedsEmail = class extends Error {
+  name = "NeedsEmail";
+};
+var ANALYST_SECTION = { market: "market", sentiment: "sentiment", news: "news", fundamentals: "fundamentals" };
+var journalOf = (root, ws = workspaceOf(root)) => journalIn(root, ws);
+function kindOf(raw, symbol4) {
+  if (cryptoBase(raw)) return "crypto";
+  return /[\^=]/.test(symbol4) ? "other" : "stock";
+}
+function stepsFor(analysts, debateRounds, riskRounds) {
+  const steps = analysts.map((a) => ({ section: ANALYST_SECTION[a], turn: 1 }));
+  for (let t = 1; t <= debateRounds; t++) steps.push({ section: "bull", turn: t }, { section: "bear", turn: t });
+  steps.push({ section: "research_plan", turn: 1 }, { section: "trader", turn: 1 });
+  for (let t = 1; t <= riskRounds; t++) steps.push({ section: "aggressive", turn: t }, { section: "conservative", turn: t }, { section: "neutral", turn: t });
+  steps.push({ section: "decision", turn: 1 });
+  return steps;
+}
+function buildPlan(root, req, ws = workspaceOf(root)) {
+  if (!readContactEmail(root)) throw new NeedsEmail(ASK_FOR_EMAIL);
+  const s = readSettings(root), dir = ws.dir;
+  const symbol4 = safeSymbol(req.symbol), day3 = analysisDate(req.analysisDate), notes = [];
+  const kind = kindOf(req.symbol, symbol4);
+  if (req.restart) deleteRun(dir, symbol4, day3);
+  const done = progress(dir, symbol4, day3), saved = savedPlan(dir, symbol4, day3);
+  const resumed = Object.keys(done).length > 0 && !!saved?.analysts;
+  let analysts, debateRounds, riskRounds, language;
+  if (resumed) {
+    ({ analysts, debateRounds, riskRounds, language } = saved);
+    notes.push(`Resuming the run started earlier for ${symbol4} on ${day3}, with its original plan (${analysts.join(", ")}; ${debateRounds} debate and ${riskRounds} risk round(s); ${language}). To start over, plan again with restart.`);
+  } else {
+    if (req.analysts) {
+      const unknown2 = req.analysts.filter((a) => !ANALYSTS.includes(a));
+      if (unknown2.length) throw new Error(`unknown analyst ${unknown2.join(", ")}; choose from ${ANALYSTS.join(", ")}`);
+      analysts = ANALYSTS.filter((a) => req.analysts.includes(a));
+      if (!analysts.length) throw new Error(`name at least one analyst from ${ANALYSTS.join(", ")}`);
+      if (kind !== "stock" && analysts.includes("fundamentals")) throw new Error(`the fundamentals analyst is not available for ${symbol4}: a ${kind === "crypto" ? "crypto asset" : "index, future or currency pair"} has no company accounts`);
+    } else {
+      analysts = s.analysis.analysts.filter((a) => kind === "stock" || a !== "fundamentals");
+      if (kind !== "stock" && s.analysis.analysts.includes("fundamentals")) notes.push(`${symbol4} is ${kind === "crypto" ? "a crypto asset" : "not a company"}, so there is no fundamentals analyst: it has no company accounts.`);
+      if (!analysts.length) throw new Error(`none of the settings' analysts is available for ${symbol4}`);
+    }
+    for (const [name, v] of [["debate rounds", req.debateRounds], ["risk rounds", req.riskRounds]]) if (v !== void 0 && !(Number.isInteger(v) && v >= 1 && v <= 5)) throw new Error(`${name} must be a whole number from 1 to 5`);
+    debateRounds = req.debateRounds ?? s.analysis.debateRounds;
+    riskRounds = req.riskRounds ?? s.analysis.riskRounds;
+    const asked = ws.sweep ? void 0 : readQueue(dir).find((i) => i.symbol === symbol4 && i.state === "running" && i.date === day3);
+    if (asked) {
+      const [d, r] = asked.depth ? [DEPTHS[asked.depth], DEPTHS[asked.depth]] : [s.analysis.debateRounds, s.analysis.riskRounds];
+      if ((req.debateRounds ?? d) !== d || (req.riskRounds ?? r) !== r) notes.push(`${symbol4} was asked for on the dashboard at ${asked.depth ? `${asked.depth} depth` : "the settings' depth"}, so it runs ${d} debate and ${r} risk round(s), not the ${debateRounds} and ${riskRounds} asked for here.`);
+      debateRounds = d;
+      riskRounds = r;
+    }
+    if (req.language !== void 0 && languageName(req.language, "") === "") throw new Error(`"${req.language}" is not a language name`);
+    language = req.language !== void 0 ? languageName(req.language) : s.analysis.outputLanguage;
+  }
+  const benchmark = resolveBenchmark(symbol4, s.scoring);
+  const plan = { symbol: symbol4, analysisDate: day3, kind, analysts, debateRounds, riskRounds, language, managerModel: s.analysis.managerModel, benchmark, holdingDays: s.scoring.holdingPeriodDays, steps: [], notes };
+  plan.steps = stepsFor(analysts, debateRounds, riskRounds).map((st) => ({ ...st, done: (done[st.section] ?? 0) >= st.turn }));
+  if (!resumed) startRun(dir, symbol4, day3, plan);
+  const lessons = journalOf(root, ws).pastContext(symbol4, isHistorical(day3) ? { asOf: day3 } : {});
+  return { plan, holdings: renderHoldings(readHoldings(deskDataDir(root)), symbol4), lessons, resumed };
+}
+function renderPlan({ plan: p, holdings, lessons, resumed }) {
+  const next = p.steps.find((x) => !x.done);
+  const step = (x) => `${x.section}${x.turn > 1 || p.steps.filter((y) => y.section === x.section).length > 1 ? ` (turn ${x.turn})` : ""}`;
+  return [
+    `Analysis plan for ${p.symbol} on ${p.analysisDate}${isHistorical(p.analysisDate) ? " (a past day: use only what was known by then)" : ""}`,
+    `Instrument: ${p.kind === "stock" ? "a stock or fund" : p.kind === "crypto" ? "a crypto asset, not a company" : "an index, future or currency pair, not a company"}`,
+    `Analysts: ${p.analysts.join(", ")}`,
+    `Debate rounds: ${p.debateRounds} (bull and bear each speak ${p.debateRounds} time(s)); risk rounds: ${p.riskRounds} (each of the three risk voices speaks ${p.riskRounds} time(s))`,
+    `Report language: ${p.language}${p.language.toLowerCase() === "english" ? "" : " (the labelled lines **Rating**, **Action**, **Recommendation** keep their English words)"}`,
+    `Manager model: ${p.managerModel || "the same as everyone else"}`,
+    `Judged after ${p.holdingDays} trading days against ${p.benchmark}`,
+    ...p.notes.length ? ["", ...p.notes.map((n2) => `Note: ${n2}`)] : [],
+    "",
+    `Steps${resumed ? " (resuming)" : ""}: ${p.steps.map((x) => `${x.done ? "[done] " : ""}${step(x)}`).join(" -> ")}`,
+    next ? `Next step: ${step(next)}` : "Every step is done: write the report and record the decision.",
+    "",
+    holdings,
+    "",
+    lessons ? `Lessons from past calls:
+${lessons}` : "Lessons from past calls: none yet (no earlier call has been settled)."
+  ].join("\n");
 }
 
 // src/desk/settle.ts
@@ -39780,7 +39804,7 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root) {
   }, async (a) => answer("news about " + a.symbol, () => companyNews(a.symbol, a.analysis_date, a.look_back_days ?? a0.newsLookbackDays, a0.companyNewsLimit)));
   server.registerTool("get_world_news", {
     title: "World and economic news",
-    description: "Headlines on central banks, the economy, geopolitics and commodities from the desk's standing searches, over the days before the analysis date.",
+    description: "Market-wide headlines over the days before the analysis date: the news Yahoo Finance files under the US stock market, the 10-year Treasury yield, oil, gold and the euro (the settings' world-news symbols), where central banks, the economy, geopolitics and commodities are reported.",
     inputSchema: { analysis_date: analysis, look_back_days: days },
     annotations: READ
   }, async (a) => answer("world news", () => worldNews(a.analysis_date, a.look_back_days ?? a0.newsLookbackDays, a0.worldNewsLimit, a0.worldNewsSearches)));
