@@ -268,8 +268,9 @@ forecast:
   about it today. Each comes with its reason in one line, such as "Fell 4.2% on 3.1 times its usual volume, a new 52-week
   low", and the robot beside it.
 
-Under the list, the switch **"Analyse the top 3 each market morning"** is off as shipped. When you switch it on, the top
-three that were not already called today go on the waiting list at shallow depth, once each weekday, and run when
+Under the list, the switch **"Analyse the top 3 each market morning"** is off as shipped. Switching it on
+puts nothing on the list at once: it starts the next market morning. Then, once each weekday morning (before noon in
+New York), the top three that were not already called today go on the waiting list at shallow depth, and run when
 something is listening; each analysis uses your Claude plan, like a chat. The morning routine reads the same list.
 
 ### What you hold: the desk's view, its stop, and sells you confirm

@@ -122,8 +122,9 @@
   average, news today), `rank` keeps five, `screenToday` works them out at most once an hour over `tiers.ts`
   `screenUniverse` and keeps them in `desk-data/screen.json` (`{ day, at, looked, unavailable, picks, queued? }`), which
   the dashboard (`/api/screen`) and the morning routine (`routine_brief`) both read. `queueTop` is the person's morning
-  switch (`prefs.ts` `morning`, set only by `/api/screen/morning`): on a weekday, once, the top three not called today
-  nor already open go on the waiting list at shallow depth; the dashboard rings the doorbell, the routine does not.
+  switch (`prefs.ts` `morning` and `morningFrom`, set only by `/api/screen/morning`, which queues nothing itself and
+  starts the switch on the next weekday): on a weekday morning (before noon New York time, `MORNING_ENDS`) from
+  `morningFrom`, once, the top three not called today nor already open go on the waiting list at shallow depth; the dashboard rings the doorbell, the routine does not.
   `src/desk/weather.ts` - "Market weather": `trendOf` (the S&P 500 against its averages), `moodOf` (the VIX) and
   `ratesOf` (Polymarket's next "Fed decision" event), each a line with a state, a tone, its figures and its meaning;
   `/api/weather` keeps it an hour. Neither ever forecasts, and a figure that cannot be had leaves its line unavailable.

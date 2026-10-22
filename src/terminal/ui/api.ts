@@ -9,7 +9,7 @@ import type { Weather, WeatherLine } from '../../desk/weather.js';
 /** One stock worth a look today (desk/screen.ts Pick; renamed so it does not hide TypeScript's own Pick). */
 export type { MarketView, Tier, TierItem, TierView, Worth, Screen, Weather, WeatherLine };
 /** The morning switch as the page shows it: on or off, and how many it puts on the waiting list. */
-export interface Morning { on: boolean; top: number }
+export interface Morning { on: boolean; top: number; /** The first market day the switch may act (YYYY-MM-DD), while it is on. */ from?: string }
 import type { History, QuoteResult } from '../quotes.js';
 import type { WatchItem } from '../store.js';
 import type { ListenerView, QueueView } from '../state.js';

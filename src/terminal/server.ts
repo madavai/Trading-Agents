@@ -39,7 +39,7 @@ import { findSymbols, QUERY } from './search.js';
 import { marketOf, readPrefs, saveMarket, savePrefs } from './prefs.js';
 import { marketSymbol, MAX_MARKET, screenUniverse, ticketable } from './tiers.js';
 import { addWatch, readWatchlist, removeWatch, setFavourite } from './store.js';
-import { queueTop, readScreen, SCREEN_MS, screenToday, TOP_QUEUED, type Screen } from '../desk/screen.js';
+import { nextMarketDay, queueTop, readScreen, SCREEN_MS, screenToday, TOP_QUEUED, type Screen } from '../desk/screen.js';
 import { weatherNow, type Weather } from '../desk/weather.js';
 import { dequeue, depthOfRounds, enqueue, isDepth, QueueRefusal, readQueue, removeListener, ringDoorbell, waitingIn } from '../desk/queue.js';
 import { findClaude } from '../watch/claude.js';
@@ -231,9 +231,9 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
   const screenNow = async (day: string) => {
     const { symbols, news } = screenUniverse(readWatchlist(dir), marketOf(dir));
     screening ??= screenToday(dir, symbols, news, day).finally(() => { screening = null; });
-    const worked = await screening, on = readPrefs(dir).morning === true;
-    const queued = on ? queueTop(dir, worked, day, true) : [];
-    return { screen: readScreen(dir) ?? worked, morning: { on, top: TOP_QUEUED }, queued };
+    const worked = await screening, prefs = readPrefs(dir), on = prefs.morning === true;
+    const queued = on ? queueTop(dir, worked, day, true, new Date(), prefs.morningFrom) : [];
+    return { screen: readScreen(dir) ?? worked, morning: { on, top: TOP_QUEUED, from: on ? prefs.morningFrom : undefined }, queued };
   };
   let weatherMemo: { at: number; day: string; value: Promise<Weather> } | null = null;
   const weather = (day: string): Promise<Weather> => {
@@ -374,7 +374,7 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
       for (const until = Date.now() + 8_000; Date.now() < until; await new Promise((r) => setTimeout(r, 200))) { const l = listenerOf(dir); if (l) return json(res, 200, { listener: l }); }
       throw new Refused(502, 'the listener did not start: see desk-data/watcher.log, or start it yourself with node dist/watch.mjs');
     }
-    if (p === '/api/prefs' && method === 'POST') { delete b.autorun; delete b.market; delete b.morning; delete b.readCall; return json(res, 200, savePrefs(dir, b)); }   // only their own switches set autorun and morning, only Change… the whole market, only a call served readCall
+    if (p === '/api/prefs' && method === 'POST') { delete b.autorun; delete b.market; delete b.morning; delete b.morningFrom; delete b.readCall; return json(res, 200, savePrefs(dir, b)); }   // only their own switches set autorun and morning, only Change… the whole market, only a call served readCall
     // The contact email the SEC asks for, from the field in "Get started": checked, kept in the desk's records like the
     // desk tool set_contact_email keeps it, sent to sec.gov alone, and never shown back in full.
     if (p === '/api/contact' && method === 'POST') {
@@ -382,13 +382,13 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
       try { email = saveContactEmail(root, typeof b.email === 'string' ? b.email : ''); } catch (e) { throw new Refused(400, (e as Error).message); }
       return json(res, 200, { saved: maskEmail(email) });
     }
-    // "Analyse the top three each market morning": the person's switch, off as shipped. Switched on, today's top three (if
-    // the screen was worked out today) go on the waiting list at once, and then once each market day.
+    // "Analyse the top three each market morning": the person's switch, off as shipped. Switching it on puts nothing on the
+    // waiting list at once: it starts the next market morning, and then acts once each market morning.
     if (p === '/api/screen/morning' && method === 'POST') {
       if (typeof b.on !== 'boolean') throw new Refused(400, 'say on or off');
-      savePrefs(dir, { morning: b.on });
-      const kept = readScreen(dir), queued = b.on && kept ? queueTop(dir, kept, day, true) : [];
-      return json(res, 200, { morning: { on: b.on, top: TOP_QUEUED }, queued });
+      const from = b.on ? nextMarketDay(day) : undefined;
+      savePrefs(dir, b.on ? { morning: true, morningFrom: from } : { morning: false }, b.on ? [] : ['morningFrom']);
+      return json(res, 200, { morning: { on: b.on, top: TOP_QUEUED, from }, queued: [] });
     }
     // The whole-market funds on "Start here": the person's own list, each a fund or a stock Yahoo has a price for, checked
     // before it is kept. The shipped four put back are kept as no list, so a later version's four reach the person.

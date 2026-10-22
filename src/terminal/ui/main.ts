@@ -992,7 +992,7 @@ function renderStart(): void {
 
 // ---------- this morning: the market weather, and what is worth a look today ----------
 // Both are worked out by the desk from figures, at most once an hour; the page asks when it opens and every hour after.
-const MORNING = { weather: null as Weather | null, weatherFailed: '', screen: null as Screen | null, screenFailed: '', on: false, top: 3 };
+const MORNING = { weather: null as Weather | null, weatherFailed: '', screen: null as Screen | null, screenFailed: '', on: false, top: 3, from: '' };
 const LINE_TONE: Record<WeatherLine['tone'], string> = { ok: 'ok', warn: 'warn', bad: 'danger', '': '' };
 
 function renderWeather(): void {
@@ -1020,7 +1020,7 @@ function renderLook(): void {
   const s = MORNING.screen, el = $('#lookCard');
   const head = `<div class="at-card-head"><h3>Worth a look today</h3>${s ? `<span class="at-chip" title="How many funds and stocks were looked at">${s.picks.length} of ${s.looked}</span>` : ''}</div>`;
   const sw = `<button class="at-toggle" data-act="morning-switch" role="switch" aria-checked="${MORNING.on}"><span class="at-switch${MORNING.on ? ' on' : ''}"></span><span>Analyse the top ${MORNING.top} each market morning</span></button>
-    <p class="at-quiet">${MORNING.on ? `On: each market day, the top ${MORNING.top} not already called go on the waiting list at shallow depth, once. Each analysis uses your Claude plan, like a chat.` : `Off as shipped. When on, the top ${MORNING.top} go on the waiting list at shallow depth once each market day, and run when something is listening.`}</p>`;
+    <p class="at-quiet">${MORNING.on ? `On${MORNING.from ? `, from ${esc(dayText(MORNING.from))}` : ''}: each market morning (before noon in New York), the top ${MORNING.top} not already called go on the waiting list at shallow depth, once. Each analysis uses your Claude plan, like a chat.` : `Off as shipped. When on, it starts the next market morning: then the top ${MORNING.top} go on the waiting list at shallow depth once each market morning, and run when something is listening. Switching it on puts nothing on the list at once.`}</p>`;
   if (!s) { el.innerHTML = `${head}<p class="at-quiet">${esc(MORNING.screenFailed || "Looking over the whole market, the sectors and your names: the first look of the day takes a minute.")}</p>${sw}`; return; }
   const list = s.picks.length ? `<div class="ta-looks">${s.picks.map(lookRow).join('')}</div>`
     : `<p class="at-lede">Nothing stood out among the ${s.looked} looked at: no move of 3% or more, no volume twice its usual, no 52-week high or low, no cross of an average, and no news today about your companies or coins.</p>`;
@@ -1035,7 +1035,7 @@ async function loadMorning(): Promise<void> {
   await Promise.all([
     api.weather().then((r) => { MORNING.weather = r.weather; MORNING.weatherFailed = ''; }, (e) => { MORNING.weatherFailed = say(e); }),
     api.screen().then(async (r) => {
-      MORNING.screen = r.screen; MORNING.on = r.morning.on; MORNING.top = r.morning.top; MORNING.screenFailed = '';
+      MORNING.screen = r.screen; MORNING.on = r.morning.on; MORNING.top = r.morning.top; MORNING.from = r.morning.from ?? ''; MORNING.screenFailed = '';
       if (r.queued.length) { toast(`${listWords(r.queued)} ${r.queued.length === 1 ? 'is' : 'are'} waiting to be analysed: your morning switch put ${r.queued.length === 1 ? 'it' : 'them'} on the list.`); await refreshState(); }
     }, (e) => { MORNING.screenFailed = say(e); }),
   ]);
@@ -1370,10 +1370,9 @@ document.addEventListener('click', (e) => {
     }
     case 'morning-switch': void run(async () => {
       const r = await api.setMorning(!MORNING.on);
-      MORNING.on = r.morning.on; MORNING.top = r.morning.top; renderLook();
+      MORNING.on = r.morning.on; MORNING.top = r.morning.top; MORNING.from = r.morning.from ?? ''; renderLook();
       toast(!r.morning.on ? 'Switched off: nothing goes on the waiting list by itself.'
-        : r.queued.length ? `Switched on: ${listWords(r.queued)} ${r.queued.length === 1 ? 'is' : 'are'} now waiting to be analysed, at shallow depth.` : `Switched on: each market day, the top ${r.morning.top} go on the waiting list at shallow depth.`);
-      if (r.queued.length) await refreshState();
+        : `Switched on: nothing is queued now. From ${r.morning.from ? dayText(r.morning.from) : 'the next market morning'}, the top ${r.morning.top} go on the waiting list at shallow depth each market morning.`);
     }); break;
     case 'mk-edit': MK.editing = true; renderStart(); document.getElementById('mkInput')?.focus(); break;
     case 'mk-cancel': MK.editing = false; renderStart(); break;

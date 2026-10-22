@@ -148,11 +148,23 @@ export async function screenToday(dir: string, symbols: readonly string[], news:
 
 const isWeekday = (day: string) => { const w = new Date(`${day}T12:00:00Z`).getUTCDay(); return w !== 0 && w !== 6; };
 
-/** The morning switch: on a weekday, once, the top three picks not already called today nor waiting or being analysed go
- *  on the waiting list at shallow depth. `ring` rings the doorbell for whoever listens (the dashboard does; the morning
+/** The switch acts in a market morning only: before this hour, New York time. */
+export const MORNING_ENDS = 12;
+const newYorkHour = (now: Date) => Number(new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: '2-digit', hourCycle: 'h23' }).format(now));
+/** The weekday after `day`: where the switch starts when it is switched on (market holidays are not known). */
+export function nextMarketDay(day: string): string {
+  let d = addDays(day, 1);
+  while (!isWeekday(d)) d = addDays(d, 1);
+  return d;
+}
+
+/** The morning switch: on a weekday morning (before noon in New York), from the day the switch starts (`from`, the market
+ *  day after it was switched on), once, the top three picks not already called today nor waiting or being analysed go on
+ *  the waiting list at shallow depth. `ring` rings the doorbell for whoever listens (the dashboard does; the morning
  *  routine, which analyses what is waiting itself, does not). Returns what it queued. */
-export function queueTop(dir: string, screen: Screen, day: string, ring: boolean, now: Date = new Date()): string[] {
-  if (!isWeekday(day) || screen.day !== day || screen.queued?.day === day || readScreen(dir)?.queued?.day === day) return [];
+export function queueTop(dir: string, screen: Screen, day: string, ring: boolean, now: Date = new Date(), from = ''): string[] {
+  if (!isWeekday(day) || day < from || newYorkHour(now) >= MORNING_ENDS) return [];
+  if (screen.day !== day || screen.queued?.day === day || readScreen(dir)?.queued?.day === day) return [];
   const called = new Set(new Journal(path.join(dir, 'journal.md')).load().filter((e) => e.date === day).map((e) => e.ticker));
   const busy = new Set(readQueue(dir, now).filter((q) => q.state === 'waiting' || q.state === 'running').map((q) => q.symbol));
   const queued: string[] = [];
