@@ -79,7 +79,9 @@ from the project's version.
 <summary>The sources, in words</summary>
 
 Free public sources, with no keys: Yahoo Finance (prices, news, company profile), StockTwits, Reddit, FRED (economic
-figures), Polymarket (odds) and SEC EDGAR (company filings). Yahoo Finance has no official free service: the desk reads
+figures), Polymarket (odds) and SEC EDGAR (company filings). World news is the news Yahoo Finance files under the
+market's own symbols (the S&P 500, the 10-year Treasury yield, oil, gold, the euro; `worldNewsSearches` in
+`desk-settings.json`): its search finds none under topic words. Yahoo Finance has no official free service: the desk reads
 the same public pages its website uses, for personal use, and Yahoo can block or change them without notice. Any source
 that does not answer is reported as unavailable, never as "nothing happened". Market prices may be up to 15 minutes
 late.
@@ -310,7 +312,8 @@ Press the robot beside any stock, choose how deep (shallow, medium or deep; your
 press "Ask the desk". The stock joins **Analyses you asked for**, where each one shows where it stands: waiting, being
 analysed (with the step it is on), done with its rating, or failed with the reason and a Retry. When one finishes, a
 notice says so wherever you are on the page. One stock is analysed at a time, at most five a run (the routines' limit
-in `desk-settings.json`); the rest wait for the next run, which is asked for by itself.
+in `desk-settings.json`); the rest wait for the next run, which is asked for by itself. Each runs at the depth you
+chose, whatever the team's lead plans: the time and the model allowance it spends are yours.
 
 Something has to run them. The page says who is listening:
 - **Madav**: switch on its "Run automatically when the dashboard asks" routine, once. The project ships it, off; it

@@ -8,6 +8,10 @@ import { parseAtom, socialPosts, subredditsFor } from '../src/data/social.js';
 import { economicSeries, parseCsv, releaseLag } from '../src/data/macro.js';
 import { predictionMarkets } from '../src/data/odds.js';
 import { deskServer } from '../src/tools/server.js';
+import { readSettings } from '../src/settings.js';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 const at = (iso: string) => Math.floor(Date.parse(iso) / 1000);
 const json = (v: unknown, status = 200) => new Response(JSON.stringify(v), { status });
@@ -55,6 +59,27 @@ test('world news merges the standing searches without repeats', async () => {
   const t = await worldNews('2026-10-10', 7, 10, ['Federal Reserve', 'oil supply']);
   assert.equal(seen.length, 2);
   assert.equal(t.match(/Fed holds rates steady/g)?.length, 1);
+});
+
+test('world news reads the news Yahoo files under market symbols, since its search finds none under topic words', async () => {
+  // As Yahoo answered on 2026-10-22: "Federal Reserve interest rates inflation" no news; ^GSPC and CL=F the day's market stories.
+  const MARKET = { news: [
+    { title: 'Stock market today: Dow, S&P 500, Nasdaq tumble as oil jumps', publisher: 'Yahoo Finance', link: 'https://x/m1', providerPublishTime: at('2026-10-09T15:00:00Z'), relatedTickers: ['^GSPC', 'CL=F'] },
+    { title: 'Nasdaq leads Wall Street lower on AI spending jitters', publisher: 'Reuters', link: 'https://x/m2', providerPublishTime: at('2026-10-09T20:00:00Z'), relatedTickers: ['^GSPC'] },
+  ] };
+  configure({ fetch: route([[/finance\/search\?q=(%5E|[A-Z]+%3D)/, () => json(MARKET)], [/finance\/search/, () => json({ news: [] })]]) });
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ta-w-'));
+  const { worldNewsSearches } = readSettings(root).analysis;
+  const t = await worldNews('2026-10-10', 7, 10, worldNewsSearches);
+  assert.match(t, /from the news filed under \^GSPC, \^TNX, CL=F, GC=F, EURUSD=X/);
+  assert.equal(t.match(/Nasdaq leads Wall Street lower/g)?.length, 1);
+  // A settings file still holding the old topic words gets the symbols; a person's own list is kept.
+  const old = ['Federal Reserve interest rates inflation', 'S&P 500 earnings GDP economic outlook', 'geopolitical risk trade war sanctions', 'ECB Bank of England BOJ central bank policy', 'oil commodities supply chain energy'];
+  fs.writeFileSync(path.join(root, 'desk-settings.json'), JSON.stringify({ analysis: { worldNewsSearches: old } }));
+  assert.deepEqual(readSettings(root).analysis.worldNewsSearches, worldNewsSearches);
+  fs.writeFileSync(path.join(root, 'desk-settings.json'), JSON.stringify({ analysis: { worldNewsSearches: [' ^VIX ', 7, ''] } }));
+  assert.deepEqual(readSettings(root).analysis.worldNewsSearches, ['^VIX']);
+  assert.deepEqual(readSettings('.').analysis.worldNewsSearches, worldNewsSearches);   // the shipped settings file
 });
 
 const ATOM = `<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">

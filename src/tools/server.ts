@@ -117,7 +117,7 @@ export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetc
 
   server.registerTool('get_world_news', {
     title: 'World and economic news',
-    description: 'Headlines on central banks, the economy, geopolitics and commodities from the desk\'s standing searches, over the days before the analysis date.',
+    description: 'Market-wide headlines over the days before the analysis date: the news Yahoo Finance files under the US stock market, the 10-year Treasury yield, oil, gold and the euro (the settings\' world-news symbols), where central banks, the economy, geopolitics and commodities are reported.',
     inputSchema: { analysis_date: analysis, look_back_days: days },
     annotations: READ,
   }, async (a) => answer('world news', () => worldNews(a.analysis_date, a.look_back_days ?? a0.newsLookbackDays, a0.worldNewsLimit, a0.worldNewsSearches)));

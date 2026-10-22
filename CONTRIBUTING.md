@@ -10,7 +10,9 @@
 - `src/data/` - the free sources, each held to the analysis date, official ones first. `company.ts` is a company's
   accounts, profile, valuation and insider trades: for a US filer all from the SEC as filed by the analysis date
   (`sec.ts`: statements, `submissions` for name and industry code, `sectorOfSic`, `trailingYear` for the last twelve
-  months no filing states, `sharesOutstanding` from the cover page; `insiders.ts`: each Form 4 read from its own XML),
+  months no filing states, `sharesOutstanding` from the cover page, or `averageDilutedShares` from the accounts when
+  the cover page gives no single count, as for a filer with two classes of shares, and said so; `insiders.ts`: each
+  Form 4 read from its own XML),
   the valuation worked out with the checked close; Yahoo Finance only for a company that does not file with the SEC,
   today only (Yahoo refuses its company data to the desk's honest name, so this is mostly unavailable). The desk never
   calls itself a browser. `fundProfile` (tool `get_fund_profile`) is a fund's in their place, from `nport.ts`: the latest
@@ -83,7 +85,8 @@
   - `queue.json`: `[{ symbol, requestedAt, depth?: "shallow"|"medium"|"deep", state: "waiting"|"running"|"done"|"failed",
     date?, startedAt?, endedAt?, rating?, reason? }]`. The dashboard adds (and takes off what is not running); the desk
     tools `start_queue_item`, `finish_queue_item` and `end_queue_run` mark the rest. One stock runs at a time; one left
-    running for two hours reads as failed.
+    running for two hours reads as failed. `plan_analysis` plans a stock running from the list at its `depth` (no depth:
+    the settings'), whatever rounds the lead asks for, and says so in the plan's notes.
   - `doorbell.json`: `{ at, waiting, why: "press"|"more" }`, written when the person presses Analyse, Retry or Run now,
     and by `end_queue_run` when stocks still wait. A runner starts a run when `at` changes, and never because the
     waiting list changed.
