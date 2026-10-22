@@ -79,8 +79,7 @@ from the project's version.
 <summary>The sources, in words</summary>
 
 Free public sources, with no keys: Yahoo Finance (prices, news, company profile), StockTwits, Reddit, FRED (economic
-figures), Polymarket (odds) and SEC EDGAR (company filings, and what each US fund reports it holds). Yahoo Finance has no
-official free service: the desk reads
+figures), Polymarket (odds) and SEC EDGAR (company filings). Yahoo Finance has no official free service: the desk reads
 the same public pages its website uses, for personal use, and Yahoo can block or change them without notice. Any source
 that does not answer is reported as unavailable, never as "nothing happened". Market prices may be up to 15 minutes
 late.
