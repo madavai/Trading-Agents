@@ -15,6 +15,11 @@ import { DEFAULT_CAPS, type Caps } from '../src/settings.js';
 import { logOrder } from '../src/desk/orders.js';
 import { confirmWords, placedToday, startTerminal, type Assets, type TerminalOptions } from '../src/terminal/server.js';
 import { accountTools, AGENTIC, fakeRobinhood, MAIN, type Fake } from './fake-robinhood.js';
+import { today } from '../src/data/dates.js';
+
+// The call the tickets come from is dated today, so its paper record is always under a week old: a fixed date made the
+// four-week refusal's words ("0 weeks") wrong a week later.
+const CALL_DAY = today();
 
 const ORDER = { symbol: 'NVDA', side: 'buy' as const, quantity: 1, limitPrice: 182.4, timeInForce: 'gfd' as const };
 const UUID = '0b6f6a52-2f3c-4f4e-9b1a-6a0c5e3d2a11';
@@ -74,10 +79,10 @@ async function desk(caps?: Partial<Caps>, more: Partial<TerminalOptions> = {}) {
   await link.choose(accounts.filter((a) => !a.deactivated).map((a) => a.key));
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ta-pl-term-')), dir = path.join(root, 'desk-data');
   fs.writeFileSync(path.join(root, 'desk-settings.json'), JSON.stringify({ trading: { caps: { perOrderUsd: 100_000, perStockPercent: 100, ordersPerDay: 50 } } }));
-  new Journal(path.join(dir, 'journal.md')).storeDecision('NVDA', '2026-10-15', '**Rating**: Buy\n\n**Executive Summary**: Buy.');
+  new Journal(path.join(dir, 'journal.md')).storeDecision('NVDA', CALL_DAY, '**Rating**: Buy\n\n**Executive Summary**: Buy.');
   const term = await startTerminal({ root, assets: new Map([['/index.html', { type: 'text/html', body: '<p>page</p>' }]]) as Assets, port: 0, robinhood: link, keyFile: path.join(path.dirname(file), 'dashboard.json'), ...more });
   const post = async (p: string, body: unknown) => { const r = await fetch(`${term.url}${p.slice(1)}`, { method: 'POST', headers: { 'x-desk-token': term.token, 'content-type': 'application/json' }, body: JSON.stringify(body) }); const t = await r.text(); return { status: r.status, body: t, json: () => JSON.parse(t) }; };
-  const ticket = async () => (await post('/api/ticket', { symbol: 'NVDA', date: '2026-10-15' })).json() as { id: string };
+  const ticket = async () => (await post('/api/ticket', { symbol: 'NVDA', date: CALL_DAY })).json() as { id: string };
   return { o, link, file, dir, term, post, ticket };
 }
 
@@ -217,7 +222,7 @@ test('every cap is checked again on Robinhood\'s latest figures just before send
 test('the caps are the person\'s own: kept beside the trading switch, changed only from the page, and never read from the project\'s settings file', async () => {
   const { file, term, post, link } = await desk();
   try {
-    const first = (await post('/api/ticket', { symbol: 'NVDA', date: '2026-10-15' })).json();
+    const first = (await post('/api/ticket', { symbol: 'NVDA', date: CALL_DAY })).json();
     assert.deepEqual(first.caps, DEFAULT_CAPS, 'the shipped caps, not the wide-open ones written into desk-settings.json');
     assert.equal((await post('/api/trading', { caps: { ...DEFAULT_CAPS, perOrderUsd: 50_000_000 } })).status, 400, 'out of range');
     assert.equal((await post('/api/trading', { caps: { ...DEFAULT_CAPS, ordersPerDay: 2.5 } })).status, 400, 'orders a day are whole');
@@ -225,7 +230,7 @@ test('the caps are the person\'s own: kept beside the trading switch, changed on
     const set = (await post('/api/trading', { caps: { ...DEFAULT_CAPS, perOrderUsd: 300, ordersPerDay: 2 } })).json();
     assert.deepEqual([set.on, set.caps], [false, { ...DEFAULT_CAPS, perOrderUsd: 300, ordersPerDay: 2 }]);
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(path.dirname(file), 'trading.json'), 'utf8')), { on: false, caps: { ...DEFAULT_CAPS, perOrderUsd: 300, ordersPerDay: 2 } });
-    const next = (await post('/api/ticket', { symbol: 'NVDA', date: '2026-10-15' })).json();
+    const next = (await post('/api/ticket', { symbol: 'NVDA', date: CALL_DAY })).json();
     assert.deepEqual([next.caps.perOrderUsd, next.proposal.order.quantity], [300, 1]);
     const words = (await post('/api/ticket/check', { id: next.id, quantity: 2, limitPrice: 182.4 })).json().checks.map((c: { words: string }) => c.words).join(' | ');
     assert.match(words, /\$364\.80 is over your cap of \$300\.00 an order/);
