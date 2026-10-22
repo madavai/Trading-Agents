@@ -14,11 +14,11 @@
     "companyNewsLimit": 20,
     "worldNewsLimit": 10,
     "worldNewsSearches": [
-      "Federal Reserve interest rates inflation",
-      "S&P 500 earnings GDP economic outlook",
-      "geopolitical risk trade war sanctions",
-      "ECB Bank of England BOJ central bank policy",
-      "oil commodities supply chain energy"
+      "^GSPC",
+      "^TNX",
+      "CL=F",
+      "GC=F",
+      "EURUSD=X"
     ],
     "stocktwitsLimit": 30,
     "subreddits": [

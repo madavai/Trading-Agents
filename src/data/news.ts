@@ -1,7 +1,7 @@
 // Company and world news from Yahoo Finance's public search (no key): headlines with their publisher and time, held to
 // the analysis window. Search returns a recent sample, so a window it cannot reach, or an empty one, is said to be so -
-// never "no news".
-// The world-news searches are TradingAgents' (default_config.py global_news_queries), Apache License 2.0.
+// never "no news". World news is the news Yahoo files under the market's own symbols (the settings' worldNewsSearches):
+// its search finds nothing under topic words such as "Federal Reserve".
 import { addDays, analysisDate, isHistorical } from './dates.js';
 import { getJson, Unavailable } from './http.js';
 import { normalizeSymbol } from './symbols.js';
@@ -58,5 +58,5 @@ export async function worldNews(analysis: string, lookBackDays: number, limit: n
   const note = failed ? `\n(${failed} of ${queries.length} searches could not be run: Yahoo Finance did not answer them.)` : '';
   if (!list.length) return gap(all, from, day, 'world and economic news') + note;
   const past = isHistorical(day) ? ' Search favours recent articles, so a past window may be thin.' : '';
-  return [`World and economic news, ${from} to ${day}, from ${queries.length} searches: ${queries.join('; ')}.${past}`, '', render(list)].join('\n') + note;
+  return [`World and economic news, ${from} to ${day}, from the news filed under ${queries.join(', ')}.${past}`, '', render(list)].join('\n') + note;
 }

@@ -70,7 +70,9 @@ export const DEFAULTS: Settings = {
     newsLookbackDays: 7,
     companyNewsLimit: 20,
     worldNewsLimit: 10,
-    worldNewsSearches: ['Federal Reserve interest rates inflation', 'S&P 500 earnings GDP economic outlook', 'geopolitical risk trade war sanctions', 'ECB Bank of England BOJ central bank policy', 'oil commodities supply chain energy'],
+    // The news Yahoo files under the market's own symbols: US stocks, the 10-year Treasury yield, oil, gold, the euro. Its
+    // search finds no news under topic words such as "Federal Reserve".
+    worldNewsSearches: ['^GSPC', '^TNX', 'CL=F', 'GC=F', 'EURUSD=X'],
     stocktwitsLimit: 30,
     subreddits: ['wallstreetbets', 'stocks', 'investing'],
     cryptoSubreddits: ['CryptoCurrency', 'CryptoMarkets'],
@@ -140,6 +142,15 @@ export function languageName(v: unknown, fallback = 'English'): string {
   return /^\p{L}[\p{L} ()\-]{0,38}$/u.test(s) ? s : fallback;
 }
 
+// The topic words shipped until October 2026 (TradingAgents' global news queries). Yahoo's search found nothing under
+// them, so a settings file still holding exactly these gets today's searches.
+const OLD_WORLD_SEARCHES = ['Federal Reserve interest rates inflation', 'S&P 500 earnings GDP economic outlook', 'geopolitical risk trade war sanctions', 'ECB Bank of England BOJ central bank policy', 'oil commodities supply chain energy'];
+
+function searchesOf(v: unknown): string[] {
+  const list = Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.trim() !== '').map((x) => x.trim()).slice(0, 10) : [];
+  return !list.length || list.join('\n') === OLD_WORLD_SEARCHES.join('\n') ? [...DEFAULTS.analysis.worldNewsSearches] : list;
+}
+
 export function readSettings(root: string): Settings {
   let raw: Partial<Record<keyof Settings, Record<string, unknown>>> = {};
   try { raw = JSON.parse(fs.readFileSync(path.join(root, 'desk-settings.json'), 'utf8')); } catch { /* the defaults */ }
@@ -153,6 +164,7 @@ export function readSettings(root: string): Settings {
       debateRounds: int(a.debateRounds, 1, 5, 1),
       riskRounds: int(a.riskRounds, 1, 5, 1),
       analysts: analysts.length ? analysts : [...ANALYSTS],
+      worldNewsSearches: searchesOf(a.worldNewsSearches),
       managerModel: typeof a.managerModel === 'string' && /^[\w.\-[\]]{0,60}$/.test(a.managerModel.trim()) ? a.managerModel.trim() : '',
     },
     scoring: {

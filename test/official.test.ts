@@ -1,7 +1,7 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { configure, NoData } from '../src/data/http.js';
-import { clearSecCache, sectorOfSic, sharesOutstanding, trailingYear, type Fact } from '../src/data/sec.js';
+import { averageDilutedShares, clearSecCache, sectorOfSic, sharesOutstanding, trailingYear, type Fact } from '../src/data/sec.js';
 import { clearYahooSession, companyOverview, insiderTransactions, profileSector } from '../src/data/company.js';
 import { parseForm4 } from '../src/data/insiders.js';
 import { chartJson, series } from './chart.js';
@@ -156,6 +156,29 @@ test("a US filer's profile and valuation from its SEC filings and the checked cl
   assert.doesNotMatch(past, /withheld/, 'a past day has its own valuation, from what was filed by then');
   assert.match(past, /Shares outstanding: unavailable/, 'the cover page of 21 August was not filed by 1 August');
   assert.match(past, /Diluted EPS, last twelve months \(derived from the full year to 2026-01-25, 4\.9\): 4\.90 USD/);
+});
+
+// Meta's own figures as the SEC served them on 2026-10-22: no cover-page count (classes A and B), the quarters' diluted shares.
+const DILUTED = [
+  { start: '2026-04-01', end: '2026-06-30', val: 2566000000, filed: '2026-07-30', form: '10-Q' },
+  { start: '2026-01-01', end: '2026-09-30', val: 2568000000, filed: '2026-10-22', form: '10-Q' },
+  { start: '2026-07-01', end: '2026-09-30', val: 2573000000, filed: '2026-10-22', form: '10-Q' },
+];
+
+test('a company with two classes of shares is valued on the average diluted shares from its accounts, and says so', async () => {
+  assert.deepEqual(averageDilutedShares(DILUTED, '2026-10-21'), { shares: 2566e6, start: '2026-04-01', end: '2026-06-30', filed: '2026-07-30' });
+  assert.equal(averageDilutedShares(DILUTED, '2026-10-22')?.shares, 2573e6, 'the latest quarter, not the nine months that end with it');
+  assert.equal(averageDilutedShares(DILUTED, '2026-07-01'), null);
+  const closes = series('2026-10-20', 300).map((r, i, all) => (i === all.length - 1 ? { ...r, c: 216.47 } : r));
+  const facts = { facts: { 'us-gaap': { ...FACTS.facts['us-gaap'], WeightedAverageNumberOfDilutedSharesOutstanding: { units: { shares: DILUTED } } } } };
+  configure({ fetch: route([TICKERS,
+    [/submissions\/CIK0000001234\.json/, () => json(record([]))],
+    [/companyfacts\/CIK0000001234\.json/, () => json(facts)],
+    [/v8\/finance\/chart\/ACME/, () => json(chartJson('ACME', closes))],
+  ]) });
+  const t = await companyOverview('ACME', '2026-10-21');
+  assert.match(t, /Shares outstanding: no single count on a cover page filed by then .* In its place, the weighted average diluted shares from its accounts for 2026-04-01 to 2026-06-30: 2,566,000,000 \(filed 2026-07-30\), so the figures worked out from it are close, not exact\nMarket value \(derived: average diluted shares × close\): 555,462,020,000 USD/);
+  assert.match(t, /Book value per share \(derived: equity ÷ average diluted shares\): 89\.24 USD/);
 });
 
 test('the sector limit learns a sector and a fund from the SEC; a company that does not file with it stays unknown', async () => {

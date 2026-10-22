@@ -8,6 +8,7 @@ import { deleteRun, progress, readSections, saveSection, startRun, writeReport }
 import { saveContactEmail } from '../src/contact.js';
 import { buildPlan, NeedsEmail, renderPlan, stepsFor } from '../src/desk/plan.js';
 import { journalOf } from '../src/desk/plan.js';
+import { enqueue, finishItem, startItem } from '../src/desk/queue.js';
 import { languageName, readSettings } from '../src/settings.js';
 
 const folder = () => { const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ta-r-')); fs.copyFileSync('desk-settings.json', path.join(root, 'desk-settings.json')); return { root, dir: path.join(root, 'desk-data') }; };
@@ -116,6 +117,26 @@ test('a run that stopped is resumed as it was planned, from its next step', () =
   assert.match(text, /Next step: bear \(turn 1\)/);
   const fresh = buildPlan(root, { symbol: 'NVDA', analysisDate: '2026-10-12', debateRounds: 1, restart: true });
   assert.deepEqual([fresh.resumed, fresh.plan.analysts.length, fresh.plan.debateRounds, fresh.plan.steps.some((s) => s.done)], [false, 4, 1, false]);
+});
+
+test('a stock asked for on the dashboard runs at the depth the person chose there, whatever rounds the lead asks for', () => {
+  const { root, dir } = folder();
+  saveContactEmail(root, 'jane@mail.com');
+  // The real run of 2026-10-21: META asked for at shallow depth, planned by the lead with three rounds of each debate.
+  enqueue(dir, 'META', new Date().toISOString(), 'shallow');
+  startItem(dir, 'META', '2026-10-12');
+  const shallow = buildPlan(root, { symbol: 'META', analysisDate: '2026-10-12', debateRounds: 3, riskRounds: 3 }).plan;
+  assert.deepEqual([shallow.debateRounds, shallow.riskRounds, shallow.steps.length], [1, 1, 4 + 2 + 2 + 3 + 1]);
+  assert.match(shallow.notes.join('\n'), /META was asked for on the dashboard at shallow depth, so it runs 1 debate and 1 risk round\(s\), not the 3 and 3 asked for here/);
+  // A deep request keeps its five rounds; asking for them is no change, so nothing is said.
+  enqueue(dir, 'NVDA', new Date().toISOString(), 'deep');
+  finishItem(dir, 'META', { reason: 'stopped for the test' });
+  startItem(dir, 'NVDA', '2026-10-12');
+  const deep = buildPlan(root, { symbol: 'NVDA', analysisDate: '2026-10-12' }).plan;
+  assert.deepEqual([deep.debateRounds, deep.riskRounds, deep.notes], [5, 5, []]);
+  // Not on the list, or on it for another day: the rounds asked for stand.
+  assert.equal(buildPlan(root, { symbol: 'TSLA', analysisDate: '2026-10-12', debateRounds: 3 }).plan.debateRounds, 3);
+  assert.equal(buildPlan(root, { symbol: 'NVDA', analysisDate: '2026-10-09', debateRounds: 2 }).plan.debateRounds, 2);
 });
 
 test('lessons reach the plan, and a past-dated plan sees only outcomes already known by its day', () => {

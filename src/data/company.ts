@@ -9,7 +9,7 @@ import { addDays, analysisDate, isHistorical } from './dates.js';
 import { getCookies, getJson, getText, NoData, Unavailable } from './http.js';
 import { cryptoBase, normalizeSymbol } from './symbols.js';
 import { history, HOSTS } from './yahoo.js';
-import { cikFor, companyFacts, fundTickers, latestBalance, sectorOfSic, secStatement, sharesOutstanding, SHOWN, STATEMENTS, submissions, trailingYear, type Fact, type Frequency, type Statement, type Table } from './sec.js';
+import { averageDilutedShares, cikFor, companyFacts, fundTickers, latestBalance, sectorOfSic, secStatement, sharesOutstanding, SHOWN, STATEMENTS, submissions, trailingYear, type Fact, type Frequency, type Statement, type Table } from './sec.js';
 import { secInsiders } from './insiders.js';
 import { ASK_FOR_EMAIL } from '../contact.js';
 
@@ -121,9 +121,13 @@ async function secOverview(sym: string, cik: string, day: string): Promise<strin
   const usd = !close?.currency || close.currency === 'USD';
   lines.push(close ? `Close: ${fixed(close.close)} ${close.currency ?? ''} on ${close.date} (the checked price table's latest row on or before ${day})`.replace('  ', ' ') : 'Close: unavailable (the prices could not be read), so no multiple can be worked out');
 
-  const shares = sharesOutstanding(units(dei.EntityCommonStockSharesOutstanding, 'shares'), day);
-  lines.push(shares ? `Shares outstanding: ${whole(shares.shares)} (counted on ${shares.end}, filed ${shares.filed})` : 'Shares outstanding: unavailable (not on a cover page filed by then)');
-  if (shares && close && usd) lines.push(`Market value (derived: shares × close): ${whole(shares.shares * close.close)} USD`);
+  const cover = sharesOutstanding(units(dei.EntityCommonStockSharesOutstanding, 'shares'), day);
+  const average = cover ? null : averageDilutedShares(units(g.WeightedAverageNumberOfDilutedSharesOutstanding, 'shares'), day);
+  const shares = cover ?? average, which = average ? 'average diluted shares' : 'shares';
+  if (cover) lines.push(`Shares outstanding: ${whole(cover.shares)} (counted on ${cover.end}, filed ${cover.filed})`);
+  else if (average) lines.push(`Shares outstanding: no single count on a cover page filed by then (a company with more than one class of shares gives one per class there, which the SEC's data leaves out). In its place, the weighted average diluted shares from its accounts for ${average.start} to ${average.end}: ${whole(average.shares)} (filed ${average.filed}), so the figures worked out from it are close, not exact`);
+  else lines.push('Shares outstanding: unavailable (not on a cover page filed by then)');
+  if (shares && close && usd) lines.push(`Market value (derived: ${which} × close): ${whole(shares.shares * close.close)} USD`);
 
   const eps = trailingYear(units(g.EarningsPerShareDiluted, 'USD/shares'), day);
   if (eps) {
@@ -136,7 +140,7 @@ async function secOverview(sym: string, cik: string, day: string): Promise<strin
     lines.push(`Stockholders' equity: ${whole(equity.val)} USD (at ${equity.end}, filed ${equity.filed})`);
     if (shares && shares.shares > 0) {
       const bv = equity.val / shares.shares;
-      lines.push(`Book value per share (derived: equity ÷ shares): ${fixed(bv)} USD`);
+      lines.push(`Book value per share (derived: equity ÷ ${which}): ${fixed(bv)} USD`);
       if (close && usd && bv > 0) lines.push(`Price to book (derived: close ÷ that): ${fixed(close.close / bv)}`);
     }
   }

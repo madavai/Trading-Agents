@@ -232,6 +232,15 @@ export function latestBalance(list: readonly Fact[], asOf: string): Fact | null 
   return knownBy(list, asOf).filter((f) => !f.start).sort((a, b) => b.end.localeCompare(a.end) || b.filed.localeCompare(a.filed))[0] ?? null;
 }
 
+/** In place of a cover-page count: the weighted average diluted shares of the latest quarter filed by `asOf` (of the
+ *  latest year, when no quarter was filed). The SEC's data leaves out the counts a filer with more than one class of
+ *  shares gives class by class on its cover page (Meta, Alphabet), and this figure from its accounts is always there. */
+export function averageDilutedShares(list: readonly Fact[], asOf: string): { shares: number; start: string; end: string; filed: string } | null {
+  const known = knownBy(list, asOf).filter((f) => f.start && f.val > 0), quarters = known.filter((f) => span(f) >= 80 && span(f) <= 100);
+  const top = (quarters.length ? quarters : known).sort((a, b) => b.end.localeCompare(a.end) || span(a) - span(b))[0];
+  return top ? { shares: top.val, start: top.start!, end: top.end, filed: top.filed } : null;
+}
+
 /** Shares outstanding as the latest cover page filed by `asOf` gives them, each class added (a filer with classes A, B
  *  and C files one count for each, on the same date in the same filing). */
 export function sharesOutstanding(list: readonly Fact[], asOf: string): { shares: number; end: string; filed: string } | null {

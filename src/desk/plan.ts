@@ -11,6 +11,7 @@ import { type Journal } from './journal.js';
 import { journalIn, workspaceOf, type Workspace } from './workspace.js';
 import { readHoldings, renderHoldings } from './holdings.js';
 import { deleteRun, progress, savedPlan, startRun, type Section } from './runs.js';
+import { DEPTHS, readQueue } from './queue.js';
 import { resolveBenchmark } from './scoring.js';
 
 export class NeedsEmail extends Error { override name = 'NeedsEmail'; }
@@ -74,6 +75,14 @@ export function buildPlan(root: string, req: PlanRequest, ws: Workspace = worksp
     for (const [name, v] of [['debate rounds', req.debateRounds], ['risk rounds', req.riskRounds]] as const) if (v !== undefined && !(Number.isInteger(v) && v >= 1 && v <= 5)) throw new Error(`${name} must be a whole number from 1 to 5`);
     debateRounds = req.debateRounds ?? s.analysis.debateRounds;
     riskRounds = req.riskRounds ?? s.analysis.riskRounds;
+    // A stock asked for on the dashboard runs at the depth the person chose there (a request from before depths: the
+    // settings'), whatever rounds the lead asks for: the time and the model allowance it spends are the person's.
+    const asked = ws.sweep ? undefined : readQueue(dir).find((i) => i.symbol === symbol && i.state === 'running' && i.date === day);
+    if (asked) {
+      const [d, r] = asked.depth ? [DEPTHS[asked.depth], DEPTHS[asked.depth]] : [s.analysis.debateRounds, s.analysis.riskRounds];
+      if ((req.debateRounds ?? d) !== d || (req.riskRounds ?? r) !== r) notes.push(`${symbol} was asked for on the dashboard at ${asked.depth ? `${asked.depth} depth` : "the settings' depth"}, so it runs ${d} debate and ${r} risk round(s), not the ${debateRounds} and ${riskRounds} asked for here.`);
+      debateRounds = d; riskRounds = r;
+    }
     if (req.language !== undefined && languageName(req.language, '') === '') throw new Error(`"${req.language}" is not a language name`);
     language = req.language !== undefined ? languageName(req.language) : s.analysis.outputLanguage;
   }
