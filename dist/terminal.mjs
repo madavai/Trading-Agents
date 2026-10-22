@@ -20683,14 +20683,14 @@ ${keep(reflection)}`;
       return true;
     });
   }
-  rotate(blocks) {
-    if (!this.maxResolved || this.maxResolved <= 0) return blocks;
-    const settled2 = blocks.filter((b) => {
+  rotate(blocks2) {
+    if (!this.maxResolved || this.maxResolved <= 0) return blocks2;
+    const settled2 = blocks2.filter((b) => {
       const e = parse3(b);
       return e && !e.pending;
     }).length;
     let drop = settled2 - this.maxResolved;
-    return drop <= 0 ? blocks : blocks.filter((b) => {
+    return drop <= 0 ? blocks2 : blocks2.filter((b) => {
       const e = parse3(b);
       if (e && !e.pending && drop > 0) {
         drop--;

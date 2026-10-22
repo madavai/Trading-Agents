@@ -156,8 +156,10 @@ const FUND = { quoteSummary: { result: [{
   defaultKeyStatistics: { fundInceptionDate: { raw: Date.parse('1998-12-16T00:00:00Z') / 1000 }, annualReportExpenseRatio: {}, beta3Year: { raw: 1.21 } },
 }], error: null } };
 
-test("a fund's fundamentals are what it holds and what it costs: always named, unavailable when not given; withheld for a past day", async () => {
-  configure({ fetch: route([...YAHOO_SESSION, [/quoteSummary\/XLK/, () => json(FUND)], [/quoteSummary\/ACME/, () => json({ quoteSummary: { result: [{ ...SUMMARY.quoteSummary.result[0], quoteType: { quoteType: 'EQUITY' } }] } })], [/quoteSummary\/BARE/, () => json({ quoteSummary: { result: [{ quoteType: { quoteType: 'ETF' }, price: { currency: 'USD' } }] } })]]) });
+test("a fund the SEC does not list is read from Yahoo: what it holds and what it costs, unavailable when not given; withheld for a past day", async () => {
+  // Neither SEC list knows these tickers (a fund outside the US), so the fund tool falls back to Yahoo, today only.
+  const unlisted: Array<[RegExp, () => Response]> = [[/company_tickers_mf\.json/, () => json({ fields: ['cik', 'seriesId', 'classId', 'symbol'], data: [] })], [/company_tickers\.json/, () => json({})]];
+  configure({ fetch: route([...unlisted, ...YAHOO_SESSION, [/quoteSummary\/XLK/, () => json(FUND)], [/quoteSummary\/ACME/, () => json({ quoteSummary: { result: [{ ...SUMMARY.quoteSummary.result[0], quoteType: { quoteType: 'EQUITY' } }] } })], [/quoteSummary\/BARE/, () => json({ quoteSummary: { result: [{ quoteType: { quoteType: 'ETF' }, price: { currency: 'USD' } }] } })]]) });
   const t = await fundProfile('XLK', '2026-10-12');
   assert.match(t, /^Fund profile for XLK, from Yahoo Finance as it stands today \(2026-10-12\)/);
   assert.match(t, /Kind: an exchange-traded fund \(ETF\)\nFamily: Example Advisors\nCategory: Technology\nStarted: 1998-12-16/);

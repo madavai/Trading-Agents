@@ -170,7 +170,7 @@ export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetc
 
   server.registerTool('get_fund_profile', {
     title: 'Fund profile',
-    description: 'For a fund (an ETF or a mutual fund, as get_instrument says), its fundamentals in place of company accounts: what it holds (top holdings, sectors, stocks against bonds), what it costs to own each year, its size, yield, family, category and start date, from Yahoo Finance as they stand today. What Yahoo does not give is said as unavailable. Withheld for a past analysis date.',
+    description: 'For a fund (an ETF or a mutual fund, as get_instrument says), its fundamentals in place of company accounts, from the latest portfolio report it had filed with the SEC by the analysis date (form N-PORT; a past date reads what was public then): its size, what it holds (largest holdings by issuer, stocks against bonds and cash, issuers, countries, for bonds their years to repayment and interest), and its own monthly returns, with the day its holdings are from. Its yearly cost has no official free source and is said as unavailable. A fund outside the US falls back to Yahoo Finance, today only.',
     inputSchema: { symbol, analysis_date: analysis },
     annotations: READ,
   }, async (a) => answer('fund profile of ' + a.symbol, () => fundProfile(a.symbol, a.analysis_date)));
