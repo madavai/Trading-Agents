@@ -47,6 +47,8 @@ test('a call in full reads the agents\' own words: plain text, its labelled line
 test('a number that is missing is a dash, never a zero', () => {
   assert.deepEqual([money(null), num(undefined), pct(NaN)], ['—', '—', '—']);
   assert.equal(money(1234.5), '$1,234.50'); assert.equal(money(-3), '−$3.00'); assert.equal(pct(-0.894), '−0.89%'); assert.equal(pct(1.2), '+1.20%');
+  // What rounds to zero is written as zero: no minus on nothing.
+  assert.deepEqual([pct(-0.004), pct(0.004), pct(0), pct(-0.024, 1), pct(-0.06, 1), money(-0.004), money(0.004)], ['0.00%', '0.00%', '0.00%', '0.0%', '−0.1%', '$0.00', '$0.00']);
   assert.equal(shortDay('2026-10-09'), '9 Oct');
 });
 

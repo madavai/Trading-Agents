@@ -6,6 +6,7 @@
 // Adapted from TradingAgents (tradingagents/backtest.py), Apache License 2.0; rewritten in TypeScript.
 import { addDays, parseDate, today } from '../data/dates.js';
 import { safeSymbol } from '../data/symbols.js';
+import { signedPct } from '../numbers.js';
 import type { Entry } from './journal.js';
 import { REVIEW } from './rating.js';
 
@@ -64,7 +65,7 @@ export function summarize(entries: Entry[]): Summary {
   return { resolved: resolved.length, pending: entries.length - resolved.length - unscored, unscored, byRating, holding: windows.join(', ') || 'the configured window' };
 }
 
-const pctText = (v: number) => `${v >= 0 ? '+' : '-'}${(Math.abs(v) * 100).toFixed(2)}%`;
+const pctText = (v: number) => signedPct(v, 2);
 
 export function renderSummary(s: Summary): string {
   const lines = [`Resolved cells: ${s.resolved} · pending: ${s.pending}${s.unscored ? ` · unscored: ${s.unscored}` : ''}`];

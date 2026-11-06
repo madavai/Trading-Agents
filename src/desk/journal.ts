@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { REVIEW, RATINGS, parseRating } from './rating.js';
 import { withLock, writeWhole } from './lock.js';
+import { signedPct as pct, unsignZero } from '../numbers.js';
 
 export interface Entry {
   date: string; ticker: string; rating: string; pending: boolean;
@@ -14,7 +15,6 @@ export interface Entry {
 }
 
 const SEPARATOR = '\n\n<!-- ENTRY_END -->\n\n';
-const pct = (v: number) => `${v >= 0 ? '+' : '-'}${(Math.abs(v) * 100).toFixed(1)}%`;
 
 const MARK = /<!--\s*ENTRY_END\s*-->/i;
 
@@ -43,7 +43,8 @@ function parse(block: string): Entry | null {
   const decision = /DECISION:\n([\s\S]*?)(?=\nREFLECTION:|$)/.exec(body)?.[1]?.trim() ?? '';
   const reflection = /REFLECTION:\n([\s\S]*)$/.exec(body)?.[1]?.trim() ?? '';
   const resolved = f.slice(6).find((x) => x.startsWith('resolved:'))?.slice('resolved:'.length).trim() ?? null;
-  return { date: f[0]!, ticker: f[1]!, rating: f[2]!, pending: f[3] === 'pending', raw: f[3] === 'pending' ? null : f[3]!, alpha: f[4] ?? null, holding: f[5] ?? null, resolved, decision, reflection };
+  const pending = f[3] === 'pending', score = (s: string | undefined) => (s === undefined ? null : unsignZero(s));
+  return { date: f[0]!, ticker: f[1]!, rating: f[2]!, pending, raw: pending ? null : score(f[3]), alpha: score(f[4]), holding: f[5] ?? null, resolved, decision, reflection };
 }
 
 export class Journal {

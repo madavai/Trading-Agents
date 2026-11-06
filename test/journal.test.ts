@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Journal } from '../src/desk/journal.js';
+import { signed, signedPct } from '../src/numbers.js';
 
 // Cases from TradingAgents' memory-log tests (tests/test_memory_log.py), Apache License 2.0, in this journal's words.
 const tmp = (max: number | null = null) => { const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ta-j-')); return { dir, j: new Journal(path.join(dir, 'journal.md'), max) }; };
@@ -52,6 +53,19 @@ test('negative figures keep their sign', () => {
   j.storeDecision('NVDA', '2026-09-01', buy);
   j.recordOutcome('NVDA', '2026-09-01', -0.0345, -0.05, 5, 'Lost.', '2026-09-08');
   assert.deepEqual([j.load()[0]!.raw, j.load()[0]!.alpha], ['-3.5%', '-5.0%']);
+});
+
+test('a score that rounds to zero is written as zero, never "-0.0%", and one stored that way reads back as "0.0%"', () => {
+  // The real case: NVDA on 2026-10-22 rose 0.683% while SPY rose 0.707%, an alpha of -0.024%, kept as "-0.0%".
+  const { j } = tmp();
+  j.storeDecision('NVDA', '2026-10-22', buy);
+  j.recordOutcome('NVDA', '2026-10-22', 0.00683, -0.00024, 5, 'Flat.', '2026-10-29');
+  assert.match(fs.readFileSync(j.file, 'utf8'), /^\[2026-10-22 \| NVDA \| Buy \| \+0\.7% \| 0\.0% \| 5d \| resolved:2026-10-29\]/);
+  fs.writeFileSync(j.file, '[2026-10-22 | NVDA | Hold | +0.7% | -0.0% | 5d | resolved:2026-10-29]\n\nDECISION:\nx\n\n<!-- ENTRY_END -->\n\n[2026-10-23 | NVDA | Hold | -0.0% | +0.0% | 5d | resolved:2026-10-30]\n\nDECISION:\ny\n\n<!-- ENTRY_END -->\n\n');
+  assert.deepEqual(j.load().map((e) => [e.raw, e.alpha]), [['+0.7%', '0.0%'], ['0.0%', '0.0%']], 'a call scored before the fix shows no minus on nothing');
+  assert.match(j.pastContext('NVDA'), /\| \+0\.7% \| 0\.0% \| 5d\]/, 'and the lessons read the same');
+  assert.deepEqual([signed(-0.04, 1), signed(0.04, 1), signed(-0.06, 1), signed(0.05, 1), signed(0, 2)], ['0.0', '0.0', '-0.1', '+0.1', '0.00']);
+  assert.deepEqual([signedPct(-0.0001234, 2), signedPct(0.0123), signedPct(-0.05)], ['-0.01%', '+1.2%', '-5.0%']);
 });
 
 test('lessons: pending calls are left out; the latest five on the stock and three on others, newest first', () => {

@@ -4,6 +4,7 @@
 // Adapted from TradingAgents (tradingagents/dataflows/vendors/polymarket.py), Apache License 2.0.
 import { analysisDate, isHistorical } from './dates.js';
 import { getJson } from './http.js';
+import { signed } from '../numbers.js';
 
 interface Market { question?: string; outcomes?: string; outcomePrices?: string; volumeNum?: number; endDate?: string; closed?: boolean; active?: boolean; oneWeekPriceChange?: number }
 interface SearchJson { events?: Array<{ markets?: Market[] }> }
@@ -20,6 +21,6 @@ export async function predictionMarkets(topic: string, analysis: string, limit =
   if (!open.length) return `${head}\nNo open markets matched "${topic}". Polymarket covers mostly economic, political, geopolitical and crypto events; a single company may have none.`;
   return head + '\n' + open.map((m) => {
     const p = Number(list(m.outcomePrices)[0]), wk = m.oneWeekPriceChange;
-    return `- ${m.question}: ${list(m.outcomes)[0]} ${(p * 100).toFixed(0)}% · volume $${Math.round(m.volumeNum ?? 0).toLocaleString('en-US')}${m.endDate ? ` · resolves ${m.endDate.slice(0, 10)}` : ''}${typeof wk === 'number' ? ` · ${wk >= 0 ? '+' : ''}${(wk * 100).toFixed(1)} points this week` : ''}`;
+    return `- ${m.question}: ${list(m.outcomes)[0]} ${(p * 100).toFixed(0)}% · volume $${Math.round(m.volumeNum ?? 0).toLocaleString('en-US')}${m.endDate ? ` · resolves ${m.endDate.slice(0, 10)}` : ''}${typeof wk === 'number' ? ` · ${signed(wk * 100, 1)} points this week` : ''}`;
   }).join('\n');
 }

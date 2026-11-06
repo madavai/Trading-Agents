@@ -37574,6 +37574,14 @@ async function socialPosts(raw, analysis2, opts) {
   return out.join("\n");
 }
 
+// src/numbers.ts
+function signed(v, digits) {
+  const text4 = Math.abs(v).toFixed(digits);
+  return Number(text4) === 0 ? text4 : `${v > 0 ? "+" : "-"}${text4}`;
+}
+var signedPct = (fraction, digits = 1) => `${signed(fraction * 100, digits)}%`;
+var unsignZero = (text4) => text4.replace(/^[+\-−](0(?:\.0+)?%)$/, "$1");
+
 // src/data/macro.ts
 var SERIES = {
   fed_funds_rate: ["FEDFUNDS", "Federal funds effective rate (percent)"],
@@ -37621,13 +37629,17 @@ async function economicSeries(indicator, analysis2, lookBackDays = 365) {
   if (past) obs = obs.filter((o) => addDays(o.date, lag) <= day3);
   obs = obs.filter((o) => o.date >= addDays(day3, -Math.max(30, Math.min(3650, lookBackDays))));
   if (!obs.length) throw new NoData(`FRED has no ${id} values published by ${day3} in this window`);
-  const first = obs[0], last = obs[obs.length - 1], change3 = last.value - first.value, pct4 = first.value ? change3 / Math.abs(first.value) * 100 : 0;
+  const first = obs[0], last = obs[obs.length - 1], change3 = last.value - first.value, pct2 = first.value ? change3 / Math.abs(first.value) * 100 : 0;
   const fmt2 = (v) => Math.abs(v) >= 1e3 ? v.toLocaleString("en-US", { maximumFractionDigits: 1 }) : v.toFixed(2);
+  const plusMinus = (v) => {
+    const t = fmt2(Math.abs(v));
+    return Number(t.replace(/,/g, "")) === 0 ? t : `${v > 0 ? "+" : "-"}${t}`;
+  };
   const lines = [
     `## ${known?.[1] ?? id} - FRED series ${id}`,
     "",
     `- Latest value known by ${day3}: ${fmt2(last.value)} (for ${last.date})`,
-    `- Change since ${first.date}: ${change3 >= 0 ? "+" : ""}${fmt2(change3)} (${pct4 >= 0 ? "+" : ""}${pct4.toFixed(1)}%)`,
+    `- Change since ${first.date}: ${plusMinus(change3)} (${signed(pct2, 1)}%)`,
     past ? `- A past analysis date: values are kept only if published by ${day3} (a ${lag}-day release lag for this series), and are today's revised figures; first releases may have differed slightly.` : "- Values as published today, revisions included.",
     "",
     "Date | Value",
@@ -37659,7 +37671,7 @@ Live odds: the crowd's priced chance of each event (more traded volume, more rel
 No open markets matched "${topic}". Polymarket covers mostly economic, political, geopolitical and crypto events; a single company may have none.`;
   return head2 + "\n" + open3.map((m2) => {
     const p = Number(list(m2.outcomePrices)[0]), wk = m2.oneWeekPriceChange;
-    return `- ${m2.question}: ${list(m2.outcomes)[0]} ${(p * 100).toFixed(0)}% \xB7 volume $${Math.round(m2.volumeNum ?? 0).toLocaleString("en-US")}${m2.endDate ? ` \xB7 resolves ${m2.endDate.slice(0, 10)}` : ""}${typeof wk === "number" ? ` \xB7 ${wk >= 0 ? "+" : ""}${(wk * 100).toFixed(1)} points this week` : ""}`;
+    return `- ${m2.question}: ${list(m2.outcomes)[0]} ${(p * 100).toFixed(0)}% \xB7 volume $${Math.round(m2.volumeNum ?? 0).toLocaleString("en-US")}${m2.endDate ? ` \xB7 resolves ${m2.endDate.slice(0, 10)}` : ""}${typeof wk === "number" ? ` \xB7 ${signed(wk * 100, 1)} points this week` : ""}`;
   }).join("\n");
 }
 
@@ -38047,7 +38059,7 @@ var country = (code) => {
   }
 };
 var pct = (n2) => `${n2.toFixed(2)}%`;
-var signed = (n2) => `${n2 >= 0 ? "+" : ""}${n2.toFixed(2)}%`;
+var signed2 = (n2) => `${signed(n2, 2)}%`;
 function shares(list2, key) {
   const m2 = /* @__PURE__ */ new Map();
   for (const h of list2) {
@@ -38085,7 +38097,7 @@ function renderReport(sym2, day3, r, topN = 10) {
       const d = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() - back, 15));
       return `${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
     };
-    lines.push(`Its own total return by month, as it reported it: ${r.returns.map((v, i) => `${month(2 - i)} ${signed(v)}`).join(", ")}`);
+    lines.push(`Its own total return by month, as it reported it: ${r.returns.map((v, i) => `${month(2 - i)} ${signed2(v)}`).join(", ")}`);
   } else lines.push("Its own monthly returns: not in this report");
   lines.push("Yearly cost (expense ratio): unavailable (no official free source gives it in a form the desk can read; the fund's prospectus states it)");
   const top = shares(r.holdings, (h) => h.name).slice(0, topN);
@@ -38521,7 +38533,7 @@ function summarize(entries) {
   const windows = [...new Set(resolved2.map((x) => x.e.holding).filter((h) => !!h && h.endsWith("d")).map((h) => `${h.slice(0, -1)} trading days`))].sort();
   return { resolved: resolved2.length, pending: entries.length - resolved2.length - unscored, unscored, byRating, holding: windows.join(", ") || "the configured window" };
 }
-var pctText = (v) => `${v >= 0 ? "+" : "-"}${(Math.abs(v) * 100).toFixed(2)}%`;
+var pctText = (v) => signedPct(v, 2);
 function renderSummary(s) {
   const lines = [`Resolved cells: ${s.resolved} \xB7 pending: ${s.pending}${s.unscored ? ` \xB7 unscored: ${s.unscored}` : ""}`];
   for (const [rating, sc] of Object.entries(s.byRating)) {
@@ -38541,7 +38553,6 @@ import path10 from "node:path";
 import fs9 from "node:fs";
 import path9 from "node:path";
 var SEPARATOR = "\n\n<!-- ENTRY_END -->\n\n";
-var pct2 = (v) => `${v >= 0 ? "+" : "-"}${(Math.abs(v) * 100).toFixed(1)}%`;
 var MARK = /<!--\s*ENTRY_END\s*-->/i;
 function keep(text4) {
   let s = text4;
@@ -38564,7 +38575,8 @@ function parse3(block) {
   const decision = /DECISION:\n([\s\S]*?)(?=\nREFLECTION:|$)/.exec(body)?.[1]?.trim() ?? "";
   const reflection = /REFLECTION:\n([\s\S]*)$/.exec(body)?.[1]?.trim() ?? "";
   const resolved2 = f.slice(6).find((x) => x.startsWith("resolved:"))?.slice("resolved:".length).trim() ?? null;
-  return { date: f[0], ticker: f[1], rating: f[2], pending: f[3] === "pending", raw: f[3] === "pending" ? null : f[3], alpha: f[4] ?? null, holding: f[5] ?? null, resolved: resolved2, decision, reflection };
+  const pending = f[3] === "pending", score = (s) => s === void 0 ? null : unsignZero(s);
+  return { date: f[0], ticker: f[1], rating: f[2], pending, raw: pending ? null : score(f[3]), alpha: score(f[4]), holding: f[5] ?? null, resolved: resolved2, decision, reflection };
 }
 var Journal = class {
   /** @param maxResolved keep at most this many settled entries (the oldest go first); pending ones are never dropped */
@@ -38617,7 +38629,7 @@ ${keep(decision)}${SEPARATOR}`);
         const e = parse3(block);
         if (done || !e || !e.pending || e.date !== date5 || e.ticker !== ticker) return block;
         done = true;
-        return `[${date5} | ${ticker} | ${e.rating} | ${pct2(raw)} | ${pct2(alpha)} | ${holdingDays}d | resolved:${resolution}]
+        return `[${date5} | ${ticker} | ${e.rating} | ${signedPct(raw)} | ${signedPct(alpha)} | ${holdingDays}d | resolved:${resolution}]
 
 DECISION:
 ${e.decision}
@@ -39038,8 +39050,7 @@ ${lessons}` : "Lessons from past calls: none yet (no earlier call has been settl
 }
 
 // src/desk/settle.ts
-var pct3 = (v) => `${v >= 0 ? "+" : "-"}${(Math.abs(v) * 100).toFixed(1)}%`;
-var line = (o, e) => `${e.ticker} ${pct3(o.raw)} from ${o.entry} to ${o.exit} (${o.holdingDays} trading days); ${o.benchmark} ${pct3(o.benchmarkReturn)}; alpha ${pct3(o.alpha)}`;
+var line = (o, e) => `${e.ticker} ${signedPct(o.raw)} from ${o.entry} to ${o.exit} (${o.holdingDays} trading days); ${o.benchmark} ${signedPct(o.benchmarkReturn)}; alpha ${signedPct(o.alpha)}`;
 var MAX_REFLECTION = 1200;
 async function dueSettlements(journal, scoring, ticker) {
   const pending = journal.pending().filter((e) => !ticker || e.ticker === ticker);

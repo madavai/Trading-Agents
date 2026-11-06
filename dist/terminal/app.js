@@ -168,12 +168,16 @@
   var num = (n, d = 2) => n === null || n === void 0 || !Number.isFinite(n) ? "\u2014" : n.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
   var money = (n, currency = "USD") => {
     if (n === null || n === void 0 || !Number.isFinite(n)) return "\u2014";
-    const sign = n < 0 ? MINUS : "", abs = Math.abs(n);
-    const sym = currency === "USD" ? "$" : "";
+    const abs = Math.abs(n), sym = currency === "USD" ? "$" : "";
     const body = abs.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const sign = n < 0 && /[1-9]/.test(body) ? MINUS : "";
     return `${sign}${sym}${body}${sym ? "" : ` ${currency}`}`;
   };
-  var pct = (n) => n === null || n === void 0 || !Number.isFinite(n) ? "\u2014" : `${n >= 0 ? "+" : MINUS}${Math.abs(n).toFixed(2)}%`;
+  var pct = (n, d = 2) => {
+    if (n === null || n === void 0 || !Number.isFinite(n)) return "\u2014";
+    const body = Math.abs(n).toFixed(d);
+    return `${Number(body) === 0 ? "" : n > 0 ? "+" : MINUS}${body}%`;
+  };
   var tone = (n) => n === null || n === void 0 || !Number.isFinite(n) ? "" : n >= 0 ? "ok" : "danger";
   var ratingTone = (r) => r === "Buy" || r === "Overweight" ? "ok" : r === "Underweight" || r === "Sell" ? "danger" : r === "Hold" ? "" : "warn";
   var ratingMeaning = (r) => isTerm(r) && GLOSSARY[r].group === GLOSSARY.Buy.group ? means(r) : "";
@@ -827,7 +831,10 @@
     }
     return cost > 0 ? { cost, value } : null;
   }
-  var signedMoney = (n, cur = "USD") => `${n >= 0 ? "+" : ""}${money(n, cur)}`;
+  var signedMoney = (n, cur = "USD") => {
+    const m = money(n, cur);
+    return `${n > 0 && /[1-9]/.test(m) ? "+" : ""}${m}`;
+  };
   var sideWord = (s) => s === "buy" ? "Buy" : s === "sell" ? "Sell" : s ?? "\u2014";
   var CARE = { holdings: [], noticed: /* @__PURE__ */ new Set() };
   var careFor = (account2, symbol) => CARE.holdings.find((c) => c.account === account2 && c.symbol === symbol);
@@ -1615,7 +1622,7 @@
     const d = S.desk;
     if (!d) return;
     renderPaper();
-    const r = d.record.summary, pctOf = (v) => `${v >= 0 ? "+" : "\u2212"}${Math.abs(v * 100).toFixed(1)}%`;
+    const r = d.record.summary, pctOf = (v) => pct(v * 100, 1);
     $("#scoreSub").textContent = `${r.resolved} scored \xB7 ${r.pending} waiting${r.unscored ? ` \xB7 ${r.unscored} unreadable` : ""}`;
     const names = [...RATINGS.filter((x) => r.byRating[x]), ...Object.keys(r.byRating).filter((x) => !RATINGS.includes(x))];
     const grid = names.length ? `<div class="ta-score"><span class="head">Rating</span><span class="head">Calls</span><span class="head">Called the direction</span><span class="head">Average ${term("alpha", "alpha")} vs the ${term("index", "index")}</span>${names.map((n) => {

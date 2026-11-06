@@ -10,14 +10,18 @@ export const num = (n: number | null | undefined, d = 2): string =>
 
 export const money = (n: number | null | undefined, currency = 'USD'): string => {
   if (n === null || n === undefined || !Number.isFinite(n)) return '—';
-  const sign = n < 0 ? MINUS : '', abs = Math.abs(n);
-  const sym = currency === 'USD' ? '$' : '';
+  const abs = Math.abs(n), sym = currency === 'USD' ? '$' : '';
   const body = abs.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const sign = n < 0 && /[1-9]/.test(body) ? MINUS : '';   // what rounds to $0.00 is written without a minus
   return `${sign}${sym}${body}${sym ? '' : ` ${currency}`}`;
 };
 
-export const pct = (n: number | null | undefined): string =>
-  n === null || n === undefined || !Number.isFinite(n) ? '—' : `${n >= 0 ? '+' : MINUS}${Math.abs(n).toFixed(2)}%`;
+/** A change in percent (1.2 is 1.2%) with its sign, to `d` decimals; what rounds to zero is plain "0.00%", never "−0.00%". */
+export const pct = (n: number | null | undefined, d = 2): string => {
+  if (n === null || n === undefined || !Number.isFinite(n)) return '—';
+  const body = Math.abs(n).toFixed(d);
+  return `${Number(body) === 0 ? '' : n > 0 ? '+' : MINUS}${body}%`;
+};
 
 export const tone = (n: number | null | undefined): '' | 'ok' | 'danger' => (n === null || n === undefined || !Number.isFinite(n) ? '' : n >= 0 ? 'ok' : 'danger');
 

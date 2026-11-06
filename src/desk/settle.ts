@@ -4,8 +4,8 @@ import { Journal, type Entry } from './journal.js';
 import { measure, resolveBenchmark, type Outcome } from './scoring.js';
 import type { Scoring } from './scoring.js';
 import { failureText } from '../data/http.js';
+import { signedPct as pct } from '../numbers.js';
 
-const pct = (v: number) => `${v >= 0 ? '+' : '-'}${(Math.abs(v) * 100).toFixed(1)}%`;
 const line = (o: Outcome, e: Entry) => `${e.ticker} ${pct(o.raw)} from ${o.entry} to ${o.exit} (${o.holdingDays} trading days); ${o.benchmark} ${pct(o.benchmarkReturn)}; alpha ${pct(o.alpha)}`;
 export const MAX_REFLECTION = 1200;
 

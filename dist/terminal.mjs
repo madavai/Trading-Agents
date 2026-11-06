@@ -20600,9 +20600,16 @@ function extractRating(text2) {
 }
 var parseRating = (text2) => extractRating(text2) ?? REVIEW2;
 
+// src/numbers.ts
+function signed(v, digits) {
+  const text2 = Math.abs(v).toFixed(digits);
+  return Number(text2) === 0 ? text2 : `${v > 0 ? "+" : "-"}${text2}`;
+}
+var signedPct = (fraction, digits = 1) => `${signed(fraction * 100, digits)}%`;
+var unsignZero = (text2) => text2.replace(/^[+\-−](0(?:\.0+)?%)$/, "$1");
+
 // src/desk/journal.ts
 var SEPARATOR = "\n\n<!-- ENTRY_END -->\n\n";
-var pct = (v) => `${v >= 0 ? "+" : "-"}${(Math.abs(v) * 100).toFixed(1)}%`;
 var MARK = /<!--\s*ENTRY_END\s*-->/i;
 function keep(text2) {
   let s = text2;
@@ -20625,7 +20632,8 @@ function parse3(block) {
   const decision = /DECISION:\n([\s\S]*?)(?=\nREFLECTION:|$)/.exec(body)?.[1]?.trim() ?? "";
   const reflection = /REFLECTION:\n([\s\S]*)$/.exec(body)?.[1]?.trim() ?? "";
   const resolved = f.slice(6).find((x) => x.startsWith("resolved:"))?.slice("resolved:".length).trim() ?? null;
-  return { date: f[0], ticker: f[1], rating: f[2], pending: f[3] === "pending", raw: f[3] === "pending" ? null : f[3], alpha: f[4] ?? null, holding: f[5] ?? null, resolved, decision, reflection };
+  const pending = f[3] === "pending", score = (s) => s === void 0 ? null : unsignZero(s);
+  return { date: f[0], ticker: f[1], rating: f[2], pending, raw: pending ? null : score(f[3]), alpha: score(f[4]), holding: f[5] ?? null, resolved, decision, reflection };
 }
 var Journal = class {
   /** @param maxResolved keep at most this many settled entries (the oldest go first); pending ones are never dropped */
@@ -20678,7 +20686,7 @@ ${keep(decision)}${SEPARATOR}`);
         const e = parse3(block);
         if (done || !e || !e.pending || e.date !== date4 || e.ticker !== ticker) return block;
         done = true;
-        return `[${date4} | ${ticker} | ${e.rating} | ${pct(raw)} | ${pct(alpha)} | ${holdingDays}d | resolved:${resolution}]
+        return `[${date4} | ${ticker} | ${e.rating} | ${signedPct(raw)} | ${signedPct(alpha)} | ${holdingDays}d | resolved:${resolution}]
 
 DECISION:
 ${e.decision}
@@ -21156,7 +21164,7 @@ function summarize(entries) {
   const windows = [...new Set(resolved.map((x) => x.e.holding).filter((h) => !!h && h.endsWith("d")).map((h) => `${h.slice(0, -1)} trading days`))].sort();
   return { resolved: resolved.length, pending: entries.length - resolved.length - unscored, unscored, byRating, holding: windows.join(", ") || "the configured window" };
 }
-var pctText = (v) => `${v >= 0 ? "+" : "-"}${(Math.abs(v) * 100).toFixed(2)}%`;
+var pctText = (v) => signedPct(v, 2);
 function renderSummary(s) {
   const lines = [`Resolved cells: ${s.resolved} \xB7 pending: ${s.pending}${s.unscored ? ` \xB7 unscored: ${s.unscored}` : ""}`];
   for (const [rating, sc] of Object.entries(s.byRating)) {
@@ -21977,8 +21985,8 @@ function ratesOf(events, now = /* @__PURE__ */ new Date()) {
   const top = odds[0];
   if (!next || !top) return unavailable("rates", "Rates", "Polymarket has no open market on the Federal Reserve's next decision");
   const [state, tone] = top.way === "cut" ? ["A cut", "ok"] : top.way === "rise" ? ["A rise", "warn"] : ["No change", ""];
-  const pct2 = (p) => `${Math.round(p * 100)}%`, second = odds[1] && odds[1].p >= 0.1 ? ` and ${odds[1].words} at ${pct2(odds[1].p)}` : "";
-  return { key: "rates", name: "Rates", state, tone, words: `For the Federal Reserve's next decision, by ${dayWords(marketDay(new Date(next.endDate)))}, Polymarket's crowd puts ${top.words} at ${pct2(top.p)}${second}.`, meaning: MEANING.rates };
+  const pct = (p) => `${Math.round(p * 100)}%`, second = odds[1] && odds[1].p >= 0.1 ? ` and ${odds[1].words} at ${pct(odds[1].p)}` : "";
+  return { key: "rates", name: "Rates", state, tone, words: `For the Federal Reserve's next decision, by ${dayWords(marketDay(new Date(next.endDate)))}, Polymarket's crowd puts ${top.words} at ${pct(top.p)}${second}.`, meaning: MEANING.rates };
 }
 async function weatherNow(day2, now = /* @__PURE__ */ new Date()) {
   const [trend, mood, rates] = await Promise.all([
