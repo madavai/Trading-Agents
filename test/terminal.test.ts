@@ -497,7 +497,15 @@ test('"Worth a look today" is worked out from figures at most once an hour, kept
 
 test('"Market weather": the trend, the mood and the rates, each from figures, and a source that fails leaves its own line unavailable', async () => {
   const rows = (closes: number[]): Row[] => weekdays('2026-10-12', closes.length).map((date, i) => ({ date, o: closes[i]!, h: closes[i]! + 1, l: closes[i]! - 1, c: closes[i]!, v: 0 }));
-  const events = { events: [{ title: 'Fed Decision in October?', endDate: '2026-10-29T03:59:00Z', closed: false, markets: [{ groupItemTitle: 'No change', outcomePrices: '["0.875", "0.125"]' }, { groupItemTitle: '25 bps increase', outcomePrices: '["0.115", "0.885"]' }] }] };
+  // The dashboard reads the real clock, and a meeting already past is rightly not "the next decision": so the next meeting's
+  // market closes a week from today, at 03:59 UTC as Polymarket's do. That is the evening before in New York (23:59 in
+  // summer, 22:59 in winter), and the line names New York's day. A fixed date here went stale on 29 Oct 2026.
+  const close = new Date(Date.now() + 7 * 86_400_000);
+  close.setUTCHours(3, 59, 0, 0);
+  const eve = new Date(close.getTime() - 86_400_000);
+  const by = `${eve.getUTCDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][eve.getUTCMonth()]} ${eve.getUTCFullYear()}`;
+  const month = eve.toLocaleString('en-US', { month: 'long', timeZone: 'UTC' });
+  const events = { events: [{ title: `Fed Decision in ${month}?`, endDate: close.toISOString(), closed: false, markets: [{ groupItemTitle: 'No change', outcomePrices: '["0.875", "0.125"]' }, { groupItemTitle: '25 bps increase', outcomePrices: '["0.115", "0.885"]' }] }] };
   let polymarket = true;
   configure({ fetch: async (input) => {
     const url = String(input);
@@ -507,7 +515,7 @@ test('"Market weather": the trend, the mood and the rates, each from figures, an
   } });
   const w = (await call(term, 'GET', '/api/weather')).json().weather;
   assert.deepEqual(w.lines.map((l: any) => [l.name, l.state, l.tone]), [['Trend', 'Rising', 'ok'], ['Mood', 'Wild', 'bad'], ['Rates', 'No change', '']]);
-  assert.match(w.lines[2].words, /by 28 Oct 2026, Polymarket's crowd puts no change at 88% and a rise of 0\.25% at 12%/);
+  assert.equal(w.lines[2].words, `For the Federal Reserve's next decision, by ${by}, Polymarket's crowd puts no change at 88% and a rise of 0.25% at 12%.`);
   assert.ok(w.lines.every((l: any) => l.meaning.length > 40), 'every line says what it means');
   polymarket = false;
   const kept = (await call(term, 'GET', '/api/weather')).json().weather;
