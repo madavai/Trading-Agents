@@ -20,6 +20,7 @@ import { writeWhole } from '../desk/lock.js';
 import { parseRating, RATINGS } from '../desk/rating.js';
 import { correctSection, progress, readSections, savedPlan, saveSection, SECTIONS, writeReport } from '../desk/runs.js';
 import { dueSettlements, settleOne } from '../desk/settle.js';
+import { correctLesson, lessonsToRecheck } from '../desk/lessons.js';
 import { failureText, NoData, Unavailable } from '../data/http.js';
 import { openDashboard } from '../terminal/launch.js';
 import { eveningBrief, morningBrief, type MorningLook } from '../desk/routine.js';
@@ -159,6 +160,20 @@ export function registerDeskTools(server: McpServer, root: string): void {
     inputSchema: { symbol, trade_date: day, lesson: z.string().min(1).max(1200) },
     annotations: { readOnlyHint: false, openWorldHint: true },
   }, async (a) => act(() => settleOne(journalOf(root, ws()), readSettings(root).scoring, safeSymbol(a.symbol), a.trade_date, a.lesson)));
+
+  server.registerTool('recheck_lessons', {
+    title: 'Lessons to re-check',
+    description: 'Find the settled calls whose lesson was not written from the holding window\'s prices (written before the desk showed them, when they could not be had, or marked unreliable before). Up to three at a time are shown to rewrite: the call\'s score, which stays as it is, the decision, the lesson as it stands and the window\'s finished sessions day by day; call again once those are saved for the next ones. A call whose window\'s prices cannot be had is marked unreliable by the desk itself, so later analyses stop reading its lesson. Never changes a call, its rating or its score.',
+    inputSchema: { symbol: symbol.optional() },
+    annotations: { readOnlyHint: false, openWorldHint: true },
+  }, async (a) => act(() => lessonsToRecheck(journalOf(root, ws()), readSettings(root).scoring, a.symbol ? safeSymbol(a.symbol) : undefined)));
+
+  server.registerTool('correct_lesson', {
+    title: 'Correct a lesson',
+    description: 'Replace the lesson of a call recheck_lessons listed TO REWRITE with one rewritten from its window\'s rows alone: 2 to 4 plain sentences, as for record_outcome. what_was_wrong quotes each statement of the lesson as it stands that the rows contradict, with the row (date and figure) that shows otherwise, or says that none is. The desk fetches the rows again first: if they cannot be had, nothing is saved and the lesson is marked unreliable. It keeps the first lesson word for word beside the new one, marked as corrected, and never touches the call, its rating or its score. Never pass or invent a number the rows do not show.',
+    inputSchema: { symbol, trade_date: day, lesson: z.string().min(1).max(1200), what_was_wrong: z.string().min(1).max(600) },
+    annotations: { readOnlyHint: false, openWorldHint: true },
+  }, async (a) => act(() => correctLesson(journalOf(root, ws()), readSettings(root).scoring, safeSymbol(a.symbol), a.trade_date, a.lesson, a.what_was_wrong)));
 
   server.registerTool('start_backtest', {
     title: 'Start a backtest sweep',

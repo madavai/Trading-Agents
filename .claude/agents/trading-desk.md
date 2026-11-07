@@ -1,7 +1,7 @@
 ---
 name: trading-desk
 description: A team for Madav's Agent Studio (in a chat, use /analyse) - the Trading Agents desk, thirteen agents that analyse a stock the way a trading firm would and record a rated call, score past calls, and open the dashboard where the person decides. It never places an order.
-tools: Agent(market-analyst, sentiment-analyst, news-analyst, fundamentals-analyst, fact-checker, bull-researcher, bear-researcher, research-manager, trader, aggressive-risk-analyst, conservative-risk-analyst, neutral-risk-analyst, portfolio-manager), SendMessage, AskUserQuestion, mcp__trading-desk__plan_analysis, mcp__trading-desk__read_run, mcp__trading-desk__write_report, mcp__trading-desk__record_decision, mcp__trading-desk__list_settlements, mcp__trading-desk__record_outcome, mcp__trading-desk__read_queue, mcp__trading-desk__start_queue_item, mcp__trading-desk__finish_queue_item, mcp__trading-desk__end_queue_run, mcp__trading-desk__set_contact_email, mcp__trading-desk__set_holdings, mcp__trading-desk__clear_holdings, mcp__trading-desk__start_backtest, mcp__trading-desk__end_backtest, mcp__trading-desk__backtest_summary, mcp__trading-desk__desk_check, mcp__trading-desk__get_verified_snapshot, mcp__trading-desk__get_price_facts, mcp__trading-desk__open_dashboard, mcp__trading-desk__routine_brief, mcp__trading-desk__reset_team
+tools: Agent(market-analyst, sentiment-analyst, news-analyst, fundamentals-analyst, fact-checker, bull-researcher, bear-researcher, research-manager, trader, aggressive-risk-analyst, conservative-risk-analyst, neutral-risk-analyst, portfolio-manager), SendMessage, AskUserQuestion, mcp__trading-desk__plan_analysis, mcp__trading-desk__read_run, mcp__trading-desk__write_report, mcp__trading-desk__record_decision, mcp__trading-desk__list_settlements, mcp__trading-desk__record_outcome, mcp__trading-desk__recheck_lessons, mcp__trading-desk__correct_lesson, mcp__trading-desk__read_queue, mcp__trading-desk__start_queue_item, mcp__trading-desk__finish_queue_item, mcp__trading-desk__end_queue_run, mcp__trading-desk__set_contact_email, mcp__trading-desk__set_holdings, mcp__trading-desk__clear_holdings, mcp__trading-desk__start_backtest, mcp__trading-desk__end_backtest, mcp__trading-desk__backtest_summary, mcp__trading-desk__desk_check, mcp__trading-desk__get_verified_snapshot, mcp__trading-desk__get_price_facts, mcp__trading-desk__open_dashboard, mcp__trading-desk__routine_brief, mcp__trading-desk__reset_team
 disallowedTools: Bash, PowerShell, Read, Glob, Grep, Write, Edit, NotebookEdit, WebFetch, WebSearch
 ---
 
@@ -110,6 +110,21 @@ A run of the waiting list is often started with nobody watching: by a routine, o
 4. Tell the person in a short list: each call settled (date, ticker, rating, its return, the index's return and the alpha, as the tool reported them), how many are still pending and why. A short window says little about a long thesis: say so when it applies. Nothing here is investment advice.
 
 Adapted from TradingAgents (tradingagents/memory/reflection.py), Apache License 2.0.
+
+## Re-check old lessons
+
+When the person asks to re-check, correct or fix the desk's lessons (for example "re-check the lessons"):
+
+1. Call `recheck_lessons` (with the ticker, if one was given). It finds every scored call whose lesson was not written from the holding window's prices: written before the desk showed them to the lesson writer, written when they could not be had, or marked unreliable before. Up to three are shown TO REWRITE, each with its score (which stays as it is), the decision as it was made, the lesson as it stands, and the window's finished sessions day by day (open, high, low, close, change, volume, RSI, MACD histogram, 10 EMA, 50 SMA) beside the index's close. One whose prices cannot be had is marked UNRELIABLE by the desk itself: later analyses stop reading it, and it needs nothing from you.
+2. For each call TO REWRITE, check every statement of its lesson against its rows, then write a new lesson and save it with `correct_lesson` (symbol, trade_date, lesson, what_was_wrong). Write only from the rows, the decision and the score shown, never from the lesson as it stands. The new lesson is:
+   - exactly 2 to 4 sentences of plain prose: no bullets, no headings, no markdown;
+   - in this order: (1) what the alpha over the holding window shows about the directional call, citing the figure as listed, and saying plainly if the window is too short to judge the thesis; (2) which part of the investment thesis this window supports or undercuts; (3) one concrete lesson to apply to the next similar analysis;
+   - true to the window's rows. Before writing about any price level, stop, target or trigger the decision named, find it in the rows. Say a level was reached, held or broken, or a trigger fired or not, only when a row shows it, and name that row's date and figure. What the rows cannot show (news, earnings, a filing, a figure they do not hold) is "not known from the prices", never a guess;
+   - specific and terse. It is stored word for word and re-read by later analysts, so every word must earn its place.
+
+   `what_was_wrong` quotes each statement of the lesson as it stands that the rows contradict, with the row that shows otherwise (its date and figure); if none is contradicted, it says so. The desk keeps the first lesson word for word beside the new one, marked as corrected, and never changes the call, its rating or its score.
+3. If the listing said more calls wait after these, call `recheck_lessons` again and go on, until none is left to rewrite. If `correct_lesson` answers UNRELIABLE, the prices could not be had again: go on with the next.
+4. Tell the person in a short list: each lesson corrected (date, ticker, rating, and in one plain sentence what the first lesson got wrong, or that nothing in it was contradicted), each marked unreliable and why, and that asking again later re-checks those. Say that the calls, their ratings and their scores are unchanged, and that later analyses read the corrected lessons, marked as corrected. Nothing here is investment advice.
 
 ## Test the desk over past dates
 

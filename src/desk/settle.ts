@@ -37,7 +37,8 @@ export async function dueSettlements(journal: Journal, scoring: Scoring, ticker?
   return [`${pending.length} pending call(s), ${ready} ready to settle. Settle a ready one with record_outcome, using only the figures shown here. Before writing about a level, stop, target or trigger the decision named, find it in that call's window rows: say what happened only as a row shows it, naming its date.`, '', ...out].join('\n\n');
 }
 
-/** Settles one call: measures it again (so the figures cannot be an agent's), then keeps outcome and lesson. */
+/** Settles one call: measures it again (so the figures cannot be an agent's), then keeps outcome and lesson. The lesson is
+ *  marked by whether the window's rows - the ones list_settlements showed - can be had now: if not, it is re-checked later. */
 export async function settleOne(journal: Journal, scoring: Scoring, ticker: string, date: string, reflection: string): Promise<string> {
   const text = reflection.trim();
   if (!text) throw new Error('the lesson is empty: write 2 to 4 plain sentences');
@@ -46,7 +47,8 @@ export async function settleOne(journal: Journal, scoring: Scoring, ticker: stri
   if (!e) throw new Error(`there is no pending call on ${ticker} for ${date}`);
   const o = await measure(ticker, date, resolveBenchmark(ticker, scoring), scoring.holdingPeriodDays);
   if (!o) return `NOT_YET: the ${scoring.holdingPeriodDays}-trading-day window after ${date} has not finished, so ${ticker} stays pending.`;
-  return journal.recordOutcome(ticker, date, o.raw, o.alpha, o.holdingDays, text, o.exit)
+  const from = await windowRows(ticker, o).then(() => 'prices' as const, () => 'no-prices' as const);
+  return journal.recordOutcome(ticker, date, o.raw, o.alpha, o.holdingDays, text, o.exit, from)
     ? `Settled: ${line(o, e)}. The lesson is kept and will be read by later analyses from ${o.exit} on.`
     : `${ticker} on ${date} was settled by another run already.`;
 }

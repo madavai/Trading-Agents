@@ -29,7 +29,7 @@ beforeEach(() => { process.env.TRADING_AGENTS_TODAY = '2026-10-12'; clearCache()
 test('the desk tools are offered, and none of them can order', async () => {
   const { client } = await connect();
   const names = (await client.listTools()).tools.map((t) => t.name);
-  for (const n of ['plan_analysis', 'save_run_section', 'correct_report', 'read_run', 'write_report', 'record_decision', 'list_settlements', 'record_outcome', 'set_holdings', 'clear_holdings']) assert.ok(names.includes(n), n);
+  for (const n of ['plan_analysis', 'save_run_section', 'correct_report', 'read_run', 'write_report', 'record_decision', 'list_settlements', 'record_outcome', 'recheck_lessons', 'correct_lesson', 'set_holdings', 'clear_holdings']) assert.ok(names.includes(n), n);
   assert.deepEqual(names.filter(isOrderTool), []);
   await client.close();
 });
@@ -102,5 +102,19 @@ test('a wrong request says what to correct, and a number is never accepted from 
   const schema = (await client.listTools()).tools.find((t) => t.name === 'record_outcome')!.inputSchema.properties as Record<string, unknown>;
   assert.deepEqual(Object.keys(schema).sort(), ['lesson', 'symbol', 'trade_date']);       // no field takes a return, an alpha or a price
   assert.match(await call('record_outcome', { symbol: 'NVDA', trade_date: '2026-09-01', lesson: 'x' }), /^INPUT_ERROR: there is no pending call on NVDA/);
+  await client.close();
+});
+
+test('an old lesson is re-checked and corrected through the desk tools, and no field takes a number', async () => {
+  const { root, call, client } = await connect();
+  fs.mkdirSync(path.join(root, 'desk-data'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'desk-data', 'journal.md'), '[2026-09-01 | NVDA | Buy | +10.0% | +7.0% | 5d | resolved:2026-09-08]\n\nDECISION:\n**Rating**: Buy\n\nAdd on a close above 103.50.\n\nREFLECTION:\nNVDA never closed above 103.50.\n\n<!-- ENTRY_END -->\n\n');
+  assert.match(await call('recheck_lessons'), /^1 lesson\(s\) to re-check: 1 to rewrite below\.[\s\S]*TO REWRITE[\s\S]*LESSON AS IT STANDS:\nNVDA never closed above 103\.50\.[\s\S]*WHAT HAPPENED IN THE WINDOW/);
+  const schema = (await client.listTools()).tools.find((t) => t.name === 'correct_lesson')!.inputSchema.properties as Record<string, unknown>;
+  assert.deepEqual(Object.keys(schema).sort(), ['lesson', 'symbol', 'trade_date', 'what_was_wrong']);   // no field takes a return, an alpha or a price
+  assert.match(await call('correct_lesson', { symbol: 'nvda', trade_date: '2026-09-01', lesson: 'Alpha of +7.0% backs the Buy. NVDA closed at 104.00 on 2026-09-07, above 103.50.', what_was_wrong: '"never closed above 103.50": the 2026-09-07 row closed at 104.00.' }),
+    /^Corrected: the lesson of the Buy call on NVDA for 2026-09-01, from its window 2026-09-01 to 2026-09-08\. Only the lesson changed/);
+  assert.match(await call('recheck_lessons'), /^No lessons to re-check/);
+  assert.match(await call('correct_lesson', { symbol: 'NVDA', trade_date: '2026-09-01', lesson: 'x', what_was_wrong: 'y' }), /^INPUT_ERROR: the lesson of NVDA on 2026-09-01 was corrected on 2026-10-12 already/);
   await client.close();
 });

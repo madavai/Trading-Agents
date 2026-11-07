@@ -959,7 +959,20 @@ b, strong { font-weight: var(--weight-semibold); }
       "do": [
         "After an update that changes the desk's agents, playbooks or settings, open Madav's Routines."],
       "see": [
-        "The desk's routines are paused until you switch them on again, so nothing new runs without your yes."] }
+        "The desk's routines are paused until you switch them on again, so nothing new runs without your yes."] },
+    { "id": "G6", "title": "Re-checking old lessons", "tags": ["Optional"], "changed": "2026-11-07",
+      "about": "Lessons written before the desk showed the lesson writer the holding week's real prices could describe moves that never happened, and later analyses read them as experience. Re-checking rewrites each one from those prices and keeps the first words beside the new ones, marked as corrected. Only the lessons change: never a call, its rating or its score.",
+      "where": "Madav › Agent Studio › trading-desk › Put to work",
+      "do": [
+        "Ask the team: [[Re-check the lessons]]",
+        "In a Claude Code chat the same is [[/recheck-lessons]]",
+        "Pick one corrected lesson that names a day and a price. Open that stock's page on the dashboard and check that day's price on the chart.",
+        "Ask once more: [[Re-check the lessons]]"],
+      "see": [
+        "A short list: each lesson corrected (its date, stock and rating), with one sentence on what the first lesson got wrong or that nothing in it was contradicted, and any lesson marked unreliable, with why. It says the calls, their ratings and their scores are unchanged.",
+        "The corrected lesson names the day and the price of each move it describes, and the chart agrees. What prices can't show (news, earnings) it calls \"not known from the prices\".",
+        "Asked once more, it says there are no lessons to re-check.",
+        "If the prices could not be fetched, the team says that lesson was marked unreliable: later analyses stop reading it until you ask again and it is corrected."] }
   ] },
   { "id": "H", "name": "Safety",
     "sub": "The desk must refuse these, whatever it is told.",
