@@ -128,3 +128,19 @@ test('/analyse names every agent, and /analyse and /settle never order and never
   assert.match(settle, /never a number of your own/);
   assert.match(settle, /exactly 2 to 4 sentences/);
 });
+
+test('/recheck-lessons rewrites a lesson under /settle\'s rules, from the window\'s rows, and never changes a call, its rating or its score; the lead does it when asked in words', () => {
+  const settle = fs.readFileSync('.claude/skills/settle/SKILL.md', 'utf8'), recheck = fs.readFileSync('.claude/skills/recheck-lessons/SKILL.md', 'utf8');
+  const shared = settle.split('\n').filter((l) => /^ {3}- (exactly 2 to 4 sentences|in this order: \(1\)|specific and terse)/.test(l));
+  assert.equal(shared.length, 3);
+  for (const rule of [...shared, 'Say a level was reached, held or broken, or a trigger fired or not, only when a row shows it, and name that row\'s date and figure.']) assert.ok(recheck.includes(rule), `/recheck-lessons keeps /settle's rule: ${rule}`);
+  assert.match(recheck, /Write only from the rows, the decision and the score shown, never from the lesson as it stands/);
+  assert.match(recheck, /never changes the call, its rating or its score/);
+  for (const t of ['recheck_lessons', 'correct_lesson', 'what_was_wrong', 'UNRELIABLE', 'Nothing here is investment advice']) assert.ok(recheck.includes(t), t);
+  const lead = front('trading-desk');
+  assert.match(lead.text, /\n## Re-check old lessons\n\nWhen the person asks to re-check, correct or fix the desk's lessons \(for example "re-check the lessons"\):\n\n1\. Call `recheck_lessons`/);
+  for (const t of ['recheck_lessons', 'correct_lesson']) {
+    assert.ok(lead.fields.tools!.includes(`mcp__trading-desk__${t}`), `the lead has ${t}`);
+    for (const agent of src.AGENTS) assert.ok(!front(agent.file).fields.tools!.includes(`mcp__trading-desk__${t}`), `${agent.file} cannot change a lesson`);
+  }
+});

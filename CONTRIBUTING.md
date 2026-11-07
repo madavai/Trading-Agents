@@ -45,7 +45,7 @@ built, which decisions stand, every document, and what is pending.
   Madav's Agent Studio lists the same files. Beside them, `trading-desk.md` is the team's own file and
   `trading-desk.team.json` its line-up in the shape Madav keeps a team in (members, steps, together, gates, talk), for
   Agent Studio to take as the team until the person changes it there. Both are written by `npm run agents` from
-  `scripts/team-src.mjs`: the team's playbook is the /analyse, /settle and /backtest skills, so after editing a skill run
+  `scripts/team-src.mjs`: the team's playbook is the /analyse, /settle, /recheck-lessons and /backtest skills, so after editing a skill run
   `npm run agents` again. The team gets no shell: it opens the dashboard with the desk tool `open_dashboard`.
   `scripts/team-files.mjs` is the one list of these files and their text: `npm run agents` writes it, the desk check
   compares the folder with it (an edit, or an older Madav, can change the files), and the desk tool `reset_team` writes it
@@ -65,6 +65,13 @@ built, which decisions stand, every document, and what is pending.
   from entry to exit with change, volume, RSI, MACD histogram, 10 EMA and 50 SMA beside the index's close.
   `list_settlements` shows it under each READY call, so a lesson says what a stock did only as a row shows it; the
   /settle skill holds the lesson to those rows.
+- `src/desk/lessons.ts` - re-checking lessons that were not written from their window's rows (`recheck_lessons`,
+  `correct_lesson`, the /recheck-lessons skill). How a lesson was written is in its journal tag (`journal.ts`):
+  `lesson:prices`, `lesson:no-prices`, `lesson:corrected:<day>`, `lesson:unreliable:<day>`, or no mark for one written
+  before the rows were shown. A correction replaces only the lesson: the tag's call, rating and score and the decision
+  stay byte for byte, the first lesson is kept word for word under FIRST LESSON, and LESSON CHECK says what the check
+  found. A call whose rows cannot be had is marked unreliable by the desk, never guessed. `pastContext` tells the
+  analyses how each lesson was written and withholds an unreliable one.
 - `src/private.ts` - the one way anything is written into the person's private folder (`paths.ts` `homeDir`): whole,
   and locked to their own account on every system (the file mode on Linux and macOS; on Windows an access list naming
   their account and the system alone, by `icacls`). The desk check reports who can open the folder (`lockState`).
