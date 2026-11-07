@@ -322,7 +322,7 @@ b, strong { font-weight: var(--weight-semibold); }
 <script type="application/json" id="walk">
 {
  "version": "0.9.0",
- "updated": "2026-10-22",
+ "updated": "2026-11-06",
  "sections": [
   { "id": "A", "name": "Getting started in Agent Studio",
     "sub": "The project is cloned, the team is where Madav reads it, and the desk check is green.",
@@ -493,7 +493,17 @@ b, strong { font-weight: var(--weight-semibold); }
         "Run a new analysis on a weekday and open its News report."],
       "see": [
         "A world news part with the last few days' market headlines (the stock market, interest rates, oil, gold, the dollar and euro), from publishers such as Reuters, AP or Yahoo Finance.",
-        "Not \"Yahoo Finance search returned no world/economic news\"."] }
+        "Not \"Yahoo Finance search returned no world/economic news\"."] },
+    { "id": "B13", "title": "The day's prices are called what they are", "tags": [], "changed": "2026-11-06",
+      "about": "During trading hours a stock's latest price is still moving, after the close it is final, and for a while after a day ends the price source has not filled that day in yet. The desk now says which, so the reports never call a moving price \"the close\", never doubt a final one, and never say a day that traded had no trading.",
+      "where": "Dashboard › any call made after this update › Market report",
+      "do": [
+        "Run an analysis of NVIDIA during US trading hours (9:30 to 16:00 New York time) and open its Market report.",
+        "Run another one in the evening, after 16:00 New York time, and open its Market report."],
+      "see": [
+        "The daytime report calls the day's figure \"the latest price\" (the session is still trading), not \"the close\", and treats no level as broken on that day alone.",
+        "The evening report uses the day's close as final, without \"may be partial\" or \"if the market is still open\".",
+        "If a report says the day's prices were \"not available yet\", it names the last day it used and does not claim the day had no trading."] }
   ] },
   { "id": "C", "name": "The dashboard",
     "sub": "The page on your own computer: markets, charts, watchlist, the desk's calls, the scorecard and a page per company.",

@@ -4,9 +4,9 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { configure, getText, NoData, Unavailable } from '../src/data/http.js';
 import { clearCache, parseChart } from '../src/data/yahoo.js';
-import { indicatorWindow, instrument, priceHistory, verifiedSnapshot } from '../src/data/market.js';
+import { indicatorWindow, instrument, latestState, priceHistory, verifiedSnapshot } from '../src/data/market.js';
 import { deskServer } from '../src/tools/server.js';
-import { chartFetch, chartJson, series } from './chart.js';
+import { chartFetch, chartJson, series, type Row } from './chart.js';
 
 beforeEach(() => { process.env.TRADING_AGENTS_TODAY = '2026-10-12'; clearCache(); });
 
@@ -18,6 +18,7 @@ test('the chart answer becomes one adjusted row a day, rows without a price left
     { date: '2026-10-07', o: 11, h: 12, l: 10, c: 12, v: 6 },
   ]), 'NVDA');
   assert.deepEqual(s.bars.map((b) => b.date), ['2026-10-06', '2026-10-07']);
+  assert.deepEqual(s.unfilled, []);      // a blank row before the last priced one is a gap, not a session still being filled in
   assert.equal(s.bars[0]!.close, 5.5);   // adjusted by adjclose / close
   assert.equal(s.bars[0]!.open, 5);
   assert.equal(s.meta.name, 'NVDA Corporation');
@@ -47,6 +48,49 @@ test('the checked price table says when its latest row is a session still in pro
   configure({ fetch: chartFetch(() => series('2026-10-12', 300)) });
   assert.match(await verifiedSnapshot('nvda', '2026-10-12'), /The latest row is today's session\. If the market is still open it is partial/);
   assert.doesNotMatch(await verifiedSnapshot('nvda', '2026-10-09'), /today's session/);
+});
+
+const sec = (ms: number) => Math.floor(ms / 1000);
+/** The chart service's answer with its session times and, if asked, a last day listed with its prices still blank. */
+const withSession = (rows: Row[], session: { start: number; end: number }, blankDay?: string): typeof fetch => async (input) => {
+  const j = chartJson(decodeURIComponent(/\/v8\/finance\/chart\/([^?]+)/.exec(String(input))![1]!), rows, { currentTradingPeriod: { regular: { start: sec(session.start), end: sec(session.end) } } });
+  const r = j.chart.result[0]!, q = r.indicators.quote[0]!;
+  if (blankDay) { r.timestamp.push(sec(Date.parse(`${blankDay}T13:30:00Z`))); for (const k of ['open', 'high', 'low', 'close', 'volume'] as const) q[k].push(null); r.indicators.adjclose[0]!.adjclose.push(null); }
+  return new Response(JSON.stringify(j), { status: 200, headers: { 'content-type': 'application/json' } });
+};
+const MONDAY = { start: Date.parse('2026-10-12T13:30:00Z'), end: Date.parse('2026-10-12T20:00:00Z') };   // 9:30 to 16:00 in New York
+
+test('a session still trading is the latest price, never "the close"', async () => {
+  configure({ fetch: withSession(series('2026-10-12', 300), { start: MONDAY.start, end: Date.now() + 3_600_000 }) });
+  const t = await verifiedSnapshot('nvda', '2026-10-12');
+  assert.match(t, /The latest row, 2026-10-12, is a session still trading \(it closes at \d\d:\d\d America\/New_York time\)\. Its "close" is the latest price so far, not a close/);
+  assert.match(t, /\| Latest price \(still trading\) \| \d+\.\d\d \|/);
+  assert.doesNotMatch(t, /\n\| Close \| /);   // the closes table's own header may say Close
+  assert.match(await instrument('nvda', '2026-10-12'), /Latest trading day on or before it: 2026-10-12, still trading: latest price \d+\.\d\d \(not a close\)\n\*\*The latest row, 2026-10-12, is a session still trading/);
+  assert.doesNotMatch(await verifiedSnapshot('nvda', '2026-10-09'), /still trading|finished session|not opened|partial/);   // a past day is simply final
+});
+
+test('a finished session is final, with no hedge; one not open yet is named, with the last finished row', async () => {
+  configure({ fetch: withSession(series('2026-10-12', 300), MONDAY) });
+  const t = await verifiedSnapshot('nvda', '2026-10-12');
+  assert.match(t, /- The latest row, 2026-10-12, is a finished session: its figures are final\./);
+  assert.match(t, /\| Close \| \d+\.\d\d \|/);
+  assert.doesNotMatch(t, /partial|still trading/);
+  assert.match(await instrument('nvda', '2026-10-12'), /Latest trading day on or before it: 2026-10-12, close \d+\.\d\d\nThe latest row, 2026-10-12, is a finished session/);
+  const friday = { meta: { symbol: 'NVDA', timezone: 'America/New_York', session: { date: '2026-10-12', ...MONDAY } }, bars: [{ date: '2026-10-09', open: 1, high: 1, low: 1, close: 1, volume: 1 }] };
+  assert.deepEqual(latestState(friday, '2026-10-12', Date.parse('2026-10-12T12:00:00Z')).lines, ["- 2026-10-12's session has not opened yet (it opens at 09:30 America/New_York time): the latest row, 2026-10-09, is the latest finished session."]);
+  assert.deepEqual(latestState(friday, '2026-10-09', Date.parse('2026-10-12T12:00:00Z')).lines, []);   // for Friday's analysis nothing is missing
+});
+
+test('a session the source lists with blank prices is named, never skipped as if it had no trading', async () => {
+  configure({ fetch: withSession(series('2026-10-09', 300), MONDAY, '2026-10-12') });
+  const t = await verifiedSnapshot('nvda', '2026-10-12');
+  assert.match(t, /Latest trading row used: 2026-10-09/);
+  assert.match(t, /The source lists a session on 2026-10-12, but its prices are not filled in yet \(this happens for a while after a session ends\)\. Every figure here is as of 2026-10-09\. Do not call 2026-10-09 the latest session, and do not say 2026-10-12 had no trading/);
+  assert.match(await instrument('nvda', '2026-10-12'), /Latest trading day on or before it: 2026-10-09, close \d+\.\d\d\n\*\*The source lists a session on 2026-10-12/);
+  assert.match(await priceHistory('NVDA', '2026-10-12', '2026-10-01', '2026-10-12'), /\n\n- \*\*The source lists a session on 2026-10-12/);
+  assert.match(await indicatorWindow('NVDA', '2026-10-12', 'rsi', 10), /The source lists a session on 2026-10-12/);
+  assert.doesNotMatch(await verifiedSnapshot('nvda', '2026-10-09'), /source lists a session/);   // a later day is no concern of a past analysis
 });
 
 test('the checked price table never uses a row after the analysis date', async () => {
