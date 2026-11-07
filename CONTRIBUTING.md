@@ -60,6 +60,10 @@ built, which decisions stand, every document, and what is pending.
 - `src/numbers.ts` - signed figures in words (`signed`, `signedPct`): what rounds to zero is written as zero, never
   "-0.0%"; `unsignZero` reads a score stored that way back as "0.0%". The page's own `pct` and `money`
   (`src/terminal/ui/fmt.ts`) follow the same rule.
+- `src/desk/window.ts` - what happened in a settled call's holding window (`windowRows`): the stock's finished sessions
+  from entry to exit with change, volume, RSI, MACD histogram, 10 EMA and 50 SMA beside the index's close.
+  `list_settlements` shows it under each READY call, so a lesson says what a stock did only as a row shows it; the
+  /settle skill holds the lesson to those rows.
 - `src/private.ts` - the one way anything is written into the person's private folder (`paths.ts` `homeDir`): whole,
   and locked to their own account on every system (the file mode on Linux and macOS; on Windows an access list naming
   their account and the system alone, by `icacls`). The desk check reports who can open the folder (`lockState`).

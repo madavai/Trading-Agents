@@ -66,6 +66,30 @@ test('pending calls are listed with their measured outcome, or why not', async (
   assert.match(await dueSettlements(j, S, 'ZZZ'), /No pending calls on ZZZ/);
 });
 
+test('a ready call lists its window day by day, so the lesson is written from what happened, not guessed', async () => {
+  const j = journalWith();
+  configure({ fetch: feed() });
+  const t = await dueSettlements(j, S);
+  assert.match(t, /find it in that call's window rows: say what happened only as a row shows it, naming its date/);
+  const table = t.slice(t.indexOf('WHAT HAPPENED IN THE WINDOW'));
+  assert.match(table, /^WHAT HAPPENED IN THE WINDOW: NVDA's finished sessions from 2026-09-01 \(entry\) to 2026-09-08 \(exit\)/);
+  assert.match(table, /\nDate \| Open \| High \| Low \| Close \| Change \| Volume \| RSI \| MACD histogram \| 10 EMA \| 50 SMA \| SPY close\n/);
+  const rows = table.split('\n').filter((l) => /^\d{4}-\d{2}-\d{2} \|/.test(l));
+  assert.deepEqual(rows.map((r) => r.slice(0, 10)), ['2026-09-01', '2026-09-02', '2026-09-03', '2026-09-04', '2026-09-07', '2026-09-08']);   // entry to exit, nothing after
+  assert.match(rows[0]!, /^2026-09-01 \| 100\.00 \| 100\.00 \| 100\.00 \| 100\.00 \| N\/A \| 1,000 \| .* \| 200\.00$/);   // no session before the first row
+  assert.match(rows[5]!, /^2026-09-08 \| 110\.00 \| 110\.00 \| 110\.00 \| 110\.00 \| \+5\.77% \| 1,000 \| .* \| 206\.00$/);   // 104 -> 110; the index's close beside it
+  assert.ok(t.indexOf('WHAT HAPPENED') > t.indexOf('DECISION:'));   // what was decided, then what happened
+});
+
+test('a window whose rows cannot be fetched says so, and the lesson may then say nothing about any day', async () => {
+  const j = journalWith(), base = feed();
+  const longAgo = (url: string) => Number(new URL(url).searchParams.get('period1')) < Date.parse('2026-08-01') / 1000;
+  configure({ fetch: async (input, init) => { const url = String(input); if (url.includes('/NVDA?') && longAgo(url)) throw new TypeError('fetch failed'); return base(input, init); } });
+  const t = await dueSettlements(j, S);
+  assert.match(t, /READY: NVDA \+10\.0%/);   // the outcome is still measured from its own rows
+  assert.match(t, /WHAT HAPPENED IN THE WINDOW: DATA_UNAVAILABLE: the day-by-day rows of NVDA's window: .* say nothing about what happened on any day of the window\./);
+});
+
 test('a source that cannot answer leaves the call pending and says so', async () => {
   const j = journalWith();
   configure({ fetch: async () => { throw new TypeError('fetch failed'); } });
