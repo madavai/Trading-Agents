@@ -21163,6 +21163,11 @@ import path15 from "node:path";
 
 // src/desk/backtest.ts
 var DIRECTION = { Buy: 1, Overweight: 1, Hold: 0, Underweight: -1, Sell: -1 };
+var directionOf = (rating) => DIRECTION[rating] ?? 0;
+function worked(rating, alpha) {
+  const dir = directionOf(rating);
+  return !dir || alpha === null || !Number.isFinite(alpha) ? null : alpha * dir > 0;
+}
 var alphaOf = (e) => {
   const t2 = (e.alpha ?? "").trim().replace(/%$/, "");
   const v = /^[+-]?\d+(\.\d+)?$/.test(t2) ? Number(t2) : NaN;
@@ -21172,8 +21177,8 @@ function summarize(entries) {
   const resolved = entries.filter((e) => !e.pending && e.rating !== REVIEW2).map((e) => ({ e, a: alphaOf(e) })).filter((x) => x.a !== null);
   const byRating = {};
   for (const rating of new Set(resolved.map((x) => x.e.rating))) {
-    const alphas = resolved.filter((x) => x.e.rating === rating).map((x) => x.a), dir = DIRECTION[rating] ?? 0;
-    byRating[rating] = { count: alphas.length, hitRate: dir ? alphas.filter((a) => a * dir > 0).length / alphas.length : null, meanAlpha: alphas.reduce((s, a) => s + a, 0) / alphas.length };
+    const alphas = resolved.filter((x) => x.e.rating === rating).map((x) => x.a), dir = directionOf(rating);
+    byRating[rating] = { count: alphas.length, direction: dir, hitRate: dir ? alphas.filter((a) => worked(rating, a)).length / alphas.length : null, meanAlpha: alphas.reduce((s, a) => s + a, 0) / alphas.length };
   }
   const unscored = entries.filter((e) => e.rating === REVIEW2).length;
   const windows = [...new Set(resolved.map((x) => x.e.holding).filter((h) => !!h && h.endsWith("d")).map((h) => `${h.slice(0, -1)} trading days`))].sort();
@@ -21499,6 +21504,7 @@ function stateOf(root2, day2) {
     raw: e.raw,
     alpha: e.alpha,
     holding: e.holding,
+    worked: e.pending ? null : worked(e.rating, alphaOf(e)),
     summary: summaryOf(e.decision),
     hasReport: hasReport(dir, e.ticker, e.date),
     ticket: ticketable(e.ticker),
@@ -22199,9 +22205,9 @@ async function startTerminal(opts) {
     screening ??= screenToday(dir, symbols, news, day2).finally(() => {
       screening = null;
     });
-    const worked = await screening, prefs = readPrefs(dir), on = prefs.morning === true;
-    const queued2 = on ? queueTop(dir, worked, day2, true, /* @__PURE__ */ new Date(), prefs.morningFrom) : [];
-    return { screen: readScreen(dir) ?? worked, morning: { on, top: TOP_QUEUED, from: on ? prefs.morningFrom : void 0 }, queued: queued2 };
+    const worked2 = await screening, prefs = readPrefs(dir), on = prefs.morning === true;
+    const queued2 = on ? queueTop(dir, worked2, day2, true, /* @__PURE__ */ new Date(), prefs.morningFrom) : [];
+    return { screen: readScreen(dir) ?? worked2, morning: { on, top: TOP_QUEUED, from: on ? prefs.morningFrom : void 0 }, queued: queued2 };
   };
   let weatherMemo = null;
   const weather = (day2) => {

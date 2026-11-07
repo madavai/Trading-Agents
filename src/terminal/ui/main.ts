@@ -4,7 +4,7 @@
 // (Decide…) or the person's own (Trade…) - and is placed only on their Confirm, with trading switched on by them.
 import { api, ApiError, claimKey, hasKey, KEY_LOST, type CallDetail, type DeskState, type Depth, type History, type LinkInfo, type Market, type Match, type Prefs, type Caps, type PaperView, type PaperTrade, type QueueView, type QuoteResult, type Account, type AccountView, type Holding, type Order, type Recent, type Snapshot, type TicketOpen, type Check, type Review, type Placed, type Trading, type Tier, type TierItem, type TierView, type Worth, type Screen, type Weather, type WeatherLine, type HoldingCare } from './api.js';
 import { heroChart, paperChart, sparkline } from './chart.js';
-import { barOn, clock, dayText, esc, labelled, money, NOTES, num, opening, pct, plain, ratingMeaning, ratingTone, SECTION_NAMES, shortDay, tone } from './fmt.js';
+import { averageOf, barOn, clock, dayText, esc, labelled, money, NOTES, num, opening, pct, plain, ratingMeaning, ratingTone, resultOf, SECTION_NAMES, shortDay, tone } from './fmt.js';
 import { GLOSSARY, glossaryGroups, isTerm, means, type TermKey } from './glossary.js';
 import { markdown } from './md.js';
 import { isCrypto } from '../../data/symbols.js';
@@ -787,7 +787,15 @@ async function loadHistory(): Promise<void> {
 }
 
 // ---------- the desk's call, the queue ----------
-const resultChip = (c: { pending: boolean; alpha?: string | null }) => (c.pending ? `<span class="at-chip" title="${esc(`Not scored yet: ${S.desk?.desk.holdingDays ?? 5} trading days after the call, its alpha is worked out.`)}">not scored yet</span>` : `<span class="at-chip ${tone(parseFloat(c.alpha ?? ''))}" title="${esc(means('alpha'))}">alpha ${esc(c.alpha ?? '—')}</span>`);
+/** The trading days a call is scored over: its own window as the journal recorded it ("5d"), else the settings'. */
+const holdDays = (c: Pick<Call, 'holding'>): number => { const m = /^(\d+)d$/.exec(c.holding ?? ''); return m ? Number(m[1]) : S.desk?.desk.holdingDays ?? 5; };
+/** A call's result: "not scored yet", or whether it worked with its alpha, coloured by whether it went the way its rating
+ *  said (never by the alpha's sign alone, which reads backwards for an Underweight or Sell). */
+const resultChip = (c: Pick<Call, 'pending' | 'alpha' | 'rating' | 'worked' | 'holding'>) => {
+  if (c.pending) return `<span class="at-chip" title="${esc(`Not scored yet: ${S.desk?.desk.holdingDays ?? 5} trading days after the call, its alpha is worked out.`)}">not scored yet</span>`;
+  const r = resultOf(c, holdDays(c));
+  return `<span class="at-chip ${r.tone}" title="${esc(r.why)}">${esc(r.words)}</span>`;
+};
 const readButton = (ticker: string, date: string, words = 'Read') => `<button class="at-btn at-press" data-act="open-call" data-symbol="${esc(ticker)}" data-date="${esc(date)}"><svg class="g"><use href="#i-file"/></svg><span>${esc(words)}</span></button>`;
 /** Decide… on a call: an order ticket from it. A call on a coin opens none, and says so instead. */
 const decideButton = (c: Pick<Call, 'ticker' | 'date' | 'ticket' | 'paper'>) => (c.ticket
@@ -886,7 +894,7 @@ function renderStock(): void {
   // every call the desk made on it, newest first, with how it scored
   const calls = d.calls.filter((c) => c.ticker === sym);
   const list = calls.length
-    ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>Date</th><th>Rating</th><th>Result</th><th></th></tr></thead><tbody>${calls.map((c) => `<tr class="ta-go" data-act="open-call" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}"><td>${esc(dayText(c.date))}</td><td>${ratingChip(c.rating)}</td><td>${c.pending ? '<span class="at-chip">not scored yet</span>' : `<span class="at-chip ${tone(parseFloat(c.alpha ?? ''))}">alpha ${esc(c.alpha ?? '—')}</span>`}</td><td><span class="at-quiet">Read</span></td></tr>`).join('')}</tbody></table></div>`
+    ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>Date</th><th>Rating</th><th>Result</th><th></th></tr></thead><tbody>${calls.map((c) => `<tr class="ta-go" data-act="open-call" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}"><td>${esc(dayText(c.date))}</td><td>${ratingChip(c.rating)}</td><td>${resultChip(c)}</td><td><span class="at-quiet">Read</span></td></tr>`).join('')}</tbody></table></div>`
     : `<p class="at-quiet">The desk has no call on ${esc(sym)} yet.</p>`;
   const latest = calls[0];
   // your own orders on it, as Robinhood listed them for the Agentic account when the dashboard last read it
@@ -1111,12 +1119,13 @@ function renderScore(): void {
   const names = [...RATINGS.filter((x) => r.byRating[x]), ...Object.keys(r.byRating).filter((x) => !RATINGS.includes(x))];
   const grid = names.length
     ? `<div class="ta-score"><span class="head">Rating</span><span class="head">Calls</span><span class="head">Called the direction</span><span class="head">Average ${term('alpha', 'alpha')} vs the ${term('index', 'index')}</span>${names.map((n) => {
-        const s = r.byRating[n]!;
-        return `${ratingChip(n)}<b>${s.count}</b><b>${s.hitRate === null ? '—' : `${Math.round(s.hitRate * 100)}%`}</b><b>${pctOf(s.meanAlpha)}</b>`;
+        const s = r.byRating[n]!, avg = averageOf(n, s);
+        return `${ratingChip(n)}<b>${s.count}</b><b>${s.hitRate === null ? '—' : `${Math.round(s.hitRate * 100)}%`}</b><b class="${avg.tone}" title="${esc(avg.why)}">${pctOf(s.meanAlpha)}</b>`;
       }).join('')}</div>`
     : '<p class="at-quiet">Nothing has been scored yet. A call is scored once its window has traded; run /settle in Madav to score the ones that are ready.</p>';
   const few = r.resolved > 0 && r.resolved < 30 ? ' With so few scored calls these figures are noise, not a record.' : '';
-  $('#score').innerHTML = `${grid}<p class="at-honest">${esc(d.record.benchmarkNote)}${esc(few)}</p>`;
+  const key = names.length ? ' Green means the calls went the way their rating said, red that they went against it: a Buy or Overweight works when its stock beats the index, an Underweight or Sell when its stock trails it. A Hold claims no direction, so it stays plain.' : '';
+  $('#score').innerHTML = `${grid}<p class="at-honest">${esc(d.record.benchmarkNote)}${esc(key)}${esc(few)}</p>`;
 }
 
 // ---------- the call in full ----------
@@ -1157,7 +1166,8 @@ async function openCall(symbol: string, date: string): Promise<void> {
   const rating = meta?.rating ?? (labelled(c.decision, 'Rating') || '—');
   const target = labelled(c.decision, 'Price Target'), horizon = labelled(c.decision, 'Time Horizon');
   const clip = (s: string, n = 150) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
-  const facts = [['Price target', target], ['Time horizon', horizon], ['Scored', meta ? (meta.pending ? `not yet: ${S.desk?.desk.holdingDays ?? 5} trading days after the call` : `alpha ${meta.alpha ?? '—'} against the index`) : '']]
+  const verdict = meta && !meta.pending ? resultOf(meta, holdDays(meta)).verdict : '';
+  const facts = [['Price target', target], ['Time horizon', horizon], ['Scored', meta ? (meta.pending ? `not yet: ${S.desk?.desk.holdingDays ?? 5} trading days after the call` : `alpha ${meta.alpha ?? '—'} against the index${verdict ? `: ${verdict}` : ''}`) : '']]
     .filter(([, v]) => v).map(([k, v]) => `<div><dt>${esc(k)}</dt><dd title="${esc(v)}">${esc(clip(v!))}</dd></div>`).join('');
   const shown = new Set(STAGES.flatMap((s) => s.keys)), extra = Object.keys(c.sections).filter((k) => k !== 'decision' && !shown.has(k) && c.sections[k]?.length);
   const stages = STAGES.map((s) => ({ ...s, keys: s.keys.filter((k) => c.sections[k]?.length) })).filter((s) => s.keys.length);

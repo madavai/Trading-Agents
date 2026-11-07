@@ -27,6 +27,13 @@ test('"What does this mean?" holds about thirty words, each in one plain line, t
   assert.deepEqual(glossaryGroups().flatMap((g) => g.terms.map((t) => t.key)), keys, 'the list shows every word, once, grouped in order');
 });
 
+test('alpha says how to read it for each rating: above zero is good only for a Buy or Overweight', () => {
+  // Round 1 (7 Nov 2026): the line said "above zero, it beat the market", the opposite of the truth for an Underweight or Sell.
+  assert.match(GLOSSARY.alpha.means, /beat \(\+\) or trailed \(−\) its market's index/);
+  assert.match(GLOSSARY.alpha.means, /Above zero is good for a Buy or Overweight; below zero is good for an Underweight or Sell\./);
+  assert.doesNotMatch(GLOSSARY.alpha.means, /beat the market|better \(\+\)|a call did/);
+});
+
 test('each rating\'s meaning on the page is the glossary\'s, and a rating the desk does not use has none made up', () => {
   for (const r of ratingKeys) { assert.ok(isTerm(r), r); assert.equal(ratingMeaning(r), means(r as TermKey), r); }
   assert.equal(ratingMeaning('alpha'), '', 'only ratings are ratings');
