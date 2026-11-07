@@ -90,6 +90,10 @@ built, which decisions stand, every document, and what is pending.
   The page has no inline script or style (the policy refuses them): colours in charts come from
   classes, and anything an agent wrote goes through `md.ts`, which escapes first. `npm run build` bundles the page into
   `dist/terminal/`. `ui/` has its own `tsconfig.json` (it needs the browser's types).
+- `src/desk/runs.ts` - a run's working record (`run.json`): each agent's section, saved as it is written, and the
+  finished report. `correctSection` (desk tool `correct_report`) is how the fact checker changes an analyst's report:
+  exact passages only, each marked `[corrected: was "..."]`, and only before the debate begins, so it never retypes a
+  report. A run whose debate began before it had a fact checker goes on without one (`buildPlan`).
 - `src/desk/queue.ts` - the analyses asked for on the dashboard, and the contract with whatever runs the agents. Three
   files in `desk-data`, each read field by field as data from another program:
   - `queue.json`: `[{ symbol, requestedAt, depth?: "shallow"|"medium"|"deep", state: "waiting"|"running"|"done"|"failed",

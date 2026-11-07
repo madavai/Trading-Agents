@@ -56,6 +56,46 @@ export function saveSection(dir: string, ticker: string, date: string, section: 
   return turns;
 }
 
+export interface Correction { was: string; now: string; every?: boolean }
+export const REPORTS: readonly Section[] = ['market', 'sentiment', 'news', 'fundamentals'];
+export const FLAG = '[the fact it rested on was corrected: see the fact check]';
+const times = (text: string, words: string) => (words ? text.split(words).length - 1 : 0);
+
+/** The fact checker's corrections to an analyst's report, made by the desk word for word: each wrong passage is replaced
+ *  where it stands with its old words kept beside it, and a conclusion that rested on one can be flagged. Nothing else
+ *  in the report changes, so the checker never writes a report out again (a long report retyped by a model can lose or
+ *  change words no one asked it to). Only before the debate begins: after that the reports are already argued from.
+ *  Returns one line per correction and flag: done, or why not (a passage not there word for word, or there twice). */
+export function correctSection(dir: string, ticker: string, date: string, section: Section, corrections: Correction[], flagAfter: string[] = []): string[] {
+  if (!REPORTS.includes(section)) throw new Error(`only an analyst's report can be corrected (${REPORTS.join(', ')}), not ${section}`);
+  if (!corrections.length && !flagAfter.length) throw new Error('give at least one correction or one conclusion to flag');
+  const lines: string[] = [];
+  change(dir, ticker, date, (r) => {
+    if (r.log.some((e) => e.section === 'bull')) throw new Error('the debate has begun: the reports are already argued from, so they are no longer corrected');
+    const entry = r.log.find((e) => e.section === section);
+    if (!entry) throw new Error(`this run has no ${section} report to correct`);
+    let t = entry.text;
+    for (const c of corrections) {
+      const now = c.now.trim(), n = times(t, c.was);
+      if (!c.was.trim() || !now || now === c.was.trim()) lines.push(`- not applied: a correction needs the report's exact old words and different new ones (${JSON.stringify(c.was)})`);
+      else if (!n) lines.push(`- not applied: "${c.was}" is not in the ${section} report word for word; copy the words exactly as it has them`);
+      else if (n > 1 && !c.every) lines.push(`- not applied: "${c.was}" is in the ${section} report ${n} times; give more of the words around the one to correct, or set every to correct all ${n}`);
+      else {
+        t = t.split(c.was).join(`${now} [corrected: was "${c.was}"]`);
+        lines.push(`- corrected${n > 1 ? ` in ${n} places` : ''}: "${c.was}" now reads "${now}"`);
+      }
+    }
+    for (const f of flagAfter) {
+      const n = times(t, f);
+      if (n !== 1) lines.push(`- not flagged: "${f}" is in the ${section} report ${n} times, not once; give the exact words that end the conclusion`);
+      else { t = t.split(f).join(`${f} ${FLAG}`); lines.push(`- flagged the conclusion ending "${f}"`); }
+    }
+    if (t.length > MAX_CHARS) throw new Error(`the corrected report would be ${t.length} characters; the most one section holds is ${MAX_CHARS}`);
+    entry.text = t;
+  });
+  return lines;
+}
+
 /** Which sections exist and how many turns each holds. */
 export function progress(dir: string, ticker: string, date: string): Record<string, number> {
   const out: Record<string, number> = {};

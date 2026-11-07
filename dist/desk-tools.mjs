@@ -39317,6 +39317,41 @@ function saveSection(dir, ticker, date5, section, text4) {
   });
   return turns;
 }
+var REPORTS = ["market", "sentiment", "news", "fundamentals"];
+var FLAG = "[the fact it rested on was corrected: see the fact check]";
+var times = (text4, words3) => words3 ? text4.split(words3).length - 1 : 0;
+function correctSection(dir, ticker, date5, section, corrections, flagAfter = []) {
+  if (!REPORTS.includes(section)) throw new Error(`only an analyst's report can be corrected (${REPORTS.join(", ")}), not ${section}`);
+  if (!corrections.length && !flagAfter.length) throw new Error("give at least one correction or one conclusion to flag");
+  const lines = [];
+  change(dir, ticker, date5, (r) => {
+    if (r.log.some((e) => e.section === "bull")) throw new Error("the debate has begun: the reports are already argued from, so they are no longer corrected");
+    const entry = r.log.find((e) => e.section === section);
+    if (!entry) throw new Error(`this run has no ${section} report to correct`);
+    let t = entry.text;
+    for (const c of corrections) {
+      const now = c.now.trim(), n2 = times(t, c.was);
+      if (!c.was.trim() || !now || now === c.was.trim()) lines.push(`- not applied: a correction needs the report's exact old words and different new ones (${JSON.stringify(c.was)})`);
+      else if (!n2) lines.push(`- not applied: "${c.was}" is not in the ${section} report word for word; copy the words exactly as it has them`);
+      else if (n2 > 1 && !c.every) lines.push(`- not applied: "${c.was}" is in the ${section} report ${n2} times; give more of the words around the one to correct, or set every to correct all ${n2}`);
+      else {
+        t = t.split(c.was).join(`${now} [corrected: was "${c.was}"]`);
+        lines.push(`- corrected${n2 > 1 ? ` in ${n2} places` : ""}: "${c.was}" now reads "${now}"`);
+      }
+    }
+    for (const f of flagAfter) {
+      const n2 = times(t, f);
+      if (n2 !== 1) lines.push(`- not flagged: "${f}" is in the ${section} report ${n2} times, not once; give the exact words that end the conclusion`);
+      else {
+        t = t.split(f).join(`${f} ${FLAG}`);
+        lines.push(`- flagged the conclusion ending "${f}"`);
+      }
+    }
+    if (t.length > MAX_CHARS) throw new Error(`the corrected report would be ${t.length} characters; the most one section holds is ${MAX_CHARS}`);
+    entry.text = t;
+  });
+  return lines;
+}
 function progress(dir, ticker, date5) {
   const out = {};
   for (const e of load(dir, ticker, date5).log) out[e.section] = (out[e.section] ?? 0) + 1;
@@ -39803,8 +39838,8 @@ function signalsOf(bars, newsToday = null) {
   if (movePct !== null && Math.abs(movePct) >= MOVE_PCT) signals.push({ kind: "move", words: `${movePct >= 0 ? "rose" : "fell"} ${one(Math.abs(movePct))}%` });
   const usual = bars.slice(Math.max(0, n2 - 1 - USUAL_DAYS), n2 - 1).map((b) => b.volume).filter((v) => v > 0);
   if (usual.length >= USUAL_DAYS / 2 && last.volume > 0) {
-    const times = last.volume / (usual.reduce((a, v) => a + v, 0) / usual.length);
-    if (times >= VOLUME_TIMES) signals.push({ kind: "volume", words: `${one(times)} times its usual volume` });
+    const times2 = last.volume / (usual.reduce((a, v) => a + v, 0) / usual.length);
+    if (times2 >= VOLUME_TIMES) signals.push({ kind: "volume", words: `${one(times2)} times its usual volume` });
   }
   const yearAgo = addDays(last.date, -365), year = bars.slice(0, n2 - 1).filter((b) => b.date >= yearAgo);
   if (bars[0] && bars[0].date <= addDays(last.date, -350) && year.length) {
@@ -40267,6 +40302,25 @@ function registerDeskTools(server, root) {
   }, async (a) => act(() => {
     const d = analysisDate(a.analysis_date), turns = saveSection(ws().dir, a.symbol, d, a.section, a.text);
     return `Saved ${a.section} for ${safeSymbol(a.symbol)} on ${d} (${turns > 1 ? `turn ${turns}` : "one text"}).`;
+  }));
+  server.registerTool("correct_report", {
+    title: "Correct an analyst's report",
+    description: `The fact checker's corrections to an analyst's report (market, sentiment, news or fundamentals), made by the desk word for word before the debate begins. Each correction gives the report's exact old words and the right ones: the desk replaces them where they stand and keeps the old words beside them as [corrected: was "..."]. flag_after names the exact words that end a conclusion resting on a corrected fact; the desk adds a note after them. Nothing else in the report changes, so never save a corrected report yourself. Words found more than once need more of the words around them, or every set to true to correct them all. It answers line by line what was done and what was not, and why.`,
+    inputSchema: {
+      symbol: symbol2,
+      analysis_date: day2,
+      section: external_exports.enum(["market", "sentiment", "news", "fundamentals"]),
+      corrections: external_exports.array(external_exports.object({
+        was: external_exports.string().min(1).max(2e3).describe("The report's words, exactly as it has them"),
+        now: external_exports.string().min(1).max(2e3).describe("The right words, from a tool result"),
+        every: external_exports.boolean().optional().describe("Correct every place these words appear")
+      })).max(60),
+      flag_after: external_exports.array(external_exports.string().min(1).max(500)).max(20).optional().describe("The exact words ending each conclusion that rested on a corrected fact")
+    },
+    annotations: write
+  }, async (a) => act(() => {
+    const d = analysisDate(a.analysis_date), lines = correctSection(ws().dir, a.symbol, d, a.section, a.corrections, a.flag_after);
+    return [`The ${a.section} report for ${safeSymbol(a.symbol)} on ${d}:`, ...lines].join("\n");
   }));
   server.registerTool("read_run", {
     title: "Read a run",
