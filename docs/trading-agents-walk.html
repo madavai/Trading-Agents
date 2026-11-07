@@ -867,14 +867,16 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "Three routines from the project: \"Run automatically when the dashboard asks\", \"Morning routine\" (8:00 on weekdays) and \"Evening wrap-up\" (17:00 on weekdays), each off until you switch it on.",
         "The morning routine runs as trading-desk without asking you anything and ends with the list of new calls. You can change the times there; your version stays yours."] },
-    { "id": "G4", "title": "Scoring past calls", "tags": ["Later"], "changed": "2026-10-21",
-      "about": "Scoring is how the desk learns: each finished call gets its result against the market and a short lesson that later analyses read.",
+    { "id": "G4", "title": "Scoring past calls", "tags": ["Later"], "changed": "2026-11-06",
+      "about": "Scoring is how the desk learns: each finished call gets its result against the market and a short lesson that later analyses read. The lesson is written from the five days' actual prices, so it cannot make up what the stock did.",
       "where": "Madav › Agent Studio › trading-desk › Put to work",
       "do": [
         "Five trading days after a call, ask the team: [[Score my past calls]]",
-        "In a Claude Code chat the same is [[/settle]]"],
+        "In a Claude Code chat the same is [[/settle]]",
+        "Pick one lesson that says what the stock did on a day (a level reached or missed, a stop hit). Open that stock's page on the dashboard and check that day's price on the chart."],
       "see": [
         "Each ready call's return against its index (its alpha) and a short lesson; a call not ready yet says \"NOT YET: the 5-trading-day window after <date> has not finished.\"",
+        "When a lesson says what happened in those days, it names the day and the price, and the chart agrees. What prices can't show (news, earnings) the lesson calls \"not known from the prices\" rather than guessing.",
         "The scorecard on the dashboard updates (C7)."] },
     { "id": "G5", "title": "Paused after an update", "tags": ["Later"], "changed": "2026-10-21",
       "about": "Switching a routine on approves the desk as it stands. When an update changes the agents, playbooks or settings, Madav pauses the routines until you look and switch them on again.",

@@ -37159,8 +37159,8 @@ function atr(bars, n2 = 14) {
 function vwma(bars, n2 = 14) {
   return bars.map((_, i) => {
     if (i < n2 - 1) return null;
-    const w = bars.slice(i - n2 + 1, i + 1), vol2 = w.reduce((a, b) => a + b.volume, 0);
-    return vol2 > 0 ? w.reduce((a, b) => a + b.close * b.volume, 0) / vol2 : null;
+    const w = bars.slice(i - n2 + 1, i + 1), vol3 = w.reduce((a, b) => a + b.volume, 0);
+    return vol3 > 0 ? w.reduce((a, b) => a + b.close * b.volume, 0) / vol3 : null;
   });
 }
 function mfi(bars, n2 = 14) {
@@ -39049,9 +39049,37 @@ ${lessons}` : "Lessons from past calls: none yet (no earlier call has been settl
   ].join("\n");
 }
 
+// src/desk/window.ts
+var f22 = (v) => v === null || v === void 0 || !Number.isFinite(v) ? "N/A" : v.toFixed(2);
+var vol2 = (v) => Math.round(v).toLocaleString("en-US");
+async function windowRows(ticker, o) {
+  const bars = (await history(ticker, o.exit)).bars;
+  const rsi2 = compute("rsi", bars), macdh = compute("macdh", bars), ema10 = compute("close_10_ema", bars), sma50 = compute("close_50_sma", bars);
+  const bench = (await daily(o.benchmark, addDays(o.entry, -7), o.exit)).bars;
+  const benchClose = (date5) => [...bench].reverse().find((b) => b.date <= date5)?.close;
+  const rows = [];
+  bars.forEach((b, i) => {
+    if (b.date < o.entry || b.date > o.exit) return;
+    const before = bars[i - 1], change3 = before ? signedPct(b.close / before.close - 1, 2) : "N/A";
+    rows.push(`${b.date} | ${f22(b.open)} | ${f22(b.high)} | ${f22(b.low)} | ${f22(b.close)} | ${change3} | ${vol2(b.volume)} | ${f22(rsi2[i])} | ${f22(macdh[i])} | ${f22(ema10[i])} | ${f22(sma50[i])} | ${f22(benchClose(b.date))}`);
+  });
+  return [
+    `WHAT HAPPENED IN THE WINDOW: ${ticker}'s finished sessions from ${o.entry} (entry) to ${o.exit} (exit), prices adjusted for splits and dividends, each change against the session before, and ${o.benchmark}'s close beside each. Anything the lesson says about what happened in the window must be found in these rows.`,
+    `Date | Open | High | Low | Close | Change | Volume | RSI | MACD histogram | 10 EMA | 50 SMA | ${o.benchmark} close`,
+    ...rows
+  ].join("\n");
+}
+
 // src/desk/settle.ts
 var line = (o, e) => `${e.ticker} ${signedPct(o.raw)} from ${o.entry} to ${o.exit} (${o.holdingDays} trading days); ${o.benchmark} ${signedPct(o.benchmarkReturn)}; alpha ${signedPct(o.alpha)}`;
 var MAX_REFLECTION = 1200;
+async function windowText(ticker, o) {
+  try {
+    return await windowRows(ticker, o);
+  } catch (err) {
+    return `WHAT HAPPENED IN THE WINDOW: ${failureText(err, `the day-by-day rows of ${ticker}'s window`)} Write the lesson from the outcome line alone, and say nothing about what happened on any day of the window.`;
+  }
+}
 async function dueSettlements(journal, scoring, ticker) {
   const pending = journal.pending().filter((e) => !ticker || e.ticker === ticker);
   if (!pending.length) return ticker ? `No pending calls on ${ticker}.` : "No pending calls: every call in the journal is settled.";
@@ -39068,12 +39096,14 @@ async function dueSettlements(journal, scoring, ticker) {
       ready++;
       out.push(`${head2} READY: ${line(o, e)}
 DECISION:
-${e.decision}`);
+${e.decision}
+
+${await windowText(e.ticker, o)}`);
     } catch (err) {
       out.push(`${head2} ${failureText(err, `prices to settle ${e.ticker} on ${e.date}`)} Leave it pending.`);
     }
   }
-  return [`${pending.length} pending call(s), ${ready} ready to settle. Settle a ready one with record_outcome, using only the figures shown here.`, "", ...out].join("\n\n");
+  return [`${pending.length} pending call(s), ${ready} ready to settle. Settle a ready one with record_outcome, using only the figures shown here. Before writing about a level, stop, target or trigger the decision named, find it in that call's window rows: say what happened only as a row shows it, naming its date.`, "", ...out].join("\n\n");
 }
 async function settleOne(journal, scoring, ticker, date5, reflection) {
   const text4 = reflection.trim();
@@ -39701,13 +39731,13 @@ Rating: ${rating}`;
   }));
   server.registerTool("list_settlements", {
     title: "Pending calls",
-    description: "List the calls in the journal that are not settled yet. For each whose holding window has finished trading, it shows the measured outcome (return, the index's return, alpha) and the decision, so you can write the lesson; the others are marked NOT YET. The figures come from price rows only.",
+    description: "List the calls in the journal that are not settled yet. For each whose holding window has finished trading, it shows the measured outcome (return, the index's return, alpha), the decision, and what happened in the window day by day (the stock's prices, volume and main indicators beside the index's close), so you can write the lesson from what happened; the others are marked NOT YET. The figures come from price rows only.",
     inputSchema: { symbol: symbol2.optional() },
     annotations: { readOnlyHint: true, openWorldHint: true }
   }, async (a) => act(() => dueSettlements(journalOf(root, ws()), readSettings(root).scoring, a.symbol ? safeSymbol(a.symbol) : void 0)));
   server.registerTool("record_outcome", {
     title: "Settle a call",
-    description: "Settle one pending call whose window has finished: the desk measures the outcome again itself and keeps it with your lesson. Give only the lesson - 2 to 4 plain sentences naming what the alpha shows, what part of the thesis it supports or undercuts, and one thing to do next time. Never pass or invent a number.",
+    description: "Settle one pending call whose window has finished: the desk measures the outcome again itself and keeps it with your lesson. Give only the lesson - 2 to 4 plain sentences naming what the alpha shows, what part of the thesis it supports or undercuts, and one thing to do next time. Say what happened in the window only as its rows from list_settlements show it, naming the day; never pass or invent a number.",
     inputSchema: { symbol: symbol2, trade_date: day2, lesson: external_exports.string().min(1).max(1200) },
     annotations: { readOnlyHint: false, openWorldHint: true }
   }, async (a) => act(() => settleOne(journalOf(root, ws()), readSettings(root).scoring, safeSymbol(a.symbol), a.trade_date, a.lesson)));

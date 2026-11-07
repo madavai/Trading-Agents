@@ -129,14 +129,14 @@ export function registerDeskTools(server: McpServer, root: string): void {
 
   server.registerTool('list_settlements', {
     title: 'Pending calls',
-    description: 'List the calls in the journal that are not settled yet. For each whose holding window has finished trading, it shows the measured outcome (return, the index\'s return, alpha) and the decision, so you can write the lesson; the others are marked NOT YET. The figures come from price rows only.',
+    description: 'List the calls in the journal that are not settled yet. For each whose holding window has finished trading, it shows the measured outcome (return, the index\'s return, alpha), the decision, and what happened in the window day by day (the stock\'s prices, volume and main indicators beside the index\'s close), so you can write the lesson from what happened; the others are marked NOT YET. The figures come from price rows only.',
     inputSchema: { symbol: symbol.optional() },
     annotations: { readOnlyHint: true, openWorldHint: true },
   }, async (a) => act(() => dueSettlements(journalOf(root, ws()), readSettings(root).scoring, a.symbol ? safeSymbol(a.symbol) : undefined)));
 
   server.registerTool('record_outcome', {
     title: 'Settle a call',
-    description: 'Settle one pending call whose window has finished: the desk measures the outcome again itself and keeps it with your lesson. Give only the lesson - 2 to 4 plain sentences naming what the alpha shows, what part of the thesis it supports or undercuts, and one thing to do next time. Never pass or invent a number.',
+    description: 'Settle one pending call whose window has finished: the desk measures the outcome again itself and keeps it with your lesson. Give only the lesson - 2 to 4 plain sentences naming what the alpha shows, what part of the thesis it supports or undercuts, and one thing to do next time. Say what happened in the window only as its rows from list_settlements show it, naming the day; never pass or invent a number.',
     inputSchema: { symbol, trade_date: day, lesson: z.string().min(1).max(1200) },
     annotations: { readOnlyHint: false, openWorldHint: true },
   }, async (a) => act(() => settleOne(journalOf(root, ws()), readSettings(root).scoring, safeSymbol(a.symbol), a.trade_date, a.lesson)));
