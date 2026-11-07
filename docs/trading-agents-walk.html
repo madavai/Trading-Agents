@@ -412,14 +412,18 @@ b, strong { font-weight: var(--weight-semibold); }
         "Margins and growth rates come with the words \"worked out\" and the figures they came from, the same as the desk's own table, not sums of the analyst's own.",
         "Earnings per share from before NVIDIA's 10-for-1 share split in 2024 are on today's basis: for the year to January 2022, about 0.39, not 3.85.",
         "\"Company profile and valuation for NVDA, from its SEC filings as they stood on …\", with its industry (the SEC's code) and its sector (worked out from that code, so approximate)."] },
-    { "id": "B3", "title": "Your holdings were used", "tags": [], "changed": "2026-10-21",
-      "about": "When the dashboard has read your Robinhood accounts, the agents see what you hold, so the trader sizes a plan to the one account the desk may trade in and treats the others as background.",
+    { "id": "B3", "title": "Your holdings were used", "tags": [], "changed": "2026-11-07",
+      "about": "When the dashboard has read your Robinhood accounts, the desk saves what you hold with each analysis as it starts. The trader, the three risk voices and the portfolio manager read it from there themselves, so the trader sizes a plan to the one account the desk may trade in and treats the others as background.",
       "where": "Dashboard › The desk's calls › the call › The trade › Trader's proposal",
       "do": [
         "Read your accounts on the dashboard first: Your account › \"Refresh from Robinhood\" (section D).",
         "Ask the team to analyse a company you hold, for example [[Analyse NVDA shallow]] on another day, and open its \"Trader's proposal\"."],
       "see": [
-        "It sizes any trade to the Agentic account and treats your other accounts as view-only context (\"view only: the desk never trades in it\")."] },
+        "The proposal begins with a line \"Holdings: …\" that names the Agentic account it sizes to, its cash or buying power, whether you already hold the stock, and the day your accounts were read.",
+        "It sizes any trade to the Agentic account and treats your other accounts as view-only context (\"view only: the desk never trades in it\").",
+        "The three risk voices and the portfolio manager speak of the same account and figures. None of them says your holdings were not provided.",
+        "If the desk has no record of what you hold (you never read your accounts or told it), the line says none are saved, and the sizing is given in terms you can apply to your own position, never assuming you hold nothing.",
+        "If this happens: the proposal says your holdings were \"not provided\" although your accounts had been read. Note the stock and the day of the call and report it: each analysis now keeps a copy of the holdings it was given, so it can be checked."] },
     { "id": "B4", "title": "No invented numbers", "tags": [], "changed": "2026-10-21",
       "about": "A rule of the desk: every exact price, level or indicator comes from a desk tool. A source that could not be reached is called \"unavailable\", never filled in.",
       "where": "Dashboard › NVDA's call › Market report, and the chart",
@@ -1032,14 +1036,15 @@ b, strong { font-weight: var(--weight-semibold); }
         "Ask for an analysis on the dashboard (the robot beside AAPL), then type [[/analyse]] in a chat."],
       "see": [
         "It analyses what is waiting, one at a time, never asking you anything, and the dashboard shows where each one stands."] },
-    { "id": "I3", "title": "A back-test", "tags": ["Optional"], "changed": "2026-10-21",
+    { "id": "I3", "title": "A back-test", "tags": ["Optional"], "changed": "2026-11-07",
       "about": "A back-test runs the team over past dates to see how its calls would have done. It is slow and uses a lot of model time, and it is kept apart from your real calls.",
       "where": "A Claude Code chat in your Trading-Agents folder",
       "do": [
         "Type [[/backtest NVDA 2026-06-01 2026-06-15]]"],
       "see": [
         "The team runs over those past dates in a journal of its own, then reports by rating how often the direction was right and the mean alpha.",
-        "The dashboard's calls and scorecard are unchanged."] }
+        "The dashboard's calls and scorecard are unchanged.",
+        "Your holdings are left out: what you hold now was not known on the days tested. In the back-test's own reports (in the desk-data folder, under backtest), each trader's proposal begins with a \"Holdings:\" line that says so."] }
   ] },
   { "id": "J", "name": "Start here and This morning",
     "sub": "The world in tiers, broadest first, then what ground the market is on and what moved: worked out from figures, never a forecast.",

@@ -45,6 +45,9 @@ const RATINGS = `**Rating Scale** (use exactly one):
 const CORRECTED = `The fact checker has checked the analysts' reports: a mark [corrected: was "..."] is its correction, so use the corrected words, and section fact_check lists every correction.`;
 const READ_REPORTS = `Read what the team has written with read_run (symbol, analysis_date, sections): the analysts' reports are market, sentiment, news and fundamentals. A report that is missing was not part of this run: it is not available, not an empty finding. ${CORRECTED}`;
 const OPENING = `If the other side has not spoken yet, open the debate with your own case; never invent the other side's position.`;
+/** What the person holds reaches the decision agents from the desk, saved with the run when it was planned: never through
+ *  the lead's request, which a lead can leave out without anyone seeing. */
+const HOLDINGS = `What the person holds is in section holdings of read_run: the desk saved it with this run when it was planned, so it is what you work from, whatever the request says. When it gives holdings, use them: never say they were not provided. When it says none are saved, say that, and never assume a flat book (that they hold nothing).`;
 
 export const AGENTS = [
   {
@@ -221,13 +224,13 @@ Save it as section "research_plan".`,
     tools: ['read_run', 'get_verified_snapshot', 'get_price_facts', 'work_out', 'save_run_section'],
     body: `You are a trading agent analysing market data to make an investment decision. Based on the research team's plan, give a specific recommendation to buy, sell or hold. You only propose: you never place an order, and the person decides.
 
-Read the research plan and the technical market report with read_run (sections research_plan and market). Ground concrete price levels (entry, stop-loss, position sizing) in the market report's price structure - current price, support and resistance, ATR and volatility - and use the research plan for direction and strategy. If the market report is missing from this run, say so. ${CORRECTED} Call get_verified_snapshot for the symbol and date to take the current price and ATR from the checked price table.
+Read the research plan, the technical market report and what the person holds with read_run (sections research_plan, market and holdings). Ground concrete price levels (entry, stop-loss, position sizing) in the market report's price structure - current price, support and resistance, ATR and volatility - and use the research plan for direction and strategy. If the market report is missing from this run, say so. ${CORRECTED} Call get_verified_snapshot for the symbol and date to take the current price and ATR from the checked price table.
 
 State the entry price and stop-loss as absolute price levels in the instrument's quote currency (for example 189.5), never a percentage or a range; convert a percentage distance to the price level it implies, working it out with work_out from a checked figure and showing the sum. If you cannot ground a level in a tool result, write "not provided" rather than guess one.
 
-The request gives what the person holds, or says it is not provided: use it for sizing, and never assume a flat book when it is not provided.
+${HOLDINGS} Size the plan to the account the holdings say a trade is sized to: its cash or buying power, and any position in this stock already held.
 
-Write these sections, in this order, starting with the action on its own line:
+Start your work with one line, "Holdings: ", saying in a few words what section holdings gives: the account a trade is sized to, its cash or buying power, any position in this stock, and the day they were read; or that none are saved; or that a backtest leaves them out. Then write these sections, in this order, starting with the action on its own line:
 - **Action**: exactly one of Buy / Hold / Sell. A research recommendation of Overweight is a Buy and Underweight is a Sell, sized by how strong the case is; conflict alone is not a Hold.
 - **Reasoning**: why, against the plan and the price structure (two to four sentences), with the sums behind the entry and the stop
 - **Entry Price**: one price level alone, for example 189.50, or "not provided"
@@ -252,7 +255,7 @@ Challenge both the Aggressive and Conservative Analysts, pointing out where each
     tools: ['read_run', 'get_price_facts', 'work_out', 'save_run_section'],
     body: `${core}
 
-Read the trader's decision, the analysts' reports and the risk debate so far with read_run (sections trader, market, sentiment, news, fundamentals, risk_debate). ${CORRECTED} The request gives what the person holds, or says it is not provided: do not assume a flat book when it is not provided. If the other voices have not spoken yet, present your own argument from the available data; never invent their position.
+Read the trader's decision, the analysts' reports, what the person holds and the risk debate so far with read_run (sections trader, market, sentiment, news, fundamentals, holdings, risk_debate). ${CORRECTED} ${HOLDINGS} If the other voices have not spoken yet, present your own argument from the available data; never invent their position.
 
 Speak conversationally, as if talking, without special formatting. Start your text with "${Name} Analyst:" and save it as section "${key}" (each turn is added to the debate).`,
   })),
@@ -269,7 +272,7 @@ Speak conversationally, as if talking, without special formatting. Start your te
 - **Underweight**: Reduce exposure, take partial profits
 - **Sell**: Exit the position or avoid entry
 
-Read the research manager's plan, the trader's proposal and the risk debate with read_run (sections research_plan, trader, risk_debate); the analysts' reports are there too if you need to check a claim. ${CORRECTED} The request gives what the person holds, or says it is not provided, and the lessons from prior decisions and their outcomes: weigh the lessons where they bear on this case and ignore them where they do not. Never assume a flat book when holdings are not provided.
+Read the research manager's plan, the trader's proposal, the risk debate, what the person holds and the lessons from past calls with read_run (sections research_plan, trader, risk_debate, holdings, lessons); the analysts' reports are there too if you need to check a claim. ${CORRECTED} ${HOLDINGS} The lessons are past decisions and how they turned out: weigh them where they bear on this case and ignore them where they do not.
 
 Ground every conclusion in specific evidence from the analysts. The risk debate always contains conflicting stances; deciding which is stronger is the job, so conflict alone is not a reason to Hold. Commit to the stronger case, sized by how decisively it wins. Choose Hold only when the evidence is still balanced after that weighing, or too thin to support a call; do not force a direction to appear decisive. Weigh the analysts on their merits, independent of speaking order.
 

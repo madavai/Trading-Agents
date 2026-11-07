@@ -9,8 +9,8 @@ import { ANALYSTS, languageName, readSettings, type Analyst } from '../settings.
 import { deskDataDir } from '../paths.js';
 import { type Journal } from './journal.js';
 import { journalIn, workspaceOf, type Workspace } from './workspace.js';
-import { readHoldings, renderHoldings } from './holdings.js';
-import { deleteRun, progress, savedPlan, startRun, type Section } from './runs.js';
+import { BACKTEST_HOLDINGS, readHoldings, renderHoldings } from './holdings.js';
+import { deleteRun, progress, saveContext, savedPlan, startRun, type RunContext, type Section } from './runs.js';
 import { DEPTHS, readQueue } from './queue.js';
 import { resolveBenchmark } from './scoring.js';
 
@@ -48,7 +48,17 @@ export function stepsFor(analysts: Analyst[], debateRounds: number, riskRounds: 
   return steps;
 }
 
-export function buildPlan(root: string, req: PlanRequest, ws: Workspace = workspaceOf(root)): { plan: Plan; holdings: string; lessons: string; resumed: boolean } {
+/** What the decision agents work from besides the reports, drawn up as the plan gives it: the person's holdings (in a
+ *  backtest, none: what they hold now was not known on the days it tests) and the lessons from past calls. */
+export function runContext(root: string, ws: Workspace, symbol: string, day: string): RunContext {
+  const lessons = journalOf(root, ws).pastContext(symbol, isHistorical(day) ? { asOf: day } : {});
+  return {
+    holdings: ws.sweep ? BACKTEST_HOLDINGS : renderHoldings(readHoldings(deskDataDir(root)), symbol),
+    lessons: lessons ? `Lessons from past calls:\n${lessons}` : 'Lessons from past calls: none yet (no earlier call has been settled).',
+  };
+}
+
+export function buildPlan(root: string, req: PlanRequest, ws: Workspace = workspaceOf(root)): RunContext & { plan: Plan; resumed: boolean } {
   if (!readContactEmail(root)) throw new NeedsEmail(ASK_FOR_EMAIL);
   const s = readSettings(root), dir = ws.dir;
   const symbol = safeSymbol(req.symbol), day = analysisDate(req.analysisDate), notes: string[] = [];
@@ -99,8 +109,10 @@ export function buildPlan(root: string, req: PlanRequest, ws: Workspace = worksp
   }
   plan.steps = steps.map((st) => ({ ...st, done: (done[st.section] ?? 0) >= st.turn }));
   if (!resumed) startRun(dir, symbol, day, plan);
-  const lessons = journalOf(root, ws).pastContext(symbol, isHistorical(day) ? { asOf: day } : {});
-  return { plan, holdings: renderHoldings(readHoldings(deskDataDir(root)), symbol), lessons, resumed };
+  // Saved with the run each time it is planned, so the agents read them from the desk, never from the lead's copy.
+  const ctx = runContext(root, ws, symbol, day);
+  saveContext(dir, symbol, day, ctx);
+  return { plan, ...ctx, resumed };
 }
 
 export function renderPlan({ plan: p, holdings, lessons, resumed }: ReturnType<typeof buildPlan>): string {
@@ -117,7 +129,8 @@ export function renderPlan({ plan: p, holdings, lessons, resumed }: ReturnType<t
     ...(p.notes.length ? ['', ...p.notes.map((n) => `Note: ${n}`)] : []),
     '', `Steps${resumed ? ' (resuming)' : ''}: ${p.steps.map((x) => `${x.done ? '[done] ' : ''}${step(x)}`).join(' -> ')}`,
     next ? `Next step: ${step(next)}` : 'Every step is done: write the report and record the decision.',
+    '', 'Saved with this run: the holdings and the lessons below. The trader, the risk voices and the portfolio manager read them from the desk themselves (read_run, sections holdings and lessons): do not copy them into their requests.',
     '', holdings,
-    '', lessons ? `Lessons from past calls:\n${lessons}` : 'Lessons from past calls: none yet (no earlier call has been settled).',
+    '', lessons,
   ].join('\n');
 }

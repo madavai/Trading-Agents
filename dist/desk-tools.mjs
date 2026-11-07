@@ -39099,9 +39099,11 @@ function renderAccounts(h, ticker) {
   return `Portfolio as read from Robinhood on ${h.savedOn} (it may have changed since). Size any trade to the tradable account; the other accounts are the rest of the person's holdings, for context only:
 ${lines.join("\n")}`;
 }
+var NO_HOLDINGS = "Portfolio context: none saved. The desk has no record of what the person holds (none given in a chat, none saved from their Robinhood accounts on the dashboard), so you do not know their holdings or cash. Say so; do not assume they hold nothing (a flat book), and give direction and sizing guidance in terms they can apply to their own position.";
+var BACKTEST_HOLDINGS = "Portfolio context: not used in a backtest. A backtest judges the desk's calls over past days, and what the person holds now was not known then, so their holdings are left out on purpose. Say so; do not assume they hold nothing (a flat book), and size against a standard allocation.";
 function renderHoldings(h, ticker) {
   if (h?.accounts?.length) return renderAccounts(h, ticker);
-  if (!h) return "Portfolio context: not provided. You do not know the person's current holdings or cash, so do not assume a flat book; give direction and sizing guidance in terms they can apply to their own position.";
+  if (!h) return NO_HOLDINGS;
   const held = h.positions.find((p) => p.ticker === ticker);
   const lines = [held ? `- Current position in ${ticker}: ${n(held.quantity)} units${held.averagePrice ? `, average price ${m(held.averagePrice)}` : ""}` : `- No current position in ${ticker}`];
   if (h.cash !== void 0) lines.push(`- Cash available: ${m(h.cash)}${h.currency ? ` ${h.currency}` : ""}`);
@@ -39349,6 +39351,8 @@ var PARTS = [
   ["IV. Risk Management Team Decision", ["aggressive", "conservative", "neutral"]],
   ["V. Portfolio Manager Decision", ["decision"]]
 ];
+var CONTEXT = ["holdings", "lessons"];
+var CONTEXT_LABELS = { holdings: "Holdings", lessons: "Lessons" };
 var folder = (dir, ticker, date5) => path11.join(dir, "runs", `${safeSymbol(ticker).replace(/\^/g, "IDX_").replace(/=/g, "_EQ_")}_${date5}`);
 var runFile = (dir, ticker, date5) => path11.join(folder(dir, ticker, date5), "run.json");
 function load(dir, ticker, date5) {
@@ -39374,6 +39378,12 @@ function startRun(dir, ticker, date5, plan) {
     r.plan = plan;
   });
 }
+function saveContext(dir, ticker, date5, ctx) {
+  change(dir, ticker, date5, (r) => {
+    r.context = { holdings: ctx.holdings, lessons: ctx.lessons, at: (/* @__PURE__ */ new Date()).toISOString() };
+  });
+}
+var contextOf = ({ context: c }) => typeof c?.holdings === "string" && typeof c.lessons === "string" ? { holdings: c.holdings, lessons: c.lessons } : void 0;
 function saveSection(dir, ticker, date5, section, text4) {
   const t = text4.trim();
   if (!t) throw new Error("there is nothing to save: the text is empty");
@@ -39427,9 +39437,16 @@ function progress(dir, ticker, date5) {
   return out;
 }
 var savedPlan = (dir, ticker, date5) => load(dir, ticker, date5).plan;
-function readSections(dir, ticker, date5, names) {
-  const log = load(dir, ticker, date5).log;
+function readSections(dir, ticker, date5, names, fallback) {
+  const run = load(dir, ticker, date5), log = run.log;
+  let ctx;
   return names.map((name) => {
+    if (CONTEXT.includes(name)) {
+      ctx ??= contextOf(run) ?? fallback?.();
+      const label2 = CONTEXT_LABELS[name];
+      return ctx ? `## ${label2}
+${ctx[name]}` : `(No ${label2.toLowerCase()} saved with this run: plan it with plan_analysis first. It is not known, not empty.)`;
+    }
     const group = DEBATES[name];
     const entries = group ? log.filter((e) => group.includes(e.section)) : log.filter((e) => e.section === name);
     const label = group ? name.replace("_", " ") : isSection(name) ? LABELS[name] : name;
@@ -39660,6 +39677,14 @@ function stepsFor(analysts, debateRounds, riskRounds) {
   steps.push({ section: "decision", turn: 1 });
   return steps;
 }
+function runContext(root, ws, symbol4, day3) {
+  const lessons = journalOf(root, ws).pastContext(symbol4, isHistorical(day3) ? { asOf: day3 } : {});
+  return {
+    holdings: ws.sweep ? BACKTEST_HOLDINGS : renderHoldings(readHoldings(deskDataDir(root)), symbol4),
+    lessons: lessons ? `Lessons from past calls:
+${lessons}` : "Lessons from past calls: none yet (no earlier call has been settled)."
+  };
+}
 function buildPlan(root, req, ws = workspaceOf(root)) {
   if (!readContactEmail(root)) throw new NeedsEmail(ASK_FOR_EMAIL);
   const s = readSettings(root), dir = ws.dir;
@@ -39706,8 +39731,9 @@ function buildPlan(root, req, ws = workspaceOf(root)) {
   }
   plan.steps = steps.map((st) => ({ ...st, done: (done[st.section] ?? 0) >= st.turn }));
   if (!resumed) startRun(dir, symbol4, day3, plan);
-  const lessons = journalOf(root, ws).pastContext(symbol4, isHistorical(day3) ? { asOf: day3 } : {});
-  return { plan, holdings: renderHoldings(readHoldings(deskDataDir(root)), symbol4), lessons, resumed };
+  const ctx = runContext(root, ws, symbol4, day3);
+  saveContext(dir, symbol4, day3, ctx);
+  return { plan, ...ctx, resumed };
 }
 function renderPlan({ plan: p, holdings, lessons, resumed }) {
   const next = p.steps.find((x) => !x.done);
@@ -39725,10 +39751,11 @@ function renderPlan({ plan: p, holdings, lessons, resumed }) {
     `Steps${resumed ? " (resuming)" : ""}: ${p.steps.map((x) => `${x.done ? "[done] " : ""}${step(x)}`).join(" -> ")}`,
     next ? `Next step: ${step(next)}` : "Every step is done: write the report and record the decision.",
     "",
+    "Saved with this run: the holdings and the lessons below. The trader, the risk voices and the portfolio manager read them from the desk themselves (read_run, sections holdings and lessons): do not copy them into their requests.",
+    "",
     holdings,
     "",
-    lessons ? `Lessons from past calls:
-${lessons}` : "Lessons from past calls: none yet (no earlier call has been settled)."
+    lessons
   ].join("\n");
 }
 
@@ -40113,7 +40140,7 @@ function morningList(dir, today2, max, screen = null) {
 }
 var holdingsLine = (dir) => {
   const h = readHoldings(dir);
-  if (!h) return "Holdings: not provided. The analyses say so; they do not assume a flat book.";
+  if (!h) return "Holdings: none saved. The analyses say so; they do not assume a flat book.";
   return h.source === "robinhood" ? `Holdings: as the dashboard last read them from Robinhood, on ${h.savedOn}. The team never reads Robinhood itself; for fresher figures the person presses "Refresh from Robinhood" on the dashboard.` : `Holdings: as the person gave them, on ${h.savedOn}.`;
 };
 function lookLines(look, today2) {
@@ -40393,12 +40420,15 @@ function registerDeskTools(server, root) {
   }));
   server.registerTool("read_run", {
     title: "Read a run",
-    description: `Read what the team has written so far for a stock and day. Without sections it lists which sections exist and how many turns each holds. With sections it returns their text; ${DEBATES2.join(" and ")} give a whole debate in the order spoken. A section not written yet is said to be missing, never blank.`,
-    inputSchema: { symbol: symbol2, analysis_date: day2, sections: external_exports.array(external_exports.enum([...SECTIONS, ...DEBATES2])).optional() },
+    description: `Read what the team has written so far for a stock and day. Without sections it lists which sections exist and how many turns each holds. With sections it returns their text; ${DEBATES2.join(" and ")} give a whole debate in the order spoken. A section not written yet is said to be missing, never blank. ${CONTEXT.join(" and ")} give what the plan saved with the run: what the person holds (or that none are saved) and the lessons from past calls.`,
+    inputSchema: { symbol: symbol2, analysis_date: day2, sections: external_exports.array(external_exports.enum([...SECTIONS, ...DEBATES2, ...CONTEXT])).optional() },
     annotations: { readOnlyHint: true, openWorldHint: false }
   }, async (a) => act(() => {
     const d = analysisDate(a.analysis_date);
-    if (a.sections?.length) return readSections(ws().dir, a.symbol, d, a.sections);
+    if (a.sections?.length) {
+      const w = ws();
+      return readSections(w.dir, a.symbol, d, a.sections, () => runContext(root, w, safeSymbol(a.symbol), d));
+    }
     const p = progress(ws().dir, a.symbol, d);
     return Object.keys(p).length ? `Written so far for ${safeSymbol(a.symbol)} on ${d}: ${Object.entries(p).map(([k, n2]) => `${k} (${n2})`).join(", ")}` : `Nothing written yet for ${safeSymbol(a.symbol)} on ${d}.`;
   }));

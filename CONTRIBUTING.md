@@ -94,7 +94,11 @@ built, which decisions stand, every document, and what is pending.
 - `src/desk/runs.ts` - a run's working record (`run.json`): each agent's section, saved as it is written, and the
   finished report. `correctSection` (desk tool `correct_report`) is how the fact checker changes an analyst's report:
   exact passages only, each marked `[corrected: was "..."]`, and only before the debate begins, so it never retypes a
-  report. A run whose debate began before it had a fact checker goes on without one (`buildPlan`).
+  report. A run whose debate began before it had a fact checker goes on without one (`buildPlan`). Each time a run is
+  planned, `saveContext` keeps the holdings and the lessons the plan drew up (`runContext` in `plan.ts`; in a backtest no
+  holdings, since today's were not known on the days tested), and `read_run` serves them as sections `holdings` and
+  `lessons`. The trader, the risk voices and the portfolio manager read them from there, never from the lead's request,
+  which a lead can leave out unseen.
 - `src/desk/queue.ts` - the analyses asked for on the dashboard, and the contract with whatever runs the agents. Three
   files in `desk-data`, each read field by field as data from another program:
   - `queue.json`: `[{ symbol, requestedAt, depth?: "shallow"|"medium"|"deep", state: "waiting"|"running"|"done"|"failed",

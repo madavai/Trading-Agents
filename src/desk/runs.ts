@@ -23,7 +23,15 @@ const PARTS: Array<[string, Section[]]> = [
   ['V. Portfolio Manager Decision', ['decision']],
 ];
 
-interface Run { ticker: string; date: string; startedAt: string; plan?: unknown; log: Array<{ section: Section; text: string }> }
+/** What the decision agents work from besides the reports: the person's holdings and the lessons from past calls, as the
+ *  plan drew them up. Saved with the run, so the trader, the risk voices and the portfolio manager read them from the desk
+ *  (read_run) instead of trusting the lead to copy them into each request, and so the run shows what they were given. */
+export const CONTEXT = ['holdings', 'lessons'] as const;
+export type ContextName = (typeof CONTEXT)[number];
+export interface RunContext { holdings: string; lessons: string }
+const CONTEXT_LABELS: Record<ContextName, string> = { holdings: 'Holdings', lessons: 'Lessons' };
+
+interface Run { ticker: string; date: string; startedAt: string; plan?: unknown; context?: RunContext & { at: string }; log: Array<{ section: Section; text: string }> }
 
 const folder = (dir: string, ticker: string, date: string) => path.join(dir, 'runs', `${safeSymbol(ticker).replace(/\^/g, 'IDX_').replace(/=/g, '_EQ_')}_${date}`);
 const runFile = (dir: string, ticker: string, date: string) => path.join(folder(dir, ticker, date), 'run.json');
@@ -41,6 +49,17 @@ function change(dir: string, ticker: string, date: string, edit: (r: Run) => voi
 export const isSection = (s: string): s is Section => (SECTIONS as readonly string[]).includes(s);
 
 export function startRun(dir: string, ticker: string, date: string, plan: unknown): void { change(dir, ticker, date, (r) => { r.plan = plan; }); }
+
+/** Keeps the holdings and lessons the plan gave, replacing older ones: a run planned again (resumed) works from the latest. */
+export function saveContext(dir: string, ticker: string, date: string, ctx: RunContext): void {
+  change(dir, ticker, date, (r) => { r.context = { holdings: ctx.holdings, lessons: ctx.lessons, at: new Date().toISOString() }; });
+}
+
+const contextOf = ({ context: c }: Run): RunContext | undefined =>
+  (typeof c?.holdings === 'string' && typeof c.lessons === 'string' ? { holdings: c.holdings, lessons: c.lessons } : undefined);
+
+/** The holdings and lessons saved with a run, or undefined for a run planned before the desk kept them. */
+export const savedContext = (dir: string, ticker: string, date: string): RunContext | undefined => contextOf(load(dir, ticker, date));
 
 /** Saves what an agent wrote. A debate turn is added; any other section is replaced. */
 export function saveSection(dir: string, ticker: string, date: string, section: Section, text: string): number {
@@ -127,10 +146,17 @@ export function stepWords(dir: string, ticker: string, date: string): string {
 }
 
 /** The text of the named sections, in the order asked. A debate name (investment_debate, risk_debate) gives its turns in
- *  the order they were spoken. */
-export function readSections(dir: string, ticker: string, date: string, names: string[]): string {
-  const log = load(dir, ticker, date).log;
+ *  the order they were spoken. holdings and lessons give what the plan saved with the run; for a run planned before the
+ *  desk kept them, `fallback` draws them up now, so an agent is never left to guess. */
+export function readSections(dir: string, ticker: string, date: string, names: string[], fallback?: () => RunContext): string {
+  const run = load(dir, ticker, date), log = run.log;
+  let ctx: RunContext | undefined;
   return names.map((name) => {
+    if ((CONTEXT as readonly string[]).includes(name)) {
+      ctx ??= contextOf(run) ?? fallback?.();
+      const label = CONTEXT_LABELS[name as ContextName];
+      return ctx ? `## ${label}\n${ctx[name as ContextName]}` : `(No ${label.toLowerCase()} saved with this run: plan it with plan_analysis first. It is not known, not empty.)`;
+    }
     const group = DEBATES[name];
     const entries = group ? log.filter((e) => group.includes(e.section)) : log.filter((e) => e.section === name);
     const label = group ? name.replace('_', ' ') : isSection(name) ? LABELS[name] : name;
