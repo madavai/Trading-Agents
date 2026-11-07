@@ -5,7 +5,7 @@
 // so it is withheld for a past analysis date rather than leak later knowledge into it.
 // Adapted from TradingAgents (tradingagents/dataflows/vendors/yahoo/fundamentals.py and date_window.py), Apache License
 // 2.0; rewritten in TypeScript.
-import { addDays, analysisDate, isHistorical } from './dates.js';
+import { addDays, analysisDate, daysBetween, isHistorical } from './dates.js';
 import { getCookies, getJson, getText, NoData, Unavailable } from './http.js';
 import { cryptoBase, normalizeSymbol } from './symbols.js';
 import { history, HOSTS } from './yahoo.js';
@@ -283,16 +283,76 @@ async function yahooStatement(sym: string, kind: Statement, freq: Frequency, day
   return yahooTable(j, kind, freq);
 }
 
-/** A statement as a table an agent reads: millions of the main currency, per-share rows as they are, "–" for no figure. */
+type Row = Table['rows'][number];
+// A column's period: its end date, and whether it is one quarter, one year or a year to date.
+const periodOf = (column: string, freq: Frequency) => ({ end: column.slice(0, 10), kind: /months to date/.test(column) ? 'to date' : freq === 'quarterly' ? 'quarter' : 'year' });
+
+/** The figures an agent would otherwise work out in its head, worked out here from the table's own figures: margins,
+ *  growth (a quarter only against the quarter just before it or the same quarter a year earlier, a year against the year
+ *  before; never across a gap or against a loss), free cash flow, capital spending against operating cash, and the
+ *  balance-sheet ratios. Each row names its sum. Exported for the tests. */
+export function withWorkedRows(t: Table, kind: Statement, freq: Frequency): Table {
+  const row = (label: string) => t.rows.find((r) => r.label === label && r.cells.some((c) => c !== null));
+  const money = t.rows.find((r) => !r.unit.includes('/'))?.unit ?? 'USD';
+  const periods = t.columns.map((c) => periodOf(c, freq));
+  const each = (f: (i: number) => number | null) => t.columns.map((_, i) => { const v = f(i); return v === null || !Number.isFinite(v) ? null : v; });
+  const ratio = (a: Row | undefined, b: Row | undefined, label: string, worked: 'percent' | 'times', abs = false): Row | null => {
+    if (!a || !b) return null;
+    const cells = each((i) => { const x = a.cells[i] ?? null, y = b.cells[i] ?? null; return x === null || y === null || y <= 0 ? null : (abs ? Math.abs(x) : x) / y * (worked === 'percent' ? 100 : 1); });
+    return cells.some((c) => c !== null) ? { label, unit: '', cells, worked } : null;
+  };
+  // The column `days` before column i (within ten days), of the same kind of period.
+  const before = (i: number, lo: number, hi: number) => periods.findIndex((p, j) => j > i && p.kind === periods[i]!.kind && p.kind !== 'to date' && (() => { const d = daysBetween(p.end, periods[i]!.end); return d >= lo && d <= hi; })());
+  const growth = (r: Row | undefined, label: string, lo: number, hi: number): Row | null => {
+    if (!r) return null;
+    const cells = each((i) => { const j = before(i, lo, hi), x = r.cells[i] ?? null, y = j < 0 ? null : r.cells[j] ?? null; return x === null || y === null || y <= 0 ? null : (x / y - 1) * 100; });
+    return cells.some((c) => c !== null) ? { label, unit: '', cells, worked: 'percent' } : null;
+  };
+  const out: Array<Row | null> = [];
+  if (kind === 'income_statement') {
+    const revenue = row('Revenue'), op = row('Operating Income'), net = row('Net Income');
+    let gross = row('Gross Profit');
+    const cost = row('Cost of Revenue');
+    if (!gross && revenue && cost) gross = { label: 'Gross Profit', unit: revenue.unit, cells: each((i) => { const r = revenue.cells[i] ?? null, c = cost.cells[i] ?? null; return r === null || c === null ? null : r - c; }) };
+    out.push(ratio(gross, revenue, `Gross margin (worked out: gross profit ÷ revenue${row('Gross Profit') ? '' : ', gross profit being revenue less cost of revenue'})`, 'percent'),
+      ratio(op, revenue, 'Operating margin (worked out: operating income ÷ revenue)', 'percent'),
+      ratio(net, revenue, 'Net margin (worked out: net income ÷ revenue)', 'percent'));
+    if (freq === 'quarterly') out.push(growth(revenue, 'Revenue growth on the quarter just before (worked out)', 80, 100));
+    const year = freq === 'quarterly' ? 'the same quarter a year before' : 'the year before';
+    out.push(growth(revenue, `Revenue growth on ${year} (worked out)`, 355, 375), growth(op, `Operating income growth on ${year} (worked out)`, 355, 375), growth(net, `Net income growth on ${year} (worked out)`, 355, 375));
+  } else if (kind === 'cashflow') {
+    const ocf = row('Operating Cash Flow'), capex = row('Capital Expenditure');
+    if (ocf && capex) {
+      const fcf = each((i) => { const o = ocf.cells[i] ?? null, c = capex.cells[i] ?? null; return o === null || c === null ? null : o - Math.abs(c); });
+      if (fcf.some((c) => c !== null)) out.push({ label: 'Free cash flow (worked out: operating cash flow less capital expenditure)', unit: money, cells: fcf, worked: 'money' });
+      out.push(ratio(capex, ocf, 'Capital expenditure as a share of operating cash flow (worked out)', 'percent', true));
+    }
+  } else {
+    const ca = row('Current Assets'), cl = row('Current Liabilities'), tl = row('Total Liabilities'), eq = row('Stockholders Equity'), cash = row('Cash and Equivalents');
+    out.push(ratio(ca, cl, 'Current ratio (worked out: current assets ÷ current liabilities)', 'times'), ratio(tl, eq, 'Liabilities to equity (worked out: total liabilities ÷ equity)', 'times'));
+    const less = (a: Row | undefined, b: Row | undefined, label: string): Row | null => {
+      if (!a || !b) return null;
+      const cells = each((i) => { const x = a.cells[i] ?? null, y = b.cells[i] ?? null; return x === null || y === null ? null : x - y; });
+      return cells.some((c) => c !== null) ? { label, unit: money, cells, worked: 'money' } : null;
+    };
+    out.push(less(tl, cl, 'Non-current liabilities (worked out: total liabilities less current liabilities)'), less(ca, cash, 'Current assets other than cash (worked out: current assets less cash and equivalents)'));
+  }
+  return { ...t, rows: [...t.rows, ...out.filter((r): r is Row => r !== null)] };
+}
+
+/** A statement as a table an agent reads: millions of the main currency, per-share rows as they are, worked-out rows as
+ *  percentages or multiples, "–" for no figure, then the table's notes. */
 export function renderTable(t: Table, head: string, note: string): string {
-  const rows = t.rows.filter((r) => r.cells.some((c) => c !== null)), missing = t.rows.filter((r) => !rows.includes(r)).map((r) => r.label);
+  const rows = t.rows.filter((r) => r.cells.some((c) => c !== null)), missing = t.rows.filter((r) => !rows.includes(r) && !r.worked).map((r) => r.label);
   const perShare = (u: string) => u.includes('/');
-  const main = rows.find((r) => !perShare(r.unit))?.unit ?? '';
-  const name = (r: Table['rows'][number]) => (perShare(r.unit) ? `${r.label} (${r.unit.split('/')[0] || 'currency'} per share)` : r.unit !== main ? `${r.label} (millions of ${r.unit || 'an unstated currency'})` : r.label);
-  const cell = (v: number | null, u: string) => (v === null ? '–' : perShare(u) ? v.toFixed(2) : (v / 1e6).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
-  const out = [head, `Money in millions of ${main || 'an unstated currency'} unless the row says otherwise; "–" means no figure for that period. ${note}`, '',
-    `Line | ${t.columns.join(' | ')}`, `---|${t.columns.map(() => '---:').join('|')}`, ...rows.map((r) => `${name(r)} | ${r.cells.map((c) => cell(c, r.unit)).join(' | ')}`)];
+  const main = rows.find((r) => !perShare(r.unit) && !r.worked)?.unit ?? '';
+  const name = (r: Row) => (r.worked === 'percent' || r.worked === 'times' ? r.label : perShare(r.unit) ? `${r.label} (${r.unit.split('/')[0] || 'currency'} per share)` : r.unit !== main ? `${r.label} (millions of ${r.unit || 'an unstated currency'})` : r.label);
+  const cell = (v: number | null, r: Row) => (v === null ? '–' : r.worked === 'percent' ? `${v.toFixed(1)}%` : r.worked === 'times' ? v.toFixed(2) : perShare(r.unit) ? v.toFixed(2) : (v / 1e6).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
+  const worked = rows.some((r) => r.worked) ? ' Rows marked "worked out" are worked out by the desk from the figures in this table, as named; quote them rather than working your own.' : '';
+  const out = [head, `Money in millions of ${main || 'an unstated currency'} unless the row says otherwise; "–" means no figure for that period. ${note}${worked}`, '',
+    `Line | ${t.columns.join(' | ')}`, `---|${t.columns.map(() => '---:').join('|')}`, ...rows.map((r) => `${name(r)} | ${r.cells.map((c) => cell(c, r)).join(' | ')}`)];
   if (missing.length) out.push('', `Not reported by this source: ${missing.join(', ')}.`);
+  if (t.notes?.length) out.push('', ...t.notes);
   return out.join('\n');
 }
 
@@ -304,16 +364,16 @@ export async function financialStatement(raw: string, kind: Statement, freq: Fre
   const day = analysisDate(analysis), sym = companySymbol(raw), title = STATEMENTS[kind].title;
   let secFailure: unknown;
   try {
-    const t = await secStatement(sym, kind, freq, day);
-    const q4 = kind !== 'balance_sheet' && freq === 'quarterly' ? ' A fourth quarter is never derived: it is filed only inside the annual figure.' : '';
-    return renderTable(t, `${title} for ${sym} (${freq}), as filed with the SEC on or before ${day}`, `Each figure is the latest filing of it by that day; a restatement counts only from the day it was filed.${q4}`);
+    const t = withWorkedRows(await secStatement(sym, kind, freq, day), kind, freq);
+    const q = kind !== 'balance_sheet' && freq === 'quarterly' ? ' Every column is one quarter in a row of quarters; a quarter no filing states (a fourth quarter, which only the annual report covers, or one filed only inside a year to date) is derived from two filed figures of the same year, its column marked "(derived)", and the notes below say from which. Per-share figures are never derived.' : '';
+    return renderTable(t, `${title} for ${sym} (${freq}), as filed with the SEC on or before ${day}`, `Each figure is the latest filing of it by that day; a restatement counts only from the day it was filed.${q}`);
   } catch (e) { secFailure = e; }
   if (isHistorical(day)) {
     if (!(secFailure instanceof NoData)) throw new Unavailable(`the SEC, the only source of accounts as filed by ${day}, could not answer (${reason(secFailure)})`);
     return `${title} for ${sym} is withheld for ${day}: ${reason(secFailure)}, and the other source, Yahoo Finance, dates a statement by the period it covers, not by when it was filed, so it cannot show which figures were public on ${day}.`;
   }
   try {
-    const t = await yahooStatement(sym, kind, freq, day);
+    const t = withWorkedRows(await yahooStatement(sym, kind, freq, day), kind, freq);
     return renderTable(t, `${title} for ${sym} (${freq}), from Yahoo Finance as it stands today`, `Not from the SEC (${reason(secFailure)}). Yahoo gives money spent, such as capital expenditure, as a negative figure.`);
   } catch (e) {
     const both = `SEC: ${reason(secFailure)}; Yahoo Finance: ${(e as Error).message}`;

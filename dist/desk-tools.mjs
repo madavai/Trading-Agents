@@ -37773,7 +37773,7 @@ function lineAsOf(facts, tags, asOf, spans, forms) {
       }
       let any2 = false;
       for (const [key, f] of latest) if (covered.has(key)) {
-        values.set(key, f.val);
+        values.set(key, f);
         any2 = true;
       }
       if (any2) unit = u;
@@ -37781,26 +37781,112 @@ function lineAsOf(facts, tags, asOf, spans, forms) {
   }
   return { values, unit };
 }
+var perShareUnit = (u) => u.includes("/");
+var spanWords = (f) => {
+  const d = f.start ? daysBetween(f.start, f.end) : 0;
+  return d <= QUARTER[1] ? "the quarter" : d <= 200 ? "the six months" : d <= 290 ? "the nine months" : "the year";
+};
+function quartersOf(values, years) {
+  const out = /* @__PURE__ */ new Map();
+  const all = [...values.values(), ...years.values()].filter((f) => f.start);
+  for (const f of all) if (daysBetween(f.start, f.end) <= QUARTER[1]) out.set(f.end, { val: f.val, start: f.start });
+  const near = (a, b, lo, hi) => {
+    const d = daysBetween(a, b);
+    return d >= lo && d <= hi;
+  };
+  for (const c of all.filter((f) => daysBetween(f.start, f.end) > QUARTER[1]).sort((a, b) => daysBetween(a.start, a.end) - daysBetween(b.start, b.end))) {
+    if (out.has(c.end)) continue;
+    const prior = all.find((p) => p !== c && Math.abs(daysBetween(c.start, p.start)) <= 7 && near(p.end, c.end, 80, 100));
+    if (prior) {
+      out.set(c.end, { val: c.val - prior.val, start: prior.end, how: `${spanWords(c)} to ${c.end} less ${spanWords(prior)} to ${prior.end}` });
+      continue;
+    }
+    let sum = 0, at = "", parts = 0;
+    for (let q = [...out.entries()].find(([, v]) => Math.abs(daysBetween(c.start, v.start)) <= 7); q; ) {
+      sum += q[1].val;
+      at = q[0];
+      parts++;
+      if (near(at, c.end, 80, 100)) break;
+      q = [...out.entries()].find(([e, v]) => e > at && near(at, v.start, 0, 7) && !v.how?.includes(c.end));
+    }
+    if (parts && near(at, c.end, 80, 100)) out.set(c.end, { val: c.val - sum, start: at, how: `${spanWords(c)} to ${c.end} less its ${parts} quarter${parts > 1 ? "s" : ""} to ${at}` });
+  }
+  return out;
+}
+function splitsIn(list2, asOf) {
+  const periods = /* @__PURE__ */ new Map();
+  for (const f of list2) if (f.filed <= asOf && f.start) (periods.get(`${f.start}|${f.end}`) ?? periods.set(`${f.start}|${f.end}`, []).get(`${f.start}|${f.end}`)).push(f);
+  const like = (r) => {
+    const up = r >= 1 ? r : 1 / r;
+    if (up < 1.4) return null;
+    const k = Math.abs(up - 1.5) < 0.05 ? 1.5 : Math.round(up);
+    return Math.abs(up / k - 1) <= 0.03 ? r >= 1 ? k : 1 / k : null;
+  };
+  const found = [];
+  for (const fs18 of periods.values()) {
+    const byDay = fs18.sort((a, b) => a.filed.localeCompare(b.filed));
+    for (let n2 = 1; n2 < byDay.length; n2++) {
+      const a = byDay[n2 - 1], b = byDay[n2];
+      if (a.filed === b.filed || !a.val || !b.val || Math.sign(a.val) !== Math.sign(b.val) || Math.min(Math.abs(a.val), Math.abs(b.val)) < 0.05) continue;
+      const k = like(a.val / b.val);
+      if (k === null) continue;
+      const later = (x, y) => x > y ? x : y, sooner = (x, y) => x < y ? x : y;
+      const same = found.find((e) => e.factor === k && later(e.old, a.filed) < sooner(e.from, b.filed));
+      if (same) {
+        same.old = later(same.old, a.filed);
+        same.from = sooner(same.from, b.filed);
+        same.seen++;
+      } else found.push({ factor: k, old: a.filed, from: b.filed, seen: 1 });
+    }
+  }
+  const real = found.filter((e) => e.seen >= 2);
+  return real.filter((e) => {
+    const inside = real.filter((o) => o !== e && o.from > e.old && o.from <= e.from);
+    return !(inside.length && Math.abs(inside.reduce((p, o) => p * o.factor, 1) / e.factor - 1) <= 0.03);
+  }).map(({ factor, old, from }) => ({ factor, old, from })).sort((a, b) => a.from.localeCompare(b.from));
+}
+var splitWords = (k) => k >= 1 ? `${k === 1.5 ? "3-for-2" : `${k}-for-1`} split` : `1-for-${Math.round(1 / k)} reverse split`;
+var plain2 = (n2) => Number(n2.toFixed(6)).toString();
 function filedStatement(usGaap, kind, freq, asOf) {
-  const quarterly = freq === "quarterly";
+  const quarterly = freq === "quarterly", flows = kind !== "balance_sheet";
   const spans = quarterly ? [QUARTER, ...YEAR_TO_DATE.map(([lo, hi]) => [lo, hi])] : [YEAR];
   const names = quarterly ? ["", ...YEAR_TO_DATE.map(([, , m2]) => ` (${m2} months to date)`)] : [""];
   const lines = STATEMENTS[kind].lines.map(([label, tags]) => ({ label, ...lineAsOf(usGaap, tags, asOf, spans, quarterly ? [] : ANNUAL_FORMS) }));
-  const chosen = lines.map((l) => {
+  const notes = [];
+  const quarters = lines.map((l, n2) => quarterly && flows && !perShareUnit(l.unit) ? quartersOf(l.values, lineAsOf(usGaap, STATEMENTS[kind].lines[n2][1], asOf, [YEAR], ANNUAL_FORMS).values) : /* @__PURE__ */ new Map());
+  const chosen = lines.map((l, n2) => {
     const m2 = /* @__PURE__ */ new Map();
     for (const key of l.values.keys()) {
       const [end, i] = key.split("|");
-      m2.set(end, Math.min(Number(i), m2.get(end) ?? Number(i)));
+      if (!quarters[n2].has(end)) m2.set(end, Math.min(Number(i), m2.get(end) ?? Number(i)));
     }
+    for (const end of quarters[n2].keys()) m2.set(end, 0);
     return m2;
   });
   const ends = [...new Set(chosen.flatMap((m2) => [...m2.keys()]))].sort().reverse().slice(0, SHOWN[freq]);
   const periods = ends.flatMap((end) => [...new Set(chosen.map((m2) => m2.get(end)).filter((i) => i !== void 0))].sort().map((i) => ({ end, i })));
   if (!periods.length) throw new NoData(`no ${freq} ${STATEMENTS[kind].title.toLowerCase()} was filed with the SEC by ${asOf}`);
-  return {
-    columns: periods.map((p) => p.end + names[p.i]),
-    rows: lines.map((l, n2) => ({ label: l.label, unit: l.unit, cells: periods.map((p) => chosen[n2].get(p.end) === p.i ? l.values.get(`${p.end}|${p.i}`) ?? null : null) }))
-  };
+  const derived2 = /* @__PURE__ */ new Map();
+  for (const q of quarters) for (const [end, v] of q) if (v.how && ends.includes(end)) (derived2.get(end) ?? derived2.set(end, /* @__PURE__ */ new Set()).get(end)).add(v.how);
+  for (const [end, how] of [...derived2].sort((a, b) => b[0].localeCompare(a[0]))) notes.push(`The quarter to ${end} is derived (no filing states it): ${[...how].join("; or ")}.`);
+  const rows = lines.map((l, n2) => {
+    const every = STATEMENTS[kind].lines[n2][1].flatMap((tag) => Object.entries(usGaap[tag]?.units ?? {}).filter(([u]) => perShareUnit(u)).flatMap(([, list2]) => list2));
+    const splits = perShareUnit(l.unit) ? splitsIn(every, asOf) : [];
+    const cells2 = periods.map((p) => {
+      if (chosen[n2].get(p.end) !== p.i) return null;
+      const q = p.i === 0 ? quarters[n2].get(p.end) : void 0;
+      if (q) return q.val;
+      const f = l.values.get(`${p.end}|${p.i}`);
+      if (!f) return null;
+      const k = splits.filter((s) => f.filed < s.from).reduce((a, s) => a * s.factor, 1);
+      if (k === 1) return f.val;
+      const v = Number((f.val / k).toFixed(6));
+      notes.push(`${l.label} for ${spanWords(f)} to ${f.end} was filed on ${f.filed} as ${plain2(f.val)}, before ${splits.filter((s) => f.filed < s.from).map((s) => `the ${splitWords(s.factor)} the filings show between ${s.old} and ${s.from}`).join(" and ")}; shown here on the basis of the later filings: ${plain2(v)}.`);
+      return v;
+    });
+    return { label: l.label, unit: l.unit, cells: cells2 };
+  });
+  return { columns: periods.map((p) => p.end + (p.i === 0 && derived2.has(p.end) ? " (derived)" : names[p.i])), rows, notes };
 }
 var DAY_MS = 864e5;
 var cache2 = /* @__PURE__ */ new Map();
@@ -38203,7 +38289,7 @@ async function summary(sym2, modules) {
 var MAIN_UNIT = { GBp: "GBP", GBX: "GBP", ZAc: "ZAR", ILA: "ILS" };
 var has = (v) => typeof v?.raw === "number" && Number.isFinite(v.raw);
 var money = (v, currency) => has(v) ? `${v.raw.toLocaleString("en-US", { maximumFractionDigits: 2 })}${currency ? ` ${currency}` : ""}` : null;
-var plain2 = (v) => has(v) ? String(Number(v.raw.toFixed(4))) : null;
+var plain3 = (v) => has(v) ? String(Number(v.raw.toFixed(4))) : null;
 var percent = (v) => has(v) ? `${(v.raw * 100).toFixed(2)}%` : null;
 var MONTHS2 = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 var units = (facts, unit) => facts?.units?.[unit] ?? [];
@@ -38267,14 +38353,14 @@ async function companyOverview(raw, analysis2) {
     ["Sector", r.summaryProfile?.sector],
     ["Industry", r.summaryProfile?.industry],
     ["Market Cap", money(p.marketCap ?? d.marketCap, main)],
-    ["PE Ratio (TTM)", plain2(d.trailingPE)],
-    ["Forward PE", plain2(d.forwardPE ?? k.forwardPE)],
-    ["PEG Ratio", plain2(k.pegRatio)],
-    ["Price to Book", plain2(k.priceToBook)],
+    ["PE Ratio (TTM)", plain3(d.trailingPE)],
+    ["Forward PE", plain3(d.forwardPE ?? k.forwardPE)],
+    ["PEG Ratio", plain3(k.pegRatio)],
+    ["Price to Book", plain3(k.priceToBook)],
     ["EPS (TTM)", money(k.trailingEps, main)],
     ["Forward EPS", money(k.forwardEps, main)],
     ["Dividend Yield", percent(d.dividendYield)],
-    ["Beta", plain2(d.beta ?? k.beta)],
+    ["Beta", plain3(d.beta ?? k.beta)],
     ["52 Week High", money(d.fiftyTwoWeekHigh, quote)],
     ["52 Week Low", money(d.fiftyTwoWeekLow, quote)],
     ["50 Day Average", money(d.fiftyDayAverage, quote)],
@@ -38289,7 +38375,7 @@ async function companyOverview(raw, analysis2) {
     ["Return on Equity", percent(f.returnOnEquity)],
     ["Return on Assets", percent(f.returnOnAssets)],
     ["Debt to Equity", de],
-    ["Current Ratio", plain2(f.currentRatio)],
+    ["Current Ratio", plain3(f.currentRatio)],
     ["Book Value per Share", money(k.bookValue, main)]
   ];
   const lines = fields.filter(([, v]) => v !== null && v !== void 0 && v !== "").map(([l, v]) => `${l}: ${v}`);
@@ -38354,7 +38440,7 @@ async function fundProfile(raw, analysis2, topN = 10) {
   line2("Holdings turnover (how much of it is traded in a year)", percent(fees.annualHoldingsTurnover));
   line2("Average yearly return, 3 years (past prices, as Yahoo gives it)", percent(k.threeYearAverageReturn));
   line2("Average yearly return, 5 years (past prices, as Yahoo gives it)", percent(k.fiveYearAverageReturn));
-  line2("Beta, 3 years (how much it moves with the market)", plain2(k.beta3Year));
+  line2("Beta, 3 years (how much it moves with the market)", plain3(k.beta3Year));
   const split = [["stocks", t.stockPosition], ["bonds", t.bondPosition], ["cash", t.cashPosition], ["other", t.otherPosition]].filter(([, v]) => has(v)).map(([n2, v]) => `${n2} ${percent(v)}`);
   if (split.length) lines.push(`Held in: ${split.join(", ")}`);
   const top = (t.holdings ?? []).filter((h) => has(h.holdingPercent)).slice(0, topN);
@@ -38396,21 +38482,94 @@ async function yahooStatement(sym2, kind, freq, day3) {
   const j = await yahooJson(`/ws/fundamentals-timeseries/v1/finance/timeseries/${encodeURIComponent(sym2)}?symbol=${encodeURIComponent(sym2)}&type=${types}&period1=${epoch2(addDays(day3, -6 * 366))}&period2=${epoch2(addDays(day3, 1))}`);
   return yahooTable(j, kind, freq);
 }
+var periodOf2 = (column, freq) => ({ end: column.slice(0, 10), kind: /months to date/.test(column) ? "to date" : freq === "quarterly" ? "quarter" : "year" });
+function withWorkedRows(t, kind, freq) {
+  const row = (label) => t.rows.find((r) => r.label === label && r.cells.some((c) => c !== null));
+  const money2 = t.rows.find((r) => !r.unit.includes("/"))?.unit ?? "USD";
+  const periods = t.columns.map((c) => periodOf2(c, freq));
+  const each = (f) => t.columns.map((_, i) => {
+    const v = f(i);
+    return v === null || !Number.isFinite(v) ? null : v;
+  });
+  const ratio = (a, b, label, worked, abs = false) => {
+    if (!a || !b) return null;
+    const cells2 = each((i) => {
+      const x = a.cells[i] ?? null, y = b.cells[i] ?? null;
+      return x === null || y === null || y <= 0 ? null : (abs ? Math.abs(x) : x) / y * (worked === "percent" ? 100 : 1);
+    });
+    return cells2.some((c) => c !== null) ? { label, unit: "", cells: cells2, worked } : null;
+  };
+  const before = (i, lo, hi) => periods.findIndex((p, j) => j > i && p.kind === periods[i].kind && p.kind !== "to date" && (() => {
+    const d = daysBetween(p.end, periods[i].end);
+    return d >= lo && d <= hi;
+  })());
+  const growth = (r, label, lo, hi) => {
+    if (!r) return null;
+    const cells2 = each((i) => {
+      const j = before(i, lo, hi), x = r.cells[i] ?? null, y = j < 0 ? null : r.cells[j] ?? null;
+      return x === null || y === null || y <= 0 ? null : (x / y - 1) * 100;
+    });
+    return cells2.some((c) => c !== null) ? { label, unit: "", cells: cells2, worked: "percent" } : null;
+  };
+  const out = [];
+  if (kind === "income_statement") {
+    const revenue = row("Revenue"), op = row("Operating Income"), net = row("Net Income");
+    let gross = row("Gross Profit");
+    const cost = row("Cost of Revenue");
+    if (!gross && revenue && cost) gross = { label: "Gross Profit", unit: revenue.unit, cells: each((i) => {
+      const r = revenue.cells[i] ?? null, c = cost.cells[i] ?? null;
+      return r === null || c === null ? null : r - c;
+    }) };
+    out.push(
+      ratio(gross, revenue, `Gross margin (worked out: gross profit \xF7 revenue${row("Gross Profit") ? "" : ", gross profit being revenue less cost of revenue"})`, "percent"),
+      ratio(op, revenue, "Operating margin (worked out: operating income \xF7 revenue)", "percent"),
+      ratio(net, revenue, "Net margin (worked out: net income \xF7 revenue)", "percent")
+    );
+    if (freq === "quarterly") out.push(growth(revenue, "Revenue growth on the quarter just before (worked out)", 80, 100));
+    const year = freq === "quarterly" ? "the same quarter a year before" : "the year before";
+    out.push(growth(revenue, `Revenue growth on ${year} (worked out)`, 355, 375), growth(op, `Operating income growth on ${year} (worked out)`, 355, 375), growth(net, `Net income growth on ${year} (worked out)`, 355, 375));
+  } else if (kind === "cashflow") {
+    const ocf = row("Operating Cash Flow"), capex = row("Capital Expenditure");
+    if (ocf && capex) {
+      const fcf = each((i) => {
+        const o = ocf.cells[i] ?? null, c = capex.cells[i] ?? null;
+        return o === null || c === null ? null : o - Math.abs(c);
+      });
+      if (fcf.some((c) => c !== null)) out.push({ label: "Free cash flow (worked out: operating cash flow less capital expenditure)", unit: money2, cells: fcf, worked: "money" });
+      out.push(ratio(capex, ocf, "Capital expenditure as a share of operating cash flow (worked out)", "percent", true));
+    }
+  } else {
+    const ca = row("Current Assets"), cl = row("Current Liabilities"), tl = row("Total Liabilities"), eq = row("Stockholders Equity"), cash = row("Cash and Equivalents");
+    out.push(ratio(ca, cl, "Current ratio (worked out: current assets \xF7 current liabilities)", "times"), ratio(tl, eq, "Liabilities to equity (worked out: total liabilities \xF7 equity)", "times"));
+    const less = (a, b, label) => {
+      if (!a || !b) return null;
+      const cells2 = each((i) => {
+        const x = a.cells[i] ?? null, y = b.cells[i] ?? null;
+        return x === null || y === null ? null : x - y;
+      });
+      return cells2.some((c) => c !== null) ? { label, unit: money2, cells: cells2, worked: "money" } : null;
+    };
+    out.push(less(tl, cl, "Non-current liabilities (worked out: total liabilities less current liabilities)"), less(ca, cash, "Current assets other than cash (worked out: current assets less cash and equivalents)"));
+  }
+  return { ...t, rows: [...t.rows, ...out.filter((r) => r !== null)] };
+}
 function renderTable(t, head2, note) {
-  const rows = t.rows.filter((r) => r.cells.some((c) => c !== null)), missing = t.rows.filter((r) => !rows.includes(r)).map((r) => r.label);
+  const rows = t.rows.filter((r) => r.cells.some((c) => c !== null)), missing = t.rows.filter((r) => !rows.includes(r) && !r.worked).map((r) => r.label);
   const perShare = (u) => u.includes("/");
-  const main = rows.find((r) => !perShare(r.unit))?.unit ?? "";
-  const name = (r) => perShare(r.unit) ? `${r.label} (${r.unit.split("/")[0] || "currency"} per share)` : r.unit !== main ? `${r.label} (millions of ${r.unit || "an unstated currency"})` : r.label;
-  const cell = (v, u) => v === null ? "\u2013" : perShare(u) ? v.toFixed(2) : (v / 1e6).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const main = rows.find((r) => !perShare(r.unit) && !r.worked)?.unit ?? "";
+  const name = (r) => r.worked === "percent" || r.worked === "times" ? r.label : perShare(r.unit) ? `${r.label} (${r.unit.split("/")[0] || "currency"} per share)` : r.unit !== main ? `${r.label} (millions of ${r.unit || "an unstated currency"})` : r.label;
+  const cell = (v, r) => v === null ? "\u2013" : r.worked === "percent" ? `${v.toFixed(1)}%` : r.worked === "times" ? v.toFixed(2) : perShare(r.unit) ? v.toFixed(2) : (v / 1e6).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const worked = rows.some((r) => r.worked) ? ' Rows marked "worked out" are worked out by the desk from the figures in this table, as named; quote them rather than working your own.' : "";
   const out = [
     head2,
-    `Money in millions of ${main || "an unstated currency"} unless the row says otherwise; "\u2013" means no figure for that period. ${note}`,
+    `Money in millions of ${main || "an unstated currency"} unless the row says otherwise; "\u2013" means no figure for that period. ${note}${worked}`,
     "",
     `Line | ${t.columns.join(" | ")}`,
     `---|${t.columns.map(() => "---:").join("|")}`,
-    ...rows.map((r) => `${name(r)} | ${r.cells.map((c) => cell(c, r.unit)).join(" | ")}`)
+    ...rows.map((r) => `${name(r)} | ${r.cells.map((c) => cell(c, r)).join(" | ")}`)
   ];
   if (missing.length) out.push("", `Not reported by this source: ${missing.join(", ")}.`);
+  if (t.notes?.length) out.push("", ...t.notes);
   return out.join("\n");
 }
 var reason = (e) => {
@@ -38421,9 +38580,9 @@ async function financialStatement(raw, kind, freq, analysis2) {
   const day3 = analysisDate(analysis2), sym2 = companySymbol(raw), title = STATEMENTS[kind].title;
   let secFailure;
   try {
-    const t = await secStatement(sym2, kind, freq, day3);
-    const q4 = kind !== "balance_sheet" && freq === "quarterly" ? " A fourth quarter is never derived: it is filed only inside the annual figure." : "";
-    return renderTable(t, `${title} for ${sym2} (${freq}), as filed with the SEC on or before ${day3}`, `Each figure is the latest filing of it by that day; a restatement counts only from the day it was filed.${q4}`);
+    const t = withWorkedRows(await secStatement(sym2, kind, freq, day3), kind, freq);
+    const q = kind !== "balance_sheet" && freq === "quarterly" ? ' Every column is one quarter in a row of quarters; a quarter no filing states (a fourth quarter, which only the annual report covers, or one filed only inside a year to date) is derived from two filed figures of the same year, its column marked "(derived)", and the notes below say from which. Per-share figures are never derived.' : "";
+    return renderTable(t, `${title} for ${sym2} (${freq}), as filed with the SEC on or before ${day3}`, `Each figure is the latest filing of it by that day; a restatement counts only from the day it was filed.${q}`);
   } catch (e) {
     secFailure = e;
   }
@@ -38432,7 +38591,7 @@ async function financialStatement(raw, kind, freq, analysis2) {
     return `${title} for ${sym2} is withheld for ${day3}: ${reason(secFailure)}, and the other source, Yahoo Finance, dates a statement by the period it covers, not by when it was filed, so it cannot show which figures were public on ${day3}.`;
   }
   try {
-    const t = await yahooStatement(sym2, kind, freq, day3);
+    const t = withWorkedRows(await yahooStatement(sym2, kind, freq, day3), kind, freq);
     return renderTable(t, `${title} for ${sym2} (${freq}), from Yahoo Finance as it stands today`, `Not from the SEC (${reason(secFailure)}). Yahoo gives money spent, such as capital expenditure, as a negative figure.`);
   } catch (e) {
     const both = `SEC: ${reason(secFailure)}; Yahoo Finance: ${e.message}`;
@@ -40088,7 +40247,7 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root) {
   }, async (a) => answer("profile of " + a.symbol, () => companyOverview(a.symbol, a.analysis_date)));
   server.registerTool("get_financial_statement", {
     title: "Financial statement",
-    description: "A balance sheet, income statement or cash flow statement, quarterly or annual, latest periods first. For a US filer it is the SEC filing as it stood on the analysis date; otherwise Yahoo Finance's, for today only.",
+    description: "A balance sheet, income statement or cash flow statement, quarterly or annual, latest periods first, with margins, growth, free cash flow and balance-sheet ratios worked out in rows of their own. For a US filer it is the SEC filing as it stood on the analysis date (a quarter no filing states derived and marked so, per-share figures on the basis of the latest filings across a share split); otherwise Yahoo Finance's, for today only.",
     inputSchema: {
       symbol: symbol3,
       analysis_date: analysis,
