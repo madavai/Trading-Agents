@@ -37610,7 +37610,7 @@ var unsignZero = (text4) => text4.replace(/^[+\-−](0(?:\.0+)?%)$/, "$1");
 
 // src/data/macro.ts
 var SERIES = {
-  fed_funds_rate: ["FEDFUNDS", "Federal funds effective rate (percent)"],
+  fed_funds_rate: ["DFF", "Federal funds effective rate, daily (percent)"],
   "2y_treasury": ["DGS2", "2-year Treasury yield (percent)"],
   "10y_treasury": ["DGS10", "10-year Treasury yield (percent)"],
   "30y_treasury": ["DGS30", "30-year Treasury yield (percent)"],
@@ -37640,35 +37640,56 @@ var SERIES = {
 function parseCsv(csv) {
   return csv.trim().split(/\r?\n/).slice(1).map((line2) => line2.split(",")).filter((c) => c.length >= 2 && c[1] !== "." && c[1] !== "").map(([d, v]) => ({ date: d.trim(), value: Number(v) })).filter((o) => /^\d{4}-\d{2}-\d{2}$/.test(o.date) && Number.isFinite(o.value));
 }
-function releaseLag(obs) {
+function frequency(obs) {
   const gaps = obs.slice(1).map((o, i) => (Date.parse(o.date) - Date.parse(obs[i].date)) / 864e5).sort((a, b) => a - b);
   const median = gaps[Math.floor(gaps.length / 2)] ?? 1;
-  return median <= 3 ? 1 : median <= 10 ? 6 : median <= 45 ? 45 : 120;
+  return median <= 3 ? "daily" : median <= 10 ? "weekly" : median <= 45 ? "monthly" : median <= 120 ? "quarterly" : "yearly";
+}
+var releaseLag = (obs) => ({ daily: 1, weekly: 6, monthly: 45, quarterly: 120, yearly: 120 })[frequency(obs)];
+function periodOf(date5, freq) {
+  const y = date5.slice(0, 4), m2 = Number(date5.slice(5, 7));
+  if (freq === "monthly") return `${new Date(Date.UTC(Number(y), m2 - 1, 1)).toLocaleString("en-US", { month: "long", timeZone: "UTC" })} ${y}`;
+  if (freq === "quarterly") return `the ${["first", "second", "third", "fourth"][Math.floor((m2 - 1) / 3)]} quarter of ${y}`;
+  if (freq === "yearly") return y;
+  return date5;
+}
+function yearBefore(obs, date5) {
+  const target = `${Number(date5.slice(0, 4)) - 1}${date5.slice(4)}`, floor = addDays(target.replace(/-02-29$/, "-02-28"), -10);
+  return [...obs].reverse().find((o) => o.date <= target && o.date >= floor);
 }
 async function economicSeries(indicator, analysis2, lookBackDays = 365) {
   const day3 = analysisDate(analysis2), key = indicator.trim().toLowerCase(), known = SERIES[key];
   const id = known?.[0] ?? indicator.trim().toUpperCase();
   if (!/^[A-Z0-9_]{1,40}$/.test(id)) throw new Error(`"${indicator}" is not a series name or a FRED series id`);
-  const from = addDays(day3, -Math.max(30, Math.min(3650, lookBackDays)) - 130);
-  let obs = parseCsv(await getText(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${id}&cosd=${from}&coed=${day3}`)).filter((o) => o.date <= day3);
-  const past = isHistorical(day3), lag = releaseLag(obs);
-  if (past) obs = obs.filter((o) => addDays(o.date, lag) <= day3);
-  obs = obs.filter((o) => o.date >= addDays(day3, -Math.max(30, Math.min(3650, lookBackDays))));
+  const window2 = Math.max(30, Math.min(3650, lookBackDays));
+  const from = addDays(day3, -Math.max(window2, 365) - 400);
+  const csv = await getText(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${id}&cosd=${from}&coed=${day3}`);
+  if (!/^\s*(observation_date|DATE)\s*,/i.test(csv)) throw new Unavailable(`FRED answered with something other than its data download (it may be down for maintenance)`);
+  let all = parseCsv(csv).filter((o) => o.date <= day3);
+  const past = isHistorical(day3), freq = frequency(all), lag = releaseLag(all);
+  if (past) all = all.filter((o) => addDays(o.date, lag) <= day3);
+  const obs = all.filter((o) => o.date >= addDays(day3, -window2));
   if (!obs.length) throw new NoData(`FRED has no ${id} values published by ${day3} in this window`);
-  const first = obs[0], last = obs[obs.length - 1], change3 = last.value - first.value, pct2 = first.value ? change3 / Math.abs(first.value) * 100 : 0;
+  const first = obs[0], last = obs[obs.length - 1], ago = yearBefore(all, last.date);
   const fmt2 = (v) => Math.abs(v) >= 1e3 ? v.toLocaleString("en-US", { maximumFractionDigits: 1 }) : v.toFixed(2);
   const plusMinus = (v) => {
     const t = fmt2(Math.abs(v));
     return Number(t.replace(/,/g, "")) === 0 ? t : `${v > 0 ? "+" : "-"}${t}`;
   };
+  const points = /\((percent|percentage points)\)/.test(known?.[1] ?? "");
+  const changeOf = (from2) => {
+    const d = last.value - from2.value;
+    return points ? `${plusMinus(d)} percentage points` : `${plusMinus(d)} (${signed(from2.value ? d / Math.abs(from2.value) * 100 : 0, 1)}%)`;
+  };
   const lines = [
     `## ${known?.[1] ?? id} - FRED series ${id}`,
     "",
-    `- Latest value known by ${day3}: ${fmt2(last.value)} (for ${last.date})`,
-    `- Change since ${first.date}: ${plusMinus(change3)} (${signed(pct2, 1)}%)`,
+    `- Latest value known by ${day3}: ${fmt2(last.value)} (for ${periodOf(last.date, freq)})`,
+    ago ? `- Year over year, from ${fmt2(ago.value)} for ${periodOf(ago.date, freq)}: ${changeOf(ago)}` : `- Year over year: not available (no value for ${periodOf(`${Number(last.date.slice(0, 4)) - 1}${last.date.slice(4)}`, freq)} in FRED's data). Do not work one out from other rows.`,
+    `- Change over the look-back window, from ${periodOf(first.date, freq)} to ${periodOf(last.date, freq)}: ${changeOf(first)}${first.date !== ago?.date ? " (not a yearly rate)" : ""}`,
     past ? `- A past analysis date: values are kept only if published by ${day3} (a ${lag}-day release lag for this series), and are today's revised figures; first releases may have differed slightly.` : "- Values as published today, revisions included.",
     "",
-    "Date | Value",
+    freq === "monthly" || freq === "quarterly" ? "Date (the first day of the period it stands for) | Value" : "Date | Value",
     "---|---:",
     ...obs.slice(-40).map((o) => `${o.date} | ${fmt2(o.value)}`)
   ];
@@ -40049,7 +40070,7 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root) {
   }, async (a) => answer("posts about " + a.symbol, () => socialPosts(a.symbol, a.analysis_date, { lookBackDays: a0.newsLookbackDays, stocktwitsLimit: a0.stocktwitsLimit, subreddits: a0.subreddits, cryptoSubreddits: a0.cryptoSubreddits })));
   server.registerTool("get_economic_series", {
     title: "Economic figures (FRED)",
-    description: "An economic series from FRED as known by the analysis date: the latest value, the change over the window and recent values. Names: " + Object.keys(SERIES).join(", ") + "; or any FRED series id.",
+    description: "An economic series from FRED as known by the analysis date: the latest value named by the period it stands for, the change over a year (from the same period a year earlier: quote a yearly rate only from that line), the change over the look-back window and recent values. Names: " + Object.keys(SERIES).join(", ") + "; or any FRED series id.",
     inputSchema: { indicator: external_exports.string().describe("A name such as cpi, 10y_treasury, unemployment, or a FRED series id"), analysis_date: analysis, look_back_days: external_exports.number().int().min(30).max(3650).optional().describe("365 when left out") },
     annotations: READ
   }, async (a) => answer("economic series " + a.indicator, () => economicSeries(a.indicator, a.analysis_date, a.look_back_days ?? 365)));

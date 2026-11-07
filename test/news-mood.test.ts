@@ -127,11 +127,37 @@ test('FRED: missing values left out, monthly series lag their release, a past da
   assert.equal(releaseLag(parseCsv('DATE,DGS10\n2026-10-06,4.1\n2026-10-07,4.12\n2026-10-08,4.15\n')), 1);
   configure({ fetch: route([[/fredgraph\.csv\?id=CPIAUCSL/, () => new Response(CPI)]]) });
   const past = await economicSeries('cpi', '2026-09-10', 365);   // August's figure (dated 08-01) not yet published
-  assert.match(past, /Latest value known by 2026-09-10: 320.90 \(for 2026-07-01\)/);
+  assert.match(past, /Latest value known by 2026-09-10: 320\.90 \(for July 2026\)/);
   assert.match(past, /45-day release lag/);
   const now = await economicSeries('CPI', '2026-10-12', 365);
-  assert.match(now, /Latest value known by 2026-10-12: 321.50 \(for 2026-08-01\)/);
+  assert.match(now, /Latest value known by 2026-10-12: 321\.50 \(for August 2026\)/);
+  assert.match(now, /- Year over year: not available \(no value for August 2025 in FRED's data\)\. Do not work one out from other rows\./);
+  assert.match(now, /\nDate \(the first day of the period it stands for\) \| Value\n/);
   await assert.rejects(economicSeries('drop table', '2026-10-12'), /not a series name/);
+});
+
+test('FRED: the change over a year is from the same month a year earlier, never a shorter window read as yearly', async () => {
+  // Fourteen months of an index, 300 in July 2025 rising 1 a month: August 2026 is 313, August 2025 was 301.
+  const months = Array.from({ length: 14 }, (_, i) => new Date(Date.UTC(2025, 6 + i, 1)).toISOString().slice(0, 10));
+  configure({ fetch: route([[/fredgraph\.csv\?id=CPIAUCSL/, () => new Response(`observation_date,CPIAUCSL\n${months.map((d, i) => `${d},${300 + i}`).join('\n')}\n`)]]) });
+  const t = await economicSeries('cpi', '2026-10-12', 365);
+  assert.match(t, /- Latest value known by 2026-10-12: 313\.00 \(for August 2026\)/);
+  assert.match(t, /- Year over year, from 301\.00 for August 2025: \+12\.00 \(\+4\.0%\)/);
+  // The window starts in November 2025 (a year before the analysis date): its change is labelled as not yearly.
+  assert.match(t, /- Change over the look-back window, from November 2025 to August 2026: \+9\.00 \(\+3\.0%\) \(not a yearly rate\)/);   // 304 -> 313
+});
+
+test('FRED: the federal funds rate is the daily one, a rate changes by percentage points, and an outage is not "no data"', async () => {
+  const seen: string[] = [];
+  const days = ['2025-10-08', '2025-10-09', '2026-09-16', '2026-09-17', '2026-10-08', '2026-10-09'], rates = [4.33, 4.33, 3.63, 3.88, 3.88, 3.88];
+  configure({ fetch: route([[/fredgraph\.csv\?id=DFF/, () => new Response(`observation_date,DFF\n${days.map((d, i) => `${d},${rates[i]}`).join('\n')}\n`)]], seen) });
+  const t = await economicSeries('fed_funds_rate', '2026-10-12', 365);
+  assert.ok(seen.some((u) => u.includes('id=DFF&')));
+  assert.match(t, /## Federal funds effective rate, daily \(percent\) - FRED series DFF/);
+  assert.match(t, /- Latest value known by 2026-10-12: 3\.88 \(for 2026-10-09\)/);
+  assert.match(t, /- Year over year, from 4\.33 for 2025-10-09: -0\.45 percentage points/);
+  configure({ fetch: route([[/fredgraph/, () => new Response('<html><body>FRED is down for maintenance</body></html>')]]) });
+  await assert.rejects(economicSeries('cpi', '2026-10-12'), (e: Error) => e.name === 'Unavailable' && /something other than its data download/.test(e.message));
 });
 
 const POLY = { events: [{ markets: [

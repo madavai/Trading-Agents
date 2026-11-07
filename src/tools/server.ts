@@ -131,7 +131,7 @@ export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetc
 
   server.registerTool('get_economic_series', {
     title: 'Economic figures (FRED)',
-    description: 'An economic series from FRED as known by the analysis date: the latest value, the change over the window and recent values. Names: ' + Object.keys(SERIES).join(', ') + '; or any FRED series id.',
+    description: 'An economic series from FRED as known by the analysis date: the latest value named by the period it stands for, the change over a year (from the same period a year earlier: quote a yearly rate only from that line), the change over the look-back window and recent values. Names: ' + Object.keys(SERIES).join(', ') + '; or any FRED series id.',
     inputSchema: { indicator: z.string().describe('A name such as cpi, 10y_treasury, unemployment, or a FRED series id'), analysis_date: analysis, look_back_days: z.number().int().min(30).max(3650).optional().describe('365 when left out') },
     annotations: READ,
   }, async (a) => answer('economic series ' + a.indicator, () => economicSeries(a.indicator, a.analysis_date, a.look_back_days ?? 365)));
