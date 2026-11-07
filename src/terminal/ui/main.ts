@@ -365,7 +365,7 @@ function gainOf(hs: readonly Holding[]): { cost: number; value: number } | null 
   for (const h of hs) { if (h.averageCost === null || h.value === null) return null; cost += h.averageCost * h.quantity; value += h.value; }
   return cost > 0 ? { cost, value } : null;
 }
-const signedMoney = (n: number, cur = 'USD') => `${n >= 0 ? '+' : ''}${money(n, cur)}`;
+const signedMoney = (n: number, cur = 'USD') => { const m = money(n, cur); return `${n > 0 && /[1-9]/.test(m) ? '+' : ''}${m}`; };
 const sideWord = (s: string | null) => (s === 'buy' ? 'Buy' : s === 'sell' ? 'Sell' : s ?? '—');
 
 // ---------- care for what is held: the desk's view beside each holding; in the Agentic account, its stop and a sell ----------
@@ -1106,7 +1106,7 @@ function renderScore(): void {
   const d = S.desk;
   if (!d) return;
   renderPaper();
-  const r = d.record.summary, pctOf = (v: number) => `${v >= 0 ? '+' : '−'}${Math.abs(v * 100).toFixed(1)}%`;
+  const r = d.record.summary, pctOf = (v: number) => pct(v * 100, 1);
   $('#scoreSub').textContent = `${r.resolved} scored · ${r.pending} waiting${r.unscored ? ` · ${r.unscored} unreadable` : ''}`;
   const names = [...RATINGS.filter((x) => r.byRating[x]), ...Object.keys(r.byRating).filter((x) => !RATINGS.includes(x))];
   const grid = names.length

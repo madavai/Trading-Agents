@@ -5,6 +5,7 @@
 // The series names are TradingAgents' (tradingagents/dataflows/vendors/fred.py), Apache License 2.0.
 import { addDays, analysisDate, isHistorical } from './dates.js';
 import { getText, NoData } from './http.js';
+import { signed } from '../numbers.js';
 
 export const SERIES: Record<string, [id: string, title: string]> = {
   fed_funds_rate: ['FEDFUNDS', 'Federal funds effective rate (percent)'],
@@ -62,10 +63,11 @@ export async function economicSeries(indicator: string, analysis: string, lookBa
   if (!obs.length) throw new NoData(`FRED has no ${id} values published by ${day} in this window`);
   const first = obs[0]!, last = obs[obs.length - 1]!, change = last.value - first.value, pct = first.value ? (change / Math.abs(first.value)) * 100 : 0;
   const fmt = (v: number) => (Math.abs(v) >= 1000 ? v.toLocaleString('en-US', { maximumFractionDigits: 1 }) : v.toFixed(2));
+  const plusMinus = (v: number) => { const t = fmt(Math.abs(v)); return Number(t.replace(/,/g, '')) === 0 ? t : `${v > 0 ? '+' : '-'}${t}`; };
   const lines = [
     `## ${known?.[1] ?? id} - FRED series ${id}`, '',
     `- Latest value known by ${day}: ${fmt(last.value)} (for ${last.date})`,
-    `- Change since ${first.date}: ${change >= 0 ? '+' : ''}${fmt(change)} (${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%)`,
+    `- Change since ${first.date}: ${plusMinus(change)} (${signed(pct, 1)}%)`,
     past ? `- A past analysis date: values are kept only if published by ${day} (a ${lag}-day release lag for this series), and are today's revised figures; first releases may have differed slightly.` : '- Values as published today, revisions included.',
     '', 'Date | Value', '---|---:', ...obs.slice(-40).map((o) => `${o.date} | ${fmt(o.value)}`),
   ];

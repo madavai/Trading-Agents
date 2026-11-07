@@ -322,7 +322,7 @@ b, strong { font-weight: var(--weight-semibold); }
 <script type="application/json" id="walk">
 {
  "version": "0.9.0",
- "updated": "2026-10-22",
+ "updated": "2026-11-06",
  "sections": [
   { "id": "A", "name": "Getting started in Agent Studio",
     "sub": "The project is cloned, the team is where Madav reads it, and the desk check is green.",
@@ -618,7 +618,16 @@ b, strong { font-weight: var(--weight-semibold); }
       "do": [
         "Read the four tiles at the top."],
       "see": [
-        "Your accounts, the Agentic account's buying power, the S&P 500 today and the desk's calls, each with its figure or a dash when it cannot be had."] }
+        "Your accounts, the Agentic account's buying power, the S&P 500 today and the desk's calls, each with its figure or a dash when it cannot be had."] },
+    { "id": "C15", "title": "A figure that rounds to zero has no minus sign", "tags": [], "changed": "2026-11-06",
+      "about": "A call that trailed its index by a hair, say 0.02%, rounds to zero. The page writes it as zero, so a minus sign never says it lost ground when it did not. Calls scored before this was fixed read the same way.",
+      "where": "Dashboard › The desk's calls; How the desk is doing; a stock's page",
+      "do": [
+        "Look at the \"alpha\" chips on the scored calls and the scorecard's \"Average alpha vs the index\".",
+        "Open a stock's page on a quiet day and read its change, and on the Your account page each holding's gain since bought."],
+      "see": [
+        "A figure that rounds to zero reads \"alpha 0.0%\", \"0.00%\" or \"$0.00\", never \"-0.0%\", \"−0.00%\" or \"−$0.00\".",
+        "Every other figure keeps its sign: \"+0.7%\", \"−0.1%\"."] }
   ] },
   { "id": "D", "name": "Your Robinhood accounts",
     "sub": "The dashboard reads the accounts you choose, at Robinhood's live prices. It never shows your account numbers.",

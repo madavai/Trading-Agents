@@ -6,6 +6,7 @@ import { daysBetween } from './dates.js';
 import { getText, NoData, Unavailable } from './http.js';
 import { blocks, decode } from './insiders.js';
 import { cikFor, fundOf, submissions } from './sec.js';
+import { signed as withSign } from '../numbers.js';
 
 /** One line of a fund's portfolio, as reported: one security (a company's class of shares, one bond). */
 export interface Holding {
@@ -98,7 +99,7 @@ const country = (code: string): string => {
   try { regions ??= new Intl.DisplayNames(['en'], { type: 'region' }); return regions.of(code) ?? code; } catch { return code; }
 };
 const pct = (n: number) => `${n.toFixed(2)}%`;
-const signed = (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`;
+const signed = (n: number) => `${withSign(n, 2)}%`;
 
 /** Shares of the fund added up by a key, largest first, leaving out what rounds to nothing. */
 function shares(list: Holding[], key: (h: Holding) => string): Array<[string, number, number]> {
