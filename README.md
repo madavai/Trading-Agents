@@ -135,7 +135,8 @@ the team's "talk" switch shows these messages in the Messages panel; with it off
 2. **You see.** Ask the team to open the dashboard, or type `/terminal`: a page on your own computer that starts with
    the whole market, the eleven sectors and your own names side by side, then the market weather and what is worth a
    look today, then the markets, a chart of any stock (area
-   or candles, 50- and 200-day averages, volume), your watchlist by tier, a page per stock, the desk's calls with their
+   or candles, 50- and 200-day averages, volume, at the prices it traded at, as Nasdaq or your broker shows them; the
+   desk's own analyses count dividends as part of the return), your watchlist by tier, a page per stock, the desk's calls with their
    full reasoning, and how the desk has scored. The agents see your chosen holdings when they analyse.
 3. **You decide and trade.** On a call, "Decide…" opens a ticket for the Agentic account, sized by your settings and
    checked against your caps; beside a stock's price, "Trade…" opens your own ticket instead, buy or sell, starting at
@@ -241,7 +242,7 @@ so a word means the same thing everywhere.
 
 ### Start here: the whole market first
 The first section of the dashboard shows the world in tiers, broadest first, because the broadest risk is the steadiest:
-- **The whole market**: as shipped, four funds: SPY (the S&P 500), QQQ (the Nasdaq 100), VT (the whole world) and BND
+- **The whole market**: as shipped, four funds: SPY (the S&P 500 fund), QQQ (the Nasdaq 100 fund), VT (the whole world) and BND
   (US bonds). Press Change… to choose your own, up to eight funds or stocks; each is checked with Yahoo Finance before
   it is kept, and "Put back" brings the four back. Sector funds and crypto are refused there: they have tiers of their own.
 - **Sectors**: the eleven S&P sector funds, from XLK (technology) to XLC (communication), each named in plain words with
@@ -250,8 +251,8 @@ The first section of the dashboard shows the world in tiers, broadest first, bec
 - **Crypto**: Bitcoin and Ether when you watch them. They are followed on paper only: a coin never opens an order
   ticket, and its calls say "on paper only" where a stock's say Decide….
 
-Each tile shows today's move (a dash when Yahoo Finance gave none), the desk's latest call with its date or "no call
-yet", the robot, which asks the desk to analyse a fund as readily as a stock (for a fund it reads what it holds, from
+Each tile shows the day's move (with the day named, such as Fri, when it was not today; a dash when Yahoo Finance gave
+none), the desk's latest call with its date or "no call yet", the robot, which asks the desk to analyse a fund as readily as a stock (for a fund it reads what it holds, from
 its reports to the SEC), and + to add it to your watchlist. Every trading word has its meaning beside it: under each tier, at the
 foot of the section, and on each rating and dotted word when you point at it. The watchlist further down is grouped the
 same way; press a tier's name to fold it away, and the dashboard remembers which you folded.
@@ -297,11 +298,12 @@ needs a look", with the reason and what you can do. Nothing reaches you outside 
 
 ### Your paper record
 Before you risk money, every call the desk makes on a stock, a fund, Bitcoin or Ether is followed on paper, and after
-Start here and This morning the dashboard shows what that would have done: one sentence, a line of the paper money against the S&P 500 from the same start, and how
-many weeks and calls stand behind it. Each call is sized exactly as its order ticket would size it (the rating, a full
+Start here and This morning the dashboard shows what that would have done: one sentence, a line of the paper money
+against SPY (the fund that copies the S&P 500) from the same start, and how many weeks and calls stand behind it. Each call is sized exactly as its order ticket would size it (the rating, a full
 position of 10%, your caps), takes no order the real ticket would refuse, and fills at the first closing price after
 the call's day. No costs are counted. The paper money starts at $10,000; change it on the scorecard. Each call shows a
-small "paper" badge with what it did. Switching trading on with under four weeks of record shows that record first and
+small "paper" badge with what it did there, such as "paper: bought 2 · NVDA −13.59% since": the stock's move since the
+paper buy, not the call's own result (that is its alpha, beside it). Switching trading on with under four weeks of record shows that record first and
 asks you to press "I understand".
 
 Bitcoin and Ether are followed on paper only: Robinhood's agent doorway trades stocks and funds, so a crypto call never

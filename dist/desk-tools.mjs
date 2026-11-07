@@ -37344,18 +37344,19 @@ function parseChart(json2, symbol4) {
   if (!r) throw new NoData(`Yahoo Finance has no prices for ${symbol4}${json2.chart?.error?.description ? ` (${json2.chart.error.description})` : ""}`);
   const m2 = r.meta ?? {}, q = r.indicators?.quote?.[0] ?? {}, adj = r.indicators?.adjclose?.[0]?.adjclose;
   const offset = m2.gmtoffset ?? 0, dayOf2 = (ts) => new Date((ts + offset) * 1e3).toISOString().slice(0, 10);
-  const bars = [], blank = [];
+  const rows = [], blank = [];
   (r.timestamp ?? []).forEach((ts, i) => {
     const open3 = num(q.open?.[i]), high = num(q.high?.[i]), low = num(q.low?.[i]), close = num(q.close?.[i]);
     if (open3 === null || high === null || low === null || close === null || close <= 0) {
       blank.push(dayOf2(ts));
       return;
     }
-    const a = num(adj?.[i]), k = a !== null ? a / close : 1;
-    bars.push({ date: dayOf2(ts), open: open3 * k, high: high * k, low: low * k, close: close * k, volume: num(q.volume?.[i]) ?? 0 });
+    const a = num(adj?.[i]), k = a !== null ? a / close : 1, date5 = dayOf2(ts), volume = num(q.volume?.[i]) ?? 0;
+    rows.push({ bar: { date: date5, open: open3 * k, high: high * k, low: low * k, close: close * k, volume }, traded: { date: date5, open: open3, high, low, close, volume } });
   });
   const seen = /* @__PURE__ */ new Set();
-  const unique = bars.filter((b) => seen.has(b.date) ? false : (seen.add(b.date), true));
+  const kept = rows.filter((x) => seen.has(x.bar.date) ? false : (seen.add(x.bar.date), true));
+  const unique = kept.map((x) => x.bar);
   const lastDay = unique.at(-1)?.date ?? "", unfilled = [...new Set(blank.filter((d) => d > lastDay))];
   const reg = m2.currentTradingPeriod?.regular, session2 = reg?.start && reg.end ? { date: dayOf2(reg.start), start: reg.start * 1e3, end: reg.end * 1e3 } : void 0;
   const paid = /* @__PURE__ */ new Map();
@@ -37367,7 +37368,8 @@ function parseChart(json2, symbol4) {
     meta: { symbol: m2.symbol ?? symbol4, currency: m2.currency, exchange: m2.fullExchangeName ?? m2.exchangeName, type: m2.instrumentType, name: m2.longName ?? m2.shortName, price: m2.regularMarketPrice, timezone: m2.exchangeTimezoneName, session: session2 },
     bars: unique,
     unfilled,
-    dividends: [...paid].map(([date5, amount]) => ({ date: date5, amount })).sort((a, b) => a.date.localeCompare(b.date))
+    dividends: [...paid].map(([date5, amount]) => ({ date: date5, amount })).sort((a, b) => a.date.localeCompare(b.date)),
+    traded: kept.map((x) => x.traded)
   };
 }
 async function fetchDaily(symbol4, from, to) {
@@ -37391,8 +37393,9 @@ async function daily(raw, from, to) {
     p.catch(() => cache.delete(key));
   }
   const s = await cache.get(key);
-  const bars = s.bars.filter((b) => b.date >= from && b.date <= to), lastDay = bars.at(-1)?.date ?? "";
-  return { meta: s.meta, bars, unfilled: (s.unfilled ?? []).filter((d) => d > lastDay && d <= to), dividends: (s.dividends ?? []).filter((d) => d.date >= from && d.date <= to) };
+  const within3 = (b) => b.date >= from && b.date <= to;
+  const bars = s.bars.filter(within3), lastDay = bars.at(-1)?.date ?? "";
+  return { meta: s.meta, bars, unfilled: (s.unfilled ?? []).filter((d) => d > lastDay && d <= to), dividends: (s.dividends ?? []).filter((d) => d.date >= from && d.date <= to), ...s.traded ? { traded: s.traded.filter(within3) } : {} };
 }
 async function history(raw, analysis2, calendarDays = 420) {
   const s = await daily(raw, addDays(analysis2, -calendarDays), analysis2);
@@ -38927,13 +38930,13 @@ function withWorkedRows(t, kind, freq) {
     const v = f(i);
     return v === null || !Number.isFinite(v) ? null : v;
   });
-  const ratio = (a, b, label, worked, abs = false) => {
+  const ratio = (a, b, label, worked2, abs = false) => {
     if (!a || !b) return null;
     const cells2 = each((i) => {
       const x = a.cells[i] ?? null, y = b.cells[i] ?? null;
-      return x === null || y === null || y <= 0 ? null : (abs ? Math.abs(x) : x) / y * (worked === "percent" ? 100 : 1);
+      return x === null || y === null || y <= 0 ? null : (abs ? Math.abs(x) : x) / y * (worked2 === "percent" ? 100 : 1);
     });
-    return cells2.some((c) => c !== null) ? { label, unit: "", cells: cells2, worked } : null;
+    return cells2.some((c) => c !== null) ? { label, unit: "", cells: cells2, worked: worked2 } : null;
   };
   const before = (i, lo, hi) => periods.findIndex((p, j) => j > i && p.kind === periods[i].kind && p.kind !== "to date" && (() => {
     const d = daysBetween(p.end, periods[i].end);
@@ -38995,10 +38998,10 @@ function renderTable(t, head2, note) {
   const main = rows.find((r) => !perShare(r.unit) && !r.worked)?.unit ?? "";
   const name = (r) => r.worked === "percent" || r.worked === "times" ? r.label : perShare(r.unit) ? `${r.label} (${r.unit.split("/")[0] || "currency"} per share)` : r.unit !== main ? `${r.label} (millions of ${r.unit || "an unstated currency"})` : r.label;
   const cell = (v, r) => v === null ? "\u2013" : r.worked === "percent" ? `${v.toFixed(1)}%` : r.worked === "times" ? v.toFixed(2) : perShare(r.unit) ? v.toFixed(2) : (v / 1e6).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-  const worked = rows.some((r) => r.worked) ? ' Rows marked "worked out" are worked out by the desk from the figures in this table, as named; quote them rather than working your own.' : "";
+  const worked2 = rows.some((r) => r.worked) ? ' Rows marked "worked out" are worked out by the desk from the figures in this table, as named; quote them rather than working your own.' : "";
   const out = [
     head2,
-    `Money in millions of ${main || "an unstated currency"} unless the row says otherwise; "\u2013" means no figure for that period. ${note}${worked}`,
+    `Money in millions of ${main || "an unstated currency"} unless the row says otherwise; "\u2013" means no figure for that period. ${note}${worked2}`,
     "",
     `Line | ${t.columns.join(" | ")}`,
     `---|${t.columns.map(() => "---:").join("|")}`,
@@ -39161,6 +39164,11 @@ function cells(symbols, dates) {
   return all;
 }
 var DIRECTION = { Buy: 1, Overweight: 1, Hold: 0, Underweight: -1, Sell: -1 };
+var directionOf = (rating) => DIRECTION[rating] ?? 0;
+function worked(rating, alpha) {
+  const dir = directionOf(rating);
+  return !dir || alpha === null || !Number.isFinite(alpha) ? null : alpha * dir > 0;
+}
 var alphaOf = (e) => {
   const t = (e.alpha ?? "").trim().replace(/%$/, "");
   const v = /^[+-]?\d+(\.\d+)?$/.test(t) ? Number(t) : NaN;
@@ -39170,8 +39178,8 @@ function summarize(entries) {
   const resolved2 = entries.filter((e) => !e.pending && e.rating !== REVIEW).map((e) => ({ e, a: alphaOf(e) })).filter((x) => x.a !== null);
   const byRating = {};
   for (const rating of new Set(resolved2.map((x) => x.e.rating))) {
-    const alphas = resolved2.filter((x) => x.e.rating === rating).map((x) => x.a), dir = DIRECTION[rating] ?? 0;
-    byRating[rating] = { count: alphas.length, hitRate: dir ? alphas.filter((a) => a * dir > 0).length / alphas.length : null, meanAlpha: alphas.reduce((s, a) => s + a, 0) / alphas.length };
+    const alphas = resolved2.filter((x) => x.e.rating === rating).map((x) => x.a), dir = directionOf(rating);
+    byRating[rating] = { count: alphas.length, direction: dir, hitRate: dir ? alphas.filter((a) => worked(rating, a)).length / alphas.length : null, meanAlpha: alphas.reduce((s, a) => s + a, 0) / alphas.length };
   }
   const unscored = entries.filter((e) => e.rating === REVIEW).length;
   const windows = [...new Set(resolved2.map((x) => x.e.holding).filter((h) => !!h && h.endsWith("d")).map((h) => `${h.slice(0, -1)} trading days`))].sort();
@@ -39626,7 +39634,7 @@ function readListener(dir, now = /* @__PURE__ */ new Date()) {
     if (typeof last?.ended === "string") {
       const began = iso(last.at), ended = iso(last.endedAt), how = { failed: "failed", stopped: "stopped" }[last.ended];
       const result = words([how, words(last.result, 200)].filter(Boolean).join(": "), 200) ?? "finished";
-      if (began) note.lastRun = ended && Date.parse(began) <= Date.parse(ended) ? { started: began, at: ended, result } : { at: began, result };
+      if (began) note.lastRun = ended && Date.parse(began) <= Date.parse(ended) ? { started: began, at: ended, result } : { at: began, result, startOnly: true };
     } else {
       const lastAt = iso(last?.at), result = words(last?.result, 200), started = iso(last?.started);
       if (lastAt && result) note.lastRun = { ...started && Date.parse(started) <= Date.parse(lastAt) ? { started } : {}, at: lastAt, result };
@@ -40552,9 +40560,9 @@ ${renderSummary(summarize(entries))}`;
       }
       try {
         const { symbols, news } = screenUniverse(readWatchlist(dir), marketOf(dir));
-        const worked = await screenToday(dir, symbols, news, day3);
-        if (on) queueTop(dir, worked, day3, false, /* @__PURE__ */ new Date(), readPrefs(dir).morningFrom);
-        look = { screen: readScreen(dir) ?? worked, on };
+        const worked2 = await screenToday(dir, symbols, news, day3);
+        if (on) queueTop(dir, worked2, day3, false, /* @__PURE__ */ new Date(), readPrefs(dir).morningFrom);
+        look = { screen: readScreen(dir) ?? worked2, on };
       } catch (e) {
         look = { screen: null, failed: e.message, on };
       }

@@ -15,7 +15,7 @@ import { deskServer } from '../src/tools/server.js';
 import { clearQuotes, parseQuote } from '../src/terminal/quotes.js';
 import { clearSearches, parseSearch } from '../src/terminal/search.js';
 import { MAX_RECENT, readPrefs, savePrefs } from '../src/terminal/prefs.js';
-import { summaryOf } from '../src/terminal/state.js';
+import { summaryOf, yardstickWords } from '../src/terminal/state.js';
 import { lockState } from '../src/private.js';
 import { startTerminal, type Assets, type Terminal } from '../src/terminal/server.js';
 import { MAX_WATCH, addWatch } from '../src/terminal/store.js';
@@ -252,15 +252,23 @@ test('the page\'s state is the desk\'s own files: calls, how they turned out, an
   const j = new Journal(path.join(dir(), 'journal.md'));
   j.storeDecision('NVDA', '2026-09-01', BUY); j.recordOutcome('NVDA', '2026-09-01', 0.1, 0.075, 5, 'Alpha +7.5%.', '2026-09-08');
   j.storeDecision('AAPL', '2026-10-09', '**Rating**: Sell\n\n**Executive Summary**: Trim.');
+  j.storeDecision('META', '2026-09-15', '**Rating**: Underweight\n\n**Executive Summary**: Lean against it.'); j.recordOutcome('META', '2026-09-15', -0.08, -0.105, 5, 'Alpha -10.5%.', '2026-09-22');
   saveSection(dir(), 'NVDA', '2026-09-01', 'decision', BUY);
   saveContactEmail(root, 'jane@mail.com');
   const s = (await call(term, 'GET', '/api/state')).json();
-  assert.deepEqual(s.calls.map((c: any) => [c.ticker, c.rating, c.pending, c.raw, c.alpha, c.summary]), [['AAPL', 'Sell', true, null, null, 'Trim.'], ['NVDA', 'Overweight', false, '+10.0%', '+7.5%', 'Add gradually on a close above 229.']]);
+  assert.deepEqual(s.calls.map((c: any) => [c.ticker, c.rating, c.pending, c.raw, c.alpha, c.summary]), [['AAPL', 'Sell', true, null, null, 'Trim.'], ['META', 'Underweight', false, '-8.0%', '-10.5%', 'Lean against it.'], ['NVDA', 'Overweight', false, '+10.0%', '+7.5%', 'Add gradually on a close above 229.']]);
+  // whether each call worked comes with it, by its rating: the Underweight whose stock trailed its index worked
+  assert.deepEqual(s.calls.map((c: any) => c.worked), [null, true, true]);
+  assert.deepEqual([s.record.summary.byRating.Underweight.direction, s.record.summary.byRating.Underweight.hitRate], [-1, 1]);
   assert.equal(s.desk.emailSaved, true);
   assert.ok(!JSON.stringify(s).includes('jane@mail.com'), 'the email must not reach the page');
   assert.equal(s.record.summary.byRating.Overweight.count, 1);
   assert.match(s.record.text, /Overweight: n=1, called the direction 100%, mean alpha \+7\.50%/);
-  assert.match(s.record.benchmarkNote, /after 5 trading days against its market's index/);
+  // the yardstick named for what it is: SPY is the fund that copies the S&P 500, not the index itself
+  assert.equal(s.record.benchmarkNote, "Each call is judged after 5 trading days against its market's index: for a US stock, SPY, the fund that copies the S&P 500.");
+  assert.equal(s.desk.benchmark, 'SPY');
+  assert.equal(yardstickWords({ benchmark: 'VOO', benchmarks: {} }), 'VOO, the yardstick set for every call', 'one yardstick set for every call is named as itself');
+  assert.equal(yardstickWords({ benchmark: '', benchmarks: { '': 'IVV' } }), "its market's index: for a US stock, IVV");
   const one = (await call(term, 'GET', '/api/call?symbol=nvda&date=2026-09-01')).json();
   assert.match(one.decision, /Overweight/); assert.deepEqual(Object.keys(one.sections), ['decision']);
   assert.equal((await call(term, 'GET', '/api/call?symbol=NVDA&date=2020-01-01')).status, 404);

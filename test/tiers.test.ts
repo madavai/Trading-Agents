@@ -6,6 +6,7 @@ import { cleanMarket, marketSymbol, MAX_MARKET, PLAIN, SHIPPED_MARKET, START_NAM
 import { ratingMeaning } from '../src/terminal/ui/fmt.js';
 import { GLOSSARY, means, type TermKey } from '../src/terminal/ui/glossary.js';
 import type { WatchItem } from '../src/terminal/store.js';
+import { MARKETS } from '../src/terminal/quotes.js';
 
 const watch = (symbol: string, favourite = false): WatchItem => ({ symbol, favourite, addedOn: '2026-10-01' });
 
@@ -41,7 +42,14 @@ test('Start here: the whole market and the eleven sectors always, the person\'s 
   assert.deepEqual(item('XLK').call, { rating: 'Overweight', date: '2026-10-01' });
   assert.equal(item('QQQ').call, null, 'no call yet is null, never a made-up rating');
   assert.deepEqual([item('SPY').watched, item('QQQ').watched, item('AAPL').favourite], [true, false, true]);
-  assert.deepEqual([item('SPY').name, item('SPY').meaning], ['S&P 500', 'the 500 largest US companies']);
+  assert.deepEqual([item('SPY').name, item('SPY').meaning], ['S&P 500 fund', 'copies the S&P 500 index: the 500 largest US companies']);
+  // Round 1 (7 Nov 2026): the watchlist's "S&P 500" was SPY at $735.29 while the Markets card's "S&P 500" was the index
+  // at 7,377. A fund that copies an index is named as a fund, never with an index's own name.
+  const cards = new Map(MARKETS.map((m) => [m.name, m.symbol]));
+  for (const [sym, p] of Object.entries(PLAIN)) {
+    assert.ok(!cards.has(p.name) || cards.get(p.name) === sym, `${sym} is named "${p.name}", like the Markets card for ${cards.get(p.name)}`);
+    if (/S&P 500|Nasdaq|Dow|Russell/.test(p.name)) assert.match(p.name, / fund$/, `${sym}: a fund named after its index says it is a fund`);
+  }
   assert.deepEqual([item('XLY').name, item('NVDA').name], ['Consumer discretionary', undefined], 'a company is named as the market names it');
   assert.deepEqual(['SPY', 'XLE', 'NVDA', 'BTC-USD', 'DOGE-USD'].map((s) => [item(s).ticket, item(s).paper]), [[true, true], [true, true], [true, true], [false, true], [false, false]],
     'a coin never opens a ticket; paper follows Bitcoin and Ether only');

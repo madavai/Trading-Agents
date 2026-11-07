@@ -316,7 +316,7 @@ function readListener(dir2, now = /* @__PURE__ */ new Date()) {
     if (typeof last?.ended === "string") {
       const began = iso(last.at), ended = iso(last.endedAt), how = { failed: "failed", stopped: "stopped" }[last.ended];
       const result = words([how, words(last.result, 200)].filter(Boolean).join(": "), 200) ?? "finished";
-      if (began) note.lastRun = ended && Date.parse(began) <= Date.parse(ended) ? { started: began, at: ended, result } : { at: began, result };
+      if (began) note.lastRun = ended && Date.parse(began) <= Date.parse(ended) ? { started: began, at: ended, result } : { at: began, result, startOnly: true };
     } else {
       const lastAt = iso(last?.at), result = words(last?.result, 200), started = iso(last?.started);
       if (lastAt && result) note.lastRun = { ...started && Date.parse(started) <= Date.parse(lastAt) ? { started } : {}, at: lastAt, result };

@@ -40,12 +40,26 @@ export function cells(symbols: string[], dates: string[]): Cell[] {
 // alpha proves it right or wrong.
 const DIRECTION: Record<string, number> = { Buy: 1, Overweight: 1, Hold: 0, Underweight: -1, Sell: -1 };
 
-export interface RatingScore { count: number; hitRate: number | null; meanAlpha: number }
+/** What a rating claims about its stock against the index: 1 that it beats it, -1 that it trails it, 0 no direction (a
+ *  Hold, or a rating the desk does not use). */
+export const directionOf = (rating: string): number => DIRECTION[rating] ?? 0;
+
+/** Whether a scored call went the way its rating said: true when the stock beat its index after a Buy or Overweight, or
+ *  trailed it after an Underweight or Sell; false when it did not (level with the index included); null for a call that
+ *  claims no direction or has no alpha. It is the scorecard's "called the direction", call by call, so the page's colours
+ *  and words agree with the scorecard's count. The alpha's sign alone never says it: an Underweight that worked has an
+ *  alpha below zero. */
+export function worked(rating: string, alpha: number | null): boolean | null {
+  const dir = directionOf(rating);
+  return !dir || alpha === null || !Number.isFinite(alpha) ? null : alpha * dir > 0;
+}
+
+export interface RatingScore { count: number; direction: number; hitRate: number | null; meanAlpha: number }
 export interface Summary { resolved: number; pending: number; unscored: number; byRating: Record<string, RatingScore>; holding: string }
 
 /** A settled entry's alpha as a fraction ("+7.1%" is 0.071), or null when it has none. The journal keeps one decimal of a
  *  percentage point, so aggregates are accurate to 0.1 of a point, not to the raw quote. */
-const alphaOf = (e: Entry): number | null => {
+export const alphaOf = (e: Pick<Entry, 'alpha'>): number | null => {
   const t = (e.alpha ?? '').trim().replace(/%$/, '');
   const v = /^[+-]?\d+(\.\d+)?$/.test(t) ? Number(t) : NaN;
   return Number.isFinite(v) ? v / 100 : null;
@@ -57,8 +71,8 @@ export function summarize(entries: Entry[]): Summary {
   const resolved = entries.filter((e) => !e.pending && e.rating !== REVIEW).map((e) => ({ e, a: alphaOf(e) })).filter((x): x is { e: Entry; a: number } => x.a !== null);
   const byRating: Record<string, RatingScore> = {};
   for (const rating of new Set(resolved.map((x) => x.e.rating))) {
-    const alphas = resolved.filter((x) => x.e.rating === rating).map((x) => x.a), dir = DIRECTION[rating] ?? 0;
-    byRating[rating] = { count: alphas.length, hitRate: dir ? alphas.filter((a) => a * dir > 0).length / alphas.length : null, meanAlpha: alphas.reduce((s, a) => s + a, 0) / alphas.length };
+    const alphas = resolved.filter((x) => x.e.rating === rating).map((x) => x.a), dir = directionOf(rating);
+    byRating[rating] = { count: alphas.length, direction: dir, hitRate: dir ? alphas.filter((a) => worked(rating, a)).length / alphas.length : null, meanAlpha: alphas.reduce((s, a) => s + a, 0) / alphas.length };
   }
   const unscored = entries.filter((e) => e.rating === REVIEW).length;
   const windows = [...new Set(resolved.map((x) => x.e.holding).filter((h): h is string => !!h && h.endsWith('d')).map((h) => `${h.slice(0, -1)} trading days`))].sort();

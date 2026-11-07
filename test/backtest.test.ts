@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { cells, iterGrid, MAX_CELLS, renderSummary, summarize } from '../src/desk/backtest.js';
+import { alphaOf, cells, directionOf, iterGrid, MAX_CELLS, renderSummary, summarize, worked } from '../src/desk/backtest.js';
 import type { Entry } from '../src/desk/journal.js';
 import { clearCache } from '../src/data/yahoo.js';
 import { deskServer } from '../src/tools/server.js';
@@ -45,6 +45,25 @@ test('calls are scored by rating: direction hit rate for Buy and Sell, none for 
   assert.deepEqual([s.byRating['Hold']!.hitRate, s.byRating['Hold']!.meanAlpha], [null, 0]);
   assert.equal(s.byRating['Needs review'], undefined);
   assert.deepEqual(Object.keys(s.byRating), ['Buy', 'Overweight', 'Sell', 'Hold']);
+});
+
+test('a call worked when its stock went the way its rating said against the index, not when its alpha is above zero', () => {
+  assert.deepEqual([worked('Buy', 0.07), worked('Overweight', -0.121), worked('Underweight', -0.105), worked('Sell', 0.03)], [true, false, true, false]);
+  assert.equal(worked('Overweight', 0), false, 'level with the index is not beating it, as the hit rate counts it');
+  assert.deepEqual([worked('Hold', 0.018), worked('Needs review', 0.09), worked('Buy', null)], [null, null, null], 'no direction, no verdict');
+  assert.deepEqual([directionOf('Buy'), directionOf('Overweight'), directionOf('Hold'), directionOf('Underweight'), directionOf('Sell'), directionOf('Maybe')], [1, 1, 0, -1, -1, 0]);
+  // Round 1's thirteen scored calls (7 Nov 2026), as the journal holds them: four of the six Underweights worked, though
+  // their alphas are below zero. The page colours each call by `worked`, so its green chips add up to the hit rate.
+  const round1: Array<[string, string]> = [['Hold', '-6.4%'], ['Underweight', '-2.0%'], ['Overweight', '-2.4%'], ['Hold', '0.0%'], ['Overweight', '-12.1%'], ['Underweight', '+9.0%'],
+    ['Underweight', '-0.4%'], ['Underweight', '-0.4%'], ['Underweight', '-10.5%'], ['Underweight', '+6.5%'], ['Hold', '+1.8%'], ['Hold', '-1.1%'], ['Hold', '-0.2%']];
+  const entries = round1.map(([r, a]) => e(r, a)), s = summarize(entries);
+  assert.deepEqual(round1.filter(([r]) => r === 'Underweight').map(([r, a]) => worked(r, alphaOf({ alpha: a }))), [true, false, true, true, true, false]);
+  for (const [rating, sc] of Object.entries(s.byRating)) {
+    const green = entries.filter((x) => x.rating === rating && worked(x.rating, alphaOf(x)) === true).length;
+    assert.equal(sc.hitRate === null ? null : green, sc.hitRate === null ? null : Math.round(sc.hitRate * sc.count), `${rating}: the green chips are the hit rate`);
+    assert.equal(sc.direction, directionOf(rating));
+  }
+  assert.equal(Math.round(s.byRating['Underweight']!.hitRate! * 100), 67);
 });
 
 test('the summary says what it is and is not', () => {
