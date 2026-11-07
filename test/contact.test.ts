@@ -7,6 +7,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { checkEmail, readContactEmail, saveContactEmail } from '../src/contact.js';
 import { contactLine, deskCheck } from '../src/check/desk-check.js';
+import { today } from '../src/data/dates.js';
 import { deskServer } from '../src/tools/server.js';
 
 const folder = () => { const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ta-')); fs.copyFileSync('desk-settings.json', path.join(root, 'desk-settings.json')); return root; };
@@ -51,8 +52,9 @@ test('the person gives the email through the desk tool, and from then on only th
   assert.equal(readContactEmail(root), '');
   assert.match(await call('jane@mail.com'), /^Saved\. The SEC will see jane@mail\.com/);
   assert.equal(readContactEmail(root), 'jane@mail.com');
-  await client.callTool({ name: 'get_prediction_markets', arguments: { topic: 'Fed rate cut', analysis_date: new Date().toISOString().slice(0, 10) } });
-  await client.callTool({ name: 'get_financial_statement', arguments: { symbol: 'ACME', analysis_date: new Date().toISOString().slice(0, 10), statement: 'balance_sheet' } });
+  // The desk's day is New York's: from midnight UTC until New York's midnight, the UTC date is still its future.
+  await client.callTool({ name: 'get_prediction_markets', arguments: { topic: 'Fed rate cut', analysis_date: today() } });
+  await client.callTool({ name: 'get_financial_statement', arguments: { symbol: 'ACME', analysis_date: today(), statement: 'balance_sheet' } });
   assert.ok(seen.size >= 2);
   for (const [host, ua] of seen) assert.equal(ua.includes('jane@mail.com'), host.endsWith('sec.gov'), host);
   await client.close();
