@@ -15,7 +15,8 @@ built, which decisions stand, every document, and what is pending.
   (`sec.ts`: statements, `submissions` for name and industry code, `sectorOfSic`, `trailingYear` for the last twelve
   months no filing states, `sharesOutstanding` from the cover page, or `averageDilutedShares` from the accounts when
   the cover page gives no single count, as for a filer with two classes of shares, and said so; `insiders.ts`: each
-  Form 4 read from its own XML),
+  Form 4 read from its own XML, an amended one (4/A) put in place of the same insiders' filing of the day it names,
+  `amended`),
   the valuation worked out with the checked close; Yahoo Finance only for a company that does not file with the SEC,
   today only (Yahoo refuses its company data to the desk's honest name, so this is mostly unavailable). The desk never
   calls itself a browser. `fundProfile` (tool `get_fund_profile`) is a fund's in their place, from `nport.ts`: the latest
