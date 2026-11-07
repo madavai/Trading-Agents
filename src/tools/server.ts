@@ -173,7 +173,7 @@ export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetc
 
   server.registerTool('get_company_overview', {
     title: 'Company profile and ratios',
-    description: 'For a US filer, from its SEC filings as they stood on the analysis date and the checked closing price: its name, industry and sector, fiscal year, shares outstanding, and its valuation worked out from them (market value, last-twelve-months diluted EPS, price to earnings, book value and price to book, dividends and dividend yield), each shown with the filed figures it came from; a past analysis date has its own. For a company that does not file with the SEC, Yahoo Finance\'s profile and ratios for today only, withheld for a past analysis date.',
+    description: 'For a US filer, from its SEC filings as they stood on the analysis date and the checked closing price: its name, industry and sector, fiscal year, shares outstanding, and its valuation worked out from them (market value, last-twelve-months diluted EPS, price to earnings, book value and price to book), each shown with the filed figures it came from, and the dividends per share and yield of the twelve months to the day from the dividends the price source records, each dated; a past analysis date has its own. For a company that does not file with the SEC, Yahoo Finance\'s profile and ratios for today only, withheld for a past analysis date.',
     inputSchema: { symbol, analysis_date: analysis },
     annotations: READ,
   }, async (a) => answer('profile of ' + a.symbol, () => companyOverview(a.symbol, a.analysis_date)));

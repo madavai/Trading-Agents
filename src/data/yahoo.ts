@@ -12,8 +12,12 @@ export interface Meta {
   /** The current or latest regular session the service knows of: its day in the exchange's calendar, its opening and close (ms). */
   session?: { date: string; start: number; end: number };
 }
-/** `unfilled`: days after the last row that the service lists with blank prices (their figures not filled in yet). */
-export interface Series { meta: Meta; bars: Bar[]; unfilled?: string[] }
+/** A dividend: its ex-dividend day in the exchange's calendar, and the amount per share as the chart service gives it
+ *  (in the quote currency, adjusted for later splits, so it is on the same footing as today's price). */
+export interface Dividend { date: string; amount: number }
+/** `unfilled`: days after the last row that the service lists with blank prices (their figures not filled in yet).
+ *  `dividends`: those that went ex-dividend in the range, oldest first. */
+export interface Series { meta: Meta; bars: Bar[]; unfilled?: string[]; dividends?: Dividend[] }
 
 interface ChartJson {
   chart?: {
@@ -21,6 +25,7 @@ interface ChartJson {
       meta?: { symbol?: string; currency?: string; exchangeName?: string; fullExchangeName?: string; instrumentType?: string; longName?: string; shortName?: string; regularMarketPrice?: number; gmtoffset?: number; exchangeTimezoneName?: string; currentTradingPeriod?: { regular?: { start?: number; end?: number } } };
       timestamp?: number[];
       indicators?: { quote?: Array<{ open?: Array<number | null>; high?: Array<number | null>; low?: Array<number | null>; close?: Array<number | null>; volume?: Array<number | null> }>; adjclose?: Array<{ adjclose?: Array<number | null> }> };
+      events?: { dividends?: Record<string, { amount?: number; date?: number }> };
     }> | null;
     error?: { code?: string; description?: string } | null;
   };
@@ -49,9 +54,14 @@ export function parseChart(json: ChartJson, symbol: string): Series {
   const unique = bars.filter((b) => (seen.has(b.date) ? false : (seen.add(b.date), true)));
   const lastDay = unique.at(-1)?.date ?? '', unfilled = [...new Set(blank.filter((d) => d > lastDay))];
   const reg = m.currentTradingPeriod?.regular, session = reg?.start && reg.end ? { date: dayOf(reg.start), start: reg.start * 1000, end: reg.end * 1000 } : undefined;
+  const paid = new Map<string, number>();   // one a day: the service keys them by time, and a day is the dividend
+  for (const d of Object.values(r.events?.dividends ?? {})) {
+    const amount = num(d.amount);
+    if (amount !== null && amount > 0 && typeof d.date === 'number' && Number.isFinite(d.date)) paid.set(dayOf(d.date), amount);
+  }
   return {
     meta: { symbol: m.symbol ?? symbol, currency: m.currency, exchange: m.fullExchangeName ?? m.exchangeName, type: m.instrumentType, name: m.longName ?? m.shortName, price: m.regularMarketPrice, timezone: m.exchangeTimezoneName, session },
-    bars: unique, unfilled,
+    bars: unique, unfilled, dividends: [...paid].map(([date, amount]) => ({ date, amount })).sort((a, b) => a.date.localeCompare(b.date)),
   };
 }
 
@@ -75,7 +85,7 @@ export async function daily(raw: string, from: string, to: string): Promise<Seri
   }
   const s = await cache.get(key)!;
   const bars = s.bars.filter((b) => b.date >= from && b.date <= to), lastDay = bars.at(-1)?.date ?? '';
-  return { meta: s.meta, bars, unfilled: (s.unfilled ?? []).filter((d) => d > lastDay && d <= to) };
+  return { meta: s.meta, bars, unfilled: (s.unfilled ?? []).filter((d) => d > lastDay && d <= to), dividends: (s.dividends ?? []).filter((d) => d.date >= from && d.date <= to) };
 }
 
 /** Daily rows up to the analysis date with enough history before it for the slowest average (200 trading days). */

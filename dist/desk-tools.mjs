@@ -37358,10 +37358,16 @@ function parseChart(json2, symbol4) {
   const unique = bars.filter((b) => seen.has(b.date) ? false : (seen.add(b.date), true));
   const lastDay = unique.at(-1)?.date ?? "", unfilled = [...new Set(blank.filter((d) => d > lastDay))];
   const reg = m2.currentTradingPeriod?.regular, session2 = reg?.start && reg.end ? { date: dayOf2(reg.start), start: reg.start * 1e3, end: reg.end * 1e3 } : void 0;
+  const paid = /* @__PURE__ */ new Map();
+  for (const d of Object.values(r.events?.dividends ?? {})) {
+    const amount = num(d.amount);
+    if (amount !== null && amount > 0 && typeof d.date === "number" && Number.isFinite(d.date)) paid.set(dayOf2(d.date), amount);
+  }
   return {
     meta: { symbol: m2.symbol ?? symbol4, currency: m2.currency, exchange: m2.fullExchangeName ?? m2.exchangeName, type: m2.instrumentType, name: m2.longName ?? m2.shortName, price: m2.regularMarketPrice, timezone: m2.exchangeTimezoneName, session: session2 },
     bars: unique,
-    unfilled
+    unfilled,
+    dividends: [...paid].map(([date5, amount]) => ({ date: date5, amount })).sort((a, b) => a.date.localeCompare(b.date))
   };
 }
 async function fetchDaily(symbol4, from, to) {
@@ -37386,7 +37392,7 @@ async function daily(raw, from, to) {
   }
   const s = await cache.get(key);
   const bars = s.bars.filter((b) => b.date >= from && b.date <= to), lastDay = bars.at(-1)?.date ?? "";
-  return { meta: s.meta, bars, unfilled: (s.unfilled ?? []).filter((d) => d > lastDay && d <= to) };
+  return { meta: s.meta, bars, unfilled: (s.unfilled ?? []).filter((d) => d > lastDay && d <= to), dividends: (s.dividends ?? []).filter((d) => d.date >= from && d.date <= to) };
 }
 async function history(raw, analysis2, calendarDays = 420) {
   const s = await daily(raw, addDays(analysis2, -calendarDays), analysis2);
@@ -37896,12 +37902,12 @@ var within2 = (time3, from, to) => {
 var inWindow = (a, from, to) => within2(a.time, from, to);
 var render2 = (list2) => list2.map((a) => `- ${a.time} UTC \xB7 ${a.publisher}: ${a.title}${a.link ? `
   ${a.link}` : ""}`).join("\n");
-function spanOf(times) {
-  const sorted = [...times].sort(), a = sorted[0] ?? "", b = sorted.at(-1) ?? "";
+function spanOf(times2) {
+  const sorted = [...times2].sort(), a = sorted[0] ?? "", b = sorted.at(-1) ?? "";
   return a === b ? `${a} UTC` : `${a} to ${a.slice(0, 10) === b.slice(0, 10) ? b.slice(11) : b} UTC`;
 }
 var reaches = (oldest, from) => oldest !== void 0 && dayOf(oldest) < from;
-var newest = (shown, of, noun) => of > shown ? `the newest ${shown} of ${of} ${noun}s` : `${shown} ${noun}${shown === 1 ? "" : "s"}`;
+var newest = (shown2, of, noun) => of > shown2 ? `the newest ${shown2} of ${of} ${noun}s` : `${shown2} ${noun}${shown2 === 1 ? "" : "s"}`;
 function gap(found, from, to, subject) {
   const oldest = found.map((a) => dayOf(a.time)).sort()[0];
   if (oldest && oldest > to) return `Unavailable for ${from} to ${to}: Yahoo Finance's search serves only recent articles (the oldest it returned is from ${oldest}), so this is not an absence of ${subject}.`;
@@ -37995,10 +38001,10 @@ async function socialPosts(raw, analysis2, opts) {
   if (rd.status === "rejected") out.push(`Reddit unavailable: ${rd.reason.message}. This is not a quiet crowd.`);
   else if (!rd.value.posts.length) out.push(`No Reddit posts about ${sym2} in these communities in this window that the feed still serves.`);
   else {
-    const posts = rd.value.posts, shown = posts.slice(0, 25);
+    const posts = rd.value.posts, shown2 = posts.slice(0, 25);
     out.push(
-      `${posts.length} post${posts.length === 1 ? "" : "s"}, from ${spanOf(posts.map((p) => p.time))}${posts.length > shown.length ? ` (the newest ${shown.length} shown)` : ""}.${short(rd.value, from, day3, "The feed")}`,
-      ...shown.map((p) => `- ${p.time} UTC \xB7 r/${p.where || "?"}: ${p.title}${p.text ? ` - ${p.text}` : ""}`)
+      `${posts.length} post${posts.length === 1 ? "" : "s"}, from ${spanOf(posts.map((p) => p.time))}${posts.length > shown2.length ? ` (the newest ${shown2.length} shown)` : ""}.${short(rd.value, from, day3, "The feed")}`,
+      ...shown2.map((p) => `- ${p.time} UTC \xB7 r/${p.where || "?"}: ${p.title}${p.text ? ` - ${p.text}` : ""}`)
     );
   }
   return out.join("\n");
@@ -38718,6 +38724,7 @@ var MONTHS2 = ["January", "February", "March", "April", "May", "June", "July", "
 var units = (facts, unit) => facts?.units?.[unit] ?? [];
 var fixed = (n2, d = 2) => n2.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
 var whole = (n2) => Math.round(n2).toLocaleString("en-US");
+var yearBefore2 = (day3) => `${Number(day3.slice(0, 4)) - 1}${day3.slice(4) === "-02-29" ? "-02-28" : day3.slice(4)}`;
 async function secOverview(sym2, cik, day3) {
   const [s, facts] = await Promise.all([submissions(cik), companyFacts(cik)]);
   const g = facts.facts?.["us-gaap"] ?? {}, dei = facts.facts?.dei ?? {};
@@ -38726,10 +38733,11 @@ async function secOverview(sym2, cik, day3) {
   if (s.sic) lines.push(`Industry (the SEC's code ${s.sic}): ${s.sicDescription || "not named"}`, `Sector (worked out from that code, so approximate): ${sectorOfSic(s.sic) ?? "not known"}`);
   const fy = /^(\d\d)(\d\d)$/.exec(s.fiscalYearEnd ?? "");
   if (fy && Number(fy[1]) >= 1 && Number(fy[1]) <= 12) lines.push(`Fiscal year ends: ${Number(fy[2])} ${MONTHS2[Number(fy[1]) - 1]}`);
-  let close = null;
+  let close = null, paid = [];
   try {
     const h = await history(sym2, day3), last = h.bars.at(-1);
     close = { date: last.date, close: Math.round(last.close * 100) / 100, currency: h.meta.currency };
+    paid = h.dividends ?? [];
   } catch {
   }
   const usd = !close?.currency || close.currency === "USD";
@@ -38756,12 +38764,17 @@ async function secOverview(sym2, cik, day3) {
     }
   }
   const dps = trailingYear(units(g.CommonStockDividendsPerShareDeclared, "USD/shares"), day3) ?? trailingYear(units(g.CommonStockDividendsPerShareCashPaid, "USD/shares"), day3);
-  if (dps) {
-    lines.push(`Dividends per share, last twelve months (derived from ${dps.parts}): ${fixed(dps.value, 4)} USD`);
-    if (close && usd && close.close > 0) lines.push(`Dividend yield (derived: that \xF7 close): ${fixed(dps.value / close.close * 100)}%`);
-  } else lines.push("Dividends per share: not among its filed figures (many companies pay none)");
+  if (close) {
+    const after = yearBefore2(day3), year = paid.filter((d) => d.date > after && d.date <= day3), unit = close.currency ?? "USD";
+    const sum = Number(year.reduce((a, d) => a + d.amount, 0).toFixed(6)), span2 = `${addDays(after, 1)} to ${day3}`;
+    if (year.length) {
+      lines.push(`Dividends per share, the 12 months to ${day3} (derived: the ${year.length === 1 ? "one" : year.length} that went ex-dividend from ${span2}, from the price source, ${year.map((d) => `${d.date} ${d.amount}`).join(", ")}): ${fixed(sum, 4)} ${unit}`);
+      if (close.close > 0) lines.push(`Dividend yield (derived: that \xF7 close): ${fixed(sum / close.close * 100)}%`);
+    } else lines.push(`Dividends per share, the 12 months to ${day3}: none went ex-dividend from ${span2} (the price source's record of dividends)`);
+  } else if (dps) lines.push(`Dividends per share, the last twelve months filed (derived from ${dps.parts}): ${fixed(dps.value, 4)} USD. Dividends since the last filed period are not in the filings, and the prices that record them could not be read`);
+  else lines.push("Dividends per share: not among its filed figures (many companies pay none)");
   lines.push("Unavailable from official free sources: forward estimates (forward P/E, PEG), analysts' price targets and beta.");
-  return [`Company profile and valuation for ${sym2}, from its SEC filings as they stood on ${day3} and the desk's checked closing price. Every multiple is derived here from those filed figures and that price, and shows what it came from; nothing is an estimate.`, "", ...lines].join("\n");
+  return [`Company profile and valuation for ${sym2}, from its SEC filings as they stood on ${day3} and the desk's checked closing price, with the dividends its price source records. Every multiple is derived here from those filed figures and that price, and shows what it came from; nothing is an estimate.`, "", ...lines].join("\n");
 }
 async function companyOverview(raw, analysis2) {
   const day3 = analysisDate(analysis2), sym2 = companySymbol(raw), cik = await filer(sym2);
@@ -40748,7 +40761,7 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root) {
   }, async (a) => answer("prediction markets on " + a.topic, () => predictionMarkets(a.topic, a.analysis_date, a.limit ?? 6)));
   server.registerTool("get_company_overview", {
     title: "Company profile and ratios",
-    description: "For a US filer, from its SEC filings as they stood on the analysis date and the checked closing price: its name, industry and sector, fiscal year, shares outstanding, and its valuation worked out from them (market value, last-twelve-months diluted EPS, price to earnings, book value and price to book, dividends and dividend yield), each shown with the filed figures it came from; a past analysis date has its own. For a company that does not file with the SEC, Yahoo Finance's profile and ratios for today only, withheld for a past analysis date.",
+    description: "For a US filer, from its SEC filings as they stood on the analysis date and the checked closing price: its name, industry and sector, fiscal year, shares outstanding, and its valuation worked out from them (market value, last-twelve-months diluted EPS, price to earnings, book value and price to book), each shown with the filed figures it came from, and the dividends per share and yield of the twelve months to the day from the dividends the price source records, each dated; a past analysis date has its own. For a company that does not file with the SEC, Yahoo Finance's profile and ratios for today only, withheld for a past analysis date.",
     inputSchema: { symbol: symbol3, analysis_date: analysis },
     annotations: READ
   }, async (a) => answer("profile of " + a.symbol, () => companyOverview(a.symbol, a.analysis_date)));
