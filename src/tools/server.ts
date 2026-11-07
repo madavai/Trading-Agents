@@ -9,6 +9,7 @@ import { readContactEmail, saveContactEmail } from '../contact.js';
 import { configure, failureText } from '../data/http.js';
 import { INDICATOR_NAMES } from '../data/indicators.js';
 import { indicatorWindow, instrument, priceHistory, verifiedSnapshot } from '../data/market.js';
+import { priceFacts } from '../data/facts.js';
 import { companyNews, worldNews } from '../data/news.js';
 import { socialPosts } from '../data/social.js';
 import { economicSeries, SERIES } from '../data/macro.js';
@@ -105,6 +106,13 @@ export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetc
     inputSchema: { symbol, analysis_date: analysis, look_back_days: z.number().int().min(1).max(30).optional().describe('How many recent closes to list; 30 when left out') },
     annotations: READ,
   }, async (a) => answer(`checked price table of ${a.symbol}`, () => verifiedSnapshot(a.symbol, a.analysis_date, a.look_back_days ?? 30)));
+
+  server.registerTool('get_price_facts', {
+    title: 'Price facts',
+    description: 'What the prices and indicators did, worked out by the desk so no one counts by eye: runs up to the latest row (how many sessions in a row), which side of each average and since when, every crossing of the last year, how often things happened in the last 20, 63, 126 and 252 sessions (closes below an average or beyond a band, RSI extremes, big days), the three highest and lowest of each window (closes, volume, daily moves, RSI, MACD, ATR), the latest row against the past (the lowest since when), and the change over each window. Every date carries its weekday. Call it before stating a streak, a first or last time, a record, a rank or a count of sessions.',
+    inputSchema: { symbol, analysis_date: analysis },
+    annotations: READ,
+  }, async (a) => answer(`price facts of ${a.symbol}`, () => priceFacts(a.symbol, a.analysis_date)));
 
   const days = z.number().int().min(1).max(30).optional().describe('Calendar days before the analysis date; ' + a0.newsLookbackDays + ' when left out');
 

@@ -1,7 +1,7 @@
 ---
 name: trading-desk
 description: A team for Madav's Agent Studio (in a chat, use /analyse) - the Trading Agents desk, twelve agents that analyse a stock the way a trading firm would and record a rated call, score past calls, and open the dashboard where the person decides. It never places an order.
-tools: Agent(market-analyst, sentiment-analyst, news-analyst, fundamentals-analyst, bull-researcher, bear-researcher, research-manager, trader, aggressive-risk-analyst, conservative-risk-analyst, neutral-risk-analyst, portfolio-manager), SendMessage, AskUserQuestion, mcp__trading-desk__plan_analysis, mcp__trading-desk__read_run, mcp__trading-desk__write_report, mcp__trading-desk__record_decision, mcp__trading-desk__list_settlements, mcp__trading-desk__record_outcome, mcp__trading-desk__read_queue, mcp__trading-desk__start_queue_item, mcp__trading-desk__finish_queue_item, mcp__trading-desk__end_queue_run, mcp__trading-desk__set_contact_email, mcp__trading-desk__set_holdings, mcp__trading-desk__clear_holdings, mcp__trading-desk__start_backtest, mcp__trading-desk__end_backtest, mcp__trading-desk__backtest_summary, mcp__trading-desk__desk_check, mcp__trading-desk__get_verified_snapshot, mcp__trading-desk__open_dashboard, mcp__trading-desk__routine_brief, mcp__trading-desk__reset_team
+tools: Agent(market-analyst, sentiment-analyst, news-analyst, fundamentals-analyst, bull-researcher, bear-researcher, research-manager, trader, aggressive-risk-analyst, conservative-risk-analyst, neutral-risk-analyst, portfolio-manager), SendMessage, AskUserQuestion, mcp__trading-desk__plan_analysis, mcp__trading-desk__read_run, mcp__trading-desk__write_report, mcp__trading-desk__record_decision, mcp__trading-desk__list_settlements, mcp__trading-desk__record_outcome, mcp__trading-desk__read_queue, mcp__trading-desk__start_queue_item, mcp__trading-desk__finish_queue_item, mcp__trading-desk__end_queue_run, mcp__trading-desk__set_contact_email, mcp__trading-desk__set_holdings, mcp__trading-desk__clear_holdings, mcp__trading-desk__start_backtest, mcp__trading-desk__end_backtest, mcp__trading-desk__backtest_summary, mcp__trading-desk__desk_check, mcp__trading-desk__get_verified_snapshot, mcp__trading-desk__get_price_facts, mcp__trading-desk__open_dashboard, mcp__trading-desk__routine_brief, mcp__trading-desk__reset_team
 disallowedTools: Bash, PowerShell, Read, Glob, Grep, Write, Edit, NotebookEdit, WebFetch, WebSearch
 ---
 
@@ -154,6 +154,10 @@ When the person asks to reset the team, or accepts your offer after the desk che
 1. Ask with AskUserQuestion whether to put the desk's twelve agents, this team's file and its line-up back exactly as the project ships them. Say in one line what that undoes: any change made to them, in these files or in Madav's Agent Studio (the model, permissions and effort chosen in Madav stay).
 2. Only on their yes, call `reset_team` with confirmed set to true, and pass on its answer in plain words: which files it put back, that they take effect from the next conversation or run, and what it says about Madav.
 3. On a no, change nothing.
+
+## How a price has moved
+
+When the person asks how a stock's price has moved (how many days in a row, the highest or lowest since when, how often it closed below an average or beyond a band, its biggest days), call `get_price_facts` for it with today's date, or the date they name, and answer in plain words from it, naming the window ("in the last 63 trading days") and keeping each date's weekday. Say nothing it does not give, and never count by eye.
 
 ## Show the dashboard
 
