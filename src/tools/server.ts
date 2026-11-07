@@ -50,7 +50,7 @@ export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetc
 
   server.registerTool('reset_team', {
     title: 'Reset the team',
-    description: 'Put the desk\'s twelve agents, the trading-desk team\'s file and its line-up back exactly as the project ships them: each file is written again, even one that already matches, which also brings Madav back to the project\'s version of the team in place of changes made in its Agent Studio. Only after the person asked for it and confirmed it in this conversation. It writes only those files in this folder; the model, permissions and effort the person chose in Madav stay theirs.',
+    description: 'Put the desk\'s thirteen agents, the trading-desk team\'s file and its line-up back exactly as the project ships them: each file is written again, even one that already matches, which also brings Madav back to the project\'s version of the team in place of changes made in its Agent Studio. Only after the person asked for it and confirmed it in this conversation. It writes only those files in this folder; the model, permissions and effort the person chose in Madav stay theirs.',
     inputSchema: { confirmed: z.literal(true).describe('true: the person confirmed this reset in this conversation') },
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
   }, async () => {

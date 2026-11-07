@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { forgetHoldings, readHoldings, renderHoldings, saveHoldings } from '../src/desk/holdings.js';
-import { deleteRun, progress, readSections, saveSection, startRun, writeReport } from '../src/desk/runs.js';
+import { deleteRun, progress, readSections, saveSection, startRun, stepWords, writeReport } from '../src/desk/runs.js';
 import { saveContactEmail } from '../src/contact.js';
 import { buildPlan, NeedsEmail, renderPlan, stepsFor } from '../src/desk/plan.js';
 import { journalOf } from '../src/desk/plan.js';
@@ -73,7 +73,7 @@ test('the report puts every written section in the original\'s order', () => {
 
 test('steps follow the team\'s order, with a turn for each debate round', () => {
   const steps = stepsFor(['market', 'news'], 2, 1).map((s) => `${s.section}${s.turn}`);
-  assert.deepEqual(steps, ['market1', 'news1', 'bull1', 'bear1', 'bull2', 'bear2', 'research_plan1', 'trader1', 'aggressive1', 'conservative1', 'neutral1', 'decision1']);
+  assert.deepEqual(steps, ['market1', 'news1', 'fact_check1', 'bull1', 'bear1', 'bull2', 'bear2', 'research_plan1', 'trader1', 'aggressive1', 'conservative1', 'neutral1', 'decision1']);
 });
 
 test('no analysis starts until the person has given their email', () => {
@@ -91,7 +91,7 @@ test('the plan applies the settings and the person\'s choices, and says what it 
   assert.match(crypto.notes[0]!, /crypto asset, so there is no fundamentals analyst/);
   const chosen = buildPlan(root, { symbol: '7203.T', analysisDate: '2026-10-12', analysts: ['news', 'market'], debateRounds: 3, riskRounds: 2, language: 'Japanese' }).plan;
   assert.deepEqual([chosen.analysts, chosen.debateRounds, chosen.riskRounds, chosen.language, chosen.benchmark], [['market', 'news'], 3, 2, 'Japanese', '^N225']);
-  assert.equal(chosen.steps.length, 2 + 6 + 2 + 6 + 1);
+  assert.equal(chosen.steps.length, 2 + 1 + 6 + 2 + 6 + 1);
   assert.throws(() => buildPlan(root, { symbol: 'BTC-USD', analysisDate: '2026-10-12', analysts: ['fundamentals'] }), /not available for BTC-USD.*no company accounts/);
   assert.throws(() => buildPlan(root, { symbol: 'SPY', analysisDate: '2026-10-12', analysts: ['astrology' as never] }), /unknown analyst astrology/);
   assert.throws(() => buildPlan(root, { symbol: 'SPY', analysisDate: '2026-10-12', debateRounds: 9 }), /from 1 to 5/);
@@ -107,14 +107,32 @@ test('a run that stopped is resumed as it was planned, from its next step', () =
   assert.equal(first.resumed, false);
   saveSection(dir, 'NVDA', '2026-10-12', 'market', 'M');
   saveSection(dir, 'NVDA', '2026-10-12', 'news', 'N');
+  // the analysts are done: the fact checker is next, before anyone argues from their reports
+  const checking = renderPlan(buildPlan(root, { symbol: 'NVDA', analysisDate: '2026-10-12' }));
+  assert.match(checking, /Steps \(resuming\): \[done\] market -> \[done\] news -> fact_check -> bull \(turn 1\)/);
+  assert.match(checking, /Next step: fact_check/);
+  assert.equal(stepWords(dir, 'NVDA', '2026-10-12'), 'the fact checker is checking the reports');
+  // its correction replaces the analyst's report in place, and its own section is the list of corrections
+  saveSection(dir, 'NVDA', '2026-10-12', 'market', 'M2 [corrected: was "M1"]');
+  saveSection(dir, 'NVDA', '2026-10-12', 'fact_check', 'Checked 1 claim in market: 1 wrong, corrected in place.');
+  assert.equal(progress(dir, 'NVDA', '2026-10-12').market, 1);
+  assert.match(readSections(dir, 'NVDA', '2026-10-12', ['market', 'fact_check']), /M2 \[corrected: was "M1"\][\s\S]*Checked 1 claim/);
+  assert.doesNotMatch(readSections(dir, 'NVDA', '2026-10-12', ['market']), /^M$/m);
+  assert.match(stepWords(dir, 'NVDA', '2026-10-12'), /^debate round 1/);
+  deleteRun(dir, 'NVDA', '2026-10-12');
+  buildPlan(root, { symbol: 'NVDA', analysisDate: '2026-10-12', analysts: ['market', 'news'], debateRounds: 2 });
+  saveSection(dir, 'NVDA', '2026-10-12', 'market', 'M');
+  saveSection(dir, 'NVDA', '2026-10-12', 'news', 'N');
   saveSection(dir, 'NVDA', '2026-10-12', 'bull', 'U1');
   const again = buildPlan(root, { symbol: 'NVDA', analysisDate: '2026-10-12', debateRounds: 1 });   // asking differently changes nothing mid-run
   assert.equal(again.resumed, true);
   assert.deepEqual([again.plan.analysts, again.plan.debateRounds], [['market', 'news'], 2]);
   assert.equal(again.plan.steps.filter((s) => s.done).length, 3);
   const text = renderPlan(again);
+  // a run whose debate began before the desk had a fact checker goes on without one, and says so
   assert.match(text, /Steps \(resuming\): \[done\] market -> \[done\] news -> \[done\] bull \(turn 1\) -> bear \(turn 1\)/);
   assert.match(text, /Next step: bear \(turn 1\)/);
+  assert.match(text, /began before the desk had a fact checker, so its reports go on unchecked/);
   const fresh = buildPlan(root, { symbol: 'NVDA', analysisDate: '2026-10-12', debateRounds: 1, restart: true });
   assert.deepEqual([fresh.resumed, fresh.plan.analysts.length, fresh.plan.debateRounds, fresh.plan.steps.some((s) => s.done)], [false, 4, 1, false]);
 });
@@ -126,7 +144,7 @@ test('a stock asked for on the dashboard runs at the depth the person chose ther
   enqueue(dir, 'META', new Date().toISOString(), 'shallow');
   startItem(dir, 'META', '2026-10-12');
   const shallow = buildPlan(root, { symbol: 'META', analysisDate: '2026-10-12', debateRounds: 3, riskRounds: 3 }).plan;
-  assert.deepEqual([shallow.debateRounds, shallow.riskRounds, shallow.steps.length], [1, 1, 4 + 2 + 2 + 3 + 1]);
+  assert.deepEqual([shallow.debateRounds, shallow.riskRounds, shallow.steps.length], [1, 1, 4 + 1 + 2 + 2 + 3 + 1]);
   assert.match(shallow.notes.join('\n'), /META was asked for on the dashboard at shallow depth, so it runs 1 debate and 1 risk round\(s\), not the 3 and 3 asked for here/);
   // A deep request keeps its five rounds; asking for them is no change, so nothing is said.
   enqueue(dir, 'NVDA', new Date().toISOString(), 'deep');

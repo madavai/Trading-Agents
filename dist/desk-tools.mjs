@@ -39268,13 +39268,13 @@ var journalIn = (root, ws) => new Journal(path10.join(ws.dir, "journal.md"), rea
 // src/desk/runs.ts
 import fs10 from "node:fs";
 import path11 from "node:path";
-var SECTIONS = ["market", "sentiment", "news", "fundamentals", "bull", "bear", "research_plan", "trader", "aggressive", "conservative", "neutral", "decision"];
+var SECTIONS = ["market", "sentiment", "news", "fundamentals", "fact_check", "bull", "bear", "research_plan", "trader", "aggressive", "conservative", "neutral", "decision"];
 var DEBATES = { investment_debate: ["bull", "bear"], risk_debate: ["aggressive", "conservative", "neutral"] };
 var TURNS = new Set(Object.values(DEBATES).flat());
 var MAX_CHARS = 6e4;
-var LABELS = { market: "Market Analyst", sentiment: "Sentiment Analyst", news: "News Analyst", fundamentals: "Fundamentals Analyst", bull: "Bull Researcher", bear: "Bear Researcher", research_plan: "Research Manager", trader: "Trader", aggressive: "Aggressive Analyst", conservative: "Conservative Analyst", neutral: "Neutral Analyst", decision: "Portfolio Manager" };
+var LABELS = { market: "Market Analyst", sentiment: "Sentiment Analyst", news: "News Analyst", fundamentals: "Fundamentals Analyst", fact_check: "Fact Checker", bull: "Bull Researcher", bear: "Bear Researcher", research_plan: "Research Manager", trader: "Trader", aggressive: "Aggressive Analyst", conservative: "Conservative Analyst", neutral: "Neutral Analyst", decision: "Portfolio Manager" };
 var PARTS = [
-  ["I. Analyst Team Reports", ["market", "sentiment", "news", "fundamentals"]],
+  ["I. Analyst Team Reports", ["market", "sentiment", "news", "fundamentals", "fact_check"]],
   ["II. Research Team Decision", ["bull", "bear", "research_plan"]],
   ["III. Trading Team Plan", ["trader"]],
   ["IV. Risk Management Team Decision", ["aggressive", "conservative", "neutral"]],
@@ -39549,6 +39549,7 @@ function kindOf(raw, symbol4) {
 }
 function stepsFor(analysts, debateRounds, riskRounds) {
   const steps = analysts.map((a) => ({ section: ANALYST_SECTION[a], turn: 1 }));
+  steps.push({ section: "fact_check", turn: 1 });
   for (let t = 1; t <= debateRounds; t++) steps.push({ section: "bull", turn: t }, { section: "bear", turn: t });
   steps.push({ section: "research_plan", turn: 1 }, { section: "trader", turn: 1 });
   for (let t = 1; t <= riskRounds; t++) steps.push({ section: "aggressive", turn: t }, { section: "conservative", turn: t }, { section: "neutral", turn: t });
@@ -39594,7 +39595,12 @@ function buildPlan(root, req, ws = workspaceOf(root)) {
   }
   const benchmark = resolveBenchmark(symbol4, s.scoring);
   const plan = { symbol: symbol4, analysisDate: day3, kind, analysts, debateRounds, riskRounds, language, managerModel: s.analysis.managerModel, benchmark, holdingDays: s.scoring.holdingPeriodDays, steps: [], notes };
-  plan.steps = stepsFor(analysts, debateRounds, riskRounds).map((st) => ({ ...st, done: (done[st.section] ?? 0) >= st.turn }));
+  let steps = stepsFor(analysts, debateRounds, riskRounds);
+  if (resumed && !done.fact_check && (done.bull ?? 0) > 0) {
+    steps = steps.filter((st) => st.section !== "fact_check");
+    notes.push("Its debate began before the desk had a fact checker, so its reports go on unchecked.");
+  }
+  plan.steps = steps.map((st) => ({ ...st, done: (done[st.section] ?? 0) >= st.turn }));
   if (!resumed) startRun(dir, symbol4, day3, plan);
   const lessons = journalOf(root, ws).pastContext(symbol4, isHistorical(day3) ? { asOf: day3 } : {});
   return { plan, holdings: renderHoldings(readHoldings(deskDataDir(root)), symbol4), lessons, resumed };
@@ -40521,7 +40527,7 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root) {
   }, async () => text3(await deskCheck(root, fetchImpl2, source)));
   server.registerTool("reset_team", {
     title: "Reset the team",
-    description: "Put the desk's twelve agents, the trading-desk team's file and its line-up back exactly as the project ships them: each file is written again, even one that already matches, which also brings Madav back to the project's version of the team in place of changes made in its Agent Studio. Only after the person asked for it and confirmed it in this conversation. It writes only those files in this folder; the model, permissions and effort the person chose in Madav stay theirs.",
+    description: "Put the desk's thirteen agents, the trading-desk team's file and its line-up back exactly as the project ships them: each file is written again, even one that already matches, which also brings Madav back to the project's version of the team in place of changes made in its Agent Studio. Only after the person asked for it and confirmed it in this conversation. It writes only those files in this folder; the model, permissions and effort the person chose in Madav stay theirs.",
     inputSchema: { confirmed: external_exports.literal(true).describe("true: the person confirmed this reset in this conversation") },
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false }
   }, async () => {

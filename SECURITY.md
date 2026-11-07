@@ -34,7 +34,7 @@ A ticket sends at most one order, with Robinhood's own protection against a repe
 until you trust the desk: then Robinhood also asks you on your phone before the order reaches the market.
 
 ## What agents can do
-No agent has a Robinhood tool or an order tool. The trading-desk team and its twelve members use only the desk's own
+No agent has a Robinhood tool or an order tool. The trading-desk team and its thirteen members use only the desk's own
 tools (market data, the desk's records, opening the dashboard). A guard (`.claude/hooks/guard.mjs`) refuses every broker
 tool, every tool that speaks of trading or moving money, Robinhood's site, the dashboard's address, and your private
 folder, whatever an agent was told. Tests keep all of this true: no file but the dashboard's three Robinhood doors can

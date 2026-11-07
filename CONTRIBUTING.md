@@ -39,7 +39,7 @@ built, which decisions stand, every document, and what is pending.
   did not give); `discover.ts` and `cli.ts` are `node dist/robinhood.mjs discover` and `shape`,
   which print what Robinhood offers and the SHAPE of its answers, never a value, so the desk is built on what is there.
 - `.claude/` - what Madav and Claude Code load in this folder: settings, the guard hook, skills, and the agents.
-  The twelve agent files in `.claude/agents/` are written from `scripts/agents-src.mjs` (`npm run agents`); edit the
+  The thirteen agent files in `.claude/agents/` are written from `scripts/agents-src.mjs` (`npm run agents`); edit the
   source, not the files, and a test fails if they differ.
   Madav's Agent Studio lists the same files. Beside them, `trading-desk.md` is the team's own file and
   `trading-desk.team.json` its line-up in the shape Madav keeps a team in (members, steps, together, gates, talk), for

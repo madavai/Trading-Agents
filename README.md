@@ -3,7 +3,7 @@
 <a href="https://madavai.github.io/Trading-Agents/inside-the-trading-desk.html">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/hero-dark.webp">
-  <img alt="Inside the Trading Desk. Twelve agents research; you see it beside your accounts; only your Confirm trades. Not financial advice." src="docs/readme/hero-light.webp">
+  <img alt="Inside the Trading Desk. Thirteen agents research; you see it beside your accounts; only your Confirm trades. Not financial advice." src="docs/readme/hero-light.webp">
 </picture>
 </a>
 
@@ -23,7 +23,7 @@ The pictures on this page come from the visual guide,
 to open that part of the guide. They follow your light or dark theme.
 
 > [!NOTE]
-> **Every part is built** - the desk check, the free data tools, the twelve-agent team with its scoring and lessons,
+> **Every part is built** - the desk check, the free data tools, the thirteen-agent team with its scoring and lessons,
 > back-testing, the dashboard with your Robinhood accounts, order tickets with Robinhood's own check, placing an order
 > on your Confirm, care for what you hold (the desk's view beside each holding, its stop watched, sells you confirm),
 > the morning and evening routines, a guided first month on the dashboard with every trading word explained, and the
@@ -40,13 +40,13 @@ affiliated with them.
 <a href="https://madavai.github.io/Trading-Agents/inside-the-trading-desk.html#glance">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/glance-dark.webp">
-  <img alt="The desk on one page: public data goes in, twelve agents turn it into a call, the call is kept on your computer, and you decide on your dashboard, the only part that reaches Robinhood. A guard stands between every agent and your money." src="docs/readme/glance-light.webp">
+  <img alt="The desk on one page: public data goes in, thirteen agents turn it into a call, the call is kept on your computer, and you decide on your dashboard, the only part that reaches Robinhood. A guard stands between every agent and your money." src="docs/readme/glance-light.webp">
 </picture>
 </a>
 
 ## Start in three steps
 1. In Madav, clone this repository. There is nothing to install.
-2. Open **Agent Studio**: the **trading-desk** team and its twelve agents are there, ready. If Madav asks whether to use
+2. Open **Agent Studio**: the **trading-desk** team and its thirteen agents are there, ready. If Madav asks whether to use
    this folder's tools, say yes.
 3. Ask the team to check this computer, then to analyse a stock ("analyse NVDA") or to open the dashboard. The first
    check looks at your computer and the free data sources and asks for your email (once). In a Claude Code chat in this
@@ -92,12 +92,12 @@ folder's `desk-data` (which git never commits) and sent to the SEC alone; no oth
 never shows it back in full (only its first letter and its domain).
 </details>
 
-## Who does what: twelve agents
+## Who does what: thirteen agents
 
 <a href="https://madavai.github.io/Trading-Agents/inside-the-trading-desk.html#agents">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/agents-dark.webp">
-  <img alt="Twelve agents in five stations: four analysts (market, sentiment, news, fundamentals), a bull and a bear with a research manager, a trader, three risk voices, and a portfolio manager who gives the rating. A lead, trading-desk, runs the line." src="docs/readme/agents-light.webp">
+  <img alt="Thirteen agents in five stations: four analysts (market, sentiment, news, fundamentals) and a fact checker who corrects their reports, a bull and a bear with a research manager, a trader, three risk voices, and a portfolio manager who gives the rating. A lead, trading-desk, runs the line." src="docs/readme/agents-light.webp">
 </picture>
 </a>
 
@@ -114,7 +114,7 @@ the team's "talk" switch shows these messages in the Messages panel; with it off
 <a href="https://madavai.github.io/Trading-Agents/inside-the-trading-desk.html#journey">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/journey-dark.webp">
-  <img alt="One call, from question to order. The desk researches: you ask, past calls are scored first, the plan, four analysts gather the facts, the research debate, the trade proposal, the risk debate, the call, recorded. You decide: you open a ticket, Robinhood checks it, you confirm. The desk learns: the call is scored and its lesson kept." src="docs/readme/journey-light.webp">
+  <img alt="One call, from question to order. The desk researches: you ask, past calls are scored first, the plan, four analysts gather the facts and a checker checks them, the research debate, the trade proposal, the risk debate, the call, recorded. You decide: you open a ticket, Robinhood checks it, you confirm. The desk learns: the call is scored and its lesson kept." src="docs/readme/journey-light.webp">
 </picture>
 </a>
 
@@ -124,7 +124,8 @@ the team's "talk" switch shows these messages in the Messages panel; with it off
 1. **Agents analyse.** Ask the trading-desk team in Agent Studio ("analyse NVDA"), type `/analyse NVDA` in a chat, or
    press the robot beside a stock on the dashboard (see "Analyses that run by themselves" below).
    Four analysts (price and indicators, mood, news, company accounts or, for a fund, what it holds, from its own
-   reports to the SEC), a bull and a bear, a research manager, a trader,
+   reports to the SEC), a fact checker who checks their reports against the same data and corrects them, a bull and a
+   bear, a research manager, a trader,
    three risk voices and a portfolio manager work in turn, from free public data, and give a rating. Each call is scored
    a few trading days later against its market's index (`/settle`), and the lessons go into later analyses.
    `/backtest NVDA,AAPL 2026-06-01 2026-08-01` runs the team over past dates in a journal of its own and reports, by

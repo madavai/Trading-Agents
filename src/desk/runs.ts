@@ -7,16 +7,16 @@ import path from 'node:path';
 import { safeSymbol } from '../data/symbols.js';
 import { withLock, writeWhole } from './lock.js';
 
-export const SECTIONS = ['market', 'sentiment', 'news', 'fundamentals', 'bull', 'bear', 'research_plan', 'trader', 'aggressive', 'conservative', 'neutral', 'decision'] as const;
+export const SECTIONS = ['market', 'sentiment', 'news', 'fundamentals', 'fact_check', 'bull', 'bear', 'research_plan', 'trader', 'aggressive', 'conservative', 'neutral', 'decision'] as const;
 export type Section = (typeof SECTIONS)[number];
 /** Sections that grow a turn at a time; every other section holds one text, replaced when written again. */
 const DEBATES: Record<string, readonly Section[]> = { investment_debate: ['bull', 'bear'], risk_debate: ['aggressive', 'conservative', 'neutral'] };
 const TURNS = new Set<string>(Object.values(DEBATES).flat());
 const MAX_CHARS = 60_000;
 
-const LABELS: Record<Section, string> = { market: 'Market Analyst', sentiment: 'Sentiment Analyst', news: 'News Analyst', fundamentals: 'Fundamentals Analyst', bull: 'Bull Researcher', bear: 'Bear Researcher', research_plan: 'Research Manager', trader: 'Trader', aggressive: 'Aggressive Analyst', conservative: 'Conservative Analyst', neutral: 'Neutral Analyst', decision: 'Portfolio Manager' };
+const LABELS: Record<Section, string> = { market: 'Market Analyst', sentiment: 'Sentiment Analyst', news: 'News Analyst', fundamentals: 'Fundamentals Analyst', fact_check: 'Fact Checker', bull: 'Bull Researcher', bear: 'Bear Researcher', research_plan: 'Research Manager', trader: 'Trader', aggressive: 'Aggressive Analyst', conservative: 'Conservative Analyst', neutral: 'Neutral Analyst', decision: 'Portfolio Manager' };
 const PARTS: Array<[string, Section[]]> = [
-  ['I. Analyst Team Reports', ['market', 'sentiment', 'news', 'fundamentals']],
+  ['I. Analyst Team Reports', ['market', 'sentiment', 'news', 'fundamentals', 'fact_check']],
   ['II. Research Team Decision', ['bull', 'bear', 'research_plan']],
   ['III. Trading Team Plan', ['trader']],
   ['IV. Risk Management Team Decision', ['aggressive', 'conservative', 'neutral']],
@@ -77,6 +77,7 @@ export function stepWords(dir: string, ticker: string, date: string): string {
   switch (next.section) {
     case 'market': case 'sentiment': case 'news': case 'fundamentals':
       return `analysts reading: ${analysts.filter((s) => (done[s.section] ?? 0) >= 1).length} of ${analysts.length} done`;
+    case 'fact_check': return 'the fact checker is checking the reports';
     case 'bull': case 'bear': return `debate round ${next.turn}${of(plan?.debateRounds)}`;
     case 'research_plan': return 'the research manager is weighing the debate';
     case 'trader': return 'the trader is drafting the plan';

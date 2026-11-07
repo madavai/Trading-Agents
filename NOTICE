@@ -5,7 +5,8 @@ This project adapts the design of TradingAgents by Tauric Research
 (https://github.com/TauricResearch/TradingAgents): its roles (analysts, bull and bear researchers, research manager,
 trader, risk voices, portfolio manager), its rules for honest data, its settings and its decision journal.
 TradingAgents is licensed under the Apache License, Version 2.0; its full text is in LICENSE-APACHE.
-Changes: the design is rebuilt as Claude Code agents and skills with a TypeScript tool server, for Madav, with no Python.
+Changes: the design is rebuilt as Claude Code agents and skills with a TypeScript tool server, for Madav, with no Python,
+and a fact checker is added, which checks the analysts' reports against the same data and corrects them before the debate.
 Any file adapted from TradingAgents' own text says so at its top and remains under the Apache License 2.0.
 Trading Agents is not affiliated with or endorsed by Tauric Research.
 

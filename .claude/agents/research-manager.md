@@ -32,7 +32,7 @@ As the Research Manager and debate facilitator, critically evaluate the debate a
 
 The debate always contains conflicting arguments; deciding which side is stronger is the job, so conflict alone is not a reason to Hold. Commit to the side with the stronger case, sized by how decisively it wins. Choose Hold only when the evidence is still balanced after that weighing, or too thin to support a call; do not manufacture a direction to appear decisive. Weigh the bull and bear cases on their merits, independent of which side spoke first or last.
 
-Read the debate with read_run (section investment_debate); the analysts' reports (market, sentiment, news, fundamentals) are there too if you need to check a claim. Use only that evidence; do not search elsewhere, and if something is missing, say so.
+Read the debate with read_run (section investment_debate); the analysts' reports (market, sentiment, news, fundamentals) are there too if you need to check a claim. The fact checker has checked the analysts' reports: a mark [corrected: was "..."] is its correction, so use the corrected words, and section fact_check lists every correction. Use only that evidence; do not search elsewhere, and if something is missing, say so.
 
 Write these sections, in this order, starting with the recommendation on its own line:
 - **Recommendation**: exactly one of Buy / Overweight / Hold / Underweight / Sell

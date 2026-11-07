@@ -1,4 +1,4 @@
-// The desk's agent files - the twelve agents, the trading-desk team's file and its line-up - against the project's own
+// The desk's agent files - the thirteen agents, the trading-desk team's file and its line-up - against the project's own
 // version of them. Madav keeps what the person changes in Agent Studio inside Madav, and goes back to the project's
 // version of a file whenever that file is written after the change; so reset_team writes every one of them again, even
 // one that already matches, and Madav's runs return to the project's version too. The desk check still says when a file

@@ -326,24 +326,24 @@ b, strong { font-weight: var(--weight-semibold); }
  "sections": [
   { "id": "A", "name": "Getting started in Agent Studio",
     "sub": "The project is cloned, the team is where Madav reads it, and the desk check is green.",
-    "about": "Trading Agents is a desk of twelve AI agents that analyse a company the way a trading firm would and propose a rating, from Buy to Sell. In Madav it arrives as a ready team called trading-desk. You talk to it in Agent Studio: open the trading-desk team, choose Put to work, and type what you want in plain words. Every test with a prompt box works this way: press the box to copy the words, paste them to the team, and send.",
+    "about": "Trading Agents is a desk of thirteen AI agents that analyse a company the way a trading firm would and propose a rating, from Buy to Sell. In Madav it arrives as a ready team called trading-desk. You talk to it in Agent Studio: open the trading-desk team, choose Put to work, and type what you want in plain words. Every test with a prompt box works this way: press the box to copy the words, paste them to the team, and send.",
     "before": "Madav, signed in to Claude, and Node 22 or later (the desk check tells you if it is missing). In Madav, clone https://github.com/madavai/Trading-Agents. There is nothing else to install and no keys to get. If Madav asks whether to use this folder's tools, say yes.",
     "tests": [
-    { "id": "A1", "title": "The twelve agents are listed", "tags": [], "changed": "2026-10-21",
-      "about": "Each agent has one job, like a desk at a trading firm: four analysts gather facts, a bull and a bear argue, a research manager weighs them, a trader drafts a plan, three risk voices challenge it and a portfolio manager decides.",
+    { "id": "A1", "title": "The thirteen agents are listed", "tags": [], "changed": "2026-11-07",
+      "about": "Each agent has one job, like a desk at a trading firm: four analysts gather facts, a fact checker corrects their reports, a bull and a bear argue, a research manager weighs them, a trader drafts a plan, three risk voices challenge it and a portfolio manager decides.",
       "where": "Madav › Agent Studio › Agents (in your Trading-Agents project)",
       "do": [
         "Open Agent Studio and look at the project's agents."],
       "see": [
-        "12 desk agents: market-analyst, sentiment-analyst, news-analyst, fundamentals-analyst, bull-researcher, bear-researcher, research-manager, trader, aggressive-, conservative- and neutral-risk-analyst, portfolio-manager."] },
-    { "id": "A2", "title": "trading-desk is a team", "tags": [], "changed": "2026-10-21",
-      "about": "trading-desk is the lead that runs the twelve in order. You only ever talk to the lead; it hands out the work.",
+        "13 desk agents: market-analyst, sentiment-analyst, news-analyst, fundamentals-analyst, fact-checker, bull-researcher, bear-researcher, research-manager, trader, aggressive-, conservative- and neutral-risk-analyst, portfolio-manager."] },
+    { "id": "A2", "title": "trading-desk is a team", "tags": [], "changed": "2026-11-07",
+      "about": "trading-desk is the lead that runs the thirteen in order. You only ever talk to the lead; it hands out the work.",
       "where": "Madav › Agent Studio › Teams",
       "do": [
         "Open the Teams tab, then the Agents tab."],
       "see": [
-        "Teams: trading-desk, with the 12 desk agents as its members.",
-        "Agents: the 12 desk agents, and trading-desk is not among them.",
+        "Teams: trading-desk, with the 13 desk agents as its members.",
+        "Agents: the 13 desk agents, and trading-desk is not among them.",
         "If Teams shows a sentence saying why trading-desk is not a team, paste that sentence in the note."] },
     { "id": "A3", "title": "The desk check is green", "tags": [], "changed": "2026-10-21",
       "about": "The desk check looks at your computer and at the free data sources the agents read, so you know everything is ready before the first analysis. Run it whenever something seems not to work.",
@@ -387,11 +387,11 @@ b, strong { font-weight: var(--weight-semibold); }
         "After the reset the file is as it was, and the check says \"The desk's agents and the trading-desk team are as the project ships them\"."] }
   ] },
   { "id": "B", "name": "The analysis team",
-    "sub": "Twelve agents analyse NVIDIA, a fund or a coin from free public data, official sources first, and record a rated call.",
-    "about": "An analysis is the desk's main job. You name a company and how deep to go; four analysts read prices, mood, news and the company's accounts, a bull and a bear argue, and a portfolio manager gives a rating from Buy to Sell. The result is a \"call\", kept in the desk's journal on your computer. It only proposes: nothing is ever bought or sold by an analysis.",
+    "sub": "Thirteen agents analyse NVIDIA, a fund or a coin from free public data, official sources first, and record a rated call.",
+    "about": "An analysis is the desk's main job. You name a company and how deep to go; four analysts read prices, mood, news and the company's accounts, a fact checker corrects what they got wrong, a bull and a bear argue, and a portfolio manager gives a rating from Buy to Sell. The result is a \"call\", kept in the desk's journal on your computer. It only proposes: nothing is ever bought or sold by an analysis.",
     "before": "Section A done, and your email given (A4). Depth: shallow is one round of debate (a few minutes, the least model time), medium three, deep five. Each analysis uses your Claude plan, like a chat.",
     "tests": [
-    { "id": "B1", "title": "A shallow analysis of NVIDIA runs end to end", "tags": [], "changed": "2026-10-21",
+    { "id": "B1", "title": "A shallow analysis of NVIDIA runs end to end", "tags": [], "changed": "2026-11-07",
       "about": "This is the whole desk at work on one company. Watching it once shows you every role in turn.",
       "where": "Madav › Agent Studio › trading-desk › Put to work (or a Claude Code chat in this folder)",
       "do": [
@@ -399,7 +399,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "In a Claude Code chat the same is [[/analyse NVDA shallow]]"],
       "see": [
         "First, in two lines: which analysts run, the rounds of debate and the language, and that it takes a few minutes.",
-        "Then the four analysts, the bull and the bear, the research manager, the trader, the three risk voices and the portfolio manager, in turn.",
+        "Then the four analysts, the fact checker, the bull and the bear, the research manager, the trader, the three risk voices and the portfolio manager, in turn.",
         "It ends with NVDA's rating (Buy, Overweight, Hold, Underweight or Sell), a short summary, any data that was unavailable, where the report is, that the call is scored against its index after its holding window, \"not investment advice\", and Decide… on the dashboard to act."] },
     { "id": "B2", "title": "Real company figures for NVIDIA", "tags": [], "changed": "2026-11-07",
       "about": "For a US company the facts come from its official filings with the SEC, as filed by the day of the analysis, so the desk never works from made-up or future figures.",
@@ -536,7 +536,17 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "A figure that was worked out shows its sum, for example \"change(221.97, 212.21) = -4.397%\" or \"102219 / 24257 = 4.214\".",
         "A Polymarket line says when the market's trading closes, and no report gives that as the day of the event itself (a results day or a Fed decision is dated from the news).",
-        "When one agent quotes another, the words are there in the other agent's own text."] }
+        "When one agent quotes another, the words are there in the other agent's own text."] },
+    { "id": "B17", "title": "A fact checker corrects the reports before the debate", "tags": [], "changed": "2026-11-07",
+      "about": "Even with the desk's own facts and calculator, an analyst can still slip: a figure copied wrong, a date a day off, a \"first time since\" that is not. A fact checker now reads the four reports once they are saved, checks every claim the desk's tools can settle against those same tools, and corrects a wrong one in place, keeping the old words beside it, so the bull and the bear never argue from a mistake. It adds one step to every analysis.",
+      "where": "Dashboard › The desk's calls › any call made after this update › Read › Gathering the facts",
+      "do": [
+        "Run a new analysis of NVIDIA, if you have not since this update: [[Analyse NVDA shallow]]",
+        "Watch the team at work. Then open the call on the dashboard and, under \"Gathering the facts\", the \"Fact check\"."],
+      "see": [
+        "The fact checker works after the four analysts and before the bull. (For a stock asked for on the dashboard, its line under Analyses you asked for says \"the fact checker is checking the reports\" at that point.)",
+        "Under \"Gathering the facts\", after the four reports, a \"Fact check\" card by the Fact checker. It starts \"Checked\" and a number of claims, then has a table of what each report said, what is right and where that comes from, or says nothing needed correcting.",
+        "Where it corrected a report, the report shows the new words with [corrected: was \"...\"] beside them, and the debate and the decision use the corrected figure."] }
   ] },
   { "id": "C", "name": "The dashboard",
     "sub": "The page on your own computer: markets, charts, watchlist, the desk's calls, the scorecard and a page per company.",
