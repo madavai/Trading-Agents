@@ -152,7 +152,7 @@ export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetc
 
   server.registerTool('get_financial_statement', {
     title: 'Financial statement',
-    description: 'A balance sheet, income statement or cash flow statement, quarterly or annual, latest periods first. For a US filer it is the SEC filing as it stood on the analysis date; otherwise Yahoo Finance\'s, for today only.',
+    description: 'A balance sheet, income statement or cash flow statement, quarterly or annual, latest periods first, with margins, growth, free cash flow and balance-sheet ratios worked out in rows of their own. For a US filer it is the SEC filing as it stood on the analysis date (a quarter no filing states derived and marked so, per-share figures on the basis of the latest filings across a share split); otherwise Yahoo Finance\'s, for today only.',
     inputSchema: {
       symbol, analysis_date: analysis,
       statement: z.enum(['balance_sheet', 'income_statement', 'cashflow']),

@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { configure } from '../src/data/http.js';
-import { clearSecCache, filedStatement, type Facts } from '../src/data/sec.js';
-import { clearYahooSession, companyOverview, financialStatement, fundProfile, insiderTransactions, yahooTable } from '../src/data/company.js';
+import { clearSecCache, filedStatement, splitsIn, type Facts } from '../src/data/sec.js';
+import { clearYahooSession, companyOverview, financialStatement, fundProfile, insiderTransactions, renderTable, withWorkedRows, yahooTable } from '../src/data/company.js';
 import { deskServer } from '../src/tools/server.js';
 
 const json = (v: unknown, status = 200) => new Response(JSON.stringify(v), { status });
@@ -54,8 +54,11 @@ test('a statement is read as filed by the analysis date: tag order, quarters apa
   assert.deepEqual(after.rows[0]!.cells, [120e6, 100e6, 95e6]);        // the quarter, never the six months; the new tag first
   assert.equal(after.rows.find((r) => r.label === 'Diluted EPS')!.unit, 'USD/shares');
   const cash = filedStatement(FACTS, 'cashflow', 'quarterly', '2025-09-01');
-  assert.deepEqual(cash.columns, ['2025-06-30 (6 months to date)', '2025-03-31']);
-  assert.deepEqual(cash.rows[0]!.cells, [70e6, 30e6]);                 // filed only to date: shown so, never subtracted
+  assert.deepEqual(cash.columns, ['2025-06-30 (derived)', '2025-03-31']);
+  assert.deepEqual(cash.rows[0]!.cells, [40e6, 30e6]);                 // filed only to date: the six months less the first quarter
+  assert.deepEqual(cash.notes, ['The quarter to 2025-06-30 is derived (no filing states it): the six months to 2025-06-30 less the quarter to 2025-03-31.']);
+  const early = filedStatement(FACTS, 'cashflow', 'quarterly', '2025-07-01');
+  assert.deepEqual([early.columns, early.rows[0]!.cells], [['2025-03-31'], [30e6]]);
 });
 
 test('a restatement counts from the day it was filed, and a year is what an annual report covers', () => {
@@ -68,6 +71,86 @@ test('a restatement counts from the day it was filed, and a year is what an annu
   assert.throws(() => filedStatement(FACTS, 'cashflow', 'annual', '2025-09-01'), /no annual cash flow statement was filed with the SEC by 2025-09-01/);
 });
 
+// A filer whose fiscal year ends in January: three quarters filed, the year filed, the cash flows only to date; a
+// 10-for-1 split between its May 2024 and February 2025 filings, which refiled earlier periods on the new basis.
+const YEARS: Facts = {
+  Revenues: { units: { USD: [
+    q('2024-01-29', '2024-04-28', 26e9, '2024-05-29'), q('2024-04-29', '2024-07-28', 30e9, '2024-08-28'), q('2024-07-29', '2024-10-27', 35e9, '2024-11-20'),
+    q('2024-01-29', '2025-01-26', 130e9, '2025-02-26', '10-K'), q('2025-01-27', '2025-04-27', 44e9, '2025-05-28'),
+    q('2023-01-30', '2023-04-30', 7e9, '2023-05-26'), q('2023-01-30', '2024-01-28', 61e9, '2024-02-21', '10-K'), q('2023-04-30', '2023-07-30', 13.5e9, '2023-08-30'),
+  ] } },
+  OperatingIncomeLoss: { units: { USD: [q('2024-01-29', '2024-04-28', 17e9, '2024-05-29'), q('2025-01-27', '2025-04-27', 22e9, '2025-05-28'), q('2024-01-29', '2025-01-26', 81e9, '2025-02-26', '10-K')] } },
+  NetCashProvidedByUsedInOperatingActivities: { units: { USD: [
+    q('2024-01-29', '2024-04-28', 15e9, '2024-05-29'), q('2024-01-29', '2024-07-28', 29e9, '2024-08-28'), q('2024-01-29', '2024-10-27', 47e9, '2024-11-20'),
+    q('2024-01-29', '2025-01-26', 64e9, '2025-02-26', '10-K'), q('2025-01-27', '2025-04-27', 27e9, '2025-05-28'),
+  ] } },
+  PaymentsToAcquireProductiveAssets: { units: { USD: [q('2024-01-29', '2024-04-28', 0.4e9, '2024-05-29'), q('2024-01-29', '2024-07-28', 1.4e9, '2024-08-28')] } },
+  EarningsPerShareDiluted: { units: { 'USD/shares': [
+    q('2021-02-01', '2022-01-30', 3.85, '2024-02-21', '10-K'), q('2022-01-31', '2023-01-29', 1.74, '2024-02-21', '10-K'), q('2023-01-30', '2024-01-28', 11.93, '2024-02-21', '10-K'),
+    q('2022-01-31', '2023-01-29', 0.17, '2025-02-26', '10-K'), q('2023-01-30', '2024-01-28', 1.19, '2025-02-26', '10-K'), q('2024-01-29', '2025-01-26', 2.94, '2025-02-26', '10-K'),
+    q('2024-01-29', '2024-04-28', 5.98, '2024-05-29'), q('2024-01-29', '2024-04-28', 0.598, '2025-05-28'), q('2024-04-29', '2024-07-28', 0.67, '2024-08-28'),
+  ] } },
+};
+
+test('a quarter no filing states is derived from two filed figures of the same year, marked, and never per share', () => {
+  const t = filedStatement(YEARS, 'income_statement', 'quarterly', '2025-06-01');
+  assert.deepEqual(t.columns.slice(0, 5), ['2025-04-27', '2025-01-26 (derived)', '2024-10-27', '2024-07-28', '2024-04-28']);
+  assert.deepEqual(t.rows[0]!.cells.slice(0, 5), [44e9, 39e9, 35e9, 30e9, 26e9]);   // the year less its three quarters
+  assert.equal(t.rows.find((r) => r.label === 'Operating Income')!.cells[1], null); // its quarters are not all filed: no guess
+  assert.equal(t.rows.find((r) => r.label === 'Diluted EPS')!.cells[1], null);      // a per-share figure never adds up
+  assert.ok(t.notes!.includes('The quarter to 2025-01-26 is derived (no filing states it): the year to 2025-01-26 less its 3 quarters to 2024-10-27.'), String(t.notes));
+  const cash = filedStatement(YEARS, 'cashflow', 'quarterly', '2025-06-01');
+  assert.deepEqual(cash.columns.slice(0, 5), ['2025-04-27', '2025-01-26 (derived)', '2024-10-27 (derived)', '2024-07-28 (derived)', '2024-04-28']);
+  assert.deepEqual(cash.rows[0]!.cells.slice(0, 5), [27e9, 17e9, 18e9, 14e9, 15e9]);
+  assert.ok(cash.notes!.includes('The quarter to 2025-01-26 is derived (no filing states it): the year to 2025-01-26 less the nine months to 2024-10-27.'), String(cash.notes));
+  // Before the annual report is filed, its quarter is not there to derive.
+  assert.equal(filedStatement(YEARS, 'income_statement', 'quarterly', '2025-02-01').columns[0], '2024-10-27');
+});
+
+test('per-share figures filed before a share split are put on the later basis, and say so', () => {
+  const eps = YEARS.EarningsPerShareDiluted!.units!['USD/shares']!;
+  assert.deepEqual(splitsIn(eps, '2025-06-01'), [{ factor: 10, old: '2024-05-29', from: '2025-02-26' }]);
+  assert.deepEqual(splitsIn(eps, '2025-01-01'), []);   // not yet seen: nothing to adjust
+  const t = filedStatement(YEARS, 'income_statement', 'annual', '2025-06-01');
+  assert.deepEqual(t.columns, ['2025-01-26', '2024-01-28', '2023-01-29', '2022-01-30']);
+  assert.deepEqual(t.rows.find((r) => r.label === 'Diluted EPS')!.cells, [2.94, 1.19, 0.17, 0.385]);
+  assert.ok(t.notes!.some((n) => /^Diluted EPS for the year to 2022-01-30 was filed on 2024-02-21 as 3\.85, before the 10-for-1 split the filings show between 2024-05-29 and 2025-02-26; shown here on the basis of the later filings: 0\.385\.$/.test(n)), String(t.notes));
+  // One restatement is not a split; two splits seen at once in one refiling are not a third.
+  const one = [q('2020-01-01', '2020-12-31', 2.0, '2021-02-01', '10-K'), q('2020-01-01', '2020-12-31', 1.0, '2022-02-01', '10-K')];
+  assert.deepEqual(splitsIn(one, '2023-01-01'), []);
+  const two = [
+    q('2018-01-01', '2018-12-31', 8, '2019-02-01', '10-K'), q('2018-01-01', '2018-12-31', 2, '2020-02-01', '10-K'),
+    q('2019-01-01', '2019-03-31', 12, '2019-05-01'), q('2019-01-01', '2019-03-31', 3, '2020-05-01'), q('2019-01-01', '2019-03-31', 0.3, '2022-05-01'),
+    q('2020-01-01', '2020-12-31', 5, '2021-02-01', '10-K'), q('2020-01-01', '2020-12-31', 0.5, '2022-02-01', '10-K'),
+    q('2017-01-01', '2017-12-31', 40, '2019-02-01', '10-K'), q('2017-01-01', '2017-12-31', 1, '2022-02-01', '10-K'),
+  ];
+  assert.deepEqual(splitsIn(two, '2023-01-01').map((s) => s.factor), [4, 10]);
+});
+
+test('the desk works out margins, growth only between neighbouring periods, free cash flow and balance ratios', () => {
+  const income = withWorkedRows(filedStatement(YEARS, 'income_statement', 'quarterly', '2025-06-01'), 'income_statement', 'quarterly');
+  const row = (t: typeof income, start: string) => t.rows.find((r) => r.label.startsWith(start))!;
+  assert.equal(row(income, 'Operating margin').cells[0]!.toFixed(1), '50.0');                     // 22 of 44
+  assert.deepEqual(row(income, 'Revenue growth on the quarter just before').cells.slice(0, 4).map((c) => c?.toFixed(1)), ['12.8', '11.4', '16.7', '15.4']);
+  assert.deepEqual(row(income, 'Revenue growth on the same quarter a year before').cells.slice(0, 2).map((c) => c?.toFixed(1)), ['69.2', undefined]);
+  const yearly = withWorkedRows(filedStatement(YEARS, 'income_statement', 'annual', '2025-06-01'), 'income_statement', 'annual');
+  assert.equal(row(yearly, 'Revenue growth on the year before').cells[0]!.toFixed(1), '113.1');
+  const cash = withWorkedRows(filedStatement(YEARS, 'cashflow', 'quarterly', '2025-06-01'), 'cashflow', 'quarterly');
+  const fcf = row(cash, 'Free cash flow');
+  assert.deepEqual([fcf.worked, fcf.cells.slice(3, 5)], ['money', [13e9, 14.6e9]]);               // the quarter's spending, not the six months'
+  assert.equal(row(cash, 'Capital expenditure as a share').cells[3]!.toFixed(1), '7.1');
+  const text = renderTable(cash, 'Cash flow', '');
+  assert.match(text, /Free cash flow \(worked out: operating cash flow less capital expenditure\) \| – \| – \| – \| 13,000\.0 \| 14,600\.0/);
+  assert.match(text, /Capital expenditure as a share of operating cash flow \(worked out\) \| – \| – \| – \| 7\.1% \| 2\.7%/);
+  assert.match(text, /quote them rather than working your own/);
+  const balance = withWorkedRows({ columns: ['2025-06-30'], rows: [
+    { label: 'Current Assets', unit: 'USD', cells: [500e6] }, { label: 'Cash and Equivalents', unit: 'USD', cells: [100e6] },
+    { label: 'Total Liabilities', unit: 'USD', cells: [300e6] }, { label: 'Current Liabilities', unit: 'USD', cells: [200e6] },
+    { label: 'Stockholders Equity', unit: 'USD', cells: [600e6] },
+  ] }, 'balance_sheet', 'quarterly');
+  assert.deepEqual(balance.rows.slice(5).map((r) => [r.label.split(' (')[0], r.cells[0]]), [['Current ratio', 2.5], ['Liabilities to equity', 0.5], ['Non-current liabilities', 100e6], ['Current assets other than cash', 400e6]]);
+});
+
 test('the tool serves a US filer from the SEC, in millions, with the email sent to the SEC alone', async () => {
   const seen: Array<{ url: string; headers: Record<string, string> }> = [];
   configure({ contact: 'ta (+x)', secEmail: 'me@example.com', fetch: route(SEC, seen) });
@@ -77,7 +160,10 @@ test('the tool serves a US filer from the SEC, in millions, with the email sent 
   assert.match(t, /Revenue \| 120\.0 \| 100\.0 \| 95\.0/);
   assert.match(t, /Diluted EPS \(USD per share\) \| 1\.23 \| – \| –/);
   assert.match(t, /Not reported by this source: Cost of Revenue, Gross Profit, Operating Income, Net Income\./);
-  assert.match(t, /A fourth quarter is never derived/);
+  assert.match(t, /a quarter no filing states .* is derived from two filed figures of the same year, its column marked "\(derived\)"/);
+  assert.match(t, /Revenue growth on the quarter just before \(worked out\) \| 20\.0% \| – \| –/);      // 120 on 100; never across the gap to 2024
+  assert.match(t, /Revenue growth on the same quarter a year before \(worked out\) \| 26\.3% \| – \| –/);
+  assert.match(t, /quote them rather than working your own/);
   assert.ok(seen.every((s) => s.headers['User-Agent'] === 'ta me@example.com'), 'both SEC hosts get the name and the email, with no bracketed address');
 });
 
