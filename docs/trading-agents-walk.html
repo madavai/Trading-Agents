@@ -503,7 +503,16 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "The daytime report calls the day's figure \"the latest price\" (the session is still trading), not \"the close\", and treats no level as broken on that day alone.",
         "The evening report uses the day's close as final, without \"may be partial\" or \"if the market is still open\".",
-        "If a report says the day's prices were \"not available yet\", it names the last day it used and does not claim the day had no trading."] }
+        "If a report says the day's prices were \"not available yet\", it names the last day it used and does not claim the day had no trading."] },
+    { "id": "B14", "title": "Economic figures are named and compared honestly", "tags": [], "changed": "2026-11-06",
+      "about": "The news analyst quotes official figures from FRED (the St. Louis Fed's public data). A monthly figure is named by its month, a change over a year is taken from the same month a year earlier, and the Fed's rate is today's rate rather than last month's average.",
+      "where": "Dashboard › any call made after this update › News report",
+      "do": [
+        "Run a new analysis of NVIDIA and open its News report's economic figures."],
+      "see": [
+        "Inflation and jobs figures are named by their month (\"August 2026\"), not by a date like \"2026-08-01\".",
+        "A yearly change (\"year over year\") compares the same month a year apart. No other change is called yearly.",
+        "The federal funds rate is the latest daily rate, and a change in a rate is given in percentage points."] }
   ] },
   { "id": "C", "name": "The dashboard",
     "sub": "The page on your own computer: markets, charts, watchlist, the desk's calls, the scorecard and a page per company.",
