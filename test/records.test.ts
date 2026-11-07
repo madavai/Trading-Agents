@@ -3,10 +3,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { forgetHoldings, readHoldings, renderHoldings, saveHoldings } from '../src/desk/holdings.js';
-import { deleteRun, progress, readSections, saveSection, startRun, stepWords, writeReport } from '../src/desk/runs.js';
+import { BACKTEST_HOLDINGS, forgetHoldings, readHoldings, renderHoldings, saveAccountHoldings, saveHoldings } from '../src/desk/holdings.js';
+import { deleteRun, progress, readSections, savedContext, saveSection, startRun, stepWords, writeReport } from '../src/desk/runs.js';
 import { saveContactEmail } from '../src/contact.js';
-import { buildPlan, NeedsEmail, renderPlan, stepsFor } from '../src/desk/plan.js';
+import { buildPlan, NeedsEmail, renderPlan, runContext, stepsFor } from '../src/desk/plan.js';
+import { workspaceOf } from '../src/desk/workspace.js';
 import { journalOf } from '../src/desk/plan.js';
 import { enqueue, finishItem, startItem } from '../src/desk/queue.js';
 import { languageName, readSettings } from '../src/settings.js';
@@ -17,7 +18,8 @@ beforeEach(() => { process.env.TRADING_AGENTS_TODAY = '2026-10-12'; });
 test('holdings keep three states apart: a position, a flat book, and not knowing', () => {
   const { dir } = folder();
   assert.equal(readHoldings(dir), null);
-  assert.match(renderHoldings(null, 'NVDA'), /^Portfolio context: not provided\. .* do not assume a flat book/);
+  assert.match(renderHoldings(null, 'NVDA'), /^Portfolio context: none saved\. The desk has no record of what the person holds .*do not assume they hold nothing \(a flat book\)/);
+  assert.doesNotMatch(renderHoldings(null, 'NVDA'), /not provided/, 'none saved is said plainly, never in words that read as withheld');
   saveHoldings(dir, { positions: [] }, '2026-10-12');
   assert.match(renderHoldings(readHoldings(dir), 'NVDA'), /given by the person on 2026-10-12.*\n- No current position in NVDA/);
   saveHoldings(dir, { cash: 1234.5, currency: 'usd', positions: [{ ticker: 'nvda', quantity: 10.5, averagePrice: 120 }, { ticker: 'AAPL', quantity: -3 }] }, '2026-10-12');
@@ -167,6 +169,36 @@ test('lessons reach the plan, and a past-dated plan sees only outcomes already k
   assert.match(before, /\(a past day: use only what was known by then\)/);
   assert.match(before, /Lessons from past calls: none yet/);
   assert.match(renderPlan(buildPlan(root, { symbol: 'NVDA', analysisDate: '2026-08-10' })), /a lesson from August/);
+});
+
+test('the holdings reach the trader from the desk: saved with the run when it is planned, never left to the lead to copy', () => {
+  const { root, dir } = folder();
+  saveContactEmail(root, 'jane@mail.com');
+  // The shape of round 1's holdings (6 Nov 2026), with made-up figures: a tradable account read from Robinhood holding
+  // cash and no NVDA, beside a view-only one. Then the trader wrote "Holdings: not provided".
+  saveAccountHoldings(dir, [
+    { label: 'Agentic', tradable: true, cash: 250, buyingPower: 250, currency: 'USD', positions: [] },
+    { label: 'Roth IRA', tradable: false, cash: 10, currency: 'USD', positions: [{ ticker: 'NVDA', quantity: 2, averagePrice: 150 }] },
+  ], '2026-10-12');
+  const built = buildPlan(root, { symbol: 'NVDA', analysisDate: '2026-10-12' });
+  const block = "Portfolio as read from Robinhood on 2026-10-12 (it may have changed since). Size any trade to the tradable account; the other accounts are the rest of the person's holdings, for context only:\n"
+    + "- Agentic (the only account the desk may trade in, and only on the person's Confirm): no position in NVDA; cash 250.00 USD; buying power 250.00 USD\n"
+    + '- Roth IRA (view only: the desk never trades in it): position in NVDA: 2 units, average price 150.00; cash 10.00 USD';
+  assert.equal(built.holdings, block);
+  assert.equal(savedContext(dir, 'NVDA', '2026-10-12')?.holdings, block, 'saved with the run, for the agents and as a record of what they were given');
+  assert.equal(readSections(dir, 'NVDA', '2026-10-12', ['holdings']), `## Holdings\n${block}`);
+  assert.match(renderPlan(built), /Saved with this run: the holdings and the lessons below[\s\S]*\n\nPortfolio as read from Robinhood on 2026-10-12/);
+  // In a backtest the person's holdings of today are not used: they were not known on the days it tests.
+  const sweep = workspaceOf(root, 'test-sweep');
+  const bt = buildPlan(root, { symbol: 'NVDA', analysisDate: '2026-06-01' }, sweep);
+  assert.equal(bt.holdings, BACKTEST_HOLDINGS);
+  assert.equal(readSections(sweep.dir, 'NVDA', '2026-06-01', ['holdings']), `## Holdings\n${BACKTEST_HOLDINGS}`);
+  assert.equal(savedContext(dir, 'NVDA', '2026-06-01'), undefined, 'the live desk keeps no record of the sweep\'s run');
+  // A run planned before the desk kept them: read_run draws them up when asked (its fallback), and never answers blank.
+  startRun(dir, 'TSLA', '2026-10-12', { steps: [] });
+  assert.equal(readSections(dir, 'TSLA', '2026-10-12', ['holdings']), '(No holdings saved with this run: plan it with plan_analysis first. It is not known, not empty.)');
+  assert.match(readSections(dir, 'TSLA', '2026-10-12', ['holdings', 'lessons'], () => runContext(root, workspaceOf(root), 'TSLA', '2026-10-12')),
+    /^## Holdings\nPortfolio as read from Robinhood on 2026-10-12[\s\S]*Agentic [^\n]*: no position in TSLA[\s\S]*\n\n## Lessons\nLessons from past calls: none yet/);
 });
 
 test('settings are checked: a hand-edited file cannot put a bad value in an agent\'s instructions', () => {

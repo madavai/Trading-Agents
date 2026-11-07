@@ -133,7 +133,7 @@ export const api = {
   trading: () => call<Trading & { placedToday: number }>('GET', '/api/trading'),
   /** Switching on with under four weeks of record also says the person understood that. */
   setTrading: (on: boolean, understood = false) => call<Trading>('POST', '/api/trading', on ? { on, confirm: 'switch trading on', ...(understood ? { understood } : {}) } : { on }),
-  /** The paper book: every call followed at its ticket's size, against the S&P 500. */
+  /** The paper book: every call followed at its ticket's size, against SPY (the fund that copies the S&P 500). */
   paper: () => call<PaperView>('GET', '/api/paper'),
   setPaperStart: (startUsd: number) => call<PaperView>('POST', '/api/paper', { startUsd }),
   /** The person's caps, kept beside the trading switch; the desk checks them before keeping them. */

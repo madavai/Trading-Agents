@@ -89,7 +89,30 @@ test('a whole analysis, as the agents will run it: plan, write, report, record, 
   assert.match(await call('plan_analysis', { symbol: 'NVDA', analysis_date: '2026-10-12', restart: true }), /Lessons from past calls:\nPast analyses of NVDA[\s\S]*Alpha was \+7\.0%/);
 
   assert.match(await call('clear_holdings'), /Forgotten/);
-  assert.match(await call('plan_analysis', { symbol: 'NVDA', analysis_date: '2026-10-12', restart: true }), /Portfolio context: not provided/);
+  assert.match(await call('plan_analysis', { symbol: 'NVDA', analysis_date: '2026-10-12', restart: true }), /Portfolio context: none saved/);
+  await client.close();
+});
+
+test('the trader, the risk voices and the portfolio manager read the holdings and lessons from the desk, as the plan saved them', async () => {
+  const { call, client } = await connect();
+  await call('set_contact_email', { email: 'jane@mail.com' });
+  await call('set_holdings', { positions: [{ ticker: 'AAPL', quantity: 4 }], cash: 250, currency: 'USD' });
+  const at = { symbol: 'NVDA', analysis_date: '2026-10-12' };
+  const plan = await call('plan_analysis', at);
+  assert.match(plan, /Saved with this run: the holdings and the lessons below\. The trader, the risk voices and the portfolio manager read them from the desk themselves \(read_run, sections holdings and lessons\): do not copy them into their requests\./);
+  // what the trader reads: the saved holdings, word for word as the plan showed them, whatever its request carried
+  const read = await call('read_run', { ...at, sections: ['holdings', 'lessons'] });
+  assert.equal(read, '## Holdings\nPortfolio as given by the person on 2026-10-12 (it may have changed since):\n- No current position in NVDA\n- Cash available: 250.00 USD\n- Other positions: AAPL 4\n\n## Lessons\nLessons from past calls: none yet (no earlier call has been settled).');
+  assert.ok(plan.includes(read.split('\n').slice(1, 5).join('\n')), 'the plan and the run say the same');
+  // a run planned again (resumed) works from the latest holdings
+  await call('save_run_section', { ...at, section: 'market', text: 'Market report' });
+  await call('set_holdings', { positions: [{ ticker: 'NVDA', quantity: 3, average_price: 180 }], cash: 40, currency: 'USD' });
+  assert.match(await call('plan_analysis', at), /Steps \(resuming\)/);
+  assert.match(await call('read_run', { ...at, sections: ['holdings'] }), /^## Holdings\n.*\n- Current position in NVDA: 3 units, average price 180\.00\n- Cash available: 40\.00 USD$/);
+  await call('clear_holdings');
+  await call('plan_analysis', at);
+  assert.match(await call('read_run', { ...at, sections: ['holdings'] }), /^## Holdings\nPortfolio context: none saved\./);
+  assert.match(await call('save_run_section', { ...at, section: 'holdings' as never, text: 'Holds 1,000 NVDA' }), /^MCP error|Input validation error|Invalid/, 'no agent can write the holdings');
   await client.close();
 });
 

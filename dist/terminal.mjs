@@ -7625,18 +7625,19 @@ function parseChart(json, symbol) {
   if (!r) throw new NoData(`Yahoo Finance has no prices for ${symbol}${json.chart?.error?.description ? ` (${json.chart.error.description})` : ""}`);
   const m = r.meta ?? {}, q = r.indicators?.quote?.[0] ?? {}, adj = r.indicators?.adjclose?.[0]?.adjclose;
   const offset = m.gmtoffset ?? 0, dayOf = (ts) => new Date((ts + offset) * 1e3).toISOString().slice(0, 10);
-  const bars = [], blank = [];
+  const rows = [], blank = [];
   (r.timestamp ?? []).forEach((ts, i) => {
     const open4 = num(q.open?.[i]), high = num(q.high?.[i]), low = num(q.low?.[i]), close = num(q.close?.[i]);
     if (open4 === null || high === null || low === null || close === null || close <= 0) {
       blank.push(dayOf(ts));
       return;
     }
-    const a = num(adj?.[i]), k = a !== null ? a / close : 1;
-    bars.push({ date: dayOf(ts), open: open4 * k, high: high * k, low: low * k, close: close * k, volume: num(q.volume?.[i]) ?? 0 });
+    const a = num(adj?.[i]), k = a !== null ? a / close : 1, date4 = dayOf(ts), volume = num(q.volume?.[i]) ?? 0;
+    rows.push({ bar: { date: date4, open: open4 * k, high: high * k, low: low * k, close: close * k, volume }, traded: { date: date4, open: open4, high, low, close, volume } });
   });
   const seen = /* @__PURE__ */ new Set();
-  const unique = bars.filter((b) => seen.has(b.date) ? false : (seen.add(b.date), true));
+  const kept = rows.filter((x) => seen.has(x.bar.date) ? false : (seen.add(x.bar.date), true));
+  const unique = kept.map((x) => x.bar);
   const lastDay = unique.at(-1)?.date ?? "", unfilled = [...new Set(blank.filter((d) => d > lastDay))];
   const reg = m.currentTradingPeriod?.regular, session = reg?.start && reg.end ? { date: dayOf(reg.start), start: reg.start * 1e3, end: reg.end * 1e3 } : void 0;
   const paid = /* @__PURE__ */ new Map();
@@ -7648,7 +7649,8 @@ function parseChart(json, symbol) {
     meta: { symbol: m.symbol ?? symbol, currency: m.currency, exchange: m.fullExchangeName ?? m.exchangeName, type: m.instrumentType, name: m.longName ?? m.shortName, price: m.regularMarketPrice, timezone: m.exchangeTimezoneName, session },
     bars: unique,
     unfilled,
-    dividends: [...paid].map(([date4, amount]) => ({ date: date4, amount })).sort((a, b) => a.date.localeCompare(b.date))
+    dividends: [...paid].map(([date4, amount]) => ({ date: date4, amount })).sort((a, b) => a.date.localeCompare(b.date)),
+    traded: kept.map((x) => x.traded)
   };
 }
 async function fetchDaily(symbol, from, to) {
@@ -7672,8 +7674,9 @@ async function daily(raw, from, to) {
     p.catch(() => cache.delete(key));
   }
   const s = await cache.get(key);
-  const bars = s.bars.filter((b) => b.date >= from && b.date <= to), lastDay = bars.at(-1)?.date ?? "";
-  return { meta: s.meta, bars, unfilled: (s.unfilled ?? []).filter((d) => d > lastDay && d <= to), dividends: (s.dividends ?? []).filter((d) => d.date >= from && d.date <= to) };
+  const within2 = (b) => b.date >= from && b.date <= to;
+  const bars = s.bars.filter(within2), lastDay = bars.at(-1)?.date ?? "";
+  return { meta: s.meta, bars, unfilled: (s.unfilled ?? []).filter((d) => d > lastDay && d <= to), dividends: (s.dividends ?? []).filter((d) => d.date >= from && d.date <= to), ...s.traded ? { traded: s.traded.filter(within2) } : {} };
 }
 var clearCache = () => cache.clear();
 
@@ -20882,7 +20885,7 @@ function readListener(dir, now = /* @__PURE__ */ new Date()) {
     if (typeof last?.ended === "string") {
       const began = iso(last.at), ended = iso(last.endedAt), how = { failed: "failed", stopped: "stopped" }[last.ended];
       const result = words2([how, words2(last.result, 200)].filter(Boolean).join(": "), 200) ?? "finished";
-      if (began) note.lastRun = ended && Date.parse(began) <= Date.parse(ended) ? { started: began, at: ended, result } : { at: began, result };
+      if (began) note.lastRun = ended && Date.parse(began) <= Date.parse(ended) ? { started: began, at: ended, result } : { at: began, result, startOnly: true };
     } else {
       const lastAt = iso(last?.at), result = words2(last?.result, 200), started = iso(last?.started);
       if (lastAt && result) note.lastRun = { ...started && Date.parse(started) <= Date.parse(lastAt) ? { started } : {}, at: lastAt, result };
@@ -21197,6 +21200,14 @@ function renderSummary(s) {
   return lines.join("\n");
 }
 
+// src/desk/scoring.ts
+function resolveBenchmark(ticker, s) {
+  if (s.benchmark.trim()) return normalizeSymbol(s.benchmark);
+  const sym2 = normalizeSymbol(ticker);
+  const suffix = Object.keys(s.benchmarks).filter(Boolean).sort((a, b) => b.length - a.length).find((x) => sym2.endsWith(x.toUpperCase()));
+  return suffix ? s.benchmarks[suffix] : s.benchmarks[""] ?? "SPY";
+}
+
 // src/terminal/store.ts
 import fs14 from "node:fs";
 import path13 from "node:path";
@@ -21255,7 +21266,7 @@ var TIER_WORDS = {
 var SHIPPED_MARKET = ["SPY", "QQQ", "VT", "BND"];
 var MAX_MARKET = 8;
 var START_NAMES = 12;
-var sp500 = { name: "S&P 500", meaning: "the 500 largest US companies" };
+var sp500 = { name: "S&P 500 fund", meaning: "copies the S&P 500 index: the 500 largest US companies" };
 var us = { name: "The whole US market", meaning: "nearly every US company, large and small" };
 var bonds = { name: "US bonds", meaning: "loans to the US government and to companies: steadier than shares, and they pay interest" };
 var PLAIN = {
@@ -21267,9 +21278,9 @@ var PLAIN = {
   SCHB: us,
   BND: bonds,
   AGG: bonds,
-  QQQ: { name: "Nasdaq 100", meaning: "the 100 largest companies on the Nasdaq exchange, mostly technology" },
-  DIA: { name: "Dow Jones", meaning: "30 large, long-established US companies" },
-  IWM: { name: "Russell 2000", meaning: "2,000 smaller US companies" },
+  QQQ: { name: "Nasdaq 100 fund", meaning: "copies the Nasdaq 100 index: the 100 largest companies on the Nasdaq exchange, mostly technology" },
+  DIA: { name: "Dow Jones fund", meaning: "copies the Dow Jones index: 30 large, long-established US companies" },
+  IWM: { name: "Russell 2000 fund", meaning: "copies the Russell 2000 index: 2,000 smaller US companies" },
   VT: { name: "The whole world", meaning: "thousands of companies in dozens of countries" },
   VXUS: { name: "The world outside the US", meaning: "thousands of companies outside the United States" },
   VEA: { name: "Developed markets", meaning: "large companies in Europe, Japan, Canada and Australia" },
@@ -21474,6 +21485,11 @@ var stamp = (file4) => {
     return "0";
   }
 };
+function yardstickWords(s) {
+  const us2 = resolveBenchmark("SPY", s);
+  if (s.benchmark.trim()) return `${us2}, the yardstick set for every call`;
+  return `its market's index: for a US stock, ${us2}${us2 === "SPY" ? ", the fund that copies the S&P 500" : ""}`;
+}
 function versionOf(root2) {
   const dir = deskDataDir(root2), runs = path15.join(dir, "runs");
   let latest = 0;
@@ -21525,8 +21541,8 @@ function stateOf(root2, day2) {
     watchTiers: watch,
     market,
     guide,
-    record: { summary, text: renderSummary(summary), benchmarkNote: `Each call is judged after ${s.scoring.holdingPeriodDays} trading days against its market's index.` },
-    desk: { emailSaved: !!email2, tradingEnabled: false, holdingDays: s.scoring.holdingPeriodDays },
+    record: { summary, text: renderSummary(summary), benchmarkNote: `Each call is judged after ${s.scoring.holdingPeriodDays} trading days against ${yardstickWords(s.scoring)}.` },
+    desk: { emailSaved: !!email2, tradingEnabled: false, holdingDays: s.scoring.holdingPeriodDays, benchmark: resolveBenchmark("SPY", s.scoring) },
     analyses: { depth: depthOfRounds(s.analysis.debateRounds), perRun: s.routines.maxAnalyses, listener },
     paper: { ...record2, startUsd: readPaperStart(dir), minWeeks: RECORD_WEEKS, minWords: RECORD_WORDS }
   };
@@ -21729,10 +21745,10 @@ var RANGES = { "1M": 31, "3M": 92, "6M": 183, "1Y": 366, "5Y": 1830 };
 var isRange = (s) => s in RANGES;
 async function history2(raw, range) {
   const symbol = safeSymbol(raw), end = today(), from = addDays(end, -(RANGES[range] + 320));
-  const s = await daily(symbol, from, end);
-  if (!s.bars.length) throw new NoData(`Yahoo Finance has no daily prices for ${symbol}`);
-  const m50 = compute("close_50_sma", s.bars), m200 = compute("close_200_sma", s.bars), cut = addDays(end, -RANGES[range]);
-  const keep3 = s.bars.map((b, i) => ({ b, i })).filter(({ b }) => b.date >= cut);
+  const s = await daily(symbol, from, end), bars = s.traded ?? s.bars;
+  if (!bars.length) throw new NoData(`Yahoo Finance has no daily prices for ${symbol}`);
+  const m50 = compute("close_50_sma", bars), m200 = compute("close_200_sma", bars), cut = addDays(end, -RANGES[range]);
+  const keep3 = bars.map((b, i) => ({ b, i })).filter(({ b }) => b.date >= cut);
   const round = (v) => v === null || v === void 0 ? null : Math.round(v * 1e4) / 1e4;
   return {
     symbol,

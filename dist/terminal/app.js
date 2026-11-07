@@ -103,7 +103,7 @@
     trading: () => call("GET", "/api/trading"),
     /** Switching on with under four weeks of record also says the person understood that. */
     setTrading: (on, understood = false) => call("POST", "/api/trading", on ? { on, confirm: "switch trading on", ...understood ? { understood } : {} } : { on }),
-    /** The paper book: every call followed at its ticket's size, against the S&P 500. */
+    /** The paper book: every call followed at its ticket's size, against SPY (the fund that copies the S&P 500). */
     paper: () => call("GET", "/api/paper"),
     setPaperStart: (startUsd) => call("POST", "/api/paper", { startUsd }),
     /** The person's caps, kept beside the trading switch; the desk checks them before keeping them. */
@@ -127,16 +127,16 @@
     depth: { group: desk, term: "Depth", means: "how long the debates in an analysis run: shallow (one round each, quick), medium (three) or deep (five, the slowest and costliest)." },
     alpha: { group: desk, term: "Alpha", means: "how far the stock beat (+) or trailed (\u2212) its market's index in the trading days after a call. Above zero is good for a Buy or Overweight; below zero is good for an Underweight or Sell." },
     paper: { group: desk, term: "On paper", means: "followed with pretend money only, to see what the desk's calls would have done before any real money is at stake." },
-    scorecard: { group: desk, term: "Scorecard", means: "the desk's record, good or bad: its paper money against the S&P 500, and each rating's average alpha." },
+    scorecard: { group: desk, term: "Scorecard", means: "the desk's record, good or bad: its paper money against SPY, the S&P 500 fund, and each rating's average alpha." },
     rerating: { group: desk, term: "Re-rating", means: "it is on the waiting list, so the desk analyses it again and its view is fresh. Monday's morning routine re-rates the Agentic account's holdings whose view is a week old." },
     stop: { group: desk, term: "Stop", means: "the price under which the desk's trader proposed selling, to limit a loss. The dashboard watches it against Yahoo Finance's price and tells you when the price falls below it. Nothing is ever sold by itself." },
     stock: { group: markets, term: "Stock", means: "a small share of one company; its price moves with what people will pay for that company." },
     fund: { group: markets, term: "Fund", means: "a basket of many companies (or bonds) bought and sold as one share, also called an ETF." },
     index: { group: markets, term: "Index", means: "a list of companies whose prices are averaged into one number, such as the S&P 500. It cannot be bought itself, only through a fund that copies it." },
-    sp500: { group: markets, term: "S&P 500", means: "the 500 largest US companies taken together: the yardstick the desk measures itself against." },
+    sp500: { group: markets, term: "S&P 500", means: "the index of the 500 largest US companies taken together. SPY, the S&P 500 fund, copies it at about a tenth of its number, and is the yardstick the desk measures itself against." },
     sector: { group: markets, term: "Sector", means: "one part of the economy, such as technology or energy. Companies in one sector tend to rise and fall together." },
     crypto: { group: markets, term: "Crypto", means: "digital coins such as Bitcoin, which swing far more than shares. The desk follows Bitcoin and Ether on paper only." },
-    today: { group: markets, term: "Today", means: "the change in price since the last day's close." },
+    today: { group: markets, term: "Day's move", means: "the change in price over the latest trading day, from the close before it. When that day was not today, as on a weekend, the page names it (Fri)." },
     volume: { group: markets, term: "Volume", means: "how many shares changed hands in a day. A move on high volume means many people acted on it." },
     average: { group: markets, term: "50- and 200-day average", means: "the average closing price over that many days. A price above it has been rising lately; below it, falling." },
     vix: { group: markets, term: "VIX", means: "the market's own measure of nerves, from what insurance on the S&P 500 costs: under 15 is calm, over 25 is wild." },
@@ -216,6 +216,40 @@
     const d = new Date(iso);
     return Number.isNaN(d.getTime()) ? "" : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
+  var WEEKDAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  var weekDay = (day) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(day);
+    return m ? `${WEEKDAY[new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12)).getUTCDay()]} ${Number(m[3])} ${MON[Number(m[2]) - 1]}` : day;
+  };
+  var nyDay = (at) => {
+    const d = new Date(at);
+    return Number.isNaN(d.getTime()) ? "" : new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+  };
+  var moveDayOf = (asOf, now = /* @__PURE__ */ new Date()) => {
+    const d = nyDay(asOf);
+    return d && d !== nyDay(now) ? d : "";
+  };
+  var chipDay = (day, now = /* @__PURE__ */ new Date()) => {
+    const ago = (Date.parse(`${nyDay(now)}T12:00:00Z`) - Date.parse(`${day}T12:00:00Z`)) / 864e5;
+    return ago > 0 && ago < 7 ? weekDay(day).split(" ")[0] : shortDay(day);
+  };
+  var when = (iso, now = /* @__PURE__ */ new Date()) => {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "";
+    const local = (x) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+    if (local(d) === local(now)) return clock(iso);
+    return `${d.getFullYear() === now.getFullYear() ? weekDay(local(d)) : `${d.getDate()} ${MON[d.getMonth()]} ${d.getFullYear()}`}, ${clock(iso)}`;
+  };
+  var priceDayWords = (price, move, q2, now = /* @__PURE__ */ new Date()) => {
+    if (q2.open) return `${price}${move ? ` (${move} today)` : ""} on Yahoo Finance, up to 15 min late`;
+    const day = moveDayOf(q2.asOf, now);
+    return day ? `${price}, the close of ${weekDay(day)}${move ? ` (${move} that day)` : ""}, from Yahoo Finance` : `${price}, today's close${move ? ` (${move} today)` : ""}, from Yahoo Finance`;
+  };
+  var points = (n, d = 2) => {
+    if (n === null || n === void 0 || !Number.isFinite(n)) return "\u2014";
+    const body = Math.abs(n).toFixed(d);
+    return `${Number(body) === 0 ? "" : n > 0 ? "+" : MINUS}${body} ${Number(body) === 1 ? "point" : "points"}`;
+  };
   var SECTION_NAMES = {
     market: "Market report",
     sentiment: "Sentiment report",
@@ -237,7 +271,9 @@
     return m ? plain(m[1]) : "";
   }
   function opening(md, n = 160) {
-    const text = plain(md.split("\n").filter((l) => !/^\s{0,3}#/.test(l)).join("\n"));
+    const lines = md.replace(/\r\n/g, "\n").split("\n").filter((l) => !/^\s{0,3}#/.test(l));
+    const body = lines.filter((l) => !/^\s*(?:[-*+]\s+)?\*\*[^*\n]+\*\*[\s:.]*$/.test(l)).map((l) => l.replace(/^(\s*(?:[-*+]\s+)?)\*\*[^*\n]*[.!?]\*\*\s*/, "$1"));
+    const text = plain(body.join("\n")) || plain(lines.join("\n"));
     const s = /^(.{12,}?[.!?])(?=\s|$)/.exec(text)?.[1] ?? text;
     return s.length > n ? `${s.slice(0, n - 1).trimEnd()}\u2026` : s;
   }
@@ -583,7 +619,12 @@
   }
   var term = (key2, words = GLOSSARY[key2].term) => `<span class="ta-term" title="${esc(means(key2))}">${esc(words)}</span>`;
   var ratingChip = (r) => `<span class="at-chip ${ratingTone(r)}"${ratingMeaning(r) ? ` title="${esc(ratingMeaning(r))}"` : ""}>${esc(r)}</span>`;
-  var changeChip = (q2) => q2 && q2.changePct !== null ? `<span class="at-chip ${tone(q2.changePct)}" title="${esc(means("today"))}">${pct(q2.changePct)}</span>` : `<span class="at-chip" title="${esc(means("today"))}">\u2014</span>`;
+  var moveText = (q2) => marketOf(q2.symbol)?.unit === "%" ? points(q2.change) : pct(q2.changePct);
+  var changeChip = (q2) => {
+    if (!q2 || q2.changePct === null) return `<span class="at-chip" title="${esc(means("today"))}">\u2014</span>`;
+    const day = moveDayOf(q2.asOf);
+    return `<span class="at-chip ${tone(q2.changePct)}" title="${esc(day ? `${means("today")} This move is from ${weekDay(day)}.` : means("today"))}">${moveText(q2)}${day ? ` \xB7 ${chipDay(day)}` : ""}</span>`;
+  };
   var noTicketChip = (paper) => paper ? `<span class="at-chip" title="${esc(`${means("paper")} ${NOTES.coinOnPaper}`)}">on paper only</span>` : `<span class="at-chip" title="${esc(NOTES.noTicket)}">no order ticket</span>`;
   var robot = (sym) => `<button class="icon-btn" data-act="analyse" data-symbol="${esc(sym)}" title="Ask the desk to analyse ${esc(sym)}" aria-label="Ask the desk to analyse ${esc(sym)}"><svg class="g"><use href="#i-bot"/></svg></button>`;
   var listWords = (xs) => xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
@@ -591,6 +632,8 @@
     const unit = marketOf(sym)?.unit;
     return unit ? `${num(q2.price)}${unit}` : isIndex(sym) ? num(q2.price) : money(q2.price, q2.currency ?? "USD");
   };
+  var fundWords = (sym) => sym === "SPY" ? "SPY (the S&P 500 fund)" : sym;
+  var priceWords = (sym, q2) => priceDayWords(priceText(sym, q2), q2.changePct === null ? null : moveText(q2), q2);
   var latestCall = (sym) => S.desk?.calls.find((c) => c.ticker === sym) ?? null;
   var nameOf = (sym) => quoteOf(sym)?.name ?? S.history?.name ?? marketOf(sym)?.name ?? sym;
   var life = { stopped: false, updating: false, noKey: false };
@@ -680,7 +723,7 @@
       w.done,
       `Follow them ${term("paper", "on paper")} for ${esc(w.words)}, then read the ${term("scorecard", "scorecard")} before deciding about money and Robinhood`,
       `<div class="at-meter${w.done ? " ok" : ""}"><progress class="at-bar" max="${w.need}" value="${Math.min(w.weeks, w.need)}" aria-label="${w.weeks} of ${w.need} weeks on paper"></progress><b>${Math.min(w.weeks, w.need)} of ${w.need} weeks</b></div>
-    <p class="at-quiet ta-gwhy">Paper follows every call with pretend money, against the ${term("sp500", "S&P 500")}. A few weeks are noise, not proof: read the scorecard, good or bad, before you decide anything. Connecting Robinhood and switching trading on stay your own decisions.</p>
+    <p class="at-quiet ta-gwhy">Paper follows every call with pretend money, against SPY, the fund that copies the ${term("sp500", "S&P 500")}. A few weeks are noise, not proof: read the scorecard, good or bad, before you decide anything. Connecting Robinhood and switching trading on stay your own decisions.</p>
     <div class="at-row"><button class="at-btn at-press" data-act="goto" data-to="sec-score"><svg class="g"><use href="#i-target"/></svg><span>Go to the scorecard</span></button></div>`
     );
     const all = g.done === g.of;
@@ -772,9 +815,9 @@
       actions = connect("Connect Robinhood", true);
     } else if (r.state === "saved") actions = check("Check the connection", true) + leave;
     else if (r.state === "connected") {
-      const when = r.checkedAt ? clock(r.checkedAt) : "";
+      const checked = r.checkedAt ? when(r.checkedAt) : "";
       lede = "The sign-in works and Robinhood answered.";
-      facts = `<p class="at-quiet">${esc(r.message)}${when ? ` Checked at ${esc(when)}.` : ""}</p>`;
+      facts = `<p class="at-quiet">${esc(r.message)}${checked ? ` Checked at ${esc(checked)}.` : ""}</p>`;
       actions = check("Check again", false) + leave;
     } else if (r.state === "failed") actions = connect("Connect again", true) + check("Check again", false);
     $("#accountCard").innerHTML = `<div class="at-card-head"><h3>Robinhood</h3><span class="at-chip ${w.chip}">${esc(w.label)}</span></div>
@@ -815,8 +858,8 @@
     }
     const ag = views.find((v) => v.account.agentic);
     const agentic = kpi({ tone: "accent", icon: "i-bolt", name: "Agentic buying power", term: "buyingPower", value: ag ? money(ag.portfolio?.buyingPower, ag.portfolio?.currency ?? "USD") : "\u2014", line: ag ? tradingOn() ? '<span class="ta-warn">Trading is on</span> \xB7 orders only on your Confirm' : "Trading is off \xB7 the dashboard only reads" : "Show your Agentic account to trade", act: { act: "view", view: "account" } });
-    const m = marketOf("^GSPC"), q2 = m && isQuote(m.quote) ? m.quote : null;
-    const market = kpi({ tone: q2 ? q2.changePct !== null && q2.changePct < 0 ? "bad" : "ok" : "", icon: "i-pulse", name: "S&P 500 today", term: "sp500", value: q2 ? num(q2.price, 0) : "\u2014", line: q2 ? `<span class="${(q2.changePct ?? 0) >= 0 ? "ta-up" : "ta-down"}">${pct(q2.changePct)}</span> \xB7 ${q2.open ? "now" : "last close"}` : "Reading the market", act: { act: "select", symbol: "^GSPC" }, spark: q2 ? "gspc" : "" });
+    const m = marketOf("^GSPC"), q2 = m && isQuote(m.quote) ? m.quote : null, qDay = q2 ? moveDayOf(q2.asOf) : "";
+    const market = kpi({ tone: q2 ? q2.changePct !== null && q2.changePct < 0 ? "bad" : "ok" : "", icon: "i-pulse", name: "S&P 500", term: "sp500", value: q2 ? num(q2.price, 0) : "\u2014", line: q2 ? `<span class="${(q2.changePct ?? 0) >= 0 ? "ta-up" : "ta-down"}">${pct(q2.changePct)}</span> \xB7 ${q2.open ? "now" : qDay ? `close of ${weekDay(qDay)}` : "today's close"}` : "Reading the market", act: { act: "select", symbol: "^GSPC" }, spark: q2 ? "gspc" : "" });
     const latest = d?.calls[0];
     const desk2 = kpi({ tone: "merged", icon: "i-check", name: "The desk's calls", value: d ? String(d.calls.length) : "\u2014", line: d ? `${latest ? `latest <b>${esc(latest.ticker)}</b> ${esc(latest.rating)}` : "none yet"} \xB7 ${d.queue.filter(isOpenItem).length} waiting \xB7 ${d.record.summary.resolved} scored` : "Reading the desk", act: { act: "goto", to: "sec-calls" } });
     el.innerHTML = accounts + agentic + market + desk2;
@@ -856,7 +899,7 @@
   var sideWord = (s) => s === "buy" ? "Buy" : s === "sell" ? "Sell" : s ?? "\u2014";
   var CARE = { holdings: [], noticed: /* @__PURE__ */ new Set() };
   var careFor = (account2, symbol) => CARE.holdings.find((c) => c.account === account2 && c.symbol === symbol);
-  var belowWords = (c) => c.price && c.stop?.level != null ? `${c.desk} is at ${money(c.price.value)} on Yahoo Finance (${clock(c.price.asOf)}, up to 15 minutes late), below the stop of ${money(c.stop.level)} the desk's trader proposed on ${dayText(c.stop.date)}. Nothing is sold by itself: selling is your decision.` : "";
+  var belowWords = (c) => c.price && c.stop?.level != null ? `${c.desk} is at ${money(c.price.value)} on Yahoo Finance (${when(c.price.asOf)}, up to 15 minutes late), below the stop of ${money(c.stop.level)} the desk's trader proposed on ${dayText(c.stop.date)}. Nothing is sold by itself: selling is your decision.` : "";
   var sellWords = (c) => {
     if (!c.sell || !c.view) return "";
     const e = c.sell.early;
@@ -945,7 +988,7 @@
     const unread = v.unread ? `<p class="at-honest">${v.unread} holding(s) could not be read and are left out.</p>` : "";
     return `<div class="at-card at-box"><div class="at-card-head"><h3>${esc(a.label)}</h3><span class="at-chip">\u2022\u2022\u2022\u2022 ${esc(a.last4)}</span>${role}</div>
     ${tiles}${table}${unread}${agentic}${problems}
-    <p class="at-quiet">From Robinhood at ${esc(clock(at))}; holdings valued at Robinhood's live prices.</p></div>`;
+    <p class="at-quiet">From Robinhood at ${esc(when(at))}; holdings valued at Robinhood's live prices.</p></div>`;
   }
   function renderViews() {
     const el = $("#accountViews");
@@ -1260,15 +1303,17 @@
     const price = $("#heroPrice"), change = $("#heroChange"), asOf = $("#heroAsOf");
     const first = h?.bars[0]?.close, last = h?.bars[h.bars.length - 1]?.close;
     const spanPct = first && last ? (last / first - 1) * 100 : null;
+    const span = spanPct === null ? "" : marketOf(sym)?.unit === "%" && first && last ? points(last - first) : pct(spanPct);
     if (q2) {
+      const day = moveDayOf(q2.asOf);
       price.textContent = priceText(sym, q2);
       change.className = `at-chip ${tone(q2.changePct)}`;
-      change.textContent = q2.changePct === null ? "" : `${pct(q2.changePct)} today`;
-      asOf.textContent = `${spanPct === null ? "" : `${pct(spanPct)} over ${OVER[S.range]} \xB7 `}price at ${clock(q2.asOf)}${q2.open ? "" : ", market closed"}`;
+      change.textContent = q2.changePct === null ? "" : `${moveText(q2)} ${day ? `on ${weekDay(day)}` : "today"}`;
+      asOf.textContent = `${span ? `${span} over ${OVER[S.range]} \xB7 ` : ""}price at ${when(q2.asOf)}${q2.open ? "" : " \xB7 market closed"}`;
     } else if (last !== void 0) {
       price.textContent = isIndex(sym) ? num(last) : money(last, h?.currency ?? "USD");
       change.className = `at-chip ${tone(spanPct)}`;
-      change.textContent = spanPct === null ? "" : `${pct(spanPct)} over ${OVER[S.range]}`;
+      change.textContent = span ? `${span} over ${OVER[S.range]}` : "";
       asOf.textContent = "last daily close; no live price";
     } else {
       price.textContent = "\u2014";
@@ -1383,13 +1428,13 @@
     const d = S.desk;
     if (!d) return;
     const q2 = d.queue, l = d.analyses.listener, waiting = q2.filter((x) => x.state === "waiting").length, running = q2.some((x) => x.state === "running");
-    $("#analysesSub").textContent = l ? `Runs by itself: ${l.listener} is listening on this computer${l.lastRun ? ` \xB7 last run ${clock(l.lastRun.at)}: ${l.lastRun.result}` : ""}. One stock at a time, at most ${d.analyses.perRun} a run.` : 'Nothing is listening, so analyses wait here. Switch on "Run automatically" in Madav, or run them with Claude Code on this computer, or ask the desk to "analyse what is waiting" in a chat.';
+    $("#analysesSub").textContent = l ? `Runs by itself: ${l.listener} is listening on this computer${l.lastRun ? ` \xB7 last run ${l.lastRun.startOnly ? "started " : ""}${when(l.lastRun.at)}: ${l.lastRun.result.replace(/[\s.]+$/, "")}` : ""}. One stock at a time, at most ${d.analyses.perRun} a run.` : 'Nothing is listening, so analyses wait here. Switch on "Run automatically" in Madav, or run them with Claude Code on this computer, or ask the desk to "analyse what is waiting" in a chat.';
     const press = (act, words, primary = false) => `<button class="at-btn at-press${primary ? " primary" : ""}" data-act="${act}">${esc(words)}</button>`;
     $("#analysesDo").innerHTML = (l && waiting && !running ? press("q-run", "Run now") : "") + (!l ? press("listen-on", "Run automatically with Claude Code", waiting > 0) : l.listener === "Claude Code" ? press("listen-off", "Stop running automatically") : "");
     const stands = (x) => {
       if (x.state === "running") return `<span class="at-chip accent">Being analysed</span> <span class="at-quiet">${esc(x.progress ?? "starting")}</span>`;
       if (x.state === "waiting") return `<span class="at-chip">Waiting</span>${l ? "" : ' <span class="at-quiet">for a run to start</span>'}`;
-      if (x.state === "done") return `${ratingChip(x.rating ?? "Recorded")} <span class="at-quiet">done ${esc(x.endedAt ? clock(x.endedAt) : "")}</span>`;
+      if (x.state === "done") return `${ratingChip(x.rating ?? "Recorded")} <span class="at-quiet">done ${esc(x.endedAt ? when(x.endedAt) : "")}</span>`;
       return `<span class="at-chip danger">Failed</span> <span class="at-quiet">${esc(x.reason ?? "")}</span>`;
     };
     const doing = (x) => {
@@ -1417,7 +1462,7 @@
     if (!sym || isIndex(sym) || !d) return;
     const q2 = quoteOf(sym), it = tierItem(sym);
     $("#stockTitle").textContent = `Everything on ${sym}`;
-    $("#stockSub").textContent = `${nameOf(sym)}${it?.name && it.meaning ? ` (${it.name}: ${it.meaning})` : ""}${q2 ? ` \xB7 ${priceText(sym, q2)}${q2.changePct === null ? "" : ` (${pct(q2.changePct)} today)`} on Yahoo Finance, up to 15 min late` : ""} \xB7 the chart is above`;
+    $("#stockSub").textContent = `${nameOf(sym)}${it?.name && it.meaning ? ` (${it.name}: ${it.meaning})` : ""}${q2 ? ` \xB7 ${priceWords(sym, q2)}` : ""} \xB7 the chart is above`;
     let held;
     if (!signedIn()) held = '<p class="at-quiet">Connect Robinhood in Your account to see what you hold of it.</p>';
     else if (!A.snapshot) held = '<p class="at-quiet">Read your accounts (Your account, Refresh from Robinhood) to see what you hold of it.</p>';
@@ -1427,7 +1472,7 @@
         const c = careFor(v.account.key, h.symbol), marks = c ? careMarks(c) : "";
         return `<div><dt>${esc(v.account.label)} \xB7 ${v.account.agentic ? "Agentic" : "view only"}</dt><dd>${num(h.quantity, h.quantity % 1 ? 4 : 0)} at ${money(h.averageCost, cur)} average \xB7 now ${money(h.value, cur)}${h.gainPct === null ? "" : ` <span class="at-chip ${tone(h.gainPct)}">${pct(h.gainPct)}</span>`}${marks ? ` ${marks}` : ""}</dd></div>`;
       }));
-      held = rows.length ? `<dl class="at-facts ruled at-box">${rows.join("")}</dl><p class="at-quiet">Valued at Robinhood's live price, read at ${esc(clock(A.snapshot.at))}.</p>` : `<p class="at-quiet">Not held in the accounts you show.</p>`;
+      held = rows.length ? `<dl class="at-facts ruled at-box">${rows.join("")}</dl><p class="at-quiet">Valued at Robinhood's live price, read at ${esc(when(A.snapshot.at))}.</p>` : `<p class="at-quiet">Not held in the accounts you show.</p>`;
     }
     const calls = d.calls.filter((c) => c.ticker === sym);
     const list = calls.length ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>Date</th><th>Rating</th><th>Result</th><th></th></tr></thead><tbody>${calls.map((c) => `<tr class="ta-go" data-act="open-call" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}"><td>${esc(dayText(c.date))}</td><td>${ratingChip(c.rating)}</td><td>${resultChip(c)}</td><td><span class="at-quiet">Read</span></td></tr>`).join("")}</tbody></table></div>` : `<p class="at-quiet">The desk has no call on ${esc(sym)} yet.</p>`;
@@ -1462,7 +1507,7 @@
       const head = `<tr class="ta-tier-row"><td colspan="7"><button class="ta-tier-fold" data-act="fold" data-tier="${esc(t.tier)}" aria-expanded="${open}" title="${open ? "Fold this tier away" : "Open this tier"}"><svg class="g"><use href="#i-chev-right"/></svg><b>${esc(t.name)}</b><span class="at-chip">${t.items.length}</span><span class="at-quiet">${esc(t.meaning)}</span></button></td></tr>`;
       return `<tbody>${head}${open ? t.items.map(row).join("") : ""}</tbody>`;
     }).join("");
-    $("#watchTable").innerHTML = `<thead><tr><th></th><th>Name</th><th class="num">Price</th><th class="num">Today</th><th>Today's moves</th><th>Latest call</th><th></th></tr></thead>${groups || '<tbody><tr><td colspan="7" class="ta-empty">Nothing on the watchlist yet. Type a company or a fund above, for example NVDA or SPY, and press Add.</td></tr></tbody>'}`;
+    $("#watchTable").innerHTML = `<thead><tr><th></th><th>Name</th><th class="num">Price</th><th class="num">${term("today")}</th><th><span title="The price through its latest trading day, every five minutes">Through the day</span></th><th>Latest call</th><th></th></tr></thead>${groups || '<tbody><tr><td colspan="7" class="ta-empty">Nothing on the watchlist yet. Type a company or a fund above, for example NVDA or SPY, and press Add.</td></tr></tbody>'}`;
     for (const t of tiers) {
       if (folded.has(t.tier)) continue;
       for (const i of t.items) {
@@ -1511,7 +1556,7 @@
     }
     const typing = document.getElementById("mkInput");
     const kept = typing ? { value: typing.value, focus: document.activeElement === typing, from: typing.selectionStart, to: typing.selectionEnd } : null;
-    el.innerHTML = d.startHere.map(tierBlock).join("") + `<p class="at-honest">${term("today", "Today's move")} is the change since the last day's close; a dash is a price Yahoo Finance did not give. Each ${term("call", "call")} is the desk's rating, from Buy to Sell: Buy and Overweight lean towards owning it, Hold keeps what is held, Underweight and Sell lean against it, and pointing at a rating says what its ticket does. A ${term("fund", "fund")} holds many companies at once; + adds one to your watchlist. Nothing here is investment advice.</p>`;
+    el.innerHTML = d.startHere.map(tierBlock).join("") + `<p class="at-honest">${term("today")} is the change over the latest trading day, from the close before it, with the day named (Fri) when it was not today; a dash is a price Yahoo Finance did not give. Each ${term("call", "call")} is the desk's rating, from Buy to Sell: Buy and Overweight lean towards owning it, Hold keeps what is held, Underweight and Sell lean against it, and pointing at a rating says what its ticket does. A ${term("fund", "fund")} holds many companies at once; + adds one to your watchlist. Nothing here is investment advice.</p>`;
     const field = document.getElementById("mkInput");
     if (kept && field) {
       field.value = kept.value;
@@ -1534,7 +1579,7 @@
     el.innerHTML = `${head}<div class="ta-lines">${w.lines.map((l) => `<div class="ta-line">
       <div class="ta-line-head"><b>${named(l)}</b>${l.state ? `<span class="at-chip ${LINE_TONE[l.tone]}">${esc(l.state)}</span>` : '<span class="at-chip">\u2014</span>'}</div>
       <p>${esc(l.words)}</p><p class="at-quiet">${esc(l.meaning)}</p></div>`).join("")}</div>
-    <p class="at-honest">From Yahoo Finance and Polymarket at ${esc(clock(w.at))}. Nothing here is investment advice.</p>`;
+    <p class="at-honest">From Yahoo Finance and Polymarket at ${esc(when(w.at))}. Nothing here is investment advice.</p>`;
   }
   function lookRow(p) {
     const it = tierItem(p.symbol), name = it?.name ?? quoteOf(p.symbol)?.name ?? p.symbol;
@@ -1554,7 +1599,7 @@
     }
     const list = s.picks.length ? `<div class="ta-looks">${s.picks.map(lookRow).join("")}</div>` : `<p class="at-lede">Nothing stood out among the ${s.looked} looked at: no move of 3% or more, no volume twice its usual, no 52-week high or low, no cross of an average, and no news today about your companies or coins.</p>`;
     el.innerHTML = `${head}${list}${s.unavailable.length ? `<p class="at-quiet">Could not be read just now: ${esc(listWords(s.unavailable))}.</p>` : ""}${sw}
-    <p class="at-honest">Ranked by how many of these fire, then by the size of the move: a move of 3% or more in a day; volume at least twice its usual (its average over 20 days); a new 52-week high or low (the highest or lowest price in a year); a close across its 50- or 200-day average (its average closing price over that many days); and, for a company or a coin, news about it today. From Yahoo Finance's daily prices at ${esc(clock(s.at))}. A move says what happened, not what comes next. Nothing here is investment advice.</p>`;
+    <p class="at-honest">Ranked by how many of these fire, then by the size of the move: a move of 3% or more in a day; volume at least twice its usual (its average over 20 days); a new 52-week high or low (the highest or lowest price in a year); a close across its 50- or 200-day average (its average closing price over that many days); and, for a company or a coin, news about it today. From Yahoo Finance's daily prices at ${esc(when(s.at))}. A move says what happened, not what comes next. Nothing here is investment advice.</p>`;
   }
   function renderMorning() {
     renderWeather();
@@ -1597,7 +1642,7 @@
   function renderCalls() {
     const d = S.desk;
     if (!d) return;
-    $("#callsSub").textContent = d.calls.length ? `${d.calls.length} recorded \xB7 each is scored ${d.desk.holdingDays} trading days later against its market's index` : "Every analysis the team records appears here";
+    $("#callsSub").textContent = d.calls.length ? `${d.calls.length} recorded \xB7 each is scored ${d.desk.holdingDays} trading days later against ${fundWords(d.desk.benchmark)} for a US stock` : "Every analysis the team records appears here";
     const rows = d.calls.map((c) => `<tr class="ta-go" data-act="open-call" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}" title="Press to read the call in full">
     <td>${esc(dayText(c.date))}</td><td><b>${esc(c.ticker)}</b></td><td>${ratingChip(c.rating)}</td>
     <td><span class="at-row compact">${resultChip(c)}${paperChip(c.ticker, c.date)}</span></td>
@@ -1611,9 +1656,14 @@
   function paperChip(ticker, date) {
     const t = tradeOf(ticker, date);
     if (!t) return "";
-    if (t.status === "filled" && t.side === "buy") return `<span class="at-chip ${tone(t.sincePct === void 0 ? null : t.sincePct)}" title="${esc(t.why)}">paper ${t.sincePct === void 0 ? "bought" : pct(t.sincePct * 100)}</span>`;
-    if (t.status === "filled") return `<span class="at-chip" title="${esc(t.why)}">paper: sold ${esc(String(t.quantity ?? ""))}</span>`;
-    return `<span class="at-chip" title="${esc(t.why)}">${esc(PAPER_WORDS[t.status])}</span>`;
+    const reason = t.why.replace(/\b\d{4}-\d{2}-\d{2}\b/g, (day) => dayText(day));
+    if (t.status === "filled" && t.side === "buy") {
+      const since = t.sincePct === void 0 ? null : pct(t.sincePct * 100);
+      const why = `${reason}${since ? ` ${t.ticker} has moved ${since} since that close, to the latest close: the stock's move since the paper buy, not the call's result.` : ""}`;
+      return `<span class="at-chip ${tone(t.sincePct ?? null)}" title="${esc(why)}">paper: bought ${esc(String(t.quantity ?? ""))}${since ? ` \xB7 ${esc(t.ticker)} ${since} since` : ""}</span>`;
+    }
+    if (t.status === "filled") return `<span class="at-chip" title="${esc(reason)}">paper: sold ${esc(String(t.quantity ?? ""))}</span>`;
+    return `<span class="at-chip" title="${esc(reason)}">${esc(PAPER_WORDS[t.status])}</span>`;
   }
   async function loadPaper() {
     try {
@@ -1636,10 +1686,10 @@
     if (!d.paper.since) lede = "No calls yet: the paper record starts with the desk's first call on a stock, a fund, Bitcoin or Ether.";
     else if (!b) lede = PAPER.failed ? "The paper record could not be worked out just now: Yahoo Finance did not answer. It tries again in a moment." : "Working out the paper record from the closing prices.";
     else if (b.series.length < 2 || b.returnPct === null) lede = `Following the desk on paper since ${dayText(b.since ?? d.paper.since)}: nothing has filled yet. A call fills at the first closing price after its day.`;
-    else lede = `Following the desk on paper since ${dayText(b.since ?? d.paper.since)}: ${pct(b.returnPct * 100)} (${money(b.value)} from ${money(b.startUsd)}), ${b.benchmarkPct === null ? "the S&P 500 unavailable" : `the S&P 500 ${pct(b.benchmarkPct * 100)}`} over the same days.`;
+    else lede = `Following the desk on paper since ${dayText(b.since ?? d.paper.since)}: ${pct(b.returnPct * 100)} (${money(b.value)} from ${money(b.startUsd)}), ${fundWords(b.benchmark)} ${b.benchmarkPct === null ? "unavailable" : pct(b.benchmarkPct * 100)} over the same days.`;
     const held = b?.positions.length ? `<p class="at-quiet">${term("position", "Positions")} on paper now: ${b.positions.map((p) => `${esc(p.ticker)} ${p.quantity}`).join(", ")}, and ${esc(money(b.cash))} in cash.</p>` : "";
     $("#paperCard").innerHTML = `<div class="at-card-head"><h3>Your ${term("paper", "paper")} record</h3><span class="at-chip">${esc(weeksWords(d.paper))} of record</span></div>
-    <p class="at-lede">${esc(lede)}</p>${b && b.series.length > 1 ? `<div class="ta-spark-tall" id="paperChart"></div><p class="at-quiet">The solid line is the paper money; the dashed one is the ${term("sp500", "S&P 500")} from the same start.</p>` : ""}${held}
+    <p class="at-lede">${esc(lede)}</p>${b && b.series.length > 1 ? `<div class="ta-spark-tall" id="paperChart"></div><p class="at-quiet">The solid line is the paper money; the dashed one is ${esc(b.benchmark)}${b.benchmark === "SPY" ? `, the fund that copies the ${term("sp500", "S&P 500")},` : ""} from the same start.</p>` : ""}${held}
     <p class="at-honest">Every call on a stock, a fund, Bitcoin or Ether is followed as its order ticket would size it, and fills at the first closing price after its day. Crypto is bought in fractions within your crypto limit, on paper only: Robinhood's agent doorway trades stocks and funds. No costs are counted (Robinhood charges no commission). A few weeks of record are noise, not proof, and nothing here is investment advice.</p>`;
     const el = document.getElementById("paperChart");
     if (el && b) paperChart(el, b.series);

@@ -63,6 +63,28 @@ test('the lead has no shell and no free file access: only its members, its quest
   for (const t of ['Bash', 'PowerShell', 'Read', 'Glob', 'Grep', 'Write', 'Edit', 'NotebookEdit', 'WebFetch', 'WebSearch']) assert.ok(banned.includes(t), `the lead may use ${t}`);
 });
 
+test('the agents who size or decide read the holdings from the desk, never from the lead\'s request (round 1: "Holdings: not provided")', () => {
+  const readers = ['trader', 'aggressive-risk-analyst', 'conservative-risk-analyst', 'neutral-risk-analyst', 'portfolio-manager'];
+  for (const agent of src.AGENTS) {
+    const { text } = front(agent.file), reads = readers.includes(agent.file);
+    assert.equal(/read_run \(sections [^)]*\bholdings\b/.test(text), reads, `${agent.file} ${reads ? 'does not read' : 'reads'} section holdings`);
+    assert.equal(text.includes('What the person holds is in section holdings of read_run'), reads, agent.file);
+    assert.doesNotMatch(text, /The request gives what the person holds/, `${agent.file} still expects the lead to pass the holdings`);
+    if (reads) assert.match(text, /never say they were not provided\. When it says none are saved, say that, and never assume a flat book/, agent.file);
+  }
+  // the trader opens with what it sized to, so every saved run shows it; the portfolio manager reads the lessons too
+  assert.match(front('trader').text, /Start your work with one line, "Holdings: ", saying in a few words what section holdings gives/);
+  assert.match(front('portfolio-manager').text, /read_run \(sections research_plan, trader, risk_debate, holdings, lessons\)/);
+  // the research manager plans against a standard allocation: the position is the trader's and the portfolio manager's
+  assert.match(front('research-manager').text, /You do not see the person's holdings/);
+  // and the lead is never asked to copy them into a request
+  for (const file of ['.claude/skills/analyse/SKILL.md', '.claude/agents/trading-desk.md']) {
+    const text = fs.readFileSync(file, 'utf8');
+    assert.doesNotMatch(text, /holdings block|word for word\. \|/, `${file} still relays the holdings`);
+    assert.match(text, /read what the person holds, and the portfolio manager the lessons, from the desk \(`read_run`\)/, file);
+  }
+});
+
 test('every agent carries the desk\'s rules and saves the section the plan expects', () => {
   for (const agent of src.AGENTS) {
     const { text } = front(agent.file);
