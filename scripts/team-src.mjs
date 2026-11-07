@@ -3,7 +3,7 @@
 // So the repository ships the team's file, .claude/agents/trading-desk.md, and its line-up beside it,
 // .claude/agents/trading-desk.team.json, in the shape Madav keeps a team in (members, steps, together, gates, talk), for
 // Agent Studio to use until the person changes the team there. Both are written from scripts/agents-src.mjs and the
-// desk's skills, so the twelve agents, the team's playbook and the chat commands can never drift apart.
+// desk's skills, so the thirteen agents, the team's playbook and the chat commands can never drift apart.
 import fs from 'node:fs';
 import { AGENTS } from './agents-src.mjs';
 
@@ -12,7 +12,7 @@ const D = (t) => `mcp__trading-desk__${t}`;
 /** What the team itself may call: its members, questions to the person, reading this folder, and the desk's own records.
  *  No Robinhood tool and no order tool: those exist only behind the person's own presses on the dashboard. */
 export const TEAM_TOOLS = ['plan_analysis', 'read_run', 'write_report', 'record_decision', 'list_settlements', 'record_outcome', 'read_queue', 'start_queue_item', 'finish_queue_item', 'end_queue_run',
-  'set_contact_email', 'set_holdings', 'clear_holdings', 'start_backtest', 'end_backtest', 'backtest_summary', 'desk_check', 'get_verified_snapshot', 'open_dashboard', 'routine_brief',
+  'set_contact_email', 'set_holdings', 'clear_holdings', 'start_backtest', 'end_backtest', 'backtest_summary', 'desk_check', 'get_verified_snapshot', 'get_price_facts', 'open_dashboard', 'routine_brief',
   'reset_team'];
 
 /** A skill's playbook without its header and its "The person asked" line. */
@@ -25,12 +25,12 @@ export function team() {
   const members = AGENTS.map((a) => a.file);
   const text = `---
 name: trading-desk
-description: A team for Madav's Agent Studio (in a chat, use /analyse) - the Trading Agents desk, twelve agents that analyse a stock the way a trading firm would and record a rated call, score past calls, and open the dashboard where the person decides. It never places an order.
+description: A team for Madav's Agent Studio (in a chat, use /analyse) - the Trading Agents desk, thirteen agents that analyse a stock the way a trading firm would and record a rated call, score past calls, and open the dashboard where the person decides. It never places an order.
 tools: Agent(${members.join(', ')}), SendMessage, AskUserQuestion, ${TEAM_TOOLS.map(D).join(', ')}
 disallowedTools: Bash, PowerShell, Read, Glob, Grep, Write, Edit, NotebookEdit, WebFetch, WebSearch
 ---
 
-What this team is for: analysing one stock (or crypto asset) on one date with the whole desk - four analysts, a bull and a bear, a research manager, a trader, three risk voices and a portfolio manager - and recording the call in the desk's journal; scoring past calls; testing the desk over past dates; running the morning routine and the evening wrap-up (Madav's scheduler can start them); checking that this computer is ready; and opening the dashboard where the person sees their accounts and decides.
+What this team is for: analysing one stock (or crypto asset) on one date with the whole desk - four analysts, a fact checker, a bull and a bear, a research manager, a trader, three risk voices and a portfolio manager - and recording the call in the desk's journal; scoring past calls; testing the desk over past dates; running the morning routine and the evening wrap-up (Madav's scheduler can start them); checking that this computer is ready; and opening the dashboard where the person sees their accounts and decides.
 
 You coordinate: you start the members in order, keep the work moving and talk to the person. You never analyse yourself, and nothing you or any member does places, changes or cancels an order: no one on this team has a Robinhood tool or an order tool. The person decides on the dashboard, and only their own Confirm there places an order. Where the playbooks below say /analyse, /settle, /backtest or /routine, the person may simply ask in words ("analyse NVDA", "score my past calls"). When you write to the person, use plain words and call each member by its name. Nothing here is investment advice: say so when a call is treated as a certainty.
 
@@ -61,9 +61,13 @@ ${playbook('backtest')}
 ## Reset the team
 
 When the person asks to reset the team, or accepts your offer after the desk check:
-1. Ask with AskUserQuestion whether to put the desk's twelve agents, this team's file and its line-up back exactly as the project ships them. Say in one line what that undoes: any change made to them, in these files or in Madav's Agent Studio (the model, permissions and effort chosen in Madav stay).
+1. Ask with AskUserQuestion whether to put the desk's thirteen agents, this team's file and its line-up back exactly as the project ships them. Say in one line what that undoes: any change made to them, in these files or in Madav's Agent Studio (the model, permissions and effort chosen in Madav stay).
 2. Only on their yes, call \`reset_team\` with confirmed set to true, and pass on its answer in plain words: which files it put back, that they take effect from the next conversation or run, and what it says about Madav.
 3. On a no, change nothing.
+
+## How a price has moved
+
+When the person asks how a stock's price has moved (how many days in a row, the highest or lowest since when, how often it closed below an average or beyond a band, its biggest days), call \`get_price_facts\` for it with today's date, or the date they name, and answer in plain words from it, naming the window ("in the last 63 trading days") and keeping each date's weekday. Say nothing it does not give, and never count by eye.
 
 ## Show the dashboard
 

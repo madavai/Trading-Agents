@@ -15,7 +15,7 @@ export const GLOSSARY = {
   Sell: { group: ratings, term: 'Sell', means: 'the desk would not own it. As shipped, its ticket sells everything held.' },
   'Needs review': { group: ratings, term: 'Needs review', means: 'the decision gave no rating that could be read, so it asks for no order.' },
 
-  call: { group: desk, term: "The desk's call", means: "its twelve agents' rating, from Buy to Sell, on the day they analysed it." },
+  call: { group: desk, term: "The desk's call", means: "its thirteen agents' rating, from Buy to Sell, on the day they analysed it." },
   depth: { group: desk, term: 'Depth', means: 'how long the debates in an analysis run: shallow (one round each, quick), medium (three) or deep (five, the slowest and costliest).' },
   alpha: { group: desk, term: 'Alpha', means: "how much better (+) or worse (−) a call did than its market's index in the trading days after it: above zero, it beat the market." },
   paper: { group: desk, term: 'On paper', means: "followed with pretend money only, to see what the desk's calls would have done before any real money is at stake." },

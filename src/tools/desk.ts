@@ -18,7 +18,7 @@ import { DEPTHS, finishItem, QueueRefusal, readQueue, ringDoorbell, startItem, w
 import { Journal } from '../desk/journal.js';
 import { writeWhole } from '../desk/lock.js';
 import { parseRating, RATINGS } from '../desk/rating.js';
-import { progress, readSections, savedPlan, saveSection, SECTIONS, writeReport } from '../desk/runs.js';
+import { correctSection, progress, readSections, savedPlan, saveSection, SECTIONS, writeReport } from '../desk/runs.js';
 import { dueSettlements, settleOne } from '../desk/settle.js';
 import { failureText, NoData, Unavailable } from '../data/http.js';
 import { openDashboard } from '../terminal/launch.js';
@@ -83,6 +83,25 @@ export function registerDeskTools(server: McpServer, root: string): void {
   }, async (a) => act(() => {
     const d = analysisDate(a.analysis_date), turns = saveSection(ws().dir, a.symbol, d, a.section, a.text);
     return `Saved ${a.section} for ${safeSymbol(a.symbol)} on ${d} (${turns > 1 ? `turn ${turns}` : 'one text'}).`;
+  }));
+
+  server.registerTool('correct_report', {
+    title: "Correct an analyst's report",
+    description: 'The fact checker\'s corrections to an analyst\'s report (market, sentiment, news or fundamentals), made by the desk word for word before the debate begins. Each correction gives the report\'s exact old words and the right ones: the desk replaces them where they stand and keeps the old words beside them as [corrected: was "..."]. flag_after names the exact words that end a conclusion resting on a corrected fact; the desk adds a note after them. Nothing else in the report changes, so never save a corrected report yourself. Words found more than once need more of the words around them, or every set to true to correct them all. It answers line by line what was done and what was not, and why.',
+    inputSchema: {
+      symbol, analysis_date: day,
+      section: z.enum(['market', 'sentiment', 'news', 'fundamentals']),
+      corrections: z.array(z.object({
+        was: z.string().min(1).max(2000).describe('The report\'s words, exactly as it has them'),
+        now: z.string().min(1).max(2000).describe('The right words, from a tool result'),
+        every: z.boolean().optional().describe('Correct every place these words appear'),
+      })).max(60),
+      flag_after: z.array(z.string().min(1).max(500)).max(20).optional().describe('The exact words ending each conclusion that rested on a corrected fact'),
+    },
+    annotations: write,
+  }, async (a) => act(() => {
+    const d = analysisDate(a.analysis_date), lines = correctSection(ws().dir, a.symbol, d, a.section, a.corrections, a.flag_after);
+    return [`The ${a.section} report for ${safeSymbol(a.symbol)} on ${d}:`, ...lines].join('\n');
   }));
 
   server.registerTool('read_run', {

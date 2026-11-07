@@ -17917,8 +17917,8 @@ var error43 = () => {
       case "not_multiple_of":
         return `N\xFAmero inv\xE1lido: deve ser m\xFAltiplo de ${issue2.divisor}`;
       case "unrecognized_keys": {
-        const plural2 = issue2.keys.length > 1 ? "s" : "";
-        return `Chave${plural2} inv\xE1lida${plural2}: ${joinValues(issue2.keys, ", ")}`;
+        const plural3 = issue2.keys.length > 1 ? "s" : "";
+        return `Chave${plural3} inv\xE1lida${plural3}: ${joinValues(issue2.keys, ", ")}`;
       }
       case "invalid_key":
         return `Entrada inv\xE1lida n${translateOriginWithArticle(issue2.origin, "definite")}`;
@@ -18062,8 +18062,8 @@ var error44 = () => {
       case "not_multiple_of":
         return `N\xFAmero inv\xE1lido: deve ser m\xFAltiplo de ${issue2.divisor}`;
       case "unrecognized_keys": {
-        const plural2 = issue2.keys.length > 1 ? "s" : "";
-        return `Chave${plural2} inv\xE1lida${plural2}: ${joinValues(issue2.keys, ", ")}`;
+        const plural3 = issue2.keys.length > 1 ? "s" : "";
+        return `Chave${plural3} inv\xE1lida${plural3}: ${joinValues(issue2.keys, ", ")}`;
       }
       case "invalid_key":
         return `Entrada inv\xE1lida n${translateOriginWithArticle(issue2.origin, "definite")}`;
@@ -37159,8 +37159,8 @@ function atr(bars, n2 = 14) {
 function vwma(bars, n2 = 14) {
   return bars.map((_, i) => {
     if (i < n2 - 1) return null;
-    const w = bars.slice(i - n2 + 1, i + 1), vol3 = w.reduce((a, b) => a + b.volume, 0);
-    return vol3 > 0 ? w.reduce((a, b) => a + b.close * b.volume, 0) / vol3 : null;
+    const w = bars.slice(i - n2 + 1, i + 1), vol4 = w.reduce((a, b) => a + b.volume, 0);
+    return vol4 > 0 ? w.reduce((a, b) => a + b.close * b.volume, 0) / vol4 : null;
   });
 }
 function mfi(bars, n2 = 14) {
@@ -37247,6 +37247,9 @@ function analysisDate(value) {
 }
 var isHistorical = (date5) => date5 < today();
 var addDays = (date5, days) => new Date(Date.parse(`${date5}T00:00:00Z`) + days * DAY).toISOString().slice(0, 10);
+var WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+var weekday = (date5) => WEEKDAYS[(/* @__PURE__ */ new Date(`${date5}T00:00:00Z`)).getUTCDay()];
+var withWeekday = (date5) => `${date5} (${weekday(date5)})`;
 var daysBetween = (from, to) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY);
 function window(start, end, analysis2) {
   let s = parseDate(start, "start date"), e = parseDate(end, "end date");
@@ -37340,25 +37343,25 @@ function parseChart(json2, symbol4) {
   const r = json2.chart?.result?.[0];
   if (!r) throw new NoData(`Yahoo Finance has no prices for ${symbol4}${json2.chart?.error?.description ? ` (${json2.chart.error.description})` : ""}`);
   const m2 = r.meta ?? {}, q = r.indicators?.quote?.[0] ?? {}, adj = r.indicators?.adjclose?.[0]?.adjclose;
-  const offset = m2.gmtoffset ?? 0, dayOf = (ts) => new Date((ts + offset) * 1e3).toISOString().slice(0, 10);
+  const offset = m2.gmtoffset ?? 0, dayOf2 = (ts) => new Date((ts + offset) * 1e3).toISOString().slice(0, 10);
   const bars = [], blank = [];
   (r.timestamp ?? []).forEach((ts, i) => {
     const open3 = num(q.open?.[i]), high = num(q.high?.[i]), low = num(q.low?.[i]), close = num(q.close?.[i]);
     if (open3 === null || high === null || low === null || close === null || close <= 0) {
-      blank.push(dayOf(ts));
+      blank.push(dayOf2(ts));
       return;
     }
     const a = num(adj?.[i]), k = a !== null ? a / close : 1;
-    bars.push({ date: dayOf(ts), open: open3 * k, high: high * k, low: low * k, close: close * k, volume: num(q.volume?.[i]) ?? 0 });
+    bars.push({ date: dayOf2(ts), open: open3 * k, high: high * k, low: low * k, close: close * k, volume: num(q.volume?.[i]) ?? 0 });
   });
   const seen = /* @__PURE__ */ new Set();
   const unique = bars.filter((b) => seen.has(b.date) ? false : (seen.add(b.date), true));
   const lastDay = unique.at(-1)?.date ?? "", unfilled = [...new Set(blank.filter((d) => d > lastDay))];
-  const reg = m2.currentTradingPeriod?.regular, session2 = reg?.start && reg.end ? { date: dayOf(reg.start), start: reg.start * 1e3, end: reg.end * 1e3 } : void 0;
+  const reg = m2.currentTradingPeriod?.regular, session2 = reg?.start && reg.end ? { date: dayOf2(reg.start), start: reg.start * 1e3, end: reg.end * 1e3 } : void 0;
   const paid = /* @__PURE__ */ new Map();
   for (const d of Object.values(r.events?.dividends ?? {})) {
     const amount = num(d.amount);
-    if (amount !== null && amount > 0 && typeof d.date === "number" && Number.isFinite(d.date)) paid.set(dayOf(d.date), amount);
+    if (amount !== null && amount > 0 && typeof d.date === "number" && Number.isFinite(d.date)) paid.set(dayOf2(d.date), amount);
   }
   return {
     meta: { symbol: m2.symbol ?? symbol4, currency: m2.currency, exchange: m2.fullExchangeName ?? m2.exchangeName, type: m2.instrumentType, name: m2.longName ?? m2.shortName, price: m2.regularMarketPrice, timezone: m2.exchangeTimezoneName, session: session2 },
@@ -37504,6 +37507,378 @@ async function verifiedSnapshot(raw, analysis2, lookBack = 30) {
   return lines.join("\n");
 }
 
+// src/numbers.ts
+function signed(v, digits) {
+  const text4 = Math.abs(v).toFixed(digits);
+  return Number(text4) === 0 ? text4 : `${v > 0 ? "+" : "-"}${text4}`;
+}
+var signedPct = (fraction, digits = 1) => `${signed(fraction * 100, digits)}%`;
+var unsignZero = (text4) => text4.replace(/^[+\-−](0(?:\.0+)?%)$/, "$1");
+
+// src/data/facts.ts
+var WINDOWS = [[20, "about a month"], [63, "about three months"], [126, "about six months"], [252, "about a year"]];
+var CALENDAR_DAYS = 700;
+var CROSSES_SHOWN = 6;
+var TOP = 3;
+var f22 = (v) => v.toFixed(2);
+var vol2 = (v) => Math.round(v).toLocaleString("en-US");
+var cent = (v) => v === null || v === void 0 || !Number.isFinite(v) ? null : Math.round(v * 100) / 100;
+var cmp = (a, b) => {
+  const x = cent(a), y = cent(b);
+  return x === null || y === null ? null : x > y ? 1 : x < y ? -1 : 0;
+};
+var plural2 = (n2, one3, many = `${one3}s`) => `${n2} ${n2 === 1 ? one3 : many}`;
+async function priceFacts(raw, analysis2) {
+  const day3 = analysisDate(analysis2);
+  return priceFactsText(normalizeSymbol(raw), day3, await history(raw, day3, CALENDAR_DAYS));
+}
+function priceFactsText(sym2, day3, s) {
+  const bars = s.bars, n2 = bars.length, L = n2 - 1;
+  const d = (i) => withWeekday(bars[i].date);
+  const close = bars.map((b) => b.close), m2 = macd(close), bb = bollinger(close);
+  const ema10 = ema(close, 10), sma50 = sma(close, 50), sma200 = sma(close, 200), vw = vwma(bars), rsi14 = rsi(close), atr14 = atr(bars);
+  const change3 = close.map((c, i) => i && close[i - 1] ? (c / close[i - 1] - 1) * 100 : null);
+  const windows = WINDOWS.map(([size, words3]) => ({ size: Math.min(size, n2), words: size <= n2 ? words3 : "all on record", full: size }));
+  const from = (w) => n2 - w.size;
+  const out = [
+    `## Price facts for ${sym2}, worked out by the desk`,
+    "",
+    `- Analysis date: ${withWeekday(day3)}. Latest row: ${d(L)}. Rows after the analysis date are excluded.`,
+    "- From the same daily prices as the checked price table (adjusted for splits and dividends) and the same indicators (10 EMA, 50 SMA, 200 SMA, VWMA, RSI, MACD, Bollinger bands, ATR). A session is a trading day; every date carries its weekday.",
+    `- Windows count back from the latest row, which they include: ${windows.map((w) => `the last ${w.size} sessions${w.size < w.full ? " (all on record)" : ""} from ${d(from(w))}`).join("; ")}.`,
+    "- Directions and sides are judged on figures rounded to the cent, as the tables show them.",
+    ...latestState(s, day3).lines,
+    "",
+    'Quote a fact as it stands here, naming its window ("the lowest RSI of the last 63 sessions"). A run, a first or a last time, a record, a rank, a count of sessions or a crossing that is not here is not known to the desk: leave it out rather than count it by eye.',
+    ""
+  ];
+  const dir = (v, i) => i ? cmp(v[i], v[i - 1]) : null;
+  const trend = (name, v, up2 = "rising", down2 = "falling", rose = "rose", fell = "fell") => {
+    const now = dir(v, L);
+    if (now === null) return null;
+    let st = L;
+    while (st - 1 >= 1 && dir(v, st - 1) === now) st--;
+    const len = L - st + 1, word = now > 0 ? up2 : now < 0 ? down2 : "unchanged", before = st >= 2 ? dir(v, st - 1) : null;
+    const last20 = Array.from({ length: Math.min(20, n2 - 1) }, (_, k) => dir(v, L - k)).filter((x) => x !== null);
+    const tally = `Over the last ${last20.length} sessions it ${rose} on ${last20.filter((x) => x === 1).length} and ${fell} on ${last20.filter((x) => x === -1).length}${last20.some((x) => x === 0) ? `, unchanged on ${last20.filter((x) => x === 0).length}` : ""}.`;
+    const span2 = len === 1 ? `on the latest session, ${d(L)}` : `on each of the last ${len} sessions, ${d(st)} to ${d(L)}`;
+    const prior = before === null ? "" : `; on ${d(st - 1)} it ${before > 0 ? rose : before < 0 ? fell : "was unchanged"}`;
+    return `- ${name}: ${word} ${span2}, from ${f22(v[st - 1])} to ${f22(v[L])}${prior}. ${tally}`;
+  };
+  out.push("### Runs up to the latest row", "");
+  out.push(...[
+    trend("Close", close, "up", "down", "closed up", "closed down"),
+    trend("10 EMA", ema10),
+    trend("50 SMA", sma50),
+    trend("200 SMA", sma200),
+    trend("VWMA", vw),
+    trend("RSI", rsi14),
+    trend("MACD", m2.macd),
+    trend("MACD histogram", m2.hist),
+    trend("ATR", atr14)
+  ].filter((x) => x !== null));
+  const year = Math.max(0, n2 - 252);
+  const sides = (a, av, b, bv, what = "session") => {
+    const sd = (i) => cmp(av[i], bv[i]), now = sd(L);
+    if (now === null) return null;
+    let st = L;
+    while (st - 1 >= 0 && sd(st - 1) === now) st--;
+    const len = L - st + 1, word = now > 0 ? "above" : now < 0 ? "below" : "level with";
+    const prev = st - 1 >= 0 ? sd(st - 1) : null;
+    const before = st === 0 ? ` (every ${what} on record)` : prev === null ? `; before ${d(st)} the ${b} had no value yet` : prev === 0 ? `; on ${d(st - 1)} they were level to the cent` : `; the last ${what} ${prev > 0 ? "above" : "below"} it was ${d(st - 1)} (${f22(av[st - 1])} against ${f22(bv[st - 1])})`;
+    const crosses = [];
+    let last = null;
+    for (let i = 0; i < n2; i++) {
+      const x = sd(i);
+      if (x === null || x === 0) continue;
+      if (last !== null && x !== last && i >= year) crosses.push({ i, up: x > 0 });
+      last = x;
+    }
+    const span2 = len === 1 ? `on the latest ${what}, ${d(L)}` : `on each of the last ${plural2(len, what)}, since ${d(st)}`;
+    const list2 = crosses.length ? ` Crossings in the last ${L - year + 1} sessions (${crosses.length} in all${crosses.length > CROSSES_SHOWN ? `, the ${CROSSES_SHOWN} latest shown` : ""}, newest first): ${crosses.reverse().slice(0, CROSSES_SHOWN).map((c) => `${c.up ? "above" : "below"} on ${d(c.i)}`).join("; ")}.` : ` No crossing in the last ${L - year + 1} sessions.`;
+    return `- ${a} ${word} the ${b} ${span2}${before}.${list2}`;
+  };
+  const zero = close.map(() => 0);
+  out.push("", "### Sides and crossings", "");
+  out.push(...[
+    sides("Close", close, "10 EMA", ema10, "close"),
+    sides("Close", close, "50 SMA", sma50, "close"),
+    sides("Close", close, "200 SMA", sma200, "close"),
+    sides("Close", close, "VWMA", vw, "close"),
+    sides("Close", close, "Bollinger middle", bb.mid, "close"),
+    sides("10 EMA", ema10, "50 SMA", sma50),
+    sides("50 SMA", sma50, "200 SMA", sma200),
+    sides("MACD", m2.macd, "MACD signal", m2.signal),
+    sides("MACD", m2.macd, "zero line", zero)
+  ].filter((x) => x !== null));
+  const up = (i) => i ? dir(close, i) === null ? null : dir(close, i) === 1 : null;
+  const down = (i) => i ? dir(close, i) === null ? null : dir(close, i) === -1 : null;
+  const below = (v) => (i) => {
+    const x = cmp(close[i], v[i]);
+    return x === null ? null : x < 0;
+  };
+  const over = (a, v, sign) => (i) => {
+    const x = cmp(a(i), v[i]);
+    return x === null ? null : x === sign;
+  };
+  const level = (v, t) => (i) => cent(v[i]) === null ? null : t(cent(v[i]));
+  const counts = [
+    ["Up closes (above the close before)", up],
+    ["Down closes (below the close before)", down],
+    ["Closes below the 10 EMA", below(ema10)],
+    ["Closes below the 50 SMA", below(sma50)],
+    ["Closes below the 200 SMA", below(sma200)],
+    ["Closes below the VWMA", below(vw)],
+    ["Closes above the upper Bollinger band", over((i) => close[i], bb.upper, 1)],
+    ["Highs above the upper Bollinger band", over((i) => bars[i].high, bb.upper, 1)],
+    ["Closes below the lower Bollinger band", over((i) => close[i], bb.lower, -1)],
+    ["Lows below the lower Bollinger band", over((i) => bars[i].low, bb.lower, -1)],
+    ["RSI at 70 or above", level(rsi14, (x) => x >= 70)],
+    ["RSI at 30 or below", level(rsi14, (x) => x <= 30)],
+    ["RSI below 50", level(rsi14, (x) => x < 50)],
+    ["MACD below its signal", over((i) => m2.macd[i], m2.signal, -1)],
+    ["MACD below zero", level(m2.macd, (x) => x < 0)],
+    ["Days up 3% or more", level(change3, (x) => x >= 3)],
+    ["Days down 3% or more", level(change3, (x) => x <= -3)]
+  ];
+  out.push("", "### How often, in each window", "", `Fact | ${windows.map((w) => `Last ${w.size} sessions`).join(" | ")} | Latest in the last year`, `---|${windows.map(() => "---").join("|")}|---`);
+  for (const [name, t] of counts) {
+    const cells2 = windows.map((w) => {
+      const idx = Array.from({ length: w.size }, (_, k) => from(w) + k), known = idx.filter((i) => t(i) !== null), hits = known.filter((i) => t(i) === true);
+      const of = known.length < idx.length ? ` of ${plural2(known.length, "session")} with a value` : "";
+      return hits.length ? `${hits.length}${of}, first ${d(hits[0])}` : `0${of}`;
+    });
+    const latest = Array.from({ length: L - year + 1 }, (_, k) => L - k).find((i) => t(i) === true);
+    out.push(`${name} | ${cells2.join(" | ")} | ${latest === void 0 ? "\u2013" : d(latest)}`);
+  }
+  const pct2 = (i) => `${signed(change3[i], 2)}%`;
+  const extremes = [
+    ["Highest closes", (i) => close[i], 1, (i) => f22(close[i])],
+    ["Lowest closes", (i) => close[i], -1, (i) => f22(close[i])],
+    ["Highest intraday highs", (i) => bars[i].high, 1, (i) => f22(bars[i].high)],
+    ["Lowest intraday lows", (i) => bars[i].low, -1, (i) => f22(bars[i].low)],
+    ["Biggest daily rises", (i) => change3[i], 1, (i) => `${pct2(i)} (${signed(close[i] - close[i - 1], 2)})`, (i) => (change3[i] ?? 0) > 0],
+    ["Biggest daily falls", (i) => change3[i], -1, (i) => `${pct2(i)} (${signed(close[i] - close[i - 1], 2)})`, (i) => (change3[i] ?? 0) < 0],
+    ["Heaviest volume", (i) => bars[i].volume, 1, (i) => `${vol2(bars[i].volume)}${change3[i] === null ? "" : ` (close ${pct2(i)})`}`],
+    ["Heaviest volume on a down close", (i) => bars[i].volume, 1, (i) => `${vol2(bars[i].volume)} (close ${pct2(i)})`, (i) => down(i) === true],
+    ["Heaviest volume on an up close", (i) => bars[i].volume, 1, (i) => `${vol2(bars[i].volume)} (close ${pct2(i)})`, (i) => up(i) === true],
+    ["Lightest volume", (i) => bars[i].volume, -1, (i) => vol2(bars[i].volume)],
+    ["Highest RSI", (i) => rsi14[i], 1, (i) => f22(rsi14[i])],
+    ["Lowest RSI", (i) => rsi14[i], -1, (i) => f22(rsi14[i])],
+    ["Highest MACD", (i) => m2.macd[i], 1, (i) => f22(m2.macd[i])],
+    ["Lowest MACD", (i) => m2.macd[i], -1, (i) => f22(m2.macd[i])],
+    ["Highest MACD histogram", (i) => m2.hist[i], 1, (i) => f22(m2.hist[i])],
+    ["Lowest MACD histogram", (i) => m2.hist[i], -1, (i) => f22(m2.hist[i])],
+    ["Highest ATR", (i) => atr14[i], 1, (i) => f22(atr14[i])],
+    ["Lowest ATR", (i) => atr14[i], -1, (i) => f22(atr14[i])]
+  ];
+  out.push("", "### Highest and lowest in each window", "", `The ${TOP} highest or lowest of each window, first to ${TOP === 3 ? "third" : "last"}; a tie is ranked latest first.`);
+  for (const w of windows) {
+    out.push("", `Last ${w.size} sessions (${w.words}, from ${d(from(w))}) | First | Second | Third`, "---|---|---|---");
+    for (const [name, key, sign, show, keep3] of extremes) {
+      const idx = Array.from({ length: w.size }, (_, k) => from(w) + k).filter((i) => cent(key(i)) !== null && (!keep3 || keep3(i)));
+      const ranked = idx.sort((a, b) => sign * (key(b) - key(a)) || b - a).slice(0, TOP);
+      out.push(`${name} | ${[0, 1, 2].map((k) => ranked[k] === void 0 ? "\u2013" : `${show(ranked[k])} on ${d(ranked[k])}`).join(" | ")}`);
+    }
+  }
+  const since = (name, words3, v, show, bySign = false) => {
+    const x = v(L), p = bySign ? 0 : v(L - 1);
+    if (cent(x) === null || cent(p) === null || cent(x) === cent(p)) return null;
+    const high = x > p, j = Array.from({ length: L }, (_, k) => L - 1 - k).find((i) => cent(v(i)) !== null && (high ? v(i) >= x : v(i) <= x));
+    const valued = Array.from({ length: n2 }, (_, i) => i).filter((i) => cent(v(i)) !== null).length, what = words3[high ? 0 : 1];
+    return j === void 0 ? `- ${name} ${show(x)} on ${d(L)}: the ${what} of all ${plural2(valued, "session")} on record${valued < n2 ? " with a value" : ""}.` : `- ${name} ${show(x)} on ${d(L)}: the ${what} since ${d(j)} (${show(v(j))}), ${plural2(L - j, "session")} before.`;
+  };
+  out.push("", "### The latest row against the past", "");
+  out.push(...[
+    since("Close", ["highest close", "lowest close"], (i) => close[i], f22),
+    since("Volume", ["heaviest volume", "lightest volume"], (i) => bars[i].volume, vol2),
+    since("Daily move", ["biggest daily rise", "biggest daily fall"], (i) => change3[i], (x) => `${signed(x, 2)}%`, true),
+    since("RSI", ["highest RSI", "lowest RSI"], (i) => rsi14[i], f22),
+    since("MACD", ["highest MACD", "lowest MACD"], (i) => m2.macd[i], f22),
+    since("MACD histogram", ["highest MACD histogram", "lowest MACD histogram"], (i) => m2.hist[i], f22)
+  ].filter((x) => x !== null));
+  for (const w of windows.filter((w2) => w2.full === 63 || w2.full === 252)) {
+    const idx = Array.from({ length: w.size }, (_, k) => from(w) + k);
+    const hi = idx.reduce((a, i) => close[i] >= close[a] ? i : a), lo = idx.reduce((a, i) => close[i] <= close[a] ? i : a);
+    out.push(`- The close ${f22(close[L])} is ${f22(Math.abs((close[L] / close[hi] - 1) * 100))}% ${close[L] < close[hi] ? "below" : "at"} the highest close of the last ${w.size} sessions (${f22(close[hi])} on ${d(hi)}) and ${f22(Math.abs((close[L] / close[lo] - 1) * 100))}% ${close[L] > close[lo] ? "above" : "at"} the lowest (${f22(close[lo])} on ${d(lo)}).`);
+  }
+  const moves = [1, 5, 20, 63, 126, 252].filter((k) => k <= L).map((k) => `${plural2(k, "session")} ${signed((close[L] / close[L - k] - 1) * 100, 2)}% (from ${f22(close[L - k])} on ${d(L - k)})`);
+  const lastOfYear = Array.from({ length: L }, (_, k) => L - 1 - k).find((i) => bars[i].date.slice(0, 4) < bars[L].date.slice(0, 4));
+  if (lastOfYear !== void 0) moves.push(`this calendar year ${signed((close[L] / close[lastOfYear] - 1) * 100, 2)}% (from the last close of ${bars[lastOfYear].date.slice(0, 4)}, ${f22(close[lastOfYear])} on ${d(lastOfYear)})`);
+  out.push("", "### Change of the close to the latest row", "", `- ${moves.join("; ")}.`);
+  return out.join("\n");
+}
+
+// src/data/workout.ts
+var FUNCTIONS = {
+  change: { args: [2, 2], run: ([a, b]) => (b / a - 1) * 100, says: "change(a, b) is the percent change from a to b" },
+  share: { args: [2, 2], run: ([a, b]) => a / b * 100, says: "share(a, b) is a as a percent of b" },
+  abs: { args: [1, 1], run: ([a]) => Math.abs(a), says: "abs(a) is a without its sign" },
+  sqrt: { args: [1, 1], run: ([a]) => Math.sqrt(a), says: "sqrt(a) is the square root" },
+  round: { args: [1, 2], run: ([a, d]) => {
+    const k = 10 ** (d ?? 0);
+    return Math.round(a * k) / k;
+  }, says: "round(a, d) rounds to d decimals" },
+  sum: { args: [1, 100], run: (xs) => xs.reduce((p, x) => p + x, 0), says: "sum(...) adds them" },
+  avg: { args: [1, 100], run: (xs) => xs.reduce((p, x) => p + x, 0) / xs.length, says: "avg(...) is their average" },
+  min: { args: [1, 100], run: (xs) => Math.min(...xs), says: "min(...) and max(...) are the smallest and largest" },
+  max: { args: [1, 100], run: (xs) => Math.max(...xs), says: "" }
+};
+var helper = (name) => Object.hasOwn(FUNCTIONS, name.toLowerCase()) ? FUNCTIONS[name.toLowerCase()] : void 0;
+var Refused = class extends Error {
+};
+function evaluate(expression) {
+  const src = expression.replace(/[−–]/g, "-").replace(/[×·]/g, "*").replace(/÷/g, "/");
+  let i = 0;
+  const space = () => {
+    while (i < src.length && /\s/.test(src[i])) i++;
+  };
+  const peek = () => {
+    space();
+    return src[i] ?? "";
+  };
+  const take = (c) => {
+    if (peek() === c) {
+      i++;
+      return true;
+    }
+    return false;
+  };
+  const number4 = () => {
+    space();
+    const m2 = /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?/i.exec(src.slice(i));
+    if (!m2) throw new Refused(src[i] === void 0 ? "it ends where a number should be" : `"${src.slice(i, i + 12)}" is not a number`);
+    i += m2[0].length;
+    return Number(m2[0]);
+  };
+  const primary = () => {
+    if (take("(")) {
+      const v2 = expr();
+      if (!take(")")) throw new Refused("a bracket is not closed");
+      return v2;
+    }
+    space();
+    const id = /^[a-z]+/i.exec(src.slice(i));
+    if (id) {
+      const f = helper(id[0]);
+      if (!f) throw new Refused(`"${id[0]}" is not something it knows: use numbers, + - * / ^, brackets, % and ${Object.keys(FUNCTIONS).join(", ")}`);
+      i += id[0].length;
+      if (!take("(")) throw new Refused(`${id[0]} needs its numbers in brackets`);
+      const xs = [expr()];
+      while (take(",")) xs.push(expr());
+      if (!take(")")) throw new Refused(`the brackets of ${id[0]} are not closed`);
+      if (xs.length < f.args[0] || xs.length > f.args[1]) throw new Refused(`${id[0]} takes ${f.args[0] === f.args[1] ? f.args[0] : `${f.args[0]} to ${f.args[1]}`} number${f.args[1] > 1 ? "s" : ""}, not ${xs.length} (write numbers without thousands commas: 1234567, not 1,234,567)`);
+      return f.run(xs);
+    }
+    return number4();
+  };
+  const postfix = () => {
+    let v2 = primary();
+    while (take("%")) v2 /= 100;
+    return v2;
+  };
+  const power = () => {
+    const b = postfix();
+    return take("^") ? b ** unary() : b;
+  };
+  const unary = () => take("-") ? -unary() : take("+") ? unary() : power();
+  const term = () => {
+    let v2 = unary();
+    for (; ; ) {
+      if (take("*")) v2 *= unary();
+      else if (take("/")) {
+        const d = unary();
+        if (d === 0) throw new Refused("it divides by zero");
+        v2 /= d;
+      } else return v2;
+    }
+  };
+  const expr = () => {
+    let v2 = term();
+    for (; ; ) {
+      if (take("+")) v2 += term();
+      else if (take("-")) v2 -= term();
+      else return v2;
+    }
+  };
+  const v = expr();
+  if (peek() === ",") throw new Refused("a comma outside a function's brackets: write numbers without thousands commas (1234567, not 1,234,567)");
+  if (peek()) throw new Refused(`"${src.slice(i, i + 12)}" was not expected there`);
+  if (!Number.isFinite(v)) throw new Refused("the answer is not a finite number");
+  return v;
+}
+function shown(v) {
+  const opts = Math.abs(v) >= 1 || v === 0 ? { maximumFractionDigits: 4 } : { maximumSignificantDigits: 4 };
+  const t = v.toLocaleString("en-US", opts);
+  return /^-0(\.0*)?$/.test(t) ? t.slice(1) : t;
+}
+var weeks = (days) => {
+  const w = Math.floor(Math.abs(days) / 7), r = Math.abs(days) % 7;
+  return w ? ` (${w} week${w > 1 ? "s" : ""}${r ? ` and ${r} day${r > 1 ? "s" : ""}` : ""})` : "";
+};
+var LONG = { Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday", Fri: "Friday", Sat: "Saturday", Sun: "Sunday" };
+function weekdaysBetween(from, to) {
+  let n2 = 0;
+  for (let d = addDays(from, 1); d <= to; d = addDays(d, 1)) if (!["Sat", "Sun"].includes(weekday(d))) n2++;
+  return n2;
+}
+async function dateAnswer(q, day3) {
+  const sym2 = q.symbol ? normalizeSymbol(q.symbol) : "";
+  if (q.date && !q.from && !q.to) {
+    const d = parseDate(q.date);
+    const line2 = `- ${d} is a ${LONG[weekday(d)]}.`;
+    if (!sym2) return line2;
+    if (d > day3) return `${line2} ${sym2}'s sessions after the analysis date, ${day3}, are not known to the desk.`;
+    const rows = (await daily(sym2, addDays(d, -10), d)).bars;
+    const last = rows.at(-1);
+    return `${line2} ${last?.date === d ? `${sym2} traded that day.` : `${sym2} did not trade that day${last ? `; its session on or before it: ${withWeekday(last.date)}` : ""}.`}`;
+  }
+  if (!q.from || !q.to) throw new Refused("give a date, or a from date and a to date");
+  let a = parseDate(q.from, "from date"), b = parseDate(q.to, "to date");
+  if (a > b) [a, b] = [b, a];
+  const days = daysBetween(a, b);
+  const parts = [`- From ${withWeekday(a)} to ${withWeekday(b)}: ${days} calendar day${days === 1 ? "" : "s"}${weeks(days)}; ${weekdaysBetween(a, b)} weekdays after the first date up to and including the second.`];
+  if (sym2) {
+    if (b > day3) parts.push(` ${sym2}'s sessions after the analysis date, ${day3}, are not known to the desk: counted to ${withWeekday(day3)}.`);
+    const end = b > day3 ? day3 : b, rows = (await daily(sym2, a, end)).bars;
+    const after = rows.filter((r) => r.date > a), traded = rows.length && rows[0].date === a;
+    parts.push(` ${sym2} traded on ${after.length} session${after.length === 1 ? "" : "s"} after ${a} up to and including ${end}${after.length ? ` (the first ${withWeekday(after[0].date)}, the last ${withWeekday(after.at(-1).date)})` : ""}; ${a} itself ${traded ? "was a session, so both included it is " + (after.length + 1) : "was not a session"}.`);
+  }
+  return parts.join("");
+}
+async function workOut(analysis2, sums = [], dates = []) {
+  const day3 = analysisDate(analysis2);
+  if (!sums.length && !dates.length) throw new Error("give at least one sum or one date question");
+  const out = [];
+  const used = /* @__PURE__ */ new Set();
+  if (sums.length) {
+    out.push("## Sums, worked out by the desk", "");
+    for (const s of sums) {
+      for (const m2 of s.expression.toLowerCase().matchAll(/[a-z]+(?=\s*\()/g)) used.add(m2[0]);
+      const label = s.label ? `${s.label.trim()}: ` : "";
+      try {
+        out.push(`- ${label}${s.expression.trim()} = ${shown(evaluate(s.expression))}`);
+      } catch (e) {
+        out.push(`- ${label}${s.expression.trim()}: cannot be worked out, ${e instanceof Refused ? e.message : e.message}.`);
+      }
+    }
+    const says = [...used].map((u) => helper(u)?.says).filter(Boolean);
+    if (says.length) out.push("", `${says.join("; ")}.`);
+    out.push("", "Quote a result with its sum, as written here, and round it only when you say so.");
+  }
+  if (dates.length) {
+    out.push(...out.length ? [""] : [], "## Dates, worked out by the desk", "");
+    for (const q of dates) {
+      try {
+        out.push(await dateAnswer(q, day3));
+      } catch (e) {
+        out.push(`- ${JSON.stringify(q)}: cannot be answered, ${e.message}.`);
+      }
+    }
+  }
+  return out.join("\n");
+}
+
 // src/data/news.ts
 var stamp = (epoch3) => new Date(epoch3 * 1e3).toISOString().slice(0, 16).replace("T", " ");
 async function search(q, count) {
@@ -37519,11 +37894,22 @@ async function search(q, count) {
   }
   throw last;
 }
-var inWindow = (a, from, to) => a.time.slice(0, 10) >= from && a.time.slice(0, 10) <= to;
+var dayOf = (time3) => marketDay(/* @__PURE__ */ new Date(`${time3.replace(" ", "T")}:00Z`));
+var within2 = (time3, from, to) => {
+  const d = dayOf(time3);
+  return d >= from && d <= to;
+};
+var inWindow = (a, from, to) => within2(a.time, from, to);
 var render2 = (list2) => list2.map((a) => `- ${a.time} UTC \xB7 ${a.publisher}: ${a.title}${a.link ? `
   ${a.link}` : ""}`).join("\n");
+function spanOf(times2) {
+  const sorted = [...times2].sort(), a = sorted[0] ?? "", b = sorted.at(-1) ?? "";
+  return a === b ? `${a} UTC` : `${a} to ${a.slice(0, 10) === b.slice(0, 10) ? b.slice(11) : b} UTC`;
+}
+var reaches = (oldest, from) => oldest !== void 0 && dayOf(oldest) < from;
+var newest = (shown2, of, noun) => of > shown2 ? `the newest ${shown2} of ${of} ${noun}s` : `${shown2} ${noun}${shown2 === 1 ? "" : "s"}`;
 function gap(found, from, to, subject) {
-  const oldest = found.map((a) => a.time.slice(0, 10)).sort()[0];
+  const oldest = found.map((a) => dayOf(a.time)).sort()[0];
   if (oldest && oldest > to) return `Unavailable for ${from} to ${to}: Yahoo Finance's search serves only recent articles (the oldest it returned is from ${oldest}), so this is not an absence of ${subject}.`;
   return `No ${subject} between ${from} and ${to} in Yahoo Finance's search results. Search returns a sample, so this is not proof that nothing happened.`;
 }
@@ -37533,10 +37919,12 @@ async function companyNews(raw, analysis2, lookBackDays, limit) {
   const untagged = all.length > 0 && all.every((a) => a.tickers.length === 0);
   const found = untagged ? all : all.filter((a) => a.tickers.includes(sym2));
   if (!found.length) throw new Unavailable(`Yahoo Finance's search has no articles tagged ${sym2} (it tags few listings outside the US)`);
-  const list2 = found.filter((a) => inWindow(a, from, day3)).sort((a, b) => b.time.localeCompare(a.time)).slice(0, limit);
+  const within3 = found.filter((a) => inWindow(a, from, day3)).sort((a, b) => b.time.localeCompare(a.time)), list2 = within3.slice(0, limit);
   if (!list2.length) return gap(found, from, day3, `news about ${sym2}`);
   const how = untagged ? `matched by Yahoo's search for "${sym2}", not tagged: check each is about this company` : `tagged ${sym2}`;
-  return [`News about ${sym2}, ${from} to ${day3} (${list2.length} article${list2.length === 1 ? "" : "s"} ${how}; headlines only)`, "", render2(list2)].join("\n");
+  const count = newest(list2.length, within3.length, "article"), span2 = spanOf(list2.map((a) => a.time)), oldest = found.map((a) => a.time).sort()[0];
+  const head2 = reaches(oldest, from) ? `News about ${sym2}, ${from} to ${day3} (New York days; ${count} ${how}, from ${span2}; headlines only)` : `News about ${sym2} from ${span2} only (${count} ${how}; headlines only). The window asked for is ${from} to ${day3} (New York days), but Yahoo Finance's search returns only its latest articles, and the oldest it returned is from ${oldest} UTC: what came before was not reached, so this says nothing about the news earlier in the window.`;
+  return [head2, "", render2(list2)].join("\n");
 }
 async function worldNews(analysis2, lookBackDays, limit, queries) {
   const day3 = analysisDate(analysis2), from = addDays(day3, -lookBackDays);
@@ -37551,22 +37939,30 @@ async function worldNews(analysis2, lookBackDays, limit, queries) {
       all.push(a);
     }
   }
-  const list2 = all.filter((a) => inWindow(a, from, day3)).sort((a, b) => b.time.localeCompare(a.time)).slice(0, limit);
+  const within3 = all.filter((a) => inWindow(a, from, day3)).sort((a, b) => b.time.localeCompare(a.time)), list2 = within3.slice(0, limit);
   const note = failed ? `
 (${failed} of ${queries.length} searches could not be run: Yahoo Finance did not answer them.)` : "";
   if (!list2.length) return gap(all, from, day3, "world and economic news") + note;
+  const short2 = queries.flatMap((q, i) => {
+    const r = results[i], oldest = r.status === "fulfilled" ? r.value.map((a) => a.time).sort()[0] : void 0;
+    return r.status === "fulfilled" && oldest !== void 0 && !reaches(oldest, from) ? [`under ${q} only back to ${oldest} UTC`] : [];
+  });
   const past = isHistorical(day3) ? " Search favours recent articles, so a past window may be thin." : "";
-  return [`World and economic news, ${from} to ${day3}, from the news filed under ${queries.join(", ")}.${past}`, "", render2(list2)].join("\n") + note;
+  const count = newest(list2.length, within3.length, "article"), span2 = spanOf(list2.map((a) => a.time));
+  const head2 = short2.length ? `World and economic news from ${span2} (${count}), from the news filed under ${queries.join(", ")}. The window asked for is ${from} to ${day3} (New York days), but each search returns only its latest articles, and these did not reach back over it: ${short2.join("; ")}. What came before was not reached, so this says nothing about the news earlier in the window.${past}` : `World and economic news, ${from} to ${day3} (${count}, from ${span2}), from the news filed under ${queries.join(", ")}.${past}`;
+  return [head2, "", render2(list2)].join("\n") + note;
 }
 
 // src/data/social.ts
 var clip = (s, n2) => s.length > n2 ? `${s.slice(0, n2 - 1)}\u2026` : s;
 var decode3 = (s) => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;|&#x27;/g, "'").replace(/&amp;/g, "&");
 var plain = (html) => decode3(decode3(html).replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+var oldestOf = (posts) => posts.map((p) => p.time).sort()[0];
 async function stocktwits(raw, from, to, limit) {
   const base = cryptoBase(raw), sym2 = base ? `${base}.X` : normalizeSymbol(raw);
   const j = await getJson(`https://api.stocktwits.com/api/2/streams/symbol/${encodeURIComponent(sym2)}.json`);
-  return (j.messages ?? []).filter((m2) => m2.body && m2.created_at).map((m2) => ({ time: m2.created_at.slice(0, 16).replace("T", " "), text: clip(m2.body.replace(/\s+/g, " ").trim(), 280), tag: m2.entities?.sentiment?.basic ?? void 0 })).filter((p) => p.time.slice(0, 10) >= from && p.time.slice(0, 10) <= to).slice(0, limit);
+  const all = (j.messages ?? []).filter((m2) => m2.body && m2.created_at).map((m2) => ({ time: m2.created_at.slice(0, 16).replace("T", " "), text: clip(m2.body.replace(/\s+/g, " ").trim(), 280), tag: m2.entities?.sentiment?.basic ?? void 0 }));
+  return { posts: all.filter((p) => within2(p.time, from, to)).slice(0, limit), oldest: oldestOf(all), full: (j.messages ?? []).length >= 30 };
 }
 function parseAtom(xml) {
   return xml.split(/<entry[\s>]/).slice(1).map((chunk) => {
@@ -37578,8 +37974,10 @@ function parseAtom(xml) {
 async function reddit(raw, from, to, subs) {
   const base = cryptoBase(raw), q = base ?? normalizeSymbol(raw).replace(/\..*$/, "");
   const url2 = `https://www.reddit.com/r/${subs.map(encodeURIComponent).join("+")}/search.rss?q=${encodeURIComponent(q)}&restrict_sr=on&sort=new&t=week&limit=100`;
-  return parseAtom(await getText(url2, { headers: { Accept: "application/atom+xml" } })).filter((p) => p.time.slice(0, 10) >= from && p.time.slice(0, 10) <= to);
+  const all = parseAtom(await getText(url2, { headers: { Accept: "application/atom+xml" } }));
+  return { posts: all.filter((p) => within2(p.time, from, to)), oldest: oldestOf(all), full: all.length >= 100 };
 }
+var short = (s, from, to, what) => s.full && !reaches(s.oldest, from) ? ` ${what} serves only its latest posts, and the oldest it returned is from ${s.oldest} UTC: the rest of the window asked for (${from} to ${to}, New York days) was not reached, so these show the mood of those hours and say nothing about earlier in the window.` : "";
 function subredditsFor(raw, stock, crypto2) {
   const base = cryptoBase(raw);
   if (!base) return stock;
@@ -37590,33 +37988,31 @@ async function socialPosts(raw, analysis2, opts) {
   const day3 = analysisDate(analysis2), from = addDays(day3, -opts.lookBackDays), sym2 = normalizeSymbol(raw);
   const subs = subredditsFor(raw, opts.subreddits, opts.cryptoSubreddits);
   const [tw, rd] = await Promise.allSettled([stocktwits(raw, from, day3, opts.stocktwitsLimit), reddit(raw, from, day3, subs)]);
-  const out = [`Posts about ${sym2}, ${from} to ${day3}. Both sources serve only recent posts, so a past window can be empty for that reason alone.`, ""];
+  const out = [`Posts about ${sym2}, asked for ${from} to ${day3} (New York days; the times below are UTC). Both sources serve only their latest posts, so each part says the span its posts really cover, and a past window can be empty for that reason alone.`, ""];
   out.push("### StockTwits (retail traders; each author may tag a message Bullish or Bearish)");
   if (tw.status === "rejected") out.push(`StockTwits unavailable: ${tw.reason.message}. This is not a quiet crowd.`);
-  else if (!tw.value.length) out.push(`No StockTwits messages about ${sym2} in this window that the stream still serves.`);
+  else if (!tw.value.posts.length) out.push(`No StockTwits messages about ${sym2} in this window that the stream still serves.`);
   else {
-    const bull = tw.value.filter((p) => p.tag === "Bullish").length, bear = tw.value.filter((p) => p.tag === "Bearish").length, tagged = bull + bear;
-    out.push(`${tw.value.length} messages: ${bull} Bullish, ${bear} Bearish, ${tw.value.length - tagged} untagged${tagged ? ` (${Math.round(bull / tagged * 100)}/${Math.round(bear / tagged * 100)} among the tagged)` : ""}.`);
-    out.push(...tw.value.map((p) => `- ${p.time} UTC${p.tag ? ` [${p.tag}]` : ""}: ${p.text}`));
+    const posts = tw.value.posts, bull = posts.filter((p) => p.tag === "Bullish").length, bear = posts.filter((p) => p.tag === "Bearish").length, tagged = bull + bear;
+    out.push(`${posts.length} message${posts.length === 1 ? "" : "s"}, from ${spanOf(posts.map((p) => p.time))}: ${bull} Bullish, ${bear} Bearish, ${posts.length - tagged} untagged${tagged ? ` (${Math.round(bull / tagged * 100)}/${Math.round(bear / tagged * 100)} among the tagged)` : ""}.${short(tw.value, from, day3, "The stream")}`);
+    out.push(...posts.map((p) => `- ${p.time} UTC${p.tag ? ` [${p.tag}]` : ""}: ${p.text}`));
   }
   out.push("", `### Reddit (${subs.map((s) => `r/${s}`).join(", ")}; no vote or comment counts in the feed)`);
   if (rd.status === "rejected") out.push(`Reddit unavailable: ${rd.reason.message}. This is not a quiet crowd.`);
-  else if (!rd.value.length) out.push(`No Reddit posts about ${sym2} in these communities in this window that the feed still serves.`);
-  else out.push(`${rd.value.length} posts.`, ...rd.value.slice(0, 25).map((p) => `- ${p.time} UTC \xB7 r/${p.where || "?"}: ${p.title}${p.text ? ` - ${p.text}` : ""}`));
+  else if (!rd.value.posts.length) out.push(`No Reddit posts about ${sym2} in these communities in this window that the feed still serves.`);
+  else {
+    const posts = rd.value.posts, shown2 = posts.slice(0, 25);
+    out.push(
+      `${posts.length} post${posts.length === 1 ? "" : "s"}, from ${spanOf(posts.map((p) => p.time))}${posts.length > shown2.length ? ` (the newest ${shown2.length} shown)` : ""}.${short(rd.value, from, day3, "The feed")}`,
+      ...shown2.map((p) => `- ${p.time} UTC \xB7 r/${p.where || "?"}: ${p.title}${p.text ? ` - ${p.text}` : ""}`)
+    );
+  }
   return out.join("\n");
 }
 
-// src/numbers.ts
-function signed(v, digits) {
-  const text4 = Math.abs(v).toFixed(digits);
-  return Number(text4) === 0 ? text4 : `${v > 0 ? "+" : "-"}${text4}`;
-}
-var signedPct = (fraction, digits = 1) => `${signed(fraction * 100, digits)}%`;
-var unsignZero = (text4) => text4.replace(/^[+\-−](0(?:\.0+)?%)$/, "$1");
-
 // src/data/macro.ts
 var SERIES = {
-  fed_funds_rate: ["FEDFUNDS", "Federal funds effective rate (percent)"],
+  fed_funds_rate: ["DFF", "Federal funds effective rate, daily (percent)"],
   "2y_treasury": ["DGS2", "2-year Treasury yield (percent)"],
   "10y_treasury": ["DGS10", "10-year Treasury yield (percent)"],
   "30y_treasury": ["DGS30", "30-year Treasury yield (percent)"],
@@ -37646,35 +38042,56 @@ var SERIES = {
 function parseCsv(csv) {
   return csv.trim().split(/\r?\n/).slice(1).map((line2) => line2.split(",")).filter((c) => c.length >= 2 && c[1] !== "." && c[1] !== "").map(([d, v]) => ({ date: d.trim(), value: Number(v) })).filter((o) => /^\d{4}-\d{2}-\d{2}$/.test(o.date) && Number.isFinite(o.value));
 }
-function releaseLag(obs) {
+function frequency(obs) {
   const gaps = obs.slice(1).map((o, i) => (Date.parse(o.date) - Date.parse(obs[i].date)) / 864e5).sort((a, b) => a - b);
   const median = gaps[Math.floor(gaps.length / 2)] ?? 1;
-  return median <= 3 ? 1 : median <= 10 ? 6 : median <= 45 ? 45 : 120;
+  return median <= 3 ? "daily" : median <= 10 ? "weekly" : median <= 45 ? "monthly" : median <= 120 ? "quarterly" : "yearly";
+}
+var releaseLag = (obs) => ({ daily: 1, weekly: 6, monthly: 45, quarterly: 120, yearly: 120 })[frequency(obs)];
+function periodOf(date5, freq) {
+  const y = date5.slice(0, 4), m2 = Number(date5.slice(5, 7));
+  if (freq === "monthly") return `${new Date(Date.UTC(Number(y), m2 - 1, 1)).toLocaleString("en-US", { month: "long", timeZone: "UTC" })} ${y}`;
+  if (freq === "quarterly") return `the ${["first", "second", "third", "fourth"][Math.floor((m2 - 1) / 3)]} quarter of ${y}`;
+  if (freq === "yearly") return y;
+  return date5;
+}
+function yearBefore(obs, date5) {
+  const target = `${Number(date5.slice(0, 4)) - 1}${date5.slice(4)}`, floor = addDays(target.replace(/-02-29$/, "-02-28"), -10);
+  return [...obs].reverse().find((o) => o.date <= target && o.date >= floor);
 }
 async function economicSeries(indicator, analysis2, lookBackDays = 365) {
   const day3 = analysisDate(analysis2), key = indicator.trim().toLowerCase(), known = SERIES[key];
   const id = known?.[0] ?? indicator.trim().toUpperCase();
   if (!/^[A-Z0-9_]{1,40}$/.test(id)) throw new Error(`"${indicator}" is not a series name or a FRED series id`);
-  const from = addDays(day3, -Math.max(30, Math.min(3650, lookBackDays)) - 130);
-  let obs = parseCsv(await getText(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${id}&cosd=${from}&coed=${day3}`)).filter((o) => o.date <= day3);
-  const past = isHistorical(day3), lag = releaseLag(obs);
-  if (past) obs = obs.filter((o) => addDays(o.date, lag) <= day3);
-  obs = obs.filter((o) => o.date >= addDays(day3, -Math.max(30, Math.min(3650, lookBackDays))));
+  const window2 = Math.max(30, Math.min(3650, lookBackDays));
+  const from = addDays(day3, -Math.max(window2, 365) - 400);
+  const csv = await getText(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${id}&cosd=${from}&coed=${day3}`);
+  if (!/^\s*(observation_date|DATE)\s*,/i.test(csv)) throw new Unavailable(`FRED answered with something other than its data download (it may be down for maintenance)`);
+  let all = parseCsv(csv).filter((o) => o.date <= day3);
+  const past = isHistorical(day3), freq = frequency(all), lag = releaseLag(all);
+  if (past) all = all.filter((o) => addDays(o.date, lag) <= day3);
+  const obs = all.filter((o) => o.date >= addDays(day3, -window2));
   if (!obs.length) throw new NoData(`FRED has no ${id} values published by ${day3} in this window`);
-  const first = obs[0], last = obs[obs.length - 1], change3 = last.value - first.value, pct2 = first.value ? change3 / Math.abs(first.value) * 100 : 0;
+  const first = obs[0], last = obs[obs.length - 1], ago = yearBefore(all, last.date);
   const fmt2 = (v) => Math.abs(v) >= 1e3 ? v.toLocaleString("en-US", { maximumFractionDigits: 1 }) : v.toFixed(2);
   const plusMinus = (v) => {
     const t = fmt2(Math.abs(v));
     return Number(t.replace(/,/g, "")) === 0 ? t : `${v > 0 ? "+" : "-"}${t}`;
   };
+  const points = /\((percent|percentage points)\)/.test(known?.[1] ?? "");
+  const changeOf = (from2) => {
+    const d = last.value - from2.value;
+    return points ? `${plusMinus(d)} percentage points` : `${plusMinus(d)} (${signed(from2.value ? d / Math.abs(from2.value) * 100 : 0, 1)}%)`;
+  };
   const lines = [
     `## ${known?.[1] ?? id} - FRED series ${id}`,
     "",
-    `- Latest value known by ${day3}: ${fmt2(last.value)} (for ${last.date})`,
-    `- Change since ${first.date}: ${plusMinus(change3)} (${signed(pct2, 1)}%)`,
+    `- Latest value known by ${day3}: ${fmt2(last.value)} (for ${periodOf(last.date, freq)})`,
+    ago ? `- Year over year, from ${fmt2(ago.value)} for ${periodOf(ago.date, freq)}: ${changeOf(ago)}` : `- Year over year: not available (no value for ${periodOf(`${Number(last.date.slice(0, 4)) - 1}${last.date.slice(4)}`, freq)} in FRED's data). Do not work one out from other rows.`,
+    `- Change over the look-back window, from ${periodOf(first.date, freq)} to ${periodOf(last.date, freq)}: ${changeOf(first)}${first.date !== ago?.date ? " (not a yearly rate)" : ""}`,
     past ? `- A past analysis date: values are kept only if published by ${day3} (a ${lag}-day release lag for this series), and are today's revised figures; first releases may have differed slightly.` : "- Values as published today, revisions included.",
     "",
-    "Date | Value",
+    freq === "monthly" || freq === "quarterly" ? "Date (the first day of the period it stands for) | Value" : "Date | Value",
     "---|---:",
     ...obs.slice(-40).map((o) => `${o.date} | ${fmt2(o.value)}`)
   ];
@@ -37697,13 +38114,13 @@ async function predictionMarkets(topic, analysis2, limit = 6, now = /* @__PURE__
   const j = await getJson(`https://gamma-api.polymarket.com/public-search?q=${encodeURIComponent(topic)}&limit_per_type=20`);
   const open3 = (j.events ?? []).flatMap((e) => e.markets ?? []).filter((m2) => m2.question && !m2.closed && m2.active !== false && list(m2.outcomePrices).length && list(m2.outcomes).length && (!m2.endDate || Date.parse(m2.endDate) > now.getTime())).sort((a, b) => (b.volumeNum ?? 0) - (a.volumeNum ?? 0)).slice(0, Math.max(1, Math.min(10, limit)));
   const head2 = `## Polymarket: "${topic}"
-Live odds: the crowd's priced chance of each event (more traded volume, more reliable). A price is not a forecast to take as certain.
+Live odds: the crowd's priced chance of each event (more traded volume, more reliable). A price is not a forecast to take as certain. The date after each market is when it stops trading, not the date of the event it asks about: take an event's own date from the news or a filing.
 `;
   if (!open3.length) return `${head2}
 No open markets matched "${topic}". Polymarket covers mostly economic, political, geopolitical and crypto events; a single company may have none.`;
   return head2 + "\n" + open3.map((m2) => {
     const p = Number(list(m2.outcomePrices)[0]), wk = m2.oneWeekPriceChange;
-    return `- ${m2.question}: ${list(m2.outcomes)[0]} ${(p * 100).toFixed(0)}% \xB7 volume $${Math.round(m2.volumeNum ?? 0).toLocaleString("en-US")}${m2.endDate ? ` \xB7 resolves ${m2.endDate.slice(0, 10)}` : ""}${typeof wk === "number" ? ` \xB7 ${signed(wk * 100, 1)} points this week` : ""}`;
+    return `- ${m2.question}: ${list(m2.outcomes)[0]} ${(p * 100).toFixed(0)}% \xB7 volume $${Math.round(m2.volumeNum ?? 0).toLocaleString("en-US")}${m2.endDate ? ` \xB7 trading closes ${m2.endDate.slice(0, 10)}` : ""}${typeof wk === "number" ? ` \xB7 ${signed(wk * 100, 1)} points this week` : ""}`;
   }).join("\n");
 }
 
@@ -37758,7 +38175,7 @@ function lineAsOf(facts, tags, asOf, spans, forms) {
       }
       let any2 = false;
       for (const [key, f] of latest) if (covered.has(key)) {
-        values.set(key, f.val);
+        values.set(key, f);
         any2 = true;
       }
       if (any2) unit = u;
@@ -37766,26 +38183,112 @@ function lineAsOf(facts, tags, asOf, spans, forms) {
   }
   return { values, unit };
 }
+var perShareUnit = (u) => u.includes("/");
+var spanWords = (f) => {
+  const d = f.start ? daysBetween(f.start, f.end) : 0;
+  return d <= QUARTER[1] ? "the quarter" : d <= 200 ? "the six months" : d <= 290 ? "the nine months" : "the year";
+};
+function quartersOf(values, years) {
+  const out = /* @__PURE__ */ new Map();
+  const all = [...values.values(), ...years.values()].filter((f) => f.start);
+  for (const f of all) if (daysBetween(f.start, f.end) <= QUARTER[1]) out.set(f.end, { val: f.val, start: f.start });
+  const near = (a, b, lo, hi) => {
+    const d = daysBetween(a, b);
+    return d >= lo && d <= hi;
+  };
+  for (const c of all.filter((f) => daysBetween(f.start, f.end) > QUARTER[1]).sort((a, b) => daysBetween(a.start, a.end) - daysBetween(b.start, b.end))) {
+    if (out.has(c.end)) continue;
+    const prior = all.find((p) => p !== c && Math.abs(daysBetween(c.start, p.start)) <= 7 && near(p.end, c.end, 80, 100));
+    if (prior) {
+      out.set(c.end, { val: c.val - prior.val, start: prior.end, how: `${spanWords(c)} to ${c.end} less ${spanWords(prior)} to ${prior.end}` });
+      continue;
+    }
+    let sum = 0, at = "", parts = 0;
+    for (let q = [...out.entries()].find(([, v]) => Math.abs(daysBetween(c.start, v.start)) <= 7); q; ) {
+      sum += q[1].val;
+      at = q[0];
+      parts++;
+      if (near(at, c.end, 80, 100)) break;
+      q = [...out.entries()].find(([e, v]) => e > at && near(at, v.start, 0, 7) && !v.how?.includes(c.end));
+    }
+    if (parts && near(at, c.end, 80, 100)) out.set(c.end, { val: c.val - sum, start: at, how: `${spanWords(c)} to ${c.end} less its ${parts} quarter${parts > 1 ? "s" : ""} to ${at}` });
+  }
+  return out;
+}
+function splitsIn(list2, asOf) {
+  const periods = /* @__PURE__ */ new Map();
+  for (const f of list2) if (f.filed <= asOf && f.start) (periods.get(`${f.start}|${f.end}`) ?? periods.set(`${f.start}|${f.end}`, []).get(`${f.start}|${f.end}`)).push(f);
+  const like = (r) => {
+    const up = r >= 1 ? r : 1 / r;
+    if (up < 1.4) return null;
+    const k = Math.abs(up - 1.5) < 0.05 ? 1.5 : Math.round(up);
+    return Math.abs(up / k - 1) <= 0.03 ? r >= 1 ? k : 1 / k : null;
+  };
+  const found = [];
+  for (const fs18 of periods.values()) {
+    const byDay = fs18.sort((a, b) => a.filed.localeCompare(b.filed));
+    for (let n2 = 1; n2 < byDay.length; n2++) {
+      const a = byDay[n2 - 1], b = byDay[n2];
+      if (a.filed === b.filed || !a.val || !b.val || Math.sign(a.val) !== Math.sign(b.val) || Math.min(Math.abs(a.val), Math.abs(b.val)) < 0.05) continue;
+      const k = like(a.val / b.val);
+      if (k === null) continue;
+      const later = (x, y) => x > y ? x : y, sooner = (x, y) => x < y ? x : y;
+      const same = found.find((e) => e.factor === k && later(e.old, a.filed) < sooner(e.from, b.filed));
+      if (same) {
+        same.old = later(same.old, a.filed);
+        same.from = sooner(same.from, b.filed);
+        same.seen++;
+      } else found.push({ factor: k, old: a.filed, from: b.filed, seen: 1 });
+    }
+  }
+  const real = found.filter((e) => e.seen >= 2);
+  return real.filter((e) => {
+    const inside = real.filter((o) => o !== e && o.from > e.old && o.from <= e.from);
+    return !(inside.length && Math.abs(inside.reduce((p, o) => p * o.factor, 1) / e.factor - 1) <= 0.03);
+  }).map(({ factor, old, from }) => ({ factor, old, from })).sort((a, b) => a.from.localeCompare(b.from));
+}
+var splitWords = (k) => k >= 1 ? `${k === 1.5 ? "3-for-2" : `${k}-for-1`} split` : `1-for-${Math.round(1 / k)} reverse split`;
+var plain2 = (n2) => Number(n2.toFixed(6)).toString();
 function filedStatement(usGaap, kind, freq, asOf) {
-  const quarterly = freq === "quarterly";
+  const quarterly = freq === "quarterly", flows = kind !== "balance_sheet";
   const spans = quarterly ? [QUARTER, ...YEAR_TO_DATE.map(([lo, hi]) => [lo, hi])] : [YEAR];
   const names = quarterly ? ["", ...YEAR_TO_DATE.map(([, , m2]) => ` (${m2} months to date)`)] : [""];
   const lines = STATEMENTS[kind].lines.map(([label, tags]) => ({ label, ...lineAsOf(usGaap, tags, asOf, spans, quarterly ? [] : ANNUAL_FORMS) }));
-  const chosen = lines.map((l) => {
+  const notes = [];
+  const quarters = lines.map((l, n2) => quarterly && flows && !perShareUnit(l.unit) ? quartersOf(l.values, lineAsOf(usGaap, STATEMENTS[kind].lines[n2][1], asOf, [YEAR], ANNUAL_FORMS).values) : /* @__PURE__ */ new Map());
+  const chosen = lines.map((l, n2) => {
     const m2 = /* @__PURE__ */ new Map();
     for (const key of l.values.keys()) {
       const [end, i] = key.split("|");
-      m2.set(end, Math.min(Number(i), m2.get(end) ?? Number(i)));
+      if (!quarters[n2].has(end)) m2.set(end, Math.min(Number(i), m2.get(end) ?? Number(i)));
     }
+    for (const end of quarters[n2].keys()) m2.set(end, 0);
     return m2;
   });
   const ends = [...new Set(chosen.flatMap((m2) => [...m2.keys()]))].sort().reverse().slice(0, SHOWN[freq]);
   const periods = ends.flatMap((end) => [...new Set(chosen.map((m2) => m2.get(end)).filter((i) => i !== void 0))].sort().map((i) => ({ end, i })));
   if (!periods.length) throw new NoData(`no ${freq} ${STATEMENTS[kind].title.toLowerCase()} was filed with the SEC by ${asOf}`);
-  return {
-    columns: periods.map((p) => p.end + names[p.i]),
-    rows: lines.map((l, n2) => ({ label: l.label, unit: l.unit, cells: periods.map((p) => chosen[n2].get(p.end) === p.i ? l.values.get(`${p.end}|${p.i}`) ?? null : null) }))
-  };
+  const derived2 = /* @__PURE__ */ new Map();
+  for (const q of quarters) for (const [end, v] of q) if (v.how && ends.includes(end)) (derived2.get(end) ?? derived2.set(end, /* @__PURE__ */ new Set()).get(end)).add(v.how);
+  for (const [end, how] of [...derived2].sort((a, b) => b[0].localeCompare(a[0]))) notes.push(`The quarter to ${end} is derived (no filing states it): ${[...how].join("; or ")}.`);
+  const rows = lines.map((l, n2) => {
+    const every = STATEMENTS[kind].lines[n2][1].flatMap((tag) => Object.entries(usGaap[tag]?.units ?? {}).filter(([u]) => perShareUnit(u)).flatMap(([, list2]) => list2));
+    const splits = perShareUnit(l.unit) ? splitsIn(every, asOf) : [];
+    const cells2 = periods.map((p) => {
+      if (chosen[n2].get(p.end) !== p.i) return null;
+      const q = p.i === 0 ? quarters[n2].get(p.end) : void 0;
+      if (q) return q.val;
+      const f = l.values.get(`${p.end}|${p.i}`);
+      if (!f) return null;
+      const k = splits.filter((s) => f.filed < s.from).reduce((a, s) => a * s.factor, 1);
+      if (k === 1) return f.val;
+      const v = Number((f.val / k).toFixed(6));
+      notes.push(`${l.label} for ${spanWords(f)} to ${f.end} was filed on ${f.filed} as ${plain2(f.val)}, before ${splits.filter((s) => f.filed < s.from).map((s) => `the ${splitWords(s.factor)} the filings show between ${s.old} and ${s.from}`).join(" and ")}; shown here on the basis of the later filings: ${plain2(v)}.`);
+      return v;
+    });
+    return { label: l.label, unit: l.unit, cells: cells2 };
+  });
+  return { columns: periods.map((p) => p.end + (p.i === 0 && derived2.has(p.end) ? " (derived)" : names[p.i])), rows, notes };
 }
 var DAY_MS = 864e5;
 var cache2 = /* @__PURE__ */ new Map();
@@ -37937,6 +38440,31 @@ function parseForm4(xml, filed) {
     indirect: field(t, "directOrIndirectOwnership").toUpperCase() === "I" ? field(t, "natureOfOwnership") || "indirectly" : null
   })).filter((t) => t.date && t.code);
 }
+function parseFiling(xml, form, filed) {
+  const owners = blocks(xml, "reportingOwner").map((o) => field(o, "rptOwnerCik").replace(/^0+/, "") || field(o, "rptOwnerName").toUpperCase()).sort().join("+");
+  const original = form.endsWith("/A") ? field(xml, "dateOfOriginalSubmission").slice(0, 10) || null : null;
+  return { form, filed, owners, original, period: field(xml, "periodOfReport").slice(0, 10), trades: parseForm4(xml, filed) };
+}
+function amended(filings2) {
+  const state = new Map(filings2.map((f) => [f, { first: f.filed, by: null }]));
+  let replaced = 0;
+  for (const f of [...filings2].sort((a, b) => a.filed.localeCompare(b.filed))) {
+    if (!f.original) continue;
+    const me = state.get(f);
+    me.first = f.original;
+    const same = filings2.filter((g) => g !== f && g.owners === f.owners && g.filed === f.original && g.filed <= f.filed);
+    const pool = same.some((g) => g.period === f.period) ? same.filter((g) => g.period === f.period) : same;
+    if (pool.length !== 1) continue;
+    let target = pool[0];
+    while (state.get(target).by) target = state.get(target).by;
+    me.first = state.get(target).first;
+    if (!f.trades.length) continue;
+    state.get(target).by = f;
+    replaced++;
+  }
+  const trades = filings2.filter((f) => !state.get(f).by).flatMap((f) => f.trades.map((t) => f.original ? { ...t, filed: state.get(f).first, corrected: f.filed } : t));
+  return { trades: trades.sort((a, b) => b.filed.localeCompare(a.filed)), replaced };
+}
 var CODES = {
   P: "bought",
   S: "sold",
@@ -37964,7 +38492,7 @@ async function secInsiders(symbol4, cik, asOf, days = 90, limit = 25) {
     if (partial2) throw new NoData(`the SEC's recent list of ${symbol4}'s filings starts on ${oldest}, after ${addDays(from, 1)}, so the trades of those days cannot be read`);
     return `${head2}: none. No director, officer or large owner reported a trade in these ${days} days. That is a fact from the SEC, not a gap in the data.`;
   }
-  const read2 = picked.slice(0, limit), trades = [];
+  const read2 = picked.slice(0, limit), filings2 = [];
   let failed = 0;
   for (const p of read2) {
     const acc = r.accessionNumber?.[p.i] ?? "", doc = (r.primaryDocument?.[p.i] ?? "").replace(/^xsl[^/]*\//, "");
@@ -37973,20 +38501,22 @@ async function secInsiders(symbol4, cik, asOf, days = 90, limit = 25) {
       continue;
     }
     try {
-      trades.push(...parseForm4(await getText(`https://www.sec.gov/Archives/edgar/data/${Number(cik)}/${acc.replaceAll("-", "")}/${doc}`), p.filed));
+      filings2.push(parseFiling(await getText(`https://www.sec.gov/Archives/edgar/data/${Number(cik)}/${acc.replaceAll("-", "")}/${doc}`), p.form, p.filed));
     } catch {
       failed++;
     }
   }
+  const { trades: all, replaced } = amended(filings2), trades = all.filter((t) => t.filed > from);
   const market = (code) => trades.filter((t) => t.code === code);
   const total = (list2) => {
     const shares2 = list2.reduce((a, t) => a + t.shares, 0), value = list2.reduce((a, t) => a + t.shares * (t.price ?? 0), 0), planned = list2.filter((t) => t.plan).length;
     return list2.length ? `${list2.length} (${fmt(shares2)} shares, about ${fmt(value)} USD at their own prices${planned ? `; ${planned} under a pre-arranged 10b5-1 plan` : ""})` : "none";
   };
   const buys = market("P"), sales = market("S"), other = trades.length - buys.length - sales.length;
-  const lines = trades.map((t) => `- ${t.date} (made public ${t.filed}) \xB7 ${t.owner} (${t.role}): ${CODES[t.code] ?? `transaction ${t.code} of`} ${fmt(t.shares, 4)} shares${t.price ? ` at ${fmt(t.price, 4)}` : ", no price"}${t.after !== null ? ` \xB7 holds ${fmt(t.after, 4)} after` : ""}${t.indirect ? ` \xB7 indirectly (${t.indirect})` : ""}${t.plan ? " \xB7 under a 10b5-1 plan" : ""}`);
+  const when = (t) => !t.corrected ? `made public ${t.filed}` : `made public ${t.filed}${t.filed > from ? "" : ", before these days"}; corrected ${t.corrected} by an amended filing, a Form 4/A${t.filed > from ? "" : ", so not counted above"}`;
+  const lines = all.map((t) => `- ${t.date} (${when(t)}) \xB7 ${t.owner} (${t.role}): ${CODES[t.code] ?? `transaction ${t.code} of`} ${fmt(t.shares, 4)} shares${t.price ? ` at ${fmt(t.price, 4)}` : ", no price"}${t.after !== null ? ` \xB7 holds ${fmt(t.after, 4)} after` : ""}${t.indirect ? ` \xB7 indirectly (${t.indirect})` : ""}${t.plan ? " \xB7 under a 10b5-1 plan" : ""}`);
   return [
-    `${head2} (${read2.length} of ${picked.length} filings read, newest first${failed ? `; ${failed} could not be read` : ""}). Each trade is dated by the day it happened and the day its filing made it public; only filings public by ${asOf} are shown.${gap2}`,
+    `${head2} (${read2.length} of ${picked.length} filings read, newest first${failed ? `; ${failed} could not be read` : ""}${replaced ? `; ${replaced === 1 ? "one is an amended filing, a Form 4/A, shown in place of the filing it corrects" : `${replaced} are amended filings, Form 4/A, each shown in place of the filing it corrects`}` : ""}). Each trade is dated by the day it happened and the day its filing made it public; only filings public by ${asOf} are shown.${gap2}`,
     "",
     `In these ${days} days: bought (code P) ${total(buys)}; sold (code S) ${total(sales)}; other kinds (awards, option exercises, shares handed back for tax, gifts) ${other}.`,
     "P and S are purchases and sales on the market or in a private deal: a purchase is the insider spending their own money. A sale under a 10b5-1 plan was arranged months ahead. Awards, exercises, tax handbacks and gifts say little about what an insider thinks of the price.",
@@ -38188,13 +38718,13 @@ async function summary(sym2, modules) {
 var MAIN_UNIT = { GBp: "GBP", GBX: "GBP", ZAc: "ZAR", ILA: "ILS" };
 var has = (v) => typeof v?.raw === "number" && Number.isFinite(v.raw);
 var money = (v, currency) => has(v) ? `${v.raw.toLocaleString("en-US", { maximumFractionDigits: 2 })}${currency ? ` ${currency}` : ""}` : null;
-var plain2 = (v) => has(v) ? String(Number(v.raw.toFixed(4))) : null;
+var plain3 = (v) => has(v) ? String(Number(v.raw.toFixed(4))) : null;
 var percent = (v) => has(v) ? `${(v.raw * 100).toFixed(2)}%` : null;
 var MONTHS2 = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 var units = (facts, unit) => facts?.units?.[unit] ?? [];
 var fixed = (n2, d = 2) => n2.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
 var whole = (n2) => Math.round(n2).toLocaleString("en-US");
-var yearBefore = (day3) => `${Number(day3.slice(0, 4)) - 1}${day3.slice(4) === "-02-29" ? "-02-28" : day3.slice(4)}`;
+var yearBefore2 = (day3) => `${Number(day3.slice(0, 4)) - 1}${day3.slice(4) === "-02-29" ? "-02-28" : day3.slice(4)}`;
 async function secOverview(sym2, cik, day3) {
   const [s, facts] = await Promise.all([submissions(cik), companyFacts(cik)]);
   const g = facts.facts?.["us-gaap"] ?? {}, dei = facts.facts?.dei ?? {};
@@ -38235,7 +38765,7 @@ async function secOverview(sym2, cik, day3) {
   }
   const dps = trailingYear(units(g.CommonStockDividendsPerShareDeclared, "USD/shares"), day3) ?? trailingYear(units(g.CommonStockDividendsPerShareCashPaid, "USD/shares"), day3);
   if (close) {
-    const after = yearBefore(day3), year = paid.filter((d) => d.date > after && d.date <= day3), unit = close.currency ?? "USD";
+    const after = yearBefore2(day3), year = paid.filter((d) => d.date > after && d.date <= day3), unit = close.currency ?? "USD";
     const sum = Number(year.reduce((a, d) => a + d.amount, 0).toFixed(6)), span2 = `${addDays(after, 1)} to ${day3}`;
     if (year.length) {
       lines.push(`Dividends per share, the 12 months to ${day3} (derived: the ${year.length === 1 ? "one" : year.length} that went ex-dividend from ${span2}, from the price source, ${year.map((d) => `${d.date} ${d.amount}`).join(", ")}): ${fixed(sum, 4)} ${unit}`);
@@ -38259,14 +38789,14 @@ async function companyOverview(raw, analysis2) {
     ["Sector", r.summaryProfile?.sector],
     ["Industry", r.summaryProfile?.industry],
     ["Market Cap", money(p.marketCap ?? d.marketCap, main)],
-    ["PE Ratio (TTM)", plain2(d.trailingPE)],
-    ["Forward PE", plain2(d.forwardPE ?? k.forwardPE)],
-    ["PEG Ratio", plain2(k.pegRatio)],
-    ["Price to Book", plain2(k.priceToBook)],
+    ["PE Ratio (TTM)", plain3(d.trailingPE)],
+    ["Forward PE", plain3(d.forwardPE ?? k.forwardPE)],
+    ["PEG Ratio", plain3(k.pegRatio)],
+    ["Price to Book", plain3(k.priceToBook)],
     ["EPS (TTM)", money(k.trailingEps, main)],
     ["Forward EPS", money(k.forwardEps, main)],
     ["Dividend Yield", percent(d.dividendYield)],
-    ["Beta", plain2(d.beta ?? k.beta)],
+    ["Beta", plain3(d.beta ?? k.beta)],
     ["52 Week High", money(d.fiftyTwoWeekHigh, quote)],
     ["52 Week Low", money(d.fiftyTwoWeekLow, quote)],
     ["50 Day Average", money(d.fiftyDayAverage, quote)],
@@ -38281,7 +38811,7 @@ async function companyOverview(raw, analysis2) {
     ["Return on Equity", percent(f.returnOnEquity)],
     ["Return on Assets", percent(f.returnOnAssets)],
     ["Debt to Equity", de],
-    ["Current Ratio", plain2(f.currentRatio)],
+    ["Current Ratio", plain3(f.currentRatio)],
     ["Book Value per Share", money(k.bookValue, main)]
   ];
   const lines = fields.filter(([, v]) => v !== null && v !== void 0 && v !== "").map(([l, v]) => `${l}: ${v}`);
@@ -38346,7 +38876,7 @@ async function fundProfile(raw, analysis2, topN = 10) {
   line2("Holdings turnover (how much of it is traded in a year)", percent(fees.annualHoldingsTurnover));
   line2("Average yearly return, 3 years (past prices, as Yahoo gives it)", percent(k.threeYearAverageReturn));
   line2("Average yearly return, 5 years (past prices, as Yahoo gives it)", percent(k.fiveYearAverageReturn));
-  line2("Beta, 3 years (how much it moves with the market)", plain2(k.beta3Year));
+  line2("Beta, 3 years (how much it moves with the market)", plain3(k.beta3Year));
   const split = [["stocks", t.stockPosition], ["bonds", t.bondPosition], ["cash", t.cashPosition], ["other", t.otherPosition]].filter(([, v]) => has(v)).map(([n2, v]) => `${n2} ${percent(v)}`);
   if (split.length) lines.push(`Held in: ${split.join(", ")}`);
   const top = (t.holdings ?? []).filter((h) => has(h.holdingPercent)).slice(0, topN);
@@ -38388,21 +38918,94 @@ async function yahooStatement(sym2, kind, freq, day3) {
   const j = await yahooJson(`/ws/fundamentals-timeseries/v1/finance/timeseries/${encodeURIComponent(sym2)}?symbol=${encodeURIComponent(sym2)}&type=${types}&period1=${epoch2(addDays(day3, -6 * 366))}&period2=${epoch2(addDays(day3, 1))}`);
   return yahooTable(j, kind, freq);
 }
+var periodOf2 = (column, freq) => ({ end: column.slice(0, 10), kind: /months to date/.test(column) ? "to date" : freq === "quarterly" ? "quarter" : "year" });
+function withWorkedRows(t, kind, freq) {
+  const row = (label) => t.rows.find((r) => r.label === label && r.cells.some((c) => c !== null));
+  const money2 = t.rows.find((r) => !r.unit.includes("/"))?.unit ?? "USD";
+  const periods = t.columns.map((c) => periodOf2(c, freq));
+  const each = (f) => t.columns.map((_, i) => {
+    const v = f(i);
+    return v === null || !Number.isFinite(v) ? null : v;
+  });
+  const ratio = (a, b, label, worked, abs = false) => {
+    if (!a || !b) return null;
+    const cells2 = each((i) => {
+      const x = a.cells[i] ?? null, y = b.cells[i] ?? null;
+      return x === null || y === null || y <= 0 ? null : (abs ? Math.abs(x) : x) / y * (worked === "percent" ? 100 : 1);
+    });
+    return cells2.some((c) => c !== null) ? { label, unit: "", cells: cells2, worked } : null;
+  };
+  const before = (i, lo, hi) => periods.findIndex((p, j) => j > i && p.kind === periods[i].kind && p.kind !== "to date" && (() => {
+    const d = daysBetween(p.end, periods[i].end);
+    return d >= lo && d <= hi;
+  })());
+  const growth = (r, label, lo, hi) => {
+    if (!r) return null;
+    const cells2 = each((i) => {
+      const j = before(i, lo, hi), x = r.cells[i] ?? null, y = j < 0 ? null : r.cells[j] ?? null;
+      return x === null || y === null || y <= 0 ? null : (x / y - 1) * 100;
+    });
+    return cells2.some((c) => c !== null) ? { label, unit: "", cells: cells2, worked: "percent" } : null;
+  };
+  const out = [];
+  if (kind === "income_statement") {
+    const revenue = row("Revenue"), op = row("Operating Income"), net = row("Net Income");
+    let gross = row("Gross Profit");
+    const cost = row("Cost of Revenue");
+    if (!gross && revenue && cost) gross = { label: "Gross Profit", unit: revenue.unit, cells: each((i) => {
+      const r = revenue.cells[i] ?? null, c = cost.cells[i] ?? null;
+      return r === null || c === null ? null : r - c;
+    }) };
+    out.push(
+      ratio(gross, revenue, `Gross margin (worked out: gross profit \xF7 revenue${row("Gross Profit") ? "" : ", gross profit being revenue less cost of revenue"})`, "percent"),
+      ratio(op, revenue, "Operating margin (worked out: operating income \xF7 revenue)", "percent"),
+      ratio(net, revenue, "Net margin (worked out: net income \xF7 revenue)", "percent")
+    );
+    if (freq === "quarterly") out.push(growth(revenue, "Revenue growth on the quarter just before (worked out)", 80, 100));
+    const year = freq === "quarterly" ? "the same quarter a year before" : "the year before";
+    out.push(growth(revenue, `Revenue growth on ${year} (worked out)`, 355, 375), growth(op, `Operating income growth on ${year} (worked out)`, 355, 375), growth(net, `Net income growth on ${year} (worked out)`, 355, 375));
+  } else if (kind === "cashflow") {
+    const ocf = row("Operating Cash Flow"), capex = row("Capital Expenditure");
+    if (ocf && capex) {
+      const fcf = each((i) => {
+        const o = ocf.cells[i] ?? null, c = capex.cells[i] ?? null;
+        return o === null || c === null ? null : o - Math.abs(c);
+      });
+      if (fcf.some((c) => c !== null)) out.push({ label: "Free cash flow (worked out: operating cash flow less capital expenditure)", unit: money2, cells: fcf, worked: "money" });
+      out.push(ratio(capex, ocf, "Capital expenditure as a share of operating cash flow (worked out)", "percent", true));
+    }
+  } else {
+    const ca = row("Current Assets"), cl = row("Current Liabilities"), tl = row("Total Liabilities"), eq = row("Stockholders Equity"), cash = row("Cash and Equivalents");
+    out.push(ratio(ca, cl, "Current ratio (worked out: current assets \xF7 current liabilities)", "times"), ratio(tl, eq, "Liabilities to equity (worked out: total liabilities \xF7 equity)", "times"));
+    const less = (a, b, label) => {
+      if (!a || !b) return null;
+      const cells2 = each((i) => {
+        const x = a.cells[i] ?? null, y = b.cells[i] ?? null;
+        return x === null || y === null ? null : x - y;
+      });
+      return cells2.some((c) => c !== null) ? { label, unit: money2, cells: cells2, worked: "money" } : null;
+    };
+    out.push(less(tl, cl, "Non-current liabilities (worked out: total liabilities less current liabilities)"), less(ca, cash, "Current assets other than cash (worked out: current assets less cash and equivalents)"));
+  }
+  return { ...t, rows: [...t.rows, ...out.filter((r) => r !== null)] };
+}
 function renderTable(t, head2, note) {
-  const rows = t.rows.filter((r) => r.cells.some((c) => c !== null)), missing = t.rows.filter((r) => !rows.includes(r)).map((r) => r.label);
+  const rows = t.rows.filter((r) => r.cells.some((c) => c !== null)), missing = t.rows.filter((r) => !rows.includes(r) && !r.worked).map((r) => r.label);
   const perShare = (u) => u.includes("/");
-  const main = rows.find((r) => !perShare(r.unit))?.unit ?? "";
-  const name = (r) => perShare(r.unit) ? `${r.label} (${r.unit.split("/")[0] || "currency"} per share)` : r.unit !== main ? `${r.label} (millions of ${r.unit || "an unstated currency"})` : r.label;
-  const cell = (v, u) => v === null ? "\u2013" : perShare(u) ? v.toFixed(2) : (v / 1e6).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const main = rows.find((r) => !perShare(r.unit) && !r.worked)?.unit ?? "";
+  const name = (r) => r.worked === "percent" || r.worked === "times" ? r.label : perShare(r.unit) ? `${r.label} (${r.unit.split("/")[0] || "currency"} per share)` : r.unit !== main ? `${r.label} (millions of ${r.unit || "an unstated currency"})` : r.label;
+  const cell = (v, r) => v === null ? "\u2013" : r.worked === "percent" ? `${v.toFixed(1)}%` : r.worked === "times" ? v.toFixed(2) : perShare(r.unit) ? v.toFixed(2) : (v / 1e6).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const worked = rows.some((r) => r.worked) ? ' Rows marked "worked out" are worked out by the desk from the figures in this table, as named; quote them rather than working your own.' : "";
   const out = [
     head2,
-    `Money in millions of ${main || "an unstated currency"} unless the row says otherwise; "\u2013" means no figure for that period. ${note}`,
+    `Money in millions of ${main || "an unstated currency"} unless the row says otherwise; "\u2013" means no figure for that period. ${note}${worked}`,
     "",
     `Line | ${t.columns.join(" | ")}`,
     `---|${t.columns.map(() => "---:").join("|")}`,
-    ...rows.map((r) => `${name(r)} | ${r.cells.map((c) => cell(c, r.unit)).join(" | ")}`)
+    ...rows.map((r) => `${name(r)} | ${r.cells.map((c) => cell(c, r)).join(" | ")}`)
   ];
   if (missing.length) out.push("", `Not reported by this source: ${missing.join(", ")}.`);
+  if (t.notes?.length) out.push("", ...t.notes);
   return out.join("\n");
 }
 var reason = (e) => {
@@ -38413,9 +39016,9 @@ async function financialStatement(raw, kind, freq, analysis2) {
   const day3 = analysisDate(analysis2), sym2 = companySymbol(raw), title = STATEMENTS[kind].title;
   let secFailure;
   try {
-    const t = await secStatement(sym2, kind, freq, day3);
-    const q4 = kind !== "balance_sheet" && freq === "quarterly" ? " A fourth quarter is never derived: it is filed only inside the annual figure." : "";
-    return renderTable(t, `${title} for ${sym2} (${freq}), as filed with the SEC on or before ${day3}`, `Each figure is the latest filing of it by that day; a restatement counts only from the day it was filed.${q4}`);
+    const t = withWorkedRows(await secStatement(sym2, kind, freq, day3), kind, freq);
+    const q = kind !== "balance_sheet" && freq === "quarterly" ? ' Every column is one quarter in a row of quarters; a quarter no filing states (a fourth quarter, which only the annual report covers, or one filed only inside a year to date) is derived from two filed figures of the same year, its column marked "(derived)", and the notes below say from which. Per-share figures are never derived.' : "";
+    return renderTable(t, `${title} for ${sym2} (${freq}), as filed with the SEC on or before ${day3}`, `Each figure is the latest filing of it by that day; a restatement counts only from the day it was filed.${q}`);
   } catch (e) {
     secFailure = e;
   }
@@ -38424,7 +39027,7 @@ async function financialStatement(raw, kind, freq, analysis2) {
     return `${title} for ${sym2} is withheld for ${day3}: ${reason(secFailure)}, and the other source, Yahoo Finance, dates a statement by the period it covers, not by when it was filed, so it cannot show which figures were public on ${day3}.`;
   }
   try {
-    const t = await yahooStatement(sym2, kind, freq, day3);
+    const t = withWorkedRows(await yahooStatement(sym2, kind, freq, day3), kind, freq);
     return renderTable(t, `${title} for ${sym2} (${freq}), from Yahoo Finance as it stands today`, `Not from the SEC (${reason(secFailure)}). Yahoo gives money spent, such as capital expenditure, as a negative figure.`);
   } catch (e) {
     const both = `SEC: ${reason(secFailure)}; Yahoo Finance: ${e.message}`;
@@ -38712,11 +39315,11 @@ ${keep(reflection)}`;
     const full = (e) => [`[${e.date} | ${e.ticker} | ${e.rating} | ${e.raw ?? "n/a"} | ${e.alpha ?? "n/a"} | ${e.holding ?? "n/a"}]`, `DECISION:
 ${e.decision}`, ...e.reflection ? [`REFLECTION:
 ${e.reflection}`] : []].join("\n\n");
-    const short = (e) => `[${e.date} | ${e.ticker} | ${e.rating} | ${e.raw ?? "n/a"}]
+    const short2 = (e) => `[${e.date} | ${e.ticker} | ${e.rating} | ${e.raw ?? "n/a"}]
 ${e.reflection || e.decision.slice(0, 300) + (e.decision.length > 300 ? "..." : "")}`;
     const parts = [];
     if (same.length) parts.push(`Past analyses of ${ticker} (most recent first):`, ...same.map(full));
-    if (other.length) parts.push("Recent cross-ticker lessons:", ...other.map(short));
+    if (other.length) parts.push("Recent cross-ticker lessons:", ...other.map(short2));
     return parts.join("\n\n");
   }
 };
@@ -38734,13 +39337,13 @@ var journalIn = (root, ws) => new Journal(path10.join(ws.dir, "journal.md"), rea
 // src/desk/runs.ts
 import fs10 from "node:fs";
 import path11 from "node:path";
-var SECTIONS = ["market", "sentiment", "news", "fundamentals", "bull", "bear", "research_plan", "trader", "aggressive", "conservative", "neutral", "decision"];
+var SECTIONS = ["market", "sentiment", "news", "fundamentals", "fact_check", "bull", "bear", "research_plan", "trader", "aggressive", "conservative", "neutral", "decision"];
 var DEBATES = { investment_debate: ["bull", "bear"], risk_debate: ["aggressive", "conservative", "neutral"] };
 var TURNS = new Set(Object.values(DEBATES).flat());
 var MAX_CHARS = 6e4;
-var LABELS = { market: "Market Analyst", sentiment: "Sentiment Analyst", news: "News Analyst", fundamentals: "Fundamentals Analyst", bull: "Bull Researcher", bear: "Bear Researcher", research_plan: "Research Manager", trader: "Trader", aggressive: "Aggressive Analyst", conservative: "Conservative Analyst", neutral: "Neutral Analyst", decision: "Portfolio Manager" };
+var LABELS = { market: "Market Analyst", sentiment: "Sentiment Analyst", news: "News Analyst", fundamentals: "Fundamentals Analyst", fact_check: "Fact Checker", bull: "Bull Researcher", bear: "Bear Researcher", research_plan: "Research Manager", trader: "Trader", aggressive: "Aggressive Analyst", conservative: "Conservative Analyst", neutral: "Neutral Analyst", decision: "Portfolio Manager" };
 var PARTS = [
-  ["I. Analyst Team Reports", ["market", "sentiment", "news", "fundamentals"]],
+  ["I. Analyst Team Reports", ["market", "sentiment", "news", "fundamentals", "fact_check"]],
   ["II. Research Team Decision", ["bull", "bear", "research_plan"]],
   ["III. Trading Team Plan", ["trader"]],
   ["IV. Risk Management Team Decision", ["aggressive", "conservative", "neutral"]],
@@ -38782,6 +39385,41 @@ function saveSection(dir, ticker, date5, section, text4) {
     turns = r.log.filter((e) => e.section === section).length;
   });
   return turns;
+}
+var REPORTS = ["market", "sentiment", "news", "fundamentals"];
+var FLAG = "[the fact it rested on was corrected: see the fact check]";
+var times = (text4, words3) => words3 ? text4.split(words3).length - 1 : 0;
+function correctSection(dir, ticker, date5, section, corrections, flagAfter = []) {
+  if (!REPORTS.includes(section)) throw new Error(`only an analyst's report can be corrected (${REPORTS.join(", ")}), not ${section}`);
+  if (!corrections.length && !flagAfter.length) throw new Error("give at least one correction or one conclusion to flag");
+  const lines = [];
+  change(dir, ticker, date5, (r) => {
+    if (r.log.some((e) => e.section === "bull")) throw new Error("the debate has begun: the reports are already argued from, so they are no longer corrected");
+    const entry = r.log.find((e) => e.section === section);
+    if (!entry) throw new Error(`this run has no ${section} report to correct`);
+    let t = entry.text;
+    for (const c of corrections) {
+      const now = c.now.trim(), n2 = times(t, c.was);
+      if (!c.was.trim() || !now || now === c.was.trim()) lines.push(`- not applied: a correction needs the report's exact old words and different new ones (${JSON.stringify(c.was)})`);
+      else if (!n2) lines.push(`- not applied: "${c.was}" is not in the ${section} report word for word; copy the words exactly as it has them`);
+      else if (n2 > 1 && !c.every) lines.push(`- not applied: "${c.was}" is in the ${section} report ${n2} times; give more of the words around the one to correct, or set every to correct all ${n2}`);
+      else {
+        t = t.split(c.was).join(`${now} [corrected: was "${c.was}"]`);
+        lines.push(`- corrected${n2 > 1 ? ` in ${n2} places` : ""}: "${c.was}" now reads "${now}"`);
+      }
+    }
+    for (const f of flagAfter) {
+      const n2 = times(t, f);
+      if (n2 !== 1) lines.push(`- not flagged: "${f}" is in the ${section} report ${n2} times, not once; give the exact words that end the conclusion`);
+      else {
+        t = t.split(f).join(`${f} ${FLAG}`);
+        lines.push(`- flagged the conclusion ending "${f}"`);
+      }
+    }
+    if (t.length > MAX_CHARS) throw new Error(`the corrected report would be ${t.length} characters; the most one section holds is ${MAX_CHARS}`);
+    entry.text = t;
+  });
+  return lines;
 }
 function progress(dir, ticker, date5) {
   const out = {};
@@ -39015,6 +39653,7 @@ function kindOf(raw, symbol4) {
 }
 function stepsFor(analysts, debateRounds, riskRounds) {
   const steps = analysts.map((a) => ({ section: ANALYST_SECTION[a], turn: 1 }));
+  steps.push({ section: "fact_check", turn: 1 });
   for (let t = 1; t <= debateRounds; t++) steps.push({ section: "bull", turn: t }, { section: "bear", turn: t });
   steps.push({ section: "research_plan", turn: 1 }, { section: "trader", turn: 1 });
   for (let t = 1; t <= riskRounds; t++) steps.push({ section: "aggressive", turn: t }, { section: "conservative", turn: t }, { section: "neutral", turn: t });
@@ -39060,7 +39699,12 @@ function buildPlan(root, req, ws = workspaceOf(root)) {
   }
   const benchmark = resolveBenchmark(symbol4, s.scoring);
   const plan = { symbol: symbol4, analysisDate: day3, kind, analysts, debateRounds, riskRounds, language, managerModel: s.analysis.managerModel, benchmark, holdingDays: s.scoring.holdingPeriodDays, steps: [], notes };
-  plan.steps = stepsFor(analysts, debateRounds, riskRounds).map((st) => ({ ...st, done: (done[st.section] ?? 0) >= st.turn }));
+  let steps = stepsFor(analysts, debateRounds, riskRounds);
+  if (resumed && !done.fact_check && (done.bull ?? 0) > 0) {
+    steps = steps.filter((st) => st.section !== "fact_check");
+    notes.push("Its debate began before the desk had a fact checker, so its reports go on unchecked.");
+  }
+  plan.steps = steps.map((st) => ({ ...st, done: (done[st.section] ?? 0) >= st.turn }));
   if (!resumed) startRun(dir, symbol4, day3, plan);
   const lessons = journalOf(root, ws).pastContext(symbol4, isHistorical(day3) ? { asOf: day3 } : {});
   return { plan, holdings: renderHoldings(readHoldings(deskDataDir(root)), symbol4), lessons, resumed };
@@ -39089,8 +39733,8 @@ ${lessons}` : "Lessons from past calls: none yet (no earlier call has been settl
 }
 
 // src/desk/window.ts
-var f22 = (v) => v === null || v === void 0 || !Number.isFinite(v) ? "N/A" : v.toFixed(2);
-var vol2 = (v) => Math.round(v).toLocaleString("en-US");
+var f23 = (v) => v === null || v === void 0 || !Number.isFinite(v) ? "N/A" : v.toFixed(2);
+var vol3 = (v) => Math.round(v).toLocaleString("en-US");
 async function windowRows(ticker, o) {
   const bars = (await history(ticker, o.exit)).bars;
   const rsi2 = compute("rsi", bars), macdh = compute("macdh", bars), ema10 = compute("close_10_ema", bars), sma50 = compute("close_50_sma", bars);
@@ -39100,7 +39744,7 @@ async function windowRows(ticker, o) {
   bars.forEach((b, i) => {
     if (b.date < o.entry || b.date > o.exit) return;
     const before = bars[i - 1], change3 = before ? signedPct(b.close / before.close - 1, 2) : "N/A";
-    rows.push(`${b.date} | ${f22(b.open)} | ${f22(b.high)} | ${f22(b.low)} | ${f22(b.close)} | ${change3} | ${vol2(b.volume)} | ${f22(rsi2[i])} | ${f22(macdh[i])} | ${f22(ema10[i])} | ${f22(sma50[i])} | ${f22(benchClose(b.date))}`);
+    rows.push(`${b.date} | ${f23(b.open)} | ${f23(b.high)} | ${f23(b.low)} | ${f23(b.close)} | ${change3} | ${vol3(b.volume)} | ${f23(rsi2[i])} | ${f23(macdh[i])} | ${f23(ema10[i])} | ${f23(sma50[i])} | ${f23(benchClose(b.date))}`);
   });
   return [
     `WHAT HAPPENED IN THE WINDOW: ${ticker}'s finished sessions from ${o.entry} (entry) to ${o.exit} (exit), prices adjusted for splits and dividends, each change against the session before, and ${o.benchmark}'s close beside each. Anything the lesson says about what happened in the window must be found in these rows.`,
@@ -39263,8 +39907,8 @@ function signalsOf(bars, newsToday = null) {
   if (movePct !== null && Math.abs(movePct) >= MOVE_PCT) signals.push({ kind: "move", words: `${movePct >= 0 ? "rose" : "fell"} ${one(Math.abs(movePct))}%` });
   const usual = bars.slice(Math.max(0, n2 - 1 - USUAL_DAYS), n2 - 1).map((b) => b.volume).filter((v) => v > 0);
   if (usual.length >= USUAL_DAYS / 2 && last.volume > 0) {
-    const times = last.volume / (usual.reduce((a, v) => a + v, 0) / usual.length);
-    if (times >= VOLUME_TIMES) signals.push({ kind: "volume", words: `${one(times)} times its usual volume` });
+    const times2 = last.volume / (usual.reduce((a, v) => a + v, 0) / usual.length);
+    if (times2 >= VOLUME_TIMES) signals.push({ kind: "volume", words: `${one(times2)} times its usual volume` });
   }
   const yearAgo = addDays(last.date, -365), year = bars.slice(0, n2 - 1).filter((b) => b.date >= yearAgo);
   if (bars[0] && bars[0].date <= addDays(last.date, -350) && year.length) {
@@ -39441,7 +40085,7 @@ function rerateWeekly(dir, today2, now = /* @__PURE__ */ new Date()) {
 
 // src/desk/routine.ts
 var DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-var weekday = (day3) => DAYS[(/* @__PURE__ */ new Date(`${day3}T12:00:00Z`)).getUTCDay()];
+var weekday2 = (day3) => DAYS[(/* @__PURE__ */ new Date(`${day3}T12:00:00Z`)).getUTCDay()];
 var reratedToday = (dir, today2) => {
   const r = readRerate(dir);
   return new Map(r?.day === today2 ? r.symbols.map((s) => [s.symbol, s]) : []);
@@ -39499,7 +40143,7 @@ function rerateLines(dir, today2) {
   return out;
 }
 function morningBrief(dir, today2, max, look) {
-  const day3 = weekday(today2), weekend = day3 === "Saturday" || day3 === "Sunday";
+  const day3 = weekday2(today2), weekend = day3 === "Saturday" || day3 === "Sunday";
   const m2 = morningList(dir, today2, max, look?.screen ?? null);
   const lines = [`MORNING ROUTINE for ${day3} ${today2}.`];
   if (weekend) lines.push(`US markets do not open on a ${day3}: score past calls (step 1), then stop and say so. Analyse nothing unless the person asked for it in words.`);
@@ -39525,7 +40169,7 @@ function eveningBrief(dir, today2, now) {
   const calls = new Journal(path18.join(dir, "journal.md")).load();
   const todays = calls.filter((e) => e.date === today2), pending = calls.filter((e) => e.pending).length;
   const orders = ordersOn(dir, now);
-  const lines = [`EVENING WRAP-UP for ${weekday(today2)} ${today2}.`, "", "1. Score what is ready: list_settlements, then record_outcome with a lesson for each READY call (the /settle playbook).", ""];
+  const lines = [`EVENING WRAP-UP for ${weekday2(today2)} ${today2}.`, "", "1. Score what is ready: list_settlements, then record_outcome with a lesson for each READY call (the /settle playbook).", ""];
   lines.push(todays.length ? `2. The desk's calls today (${todays.length}): ${todays.map((e) => `${e.ticker} ${e.rating}`).join(", ")}. Read each one's executive summary with read_run (section decision) for one sentence each.` : "2. The desk made no call today.");
   lines.push("");
   if (!orders.length) lines.push("3. The dashboard sent no order today.");
@@ -39728,6 +40372,25 @@ function registerDeskTools(server, root) {
     const d = analysisDate(a.analysis_date), turns = saveSection(ws().dir, a.symbol, d, a.section, a.text);
     return `Saved ${a.section} for ${safeSymbol(a.symbol)} on ${d} (${turns > 1 ? `turn ${turns}` : "one text"}).`;
   }));
+  server.registerTool("correct_report", {
+    title: "Correct an analyst's report",
+    description: `The fact checker's corrections to an analyst's report (market, sentiment, news or fundamentals), made by the desk word for word before the debate begins. Each correction gives the report's exact old words and the right ones: the desk replaces them where they stand and keeps the old words beside them as [corrected: was "..."]. flag_after names the exact words that end a conclusion resting on a corrected fact; the desk adds a note after them. Nothing else in the report changes, so never save a corrected report yourself. Words found more than once need more of the words around them, or every set to true to correct them all. It answers line by line what was done and what was not, and why.`,
+    inputSchema: {
+      symbol: symbol2,
+      analysis_date: day2,
+      section: external_exports.enum(["market", "sentiment", "news", "fundamentals"]),
+      corrections: external_exports.array(external_exports.object({
+        was: external_exports.string().min(1).max(2e3).describe("The report's words, exactly as it has them"),
+        now: external_exports.string().min(1).max(2e3).describe("The right words, from a tool result"),
+        every: external_exports.boolean().optional().describe("Correct every place these words appear")
+      })).max(60),
+      flag_after: external_exports.array(external_exports.string().min(1).max(500)).max(20).optional().describe("The exact words ending each conclusion that rested on a corrected fact")
+    },
+    annotations: write
+  }, async (a) => act(() => {
+    const d = analysisDate(a.analysis_date), lines = correctSection(ws().dir, a.symbol, d, a.section, a.corrections, a.flag_after);
+    return [`The ${a.section} report for ${safeSymbol(a.symbol)} on ${d}:`, ...lines].join("\n");
+  }));
   server.registerTool("read_run", {
     title: "Read a run",
     description: `Read what the team has written so far for a stock and day. Without sections it lists which sections exist and how many turns each holds. With sections it returns their text; ${DEBATES2.join(" and ")} give a whole debate in the order spoken. A section not written yet is said to be missing, never blank.`,
@@ -39850,9 +40513,9 @@ ${renderSummary(summarize(entries))}`;
   }, async (a) => act(async () => {
     const day3 = today();
     if (a.kind === "evening") return eveningBrief(dir, day3, /* @__PURE__ */ new Date());
-    const on = readPrefs(dir).morning === true, weekday2 = ![0, 6].includes((/* @__PURE__ */ new Date(`${day3}T12:00:00Z`)).getUTCDay());
+    const on = readPrefs(dir).morning === true, weekday3 = ![0, 6].includes((/* @__PURE__ */ new Date(`${day3}T12:00:00Z`)).getUTCDay());
     let look;
-    if (weekday2) {
+    if (weekday3) {
       try {
         rerateWeekly(dir, day3);
       } catch {
@@ -39987,7 +40650,7 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root) {
   }, async () => text3(await deskCheck(root, fetchImpl2, source)));
   server.registerTool("reset_team", {
     title: "Reset the team",
-    description: "Put the desk's twelve agents, the trading-desk team's file and its line-up back exactly as the project ships them: each file is written again, even one that already matches, which also brings Madav back to the project's version of the team in place of changes made in its Agent Studio. Only after the person asked for it and confirmed it in this conversation. It writes only those files in this folder; the model, permissions and effort the person chose in Madav stay theirs.",
+    description: "Put the desk's thirteen agents, the trading-desk team's file and its line-up back exactly as the project ships them: each file is written again, even one that already matches, which also brings Madav back to the project's version of the team in place of changes made in its Agent Studio. Only after the person asked for it and confirmed it in this conversation. It writes only those files in this folder; the model, permissions and effort the person chose in Madav stay theirs.",
     inputSchema: { confirmed: external_exports.literal(true).describe("true: the person confirmed this reset in this conversation") },
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false }
   }, async () => {
@@ -40041,6 +40704,30 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root) {
     inputSchema: { symbol: symbol3, analysis_date: analysis, look_back_days: external_exports.number().int().min(1).max(30).optional().describe("How many recent closes to list; 30 when left out") },
     annotations: READ
   }, async (a) => answer(`checked price table of ${a.symbol}`, () => verifiedSnapshot(a.symbol, a.analysis_date, a.look_back_days ?? 30)));
+  server.registerTool("get_price_facts", {
+    title: "Price facts",
+    description: "What the prices and indicators did, worked out by the desk so no one counts by eye: runs up to the latest row (how many sessions in a row), which side of each average and since when, every crossing of the last year, how often things happened in the last 20, 63, 126 and 252 sessions (closes below an average or beyond a band, RSI extremes, big days), the three highest and lowest of each window (closes, volume, daily moves, RSI, MACD, ATR), the latest row against the past (the lowest since when), and the change over each window. Every date carries its weekday. Call it before stating a streak, a first or last time, a record, a rank or a count of sessions.",
+    inputSchema: { symbol: symbol3, analysis_date: analysis },
+    annotations: READ
+  }, async (a) => answer(`price facts of ${a.symbol}`, () => priceFacts(a.symbol, a.analysis_date)));
+  server.registerTool("work_out", {
+    title: "Work it out",
+    description: "The desk's calculator, for every figure no tool prints: a difference, a percentage, a ratio, a sum or an average, many in one call, each answered with its sum; and the days between dates (calendar days, weekdays and, for a symbol, the sessions it traded), or the weekday of a date. Use it instead of working anything out in your head, and quote the sum it gives.",
+    inputSchema: {
+      analysis_date: analysis,
+      sums: external_exports.array(external_exports.object({
+        label: external_exports.string().max(120).optional().describe('What the figure is, e.g. "fall on the day"'),
+        expression: external_exports.string().min(1).max(400).describe('Numbers without thousands commas, + - * / ^, brackets, % after a number, and change(a, b) (percent change from a to b), share(a, b) (a as a percent of b), abs, sqrt, round(a, d), sum, avg, min, max. E.g. "change(221.97, 212.21)" or "(96221 - 81615) / 81615 * 100"')
+      })).max(40).optional(),
+      dates: external_exports.array(external_exports.object({
+        date: external_exports.string().optional().describe("YYYY-MM-DD: its weekday, and with a symbol whether it traded that day"),
+        from: external_exports.string().optional().describe("YYYY-MM-DD, with to: the days between them"),
+        to: external_exports.string().optional(),
+        symbol: external_exports.string().max(20).optional().describe("Also count the sessions this symbol traded")
+      })).max(20).optional()
+    },
+    annotations: READ
+  }, async (a) => answer("the sums", () => workOut(a.analysis_date, a.sums, a.dates)));
   const days = external_exports.number().int().min(1).max(30).optional().describe("Calendar days before the analysis date; " + a0.newsLookbackDays + " when left out");
   server.registerTool("get_company_news", {
     title: "Company news",
@@ -40062,7 +40749,7 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root) {
   }, async (a) => answer("posts about " + a.symbol, () => socialPosts(a.symbol, a.analysis_date, { lookBackDays: a0.newsLookbackDays, stocktwitsLimit: a0.stocktwitsLimit, subreddits: a0.subreddits, cryptoSubreddits: a0.cryptoSubreddits })));
   server.registerTool("get_economic_series", {
     title: "Economic figures (FRED)",
-    description: "An economic series from FRED as known by the analysis date: the latest value, the change over the window and recent values. Names: " + Object.keys(SERIES).join(", ") + "; or any FRED series id.",
+    description: "An economic series from FRED as known by the analysis date: the latest value named by the period it stands for, the change over a year (from the same period a year earlier: quote a yearly rate only from that line), the change over the look-back window and recent values. Names: " + Object.keys(SERIES).join(", ") + "; or any FRED series id.",
     inputSchema: { indicator: external_exports.string().describe("A name such as cpi, 10y_treasury, unemployment, or a FRED series id"), analysis_date: analysis, look_back_days: external_exports.number().int().min(30).max(3650).optional().describe("365 when left out") },
     annotations: READ
   }, async (a) => answer("economic series " + a.indicator, () => economicSeries(a.indicator, a.analysis_date, a.look_back_days ?? 365)));
@@ -40080,7 +40767,7 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root) {
   }, async (a) => answer("profile of " + a.symbol, () => companyOverview(a.symbol, a.analysis_date)));
   server.registerTool("get_financial_statement", {
     title: "Financial statement",
-    description: "A balance sheet, income statement or cash flow statement, quarterly or annual, latest periods first. For a US filer it is the SEC filing as it stood on the analysis date; otherwise Yahoo Finance's, for today only.",
+    description: "A balance sheet, income statement or cash flow statement, quarterly or annual, latest periods first, with margins, growth, free cash flow and balance-sheet ratios worked out in rows of their own. For a US filer it is the SEC filing as it stood on the analysis date (a quarter no filing states derived and marked so, per-share figures on the basis of the latest filings across a share split); otherwise Yahoo Finance's, for today only.",
     inputSchema: {
       symbol: symbol3,
       analysis_date: analysis,

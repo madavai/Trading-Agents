@@ -34,6 +34,12 @@ export const isHistorical = (date: string): boolean => date < today();
 
 export const addDays = (date: string, days: number): string => new Date(Date.parse(`${date}T00:00:00Z`) + days * DAY).toISOString().slice(0, 10);
 
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+/** A date's day of the week, "Mon" to "Sun". */
+export const weekday = (date: string): string => WEEKDAYS[new Date(`${date}T00:00:00Z`).getUTCDay()]!;
+/** A date with its day of the week, as the desk writes it where a weekday matters: "2026-10-30 (Fri)". */
+export const withWeekday = (date: string): string => `${date} (${weekday(date)})`;
+
 export const daysBetween = (from: string, to: string): number => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY);
 
 /** A date a model asked for, held to the analysis date: never later than it. */

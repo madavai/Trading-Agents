@@ -1,6 +1,6 @@
 ---
 name: analyse
-description: Analyse one stock (or crypto asset) on one date with the Trading Agents desk - four analysts, a bull and bear debate, a research manager, a trader, three risk voices and a portfolio manager - and record the call in the journal. Use when the person runs /analyse or asks the desk to analyse a ticker. It never places an order.
+description: Analyse one stock (or crypto asset) on one date with the Trading Agents desk - four analysts, a fact checker, a bull and bear debate, a research manager, a trader, three risk voices and a portfolio manager - and record the call in the journal. Use when the person runs /analyse or asks the desk to analyse a ticker. It never places an order.
 argument-hint: TICKER [YYYY-MM-DD] [shallow|medium|deep] [analysts=market,news] [language=Spanish]
 ---
 
@@ -36,6 +36,7 @@ Each agent is called with the Agent tool, `subagent_type` set to its name. Every
 | Step | Agent | Add to the request |
 |---|---|---|
 | market, sentiment, news, fundamentals | market-analyst, sentiment-analyst, news-analyst, fundamentals-analyst | Start all of this run's analysts at once, in one message, and name in each request the analysts working in this run, so they can tell each other what to weigh. |
+| fact_check | fact-checker | Start it once every analyst of this run has saved, and name the analysts working in this run. It corrects their reports in place before the debate starts. |
 | bull (turn n), bear (turn n) | bull-researcher, bear-researcher | "This is turn n of N." Run them one at a time, bull first, in turn. |
 | research_plan | research-manager | |
 | trader | trader | The plan's holdings block, word for word. |

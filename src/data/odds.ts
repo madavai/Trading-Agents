@@ -17,10 +17,10 @@ export async function predictionMarkets(topic: string, analysis: string, limit =
   const j = await getJson<SearchJson>(`https://gamma-api.polymarket.com/public-search?q=${encodeURIComponent(topic)}&limit_per_type=20`);
   const open = (j.events ?? []).flatMap((e) => e.markets ?? []).filter((m) => m.question && !m.closed && m.active !== false && list(m.outcomePrices).length && list(m.outcomes).length && (!m.endDate || Date.parse(m.endDate) > now.getTime()))
     .sort((a, b) => (b.volumeNum ?? 0) - (a.volumeNum ?? 0)).slice(0, Math.max(1, Math.min(10, limit)));
-  const head = `## Polymarket: "${topic}"\nLive odds: the crowd's priced chance of each event (more traded volume, more reliable). A price is not a forecast to take as certain.\n`;
+  const head = `## Polymarket: "${topic}"\nLive odds: the crowd's priced chance of each event (more traded volume, more reliable). A price is not a forecast to take as certain. The date after each market is when it stops trading, not the date of the event it asks about: take an event's own date from the news or a filing.\n`;
   if (!open.length) return `${head}\nNo open markets matched "${topic}". Polymarket covers mostly economic, political, geopolitical and crypto events; a single company may have none.`;
   return head + '\n' + open.map((m) => {
     const p = Number(list(m.outcomePrices)[0]), wk = m.oneWeekPriceChange;
-    return `- ${m.question}: ${list(m.outcomes)[0]} ${(p * 100).toFixed(0)}% · volume $${Math.round(m.volumeNum ?? 0).toLocaleString('en-US')}${m.endDate ? ` · resolves ${m.endDate.slice(0, 10)}` : ''}${typeof wk === 'number' ? ` · ${signed(wk * 100, 1)} points this week` : ''}`;
+    return `- ${m.question}: ${list(m.outcomes)[0]} ${(p * 100).toFixed(0)}% · volume $${Math.round(m.volumeNum ?? 0).toLocaleString('en-US')}${m.endDate ? ` · trading closes ${m.endDate.slice(0, 10)}` : ''}${typeof wk === 'number' ? ` · ${signed(wk * 100, 1)} points this week` : ''}`;
   }).join('\n');
 }

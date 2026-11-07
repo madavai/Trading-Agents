@@ -123,7 +123,7 @@
     Underweight: { group: ratings, term: "Underweight", means: "the desk leans against it. As shipped, its ticket sells half of what is held." },
     Sell: { group: ratings, term: "Sell", means: "the desk would not own it. As shipped, its ticket sells everything held." },
     "Needs review": { group: ratings, term: "Needs review", means: "the decision gave no rating that could be read, so it asks for no order." },
-    call: { group: desk, term: "The desk's call", means: "its twelve agents' rating, from Buy to Sell, on the day they analysed it." },
+    call: { group: desk, term: "The desk's call", means: "its thirteen agents' rating, from Buy to Sell, on the day they analysed it." },
     depth: { group: desk, term: "Depth", means: "how long the debates in an analysis run: shallow (one round each, quick), medium (three) or deep (five, the slowest and costliest)." },
     alpha: { group: desk, term: "Alpha", means: "how much better (+) or worse (\u2212) a call did than its market's index in the trading days after it: above zero, it beat the market." },
     paper: { group: desk, term: "On paper", means: "followed with pretend money only, to see what the desk's calls would have done before any real money is at stake." },
@@ -204,6 +204,7 @@
     sentiment: "Sentiment report",
     news: "News report",
     fundamentals: "Fundamentals report",
+    fact_check: "Fact check",
     bull: "Bull case",
     bear: "Bear case",
     research_plan: "Research plan",
@@ -1637,6 +1638,7 @@
     sentiment: { icon: "i-chat", tone: "accent", who: "Sentiment analyst" },
     news: { icon: "i-news", tone: "accent", who: "News analyst" },
     fundamentals: { icon: "i-ledger", tone: "accent", who: "Fundamentals analyst" },
+    fact_check: { icon: "i-check", tone: "ok", who: "Fact checker" },
     bull: { icon: "i-up", tone: "ok", who: "Bull researcher" },
     bear: { icon: "i-down", tone: "bad", who: "Bear researcher" },
     research_plan: { icon: "i-scale", tone: "merged", who: "Research manager" },
@@ -1647,7 +1649,7 @@
     decision: { icon: "i-flag", tone: "merged", who: "Portfolio manager" }
   };
   var STAGES = [
-    { name: "Gathering the facts", keys: ["market", "sentiment", "news", "fundamentals"] },
+    { name: "Gathering the facts", keys: ["market", "sentiment", "news", "fundamentals", "fact_check"] },
     { name: "The research debate", keys: ["bull", "bear", "research_plan"] },
     { name: "The trade", keys: ["trader"] },
     { name: "The risk debate", keys: ["aggressive", "conservative", "neutral"] }
@@ -1858,7 +1860,7 @@
     const coin = isCrypto(ASK.symbol), it = tierItem(ASK.symbol);
     const reads = coin ? "the price, the news and the mood (a coin has no accounts to read)" : "the price, the news, the mood and the accounts (for a fund: what it holds and what it costs to own)";
     $("#askDialog").innerHTML = `<h2 id="askTitle">Analyse ${esc(it?.name ? `${it.name} (${ASK.symbol})` : ASK.symbol)}</h2>
-    <p class="at-lede">The desk's twelve agents read ${reads}, argue both sides, and record a call you can read and decide on. It never places an order${coin ? `: ${it?.paper === false ? "among crypto, the desk follows only Bitcoin and Ether on paper" : "a coin is followed on paper only"}` : ""}.</p>
+    <p class="at-lede">The desk's thirteen agents read ${reads}, check the facts, argue both sides, and record a call you can read and decide on. It never places an order${coin ? `: ${it?.paper === false ? "among crypto, the desk follows only Bitcoin and Ether on paper" : "a coin is followed on paper only"}` : ""}.</p>
     <div class="at-seg" role="radiogroup" aria-label="How deep">${DEPTH_ORDER.map((d) => `<button class="at-seg-b${d === ASK.depth ? " on" : ""}" role="radio" aria-checked="${d === ASK.depth}" data-act="ask-depth" data-depth="${d}">${DEPTH_WORDS[d][0]}</button>`).join("")}</div>
     <p class="at-quiet">${term("depth")} \xB7 ${esc(DEPTH_WORDS[ASK.depth][1])}</p>
     <p class="at-honest">${l ? `It runs by itself: ${esc(l.listener)} is listening.` : "Nothing is listening on this computer yet, so it waits until a run starts: see Analyses you asked for."}</p>

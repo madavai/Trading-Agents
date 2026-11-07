@@ -20900,7 +20900,7 @@ function removeListener(dir, pid) {
 // src/desk/runs.ts
 import fs13 from "node:fs";
 import path12 from "node:path";
-var SECTIONS = ["market", "sentiment", "news", "fundamentals", "bull", "bear", "research_plan", "trader", "aggressive", "conservative", "neutral", "decision"];
+var SECTIONS = ["market", "sentiment", "news", "fundamentals", "fact_check", "bull", "bear", "research_plan", "trader", "aggressive", "conservative", "neutral", "decision"];
 var DEBATES = { investment_debate: ["bull", "bear"], risk_debate: ["aggressive", "conservative", "neutral"] };
 var TURNS = new Set(Object.values(DEBATES).flat());
 var folder = (dir, ticker, date4) => path12.join(dir, "runs", `${safeSymbol(ticker).replace(/\^/g, "IDX_").replace(/=/g, "_EQ_")}_${date4}`);
@@ -20933,6 +20933,8 @@ function stepWords(dir, ticker, date4) {
     case "news":
     case "fundamentals":
       return `analysts reading: ${analysts.filter((s) => (done[s.section] ?? 0) >= 1).length} of ${analysts.length} done`;
+    case "fact_check":
+      return "the fact checker is checking the reports";
     case "bull":
     case "bear":
       return `debate round ${next.turn}${of(plan?.debateRounds)}`;

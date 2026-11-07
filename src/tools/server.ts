@@ -9,6 +9,8 @@ import { readContactEmail, saveContactEmail } from '../contact.js';
 import { configure, failureText } from '../data/http.js';
 import { INDICATOR_NAMES } from '../data/indicators.js';
 import { indicatorWindow, instrument, priceHistory, verifiedSnapshot } from '../data/market.js';
+import { priceFacts } from '../data/facts.js';
+import { workOut } from '../data/workout.js';
 import { companyNews, worldNews } from '../data/news.js';
 import { socialPosts } from '../data/social.js';
 import { economicSeries, SERIES } from '../data/macro.js';
@@ -48,7 +50,7 @@ export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetc
 
   server.registerTool('reset_team', {
     title: 'Reset the team',
-    description: 'Put the desk\'s twelve agents, the trading-desk team\'s file and its line-up back exactly as the project ships them: each file is written again, even one that already matches, which also brings Madav back to the project\'s version of the team in place of changes made in its Agent Studio. Only after the person asked for it and confirmed it in this conversation. It writes only those files in this folder; the model, permissions and effort the person chose in Madav stay theirs.',
+    description: 'Put the desk\'s thirteen agents, the trading-desk team\'s file and its line-up back exactly as the project ships them: each file is written again, even one that already matches, which also brings Madav back to the project\'s version of the team in place of changes made in its Agent Studio. Only after the person asked for it and confirmed it in this conversation. It writes only those files in this folder; the model, permissions and effort the person chose in Madav stay theirs.',
     inputSchema: { confirmed: z.literal(true).describe('true: the person confirmed this reset in this conversation') },
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
   }, async () => {
@@ -106,6 +108,32 @@ export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetc
     annotations: READ,
   }, async (a) => answer(`checked price table of ${a.symbol}`, () => verifiedSnapshot(a.symbol, a.analysis_date, a.look_back_days ?? 30)));
 
+  server.registerTool('get_price_facts', {
+    title: 'Price facts',
+    description: 'What the prices and indicators did, worked out by the desk so no one counts by eye: runs up to the latest row (how many sessions in a row), which side of each average and since when, every crossing of the last year, how often things happened in the last 20, 63, 126 and 252 sessions (closes below an average or beyond a band, RSI extremes, big days), the three highest and lowest of each window (closes, volume, daily moves, RSI, MACD, ATR), the latest row against the past (the lowest since when), and the change over each window. Every date carries its weekday. Call it before stating a streak, a first or last time, a record, a rank or a count of sessions.',
+    inputSchema: { symbol, analysis_date: analysis },
+    annotations: READ,
+  }, async (a) => answer(`price facts of ${a.symbol}`, () => priceFacts(a.symbol, a.analysis_date)));
+
+  server.registerTool('work_out', {
+    title: 'Work it out',
+    description: 'The desk\'s calculator, for every figure no tool prints: a difference, a percentage, a ratio, a sum or an average, many in one call, each answered with its sum; and the days between dates (calendar days, weekdays and, for a symbol, the sessions it traded), or the weekday of a date. Use it instead of working anything out in your head, and quote the sum it gives.',
+    inputSchema: {
+      analysis_date: analysis,
+      sums: z.array(z.object({
+        label: z.string().max(120).optional().describe('What the figure is, e.g. "fall on the day"'),
+        expression: z.string().min(1).max(400).describe('Numbers without thousands commas, + - * / ^, brackets, % after a number, and change(a, b) (percent change from a to b), share(a, b) (a as a percent of b), abs, sqrt, round(a, d), sum, avg, min, max. E.g. "change(221.97, 212.21)" or "(96221 - 81615) / 81615 * 100"'),
+      })).max(40).optional(),
+      dates: z.array(z.object({
+        date: z.string().optional().describe('YYYY-MM-DD: its weekday, and with a symbol whether it traded that day'),
+        from: z.string().optional().describe('YYYY-MM-DD, with to: the days between them'),
+        to: z.string().optional(),
+        symbol: z.string().max(20).optional().describe('Also count the sessions this symbol traded'),
+      })).max(20).optional(),
+    },
+    annotations: READ,
+  }, async (a) => answer('the sums', () => workOut(a.analysis_date, a.sums, a.dates)));
+
   const days = z.number().int().min(1).max(30).optional().describe('Calendar days before the analysis date; ' + a0.newsLookbackDays + ' when left out');
 
   server.registerTool('get_company_news', {
@@ -131,7 +159,7 @@ export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetc
 
   server.registerTool('get_economic_series', {
     title: 'Economic figures (FRED)',
-    description: 'An economic series from FRED as known by the analysis date: the latest value, the change over the window and recent values. Names: ' + Object.keys(SERIES).join(', ') + '; or any FRED series id.',
+    description: 'An economic series from FRED as known by the analysis date: the latest value named by the period it stands for, the change over a year (from the same period a year earlier: quote a yearly rate only from that line), the change over the look-back window and recent values. Names: ' + Object.keys(SERIES).join(', ') + '; or any FRED series id.',
     inputSchema: { indicator: z.string().describe('A name such as cpi, 10y_treasury, unemployment, or a FRED series id'), analysis_date: analysis, look_back_days: z.number().int().min(30).max(3650).optional().describe('365 when left out') },
     annotations: READ,
   }, async (a) => answer('economic series ' + a.indicator, () => economicSeries(a.indicator, a.analysis_date, a.look_back_days ?? 365)));
@@ -152,7 +180,7 @@ export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetc
 
   server.registerTool('get_financial_statement', {
     title: 'Financial statement',
-    description: 'A balance sheet, income statement or cash flow statement, quarterly or annual, latest periods first. For a US filer it is the SEC filing as it stood on the analysis date; otherwise Yahoo Finance\'s, for today only.',
+    description: 'A balance sheet, income statement or cash flow statement, quarterly or annual, latest periods first, with margins, growth, free cash flow and balance-sheet ratios worked out in rows of their own. For a US filer it is the SEC filing as it stood on the analysis date (a quarter no filing states derived and marked so, per-share figures on the basis of the latest filings across a share split); otherwise Yahoo Finance\'s, for today only.',
     inputSchema: {
       symbol, analysis_date: analysis,
       statement: z.enum(['balance_sheet', 'income_statement', 'cashflow']),
