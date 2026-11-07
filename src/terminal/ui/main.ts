@@ -4,7 +4,7 @@
 // (Decide…) or the person's own (Trade…) - and is placed only on their Confirm, with trading switched on by them.
 import { api, ApiError, claimKey, hasKey, KEY_LOST, type CallDetail, type DeskState, type Depth, type History, type LinkInfo, type Market, type Match, type Prefs, type Caps, type PaperView, type PaperTrade, type QueueView, type QuoteResult, type Account, type AccountView, type Holding, type Order, type Recent, type Snapshot, type TicketOpen, type Check, type Review, type Placed, type Trading, type Tier, type TierItem, type TierView, type Worth, type Screen, type Weather, type WeatherLine, type HoldingCare } from './api.js';
 import { heroChart, paperChart, sparkline } from './chart.js';
-import { barOn, clock, dayText, esc, labelled, money, NOTES, num, opening, pct, plain, ratingMeaning, ratingTone, SECTION_NAMES, shortDay, tone } from './fmt.js';
+import { averageOf, barOn, chipDay, dayText, esc, labelled, money, moveDayOf, NOTES, num, opening, pct, plain, points, priceDayWords, ratingMeaning, ratingTone, resultOf, SECTION_NAMES, shortDay, tone, weekDay, when } from './fmt.js';
 import { GLOSSARY, glossaryGroups, isTerm, means, type TermKey } from './glossary.js';
 import { markdown } from './md.js';
 import { isCrypto } from '../../data/symbols.js';
@@ -117,7 +117,16 @@ function adopt(p: Prefs): void {
 const term = (key: TermKey, words: string = GLOSSARY[key].term) => `<span class="ta-term" title="${esc(means(key))}">${esc(words)}</span>`;
 /** A rating as a chip; pointing at it says what it means. */
 const ratingChip = (r: string) => `<span class="at-chip ${ratingTone(r)}"${ratingMeaning(r) ? ` title="${esc(ratingMeaning(r))}"` : ''}>${esc(r)}</span>`;
-const changeChip = (q: Quote | null) => (q && q.changePct !== null ? `<span class="at-chip ${tone(q.changePct)}" title="${esc(means('today'))}">${pct(q.changePct)}</span>` : `<span class="at-chip" title="${esc(means('today'))}">—</span>`);
+/** A quote's move over its latest trading day: in points for a yield, which is itself a percent (4.84% to 4.86% is "+0.02
+ *  points", never "+0.41%"), else in percent. */
+const moveText = (q: Quote): string => (marketOf(q.symbol)?.unit === '%' ? points(q.change) : pct(q.changePct));
+/** The move as a chip. When its day was not today (a weekend, or before the open), the chip names it (" · Fri"), so a
+ *  Friday's move is never shown as today's. */
+const changeChip = (q: Quote | null) => {
+  if (!q || q.changePct === null) return `<span class="at-chip" title="${esc(means('today'))}">—</span>`;
+  const day = moveDayOf(q.asOf);
+  return `<span class="at-chip ${tone(q.changePct)}" title="${esc(day ? `${means('today')} This move is from ${weekDay(day)}.` : means('today'))}">${moveText(q)}${day ? ` · ${chipDay(day)}` : ''}</span>`;
+};
 /** In place of an order ticket for what Robinhood's agent doorway does not trade: a coin on paper, or one not followed at all. */
 const noTicketChip = (paper: boolean) => (paper ? `<span class="at-chip" title="${esc(`${means('paper')} ${NOTES.coinOnPaper}`)}">on paper only</span>` : `<span class="at-chip" title="${esc(NOTES.noTicket)}">no order ticket</span>`);
 const robot = (sym: string) => `<button class="icon-btn" data-act="analyse" data-symbol="${esc(sym)}" title="Ask the desk to analyse ${esc(sym)}" aria-label="Ask the desk to analyse ${esc(sym)}"><svg class="g"><use href="#i-bot"/></svg></button>`;
@@ -127,6 +136,11 @@ const priceText = (sym: string, q: Quote): string => {
   const unit = marketOf(sym)?.unit;
   return unit ? `${num(q.price)}${unit}` : isIndex(sym) ? num(q.price) : money(q.price, q.currency ?? 'USD');
 };
+/** A yardstick fund by its ticker and, for the shipped one, what it is: "SPY (the S&P 500 fund)", never "the S&P 500",
+ *  which is the index the Markets card shows at about ten times the fund's price. */
+const fundWords = (sym: string): string => (sym === 'SPY' ? 'SPY (the S&P 500 fund)' : sym);
+/** The price with its move, and which day they are ("the close of Fri 6 Nov" on a weekend). */
+const priceWords = (sym: string, q: Quote): string => priceDayWords(priceText(sym, q), q.changePct === null ? null : moveText(q), q);
 const latestCall = (sym: string) => S.desk?.calls.find((c) => c.ticker === sym) ?? null;
 const nameOf = (sym: string): string => quoteOf(sym)?.name ?? S.history?.name ?? marketOf(sym)?.name ?? sym;
 
@@ -201,7 +215,7 @@ function renderGuide(): void {
   const w = g.paper;
   const paper = guideStep(5, w.done, `Follow them ${term('paper', 'on paper')} for ${esc(w.words)}, then read the ${term('scorecard', 'scorecard')} before deciding about money and Robinhood`,
     `<div class="at-meter${w.done ? ' ok' : ''}"><progress class="at-bar" max="${w.need}" value="${Math.min(w.weeks, w.need)}" aria-label="${w.weeks} of ${w.need} weeks on paper"></progress><b>${Math.min(w.weeks, w.need)} of ${w.need} weeks</b></div>
-    <p class="at-quiet ta-gwhy">Paper follows every call with pretend money, against the ${term('sp500', 'S&P 500')}. A few weeks are noise, not proof: read the scorecard, good or bad, before you decide anything. Connecting Robinhood and switching trading on stay your own decisions.</p>
+    <p class="at-quiet ta-gwhy">Paper follows every call with pretend money, against SPY, the fund that copies the ${term('sp500', 'S&P 500')}. A few weeks are noise, not proof: read the scorecard, good or bad, before you decide anything. Connecting Robinhood and switching trading on stay your own decisions.</p>
     <div class="at-row"><button class="at-btn at-press" data-act="goto" data-to="sec-score"><svg class="g"><use href="#i-target"/></svg><span>Go to the scorecard</span></button></div>`);
 
   const all = g.done === g.of;
@@ -280,9 +294,9 @@ function renderAccount(): void {
   if (r.state === 'none') { lede = "Connect Robinhood to bring your accounts here. Connecting opens Robinhood's own sign-in page in your browser. Until you switch trading on, the dashboard only reads."; actions = connect('Connect Robinhood', true); }
   else if (r.state === 'saved') actions = check('Check the connection', true) + leave;
   else if (r.state === 'connected') {
-    const when = r.checkedAt ? clock(r.checkedAt) : '';
+    const checked = r.checkedAt ? when(r.checkedAt) : '';
     lede = 'The sign-in works and Robinhood answered.';
-    facts = `<p class="at-quiet">${esc(r.message)}${when ? ` Checked at ${esc(when)}.` : ''}</p>`;
+    facts = `<p class="at-quiet">${esc(r.message)}${checked ? ` Checked at ${esc(checked)}.` : ''}</p>`;
     actions = check('Check again', false) + leave;
   } else if (r.state === 'failed') actions = connect('Connect again', true) + check('Check again', false);
   $('#accountCard').innerHTML = `<div class="at-card-head"><h3>Robinhood</h3><span class="at-chip ${w.chip}">${esc(w.label)}</span></div>
@@ -332,9 +346,9 @@ function renderToday(): void {
   // the Agentic account: what the desk may spend, on the person's Confirm
   const ag = views.find((v) => v.account.agentic);
   const agentic = kpi({ tone: 'accent', icon: 'i-bolt', name: 'Agentic buying power', term: 'buyingPower', value: ag ? money(ag.portfolio?.buyingPower, ag.portfolio?.currency ?? 'USD') : '—', line: ag ? (tradingOn() ? '<span class="ta-warn">Trading is on</span> · orders only on your Confirm' : 'Trading is off · the dashboard only reads') : 'Show your Agentic account to trade', act: { act: 'view', view: 'account' } });
-  // the market: the S&P 500 today
-  const m = marketOf('^GSPC'), q = m && isQuote(m.quote) ? m.quote : null;
-  const market = kpi({ tone: q ? (q.changePct !== null && q.changePct < 0 ? 'bad' : 'ok') : '', icon: 'i-pulse', name: 'S&P 500 today', term: 'sp500', value: q ? num(q.price, 0) : '—', line: q ? `<span class="${(q.changePct ?? 0) >= 0 ? 'ta-up' : 'ta-down'}">${pct(q.changePct)}</span> · ${q.open ? 'now' : 'last close'}` : 'Reading the market', act: { act: 'select', symbol: '^GSPC' }, spark: q ? 'gspc' : '' });
+  // the market: the S&P 500 index, its latest trading day named when that was not today
+  const m = marketOf('^GSPC'), q = m && isQuote(m.quote) ? m.quote : null, qDay = q ? moveDayOf(q.asOf) : '';
+  const market = kpi({ tone: q ? (q.changePct !== null && q.changePct < 0 ? 'bad' : 'ok') : '', icon: 'i-pulse', name: 'S&P 500', term: 'sp500', value: q ? num(q.price, 0) : '—', line: q ? `<span class="${(q.changePct ?? 0) >= 0 ? 'ta-up' : 'ta-down'}">${pct(q.changePct)}</span> · ${q.open ? 'now' : qDay ? `close of ${weekDay(qDay)}` : "today's close"}` : 'Reading the market', act: { act: 'select', symbol: '^GSPC' }, spark: q ? 'gspc' : '' });
   // the desk: its latest call, what is waiting, what is scored
   const latest = d?.calls[0];
   const desk = kpi({ tone: 'merged', icon: 'i-check', name: "The desk's calls", value: d ? String(d.calls.length) : '—', line: d ? `${latest ? `latest <b>${esc(latest.ticker)}</b> ${esc(latest.rating)}` : 'none yet'} · ${d.queue.filter(isOpenItem).length} waiting · ${d.record.summary.resolved} scored` : 'Reading the desk', act: { act: 'goto', to: 'sec-calls' } });
@@ -374,7 +388,7 @@ const sideWord = (s: string | null) => (s === 'buy' ? 'Buy' : s === 'sell' ? 'Se
 const CARE = { holdings: [] as HoldingCare[], noticed: new Set<string>() };
 const careFor = (account: string, symbol: string): HoldingCare | undefined => CARE.holdings.find((c) => c.account === account && c.symbol === symbol);
 const belowWords = (c: HoldingCare): string => c.price && c.stop?.level != null
-  ? `${c.desk} is at ${money(c.price.value)} on Yahoo Finance (${clock(c.price.asOf)}, up to 15 minutes late), below the stop of ${money(c.stop.level)} the desk's trader proposed on ${dayText(c.stop.date)}. Nothing is sold by itself: selling is your decision.`
+  ? `${c.desk} is at ${money(c.price.value)} on Yahoo Finance (${when(c.price.asOf)}, up to 15 minutes late), below the stop of ${money(c.stop.level)} the desk's trader proposed on ${dayText(c.stop.date)}. Nothing is sold by itself: selling is your decision.`
   : '';
 const sellWords = (c: HoldingCare): string => {
   if (!c.sell || !c.view) return '';
@@ -467,7 +481,7 @@ function viewCard(v: AccountView, at: string): string {
   const unread = v.unread ? `<p class="at-honest">${v.unread} holding(s) could not be read and are left out.</p>` : '';
   return `<div class="at-card at-box"><div class="at-card-head"><h3>${esc(a.label)}</h3><span class="at-chip">•••• ${esc(a.last4)}</span>${role}</div>
     ${tiles}${table}${unread}${agentic}${problems}
-    <p class="at-quiet">From Robinhood at ${esc(clock(at))}; holdings valued at Robinhood's live prices.</p></div>`;
+    <p class="at-quiet">From Robinhood at ${esc(when(at))}; holdings valued at Robinhood's live prices.</p></div>`;
 }
 
 function renderViews(): void {
@@ -721,13 +735,16 @@ function renderHero(): void {
   const price = $('#heroPrice'), change = $('#heroChange'), asOf = $('#heroAsOf');
   const first = h?.bars[0]?.close, last = h?.bars[h.bars.length - 1]?.close;
   const spanPct = first && last ? (last / first - 1) * 100 : null;
+  // a yield's change over the range in points, like its day's move
+  const span = spanPct === null ? '' : marketOf(sym)?.unit === '%' && first && last ? points(last - first) : pct(spanPct);
   if (q) {
+    const day = moveDayOf(q.asOf);
     price.textContent = priceText(sym, q);
-    change.className = `at-chip ${tone(q.changePct)}`; change.textContent = q.changePct === null ? '' : `${pct(q.changePct)} today`;
-    asOf.textContent = `${spanPct === null ? '' : `${pct(spanPct)} over ${OVER[S.range]} · `}price at ${clock(q.asOf)}${q.open ? '' : ', market closed'}`;
+    change.className = `at-chip ${tone(q.changePct)}`; change.textContent = q.changePct === null ? '' : `${moveText(q)} ${day ? `on ${weekDay(day)}` : 'today'}`;
+    asOf.textContent = `${span ? `${span} over ${OVER[S.range]} · ` : ''}price at ${when(q.asOf)}${q.open ? '' : ' · market closed'}`;
   } else if (last !== undefined) {
     price.textContent = isIndex(sym) ? num(last) : money(last, h?.currency ?? 'USD');
-    change.className = `at-chip ${tone(spanPct)}`; change.textContent = spanPct === null ? '' : `${pct(spanPct)} over ${OVER[S.range]}`;
+    change.className = `at-chip ${tone(spanPct)}`; change.textContent = span ? `${span} over ${OVER[S.range]}` : '';
     asOf.textContent = 'last daily close; no live price';
   } else { price.textContent = '—'; change.className = 'at-chip'; change.textContent = ''; asOf.textContent = ''; }
 
@@ -787,7 +804,15 @@ async function loadHistory(): Promise<void> {
 }
 
 // ---------- the desk's call, the queue ----------
-const resultChip = (c: { pending: boolean; alpha?: string | null }) => (c.pending ? `<span class="at-chip" title="${esc(`Not scored yet: ${S.desk?.desk.holdingDays ?? 5} trading days after the call, its alpha is worked out.`)}">not scored yet</span>` : `<span class="at-chip ${tone(parseFloat(c.alpha ?? ''))}" title="${esc(means('alpha'))}">alpha ${esc(c.alpha ?? '—')}</span>`);
+/** The trading days a call is scored over: its own window as the journal recorded it ("5d"), else the settings'. */
+const holdDays = (c: Pick<Call, 'holding'>): number => { const m = /^(\d+)d$/.exec(c.holding ?? ''); return m ? Number(m[1]) : S.desk?.desk.holdingDays ?? 5; };
+/** A call's result: "not scored yet", or whether it worked with its alpha, coloured by whether it went the way its rating
+ *  said (never by the alpha's sign alone, which reads backwards for an Underweight or Sell). */
+const resultChip = (c: Pick<Call, 'pending' | 'alpha' | 'rating' | 'worked' | 'holding'>) => {
+  if (c.pending) return `<span class="at-chip" title="${esc(`Not scored yet: ${S.desk?.desk.holdingDays ?? 5} trading days after the call, its alpha is worked out.`)}">not scored yet</span>`;
+  const r = resultOf(c, holdDays(c));
+  return `<span class="at-chip ${r.tone}" title="${esc(r.why)}">${esc(r.words)}</span>`;
+};
 const readButton = (ticker: string, date: string, words = 'Read') => `<button class="at-btn at-press" data-act="open-call" data-symbol="${esc(ticker)}" data-date="${esc(date)}"><svg class="g"><use href="#i-file"/></svg><span>${esc(words)}</span></button>`;
 /** Decide… on a call: an order ticket from it. A call on a coin opens none, and says so instead. */
 const decideButton = (c: Pick<Call, 'ticker' | 'date' | 'ticket' | 'paper'>) => (c.ticket
@@ -828,7 +853,7 @@ function renderAnalyses(): void {
   if (!d) return;
   const q = d.queue, l = d.analyses.listener, waiting = q.filter((x) => x.state === 'waiting').length, running = q.some((x) => x.state === 'running');
   $('#analysesSub').textContent = l
-    ? `Runs by itself: ${l.listener} is listening on this computer${l.lastRun ? ` · last run ${clock(l.lastRun.at)}: ${l.lastRun.result}` : ''}. One stock at a time, at most ${d.analyses.perRun} a run.`
+    ? `Runs by itself: ${l.listener} is listening on this computer${l.lastRun ? ` · last run ${l.lastRun.startOnly ? 'started ' : ''}${when(l.lastRun.at)}: ${l.lastRun.result.replace(/[\s.]+$/, '')}` : ''}. One stock at a time, at most ${d.analyses.perRun} a run.`
     : 'Nothing is listening, so analyses wait here. Switch on "Run automatically" in Madav, or run them with Claude Code on this computer, or ask the desk to "analyse what is waiting" in a chat.';
   const press = (act: string, words: string, primary = false) => `<button class="at-btn at-press${primary ? ' primary' : ''}" data-act="${act}">${esc(words)}</button>`;
   $('#analysesDo').innerHTML = (l && waiting && !running ? press('q-run', 'Run now') : '')
@@ -836,7 +861,7 @@ function renderAnalyses(): void {
   const stands = (x: QueueView): string => {
     if (x.state === 'running') return `<span class="at-chip accent">Being analysed</span> <span class="at-quiet">${esc(x.progress ?? 'starting')}</span>`;
     if (x.state === 'waiting') return `<span class="at-chip">Waiting</span>${l ? '' : ' <span class="at-quiet">for a run to start</span>'}`;
-    if (x.state === 'done') return `${ratingChip(x.rating ?? 'Recorded')} <span class="at-quiet">done ${esc(x.endedAt ? clock(x.endedAt) : '')}</span>`;
+    if (x.state === 'done') return `${ratingChip(x.rating ?? 'Recorded')} <span class="at-quiet">done ${esc(x.endedAt ? when(x.endedAt) : '')}</span>`;
     return `<span class="at-chip danger">Failed</span> <span class="at-quiet">${esc(x.reason ?? '')}</span>`;
   };
   const doing = (x: QueueView): string => {
@@ -868,7 +893,7 @@ function renderStock(): void {
   if (!sym || isIndex(sym) || !d) return;
   const q = quoteOf(sym), it = tierItem(sym);
   $('#stockTitle').textContent = `Everything on ${sym}`;
-  $('#stockSub').textContent = `${nameOf(sym)}${it?.name && it.meaning ? ` (${it.name}: ${it.meaning})` : ''}${q ? ` · ${priceText(sym, q)}${q.changePct === null ? '' : ` (${pct(q.changePct)} today)`} on Yahoo Finance, up to 15 min late` : ''} · the chart is above`;
+  $('#stockSub').textContent = `${nameOf(sym)}${it?.name && it.meaning ? ` (${it.name}: ${it.meaning})` : ''}${q ? ` · ${priceWords(sym, q)}` : ''} · the chart is above`;
 
   // what the person holds of it, account by account, as the dashboard last read Robinhood
   let held: string;
@@ -880,13 +905,13 @@ function renderStock(): void {
       const c = careFor(v.account.key, h.symbol), marks = c ? careMarks(c) : '';
       return `<div><dt>${esc(v.account.label)} · ${v.account.agentic ? 'Agentic' : 'view only'}</dt><dd>${num(h.quantity, h.quantity % 1 ? 4 : 0)} at ${money(h.averageCost, cur)} average · now ${money(h.value, cur)}${h.gainPct === null ? '' : ` <span class="at-chip ${tone(h.gainPct)}">${pct(h.gainPct)}</span>`}${marks ? ` ${marks}` : ''}</dd></div>`;
     }));
-    held = rows.length ? `<dl class="at-facts ruled at-box">${rows.join('')}</dl><p class="at-quiet">Valued at Robinhood's live price, read at ${esc(clock(A.snapshot.at))}.</p>` : `<p class="at-quiet">Not held in the accounts you show.</p>`;
+    held = rows.length ? `<dl class="at-facts ruled at-box">${rows.join('')}</dl><p class="at-quiet">Valued at Robinhood's live price, read at ${esc(when(A.snapshot.at))}.</p>` : `<p class="at-quiet">Not held in the accounts you show.</p>`;
   }
 
   // every call the desk made on it, newest first, with how it scored
   const calls = d.calls.filter((c) => c.ticker === sym);
   const list = calls.length
-    ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>Date</th><th>Rating</th><th>Result</th><th></th></tr></thead><tbody>${calls.map((c) => `<tr class="ta-go" data-act="open-call" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}"><td>${esc(dayText(c.date))}</td><td>${ratingChip(c.rating)}</td><td>${c.pending ? '<span class="at-chip">not scored yet</span>' : `<span class="at-chip ${tone(parseFloat(c.alpha ?? ''))}">alpha ${esc(c.alpha ?? '—')}</span>`}</td><td><span class="at-quiet">Read</span></td></tr>`).join('')}</tbody></table></div>`
+    ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>Date</th><th>Rating</th><th>Result</th><th></th></tr></thead><tbody>${calls.map((c) => `<tr class="ta-go" data-act="open-call" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}"><td>${esc(dayText(c.date))}</td><td>${ratingChip(c.rating)}</td><td>${resultChip(c)}</td><td><span class="at-quiet">Read</span></td></tr>`).join('')}</tbody></table></div>`
     : `<p class="at-quiet">The desk has no call on ${esc(sym)} yet.</p>`;
   const latest = calls[0];
   // your own orders on it, as Robinhood listed them for the Agentic account when the dashboard last read it
@@ -928,7 +953,7 @@ function renderWatch(): void {
     const head = `<tr class="ta-tier-row"><td colspan="7"><button class="ta-tier-fold" data-act="fold" data-tier="${esc(t.tier)}" aria-expanded="${open}" title="${open ? 'Fold this tier away' : 'Open this tier'}"><svg class="g"><use href="#i-chev-right"/></svg><b>${esc(t.name)}</b><span class="at-chip">${t.items.length}</span><span class="at-quiet">${esc(t.meaning)}</span></button></td></tr>`;
     return `<tbody>${head}${open ? t.items.map(row).join('') : ''}</tbody>`;
   }).join('');
-  $('#watchTable').innerHTML = `<thead><tr><th></th><th>Name</th><th class="num">Price</th><th class="num">Today</th><th>Today's moves</th><th>Latest call</th><th></th></tr></thead>${groups || '<tbody><tr><td colspan="7" class="ta-empty">Nothing on the watchlist yet. Type a company or a fund above, for example NVDA or SPY, and press Add.</td></tr></tbody>'}`;
+  $('#watchTable').innerHTML = `<thead><tr><th></th><th>Name</th><th class="num">Price</th><th class="num">${term('today')}</th><th><span title="The price through its latest trading day, every five minutes">Through the day</span></th><th>Latest call</th><th></th></tr></thead>${groups || '<tbody><tr><td colspan="7" class="ta-empty">Nothing on the watchlist yet. Type a company or a fund above, for example NVDA or SPY, and press Add.</td></tr></tbody>'}`;
   for (const t of tiers) {
     if (folded.has(t.tier)) continue;
     for (const i of t.items) {
@@ -985,7 +1010,7 @@ function renderStart(): void {
   const typing = document.getElementById('mkInput') as HTMLInputElement | null;
   const kept = typing ? { value: typing.value, focus: document.activeElement === typing, from: typing.selectionStart, to: typing.selectionEnd } : null;
   el.innerHTML = d.startHere.map(tierBlock).join('')
-    + `<p class="at-honest">${term('today', "Today's move")} is the change since the last day's close; a dash is a price Yahoo Finance did not give. Each ${term('call', 'call')} is the desk's rating, from Buy to Sell: Buy and Overweight lean towards owning it, Hold keeps what is held, Underweight and Sell lean against it, and pointing at a rating says what its ticket does. A ${term('fund', 'fund')} holds many companies at once; + adds one to your watchlist. Nothing here is investment advice.</p>`;
+    + `<p class="at-honest">${term('today')} is the change over the latest trading day, from the close before it, with the day named (Fri) when it was not today; a dash is a price Yahoo Finance did not give. Each ${term('call', 'call')} is the desk's rating, from Buy to Sell: Buy and Overweight lean towards owning it, Hold keeps what is held, Underweight and Sell lean against it, and pointing at a rating says what its ticket does. A ${term('fund', 'fund')} holds many companies at once; + adds one to your watchlist. Nothing here is investment advice.</p>`;
   const field = document.getElementById('mkInput') as HTMLInputElement | null;
   if (kept && field) { field.value = kept.value; if (kept.focus) { field.focus(); field.setSelectionRange(kept.from, kept.to); } }
 }
@@ -1004,7 +1029,7 @@ function renderWeather(): void {
   el.innerHTML = `${head}<div class="ta-lines">${w.lines.map((l) => `<div class="ta-line">
       <div class="ta-line-head"><b>${named(l)}</b>${l.state ? `<span class="at-chip ${LINE_TONE[l.tone]}">${esc(l.state)}</span>` : '<span class="at-chip">—</span>'}</div>
       <p>${esc(l.words)}</p><p class="at-quiet">${esc(l.meaning)}</p></div>`).join('')}</div>
-    <p class="at-honest">From Yahoo Finance and Polymarket at ${esc(clock(w.at))}. Nothing here is investment advice.</p>`;
+    <p class="at-honest">From Yahoo Finance and Polymarket at ${esc(when(w.at))}. Nothing here is investment advice.</p>`;
 }
 
 /** One stock worth a look: its name, the day's move, why, and the robot. */
@@ -1025,7 +1050,7 @@ function renderLook(): void {
   const list = s.picks.length ? `<div class="ta-looks">${s.picks.map(lookRow).join('')}</div>`
     : `<p class="at-lede">Nothing stood out among the ${s.looked} looked at: no move of 3% or more, no volume twice its usual, no 52-week high or low, no cross of an average, and no news today about your companies or coins.</p>`;
   el.innerHTML = `${head}${list}${s.unavailable.length ? `<p class="at-quiet">Could not be read just now: ${esc(listWords(s.unavailable))}.</p>` : ''}${sw}
-    <p class="at-honest">Ranked by how many of these fire, then by the size of the move: a move of 3% or more in a day; volume at least twice its usual (its average over 20 days); a new 52-week high or low (the highest or lowest price in a year); a close across its 50- or 200-day average (its average closing price over that many days); and, for a company or a coin, news about it today. From Yahoo Finance's daily prices at ${esc(clock(s.at))}. A move says what happened, not what comes next. Nothing here is investment advice.</p>`;
+    <p class="at-honest">Ranked by how many of these fire, then by the size of the move: a move of 3% or more in a day; volume at least twice its usual (its average over 20 days); a new 52-week high or low (the highest or lowest price in a year); a close across its 50- or 200-day average (its average closing price over that many days); and, for a company or a coin, news about it today. From Yahoo Finance's daily prices at ${esc(when(s.at))}. A move says what happened, not what comes next. Nothing here is investment advice.</p>`;
 }
 
 function renderMorning(): void { renderWeather(); renderLook(); }
@@ -1056,7 +1081,7 @@ async function saveMarketList(symbols: string[]): Promise<void> {
 function renderCalls(): void {
   const d = S.desk;
   if (!d) return;
-  $('#callsSub').textContent = d.calls.length ? `${d.calls.length} recorded · each is scored ${d.desk.holdingDays} trading days later against its market's index` : 'Every analysis the team records appears here';
+  $('#callsSub').textContent = d.calls.length ? `${d.calls.length} recorded · each is scored ${d.desk.holdingDays} trading days later against ${fundWords(d.desk.benchmark)} for a US stock` : 'Every analysis the team records appears here';
   const rows = d.calls.map((c) => `<tr class="ta-go" data-act="open-call" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}" title="Press to read the call in full">
     <td>${esc(dayText(c.date))}</td><td><b>${esc(c.ticker)}</b></td><td>${ratingChip(c.rating)}</td>
     <td><span class="at-row compact">${resultChip(c)}${paperChip(c.ticker, c.date)}</span></td>
@@ -1073,9 +1098,16 @@ const PAPER_WORDS: Record<PaperTrade['status'], string> = { filled: 'paper', non
 function paperChip(ticker: string, date: string): string {
   const t = tradeOf(ticker, date);
   if (!t) return '';
-  if (t.status === 'filled' && t.side === 'buy') return `<span class="at-chip ${tone(t.sincePct === undefined ? null : t.sincePct)}" title="${esc(t.why)}">paper ${t.sincePct === undefined ? 'bought' : pct(t.sincePct * 100)}</span>`;
-  if (t.status === 'filled') return `<span class="at-chip" title="${esc(t.why)}">paper: sold ${esc(String(t.quantity ?? ''))}</span>`;
-  return `<span class="at-chip" title="${esc(t.why)}">${esc(PAPER_WORDS[t.status])}</span>`;
+  const reason = t.why.replace(/\b\d{4}-\d{2}-\d{2}\b/g, (day) => dayText(day));   // "the close of 26 Oct 2026", as the page writes days
+  // The figure is the stock's move since the paper buy, labelled as that: never the call's own result (its alpha, beside
+  // it), and never a paper profit for this call alone, since the paper book keeps one average cost a stock.
+  if (t.status === 'filled' && t.side === 'buy') {
+    const since = t.sincePct === undefined ? null : pct(t.sincePct * 100);
+    const why = `${reason}${since ? ` ${t.ticker} has moved ${since} since that close, to the latest close: the stock's move since the paper buy, not the call's result.` : ''}`;
+    return `<span class="at-chip ${tone(t.sincePct ?? null)}" title="${esc(why)}">paper: bought ${esc(String(t.quantity ?? ''))}${since ? ` · ${esc(t.ticker)} ${since} since` : ''}</span>`;
+  }
+  if (t.status === 'filled') return `<span class="at-chip" title="${esc(reason)}">paper: sold ${esc(String(t.quantity ?? ''))}</span>`;
+  return `<span class="at-chip" title="${esc(reason)}">${esc(PAPER_WORDS[t.status])}</span>`;
 }
 async function loadPaper(): Promise<void> {
   try { PAPER.book = await api.paper(); PAPER.failed = false; } catch { PAPER.failed = true; }
@@ -1093,10 +1125,10 @@ function renderPaper(): void {
   if (!d.paper.since) lede = "No calls yet: the paper record starts with the desk's first call on a stock, a fund, Bitcoin or Ether.";
   else if (!b) lede = PAPER.failed ? 'The paper record could not be worked out just now: Yahoo Finance did not answer. It tries again in a moment.' : 'Working out the paper record from the closing prices.';
   else if (b.series.length < 2 || b.returnPct === null) lede = `Following the desk on paper since ${dayText(b.since ?? d.paper.since)}: nothing has filled yet. A call fills at the first closing price after its day.`;
-  else lede = `Following the desk on paper since ${dayText(b.since ?? d.paper.since)}: ${pct(b.returnPct * 100)} (${money(b.value)} from ${money(b.startUsd)}), ${b.benchmarkPct === null ? 'the S&P 500 unavailable' : `the S&P 500 ${pct(b.benchmarkPct * 100)}`} over the same days.`;
+  else lede = `Following the desk on paper since ${dayText(b.since ?? d.paper.since)}: ${pct(b.returnPct * 100)} (${money(b.value)} from ${money(b.startUsd)}), ${fundWords(b.benchmark)} ${b.benchmarkPct === null ? 'unavailable' : pct(b.benchmarkPct * 100)} over the same days.`;
   const held = b?.positions.length ? `<p class="at-quiet">${term('position', 'Positions')} on paper now: ${b.positions.map((p) => `${esc(p.ticker)} ${p.quantity}`).join(', ')}, and ${esc(money(b.cash))} in cash.</p>` : '';
   $('#paperCard').innerHTML = `<div class="at-card-head"><h3>Your ${term('paper', 'paper')} record</h3><span class="at-chip">${esc(weeksWords(d.paper))} of record</span></div>
-    <p class="at-lede">${esc(lede)}</p>${b && b.series.length > 1 ? `<div class="ta-spark-tall" id="paperChart"></div><p class="at-quiet">The solid line is the paper money; the dashed one is the ${term('sp500', 'S&P 500')} from the same start.</p>` : ''}${held}
+    <p class="at-lede">${esc(lede)}</p>${b && b.series.length > 1 ? `<div class="ta-spark-tall" id="paperChart"></div><p class="at-quiet">The solid line is the paper money; the dashed one is ${esc(b.benchmark)}${b.benchmark === 'SPY' ? `, the fund that copies the ${term('sp500', 'S&P 500')},` : ''} from the same start.</p>` : ''}${held}
     <p class="at-honest">Every call on a stock, a fund, Bitcoin or Ether is followed as its order ticket would size it, and fills at the first closing price after its day. Crypto is bought in fractions within your crypto limit, on paper only: Robinhood's agent doorway trades stocks and funds. No costs are counted (Robinhood charges no commission). A few weeks of record are noise, not proof, and nothing here is investment advice.</p>`;
   const el = document.getElementById('paperChart');
   if (el && b) paperChart(el, b.series);
@@ -1111,12 +1143,13 @@ function renderScore(): void {
   const names = [...RATINGS.filter((x) => r.byRating[x]), ...Object.keys(r.byRating).filter((x) => !RATINGS.includes(x))];
   const grid = names.length
     ? `<div class="ta-score"><span class="head">Rating</span><span class="head">Calls</span><span class="head">Called the direction</span><span class="head">Average ${term('alpha', 'alpha')} vs the ${term('index', 'index')}</span>${names.map((n) => {
-        const s = r.byRating[n]!;
-        return `${ratingChip(n)}<b>${s.count}</b><b>${s.hitRate === null ? '—' : `${Math.round(s.hitRate * 100)}%`}</b><b>${pctOf(s.meanAlpha)}</b>`;
+        const s = r.byRating[n]!, avg = averageOf(n, s);
+        return `${ratingChip(n)}<b>${s.count}</b><b>${s.hitRate === null ? '—' : `${Math.round(s.hitRate * 100)}%`}</b><b class="${avg.tone}" title="${esc(avg.why)}">${pctOf(s.meanAlpha)}</b>`;
       }).join('')}</div>`
     : '<p class="at-quiet">Nothing has been scored yet. A call is scored once its window has traded; run /settle in Madav to score the ones that are ready.</p>';
   const few = r.resolved > 0 && r.resolved < 30 ? ' With so few scored calls these figures are noise, not a record.' : '';
-  $('#score').innerHTML = `${grid}<p class="at-honest">${esc(d.record.benchmarkNote)}${esc(few)}</p>`;
+  const key = names.length ? ' Green means the calls went the way their rating said, red that they went against it: a Buy or Overweight works when its stock beats the index, an Underweight or Sell when its stock trails it. A Hold claims no direction, so it stays plain.' : '';
+  $('#score').innerHTML = `${grid}<p class="at-honest">${esc(d.record.benchmarkNote)}${esc(key)}${esc(few)}</p>`;
 }
 
 // ---------- the call in full ----------
@@ -1157,7 +1190,8 @@ async function openCall(symbol: string, date: string): Promise<void> {
   const rating = meta?.rating ?? (labelled(c.decision, 'Rating') || '—');
   const target = labelled(c.decision, 'Price Target'), horizon = labelled(c.decision, 'Time Horizon');
   const clip = (s: string, n = 150) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
-  const facts = [['Price target', target], ['Time horizon', horizon], ['Scored', meta ? (meta.pending ? `not yet: ${S.desk?.desk.holdingDays ?? 5} trading days after the call` : `alpha ${meta.alpha ?? '—'} against the index`) : '']]
+  const verdict = meta && !meta.pending ? resultOf(meta, holdDays(meta)).verdict : '';
+  const facts = [['Price target', target], ['Time horizon', horizon], ['Scored', meta ? (meta.pending ? `not yet: ${S.desk?.desk.holdingDays ?? 5} trading days after the call` : `alpha ${meta.alpha ?? '—'} against the index${verdict ? `: ${verdict}` : ''}`) : '']]
     .filter(([, v]) => v).map(([k, v]) => `<div><dt>${esc(k)}</dt><dd title="${esc(v)}">${esc(clip(v!))}</dd></div>`).join('');
   const shown = new Set(STAGES.flatMap((s) => s.keys)), extra = Object.keys(c.sections).filter((k) => k !== 'decision' && !shown.has(k) && c.sections[k]?.length);
   const stages = STAGES.map((s) => ({ ...s, keys: s.keys.filter((k) => c.sections[k]?.length) })).filter((s) => s.keys.length);

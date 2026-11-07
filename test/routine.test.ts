@@ -37,7 +37,7 @@ test('the morning analyses what was asked for on the dashboard first, then the s
   assert.match(brief, /call end_queue_run once/);
   assert.match(brief, /Left for another morning, over the limit of 3: AMD/);
   assert.match(brief, /Already called today, so not analysed again: MSFT/);
-  assert.match(brief, /Holdings: not provided/);
+  assert.match(brief, /Holdings: none saved\. The analyses say so/);
   assert.match(brief, /only the person's own Confirm there places an order/);
   assert.match(brief, /do not wait for an answer/);
   // a stock being analysed by another run is left alone

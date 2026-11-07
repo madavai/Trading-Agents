@@ -32,6 +32,37 @@ export const ratingTone = (r: string): '' | 'ok' | 'danger' | 'warn' =>
  *  the desk does not use. */
 export const ratingMeaning = (r: string): string => (isTerm(r) && GLOSSARY[r].group === GLOSSARY.Buy.group ? means(r) : '');
 
+/** What a rating claims its stock does against the index, in words: "beats", "trails", or '' for no direction. */
+const claimOf = (rating: string): string => (ratingTone(rating) === 'ok' ? 'beats' : ratingTone(rating) === 'danger' ? 'trails' : '');
+const article = (word: string): string => (/^[AEIOU]/i.test(word) ? 'An' : 'A');
+
+/** A scored call's result as the page shows it: its colour, its words, why (when pointed at) and its verdict in a few
+ *  words. All follow whether the call went the way its rating said (`worked`, which the desk works out with the
+ *  scorecard's own rule), never the alpha's sign alone: an Underweight whose stock trailed its index worked, though its
+ *  alpha is below zero. A call that claims no direction (a Hold) is plain, and says so. `days` is its holding window. */
+export function resultOf(c: { rating: string; alpha: string | null; worked: boolean | null }, days: number): { tone: '' | 'ok' | 'danger'; words: string; why: string; verdict: string } {
+  const alpha = `alpha ${c.alpha ?? '—'}`, claim = claimOf(c.rating);
+  if (c.worked === null || !claim) {
+    return c.rating === 'Hold'
+      ? { tone: '', words: alpha, verdict: 'a Hold claims no direction', why: `A Hold claims no direction, so it neither worked nor failed: its ${alpha} only says how the stock did against its market's index over the ${days} trading days after the call.` }
+      : { tone: '', words: alpha, verdict: '', why: means('alpha') };
+  }
+  const how = `${article(c.rating)} ${c.rating} works when the stock ${claim} its market's index over the ${days} trading days after the call.`;
+  return c.worked
+    ? { tone: 'ok', words: `worked · ${alpha}`, verdict: 'the call worked', why: `${how} It did (${alpha}): the call worked.` }
+    : { tone: 'danger', words: `did not work · ${alpha}`, verdict: 'the call did not work', why: `${how} It did not (${alpha}): the call did not work.` };
+}
+
+/** One rating's average alpha on the scorecard: green when, on average, its calls went the way the rating said, red when
+ *  they went against it, plain for a Hold (no direction) or an average that rounds to zero; and why, in words. */
+export function averageOf(rating: string, s: { direction: number; meanAlpha: number }): { tone: '' | 'ta-up' | 'ta-down'; why: string } {
+  const shown = Math.round(s.meanAlpha * 1000) / 10, by = `${Math.abs(shown).toFixed(1)}%`;   // as the scorecard prints it, to 0.1 of a point
+  if (!s.direction) return { tone: '', why: `${article(rating)} ${rating} claims no direction: its average alpha only says how its stocks did against their index.` };
+  if (shown === 0) return { tone: '', why: `On average the stocks rated ${rating} ended level with their index.` };
+  const beat = shown > 0, good = (shown > 0) === (s.direction > 0);
+  return { tone: good ? 'ta-up' : 'ta-down', why: `On average the stocks rated ${rating} ${beat ? 'beat' : 'trailed'} their index by ${by}: on average these calls ${good ? 'worked' : 'did not work'}.` };
+}
+
 /** Why a mark is there, each in one plain line. The trading words themselves are in the glossary (glossary.ts). */
 export const NOTES = {
   coinOnPaper: "Robinhood's agent doorway trades stocks and funds, so a coin never gets an order ticket.",
@@ -48,6 +79,51 @@ export const dayText = (iso: string): string => {
 /** 2026-10-09 as "9 Oct". */
 export const shortDay = (iso: string): string => { const m = /^\d{4}-(\d{2})-(\d{2})/.exec(iso); return m ? `${Number(m[2])} ${MON[Number(m[1]) - 1]}` : iso; };
 export const clock = (iso: string): string => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); };
+
+const WEEKDAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+/** 2026-11-06 as "Fri 6 Nov". */
+export const weekDay = (day: string): string => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(day);
+  return m ? `${WEEKDAY[new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12)).getUTCDay()]} ${Number(m[3])} ${MON[Number(m[2]) - 1]}` : day;
+};
+/** The day an instant falls on in New York, the desk's day and the US market's ("2026-11-06"); '' for no instant. */
+export const nyDay = (at: string | number | Date): string => {
+  const d = new Date(at);
+  return Number.isNaN(d.getTime()) ? '' : new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+};
+/** The trading day a price's move belongs to, when it is not today in New York ("2026-11-06"); '' when it is today's.
+ *  On a Saturday, a quote's "day" is Friday's session: the page names it rather than calling it today. */
+export const moveDayOf = (asOf: string, now: Date = new Date()): string => { const d = nyDay(asOf); return d && d !== nyDay(now) ? d : ''; };
+/** A past trading day, short, for a chip: its weekday within the last six days ("Fri"), else its date ("6 Nov"). */
+export const chipDay = (day: string, now: Date = new Date()): string => {
+  const ago = (Date.parse(`${nyDay(now)}T12:00:00Z`) - Date.parse(`${day}T12:00:00Z`)) / 86_400_000;
+  return ago > 0 && ago < 7 ? weekDay(day).split(' ')[0]! : shortDay(day);
+};
+/** A time the page shows: the clock alone when it is today, else with its day ("Sat 24 Oct, 12:54 AM"), and its year
+ *  when another year's. Times are the person's own, as their computer keeps them. */
+export const when = (iso: string, now: Date = new Date()): string => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const local = (x: Date) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+  if (local(d) === local(now)) return clock(iso);
+  return `${d.getFullYear() === now.getFullYear() ? weekDay(local(d)) : `${d.getDate()} ${MON[d.getMonth()]} ${d.getFullYear()}`}, ${clock(iso)}`;
+};
+/** A price and its move in words, saying which day they are: while the market is open, "$188.08 (+1.20% today) on Yahoo
+ *  Finance, up to 15 min late"; after today's close, "$188.08, today's close (+1.20% today)"; on a weekend or before the
+ *  open, "$188.08, the close of Fri 6 Nov (+1.20% that day)", never "today". */
+export const priceDayWords = (price: string, move: string | null, q: { open: boolean; asOf: string }, now: Date = new Date()): string => {
+  if (q.open) return `${price}${move ? ` (${move} today)` : ''} on Yahoo Finance, up to 15 min late`;
+  const day = moveDayOf(q.asOf, now);
+  return day ? `${price}, the close of ${weekDay(day)}${move ? ` (${move} that day)` : ''}, from Yahoo Finance`
+    : `${price}, today's close${move ? ` (${move} today)` : ''}, from Yahoo Finance`;
+};
+/** A change in a rate that is itself a percent (a bond's yield), in percentage points: 4.84% to 4.86% is "+0.02 points",
+ *  never "+0.41%", which would be a percent of a percent. */
+export const points = (n: number | null | undefined, d = 2): string => {
+  if (n === null || n === undefined || !Number.isFinite(n)) return '—';
+  const body = Math.abs(n).toFixed(d);
+  return `${Number(body) === 0 ? '' : n > 0 ? '+' : MINUS}${body} ${Number(body) === 1 ? 'point' : 'points'}`;
+};
 
 export const SECTION_NAMES: Record<string, string> = {
   market: 'Market report', sentiment: 'Sentiment report', news: 'News report', fundamentals: 'Fundamentals report', fact_check: 'Fact check',
@@ -67,9 +143,14 @@ export function labelled(md: string, label: string): string {
   return m ? plain(m[1]!) : '';
 }
 
-/** A report's opening, as a preview: its first sentence in plain words (headings left out), at most n characters. */
+/** A report's opening, as a preview: its first sentence in plain words, at most n characters. Headings are left out,
+ *  and so are headings written in bold: a line that is only bold words, and a bold lead-in that is a sentence of its own
+ *  ("**Data note and verification.** Instrument confirmed ...", which would preview as the label alone). A bold label
+ *  that introduces a value ("**Rating**: Overweight") stays. */
 export function opening(md: string, n = 160): string {
-  const text = plain(md.split('\n').filter((l) => !/^\s{0,3}#/.test(l)).join('\n'));
+  const lines = md.replace(/\r\n/g, '\n').split('\n').filter((l) => !/^\s{0,3}#/.test(l));
+  const body = lines.filter((l) => !/^\s*(?:[-*+]\s+)?\*\*[^*\n]+\*\*[\s:.]*$/.test(l)).map((l) => l.replace(/^(\s*(?:[-*+]\s+)?)\*\*[^*\n]*[.!?]\*\*\s*/, '$1'));
+  const text = plain(body.join('\n')) || plain(lines.join('\n'));
   const s = /^(.{12,}?[.!?])(?=\s|$)/.exec(text)?.[1] ?? text;
   return s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s;
 }

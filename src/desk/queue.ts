@@ -212,8 +212,8 @@ export interface ListenerNote {
   pid?: number;
   /** The last run: when it started and ended (`at`; for a note that gives no end time, when it started), and what it did
    *  or why it stopped, in plain words. With `started`, a stock that run left "running" reads as failed with these words
-   *  at once. */
-  lastRun?: { started?: string; at: string; result: string };
+   *  at once. `startOnly`: `at` is when it started, because the note gave no end time, so the page says "started". */
+  lastRun?: { started?: string; at: string; result: string; startOnly?: true };
 }
 export const LISTENER_FRESH_MS = 3 * 60_000;
 
@@ -232,7 +232,7 @@ export function readListener(dir: string, now: Date = new Date()): (ListenerNote
     if (typeof last?.ended === 'string') {
       const began = iso(last.at), ended = iso(last.endedAt), how = ({ failed: 'failed', stopped: 'stopped' } as Record<string, string>)[last.ended];
       const result = words([how, words(last.result, 200)].filter(Boolean).join(': '), 200) ?? 'finished';
-      if (began) note.lastRun = ended && Date.parse(began) <= Date.parse(ended) ? { started: began, at: ended, result } : { at: began, result };
+      if (began) note.lastRun = ended && Date.parse(began) <= Date.parse(ended) ? { started: began, at: ended, result } : { at: began, result, startOnly: true };
     } else {
       const lastAt = iso(last?.at), result = words(last?.result, 200), started = iso(last?.started);
       if (lastAt && result) note.lastRun = { ...(started && Date.parse(started) <= Date.parse(lastAt) ? { started } : {}), at: lastAt, result };

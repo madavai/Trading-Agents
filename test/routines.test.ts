@@ -68,7 +68,7 @@ test("Madav's note is read like the desk's own: who listens, the heartbeat, the 
   assert.deepEqual(listenerOf(dir, now), { listener: 'Madav', since: '2026-10-21T09:00:12.000Z' }, 'the dashboard says Madav is listening');
   assert.equal(readListener(dir, new Date('2026-10-21T10:44:30.000Z'))!.fresh, false, 'checked over three minutes ago: Madav was closed without tidying up');
   put(madav({ lastRun: { at: '2026-10-21T10:32:05.000Z', ended: 'finished', result: '2 analysed, 0 failed' } }));
-  assert.deepEqual(readListener(dir, now)!.lastRun, { at: '2026-10-21T10:32:05.000Z', result: '2 analysed, 0 failed' });
+  assert.deepEqual(readListener(dir, now)!.lastRun, { at: '2026-10-21T10:32:05.000Z', result: '2 analysed, 0 failed', startOnly: true }, 'no end time: the page says when it started');
   put(madav({ lastRun: { at: '2026-10-21T10:32:05.000Z', ended: 'stopped', result: '' } }));
   assert.equal(readListener(dir, now)!.lastRun!.result, 'stopped');
 

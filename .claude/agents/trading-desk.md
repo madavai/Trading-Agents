@@ -48,7 +48,7 @@ Call `list_settlements`. For each call marked READY, write its lesson and save i
 Call `plan_analysis` with the ticker, date, and any rounds, analysts or language the person asked for (debate_rounds and risk_rounds both take the depth's number).
 - **NEEDS_EMAIL**: ask the person for their own email. Say in one sentence why: the SEC asks everyone who reads its filings for a contact address; it stays in this folder and only the SEC sees it. Save it with `set_contact_email`, never inventing one, then plan again.
 - **INPUT_ERROR**: tell the person what to correct and stop.
-- **Otherwise**: keep the plan. It lists the steps, marks any already done (a run that stopped is resumed), and gives the holdings block, the lessons and the manager model.
+- **Otherwise**: keep the plan. It lists the steps, marks any already done (a run that stopped is resumed), and gives the manager model. It also shows the holdings and the lessons it saved with the run: the agents read those from the desk themselves, so never copy them into a request.
 
 Tell the person in two lines what will run: the analysts, the rounds, the language, and that it takes a few minutes.
 
@@ -63,9 +63,11 @@ Each agent is called with the Agent tool, `subagent_type` set to its name. Every
 | fact_check | fact-checker | Start it once every analyst of this run has saved, and name the analysts working in this run. It corrects their reports in place before the debate starts. |
 | bull (turn n), bear (turn n) | bull-researcher, bear-researcher | "This is turn n of N." Run them one at a time, bull first, in turn. |
 | research_plan | research-manager | |
-| trader | trader | The plan's holdings block, word for word. |
-| aggressive, conservative, neutral (turn n) | aggressive-risk-analyst, conservative-risk-analyst, neutral-risk-analyst | The holdings block, and "This is turn n of N." One at a time, in that order. |
-| decision | portfolio-manager | The holdings block and the lessons, word for word. |
+| trader | trader | |
+| aggressive, conservative, neutral (turn n) | aggressive-risk-analyst, conservative-risk-analyst, neutral-risk-analyst | "This is turn n of N." One at a time, in that order. |
+| decision | portfolio-manager | |
+
+The trader, the risk voices and the portfolio manager read what the person holds, and the portfolio manager the lessons, from the desk (`read_run`), as the plan saved them with the run.
 
 For the research-manager and the portfolio-manager, if the plan's manager model is not "the same as everyone else", pass it as the Agent call's `model`.
 
@@ -96,7 +98,7 @@ A run of the waiting list is often started with nobody watching: by a routine, o
 
 ### Never
 - Never call a broker connection, open Robinhood's site, or call a tool that trades or moves money. Agents in this folder have no such tool, and the guard refuses one.
-- Never invent a number, an email address or a holding. If the person tells you what they hold, save it with `set_holdings` before planning; if they don't, the desk says it is not provided.
+- Never invent a number, an email address or a holding. If the person tells you what they hold, save it with `set_holdings` before planning; otherwise the desk works from the holdings it has saved, or says plainly that none are saved.
 
 ## Score past calls
 

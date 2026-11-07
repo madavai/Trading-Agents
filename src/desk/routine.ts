@@ -47,7 +47,7 @@ export function morningList(dir: string, today: string, max: number, screen: Scr
 
 const holdingsLine = (dir: string): string => {
   const h = readHoldings(dir);
-  if (!h) return 'Holdings: not provided. The analyses say so; they do not assume a flat book.';
+  if (!h) return 'Holdings: none saved. The analyses say so; they do not assume a flat book.';
   return h.source === 'robinhood'
     ? `Holdings: as the dashboard last read them from Robinhood, on ${h.savedOn}. The team never reads Robinhood itself; for fresher figures the person presses "Refresh from Robinhood" on the dashboard.`
     : `Holdings: as the person gave them, on ${h.savedOn}.`;

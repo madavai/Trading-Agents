@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { markdown } from '../src/terminal/ui/md.js';
-import { barOn, labelled, money, num, opening, pct, plain, shortDay } from '../src/terminal/ui/fmt.js';
+import { averageOf, barOn, chipDay, clock, labelled, money, moveDayOf, num, nyDay, opening, pct, plain, points, priceDayWords, resultOf, shortDay, weekDay, when } from '../src/terminal/ui/fmt.js';
 
 const ui = 'src/terminal/ui';
 const read = (f: string) => fs.readFileSync(path.join(ui, f), 'utf8');
@@ -50,6 +50,76 @@ test('a number that is missing is a dash, never a zero', () => {
   // What rounds to zero is written as zero: no minus on nothing.
   assert.deepEqual([pct(-0.004), pct(0.004), pct(0), pct(-0.024, 1), pct(-0.06, 1), money(-0.004), money(0.004)], ['0.00%', '0.00%', '0.00%', '0.0%', '−0.1%', '$0.00', '$0.00']);
   assert.equal(shortDay('2026-10-09'), '9 Oct');
+});
+
+test('a call\'s result is coloured and worded by whether it worked for its rating, never by the alpha\'s sign alone', () => {
+  // Round 1 (7 Nov 2026): META's Underweight of 17 Oct trailed its index by 10.5%, so it worked, and showed red.
+  assert.deepEqual(resultOf({ rating: 'Underweight', alpha: '-10.5%', worked: true }, 5), {
+    tone: 'ok', words: 'worked · alpha -10.5%', verdict: 'the call worked',
+    why: 'An Underweight works when the stock trails its market\'s index over the 5 trading days after the call. It did (alpha -10.5%): the call worked.',
+  });
+  const tsla = resultOf({ rating: 'Underweight', alpha: '+9.0%', worked: false }, 5);   // it beat its index: the call failed, and showed green
+  assert.deepEqual([tsla.tone, tsla.words, tsla.verdict], ['danger', 'did not work · alpha +9.0%', 'the call did not work']);
+  const meta = resultOf({ rating: 'Overweight', alpha: '-12.1%', worked: false }, 5);   // META's Overweight of 21 Oct
+  assert.deepEqual([meta.tone, meta.words], ['danger', 'did not work · alpha -12.1%']);
+  assert.match(resultOf({ rating: 'Buy', alpha: '+7.0%', worked: true }, 5).why, /^A Buy works when the stock beats its market's index over the 5 trading days/);
+  const hold = resultOf({ rating: 'Hold', alpha: '+1.8%', worked: null }, 5);
+  assert.deepEqual([hold.tone, hold.words, hold.verdict], ['', 'alpha +1.8%', 'a Hold claims no direction'], 'a Hold is plain: it claims no direction');
+  assert.deepEqual([resultOf({ rating: 'Needs review', alpha: '+9.0%', worked: null }, 5).tone, resultOf({ rating: 'Needs review', alpha: '+9.0%', worked: null }, 5).verdict], ['', '']);
+  // the scorecard's averages, as round 1's scorecard showed them
+  assert.equal(averageOf('Underweight', { direction: -1, meanAlpha: 0.0037 }).tone, 'ta-down', 'the stocks marked down beat the index on average: against the calls');
+  assert.equal(averageOf('Underweight', { direction: -1, meanAlpha: 0.0037 }).why, 'On average the stocks rated Underweight beat their index by 0.4%: on average these calls did not work.');
+  assert.equal(averageOf('Overweight', { direction: 1, meanAlpha: -0.0725 }).tone, 'ta-down');
+  assert.equal(averageOf('Sell', { direction: -1, meanAlpha: -0.05 }).tone, 'ta-up');
+  assert.deepEqual([averageOf('Hold', { direction: 0, meanAlpha: -0.0118 }).tone, averageOf('Buy', { direction: 1, meanAlpha: 0.0004 }).tone], ['', ''], 'a Hold, and an average that prints as 0.0%, are plain');
+  // and the page uses them everywhere a call's result shows: no chip is coloured by the alpha's sign
+  const page = read('main.ts');
+  assert.doesNotMatch(page, /tone\(parseFloat\(/, 'a result coloured by the sign of its alpha');
+  assert.match(page, /<td>\$\{resultChip\(c\)\}<\/td>/, 'the stock page\'s list shows the same result chip');
+  assert.match(page, /resultOf\(meta, holdDays\(meta\)\)\.verdict/, 'the call window says whether it worked');
+  assert.match(page, /averageOf\(n, s\)/, 'the scorecard colours each average by its rating');
+});
+
+test('the page names the day of a move or a time that is not today, and never calls a weekend\'s quote today', () => {
+  // Round 1 (Sat 7 Nov 2026): the stock page said "(+2.78% today)" and the watchlist's Today column showed Friday's
+  // moves; the analyses said "last run 12:54 AM" for a run that started on 24 Oct.
+  const sat = new Date('2026-11-07T15:00:00Z'), fri = '2026-11-06T21:00:00Z';   // Friday's close: 4 PM in New York
+  assert.equal(weekDay('2026-11-06'), 'Fri 6 Nov');
+  assert.equal(nyDay('2026-11-07T03:00:00Z'), '2026-11-06', 'late Friday evening in New York is still Friday there');
+  assert.deepEqual([moveDayOf(fri, sat), moveDayOf('2026-11-07T14:00:00Z', sat)], ['2026-11-06', ''], "Friday's move on a Saturday is named; today's is not");
+  assert.deepEqual([chipDay('2026-11-06', sat), chipDay('2026-10-30', sat)], ['Fri', '30 Oct'], 'its weekday within the week, else its date');
+  assert.equal(priceDayWords('$188.08', '+2.78%', { open: false, asOf: fri }, sat), '$188.08, the close of Fri 6 Nov (+2.78% that day), from Yahoo Finance');
+  assert.equal(priceDayWords('$188.08', '+2.78%', { open: false, asOf: fri }, new Date('2026-11-06T22:00:00Z')), "$188.08, today's close (+2.78% today), from Yahoo Finance");
+  assert.equal(priceDayWords('$188.08', '+2.78%', { open: true, asOf: fri }, new Date('2026-11-06T20:00:00Z')), '$188.08 (+2.78% today) on Yahoo Finance, up to 15 min late');
+  assert.equal(priceDayWords('$188.08', null, { open: false, asOf: fri }, sat), '$188.08, the close of Fri 6 Nov, from Yahoo Finance', 'no move given: none written');
+  // a time today is its clock; another day's has its day, another year's its year (in the person's own time)
+  const now = new Date(2026, 10, 7, 10, 0), run = new Date(2026, 9, 24, 0, 54).toISOString(), early = new Date(2026, 10, 7, 8, 5).toISOString();
+  assert.equal(when(run, now), `Sat 24 Oct, ${clock(run)}`);
+  assert.equal(when(early, now), clock(early));
+  const old = new Date(2025, 9, 24, 0, 54).toISOString();
+  assert.equal(when(old, now), `24 Oct 2025, ${clock(old)}`);
+  assert.equal(when('not a time', now), '');
+  // a yield's change is in points, never a percent of a percent (4.08% to 4.10% is not "+0.41%")
+  assert.deepEqual([points(0.02), points(-0.0123), points(1), points(0.001), points(null)], ['+0.02 points', '−0.01 points', '+1.00 point', '0.00 points', '—']);
+  // and the page uses them wherever it shows a move or a time
+  const page = read('main.ts');
+  assert.doesNotMatch(page, /\bclock\(/, 'a time is shown with its day when it is not today, never as a bare clock');
+  assert.doesNotMatch(page, /\} today\)` on Yahoo|'S&P 500 today'|<th class="num">Today<\/th>/, "a move called today's whatever its day");
+  assert.match(page, /const day = moveDayOf\(q\.asOf\)/, 'the move chip names its day');
+  assert.match(page, /marketOf\(q\.symbol\)\?\.unit === '%' \? points\(q\.change\)/, "a yield's move is in points");
+  assert.match(page, /l\.lastRun\.startOnly \? 'started ' : ''/, 'a run whose end Madav did not give says when it started');
+  assert.match(page, /l\.lastRun\.result\.replace\(\/\[\\s\.\]\+\$\/, ''\)/, 'its result ends in one full stop, not two ("1 scored..")');
+  assert.doesNotMatch(page, /title="\$\{esc\(t\.why\)\}"/, 'a paper badge says its day as the page does ("26 Oct 2026"), not "2026-10-26"');
+});
+
+test("a report's preview is its first sentence, never a heading, a bold heading or a bold label alone", () => {
+  // Round 1: the fact check's card previewed as "Data note and verification." and nothing else.
+  assert.equal(opening('**Data note and verification.** Instrument confirmed: NVDA, NVIDIA Corporation, on NasdaqGS. Prices from Yahoo Finance.'),
+    'Instrument confirmed: NVDA, NVIDIA Corporation, on NasdaqGS.');
+  assert.equal(opening('**Summary**\n\nThe trend is up. The 50-day average is rising.'), 'The trend is up.');
+  assert.equal(opening('- **Corrections:**\nThe RSI was 62.1, not 70.'), 'The RSI was 62.1, not 70.');
+  assert.equal(opening('**Rating**: Overweight\nMore words follow.'), 'Rating: Overweight More words follow.', 'a bold label with its value stays');
+  assert.equal(opening('**Only a heading.**'), 'Only a heading.', 'with nothing else, the heading is all there is');
 });
 
 test('the page is one policy-clean file: no inline script, style or event attribute, and no key in it', () => {

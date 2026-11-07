@@ -6,10 +6,11 @@ import path from 'node:path';
 import { readContactEmail } from '../contact.js';
 import { Journal, type Entry } from '../desk/journal.js';
 import { hasReport, sectionsOf, stepWords } from '../desk/runs.js';
-import { renderSummary, summarize, type Summary } from '../desk/backtest.js';
+import { alphaOf, renderSummary, summarize, worked, type Summary } from '../desk/backtest.js';
 import { depthOfRounds, readListener, readQueue, type Depth, type QueueItem } from '../desk/queue.js';
 import { followed, readPaperStart, recordOf, RECORD_WEEKS, RECORD_WORDS, type PaperRecord } from '../desk/paper.js';
 import { readSettings } from '../settings.js';
+import { resolveBenchmark, type Scoring } from '../desk/scoring.js';
 import { deskDataDir } from '../paths.js';
 import { today } from '../data/dates.js';
 import { readWatchlist, type WatchItem } from './store.js';
@@ -20,10 +21,13 @@ import { guideOf, type Guide } from './guide.js';
 /** A stock on the waiting list as the page shows it: a running one says where its run stands. */
 export type QueueView = QueueItem & { progress?: string };
 /** Who listens for the doorbell, when its heartbeat is recent. */
-export interface ListenerView { listener: string; since: string; lastRun?: { at: string; result: string } }
+export interface ListenerView { listener: string; since: string; lastRun?: { at: string; result: string; startOnly?: true } }
 
 export interface Call {
   date: string; ticker: string; rating: string; pending: boolean; raw: string | null; alpha: string | null; holding: string | null;
+  /** Whether the scored call went the way its rating said (backtest.ts `worked`): the page colours and words its result by
+   *  this, never by the alpha's sign. null while it waits, for a Hold, and for a call with no readable rating or alpha. */
+  worked: boolean | null;
   summary: string; hasReport: boolean;
   /** Whether Decide… can open an order ticket from it (not for crypto or an index), and whether paper follows it. */
   ticket: boolean; paper: boolean;
@@ -31,7 +35,8 @@ export interface Call {
 export interface DeskState {
   version: string; today: string; watchlist: WatchItem[]; queue: QueueView[]; calls: Call[];
   record: { summary: Summary; text: string; benchmarkNote: string };
-  desk: { emailSaved: boolean; tradingEnabled: boolean; holdingDays: number };
+  /** `benchmark`: what a US stock's call is scored against (SPY as shipped: the fund that copies the S&P 500). */
+  desk: { emailSaved: boolean; tradingEnabled: boolean; holdingDays: number; benchmark: string };
   /** The depth the page offers first (the settings'), how many one run analyses, and who listens for the doorbell. */
   analyses: { depth: Depth; perRun: number; listener: ListenerView | null };
   /** How much record the desk has on paper, the paper money it starts with, and the weeks under which switching trading
@@ -73,6 +78,14 @@ export function summaryOf(decision: string): string {
 
 const stamp = (file: string): string => { try { return String(fs.statSync(file).mtimeMs); } catch { return '0'; } };
 
+/** What a call is scored against, named for what it is: as shipped, its market's index, which for a US stock is SPY, the
+ *  fund that copies the S&P 500 (the index itself cannot be bought); one yardstick set for every call is named as itself. */
+export function yardstickWords(s: Pick<Scoring, 'benchmark' | 'benchmarks'>): string {
+  const us = resolveBenchmark('SPY', s);
+  if (s.benchmark.trim()) return `${us}, the yardstick set for every call`;
+  return `its market's index: for a US stock, ${us}${us === 'SPY' ? ', the fund that copies the S&P 500' : ''}`;
+}
+
 /** A short fingerprint of everything the page reads, so the page can ask "did anything change?" cheaply and refresh only then. */
 export function versionOf(root: string): string {
   const dir = deskDataDir(root), runs = path.join(dir, 'runs');
@@ -105,6 +118,7 @@ export function stateOf(root: string, day: string): DeskState {
   const entries: Entry[] = new Journal(path.join(dir, 'journal.md')).load();
   const calls: Call[] = entries.map((e) => ({
     date: e.date, ticker: e.ticker, rating: e.rating, pending: e.pending, raw: e.raw, alpha: e.alpha, holding: e.holding,
+    worked: e.pending ? null : worked(e.rating, alphaOf(e)),
     summary: summaryOf(e.decision), hasReport: hasReport(dir, e.ticker, e.date), ticket: ticketable(e.ticker), paper: followed(e.ticker),
   })).reverse().sort((a, b) => b.date.localeCompare(a.date));
   const summary = summarize(entries), watchlist = readWatchlist(dir), market = marketView(dir);
@@ -114,8 +128,8 @@ export function stateOf(root: string, day: string): DeskState {
   const guide = guideOf({ email, watchlist, market: market.symbols, queue, calls, listener: listener?.listener ?? null, autorun: prefs.autorun === true, readCall: !!prefs.readCall, record, ...(prefs.guide ? { pref: prefs.guide } : {}) });
   return {
     version: versionOf(root), today: day, watchlist, queue, calls, startHere, watchTiers: watch, market, guide,
-    record: { summary, text: renderSummary(summary), benchmarkNote: `Each call is judged after ${s.scoring.holdingPeriodDays} trading days against its market's index.` },
-    desk: { emailSaved: !!email, tradingEnabled: false, holdingDays: s.scoring.holdingPeriodDays },
+    record: { summary, text: renderSummary(summary), benchmarkNote: `Each call is judged after ${s.scoring.holdingPeriodDays} trading days against ${yardstickWords(s.scoring)}.` },
+    desk: { emailSaved: !!email, tradingEnabled: false, holdingDays: s.scoring.holdingPeriodDays, benchmark: resolveBenchmark('SPY', s.scoring) },
     analyses: { depth: depthOfRounds(s.analysis.debateRounds), perRun: s.routines.maxAnalyses, listener },
     paper: { ...record, startUsd: readPaperStart(dir), minWeeks: RECORD_WEEKS, minWords: RECORD_WORDS },
   };

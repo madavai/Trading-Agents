@@ -50,7 +50,7 @@ export function sparkline(el: HTMLElement, values: number[], t: Tone, opts: { do
     + (opts.dot ? `<circle cx="${last[0]}" cy="${last[1]}" r="3.5" class="dot f-${t}"/>` : '') + `</svg>`;
 }
 
-/** The paper book against the S&P 500: two lines on one scale, the paper one in the accent, the index dashed, the value
+/** The paper book against its yardstick fund (SPY): two lines on one scale, the paper one in the accent, the fund dashed, the value
  *  labels on the right and the first and last days underneath. Fewer than two days draws nothing. */
 export function paperChart(el: HTMLElement, series: ReadonlyArray<{ date: string; value: number; benchmark: number | null }>): void {
   if (series.length < 2) { el.replaceChildren(); return; }

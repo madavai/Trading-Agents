@@ -1,6 +1,6 @@
 // What the person holds, as the decision agents see it: positions, average prices and free cash. Three states stay
 // distinct and must never blur: a position, a flat book (the person said they hold nothing), and nothing known at all -
-// "not provided" must not read as "flat", which would invent a fact about an account the desk was never told about.
+// "none saved" must not read as "flat", which would invent a fact about an account the desk was never told about.
 // The person gives it in words (set_holdings), or the dashboard fills it in from Robinhood each time it reads the
 // accounts the person chose: then each account is listed apart, saying whether the desk may trade in it.
 // Adapted from TradingAgents (tradingagents/portfolio.py), Apache License 2.0; rewritten in TypeScript.
@@ -95,9 +95,15 @@ function renderAccounts(h: Holdings, ticker: string): string {
   return `Portfolio as read from Robinhood on ${h.savedOn} (it may have changed since). Size any trade to the tradable account; the other accounts are the rest of the person's holdings, for context only:\n${lines.join('\n')}`;
 }
 
+/** The holdings block when none are saved: plainly that, never words that could be read as "they were withheld". */
+export const NO_HOLDINGS = 'Portfolio context: none saved. The desk has no record of what the person holds (none given in a chat, none saved from their Robinhood accounts on the dashboard), so you do not know their holdings or cash. Say so; do not assume they hold nothing (a flat book), and give direction and sizing guidance in terms they can apply to their own position.';
+
+/** The holdings block in a backtest: what the person holds now was not known on the days it tests, so it is left out. */
+export const BACKTEST_HOLDINGS = 'Portfolio context: not used in a backtest. A backtest judges the desk\'s calls over past days, and what the person holds now was not known then, so their holdings are left out on purpose. Say so; do not assume they hold nothing (a flat book), and size against a standard allocation.';
+
 export function renderHoldings(h: Holdings | null, ticker: string): string {
   if (h?.accounts?.length) return renderAccounts(h, ticker);
-  if (!h) return 'Portfolio context: not provided. You do not know the person\'s current holdings or cash, so do not assume a flat book; give direction and sizing guidance in terms they can apply to their own position.';
+  if (!h) return NO_HOLDINGS;
   const held = h.positions.find((p) => p.ticker === ticker);
   const lines = [held ? `- Current position in ${ticker}: ${n(held.quantity)} units${held.averagePrice ? `, average price ${m(held.averagePrice)}` : ''}` : `- No current position in ${ticker}`];
   if (h.cash !== undefined) lines.push(`- Cash available: ${m(h.cash)}${h.currency ? ` ${h.currency}` : ''}`);
