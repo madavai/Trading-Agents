@@ -34,6 +34,15 @@ test('alpha says how to read it for each rating: above zero is good only for a B
   assert.doesNotMatch(GLOSSARY.alpha.means, /beat the market|better \(\+\)|a call did/);
 });
 
+test('the S&P 500 is the index, SPY the fund the desk measures itself against, and a move is named for its day', () => {
+  // Round 1 (7 Nov 2026): "S&P 500" named both the index (7,377) and SPY ($735.29), and a Saturday showed Friday's moves as today's.
+  assert.match(GLOSSARY.sp500.means, /^the index of the 500 largest US companies/);
+  assert.match(GLOSSARY.sp500.means, /SPY, the S&P 500 fund, copies it .* and is the yardstick the desk measures itself against\./);
+  assert.match(GLOSSARY.scorecard.means, /against SPY, the S&P 500 fund,/);
+  assert.equal(GLOSSARY.today.term, "Day's move");
+  assert.match(GLOSSARY.today.means, /latest trading day.*When that day was not today, as on a weekend, the page names it/);
+});
+
 test('each rating\'s meaning on the page is the glossary\'s, and a rating the desk does not use has none made up', () => {
   for (const r of ratingKeys) { assert.ok(isTerm(r), r); assert.equal(ratingMeaning(r), means(r as TermKey), r); }
   assert.equal(ratingMeaning('alpha'), '', 'only ratings are ratings');

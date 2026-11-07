@@ -15,7 +15,7 @@ import { deskServer } from '../src/tools/server.js';
 import { clearQuotes, parseQuote } from '../src/terminal/quotes.js';
 import { clearSearches, parseSearch } from '../src/terminal/search.js';
 import { MAX_RECENT, readPrefs, savePrefs } from '../src/terminal/prefs.js';
-import { summaryOf } from '../src/terminal/state.js';
+import { summaryOf, yardstickWords } from '../src/terminal/state.js';
 import { lockState } from '../src/private.js';
 import { startTerminal, type Assets, type Terminal } from '../src/terminal/server.js';
 import { MAX_WATCH, addWatch } from '../src/terminal/store.js';
@@ -264,7 +264,11 @@ test('the page\'s state is the desk\'s own files: calls, how they turned out, an
   assert.ok(!JSON.stringify(s).includes('jane@mail.com'), 'the email must not reach the page');
   assert.equal(s.record.summary.byRating.Overweight.count, 1);
   assert.match(s.record.text, /Overweight: n=1, called the direction 100%, mean alpha \+7\.50%/);
-  assert.match(s.record.benchmarkNote, /after 5 trading days against its market's index/);
+  // the yardstick named for what it is: SPY is the fund that copies the S&P 500, not the index itself
+  assert.equal(s.record.benchmarkNote, "Each call is judged after 5 trading days against its market's index: for a US stock, SPY, the fund that copies the S&P 500.");
+  assert.equal(s.desk.benchmark, 'SPY');
+  assert.equal(yardstickWords({ benchmark: 'VOO', benchmarks: {} }), 'VOO, the yardstick set for every call', 'one yardstick set for every call is named as itself');
+  assert.equal(yardstickWords({ benchmark: '', benchmarks: { '': 'IVV' } }), "its market's index: for a US stock, IVV");
   const one = (await call(term, 'GET', '/api/call?symbol=nvda&date=2026-09-01')).json();
   assert.match(one.decision, /Overweight/); assert.deepEqual(Object.keys(one.sections), ['decision']);
   assert.equal((await call(term, 'GET', '/api/call?symbol=NVDA&date=2020-01-01')).status, 404);

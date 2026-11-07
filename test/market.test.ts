@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { configure, getText, NoData, Unavailable } from '../src/data/http.js';
-import { clearCache, parseChart } from '../src/data/yahoo.js';
+import { clearCache, daily, parseChart } from '../src/data/yahoo.js';
+import { history } from '../src/terminal/quotes.js';
 import { indicatorWindow, instrument, latestState, priceHistory, verifiedSnapshot } from '../src/data/market.js';
 import { deskServer } from '../src/tools/server.js';
 import { chartFetch, chartJson, series, type Row } from './chart.js';
@@ -21,8 +22,22 @@ test('the chart answer becomes one adjusted row a day, rows without a price left
   assert.deepEqual(s.unfilled, []);      // a blank row before the last priced one is a gap, not a session still being filled in
   assert.equal(s.bars[0]!.close, 5.5);   // adjusted by adjclose / close
   assert.equal(s.bars[0]!.open, 5);
+  assert.deepEqual(s.traded!.map((b) => [b.date, b.open, b.low, b.close]), [['2026-10-06', 10, 9, 11], ['2026-10-07', 11, 10, 12]],
+    'the same days at the prices traded, for the dashboard\'s chart: its low is one the stock really traded at');
   assert.equal(s.meta.name, 'NVDA Corporation');
   assert.throws(() => parseChart({ chart: { result: null, error: { description: 'No data found, symbol may be delisted' } } }, 'ZZZZ'), NoData);
+});
+
+// Round 1 (7 Nov 2026): the chart box's five-year low and change were dividend-adjusted, so its low was a price NVDA
+// never traded at, and its change differed from what Nasdaq or a broker shows.
+test("the dashboard's chart is at the prices traded: no day is lowered by a later dividend, while the desk's own rows still count it", async () => {
+  const rows = series('2026-10-09', 420).map((r, i, all) => (i < all.length - 10 ? { ...r, adj: r.c * 0.98 } : r));   // a 2% dividend ten days ago
+  configure({ fetch: chartFetch(() => rows) });
+  const h = await history('NVDA', '1M'), first = rows.find((r) => r.date === h.bars[0]!.date)!;
+  const four = (n: number) => Math.round(n * 10_000) / 10_000;
+  assert.deepEqual([h.bars[0]!.close, h.bars[0]!.low], [four(first.c), four(first.l)], "the range's first close and low as traded that day");
+  const s = await daily('NVDA', '2026-09-01', '2026-10-09');
+  assert.ok(s.bars[0]!.close < s.traded![0]!.close, "the desk's own rows stay dividend-adjusted, where a dividend is part of the return");
 });
 
 test('a busy source is asked once more; a missing one is no data; a down one is unavailable', async () => {

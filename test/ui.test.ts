@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { markdown } from '../src/terminal/ui/md.js';
-import { averageOf, barOn, labelled, money, num, opening, pct, plain, resultOf, shortDay } from '../src/terminal/ui/fmt.js';
+import { averageOf, barOn, chipDay, clock, labelled, money, moveDayOf, num, nyDay, opening, pct, plain, points, priceDayWords, resultOf, shortDay, weekDay, when } from '../src/terminal/ui/fmt.js';
 
 const ui = 'src/terminal/ui';
 const read = (f: string) => fs.readFileSync(path.join(ui, f), 'utf8');
@@ -78,6 +78,47 @@ test('a call\'s result is coloured and worded by whether it worked for its ratin
   assert.match(page, /<td>\$\{resultChip\(c\)\}<\/td>/, 'the stock page\'s list shows the same result chip');
   assert.match(page, /resultOf\(meta, holdDays\(meta\)\)\.verdict/, 'the call window says whether it worked');
   assert.match(page, /averageOf\(n, s\)/, 'the scorecard colours each average by its rating');
+});
+
+test('the page names the day of a move or a time that is not today, and never calls a weekend\'s quote today', () => {
+  // Round 1 (Sat 7 Nov 2026): the stock page said "(+2.78% today)" and the watchlist's Today column showed Friday's
+  // moves; the analyses said "last run 12:54 AM" for a run that started on 24 Oct.
+  const sat = new Date('2026-11-07T15:00:00Z'), fri = '2026-11-06T21:00:00Z';   // Friday's close: 4 PM in New York
+  assert.equal(weekDay('2026-11-06'), 'Fri 6 Nov');
+  assert.equal(nyDay('2026-11-07T03:00:00Z'), '2026-11-06', 'late Friday evening in New York is still Friday there');
+  assert.deepEqual([moveDayOf(fri, sat), moveDayOf('2026-11-07T14:00:00Z', sat)], ['2026-11-06', ''], "Friday's move on a Saturday is named; today's is not");
+  assert.deepEqual([chipDay('2026-11-06', sat), chipDay('2026-10-30', sat)], ['Fri', '30 Oct'], 'its weekday within the week, else its date');
+  assert.equal(priceDayWords('$188.08', '+2.78%', { open: false, asOf: fri }, sat), '$188.08, the close of Fri 6 Nov (+2.78% that day), from Yahoo Finance');
+  assert.equal(priceDayWords('$188.08', '+2.78%', { open: false, asOf: fri }, new Date('2026-11-06T22:00:00Z')), "$188.08, today's close (+2.78% today), from Yahoo Finance");
+  assert.equal(priceDayWords('$188.08', '+2.78%', { open: true, asOf: fri }, new Date('2026-11-06T20:00:00Z')), '$188.08 (+2.78% today) on Yahoo Finance, up to 15 min late');
+  assert.equal(priceDayWords('$188.08', null, { open: false, asOf: fri }, sat), '$188.08, the close of Fri 6 Nov, from Yahoo Finance', 'no move given: none written');
+  // a time today is its clock; another day's has its day, another year's its year (in the person's own time)
+  const now = new Date(2026, 10, 7, 10, 0), run = new Date(2026, 9, 24, 0, 54).toISOString(), early = new Date(2026, 10, 7, 8, 5).toISOString();
+  assert.equal(when(run, now), `Sat 24 Oct, ${clock(run)}`);
+  assert.equal(when(early, now), clock(early));
+  const old = new Date(2025, 9, 24, 0, 54).toISOString();
+  assert.equal(when(old, now), `24 Oct 2025, ${clock(old)}`);
+  assert.equal(when('not a time', now), '');
+  // a yield's change is in points, never a percent of a percent (4.08% to 4.10% is not "+0.41%")
+  assert.deepEqual([points(0.02), points(-0.0123), points(1), points(0.001), points(null)], ['+0.02 points', '−0.01 points', '+1.00 point', '0.00 points', '—']);
+  // and the page uses them wherever it shows a move or a time
+  const page = read('main.ts');
+  assert.doesNotMatch(page, /\bclock\(/, 'a time is shown with its day when it is not today, never as a bare clock');
+  assert.doesNotMatch(page, /\} today\)` on Yahoo|'S&P 500 today'|<th class="num">Today<\/th>/, "a move called today's whatever its day");
+  assert.match(page, /const day = moveDayOf\(q\.asOf\)/, 'the move chip names its day');
+  assert.match(page, /marketOf\(q\.symbol\)\?\.unit === '%' \? points\(q\.change\)/, "a yield's move is in points");
+  assert.match(page, /l\.lastRun\.startOnly \? 'started ' : ''/, 'a run whose end Madav did not give says when it started');
+  assert.match(page, /l\.lastRun\.result\.replace\(\/\[\\s\.\]\+\$\/, ''\)/, 'its result ends in one full stop, not two ("1 scored..")');
+});
+
+test("a report's preview is its first sentence, never a heading, a bold heading or a bold label alone", () => {
+  // Round 1: the fact check's card previewed as "Data note and verification." and nothing else.
+  assert.equal(opening('**Data note and verification.** Instrument confirmed: NVDA, NVIDIA Corporation, on NasdaqGS. Prices from Yahoo Finance.'),
+    'Instrument confirmed: NVDA, NVIDIA Corporation, on NasdaqGS.');
+  assert.equal(opening('**Summary**\n\nThe trend is up. The 50-day average is rising.'), 'The trend is up.');
+  assert.equal(opening('- **Corrections:**\nThe RSI was 62.1, not 70.'), 'The RSI was 62.1, not 70.');
+  assert.equal(opening('**Rating**: Overweight\nMore words follow.'), 'Rating: Overweight More words follow.', 'a bold label with its value stays');
+  assert.equal(opening('**Only a heading.**'), 'Only a heading.', 'with nothing else, the heading is all there is');
 });
 
 test('the page is one policy-clean file: no inline script, style or event attribute, and no key in it', () => {

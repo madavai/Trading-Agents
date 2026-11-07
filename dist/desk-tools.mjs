@@ -37344,18 +37344,19 @@ function parseChart(json2, symbol4) {
   if (!r) throw new NoData(`Yahoo Finance has no prices for ${symbol4}${json2.chart?.error?.description ? ` (${json2.chart.error.description})` : ""}`);
   const m2 = r.meta ?? {}, q = r.indicators?.quote?.[0] ?? {}, adj = r.indicators?.adjclose?.[0]?.adjclose;
   const offset = m2.gmtoffset ?? 0, dayOf2 = (ts) => new Date((ts + offset) * 1e3).toISOString().slice(0, 10);
-  const bars = [], blank = [];
+  const rows = [], blank = [];
   (r.timestamp ?? []).forEach((ts, i) => {
     const open3 = num(q.open?.[i]), high = num(q.high?.[i]), low = num(q.low?.[i]), close = num(q.close?.[i]);
     if (open3 === null || high === null || low === null || close === null || close <= 0) {
       blank.push(dayOf2(ts));
       return;
     }
-    const a = num(adj?.[i]), k = a !== null ? a / close : 1;
-    bars.push({ date: dayOf2(ts), open: open3 * k, high: high * k, low: low * k, close: close * k, volume: num(q.volume?.[i]) ?? 0 });
+    const a = num(adj?.[i]), k = a !== null ? a / close : 1, date5 = dayOf2(ts), volume = num(q.volume?.[i]) ?? 0;
+    rows.push({ bar: { date: date5, open: open3 * k, high: high * k, low: low * k, close: close * k, volume }, traded: { date: date5, open: open3, high, low, close, volume } });
   });
   const seen = /* @__PURE__ */ new Set();
-  const unique = bars.filter((b) => seen.has(b.date) ? false : (seen.add(b.date), true));
+  const kept = rows.filter((x) => seen.has(x.bar.date) ? false : (seen.add(x.bar.date), true));
+  const unique = kept.map((x) => x.bar);
   const lastDay = unique.at(-1)?.date ?? "", unfilled = [...new Set(blank.filter((d) => d > lastDay))];
   const reg = m2.currentTradingPeriod?.regular, session2 = reg?.start && reg.end ? { date: dayOf2(reg.start), start: reg.start * 1e3, end: reg.end * 1e3 } : void 0;
   const paid = /* @__PURE__ */ new Map();
@@ -37367,7 +37368,8 @@ function parseChart(json2, symbol4) {
     meta: { symbol: m2.symbol ?? symbol4, currency: m2.currency, exchange: m2.fullExchangeName ?? m2.exchangeName, type: m2.instrumentType, name: m2.longName ?? m2.shortName, price: m2.regularMarketPrice, timezone: m2.exchangeTimezoneName, session: session2 },
     bars: unique,
     unfilled,
-    dividends: [...paid].map(([date5, amount]) => ({ date: date5, amount })).sort((a, b) => a.date.localeCompare(b.date))
+    dividends: [...paid].map(([date5, amount]) => ({ date: date5, amount })).sort((a, b) => a.date.localeCompare(b.date)),
+    traded: kept.map((x) => x.traded)
   };
 }
 async function fetchDaily(symbol4, from, to) {
@@ -37391,8 +37393,9 @@ async function daily(raw, from, to) {
     p.catch(() => cache.delete(key));
   }
   const s = await cache.get(key);
-  const bars = s.bars.filter((b) => b.date >= from && b.date <= to), lastDay = bars.at(-1)?.date ?? "";
-  return { meta: s.meta, bars, unfilled: (s.unfilled ?? []).filter((d) => d > lastDay && d <= to), dividends: (s.dividends ?? []).filter((d) => d.date >= from && d.date <= to) };
+  const within3 = (b) => b.date >= from && b.date <= to;
+  const bars = s.bars.filter(within3), lastDay = bars.at(-1)?.date ?? "";
+  return { meta: s.meta, bars, unfilled: (s.unfilled ?? []).filter((d) => d > lastDay && d <= to), dividends: (s.dividends ?? []).filter((d) => d.date >= from && d.date <= to), ...s.traded ? { traded: s.traded.filter(within3) } : {} };
 }
 async function history(raw, analysis2, calendarDays = 420) {
   const s = await daily(raw, addDays(analysis2, -calendarDays), analysis2);
@@ -39614,7 +39617,7 @@ function readListener(dir, now = /* @__PURE__ */ new Date()) {
     if (typeof last?.ended === "string") {
       const began = iso(last.at), ended = iso(last.endedAt), how = { failed: "failed", stopped: "stopped" }[last.ended];
       const result = words([how, words(last.result, 200)].filter(Boolean).join(": "), 200) ?? "finished";
-      if (began) note.lastRun = ended && Date.parse(began) <= Date.parse(ended) ? { started: began, at: ended, result } : { at: began, result };
+      if (began) note.lastRun = ended && Date.parse(began) <= Date.parse(ended) ? { started: began, at: ended, result } : { at: began, result, startOnly: true };
     } else {
       const lastAt = iso(last?.at), result = words(last?.result, 200), started = iso(last?.started);
       if (lastAt && result) note.lastRun = { ...started && Date.parse(started) <= Date.parse(lastAt) ? { started } : {}, at: lastAt, result };

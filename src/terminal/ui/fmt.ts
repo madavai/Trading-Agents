@@ -80,6 +80,51 @@ export const dayText = (iso: string): string => {
 export const shortDay = (iso: string): string => { const m = /^\d{4}-(\d{2})-(\d{2})/.exec(iso); return m ? `${Number(m[2])} ${MON[Number(m[1]) - 1]}` : iso; };
 export const clock = (iso: string): string => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); };
 
+const WEEKDAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+/** 2026-11-06 as "Fri 6 Nov". */
+export const weekDay = (day: string): string => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(day);
+  return m ? `${WEEKDAY[new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12)).getUTCDay()]} ${Number(m[3])} ${MON[Number(m[2]) - 1]}` : day;
+};
+/** The day an instant falls on in New York, the desk's day and the US market's ("2026-11-06"); '' for no instant. */
+export const nyDay = (at: string | number | Date): string => {
+  const d = new Date(at);
+  return Number.isNaN(d.getTime()) ? '' : new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+};
+/** The trading day a price's move belongs to, when it is not today in New York ("2026-11-06"); '' when it is today's.
+ *  On a Saturday, a quote's "day" is Friday's session: the page names it rather than calling it today. */
+export const moveDayOf = (asOf: string, now: Date = new Date()): string => { const d = nyDay(asOf); return d && d !== nyDay(now) ? d : ''; };
+/** A past trading day, short, for a chip: its weekday within the last six days ("Fri"), else its date ("6 Nov"). */
+export const chipDay = (day: string, now: Date = new Date()): string => {
+  const ago = (Date.parse(`${nyDay(now)}T12:00:00Z`) - Date.parse(`${day}T12:00:00Z`)) / 86_400_000;
+  return ago > 0 && ago < 7 ? weekDay(day).split(' ')[0]! : shortDay(day);
+};
+/** A time the page shows: the clock alone when it is today, else with its day ("Sat 24 Oct, 12:54 AM"), and its year
+ *  when another year's. Times are the person's own, as their computer keeps them. */
+export const when = (iso: string, now: Date = new Date()): string => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const local = (x: Date) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+  if (local(d) === local(now)) return clock(iso);
+  return `${d.getFullYear() === now.getFullYear() ? weekDay(local(d)) : `${d.getDate()} ${MON[d.getMonth()]} ${d.getFullYear()}`}, ${clock(iso)}`;
+};
+/** A price and its move in words, saying which day they are: while the market is open, "$188.08 (+1.20% today) on Yahoo
+ *  Finance, up to 15 min late"; after today's close, "$188.08, today's close (+1.20% today)"; on a weekend or before the
+ *  open, "$188.08, the close of Fri 6 Nov (+1.20% that day)", never "today". */
+export const priceDayWords = (price: string, move: string | null, q: { open: boolean; asOf: string }, now: Date = new Date()): string => {
+  if (q.open) return `${price}${move ? ` (${move} today)` : ''} on Yahoo Finance, up to 15 min late`;
+  const day = moveDayOf(q.asOf, now);
+  return day ? `${price}, the close of ${weekDay(day)}${move ? ` (${move} that day)` : ''}, from Yahoo Finance`
+    : `${price}, today's close${move ? ` (${move} today)` : ''}, from Yahoo Finance`;
+};
+/** A change in a rate that is itself a percent (a bond's yield), in percentage points: 4.84% to 4.86% is "+0.02 points",
+ *  never "+0.41%", which would be a percent of a percent. */
+export const points = (n: number | null | undefined, d = 2): string => {
+  if (n === null || n === undefined || !Number.isFinite(n)) return '—';
+  const body = Math.abs(n).toFixed(d);
+  return `${Number(body) === 0 ? '' : n > 0 ? '+' : MINUS}${body} ${Number(body) === 1 ? 'point' : 'points'}`;
+};
+
 export const SECTION_NAMES: Record<string, string> = {
   market: 'Market report', sentiment: 'Sentiment report', news: 'News report', fundamentals: 'Fundamentals report', fact_check: 'Fact check',
   bull: 'Bull case', bear: 'Bear case', research_plan: 'Research plan', trader: "Trader's proposal",
@@ -98,9 +143,14 @@ export function labelled(md: string, label: string): string {
   return m ? plain(m[1]!) : '';
 }
 
-/** A report's opening, as a preview: its first sentence in plain words (headings left out), at most n characters. */
+/** A report's opening, as a preview: its first sentence in plain words, at most n characters. Headings are left out,
+ *  and so are headings written in bold: a line that is only bold words, and a bold lead-in that is a sentence of its own
+ *  ("**Data note and verification.** Instrument confirmed ...", which would preview as the label alone). A bold label
+ *  that introduces a value ("**Rating**: Overweight") stays. */
 export function opening(md: string, n = 160): string {
-  const text = plain(md.split('\n').filter((l) => !/^\s{0,3}#/.test(l)).join('\n'));
+  const lines = md.replace(/\r\n/g, '\n').split('\n').filter((l) => !/^\s{0,3}#/.test(l));
+  const body = lines.filter((l) => !/^\s*(?:[-*+]\s+)?\*\*[^*\n]+\*\*[\s:.]*$/.test(l)).map((l) => l.replace(/^(\s*(?:[-*+]\s+)?)\*\*[^*\n]*[.!?]\*\*\s*/, '$1'));
+  const text = plain(body.join('\n')) || plain(lines.join('\n'));
   const s = /^(.{12,}?[.!?])(?=\s|$)/.exec(text)?.[1] ?? text;
   return s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s;
 }

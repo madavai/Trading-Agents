@@ -73,13 +73,16 @@ export interface History {
   ma50: Array<number | null>; ma200: Array<number | null>;
 }
 
-/** Daily prices for a range, with the 50- and 200-day averages worked out from the history before it, so they are whole at the left edge. */
+/** Daily prices for a range, with the 50- and 200-day averages worked out from the history before it, so they are whole at
+ *  the left edge. The prices are as traded (adjusted for splits, not for dividends), as Nasdaq or a broker shows them: the
+ *  chart's range, change, low and high are prices the stock really traded at. The desk's own tools use dividend-adjusted
+ *  prices, where a dividend counts as part of the return. */
 export async function history(raw: string, range: RangeKey): Promise<History> {
   const symbol = safeSymbol(raw), end = today(), from = addDays(end, -(RANGES[range] + 320));
-  const s = await daily(symbol, from, end);
-  if (!s.bars.length) throw new NoData(`Yahoo Finance has no daily prices for ${symbol}`);
-  const m50 = compute('close_50_sma', s.bars), m200 = compute('close_200_sma', s.bars), cut = addDays(end, -RANGES[range]);
-  const keep = s.bars.map((b, i) => ({ b, i })).filter(({ b }) => b.date >= cut);
+  const s = await daily(symbol, from, end), bars = s.traded ?? s.bars;
+  if (!bars.length) throw new NoData(`Yahoo Finance has no daily prices for ${symbol}`);
+  const m50 = compute('close_50_sma', bars), m200 = compute('close_200_sma', bars), cut = addDays(end, -RANGES[range]);
+  const keep = bars.map((b, i) => ({ b, i })).filter(({ b }) => b.date >= cut);
   const round = (v: number | null | undefined) => (v === null || v === undefined ? null : Math.round(v * 10_000) / 10_000);
   return {
     symbol, name: s.meta.name, currency: s.meta.currency, range,

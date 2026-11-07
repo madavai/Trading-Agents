@@ -24,14 +24,16 @@ export const MAX_MARKET = 8;
 /** How many of the person's own names "Start here" shows in a tier; the rest are in the watchlist below it. */
 export const START_NAMES = 12;
 
-const sp500 = { name: 'S&P 500', meaning: 'the 500 largest US companies' }, us = { name: 'The whole US market', meaning: 'nearly every US company, large and small' };
+// A fund that copies an index is named as a fund ("S&P 500 fund"), so it is never taken for the index itself, which the
+// Markets cards show under the index's own name at about ten times the fund's price.
+const sp500 = { name: 'S&P 500 fund', meaning: 'copies the S&P 500 index: the 500 largest US companies' }, us = { name: 'The whole US market', meaning: 'nearly every US company, large and small' };
 const bonds = { name: 'US bonds', meaning: 'loans to the US government and to companies: steadier than shares, and they pay interest' };
 /** The broad funds, the sector funds and the coins paper follows, by name in plain words, with what each holds. */
 export const PLAIN: Readonly<Record<string, { name: string; meaning: string }>> = {
   SPY: sp500, VOO: sp500, IVV: sp500, VTI: us, ITOT: us, SCHB: us, BND: bonds, AGG: bonds,
-  QQQ: { name: 'Nasdaq 100', meaning: 'the 100 largest companies on the Nasdaq exchange, mostly technology' },
-  DIA: { name: 'Dow Jones', meaning: '30 large, long-established US companies' },
-  IWM: { name: 'Russell 2000', meaning: '2,000 smaller US companies' },
+  QQQ: { name: 'Nasdaq 100 fund', meaning: 'copies the Nasdaq 100 index: the 100 largest companies on the Nasdaq exchange, mostly technology' },
+  DIA: { name: 'Dow Jones fund', meaning: 'copies the Dow Jones index: 30 large, long-established US companies' },
+  IWM: { name: 'Russell 2000 fund', meaning: 'copies the Russell 2000 index: 2,000 smaller US companies' },
   VT: { name: 'The whole world', meaning: 'thousands of companies in dozens of countries' },
   VXUS: { name: 'The world outside the US', meaning: 'thousands of companies outside the United States' },
   VEA: { name: 'Developed markets', meaning: 'large companies in Europe, Japan, Canada and Australia' },
