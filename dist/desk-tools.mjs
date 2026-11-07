@@ -38235,6 +38235,31 @@ function parseForm4(xml, filed) {
     indirect: field(t, "directOrIndirectOwnership").toUpperCase() === "I" ? field(t, "natureOfOwnership") || "indirectly" : null
   })).filter((t) => t.date && t.code);
 }
+function parseFiling(xml, form, filed) {
+  const owners = blocks(xml, "reportingOwner").map((o) => field(o, "rptOwnerCik").replace(/^0+/, "") || field(o, "rptOwnerName").toUpperCase()).sort().join("+");
+  const original = form.endsWith("/A") ? field(xml, "dateOfOriginalSubmission").slice(0, 10) || null : null;
+  return { form, filed, owners, original, period: field(xml, "periodOfReport").slice(0, 10), trades: parseForm4(xml, filed) };
+}
+function amended(filings2) {
+  const state = new Map(filings2.map((f) => [f, { first: f.filed, by: null }]));
+  let replaced = 0;
+  for (const f of [...filings2].sort((a, b) => a.filed.localeCompare(b.filed))) {
+    if (!f.original) continue;
+    const me = state.get(f);
+    me.first = f.original;
+    const same = filings2.filter((g) => g !== f && g.owners === f.owners && g.filed === f.original && g.filed <= f.filed);
+    const pool = same.some((g) => g.period === f.period) ? same.filter((g) => g.period === f.period) : same;
+    if (pool.length !== 1) continue;
+    let target = pool[0];
+    while (state.get(target).by) target = state.get(target).by;
+    me.first = state.get(target).first;
+    if (!f.trades.length) continue;
+    state.get(target).by = f;
+    replaced++;
+  }
+  const trades = filings2.filter((f) => !state.get(f).by).flatMap((f) => f.trades.map((t) => f.original ? { ...t, filed: state.get(f).first, corrected: f.filed } : t));
+  return { trades: trades.sort((a, b) => b.filed.localeCompare(a.filed)), replaced };
+}
 var CODES = {
   P: "bought",
   S: "sold",
@@ -38262,7 +38287,7 @@ async function secInsiders(symbol4, cik, asOf, days = 90, limit = 25) {
     if (partial2) throw new NoData(`the SEC's recent list of ${symbol4}'s filings starts on ${oldest}, after ${addDays(from, 1)}, so the trades of those days cannot be read`);
     return `${head2}: none. No director, officer or large owner reported a trade in these ${days} days. That is a fact from the SEC, not a gap in the data.`;
   }
-  const read2 = picked.slice(0, limit), trades = [];
+  const read2 = picked.slice(0, limit), filings2 = [];
   let failed = 0;
   for (const p of read2) {
     const acc = r.accessionNumber?.[p.i] ?? "", doc = (r.primaryDocument?.[p.i] ?? "").replace(/^xsl[^/]*\//, "");
@@ -38271,20 +38296,22 @@ async function secInsiders(symbol4, cik, asOf, days = 90, limit = 25) {
       continue;
     }
     try {
-      trades.push(...parseForm4(await getText(`https://www.sec.gov/Archives/edgar/data/${Number(cik)}/${acc.replaceAll("-", "")}/${doc}`), p.filed));
+      filings2.push(parseFiling(await getText(`https://www.sec.gov/Archives/edgar/data/${Number(cik)}/${acc.replaceAll("-", "")}/${doc}`), p.form, p.filed));
     } catch {
       failed++;
     }
   }
+  const { trades: all, replaced } = amended(filings2), trades = all.filter((t) => t.filed > from);
   const market = (code) => trades.filter((t) => t.code === code);
   const total = (list2) => {
     const shares2 = list2.reduce((a, t) => a + t.shares, 0), value = list2.reduce((a, t) => a + t.shares * (t.price ?? 0), 0), planned = list2.filter((t) => t.plan).length;
     return list2.length ? `${list2.length} (${fmt(shares2)} shares, about ${fmt(value)} USD at their own prices${planned ? `; ${planned} under a pre-arranged 10b5-1 plan` : ""})` : "none";
   };
   const buys = market("P"), sales = market("S"), other = trades.length - buys.length - sales.length;
-  const lines = trades.map((t) => `- ${t.date} (made public ${t.filed}) \xB7 ${t.owner} (${t.role}): ${CODES[t.code] ?? `transaction ${t.code} of`} ${fmt(t.shares, 4)} shares${t.price ? ` at ${fmt(t.price, 4)}` : ", no price"}${t.after !== null ? ` \xB7 holds ${fmt(t.after, 4)} after` : ""}${t.indirect ? ` \xB7 indirectly (${t.indirect})` : ""}${t.plan ? " \xB7 under a 10b5-1 plan" : ""}`);
+  const when = (t) => !t.corrected ? `made public ${t.filed}` : `made public ${t.filed}${t.filed > from ? "" : ", before these days"}; corrected ${t.corrected} by an amended filing, a Form 4/A${t.filed > from ? "" : ", so not counted above"}`;
+  const lines = all.map((t) => `- ${t.date} (${when(t)}) \xB7 ${t.owner} (${t.role}): ${CODES[t.code] ?? `transaction ${t.code} of`} ${fmt(t.shares, 4)} shares${t.price ? ` at ${fmt(t.price, 4)}` : ", no price"}${t.after !== null ? ` \xB7 holds ${fmt(t.after, 4)} after` : ""}${t.indirect ? ` \xB7 indirectly (${t.indirect})` : ""}${t.plan ? " \xB7 under a 10b5-1 plan" : ""}`);
   return [
-    `${head2} (${read2.length} of ${picked.length} filings read, newest first${failed ? `; ${failed} could not be read` : ""}). Each trade is dated by the day it happened and the day its filing made it public; only filings public by ${asOf} are shown.${gap2}`,
+    `${head2} (${read2.length} of ${picked.length} filings read, newest first${failed ? `; ${failed} could not be read` : ""}${replaced ? `; ${replaced === 1 ? "one is an amended filing, a Form 4/A, shown in place of the filing it corrects" : `${replaced} are amended filings, Form 4/A, each shown in place of the filing it corrects`}` : ""}). Each trade is dated by the day it happened and the day its filing made it public; only filings public by ${asOf} are shown.${gap2}`,
     "",
     `In these ${days} days: bought (code P) ${total(buys)}; sold (code S) ${total(sales)}; other kinds (awards, option exercises, shares handed back for tax, gifts) ${other}.`,
     "P and S are purchases and sales on the market or in a private deal: a purchase is the insider spending their own money. A sale under a 10b5-1 plan was arranged months ahead. Awards, exercises, tax handbacks and gifts say little about what an insider thinks of the price.",
