@@ -486,14 +486,25 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "\"Shares outstanding: no single count on a cover page filed by then …\", then \"In its place, the weighted average diluted shares from its accounts for …\", with the dates and the number.",
         "A market value and a price to book worked out from it (\"average diluted shares × close\"), not \"unavailable\"."] },
-    { "id": "B12", "title": "World news arrives", "tags": [], "changed": "2026-10-22",
+    { "id": "B12", "title": "World news arrives", "tags": [], "changed": "2026-11-06",
       "about": "The news analyst reads the world's news as well as the company's: the stories Yahoo Finance files under the stock market, interest rates, oil, gold and the euro, where central banks, the economy and world events are reported.",
       "where": "Dashboard › any call made after this update › News report",
       "do": [
         "Run a new analysis on a weekday and open its News report."],
       "see": [
-        "A world news part with the last few days' market headlines (the stock market, interest rates, oil, gold, the dollar and euro), from publishers such as Reuters, AP or Yahoo Finance.",
+        "A world news part with the latest market headlines (the stock market, interest rates, oil, gold, the dollar and euro), from publishers such as Reuters, AP or Yahoo Finance. On a busy day they may cover only the last few hours, and the report should say so (B15).",
         "Not \"Yahoo Finance search returned no world/economic news\"."] },
+    { "id": "B15", "title": "News and posts say the hours they really cover", "tags": [], "changed": "2026-11-06",
+      "about": "The free news and post sources give only their latest items. For a busy company like NVIDIA that is often the last two or three hours, not the week the analysts ask for. The desk now tells the analysts the span each sample really covers, so a report never reads a quiet evening as a quiet week. Days are New York's, as everywhere on the desk, so an evening's news counts on its own day.",
+      "where": "Dashboard › any call made after this update › Sentiment report and News report",
+      "do": [
+        "Ask the team about NVIDIA in the evening, after 16:00 New York time: [[Analyse NVDA shallow]]",
+        "Open its Sentiment report and its News report."],
+      "see": [
+        "Where they describe NVIDIA's news or its StockTwits posts, the reports give the hours those cover (for NVIDIA usually a few hours of that day, in UTC), not the whole week.",
+        "No report says there was no news, or no bad news, over the week on the strength of those few hours.",
+        "The evening's own news and posts are there: the reports do not say StockTwits had no messages.",
+        "If a report calls a few hours' sample \"this week's\" news or mood, that is a fault: note the sentence."] },
     { "id": "B13", "title": "The day's prices are called what they are", "tags": [], "changed": "2026-11-06",
       "about": "During trading hours a stock's latest price is still moving, after the close it is final, and for a while after a day ends the price source has not filled that day in yet. The desk now says which, so the reports never call a moving price \"the close\", never doubt a final one, and never say a day that traded had no trading.",
       "where": "Dashboard › any call made after this update › Market report",

@@ -37340,21 +37340,21 @@ function parseChart(json2, symbol4) {
   const r = json2.chart?.result?.[0];
   if (!r) throw new NoData(`Yahoo Finance has no prices for ${symbol4}${json2.chart?.error?.description ? ` (${json2.chart.error.description})` : ""}`);
   const m2 = r.meta ?? {}, q = r.indicators?.quote?.[0] ?? {}, adj = r.indicators?.adjclose?.[0]?.adjclose;
-  const offset = m2.gmtoffset ?? 0, dayOf = (ts) => new Date((ts + offset) * 1e3).toISOString().slice(0, 10);
+  const offset = m2.gmtoffset ?? 0, dayOf2 = (ts) => new Date((ts + offset) * 1e3).toISOString().slice(0, 10);
   const bars = [], blank = [];
   (r.timestamp ?? []).forEach((ts, i) => {
     const open3 = num(q.open?.[i]), high = num(q.high?.[i]), low = num(q.low?.[i]), close = num(q.close?.[i]);
     if (open3 === null || high === null || low === null || close === null || close <= 0) {
-      blank.push(dayOf(ts));
+      blank.push(dayOf2(ts));
       return;
     }
     const a = num(adj?.[i]), k = a !== null ? a / close : 1;
-    bars.push({ date: dayOf(ts), open: open3 * k, high: high * k, low: low * k, close: close * k, volume: num(q.volume?.[i]) ?? 0 });
+    bars.push({ date: dayOf2(ts), open: open3 * k, high: high * k, low: low * k, close: close * k, volume: num(q.volume?.[i]) ?? 0 });
   });
   const seen = /* @__PURE__ */ new Set();
   const unique = bars.filter((b) => seen.has(b.date) ? false : (seen.add(b.date), true));
   const lastDay = unique.at(-1)?.date ?? "", unfilled = [...new Set(blank.filter((d) => d > lastDay))];
-  const reg = m2.currentTradingPeriod?.regular, session2 = reg?.start && reg.end ? { date: dayOf(reg.start), start: reg.start * 1e3, end: reg.end * 1e3 } : void 0;
+  const reg = m2.currentTradingPeriod?.regular, session2 = reg?.start && reg.end ? { date: dayOf2(reg.start), start: reg.start * 1e3, end: reg.end * 1e3 } : void 0;
   return {
     meta: { symbol: m2.symbol ?? symbol4, currency: m2.currency, exchange: m2.fullExchangeName ?? m2.exchangeName, type: m2.instrumentType, name: m2.longName ?? m2.shortName, price: m2.regularMarketPrice, timezone: m2.exchangeTimezoneName, session: session2 },
     bars: unique,
@@ -37513,11 +37513,22 @@ async function search(q, count) {
   }
   throw last;
 }
-var inWindow = (a, from, to) => a.time.slice(0, 10) >= from && a.time.slice(0, 10) <= to;
+var dayOf = (time3) => marketDay(/* @__PURE__ */ new Date(`${time3.replace(" ", "T")}:00Z`));
+var within2 = (time3, from, to) => {
+  const d = dayOf(time3);
+  return d >= from && d <= to;
+};
+var inWindow = (a, from, to) => within2(a.time, from, to);
 var render2 = (list2) => list2.map((a) => `- ${a.time} UTC \xB7 ${a.publisher}: ${a.title}${a.link ? `
   ${a.link}` : ""}`).join("\n");
+function spanOf(times) {
+  const sorted = [...times].sort(), a = sorted[0] ?? "", b = sorted.at(-1) ?? "";
+  return a === b ? `${a} UTC` : `${a} to ${a.slice(0, 10) === b.slice(0, 10) ? b.slice(11) : b} UTC`;
+}
+var reaches = (oldest, from) => oldest !== void 0 && dayOf(oldest) < from;
+var newest = (shown, of, noun) => of > shown ? `the newest ${shown} of ${of} ${noun}s` : `${shown} ${noun}${shown === 1 ? "" : "s"}`;
 function gap(found, from, to, subject) {
-  const oldest = found.map((a) => a.time.slice(0, 10)).sort()[0];
+  const oldest = found.map((a) => dayOf(a.time)).sort()[0];
   if (oldest && oldest > to) return `Unavailable for ${from} to ${to}: Yahoo Finance's search serves only recent articles (the oldest it returned is from ${oldest}), so this is not an absence of ${subject}.`;
   return `No ${subject} between ${from} and ${to} in Yahoo Finance's search results. Search returns a sample, so this is not proof that nothing happened.`;
 }
@@ -37527,10 +37538,12 @@ async function companyNews(raw, analysis2, lookBackDays, limit) {
   const untagged = all.length > 0 && all.every((a) => a.tickers.length === 0);
   const found = untagged ? all : all.filter((a) => a.tickers.includes(sym2));
   if (!found.length) throw new Unavailable(`Yahoo Finance's search has no articles tagged ${sym2} (it tags few listings outside the US)`);
-  const list2 = found.filter((a) => inWindow(a, from, day3)).sort((a, b) => b.time.localeCompare(a.time)).slice(0, limit);
+  const within3 = found.filter((a) => inWindow(a, from, day3)).sort((a, b) => b.time.localeCompare(a.time)), list2 = within3.slice(0, limit);
   if (!list2.length) return gap(found, from, day3, `news about ${sym2}`);
   const how = untagged ? `matched by Yahoo's search for "${sym2}", not tagged: check each is about this company` : `tagged ${sym2}`;
-  return [`News about ${sym2}, ${from} to ${day3} (${list2.length} article${list2.length === 1 ? "" : "s"} ${how}; headlines only)`, "", render2(list2)].join("\n");
+  const count = newest(list2.length, within3.length, "article"), span2 = spanOf(list2.map((a) => a.time)), oldest = found.map((a) => a.time).sort()[0];
+  const head2 = reaches(oldest, from) ? `News about ${sym2}, ${from} to ${day3} (New York days; ${count} ${how}, from ${span2}; headlines only)` : `News about ${sym2} from ${span2} only (${count} ${how}; headlines only). The window asked for is ${from} to ${day3} (New York days), but Yahoo Finance's search returns only its latest articles, and the oldest it returned is from ${oldest} UTC: what came before was not reached, so this says nothing about the news earlier in the window.`;
+  return [head2, "", render2(list2)].join("\n");
 }
 async function worldNews(analysis2, lookBackDays, limit, queries) {
   const day3 = analysisDate(analysis2), from = addDays(day3, -lookBackDays);
@@ -37545,22 +37558,30 @@ async function worldNews(analysis2, lookBackDays, limit, queries) {
       all.push(a);
     }
   }
-  const list2 = all.filter((a) => inWindow(a, from, day3)).sort((a, b) => b.time.localeCompare(a.time)).slice(0, limit);
+  const within3 = all.filter((a) => inWindow(a, from, day3)).sort((a, b) => b.time.localeCompare(a.time)), list2 = within3.slice(0, limit);
   const note = failed ? `
 (${failed} of ${queries.length} searches could not be run: Yahoo Finance did not answer them.)` : "";
   if (!list2.length) return gap(all, from, day3, "world and economic news") + note;
+  const short2 = queries.flatMap((q, i) => {
+    const r = results[i], oldest = r.status === "fulfilled" ? r.value.map((a) => a.time).sort()[0] : void 0;
+    return r.status === "fulfilled" && oldest !== void 0 && !reaches(oldest, from) ? [`under ${q} only back to ${oldest} UTC`] : [];
+  });
   const past = isHistorical(day3) ? " Search favours recent articles, so a past window may be thin." : "";
-  return [`World and economic news, ${from} to ${day3}, from the news filed under ${queries.join(", ")}.${past}`, "", render2(list2)].join("\n") + note;
+  const count = newest(list2.length, within3.length, "article"), span2 = spanOf(list2.map((a) => a.time));
+  const head2 = short2.length ? `World and economic news from ${span2} (${count}), from the news filed under ${queries.join(", ")}. The window asked for is ${from} to ${day3} (New York days), but each search returns only its latest articles, and these did not reach back over it: ${short2.join("; ")}. What came before was not reached, so this says nothing about the news earlier in the window.${past}` : `World and economic news, ${from} to ${day3} (${count}, from ${span2}), from the news filed under ${queries.join(", ")}.${past}`;
+  return [head2, "", render2(list2)].join("\n") + note;
 }
 
 // src/data/social.ts
 var clip = (s, n2) => s.length > n2 ? `${s.slice(0, n2 - 1)}\u2026` : s;
 var decode3 = (s) => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;|&#x27;/g, "'").replace(/&amp;/g, "&");
 var plain = (html) => decode3(decode3(html).replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+var oldestOf = (posts) => posts.map((p) => p.time).sort()[0];
 async function stocktwits(raw, from, to, limit) {
   const base = cryptoBase(raw), sym2 = base ? `${base}.X` : normalizeSymbol(raw);
   const j = await getJson(`https://api.stocktwits.com/api/2/streams/symbol/${encodeURIComponent(sym2)}.json`);
-  return (j.messages ?? []).filter((m2) => m2.body && m2.created_at).map((m2) => ({ time: m2.created_at.slice(0, 16).replace("T", " "), text: clip(m2.body.replace(/\s+/g, " ").trim(), 280), tag: m2.entities?.sentiment?.basic ?? void 0 })).filter((p) => p.time.slice(0, 10) >= from && p.time.slice(0, 10) <= to).slice(0, limit);
+  const all = (j.messages ?? []).filter((m2) => m2.body && m2.created_at).map((m2) => ({ time: m2.created_at.slice(0, 16).replace("T", " "), text: clip(m2.body.replace(/\s+/g, " ").trim(), 280), tag: m2.entities?.sentiment?.basic ?? void 0 }));
+  return { posts: all.filter((p) => within2(p.time, from, to)).slice(0, limit), oldest: oldestOf(all), full: (j.messages ?? []).length >= 30 };
 }
 function parseAtom(xml) {
   return xml.split(/<entry[\s>]/).slice(1).map((chunk) => {
@@ -37572,8 +37593,10 @@ function parseAtom(xml) {
 async function reddit(raw, from, to, subs) {
   const base = cryptoBase(raw), q = base ?? normalizeSymbol(raw).replace(/\..*$/, "");
   const url2 = `https://www.reddit.com/r/${subs.map(encodeURIComponent).join("+")}/search.rss?q=${encodeURIComponent(q)}&restrict_sr=on&sort=new&t=week&limit=100`;
-  return parseAtom(await getText(url2, { headers: { Accept: "application/atom+xml" } })).filter((p) => p.time.slice(0, 10) >= from && p.time.slice(0, 10) <= to);
+  const all = parseAtom(await getText(url2, { headers: { Accept: "application/atom+xml" } }));
+  return { posts: all.filter((p) => within2(p.time, from, to)), oldest: oldestOf(all), full: all.length >= 100 };
 }
+var short = (s, from, to, what) => s.full && !reaches(s.oldest, from) ? ` ${what} serves only its latest posts, and the oldest it returned is from ${s.oldest} UTC: the rest of the window asked for (${from} to ${to}, New York days) was not reached, so these show the mood of those hours and say nothing about earlier in the window.` : "";
 function subredditsFor(raw, stock, crypto2) {
   const base = cryptoBase(raw);
   if (!base) return stock;
@@ -37584,19 +37607,25 @@ async function socialPosts(raw, analysis2, opts) {
   const day3 = analysisDate(analysis2), from = addDays(day3, -opts.lookBackDays), sym2 = normalizeSymbol(raw);
   const subs = subredditsFor(raw, opts.subreddits, opts.cryptoSubreddits);
   const [tw, rd] = await Promise.allSettled([stocktwits(raw, from, day3, opts.stocktwitsLimit), reddit(raw, from, day3, subs)]);
-  const out = [`Posts about ${sym2}, ${from} to ${day3}. Both sources serve only recent posts, so a past window can be empty for that reason alone.`, ""];
+  const out = [`Posts about ${sym2}, asked for ${from} to ${day3} (New York days; the times below are UTC). Both sources serve only their latest posts, so each part says the span its posts really cover, and a past window can be empty for that reason alone.`, ""];
   out.push("### StockTwits (retail traders; each author may tag a message Bullish or Bearish)");
   if (tw.status === "rejected") out.push(`StockTwits unavailable: ${tw.reason.message}. This is not a quiet crowd.`);
-  else if (!tw.value.length) out.push(`No StockTwits messages about ${sym2} in this window that the stream still serves.`);
+  else if (!tw.value.posts.length) out.push(`No StockTwits messages about ${sym2} in this window that the stream still serves.`);
   else {
-    const bull = tw.value.filter((p) => p.tag === "Bullish").length, bear = tw.value.filter((p) => p.tag === "Bearish").length, tagged = bull + bear;
-    out.push(`${tw.value.length} messages: ${bull} Bullish, ${bear} Bearish, ${tw.value.length - tagged} untagged${tagged ? ` (${Math.round(bull / tagged * 100)}/${Math.round(bear / tagged * 100)} among the tagged)` : ""}.`);
-    out.push(...tw.value.map((p) => `- ${p.time} UTC${p.tag ? ` [${p.tag}]` : ""}: ${p.text}`));
+    const posts = tw.value.posts, bull = posts.filter((p) => p.tag === "Bullish").length, bear = posts.filter((p) => p.tag === "Bearish").length, tagged = bull + bear;
+    out.push(`${posts.length} message${posts.length === 1 ? "" : "s"}, from ${spanOf(posts.map((p) => p.time))}: ${bull} Bullish, ${bear} Bearish, ${posts.length - tagged} untagged${tagged ? ` (${Math.round(bull / tagged * 100)}/${Math.round(bear / tagged * 100)} among the tagged)` : ""}.${short(tw.value, from, day3, "The stream")}`);
+    out.push(...posts.map((p) => `- ${p.time} UTC${p.tag ? ` [${p.tag}]` : ""}: ${p.text}`));
   }
   out.push("", `### Reddit (${subs.map((s) => `r/${s}`).join(", ")}; no vote or comment counts in the feed)`);
   if (rd.status === "rejected") out.push(`Reddit unavailable: ${rd.reason.message}. This is not a quiet crowd.`);
-  else if (!rd.value.length) out.push(`No Reddit posts about ${sym2} in these communities in this window that the feed still serves.`);
-  else out.push(`${rd.value.length} posts.`, ...rd.value.slice(0, 25).map((p) => `- ${p.time} UTC \xB7 r/${p.where || "?"}: ${p.title}${p.text ? ` - ${p.text}` : ""}`));
+  else if (!rd.value.posts.length) out.push(`No Reddit posts about ${sym2} in these communities in this window that the feed still serves.`);
+  else {
+    const posts = rd.value.posts, shown = posts.slice(0, 25);
+    out.push(
+      `${posts.length} post${posts.length === 1 ? "" : "s"}, from ${spanOf(posts.map((p) => p.time))}${posts.length > shown.length ? ` (the newest ${shown.length} shown)` : ""}.${short(rd.value, from, day3, "The feed")}`,
+      ...shown.map((p) => `- ${p.time} UTC \xB7 r/${p.where || "?"}: ${p.title}${p.text ? ` - ${p.text}` : ""}`)
+    );
+  }
   return out.join("\n");
 }
 
@@ -38699,11 +38728,11 @@ ${keep(reflection)}`;
     const full = (e) => [`[${e.date} | ${e.ticker} | ${e.rating} | ${e.raw ?? "n/a"} | ${e.alpha ?? "n/a"} | ${e.holding ?? "n/a"}]`, `DECISION:
 ${e.decision}`, ...e.reflection ? [`REFLECTION:
 ${e.reflection}`] : []].join("\n\n");
-    const short = (e) => `[${e.date} | ${e.ticker} | ${e.rating} | ${e.raw ?? "n/a"}]
+    const short2 = (e) => `[${e.date} | ${e.ticker} | ${e.rating} | ${e.raw ?? "n/a"}]
 ${e.reflection || e.decision.slice(0, 300) + (e.decision.length > 300 ? "..." : "")}`;
     const parts = [];
     if (same.length) parts.push(`Past analyses of ${ticker} (most recent first):`, ...same.map(full));
-    if (other.length) parts.push("Recent cross-ticker lessons:", ...other.map(short));
+    if (other.length) parts.push("Recent cross-ticker lessons:", ...other.map(short2));
     return parts.join("\n\n");
   }
 };
