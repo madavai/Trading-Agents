@@ -7639,10 +7639,16 @@ function parseChart(json, symbol) {
   const unique = bars.filter((b) => seen.has(b.date) ? false : (seen.add(b.date), true));
   const lastDay = unique.at(-1)?.date ?? "", unfilled = [...new Set(blank.filter((d) => d > lastDay))];
   const reg = m.currentTradingPeriod?.regular, session = reg?.start && reg.end ? { date: dayOf(reg.start), start: reg.start * 1e3, end: reg.end * 1e3 } : void 0;
+  const paid = /* @__PURE__ */ new Map();
+  for (const d of Object.values(r.events?.dividends ?? {})) {
+    const amount = num(d.amount);
+    if (amount !== null && amount > 0 && typeof d.date === "number" && Number.isFinite(d.date)) paid.set(dayOf(d.date), amount);
+  }
   return {
     meta: { symbol: m.symbol ?? symbol, currency: m.currency, exchange: m.fullExchangeName ?? m.exchangeName, type: m.instrumentType, name: m.longName ?? m.shortName, price: m.regularMarketPrice, timezone: m.exchangeTimezoneName, session },
     bars: unique,
-    unfilled
+    unfilled,
+    dividends: [...paid].map(([date4, amount]) => ({ date: date4, amount })).sort((a, b) => a.date.localeCompare(b.date))
   };
 }
 async function fetchDaily(symbol, from, to) {
@@ -7667,7 +7673,7 @@ async function daily(raw, from, to) {
   }
   const s = await cache.get(key);
   const bars = s.bars.filter((b) => b.date >= from && b.date <= to), lastDay = bars.at(-1)?.date ?? "";
-  return { meta: s.meta, bars, unfilled: (s.unfilled ?? []).filter((d) => d > lastDay && d <= to) };
+  return { meta: s.meta, bars, unfilled: (s.unfilled ?? []).filter((d) => d > lastDay && d <= to), dividends: (s.dividends ?? []).filter((d) => d.date >= from && d.date <= to) };
 }
 var clearCache = () => cache.clear();
 

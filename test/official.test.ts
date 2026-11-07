@@ -5,6 +5,7 @@ import { averageDilutedShares, clearSecCache, sectorOfSic, sharesOutstanding, tr
 import { clearYahooSession, companyOverview, insiderTransactions, profileSector } from '../src/data/company.js';
 import { parseForm4 } from '../src/data/insiders.js';
 import { chartJson, series } from './chart.js';
+import { clearCache, daily, parseChart } from '../src/data/yahoo.js';
 
 const json = (v: unknown, status = 200) => new Response(JSON.stringify(v), { status });
 function route(routes: Array<[RegExp, (url: string) => Response]>, seen: string[] = []): typeof fetch {
@@ -150,12 +151,56 @@ test("a US filer's profile and valuation from its SEC filings and the checked cl
   assert.match(t, /Shares outstanding: 24,100,000,000 \(counted on 2026-08-21, filed 2026-08-26\)\nMarket value \(derived: shares × close\): 5,216,927,000,000 USD/);
   assert.match(t, /Diluted EPS, last twelve months \(derived from the full year to 2026-01-25, 4\.9, plus 2026-01-26 to 2026-07-26, 4\.85, less 2025-01-27 to 2025-07-27, 1\.84\): 7\.91 USD\nPrice to earnings \(derived: close ÷ that\): 27\.37/);
   assert.match(t, /Book value per share \(derived: equity ÷ shares\): 9\.50 USD\nPrice to book \(derived: close ÷ that\): 22\.78/);
-  assert.match(t, /Dividends per share: not among its filed figures/);
+  assert.match(t, /Dividends per share, the 12 months to 2026-10-21: none went ex-dividend from 2025-10-22 to 2026-10-21 \(the price source's record of dividends\)/);
   assert.match(t, /Unavailable from official free sources: forward estimates/);
   const past = await companyOverview('ACME', '2026-08-01');
   assert.doesNotMatch(past, /withheld/, 'a past day has its own valuation, from what was filed by then');
   assert.match(past, /Shares outstanding: unavailable/, 'the cover page of 21 August was not filed by 1 August');
   assert.match(past, /Diluted EPS, last twelve months \(derived from the full year to 2026-01-25, 4\.9\): 4\.90 USD/);
+});
+
+/** A chart answer with dividends, keyed as the chart service keys them (by the time of the ex-dividend day's open). */
+const withDividends = (j: ReturnType<typeof chartJson>, paid: Array<[string, number]>) => {
+  const events = { dividends: Object.fromEntries(paid.map(([d, amount]) => { const at = Date.parse(`${d}T13:30:00Z`) / 1000; return [String(at), { amount, date: at }]; })) };
+  return { chart: { ...j.chart, result: [{ ...j.chart.result[0]!, events }] } };
+};
+// NVIDIA's of round 1: four dividends in the twelve months, the last two of 0.25, and one more before them.
+const NVDA_PAID: Array<[string, number]> = [['2025-09-11', 0.01], ['2025-12-04', 0.01], ['2026-03-11', 0.01], ['2026-06-04', 0.25], ['2026-09-10', 0.25], ['2026-12-04', 0.25]];
+
+test('the price history carries each dividend by its ex-dividend day, held to the range asked for', async () => {
+  clearCache();
+  const s = parseChart(withDividends(chartJson('NVDA', series('2026-10-20', 5)), [['2026-09-10', 0.25], ['2025-09-11', 0.01]]), 'NVDA');
+  assert.deepEqual(s.dividends, [{ date: '2025-09-11', amount: 0.01 }, { date: '2026-09-10', amount: 0.25 }], 'oldest first, on the exchange\'s day');
+  assert.deepEqual(parseChart(chartJson('NVDA', series('2026-10-20', 5)), 'NVDA').dividends, [], 'a company that paid none has none');
+  configure({ fetch: route([[/v8\/finance\/chart\/NVDA/, () => json(withDividends(chartJson('NVDA', series('2026-10-20', 300)), NVDA_PAID))]]) });
+  assert.deepEqual((await daily('NVDA', '2025-11-01', '2026-10-20')).dividends?.map((d) => d.date), ['2025-12-04', '2026-03-11', '2026-06-04', '2026-09-10'], 'none before the range, none after it');
+});
+
+test("dividends per share over the true twelve months to the day, from the price source, with each one's date; the filings stop months earlier", async () => {
+  clearCache();
+  const closes = series('2026-10-20', 300).map((r, i, all) => (i === all.length - 1 ? { ...r, c: 216.47 } : r));
+  // As filed with the SEC by then: the twelve months to 26 July, 0.28 (0.04 + 0.26 - 0.02); the dividend of 10 Sep is in no filing yet.
+  const declared = [
+    { start: '2025-01-27', end: '2026-01-25', val: 0.04, filed: '2026-02-25', form: '10-K' },
+    { start: '2025-01-27', end: '2025-07-27', val: 0.02, filed: '2025-08-27', form: '10-Q' },
+    { start: '2026-01-26', end: '2026-07-26', val: 0.26, filed: '2026-08-26', form: '10-Q' },
+  ];
+  const facts = { facts: { ...FACTS.facts, 'us-gaap': { ...FACTS.facts['us-gaap'], CommonStockDividendsPerShareDeclared: { units: { 'USD/shares': declared } } } } };
+  const answer = (chart: () => Response) => configure({ fetch: route([TICKERS,
+    [/submissions\/CIK0000001234\.json/, () => json(record([]))],
+    [/companyfacts\/CIK0000001234\.json/, () => json(facts)],
+    [/v8\/finance\/chart\/ACME/, chart],
+  ]) });
+  answer(() => json(withDividends(chartJson('ACME', closes), NVDA_PAID)));
+  const t = await companyOverview('ACME', '2026-10-21');
+  assert.match(t, /Dividends per share, the 12 months to 2026-10-21 \(derived: the 4 that went ex-dividend from 2025-10-22 to 2026-10-21, from the price source, 2025-12-04 0\.01, 2026-03-11 0\.01, 2026-06-04 0\.25, 2026-09-10 0\.25\): 0\.5200 USD\nDividend yield \(derived: that ÷ close\): 0\.24%/);
+  assert.doesNotMatch(t, /0\.2800/, 'never the filings\' twelve months to July as the last twelve months');
+  // Prices that cannot be read: the filed figure, named as what it is.
+  clearSecCache(); clearCache();
+  answer(() => new Response('no such symbol', { status: 404 }));
+  const filed = await companyOverview('ACME', '2026-10-21');
+  assert.match(filed, /Dividends per share, the last twelve months filed \(derived from the full year to 2026-01-25, 0\.04, plus 2026-01-26 to 2026-07-26, 0\.26, less 2025-01-27 to 2025-07-27, 0\.02\): 0\.2800 USD\. Dividends since the last filed period are not in the filings, and the prices that record them could not be read/);
+  assert.doesNotMatch(filed, /Dividend yield/);
 });
 
 // Meta's own figures as the SEC served them on 2026-10-22: no cover-page count (classes A and B), the quarters' diluted shares.

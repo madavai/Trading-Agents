@@ -103,6 +103,8 @@ const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 
 const units = (facts: { units?: Record<string, Fact[]> } | undefined, unit: string): Fact[] => facts?.units?.[unit] ?? [];
 const fixed = (n: number, d = 2) => n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
 const whole = (n: number) => Math.round(n).toLocaleString('en-US');
+/** The same day a year before (28 February for 29 February): the twelve months to `day` begin the day after it. */
+const yearBefore = (day: string) => `${Number(day.slice(0, 4)) - 1}${day.slice(4) === '-02-29' ? '-02-28' : day.slice(4)}`;
 
 /** A US filer's profile and valuation as known on `day`: who it is from its SEC record, and the multiples worked out from
  *  what it had filed by then and the checked closing price on or before then. Every multiple is derived and shows what it
@@ -116,9 +118,9 @@ async function secOverview(sym: string, cik: string, day: string): Promise<strin
   const fy = /^(\d\d)(\d\d)$/.exec(s.fiscalYearEnd ?? '');
   if (fy && Number(fy[1]) >= 1 && Number(fy[1]) <= 12) lines.push(`Fiscal year ends: ${Number(fy[2])} ${MONTHS[Number(fy[1]) - 1]}`);
 
-  let close: { date: string; close: number; currency?: string } | null = null;
+  let close: { date: string; close: number; currency?: string } | null = null, paid: Array<{ date: string; amount: number }> = [];
   // The close in cents, as the price table shows it, so a product like the market value carries no rounding noise.
-  try { const h = await history(sym, day), last = h.bars.at(-1)!; close = { date: last.date, close: Math.round(last.close * 100) / 100, currency: h.meta.currency }; } catch { /* no price: the multiples are unavailable */ }
+  try { const h = await history(sym, day), last = h.bars.at(-1)!; close = { date: last.date, close: Math.round(last.close * 100) / 100, currency: h.meta.currency }; paid = h.dividends ?? []; } catch { /* no price: the multiples are unavailable */ }
   const usd = !close?.currency || close.currency === 'USD';
   lines.push(close ? `Close: ${fixed(close.close)} ${close.currency ?? ''} on ${close.date} (the checked price table's latest row on or before ${day})`.replace('  ', ' ') : 'Close: unavailable (the prices could not be read), so no multiple can be worked out');
 
@@ -145,13 +147,20 @@ async function secOverview(sym: string, cik: string, day: string): Promise<strin
       if (close && usd && bv > 0) lines.push(`Price to book (derived: close ÷ that): ${fixed(close.close / bv)}`);
     }
   }
+  // Dividends over the true twelve months to the day, from the price source's record of each one (the filings stop at
+  // the last quarter filed, months before); the filed figure only when the prices could not be read.
   const dps = trailingYear(units(g.CommonStockDividendsPerShareDeclared, 'USD/shares'), day) ?? trailingYear(units(g.CommonStockDividendsPerShareCashPaid, 'USD/shares'), day);
-  if (dps) {
-    lines.push(`Dividends per share, last twelve months (derived from ${dps.parts}): ${fixed(dps.value, 4)} USD`);
-    if (close && usd && close.close > 0) lines.push(`Dividend yield (derived: that ÷ close): ${fixed((dps.value / close.close) * 100)}%`);
-  } else lines.push('Dividends per share: not among its filed figures (many companies pay none)');
+  if (close) {
+    const after = yearBefore(day), year = paid.filter((d) => d.date > after && d.date <= day), unit = close.currency ?? 'USD';
+    const sum = Number(year.reduce((a, d) => a + d.amount, 0).toFixed(6)), span = `${addDays(after, 1)} to ${day}`;
+    if (year.length) {
+      lines.push(`Dividends per share, the 12 months to ${day} (derived: the ${year.length === 1 ? 'one' : year.length} that went ex-dividend from ${span}, from the price source, ${year.map((d) => `${d.date} ${d.amount}`).join(', ')}): ${fixed(sum, 4)} ${unit}`);
+      if (close.close > 0) lines.push(`Dividend yield (derived: that ÷ close): ${fixed((sum / close.close) * 100)}%`);
+    } else lines.push(`Dividends per share, the 12 months to ${day}: none went ex-dividend from ${span} (the price source's record of dividends)`);
+  } else if (dps) lines.push(`Dividends per share, the last twelve months filed (derived from ${dps.parts}): ${fixed(dps.value, 4)} USD. Dividends since the last filed period are not in the filings, and the prices that record them could not be read`);
+  else lines.push('Dividends per share: not among its filed figures (many companies pay none)');
   lines.push('Unavailable from official free sources: forward estimates (forward P/E, PEG), analysts\' price targets and beta.');
-  return [`Company profile and valuation for ${sym}, from its SEC filings as they stood on ${day} and the desk's checked closing price. Every multiple is derived here from those filed figures and that price, and shows what it came from; nothing is an estimate.`, '', ...lines].join('\n');
+  return [`Company profile and valuation for ${sym}, from its SEC filings as they stood on ${day} and the desk's checked closing price, with the dividends its price source records. Every multiple is derived here from those filed figures and that price, and shows what it came from; nothing is an estimate.`, '', ...lines].join('\n');
 }
 
 export async function companyOverview(raw: string, analysis: string): Promise<string> {
