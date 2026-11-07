@@ -618,23 +618,26 @@ b, strong { font-weight: var(--weight-semibold); }
         "Chart NVDA. Switch Area and Candles, try 1M to 5Y, and toggle \"50-day average\", \"200-day average\" and \"Volume\"."],
       "see": [
         "The chart redraws each time, and the averages and volume come and go."] },
-    { "id": "C6", "title": "Reading a call and its reasoning", "tags": [], "changed": "2026-10-21",
+    { "id": "C6", "title": "Reading a call and its reasoning", "tags": [], "changed": "2026-11-07",
       "about": "Every call keeps the team's full reasoning, so you can see why it rated NVIDIA the way it did, in the order the team worked.",
       "where": "Dashboard › The desk's calls › NVDA › Read",
       "do": [
         "Open the NVDA call (\"Read\")."],
       "see": [
         "\"The portfolio manager's rating\" first, with the price target, the time horizon and how it scored, and the \"Portfolio manager's decision\" open.",
+        "How it scored says whether it worked: \"Scored: not yet: 5 trading days after the call\", or for a scored call \"alpha -12.1% against the index: the call did not work\", \"…: the call worked\", or for a Hold \"…: a Hold claims no direction\".",
         "Then \"Gathering the facts\", \"The research debate\", \"The trade\" and \"The risk debate\", each readable.",
         "At the foot: \"This is the team's reasoning as it wrote it. It is not investment advice.\""] },
-    { "id": "C7", "title": "Scorecard", "tags": [], "changed": "2026-10-21",
-      "about": "Each call is scored five trading days later against its market's index (SPY for US companies): did it call the direction, and by how much did it beat or trail the market (its \"alpha\")? The scorecard adds them up by rating.",
+    { "id": "C7", "title": "Scorecard", "tags": [], "changed": "2026-11-07",
+      "about": "Each call is scored five trading days later against its market's index (SPY for US companies): did it call the direction, and by how much did its stock beat or trail the index (its \"alpha\")? The scorecard adds them up by rating. Alpha above zero is good for a Buy or Overweight, and below zero is good for an Underweight or Sell.",
       "where": "Dashboard › How the desk is doing",
       "do": [
-        "Look at the scorecard under your paper record."],
+        "Look at the scorecard under your paper record.",
+        "Point at each rating's average alpha."],
       "see": [
         "\"N scored · M waiting\" under the heading, and by rating: Calls, Called the direction, Average alpha vs the index.",
-        "\"Each call is judged after 5 trading days against its market's index.\"",
+        "Each average is green when that rating's calls went its way on average, red when they went against it, and plain for Hold. Round 1's Underweight read \"+0.4%\" in red: pointing at it says \"On average the stocks rated Underweight beat their index by 0.4%: on average these calls did not work.\"",
+        "\"Each call is judged after 5 trading days against its market's index. Green means the calls went the way their rating said, red that they went against it: a Buy or Overweight works when its stock beats the index, an Underweight or Sell when its stock trails it. A Hold claims no direction, so it stays plain.\"",
         "With few scored calls: \"With so few scored calls these figures are noise, not a record.\" With none: \"Nothing has been scored yet.\""] },
     { "id": "C8", "title": "NVIDIA's own page", "tags": [], "changed": "2026-10-21",
       "about": "Every company has a page that gathers everything about it: what you hold of it, your orders on it, and every call the desk made on it.",
@@ -702,7 +705,19 @@ b, strong { font-weight: var(--weight-semibold); }
         "Open a stock's page on a quiet day and read its change, and on the Your account page each holding's gain since bought."],
       "see": [
         "A figure that rounds to zero reads \"alpha 0.0%\", \"0.00%\" or \"$0.00\", never \"-0.0%\", \"−0.00%\" or \"−$0.00\".",
-        "Every other figure keeps its sign: \"+0.7%\", \"−0.1%\"."] }
+        "Every other figure keeps its sign: \"+0.7%\", \"−0.1%\"."] },
+    { "id": "C16", "title": "A call's result says whether it worked", "tags": [], "changed": "2026-11-07",
+      "about": "A call is right when its stock goes the way its rating said against the index: above it after a Buy or Overweight, below it after an Underweight or Sell. So an Underweight that worked has an alpha below zero. Each scored call says in words whether it worked, and its colour follows the words, not the sign. A Hold claims no direction, so it stays plain. The green chips add up to the scorecard's \"Called the direction\".",
+      "where": "Dashboard › The desk's calls; the bar under the chart; a stock's page; a call's window",
+      "do": [
+        "Look at the Result column of the desk's calls, chart a stock and read the bar under the chart, and open META's page.",
+        "Point at a result chip.",
+        "Press \"What does this mean?\" in the side list and read \"Alpha\"."],
+      "see": [
+        "An Underweight whose stock trailed its index: \"worked · alpha -10.5%\" in green (META, 17 Oct, in round 1). An Underweight whose stock beat its index: \"did not work · alpha +9.0%\" in red (TSLA). An Overweight that trailed: \"did not work · alpha -12.1%\" in red.",
+        "A Hold: just \"alpha -0.2%\", plain. A call not scored yet: \"not scored yet\".",
+        "Pointing at a chip says why, for example \"An Underweight works when the stock trails its market's index over the 5 trading days after the call. It did (alpha -10.5%): the call worked.\"",
+        "\"Alpha: how far the stock beat (+) or trailed (−) its market's index in the trading days after a call. Above zero is good for a Buy or Overweight; below zero is good for an Underweight or Sell.\""] }
   ] },
   { "id": "D", "name": "Your Robinhood accounts",
     "sub": "The dashboard reads the accounts you choose, at Robinhood's live prices. It never shows your account numbers.",

@@ -6,7 +6,7 @@ import path from 'node:path';
 import { readContactEmail } from '../contact.js';
 import { Journal, type Entry } from '../desk/journal.js';
 import { hasReport, sectionsOf, stepWords } from '../desk/runs.js';
-import { renderSummary, summarize, type Summary } from '../desk/backtest.js';
+import { alphaOf, renderSummary, summarize, worked, type Summary } from '../desk/backtest.js';
 import { depthOfRounds, readListener, readQueue, type Depth, type QueueItem } from '../desk/queue.js';
 import { followed, readPaperStart, recordOf, RECORD_WEEKS, RECORD_WORDS, type PaperRecord } from '../desk/paper.js';
 import { readSettings } from '../settings.js';
@@ -24,6 +24,9 @@ export interface ListenerView { listener: string; since: string; lastRun?: { at:
 
 export interface Call {
   date: string; ticker: string; rating: string; pending: boolean; raw: string | null; alpha: string | null; holding: string | null;
+  /** Whether the scored call went the way its rating said (backtest.ts `worked`): the page colours and words its result by
+   *  this, never by the alpha's sign. null while it waits, for a Hold, and for a call with no readable rating or alpha. */
+  worked: boolean | null;
   summary: string; hasReport: boolean;
   /** Whether Decide… can open an order ticket from it (not for crypto or an index), and whether paper follows it. */
   ticket: boolean; paper: boolean;
@@ -105,6 +108,7 @@ export function stateOf(root: string, day: string): DeskState {
   const entries: Entry[] = new Journal(path.join(dir, 'journal.md')).load();
   const calls: Call[] = entries.map((e) => ({
     date: e.date, ticker: e.ticker, rating: e.rating, pending: e.pending, raw: e.raw, alpha: e.alpha, holding: e.holding,
+    worked: e.pending ? null : worked(e.rating, alphaOf(e)),
     summary: summaryOf(e.decision), hasReport: hasReport(dir, e.ticker, e.date), ticket: ticketable(e.ticker), paper: followed(e.ticker),
   })).reverse().sort((a, b) => b.date.localeCompare(a.date));
   const summary = summarize(entries), watchlist = readWatchlist(dir), market = marketView(dir);

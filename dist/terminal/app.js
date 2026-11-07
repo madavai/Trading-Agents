@@ -125,7 +125,7 @@
     "Needs review": { group: ratings, term: "Needs review", means: "the decision gave no rating that could be read, so it asks for no order." },
     call: { group: desk, term: "The desk's call", means: "its thirteen agents' rating, from Buy to Sell, on the day they analysed it." },
     depth: { group: desk, term: "Depth", means: "how long the debates in an analysis run: shallow (one round each, quick), medium (three) or deep (five, the slowest and costliest)." },
-    alpha: { group: desk, term: "Alpha", means: "how much better (+) or worse (\u2212) a call did than its market's index in the trading days after it: above zero, it beat the market." },
+    alpha: { group: desk, term: "Alpha", means: "how far the stock beat (+) or trailed (\u2212) its market's index in the trading days after a call. Above zero is good for a Buy or Overweight; below zero is good for an Underweight or Sell." },
     paper: { group: desk, term: "On paper", means: "followed with pretend money only, to see what the desk's calls would have done before any real money is at stake." },
     scorecard: { group: desk, term: "Scorecard", means: "the desk's record, good or bad: its paper money against the S&P 500, and each rating's average alpha." },
     rerating: { group: desk, term: "Re-rating", means: "it is on the waiting list, so the desk analyses it again and its view is fresh. Monday's morning routine re-rates the Agentic account's holdings whose view is a week old." },
@@ -181,6 +181,23 @@
   var tone = (n) => n === null || n === void 0 || !Number.isFinite(n) ? "" : n >= 0 ? "ok" : "danger";
   var ratingTone = (r) => r === "Buy" || r === "Overweight" ? "ok" : r === "Underweight" || r === "Sell" ? "danger" : r === "Hold" ? "" : "warn";
   var ratingMeaning = (r) => isTerm(r) && GLOSSARY[r].group === GLOSSARY.Buy.group ? means(r) : "";
+  var claimOf = (rating) => ratingTone(rating) === "ok" ? "beats" : ratingTone(rating) === "danger" ? "trails" : "";
+  var article = (word) => /^[AEIOU]/i.test(word) ? "An" : "A";
+  function resultOf(c, days) {
+    const alpha = `alpha ${c.alpha ?? "\u2014"}`, claim = claimOf(c.rating);
+    if (c.worked === null || !claim) {
+      return c.rating === "Hold" ? { tone: "", words: alpha, verdict: "a Hold claims no direction", why: `A Hold claims no direction, so it neither worked nor failed: its ${alpha} only says how the stock did against its market's index over the ${days} trading days after the call.` } : { tone: "", words: alpha, verdict: "", why: means("alpha") };
+    }
+    const how = `${article(c.rating)} ${c.rating} works when the stock ${claim} its market's index over the ${days} trading days after the call.`;
+    return c.worked ? { tone: "ok", words: `worked \xB7 ${alpha}`, verdict: "the call worked", why: `${how} It did (${alpha}): the call worked.` } : { tone: "danger", words: `did not work \xB7 ${alpha}`, verdict: "the call did not work", why: `${how} It did not (${alpha}): the call did not work.` };
+  }
+  function averageOf(rating, s) {
+    const shown = Math.round(s.meanAlpha * 1e3) / 10, by = `${Math.abs(shown).toFixed(1)}%`;
+    if (!s.direction) return { tone: "", why: `${article(rating)} ${rating} claims no direction: its average alpha only says how its stocks did against their index.` };
+    if (shown === 0) return { tone: "", why: `On average the stocks rated ${rating} ended level with their index.` };
+    const beat = shown > 0, good = shown > 0 === s.direction > 0;
+    return { tone: good ? "ta-up" : "ta-down", why: `On average the stocks rated ${rating} ${beat ? "beat" : "trailed"} their index by ${by}: on average these calls ${good ? "worked" : "did not work"}.` };
+  }
   var NOTES = {
     coinOnPaper: "Robinhood's agent doorway trades stocks and funds, so a coin never gets an order ticket.",
     noTicket: "No order ticket: Robinhood's agent doorway trades stocks and funds, and among crypto the desk follows only Bitcoin and Ether on paper.",
@@ -1319,7 +1336,15 @@
     }
     renderHero();
   }
-  var resultChip = (c) => c.pending ? `<span class="at-chip" title="${esc(`Not scored yet: ${S.desk?.desk.holdingDays ?? 5} trading days after the call, its alpha is worked out.`)}">not scored yet</span>` : `<span class="at-chip ${tone(parseFloat(c.alpha ?? ""))}" title="${esc(means("alpha"))}">alpha ${esc(c.alpha ?? "\u2014")}</span>`;
+  var holdDays = (c) => {
+    const m = /^(\d+)d$/.exec(c.holding ?? "");
+    return m ? Number(m[1]) : S.desk?.desk.holdingDays ?? 5;
+  };
+  var resultChip = (c) => {
+    if (c.pending) return `<span class="at-chip" title="${esc(`Not scored yet: ${S.desk?.desk.holdingDays ?? 5} trading days after the call, its alpha is worked out.`)}">not scored yet</span>`;
+    const r = resultOf(c, holdDays(c));
+    return `<span class="at-chip ${r.tone}" title="${esc(r.why)}">${esc(r.words)}</span>`;
+  };
   var readButton = (ticker, date, words = "Read") => `<button class="at-btn at-press" data-act="open-call" data-symbol="${esc(ticker)}" data-date="${esc(date)}"><svg class="g"><use href="#i-file"/></svg><span>${esc(words)}</span></button>`;
   var decideButton = (c) => c.ticket ? `<button class="at-btn at-press primary" data-act="decide" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}" title="${esc(means("ticket"))}"><span>Decide\u2026</span></button>` : noTicketChip(c.paper);
   function renderCall() {
@@ -1405,7 +1430,7 @@
       held = rows.length ? `<dl class="at-facts ruled at-box">${rows.join("")}</dl><p class="at-quiet">Valued at Robinhood's live price, read at ${esc(clock(A.snapshot.at))}.</p>` : `<p class="at-quiet">Not held in the accounts you show.</p>`;
     }
     const calls = d.calls.filter((c) => c.ticker === sym);
-    const list = calls.length ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>Date</th><th>Rating</th><th>Result</th><th></th></tr></thead><tbody>${calls.map((c) => `<tr class="ta-go" data-act="open-call" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}"><td>${esc(dayText(c.date))}</td><td>${ratingChip(c.rating)}</td><td>${c.pending ? '<span class="at-chip">not scored yet</span>' : `<span class="at-chip ${tone(parseFloat(c.alpha ?? ""))}">alpha ${esc(c.alpha ?? "\u2014")}</span>`}</td><td><span class="at-quiet">Read</span></td></tr>`).join("")}</tbody></table></div>` : `<p class="at-quiet">The desk has no call on ${esc(sym)} yet.</p>`;
+    const list = calls.length ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>Date</th><th>Rating</th><th>Result</th><th></th></tr></thead><tbody>${calls.map((c) => `<tr class="ta-go" data-act="open-call" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}"><td>${esc(dayText(c.date))}</td><td>${ratingChip(c.rating)}</td><td>${resultChip(c)}</td><td><span class="at-quiet">Read</span></td></tr>`).join("")}</tbody></table></div>` : `<p class="at-quiet">The desk has no call on ${esc(sym)} yet.</p>`;
     const latest = calls[0];
     const ag = A.snapshot?.views.find((v) => v.account.agentic);
     const mine = (ag?.orders?.orders ?? []).filter((o) => (o.symbol ?? "").toUpperCase() === sym);
@@ -1627,11 +1652,12 @@
     $("#scoreSub").textContent = `${r.resolved} scored \xB7 ${r.pending} waiting${r.unscored ? ` \xB7 ${r.unscored} unreadable` : ""}`;
     const names = [...RATINGS.filter((x) => r.byRating[x]), ...Object.keys(r.byRating).filter((x) => !RATINGS.includes(x))];
     const grid = names.length ? `<div class="ta-score"><span class="head">Rating</span><span class="head">Calls</span><span class="head">Called the direction</span><span class="head">Average ${term("alpha", "alpha")} vs the ${term("index", "index")}</span>${names.map((n) => {
-      const s = r.byRating[n];
-      return `${ratingChip(n)}<b>${s.count}</b><b>${s.hitRate === null ? "\u2014" : `${Math.round(s.hitRate * 100)}%`}</b><b>${pctOf(s.meanAlpha)}</b>`;
+      const s = r.byRating[n], avg = averageOf(n, s);
+      return `${ratingChip(n)}<b>${s.count}</b><b>${s.hitRate === null ? "\u2014" : `${Math.round(s.hitRate * 100)}%`}</b><b class="${avg.tone}" title="${esc(avg.why)}">${pctOf(s.meanAlpha)}</b>`;
     }).join("")}</div>` : '<p class="at-quiet">Nothing has been scored yet. A call is scored once its window has traded; run /settle in Madav to score the ones that are ready.</p>';
     const few = r.resolved > 0 && r.resolved < 30 ? " With so few scored calls these figures are noise, not a record." : "";
-    $("#score").innerHTML = `${grid}<p class="at-honest">${esc(d.record.benchmarkNote)}${esc(few)}</p>`;
+    const key2 = names.length ? " Green means the calls went the way their rating said, red that they went against it: a Buy or Overweight works when its stock beats the index, an Underweight or Sell when its stock trails it. A Hold claims no direction, so it stays plain." : "";
+    $("#score").innerHTML = `${grid}<p class="at-honest">${esc(d.record.benchmarkNote)}${esc(key2)}${esc(few)}</p>`;
   }
   var ROLE = {
     market: { icon: "i-candle", tone: "accent", who: "Market analyst" },
@@ -1680,7 +1706,8 @@
     const rating = meta?.rating ?? (labelled(c.decision, "Rating") || "\u2014");
     const target = labelled(c.decision, "Price Target"), horizon = labelled(c.decision, "Time Horizon");
     const clip = (s, n = 150) => s.length > n ? `${s.slice(0, n - 1).trimEnd()}\u2026` : s;
-    const facts = [["Price target", target], ["Time horizon", horizon], ["Scored", meta ? meta.pending ? `not yet: ${S.desk?.desk.holdingDays ?? 5} trading days after the call` : `alpha ${meta.alpha ?? "\u2014"} against the index` : ""]].filter(([, v]) => v).map(([k, v]) => `<div><dt>${esc(k)}</dt><dd title="${esc(v)}">${esc(clip(v))}</dd></div>`).join("");
+    const verdict = meta && !meta.pending ? resultOf(meta, holdDays(meta)).verdict : "";
+    const facts = [["Price target", target], ["Time horizon", horizon], ["Scored", meta ? meta.pending ? `not yet: ${S.desk?.desk.holdingDays ?? 5} trading days after the call` : `alpha ${meta.alpha ?? "\u2014"} against the index${verdict ? `: ${verdict}` : ""}` : ""]].filter(([, v]) => v).map(([k, v]) => `<div><dt>${esc(k)}</dt><dd title="${esc(v)}">${esc(clip(v))}</dd></div>`).join("");
     const shown = new Set(STAGES.flatMap((s) => s.keys)), extra = Object.keys(c.sections).filter((k) => k !== "decision" && !shown.has(k) && c.sections[k]?.length);
     const stages = STAGES.map((s) => ({ ...s, keys: s.keys.filter((k) => c.sections[k]?.length) })).filter((s) => s.keys.length);
     dlg.innerHTML = `<div class="ta-pophead"><div class="ta-pop-id"><h2>${esc(symbol)}</h2><span class="at-quiet">${esc(nameOf(symbol))} \xB7 the desk's call of ${esc(dayText(date))}</span></div><button class="icon-btn" data-act="close-dialog" aria-label="Close"><svg class="g"><use href="#i-x"/></svg></button></div>

@@ -38927,13 +38927,13 @@ function withWorkedRows(t, kind, freq) {
     const v = f(i);
     return v === null || !Number.isFinite(v) ? null : v;
   });
-  const ratio = (a, b, label, worked, abs = false) => {
+  const ratio = (a, b, label, worked2, abs = false) => {
     if (!a || !b) return null;
     const cells2 = each((i) => {
       const x = a.cells[i] ?? null, y = b.cells[i] ?? null;
-      return x === null || y === null || y <= 0 ? null : (abs ? Math.abs(x) : x) / y * (worked === "percent" ? 100 : 1);
+      return x === null || y === null || y <= 0 ? null : (abs ? Math.abs(x) : x) / y * (worked2 === "percent" ? 100 : 1);
     });
-    return cells2.some((c) => c !== null) ? { label, unit: "", cells: cells2, worked } : null;
+    return cells2.some((c) => c !== null) ? { label, unit: "", cells: cells2, worked: worked2 } : null;
   };
   const before = (i, lo, hi) => periods.findIndex((p, j) => j > i && p.kind === periods[i].kind && p.kind !== "to date" && (() => {
     const d = daysBetween(p.end, periods[i].end);
@@ -38995,10 +38995,10 @@ function renderTable(t, head2, note) {
   const main = rows.find((r) => !perShare(r.unit) && !r.worked)?.unit ?? "";
   const name = (r) => r.worked === "percent" || r.worked === "times" ? r.label : perShare(r.unit) ? `${r.label} (${r.unit.split("/")[0] || "currency"} per share)` : r.unit !== main ? `${r.label} (millions of ${r.unit || "an unstated currency"})` : r.label;
   const cell = (v, r) => v === null ? "\u2013" : r.worked === "percent" ? `${v.toFixed(1)}%` : r.worked === "times" ? v.toFixed(2) : perShare(r.unit) ? v.toFixed(2) : (v / 1e6).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-  const worked = rows.some((r) => r.worked) ? ' Rows marked "worked out" are worked out by the desk from the figures in this table, as named; quote them rather than working your own.' : "";
+  const worked2 = rows.some((r) => r.worked) ? ' Rows marked "worked out" are worked out by the desk from the figures in this table, as named; quote them rather than working your own.' : "";
   const out = [
     head2,
-    `Money in millions of ${main || "an unstated currency"} unless the row says otherwise; "\u2013" means no figure for that period. ${note}${worked}`,
+    `Money in millions of ${main || "an unstated currency"} unless the row says otherwise; "\u2013" means no figure for that period. ${note}${worked2}`,
     "",
     `Line | ${t.columns.join(" | ")}`,
     `---|${t.columns.map(() => "---:").join("|")}`,
@@ -39159,6 +39159,11 @@ function cells(symbols, dates) {
   return all;
 }
 var DIRECTION = { Buy: 1, Overweight: 1, Hold: 0, Underweight: -1, Sell: -1 };
+var directionOf = (rating) => DIRECTION[rating] ?? 0;
+function worked(rating, alpha) {
+  const dir = directionOf(rating);
+  return !dir || alpha === null || !Number.isFinite(alpha) ? null : alpha * dir > 0;
+}
 var alphaOf = (e) => {
   const t = (e.alpha ?? "").trim().replace(/%$/, "");
   const v = /^[+-]?\d+(\.\d+)?$/.test(t) ? Number(t) : NaN;
@@ -39168,8 +39173,8 @@ function summarize(entries) {
   const resolved2 = entries.filter((e) => !e.pending && e.rating !== REVIEW).map((e) => ({ e, a: alphaOf(e) })).filter((x) => x.a !== null);
   const byRating = {};
   for (const rating of new Set(resolved2.map((x) => x.e.rating))) {
-    const alphas = resolved2.filter((x) => x.e.rating === rating).map((x) => x.a), dir = DIRECTION[rating] ?? 0;
-    byRating[rating] = { count: alphas.length, hitRate: dir ? alphas.filter((a) => a * dir > 0).length / alphas.length : null, meanAlpha: alphas.reduce((s, a) => s + a, 0) / alphas.length };
+    const alphas = resolved2.filter((x) => x.e.rating === rating).map((x) => x.a), dir = directionOf(rating);
+    byRating[rating] = { count: alphas.length, direction: dir, hitRate: dir ? alphas.filter((a) => worked(rating, a)).length / alphas.length : null, meanAlpha: alphas.reduce((s, a) => s + a, 0) / alphas.length };
   }
   const unscored = entries.filter((e) => e.rating === REVIEW).length;
   const windows = [...new Set(resolved2.map((x) => x.e.holding).filter((h) => !!h && h.endsWith("d")).map((h) => `${h.slice(0, -1)} trading days`))].sort();
@@ -40522,9 +40527,9 @@ ${renderSummary(summarize(entries))}`;
       }
       try {
         const { symbols, news } = screenUniverse(readWatchlist(dir), marketOf(dir));
-        const worked = await screenToday(dir, symbols, news, day3);
-        if (on) queueTop(dir, worked, day3, false, /* @__PURE__ */ new Date(), readPrefs(dir).morningFrom);
-        look = { screen: readScreen(dir) ?? worked, on };
+        const worked2 = await screenToday(dir, symbols, news, day3);
+        if (on) queueTop(dir, worked2, day3, false, /* @__PURE__ */ new Date(), readPrefs(dir).morningFrom);
+        look = { screen: readScreen(dir) ?? worked2, on };
       } catch (e) {
         look = { screen: null, failed: e.message, on };
       }

@@ -32,6 +32,37 @@ export const ratingTone = (r: string): '' | 'ok' | 'danger' | 'warn' =>
  *  the desk does not use. */
 export const ratingMeaning = (r: string): string => (isTerm(r) && GLOSSARY[r].group === GLOSSARY.Buy.group ? means(r) : '');
 
+/** What a rating claims its stock does against the index, in words: "beats", "trails", or '' for no direction. */
+const claimOf = (rating: string): string => (ratingTone(rating) === 'ok' ? 'beats' : ratingTone(rating) === 'danger' ? 'trails' : '');
+const article = (word: string): string => (/^[AEIOU]/i.test(word) ? 'An' : 'A');
+
+/** A scored call's result as the page shows it: its colour, its words, why (when pointed at) and its verdict in a few
+ *  words. All follow whether the call went the way its rating said (`worked`, which the desk works out with the
+ *  scorecard's own rule), never the alpha's sign alone: an Underweight whose stock trailed its index worked, though its
+ *  alpha is below zero. A call that claims no direction (a Hold) is plain, and says so. `days` is its holding window. */
+export function resultOf(c: { rating: string; alpha: string | null; worked: boolean | null }, days: number): { tone: '' | 'ok' | 'danger'; words: string; why: string; verdict: string } {
+  const alpha = `alpha ${c.alpha ?? '—'}`, claim = claimOf(c.rating);
+  if (c.worked === null || !claim) {
+    return c.rating === 'Hold'
+      ? { tone: '', words: alpha, verdict: 'a Hold claims no direction', why: `A Hold claims no direction, so it neither worked nor failed: its ${alpha} only says how the stock did against its market's index over the ${days} trading days after the call.` }
+      : { tone: '', words: alpha, verdict: '', why: means('alpha') };
+  }
+  const how = `${article(c.rating)} ${c.rating} works when the stock ${claim} its market's index over the ${days} trading days after the call.`;
+  return c.worked
+    ? { tone: 'ok', words: `worked · ${alpha}`, verdict: 'the call worked', why: `${how} It did (${alpha}): the call worked.` }
+    : { tone: 'danger', words: `did not work · ${alpha}`, verdict: 'the call did not work', why: `${how} It did not (${alpha}): the call did not work.` };
+}
+
+/** One rating's average alpha on the scorecard: green when, on average, its calls went the way the rating said, red when
+ *  they went against it, plain for a Hold (no direction) or an average that rounds to zero; and why, in words. */
+export function averageOf(rating: string, s: { direction: number; meanAlpha: number }): { tone: '' | 'ta-up' | 'ta-down'; why: string } {
+  const shown = Math.round(s.meanAlpha * 1000) / 10, by = `${Math.abs(shown).toFixed(1)}%`;   // as the scorecard prints it, to 0.1 of a point
+  if (!s.direction) return { tone: '', why: `${article(rating)} ${rating} claims no direction: its average alpha only says how its stocks did against their index.` };
+  if (shown === 0) return { tone: '', why: `On average the stocks rated ${rating} ended level with their index.` };
+  const beat = shown > 0, good = (shown > 0) === (s.direction > 0);
+  return { tone: good ? 'ta-up' : 'ta-down', why: `On average the stocks rated ${rating} ${beat ? 'beat' : 'trailed'} their index by ${by}: on average these calls ${good ? 'worked' : 'did not work'}.` };
+}
+
 /** Why a mark is there, each in one plain line. The trading words themselves are in the glossary (glossary.ts). */
 export const NOTES = {
   coinOnPaper: "Robinhood's agent doorway trades stocks and funds, so a coin never gets an order ticket.",
