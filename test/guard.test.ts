@@ -33,6 +33,10 @@ test('the desk\'s own tools and Madav\'s tools pass', () => {
   for (const [s, t] of [['trading-desk', 'desk_check'], ['madav', 'publish_document'], ['madav', 'create_scheduled_task'], ['madav', 'browse_read'], ['madav', 'send_message']] as const) {
     assert.equal(guard.verdict(mcp(s, t)), null, `${s} ${t}`);
   }
+  // the fact checker's corrections pass like a report, words of buying and selling included, and are checked the same way
+  const fix = (now: string) => mcp('trading-desk', 'correct_report', { symbol: 'NVDA', section: 'fundamentals', corrections: [{ was: 'insiders made 14 sales', now }] });
+  assert.equal(guard.verdict(fix('insiders made 16 sales and no buys')), null);
+  assert.match(guard.verdict(fix(`the ${['refresh', 'token'].join('_')} is`)) ?? '', /private to them/);
 });
 
 test('an analysis of Robinhood\'s own stock can quote its address; no other tool may reach it, and the private folder is never named', () => {

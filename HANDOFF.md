@@ -47,7 +47,8 @@ notes about Madav (the app the owner runs the desk in). If you are on that compu
   the page.
 
 ## 3. What the project is
-A team of twelve agents (adapted from TradingAgents by Tauric Research; see [NOTICE](NOTICE)) analyses a stock, a fund
+A team of thirteen agents (adapted from TradingAgents by Tauric Research, whose twelve it keeps, with a fact checker
+added; see [NOTICE](NOTICE)) analyses a stock, a fund
 or a coin from free public data and records a rated call. A dashboard on the person's own computer shows the markets,
 the calls, the paper record and their Robinhood accounts. An order is placed only by the person's own Confirm there,
 through Robinhood's agent doorway, in its separate Agentic account, with trading switched on by them. The desk runs in
@@ -152,7 +153,7 @@ Each was the owner's, or agreed with them. Change one only on their word.
 - The desk's day is New York's (the market's own), wherever the computer is.
 
 **Agents and runs**
-- Twelve agents plus the lead `trading-desk`, written from `scripts/agents-src.mjs` and `scripts/team-src.mjs` by
+- Thirteen agents plus the lead `trading-desk`, written from `scripts/agents-src.mjs` and `scripts/team-src.mjs` by
   `npm run agents` (edit the source, never the files). Agents keep `SendMessage` in their files. No agent file sets
   `permissionMode`, and each agent's name is in one file only.
 - Analyses asked for on the dashboard wait on a list in `desk-data` and ring a doorbell; whatever listens runs them, one

@@ -29,7 +29,7 @@ beforeEach(() => { process.env.TRADING_AGENTS_TODAY = '2026-10-12'; clearCache()
 test('the desk tools are offered, and none of them can order', async () => {
   const { client } = await connect();
   const names = (await client.listTools()).tools.map((t) => t.name);
-  for (const n of ['plan_analysis', 'save_run_section', 'read_run', 'write_report', 'record_decision', 'list_settlements', 'record_outcome', 'set_holdings', 'clear_holdings']) assert.ok(names.includes(n), n);
+  for (const n of ['plan_analysis', 'save_run_section', 'correct_report', 'read_run', 'write_report', 'record_decision', 'list_settlements', 'record_outcome', 'set_holdings', 'clear_holdings']) assert.ok(names.includes(n), n);
   assert.deepEqual(names.filter(isOrderTool), []);
   await client.close();
 });
@@ -51,6 +51,27 @@ test('a whole analysis, as the agents will run it: plan, write, report, record, 
   assert.match(await call('read_run', { symbol: 'NVDA', analysis_date: '2026-09-01' }), /Written so far for NVDA on 2026-09-01: market \(1\)/);
   assert.match(await call('read_run', { symbol: 'NVDA', analysis_date: '2026-09-01', sections: ['market', 'news'] }), /## Market Analyst\nMarket report\n\n\(No News Analyst yet/);
   assert.match(await call('plan_analysis', { symbol: 'NVDA', analysis_date: '2026-09-01' }), /Steps \(resuming\): \[done\] market -> news/);
+
+  // the fact checker corrects a report word for word through the desk, and nothing else in it changes
+  const at = { symbol: 'NVDA', analysis_date: '2026-09-01' };
+  await call('save_run_section', { ...at, section: 'market', text: 'Close 110 on volume 1,000. Up 10% in a week, the first time since May: a breakout. Volume 1,000 again.' });
+  const fixed = await call('correct_report', { ...at, section: 'market', corrections: [
+    { was: 'Up 10% in a week', now: 'Up 10% in five sessions' },
+    { was: 'the first time since May', now: 'the first time in 63 sessions' },
+    { was: '1,000', now: '1,200' },
+    { was: 'Close 111', now: 'Close 110' },
+  ], flag_after: ['a breakout'] });
+  assert.match(fixed, /^The market report for NVDA on 2026-09-01:\n- corrected: "Up 10% in a week" now reads "Up 10% in five sessions"/);
+  assert.match(fixed, /- not applied: "1,000" is in the market report 2 times; give more of the words around the one to correct, or set every/);
+  assert.match(fixed, /- not applied: "Close 111" is not in the market report word for word/);
+  assert.match(fixed, /- flagged the conclusion ending "a breakout"/);
+  assert.match(await call('correct_report', { ...at, section: 'market', corrections: [{ was: '1,000', now: '1,200', every: true }] }), /corrected in 2 places: "1,000" now reads "1,200"/);
+  assert.equal((await call('read_run', { ...at, sections: ['market'] })).split('\n').slice(1).join('\n'),
+    'Close 110 on volume 1,200 [corrected: was "1,000"]. Up 10% in five sessions [corrected: was "Up 10% in a week"], the first time in 63 sessions [corrected: was "the first time since May"]: a breakout [the fact it rested on was corrected: see the fact check]. Volume 1,200 [corrected: was "1,000"] again.');
+  assert.match(await call('correct_report', { ...at, section: 'news', corrections: [{ was: 'a', now: 'b' }] }), /^INPUT_ERROR: this run has no news report to correct/);
+  await call('save_run_section', { ...at, section: 'bull', text: 'Bull turn' });
+  assert.match(await call('correct_report', { ...at, section: 'market', corrections: [{ was: 'Close 110', now: 'Close 109' }] }), /^INPUT_ERROR: the debate has begun/);
+  assert.match(await call('save_run_section', { ...at, section: 'market', text: 'Market report' }), /Saved market/);
 
   assert.match(await call('write_report', { symbol: 'NVDA', analysis_date: '2026-09-01' }), /^INPUT_ERROR: the portfolio manager's decision is not saved yet/);
   assert.match(await call('record_decision', { symbol: 'NVDA', analysis_date: '2026-09-01' }), /^INPUT_ERROR: the portfolio manager's decision is not saved yet/);

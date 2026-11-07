@@ -1,4 +1,4 @@
-// Writes .claude/agents/ from scripts/agents-src.mjs and the desk's skills: the twelve agents, read by a chat in this
+// Writes .claude/agents/ from scripts/agents-src.mjs and the desk's skills: the thirteen agents, read by a chat in this
 // folder and listed by Madav's Agent Studio, and the trading-desk team's file with its line-up beside it (team-src.mjs).
 // `npm run agents` writes; with --check it only compares, and a test runs that check.
 import fs from 'node:fs';

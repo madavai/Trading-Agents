@@ -37703,6 +37703,176 @@ function priceFactsText(sym2, day3, s) {
   return out.join("\n");
 }
 
+// src/data/workout.ts
+var FUNCTIONS = {
+  change: { args: [2, 2], run: ([a, b]) => (b / a - 1) * 100, says: "change(a, b) is the percent change from a to b" },
+  share: { args: [2, 2], run: ([a, b]) => a / b * 100, says: "share(a, b) is a as a percent of b" },
+  abs: { args: [1, 1], run: ([a]) => Math.abs(a), says: "abs(a) is a without its sign" },
+  sqrt: { args: [1, 1], run: ([a]) => Math.sqrt(a), says: "sqrt(a) is the square root" },
+  round: { args: [1, 2], run: ([a, d]) => {
+    const k = 10 ** (d ?? 0);
+    return Math.round(a * k) / k;
+  }, says: "round(a, d) rounds to d decimals" },
+  sum: { args: [1, 100], run: (xs) => xs.reduce((p, x) => p + x, 0), says: "sum(...) adds them" },
+  avg: { args: [1, 100], run: (xs) => xs.reduce((p, x) => p + x, 0) / xs.length, says: "avg(...) is their average" },
+  min: { args: [1, 100], run: (xs) => Math.min(...xs), says: "min(...) and max(...) are the smallest and largest" },
+  max: { args: [1, 100], run: (xs) => Math.max(...xs), says: "" }
+};
+var helper = (name) => Object.hasOwn(FUNCTIONS, name.toLowerCase()) ? FUNCTIONS[name.toLowerCase()] : void 0;
+var Refused = class extends Error {
+};
+function evaluate(expression) {
+  const src = expression.replace(/[−–]/g, "-").replace(/[×·]/g, "*").replace(/÷/g, "/");
+  let i = 0;
+  const space = () => {
+    while (i < src.length && /\s/.test(src[i])) i++;
+  };
+  const peek = () => {
+    space();
+    return src[i] ?? "";
+  };
+  const take = (c) => {
+    if (peek() === c) {
+      i++;
+      return true;
+    }
+    return false;
+  };
+  const number4 = () => {
+    space();
+    const m2 = /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?/i.exec(src.slice(i));
+    if (!m2) throw new Refused(src[i] === void 0 ? "it ends where a number should be" : `"${src.slice(i, i + 12)}" is not a number`);
+    i += m2[0].length;
+    return Number(m2[0]);
+  };
+  const primary = () => {
+    if (take("(")) {
+      const v2 = expr();
+      if (!take(")")) throw new Refused("a bracket is not closed");
+      return v2;
+    }
+    space();
+    const id = /^[a-z]+/i.exec(src.slice(i));
+    if (id) {
+      const f = helper(id[0]);
+      if (!f) throw new Refused(`"${id[0]}" is not something it knows: use numbers, + - * / ^, brackets, % and ${Object.keys(FUNCTIONS).join(", ")}`);
+      i += id[0].length;
+      if (!take("(")) throw new Refused(`${id[0]} needs its numbers in brackets`);
+      const xs = [expr()];
+      while (take(",")) xs.push(expr());
+      if (!take(")")) throw new Refused(`the brackets of ${id[0]} are not closed`);
+      if (xs.length < f.args[0] || xs.length > f.args[1]) throw new Refused(`${id[0]} takes ${f.args[0] === f.args[1] ? f.args[0] : `${f.args[0]} to ${f.args[1]}`} number${f.args[1] > 1 ? "s" : ""}, not ${xs.length} (write numbers without thousands commas: 1234567, not 1,234,567)`);
+      return f.run(xs);
+    }
+    return number4();
+  };
+  const postfix = () => {
+    let v2 = primary();
+    while (take("%")) v2 /= 100;
+    return v2;
+  };
+  const power = () => {
+    const b = postfix();
+    return take("^") ? b ** unary() : b;
+  };
+  const unary = () => take("-") ? -unary() : take("+") ? unary() : power();
+  const term = () => {
+    let v2 = unary();
+    for (; ; ) {
+      if (take("*")) v2 *= unary();
+      else if (take("/")) {
+        const d = unary();
+        if (d === 0) throw new Refused("it divides by zero");
+        v2 /= d;
+      } else return v2;
+    }
+  };
+  const expr = () => {
+    let v2 = term();
+    for (; ; ) {
+      if (take("+")) v2 += term();
+      else if (take("-")) v2 -= term();
+      else return v2;
+    }
+  };
+  const v = expr();
+  if (peek() === ",") throw new Refused("a comma outside a function's brackets: write numbers without thousands commas (1234567, not 1,234,567)");
+  if (peek()) throw new Refused(`"${src.slice(i, i + 12)}" was not expected there`);
+  if (!Number.isFinite(v)) throw new Refused("the answer is not a finite number");
+  return v;
+}
+function shown(v) {
+  const opts = Math.abs(v) >= 1 || v === 0 ? { maximumFractionDigits: 4 } : { maximumSignificantDigits: 4 };
+  const t = v.toLocaleString("en-US", opts);
+  return /^-0(\.0*)?$/.test(t) ? t.slice(1) : t;
+}
+var weeks = (days) => {
+  const w = Math.floor(Math.abs(days) / 7), r = Math.abs(days) % 7;
+  return w ? ` (${w} week${w > 1 ? "s" : ""}${r ? ` and ${r} day${r > 1 ? "s" : ""}` : ""})` : "";
+};
+var LONG = { Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday", Fri: "Friday", Sat: "Saturday", Sun: "Sunday" };
+function weekdaysBetween(from, to) {
+  let n2 = 0;
+  for (let d = addDays(from, 1); d <= to; d = addDays(d, 1)) if (!["Sat", "Sun"].includes(weekday(d))) n2++;
+  return n2;
+}
+async function dateAnswer(q, day3) {
+  const sym2 = q.symbol ? normalizeSymbol(q.symbol) : "";
+  if (q.date && !q.from && !q.to) {
+    const d = parseDate(q.date);
+    const line2 = `- ${d} is a ${LONG[weekday(d)]}.`;
+    if (!sym2) return line2;
+    if (d > day3) return `${line2} ${sym2}'s sessions after the analysis date, ${day3}, are not known to the desk.`;
+    const rows = (await daily(sym2, addDays(d, -10), d)).bars;
+    const last = rows.at(-1);
+    return `${line2} ${last?.date === d ? `${sym2} traded that day.` : `${sym2} did not trade that day${last ? `; its session on or before it: ${withWeekday(last.date)}` : ""}.`}`;
+  }
+  if (!q.from || !q.to) throw new Refused("give a date, or a from date and a to date");
+  let a = parseDate(q.from, "from date"), b = parseDate(q.to, "to date");
+  if (a > b) [a, b] = [b, a];
+  const days = daysBetween(a, b);
+  const parts = [`- From ${withWeekday(a)} to ${withWeekday(b)}: ${days} calendar day${days === 1 ? "" : "s"}${weeks(days)}; ${weekdaysBetween(a, b)} weekdays after the first date up to and including the second.`];
+  if (sym2) {
+    if (b > day3) parts.push(` ${sym2}'s sessions after the analysis date, ${day3}, are not known to the desk: counted to ${withWeekday(day3)}.`);
+    const end = b > day3 ? day3 : b, rows = (await daily(sym2, a, end)).bars;
+    const after = rows.filter((r) => r.date > a), traded = rows.length && rows[0].date === a;
+    parts.push(` ${sym2} traded on ${after.length} session${after.length === 1 ? "" : "s"} after ${a} up to and including ${end}${after.length ? ` (the first ${withWeekday(after[0].date)}, the last ${withWeekday(after.at(-1).date)})` : ""}; ${a} itself ${traded ? "was a session, so both included it is " + (after.length + 1) : "was not a session"}.`);
+  }
+  return parts.join("");
+}
+async function workOut(analysis2, sums = [], dates = []) {
+  const day3 = analysisDate(analysis2);
+  if (!sums.length && !dates.length) throw new Error("give at least one sum or one date question");
+  const out = [];
+  const used = /* @__PURE__ */ new Set();
+  if (sums.length) {
+    out.push("## Sums, worked out by the desk", "");
+    for (const s of sums) {
+      for (const m2 of s.expression.toLowerCase().matchAll(/[a-z]+(?=\s*\()/g)) used.add(m2[0]);
+      const label = s.label ? `${s.label.trim()}: ` : "";
+      try {
+        out.push(`- ${label}${s.expression.trim()} = ${shown(evaluate(s.expression))}`);
+      } catch (e) {
+        out.push(`- ${label}${s.expression.trim()}: cannot be worked out, ${e instanceof Refused ? e.message : e.message}.`);
+      }
+    }
+    const says = [...used].map((u) => helper(u)?.says).filter(Boolean);
+    if (says.length) out.push("", `${says.join("; ")}.`);
+    out.push("", "Quote a result with its sum, as written here, and round it only when you say so.");
+  }
+  if (dates.length) {
+    out.push(...out.length ? [""] : [], "## Dates, worked out by the desk", "");
+    for (const q of dates) {
+      try {
+        out.push(await dateAnswer(q, day3));
+      } catch (e) {
+        out.push(`- ${JSON.stringify(q)}: cannot be answered, ${e.message}.`);
+      }
+    }
+  }
+  return out.join("\n");
+}
+
 // src/data/news.ts
 var stamp = (epoch3) => new Date(epoch3 * 1e3).toISOString().slice(0, 16).replace("T", " ");
 async function search(q, count) {
@@ -37938,13 +38108,13 @@ async function predictionMarkets(topic, analysis2, limit = 6, now = /* @__PURE__
   const j = await getJson(`https://gamma-api.polymarket.com/public-search?q=${encodeURIComponent(topic)}&limit_per_type=20`);
   const open3 = (j.events ?? []).flatMap((e) => e.markets ?? []).filter((m2) => m2.question && !m2.closed && m2.active !== false && list(m2.outcomePrices).length && list(m2.outcomes).length && (!m2.endDate || Date.parse(m2.endDate) > now.getTime())).sort((a, b) => (b.volumeNum ?? 0) - (a.volumeNum ?? 0)).slice(0, Math.max(1, Math.min(10, limit)));
   const head2 = `## Polymarket: "${topic}"
-Live odds: the crowd's priced chance of each event (more traded volume, more reliable). A price is not a forecast to take as certain.
+Live odds: the crowd's priced chance of each event (more traded volume, more reliable). A price is not a forecast to take as certain. The date after each market is when it stops trading, not the date of the event it asks about: take an event's own date from the news or a filing.
 `;
   if (!open3.length) return `${head2}
 No open markets matched "${topic}". Polymarket covers mostly economic, political, geopolitical and crypto events; a single company may have none.`;
   return head2 + "\n" + open3.map((m2) => {
     const p = Number(list(m2.outcomePrices)[0]), wk = m2.oneWeekPriceChange;
-    return `- ${m2.question}: ${list(m2.outcomes)[0]} ${(p * 100).toFixed(0)}% \xB7 volume $${Math.round(m2.volumeNum ?? 0).toLocaleString("en-US")}${m2.endDate ? ` \xB7 resolves ${m2.endDate.slice(0, 10)}` : ""}${typeof wk === "number" ? ` \xB7 ${signed(wk * 100, 1)} points this week` : ""}`;
+    return `- ${m2.question}: ${list(m2.outcomes)[0]} ${(p * 100).toFixed(0)}% \xB7 volume $${Math.round(m2.volumeNum ?? 0).toLocaleString("en-US")}${m2.endDate ? ` \xB7 trading closes ${m2.endDate.slice(0, 10)}` : ""}${typeof wk === "number" ? ` \xB7 ${signed(wk * 100, 1)} points this week` : ""}`;
   }).join("\n");
 }
 
@@ -39154,13 +39324,13 @@ var journalIn = (root, ws) => new Journal(path10.join(ws.dir, "journal.md"), rea
 // src/desk/runs.ts
 import fs10 from "node:fs";
 import path11 from "node:path";
-var SECTIONS = ["market", "sentiment", "news", "fundamentals", "bull", "bear", "research_plan", "trader", "aggressive", "conservative", "neutral", "decision"];
+var SECTIONS = ["market", "sentiment", "news", "fundamentals", "fact_check", "bull", "bear", "research_plan", "trader", "aggressive", "conservative", "neutral", "decision"];
 var DEBATES = { investment_debate: ["bull", "bear"], risk_debate: ["aggressive", "conservative", "neutral"] };
 var TURNS = new Set(Object.values(DEBATES).flat());
 var MAX_CHARS = 6e4;
-var LABELS = { market: "Market Analyst", sentiment: "Sentiment Analyst", news: "News Analyst", fundamentals: "Fundamentals Analyst", bull: "Bull Researcher", bear: "Bear Researcher", research_plan: "Research Manager", trader: "Trader", aggressive: "Aggressive Analyst", conservative: "Conservative Analyst", neutral: "Neutral Analyst", decision: "Portfolio Manager" };
+var LABELS = { market: "Market Analyst", sentiment: "Sentiment Analyst", news: "News Analyst", fundamentals: "Fundamentals Analyst", fact_check: "Fact Checker", bull: "Bull Researcher", bear: "Bear Researcher", research_plan: "Research Manager", trader: "Trader", aggressive: "Aggressive Analyst", conservative: "Conservative Analyst", neutral: "Neutral Analyst", decision: "Portfolio Manager" };
 var PARTS = [
-  ["I. Analyst Team Reports", ["market", "sentiment", "news", "fundamentals"]],
+  ["I. Analyst Team Reports", ["market", "sentiment", "news", "fundamentals", "fact_check"]],
   ["II. Research Team Decision", ["bull", "bear", "research_plan"]],
   ["III. Trading Team Plan", ["trader"]],
   ["IV. Risk Management Team Decision", ["aggressive", "conservative", "neutral"]],
@@ -39202,6 +39372,41 @@ function saveSection(dir, ticker, date5, section, text4) {
     turns = r.log.filter((e) => e.section === section).length;
   });
   return turns;
+}
+var REPORTS = ["market", "sentiment", "news", "fundamentals"];
+var FLAG = "[the fact it rested on was corrected: see the fact check]";
+var times = (text4, words3) => words3 ? text4.split(words3).length - 1 : 0;
+function correctSection(dir, ticker, date5, section, corrections, flagAfter = []) {
+  if (!REPORTS.includes(section)) throw new Error(`only an analyst's report can be corrected (${REPORTS.join(", ")}), not ${section}`);
+  if (!corrections.length && !flagAfter.length) throw new Error("give at least one correction or one conclusion to flag");
+  const lines = [];
+  change(dir, ticker, date5, (r) => {
+    if (r.log.some((e) => e.section === "bull")) throw new Error("the debate has begun: the reports are already argued from, so they are no longer corrected");
+    const entry = r.log.find((e) => e.section === section);
+    if (!entry) throw new Error(`this run has no ${section} report to correct`);
+    let t = entry.text;
+    for (const c of corrections) {
+      const now = c.now.trim(), n2 = times(t, c.was);
+      if (!c.was.trim() || !now || now === c.was.trim()) lines.push(`- not applied: a correction needs the report's exact old words and different new ones (${JSON.stringify(c.was)})`);
+      else if (!n2) lines.push(`- not applied: "${c.was}" is not in the ${section} report word for word; copy the words exactly as it has them`);
+      else if (n2 > 1 && !c.every) lines.push(`- not applied: "${c.was}" is in the ${section} report ${n2} times; give more of the words around the one to correct, or set every to correct all ${n2}`);
+      else {
+        t = t.split(c.was).join(`${now} [corrected: was "${c.was}"]`);
+        lines.push(`- corrected${n2 > 1 ? ` in ${n2} places` : ""}: "${c.was}" now reads "${now}"`);
+      }
+    }
+    for (const f of flagAfter) {
+      const n2 = times(t, f);
+      if (n2 !== 1) lines.push(`- not flagged: "${f}" is in the ${section} report ${n2} times, not once; give the exact words that end the conclusion`);
+      else {
+        t = t.split(f).join(`${f} ${FLAG}`);
+        lines.push(`- flagged the conclusion ending "${f}"`);
+      }
+    }
+    if (t.length > MAX_CHARS) throw new Error(`the corrected report would be ${t.length} characters; the most one section holds is ${MAX_CHARS}`);
+    entry.text = t;
+  });
+  return lines;
 }
 function progress(dir, ticker, date5) {
   const out = {};
@@ -39435,6 +39640,7 @@ function kindOf(raw, symbol4) {
 }
 function stepsFor(analysts, debateRounds, riskRounds) {
   const steps = analysts.map((a) => ({ section: ANALYST_SECTION[a], turn: 1 }));
+  steps.push({ section: "fact_check", turn: 1 });
   for (let t = 1; t <= debateRounds; t++) steps.push({ section: "bull", turn: t }, { section: "bear", turn: t });
   steps.push({ section: "research_plan", turn: 1 }, { section: "trader", turn: 1 });
   for (let t = 1; t <= riskRounds; t++) steps.push({ section: "aggressive", turn: t }, { section: "conservative", turn: t }, { section: "neutral", turn: t });
@@ -39480,7 +39686,12 @@ function buildPlan(root, req, ws = workspaceOf(root)) {
   }
   const benchmark = resolveBenchmark(symbol4, s.scoring);
   const plan = { symbol: symbol4, analysisDate: day3, kind, analysts, debateRounds, riskRounds, language, managerModel: s.analysis.managerModel, benchmark, holdingDays: s.scoring.holdingPeriodDays, steps: [], notes };
-  plan.steps = stepsFor(analysts, debateRounds, riskRounds).map((st) => ({ ...st, done: (done[st.section] ?? 0) >= st.turn }));
+  let steps = stepsFor(analysts, debateRounds, riskRounds);
+  if (resumed && !done.fact_check && (done.bull ?? 0) > 0) {
+    steps = steps.filter((st) => st.section !== "fact_check");
+    notes.push("Its debate began before the desk had a fact checker, so its reports go on unchecked.");
+  }
+  plan.steps = steps.map((st) => ({ ...st, done: (done[st.section] ?? 0) >= st.turn }));
   if (!resumed) startRun(dir, symbol4, day3, plan);
   const lessons = journalOf(root, ws).pastContext(symbol4, isHistorical(day3) ? { asOf: day3 } : {});
   return { plan, holdings: renderHoldings(readHoldings(deskDataDir(root)), symbol4), lessons, resumed };
@@ -39683,8 +39894,8 @@ function signalsOf(bars, newsToday = null) {
   if (movePct !== null && Math.abs(movePct) >= MOVE_PCT) signals.push({ kind: "move", words: `${movePct >= 0 ? "rose" : "fell"} ${one(Math.abs(movePct))}%` });
   const usual = bars.slice(Math.max(0, n2 - 1 - USUAL_DAYS), n2 - 1).map((b) => b.volume).filter((v) => v > 0);
   if (usual.length >= USUAL_DAYS / 2 && last.volume > 0) {
-    const times = last.volume / (usual.reduce((a, v) => a + v, 0) / usual.length);
-    if (times >= VOLUME_TIMES) signals.push({ kind: "volume", words: `${one(times)} times its usual volume` });
+    const times2 = last.volume / (usual.reduce((a, v) => a + v, 0) / usual.length);
+    if (times2 >= VOLUME_TIMES) signals.push({ kind: "volume", words: `${one(times2)} times its usual volume` });
   }
   const yearAgo = addDays(last.date, -365), year = bars.slice(0, n2 - 1).filter((b) => b.date >= yearAgo);
   if (bars[0] && bars[0].date <= addDays(last.date, -350) && year.length) {
@@ -40148,6 +40359,25 @@ function registerDeskTools(server, root) {
     const d = analysisDate(a.analysis_date), turns = saveSection(ws().dir, a.symbol, d, a.section, a.text);
     return `Saved ${a.section} for ${safeSymbol(a.symbol)} on ${d} (${turns > 1 ? `turn ${turns}` : "one text"}).`;
   }));
+  server.registerTool("correct_report", {
+    title: "Correct an analyst's report",
+    description: `The fact checker's corrections to an analyst's report (market, sentiment, news or fundamentals), made by the desk word for word before the debate begins. Each correction gives the report's exact old words and the right ones: the desk replaces them where they stand and keeps the old words beside them as [corrected: was "..."]. flag_after names the exact words that end a conclusion resting on a corrected fact; the desk adds a note after them. Nothing else in the report changes, so never save a corrected report yourself. Words found more than once need more of the words around them, or every set to true to correct them all. It answers line by line what was done and what was not, and why.`,
+    inputSchema: {
+      symbol: symbol2,
+      analysis_date: day2,
+      section: external_exports.enum(["market", "sentiment", "news", "fundamentals"]),
+      corrections: external_exports.array(external_exports.object({
+        was: external_exports.string().min(1).max(2e3).describe("The report's words, exactly as it has them"),
+        now: external_exports.string().min(1).max(2e3).describe("The right words, from a tool result"),
+        every: external_exports.boolean().optional().describe("Correct every place these words appear")
+      })).max(60),
+      flag_after: external_exports.array(external_exports.string().min(1).max(500)).max(20).optional().describe("The exact words ending each conclusion that rested on a corrected fact")
+    },
+    annotations: write
+  }, async (a) => act(() => {
+    const d = analysisDate(a.analysis_date), lines = correctSection(ws().dir, a.symbol, d, a.section, a.corrections, a.flag_after);
+    return [`The ${a.section} report for ${safeSymbol(a.symbol)} on ${d}:`, ...lines].join("\n");
+  }));
   server.registerTool("read_run", {
     title: "Read a run",
     description: `Read what the team has written so far for a stock and day. Without sections it lists which sections exist and how many turns each holds. With sections it returns their text; ${DEBATES2.join(" and ")} give a whole debate in the order spoken. A section not written yet is said to be missing, never blank.`,
@@ -40407,7 +40637,7 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root) {
   }, async () => text3(await deskCheck(root, fetchImpl2, source)));
   server.registerTool("reset_team", {
     title: "Reset the team",
-    description: "Put the desk's twelve agents, the trading-desk team's file and its line-up back exactly as the project ships them: each file is written again, even one that already matches, which also brings Madav back to the project's version of the team in place of changes made in its Agent Studio. Only after the person asked for it and confirmed it in this conversation. It writes only those files in this folder; the model, permissions and effort the person chose in Madav stay theirs.",
+    description: "Put the desk's thirteen agents, the trading-desk team's file and its line-up back exactly as the project ships them: each file is written again, even one that already matches, which also brings Madav back to the project's version of the team in place of changes made in its Agent Studio. Only after the person asked for it and confirmed it in this conversation. It writes only those files in this folder; the model, permissions and effort the person chose in Madav stay theirs.",
     inputSchema: { confirmed: external_exports.literal(true).describe("true: the person confirmed this reset in this conversation") },
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false }
   }, async () => {
@@ -40467,6 +40697,24 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root) {
     inputSchema: { symbol: symbol3, analysis_date: analysis },
     annotations: READ
   }, async (a) => answer(`price facts of ${a.symbol}`, () => priceFacts(a.symbol, a.analysis_date)));
+  server.registerTool("work_out", {
+    title: "Work it out",
+    description: "The desk's calculator, for every figure no tool prints: a difference, a percentage, a ratio, a sum or an average, many in one call, each answered with its sum; and the days between dates (calendar days, weekdays and, for a symbol, the sessions it traded), or the weekday of a date. Use it instead of working anything out in your head, and quote the sum it gives.",
+    inputSchema: {
+      analysis_date: analysis,
+      sums: external_exports.array(external_exports.object({
+        label: external_exports.string().max(120).optional().describe('What the figure is, e.g. "fall on the day"'),
+        expression: external_exports.string().min(1).max(400).describe('Numbers without thousands commas, + - * / ^, brackets, % after a number, and change(a, b) (percent change from a to b), share(a, b) (a as a percent of b), abs, sqrt, round(a, d), sum, avg, min, max. E.g. "change(221.97, 212.21)" or "(96221 - 81615) / 81615 * 100"')
+      })).max(40).optional(),
+      dates: external_exports.array(external_exports.object({
+        date: external_exports.string().optional().describe("YYYY-MM-DD: its weekday, and with a symbol whether it traded that day"),
+        from: external_exports.string().optional().describe("YYYY-MM-DD, with to: the days between them"),
+        to: external_exports.string().optional(),
+        symbol: external_exports.string().max(20).optional().describe("Also count the sessions this symbol traded")
+      })).max(20).optional()
+    },
+    annotations: READ
+  }, async (a) => answer("the sums", () => workOut(a.analysis_date, a.sums, a.dates)));
   const days = external_exports.number().int().min(1).max(30).optional().describe("Calendar days before the analysis date; " + a0.newsLookbackDays + " when left out");
   server.registerTool("get_company_news", {
     title: "Company news",

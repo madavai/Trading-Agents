@@ -39,6 +39,8 @@ function kindOf(raw: string, symbol: string): Plan['kind'] {
  *  the three risk voices in turn, the portfolio manager. */
 export function stepsFor(analysts: Analyst[], debateRounds: number, riskRounds: number): Array<Omit<Step, 'done'>> {
   const steps: Array<Omit<Step, 'done'>> = analysts.map((a) => ({ section: ANALYST_SECTION[a], turn: 1 }));
+  // The fact checker corrects the analysts' reports before anyone argues from them.
+  steps.push({ section: 'fact_check', turn: 1 });
   for (let t = 1; t <= debateRounds; t++) steps.push({ section: 'bull', turn: t }, { section: 'bear', turn: t });
   steps.push({ section: 'research_plan', turn: 1 }, { section: 'trader', turn: 1 });
   for (let t = 1; t <= riskRounds; t++) steps.push({ section: 'aggressive', turn: t }, { section: 'conservative', turn: t }, { section: 'neutral', turn: t });
@@ -89,7 +91,13 @@ export function buildPlan(root: string, req: PlanRequest, ws: Workspace = worksp
 
   const benchmark = resolveBenchmark(symbol, s.scoring);
   const plan: Plan = { symbol, analysisDate: day, kind, analysts, debateRounds, riskRounds, language, managerModel: s.analysis.managerModel, benchmark, holdingDays: s.scoring.holdingPeriodDays, steps: [], notes };
-  plan.steps = stepsFor(analysts, debateRounds, riskRounds).map((st) => ({ ...st, done: (done[st.section] ?? 0) >= st.turn }));
+  let steps = stepsFor(analysts, debateRounds, riskRounds);
+  // A run whose debate began before the desk had its fact checker goes on without one: its reports are already argued from.
+  if (resumed && !done.fact_check && (done.bull ?? 0) > 0) {
+    steps = steps.filter((st) => st.section !== 'fact_check');
+    notes.push('Its debate began before the desk had a fact checker, so its reports go on unchecked.');
+  }
+  plan.steps = steps.map((st) => ({ ...st, done: (done[st.section] ?? 0) >= st.turn }));
   if (!resumed) startRun(dir, symbol, day, plan);
   const lessons = journalOf(root, ws).pastContext(symbol, isHistorical(day) ? { asOf: day } : {});
   return { plan, holdings: renderHoldings(readHoldings(deskDataDir(root)), symbol), lessons, resumed };

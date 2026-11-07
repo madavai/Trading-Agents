@@ -18,12 +18,12 @@ const header = (f: string) => {
 };
 const toolsOf = (f: string) => header(f).tools!.replace(/Agent\(([^)]*)\)/, 'Agent').split(',').map((s) => s.trim());
 
-test('a clone carries the desk for Agent Studio: the twelve agents and the trading-desk team with its line-up beside it, all from one source', () => {
+test('a clone carries the desk for Agent Studio: the thirteen agents and the trading-desk team with its line-up beside it, all from one source', () => {
   const r = spawnSync(process.execPath, ['scripts/agents.mjs', '--check'], { encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);
   assert.equal(fs.existsSync('.madav'), false, 'Agent Studio reads .claude/agents; there is no second copy to drift');
   const members = fs.readdirSync(AGENTS).filter((f) => f.endsWith('.md') && f !== 'trading-desk.md').map((f) => f.replace(/\.md$/, '')).sort();
-  assert.equal(members.length, 12);
+  assert.equal(members.length, 13);
   // the line-up, in the shape Madav's Agent Studio reads a team: members once each, the lead deciding the order
   const lineUp = JSON.parse(fs.readFileSync(path.join(AGENTS, 'trading-desk.team.json'), 'utf8')) as { members: string[]; steps: boolean; together: string[]; gates: string[]; talk: boolean };
   assert.deepEqual([...lineUp.members].sort(), members);

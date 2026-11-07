@@ -50,7 +50,7 @@ export const shortDay = (iso: string): string => { const m = /^\d{4}-(\d{2})-(\d
 export const clock = (iso: string): string => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); };
 
 export const SECTION_NAMES: Record<string, string> = {
-  market: 'Market report', sentiment: 'Sentiment report', news: 'News report', fundamentals: 'Fundamentals report',
+  market: 'Market report', sentiment: 'Sentiment report', news: 'News report', fundamentals: 'Fundamentals report', fact_check: 'Fact check',
   bull: 'Bull case', bear: 'Bear case', research_plan: 'Research plan', trader: "Trader's proposal",
   aggressive: 'Aggressive risk voice', conservative: 'Conservative risk voice', neutral: 'Neutral risk voice', decision: "Portfolio manager's decision",
 };

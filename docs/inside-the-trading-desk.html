@@ -254,6 +254,7 @@ p { text-wrap: pretty; }
 .agents.n2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .agents.n3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .agents.n1 { grid-template-columns: minmax(0, 1fr); }
+.agents .agent.wide { grid-column: 1 / -1; }
 .agent { padding: 16px; display: flex; flex-direction: column; gap: 8px; }
 .agent-h { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .agent-name { font-family: var(--font-title); font-weight: 500; font-size: 15px; line-height: 1.2; }
@@ -586,10 +587,10 @@ p { text-wrap: pretty; }
         </div>
       </div>
       <h1>Inside the Trading <em>Desk</em></h1>
-      <p class="lede">Trading Agents is a desk of <b>twelve AI agents</b> that studies a stock the way a trading firm would. This page shows how it works, end to end: the data it reads, who does what, where everything is kept, and how <b>your dashboard</b> and <b>Robinhood</b> fit in.</p>
+      <p class="lede">Trading Agents is a desk of <b>thirteen AI agents</b> that studies a stock the way a trading firm would. This page shows how it works, end to end: the data it reads, who does what, where everything is kept, and how <b>your dashboard</b> and <b>Robinhood</b> fit in.</p>
     </div>
     <ol class="joined pillars">
-      <li class="pillar edge c-desk"><span class="icbox"><svg class="ic"><use href="#i-compass"/></svg></span><b>Twelve agents research</b><p>They study a stock from free public data, debate it, and propose a rated call.</p></li>
+      <li class="pillar edge c-desk"><span class="icbox"><svg class="ic"><use href="#i-compass"/></svg></span><b>Thirteen agents research</b><p>They study a stock from free public data, debate it, and propose a rated call.</p></li>
       <li class="pillar edge c-you"><span class="icbox"><svg class="ic"><use href="#i-screen"/></svg></span><b>You see it beside your accounts</b><p>The call, its reasoning and your Robinhood accounts, on your own dashboard.</p></li>
       <li class="pillar edge c-rh"><span class="icbox"><svg class="ic"><use href="#i-check"/></svg></span><b>Only your Confirm trades</b><p>One check by Robinhood, one Confirm by you. The agents never trade.</p></li>
     </ol>
@@ -622,8 +623,8 @@ p { text-wrap: pretty; }
         </div>
         <div class="link c-src"><span class="lbl">read</span><span class="wire"><span class="pulse"></span></span></div>
         <div class="lane c-desk">
-          <div class="lane-h"><span class="icbox"><svg class="ic"><use href="#i-compass"/></svg></span><div><p class="lane-name">The desk</p><p class="lane-sub">Twelve agents and their lead</p></div></div>
-          <ul><li>Four analysts</li><li>Bull and bear</li><li>Research manager</li><li>Trader</li><li>Three risk voices</li><li>Portfolio manager</li></ul>
+          <div class="lane-h"><span class="icbox"><svg class="ic"><use href="#i-compass"/></svg></span><div><p class="lane-name">The desk</p><p class="lane-sub">Thirteen agents and their lead</p></div></div>
+          <ul><li>Four analysts</li><li>Fact checker</li><li>Bull and bear</li><li>Research manager</li><li>Trader</li><li>Three risk voices</li><li>Portfolio manager</li></ul>
         </div>
         <div class="link c-desk"><span class="lbl">save</span><span class="wire"><span class="pulse" style="--d:.5s"></span></span></div>
         <div class="lane c-store">
@@ -713,7 +714,7 @@ p { text-wrap: pretty; }
   <!-- 3 -->
   <section class="chapter" id="agents">
     <div class="ch-head">
-      <div class="ch-title"><p class="kicker">The role of each agent, and who does what</p><h2>Twelve agents in five stations</h2></div>
+      <div class="ch-title"><p class="kicker">The role of each agent, and who does what</p><h2>Thirteen agents in five stations</h2></div>
       <p>The desk is laid out like a trading firm. Each station hands its work to the next, and each agent saves its part where the others can read it. The four analysts, who read at the same time, tell each other what to weigh (at most two short messages each, noted in their reports), and anyone stuck asks the lead instead of guessing. A lead runs the line.</p>
     </div>
     <article class="at-box lead c-desk">
@@ -727,8 +728,8 @@ p { text-wrap: pretty; }
       <div class="station">
         <div class="st-words">
           <div class="st-top"><span class="st-num">1</span><p class="st-name">The analysts</p></div>
-          <p class="st-makes">Gather the facts, all four at once. Makes <b>four reports</b>.</p>
-          <p class="why"><b>Why it matters.</b> Everything after this argues from these reports. Every exact figure comes from the data, never from memory, and every run, record, rank or count of days is worked out by the desk, never counted by eye.</p>
+          <p class="st-makes">Gather the facts, all four at once, then a fact checker checks them. Makes <b>four checked reports</b>.</p>
+          <p class="why"><b>Why it matters.</b> Everything after this argues from these reports. Every exact figure comes from the data, never from memory, and every run, record, rank or count of days, and every sum, is worked out by the desk, never in an agent's head. What still slips through, the fact checker corrects before anyone argues from it.</p>
         </div>
         <div class="joined agents n2">
           <article class="agent edge c-desk">
@@ -750,6 +751,11 @@ p { text-wrap: pretty; }
             <div class="agent-h"><span class="icbox"><svg class="ic"><use href="#i-ledger"/></svg></span><div><p class="agent-name">Fundamentals analyst</p><p class="agent-id">fundamentals-analyst</p></div></div>
             <p class="agent-role">Checks the business itself: its accounts as filed, its ratios, and who inside the company is buying or selling; for a fund, what it holds, as it reports it to the SEC. Not used for a coin.</p>
             <dl><dt>Reads</dt><dd>SEC filings: accounts, valuation and insider trades; for a fund, its reports of what it holds</dd><dt>Writes</dt><dd>The fundamentals report</dd></dl>
+          </article>
+          <article class="agent edge c-desk wide">
+            <div class="agent-h"><span class="icbox"><svg class="ic"><use href="#i-check"/></svg></span><div><p class="agent-name">Fact checker</p><p class="agent-id">fact-checker</p></div></div>
+            <p class="agent-role">Once the four have saved, checks every claim in their reports that the desk's tools can settle (a price, a date, a sum, a count, a quote) against those tools, and corrects a wrong one in place, marking the old words, before the debate starts.</p>
+            <dl><dt>Reads</dt><dd>The four reports, and the same tools the analysts used</dd><dt>Writes</dt><dd>The corrections, and the fact check: every claim it changed and why</dd></dl>
           </article>
         </div>
       </div>
@@ -872,14 +878,14 @@ p { text-wrap: pretty; }
             <p class="why"><b>Why it matters.</b> Every agent works from the same brief, so a run can stop and resume where it left off.</p>
           </div></li>
           <li class="step c-src"><span class="badge">4</span><div class="step-body">
-            <div class="step-h"><p class="step-title">Four analysts gather the facts</p><span class="at-chip c-desk"><i></i>Analysts</span><span class="at-chip c-src"><i></i>Free sources</span></div>
+            <div class="step-h"><p class="step-title">Four analysts gather the facts, and a checker checks them</p><span class="at-chip c-desk"><i></i>Analysts</span><span class="at-chip c-desk"><i></i>Fact checker</span><span class="at-chip c-src"><i></i>Free sources</span></div>
             <div class="joined para">
               <div class="mini"><p class="mini-h"><svg class="ic sm"><use href="#i-chart"/></svg>Market</p><p class="quiet">Prices, indicators</p></div>
               <div class="mini"><p class="mini-h"><svg class="ic sm"><use href="#i-chat"/></svg>Sentiment</p><p class="quiet">Headlines, posts</p></div>
               <div class="mini"><p class="mini-h"><svg class="ic sm"><use href="#i-news"/></svg>News</p><p class="quiet">News, economy, odds</p></div>
               <div class="mini"><p class="mini-h"><svg class="ic sm"><use href="#i-ledger"/></svg>Fundamentals</p><p class="quiet">Accounts, or a fund's holdings</p></div>
             </div>
-            <p class="why"><b>Why it matters.</b> All four run at the same time. Their reports are the evidence the rest of the desk argues from.</p>
+            <p class="why"><b>Why it matters.</b> All four run at the same time. Then the fact checker checks every claim the tools can settle and corrects the reports in place. Their reports are the evidence the rest of the desk argues from.</p>
           </div></li>
           <li class="step c-desk"><span class="badge">5</span><div class="step-body">
             <div class="step-h"><p class="step-title">The research debate</p><span class="at-chip c-bull"><i></i>Bull</span><span class="at-chip c-bear"><i></i>Bear</span><span class="at-chip c-desk"><i></i>Research manager</span></div>
@@ -1001,8 +1007,8 @@ p { text-wrap: pretty; }
         <article class="drawer edge c-desk">
           <div class="drawer-h"><span class="icbox lg"><svg class="ic lg"><use href="#i-grid"/></svg></span><div><p class="drawer-name">Madav / Claude</p><p class="drawer-where">Madav's Agent Studio and scheduler, or Claude in this project.</p></div></div>
           <ul>
-            <li><b>The agents</b><span>The twelve agents and the lead, read by Madav / Claude from the project's agents folder.</span></li>
-            <li><b>The team</b><span>Its line-up, shipped beside the lead for Madav's Teams tab; if you change it there, yours wins. In Claude, the lead calls the same twelve agents.</span></li>
+            <li><b>The agents</b><span>The thirteen agents and the lead, read by Madav / Claude from the project's agents folder.</span></li>
+            <li><b>The team</b><span>Its line-up, shipped beside the lead for Madav's Teams tab; if you change it there, yours wins. In Claude, the lead calls the same thirteen agents.</span></li>
             <li><b>Reset the team</b><span>"Reset the team" writes the agents' files again as shipped, and Madav goes back to them too, undoing changes made in Agent Studio; your model and permissions stay.</span></li>
             <li><b>Routines</b><span>The project ships three to Madav, each off until you switch it on: run when the dashboard asks, the morning routine (8:00 on weekdays) and the evening wrap-up (17:00). An update to the desk pauses them until you switch them on again. In Claude, you start them with /routine.</span></li>
           </ul>
@@ -1030,7 +1036,7 @@ p { text-wrap: pretty; }
     <div class="doors">
       <div class="at-box d-agents c-desk">
         <p class="d-title"><span class="icbox"><svg class="ic"><use href="#i-compass"/></svg></span>The agents</p>
-        <p>Twelve agents and their lead. They read the holdings the dashboard shares, and nothing more.</p>
+        <p>Thirteen agents and their lead. They read the holdings the dashboard shares, and nothing more.</p>
         <ul class="refused">
           <li><svg class="ic sm"><use href="#i-block"/></svg>No broker or order tool</li>
           <li><svg class="ic sm"><use href="#i-block"/></svg>No Robinhood site</li>

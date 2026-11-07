@@ -220,7 +220,8 @@ const POLY = { events: [{ markets: [
 test('odds: open markets only, by volume; withheld for a past day', async () => {
   configure({ fetch: route([[/polymarket/, () => json(POLY)]]) });
   const t = await predictionMarkets('Fed rate cut', '2026-10-12', 6, new Date('2026-10-12T12:00:00Z'));
-  assert.match(t, /Fed cuts in December\?: Yes 62% · volume \$2,500,000 · resolves 2026-12-17 · \+4\.0 points this week/);
+  assert.match(t, /Fed cuts in December\?: Yes 62% · volume \$2,500,000 · trading closes 2026-12-17 · \+4\.0 points this week/);
+  assert.match(t, /The date after each market is when it stops trading, not the date of the event it asks about/);
   assert.doesNotMatch(t, /September/);
   assert.match(await predictionMarkets('Fed rate cut', '2026-10-01'), /withheld for 2026-10-01/);
 });

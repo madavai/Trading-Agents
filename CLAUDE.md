@@ -13,7 +13,7 @@ In a chat here:
 - `/desk-check`: checks this computer (Node, the desk's tools, the free data sources, whether the desk's agent files are
   as the project ships them, and on their yes puts them back with `reset_team`) and, on their yes, tests the
   Robinhood sign-in read-only.
-- `/analyse TICKER [date] [shallow|medium|deep]`: the desk's twelve agents analyse a stock and record their call in the
+- `/analyse TICKER [date] [shallow|medium|deep]`: the desk's thirteen agents analyse a stock and record their call in the
   journal. It proposes only; it never places an order.
 - `/settle`: scores past calls whose holding window has finished against their market index and writes the lessons.
 - `/backtest TICKERS START END`: runs the team over past dates in a journal of its own and scores the calls by rating.

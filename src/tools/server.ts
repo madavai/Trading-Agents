@@ -10,6 +10,7 @@ import { configure, failureText } from '../data/http.js';
 import { INDICATOR_NAMES } from '../data/indicators.js';
 import { indicatorWindow, instrument, priceHistory, verifiedSnapshot } from '../data/market.js';
 import { priceFacts } from '../data/facts.js';
+import { workOut } from '../data/workout.js';
 import { companyNews, worldNews } from '../data/news.js';
 import { socialPosts } from '../data/social.js';
 import { economicSeries, SERIES } from '../data/macro.js';
@@ -49,7 +50,7 @@ export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetc
 
   server.registerTool('reset_team', {
     title: 'Reset the team',
-    description: 'Put the desk\'s twelve agents, the trading-desk team\'s file and its line-up back exactly as the project ships them: each file is written again, even one that already matches, which also brings Madav back to the project\'s version of the team in place of changes made in its Agent Studio. Only after the person asked for it and confirmed it in this conversation. It writes only those files in this folder; the model, permissions and effort the person chose in Madav stay theirs.',
+    description: 'Put the desk\'s thirteen agents, the trading-desk team\'s file and its line-up back exactly as the project ships them: each file is written again, even one that already matches, which also brings Madav back to the project\'s version of the team in place of changes made in its Agent Studio. Only after the person asked for it and confirmed it in this conversation. It writes only those files in this folder; the model, permissions and effort the person chose in Madav stay theirs.',
     inputSchema: { confirmed: z.literal(true).describe('true: the person confirmed this reset in this conversation') },
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
   }, async () => {
@@ -113,6 +114,25 @@ export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetc
     inputSchema: { symbol, analysis_date: analysis },
     annotations: READ,
   }, async (a) => answer(`price facts of ${a.symbol}`, () => priceFacts(a.symbol, a.analysis_date)));
+
+  server.registerTool('work_out', {
+    title: 'Work it out',
+    description: 'The desk\'s calculator, for every figure no tool prints: a difference, a percentage, a ratio, a sum or an average, many in one call, each answered with its sum; and the days between dates (calendar days, weekdays and, for a symbol, the sessions it traded), or the weekday of a date. Use it instead of working anything out in your head, and quote the sum it gives.',
+    inputSchema: {
+      analysis_date: analysis,
+      sums: z.array(z.object({
+        label: z.string().max(120).optional().describe('What the figure is, e.g. "fall on the day"'),
+        expression: z.string().min(1).max(400).describe('Numbers without thousands commas, + - * / ^, brackets, % after a number, and change(a, b) (percent change from a to b), share(a, b) (a as a percent of b), abs, sqrt, round(a, d), sum, avg, min, max. E.g. "change(221.97, 212.21)" or "(96221 - 81615) / 81615 * 100"'),
+      })).max(40).optional(),
+      dates: z.array(z.object({
+        date: z.string().optional().describe('YYYY-MM-DD: its weekday, and with a symbol whether it traded that day'),
+        from: z.string().optional().describe('YYYY-MM-DD, with to: the days between them'),
+        to: z.string().optional(),
+        symbol: z.string().max(20).optional().describe('Also count the sessions this symbol traded'),
+      })).max(20).optional(),
+    },
+    annotations: READ,
+  }, async (a) => answer('the sums', () => workOut(a.analysis_date, a.sums, a.dates)));
 
   const days = z.number().int().min(1).max(30).optional().describe('Calendar days before the analysis date; ' + a0.newsLookbackDays + ' when left out');
 
