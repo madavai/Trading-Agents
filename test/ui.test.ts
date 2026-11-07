@@ -109,6 +109,7 @@ test('the page names the day of a move or a time that is not today, and never ca
   assert.match(page, /marketOf\(q\.symbol\)\?\.unit === '%' \? points\(q\.change\)/, "a yield's move is in points");
   assert.match(page, /l\.lastRun\.startOnly \? 'started ' : ''/, 'a run whose end Madav did not give says when it started');
   assert.match(page, /l\.lastRun\.result\.replace\(\/\[\\s\.\]\+\$\/, ''\)/, 'its result ends in one full stop, not two ("1 scored..")');
+  assert.doesNotMatch(page, /title="\$\{esc\(t\.why\)\}"/, 'a paper badge says its day as the page does ("26 Oct 2026"), not "2026-10-26"');
 });
 
 test("a report's preview is its first sentence, never a heading, a bold heading or a bold label alone", () => {

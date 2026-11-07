@@ -1656,13 +1656,14 @@
   function paperChip(ticker, date) {
     const t = tradeOf(ticker, date);
     if (!t) return "";
+    const reason = t.why.replace(/\b\d{4}-\d{2}-\d{2}\b/g, (day) => dayText(day));
     if (t.status === "filled" && t.side === "buy") {
       const since = t.sincePct === void 0 ? null : pct(t.sincePct * 100);
-      const why = `${t.why}${since ? ` ${t.ticker} has moved ${since} since that close, to the latest close: the stock's move since the paper buy, not the call's result.` : ""}`;
+      const why = `${reason}${since ? ` ${t.ticker} has moved ${since} since that close, to the latest close: the stock's move since the paper buy, not the call's result.` : ""}`;
       return `<span class="at-chip ${tone(t.sincePct ?? null)}" title="${esc(why)}">paper: bought ${esc(String(t.quantity ?? ""))}${since ? ` \xB7 ${esc(t.ticker)} ${since} since` : ""}</span>`;
     }
-    if (t.status === "filled") return `<span class="at-chip" title="${esc(t.why)}">paper: sold ${esc(String(t.quantity ?? ""))}</span>`;
-    return `<span class="at-chip" title="${esc(t.why)}">${esc(PAPER_WORDS[t.status])}</span>`;
+    if (t.status === "filled") return `<span class="at-chip" title="${esc(reason)}">paper: sold ${esc(String(t.quantity ?? ""))}</span>`;
+    return `<span class="at-chip" title="${esc(reason)}">${esc(PAPER_WORDS[t.status])}</span>`;
   }
   async function loadPaper() {
     try {

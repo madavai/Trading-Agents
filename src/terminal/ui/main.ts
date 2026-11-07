@@ -1098,15 +1098,16 @@ const PAPER_WORDS: Record<PaperTrade['status'], string> = { filled: 'paper', non
 function paperChip(ticker: string, date: string): string {
   const t = tradeOf(ticker, date);
   if (!t) return '';
+  const reason = t.why.replace(/\b\d{4}-\d{2}-\d{2}\b/g, (day) => dayText(day));   // "the close of 26 Oct 2026", as the page writes days
   // The figure is the stock's move since the paper buy, labelled as that: never the call's own result (its alpha, beside
   // it), and never a paper profit for this call alone, since the paper book keeps one average cost a stock.
   if (t.status === 'filled' && t.side === 'buy') {
     const since = t.sincePct === undefined ? null : pct(t.sincePct * 100);
-    const why = `${t.why}${since ? ` ${t.ticker} has moved ${since} since that close, to the latest close: the stock's move since the paper buy, not the call's result.` : ''}`;
+    const why = `${reason}${since ? ` ${t.ticker} has moved ${since} since that close, to the latest close: the stock's move since the paper buy, not the call's result.` : ''}`;
     return `<span class="at-chip ${tone(t.sincePct ?? null)}" title="${esc(why)}">paper: bought ${esc(String(t.quantity ?? ''))}${since ? ` · ${esc(t.ticker)} ${since} since` : ''}</span>`;
   }
-  if (t.status === 'filled') return `<span class="at-chip" title="${esc(t.why)}">paper: sold ${esc(String(t.quantity ?? ''))}</span>`;
-  return `<span class="at-chip" title="${esc(t.why)}">${esc(PAPER_WORDS[t.status])}</span>`;
+  if (t.status === 'filled') return `<span class="at-chip" title="${esc(reason)}">paper: sold ${esc(String(t.quantity ?? ''))}</span>`;
+  return `<span class="at-chip" title="${esc(reason)}">${esc(PAPER_WORDS[t.status])}</span>`;
 }
 async function loadPaper(): Promise<void> {
   try { PAPER.book = await api.paper(); PAPER.failed = false; } catch { PAPER.failed = true; }
