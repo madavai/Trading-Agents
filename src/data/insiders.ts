@@ -1,6 +1,7 @@
 // Insider trades as the SEC holds them: every Form 4 a company's directors, officers and largest owners filed, read from
 // the filing itself. EDGAR dates each filing by the day it was made public, so an analysis of a past day reads only the
-// trades known by then. Free and official; the SEC asks every caller for a contact email (http.ts sends it).
+// trades known by then. An amended filing (Form 4/A) takes the place of the filing it corrects, never adds to it.
+// Free and official; the SEC asks every caller for a contact email (http.ts sends it).
 import { addDays } from './dates.js';
 import { getText, NoData } from './http.js';
 import { submissions } from './sec.js';
@@ -15,7 +16,14 @@ export interface InsiderTrade {
   after: number | null; indirect: string | null;
   /** Made under a pre-arranged trading plan (Rule 10b5-1). */
   plan: boolean;
+  /** The day an amended filing (Form 4/A) gave this trade as it now stands; `filed` is then the day the trade was first
+   *  made public, the day of the filing that amendment corrects. */
+  corrected?: string;
 }
+
+/** One Form 4 or 4/A as read: whose it is (their SEC numbers, which tie an amendment to the filing it corrects), the day
+ *  of the filing an amendment corrects (null for a Form 4), the period it reports, and its trades. */
+export interface Filing { form: string; filed: string; owners: string; original: string | null; period: string; trades: InsiderTrade[] }
 
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
 export const decode = (s: string): string => s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e: string) => (e[0] === '#' ? String.fromCodePoint(e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : Number(e.slice(1))) : ENTITIES[e.toLowerCase()] ?? m));
@@ -51,6 +59,40 @@ export function parseForm4(xml: string, filed: string): InsiderTrade[] {
   })).filter((t) => t.date && t.code);
 }
 
+/** A Form 4 or 4/A with what ties an amendment to the filing it corrects. Exported for the tests. */
+export function parseFiling(xml: string, form: string, filed: string): Filing {
+  const owners = blocks(xml, 'reportingOwner').map((o) => field(o, 'rptOwnerCik').replace(/^0+/, '') || field(o, 'rptOwnerName').toUpperCase()).sort().join('+');
+  const original = form.endsWith('/A') ? field(xml, 'dateOfOriginalSubmission').slice(0, 10) || null : null;
+  return { form, filed, owners, original, period: field(xml, 'periodOfReport').slice(0, 10), trades: parseForm4(xml, filed) };
+}
+
+/** The trades of these filings, each amendment in place of the filing it corrects: the same insiders' filing made public
+ *  on the day the amendment names (of two that day, the one for the same period). An amendment that lists trades in
+ *  shares replaces that filing's trades; one that lists none corrected something else (the options table, a footnote,
+ *  the signature) and leaves them. Taken oldest first, so a second amendment replaces the first. A corrected trade keeps
+ *  the day it was first made public and carries the day of its correction. Exported for the tests. */
+export function amended(filings: readonly Filing[]): { trades: InsiderTrade[]; replaced: number } {
+  const state = new Map(filings.map((f) => [f, { first: f.filed, by: null as Filing | null }]));
+  let replaced = 0;
+  for (const f of [...filings].sort((a, b) => a.filed.localeCompare(b.filed))) {
+    if (!f.original) continue;
+    const me = state.get(f)!;
+    me.first = f.original;
+    const same = filings.filter((g) => g !== f && g.owners === f.owners && g.filed === f.original && g.filed <= f.filed);
+    const pool = same.some((g) => g.period === f.period) ? same.filter((g) => g.period === f.period) : same;
+    if (pool.length !== 1) continue;   // not read (older than the list, or beyond what was read), or no single match
+    let target = pool[0]!;
+    while (state.get(target)!.by) target = state.get(target)!.by!;
+    me.first = state.get(target)!.first;
+    if (!f.trades.length) continue;
+    state.get(target)!.by = f;
+    replaced++;
+  }
+  const trades = filings.filter((f) => !state.get(f)!.by)
+    .flatMap((f) => f.trades.map((t) => (f.original ? { ...t, filed: state.get(f)!.first, corrected: f.filed } : t)));
+  return { trades: trades.sort((a, b) => b.filed.localeCompare(a.filed)), replaced };
+}
+
 const CODES: Record<string, string> = {
   P: 'bought', S: 'sold', A: 'was awarded', M: 'exercised options for', X: 'exercised options for',
   F: 'handed back, for tax or the exercise price,', G: 'gave away', D: 'returned to the company', C: 'converted into', J: 'other transaction of', W: 'inherited or bequeathed', I: 'discretionary trade of',
@@ -75,22 +117,27 @@ export async function secInsiders(symbol: string, cik: string, asOf: string, day
     if (partial) throw new NoData(`the SEC's recent list of ${symbol}'s filings starts on ${oldest}, after ${addDays(from, 1)}, so the trades of those days cannot be read`);
     return `${head}: none. No director, officer or large owner reported a trade in these ${days} days. That is a fact from the SEC, not a gap in the data.`;
   }
-  const read = picked.slice(0, limit), trades: InsiderTrade[] = [];
+  const read = picked.slice(0, limit), filings: Filing[] = [];
   let failed = 0;
   for (const p of read) {
     const acc = r.accessionNumber?.[p.i] ?? '', doc = (r.primaryDocument?.[p.i] ?? '').replace(/^xsl[^/]*\//, '');
     if (!/^[\d-]+$/.test(acc) || !/^[\w.-]+\.xml$/i.test(doc)) { failed++; continue; }
-    try { trades.push(...parseForm4(await getText(`https://www.sec.gov/Archives/edgar/data/${Number(cik)}/${acc.replaceAll('-', '')}/${doc}`), p.filed)); } catch { failed++; }
+    try { filings.push(parseFiling(await getText(`https://www.sec.gov/Archives/edgar/data/${Number(cik)}/${acc.replaceAll('-', '')}/${doc}`), p.form, p.filed)); } catch { failed++; }
   }
+  // Every trade is listed; the counts hold only those first made public in these days (a correction made now of a trade
+  // made public before them is listed, not counted).
+  const { trades: all, replaced } = amended(filings), trades = all.filter((t) => t.filed > from);
   const market = (code: string) => trades.filter((t) => t.code === code);
   const total = (list: InsiderTrade[]) => {
     const shares = list.reduce((a, t) => a + t.shares, 0), value = list.reduce((a, t) => a + t.shares * (t.price ?? 0), 0), planned = list.filter((t) => t.plan).length;
     return list.length ? `${list.length} (${fmt(shares)} shares, about ${fmt(value)} USD at their own prices${planned ? `; ${planned} under a pre-arranged 10b5-1 plan` : ''})` : 'none';
   };
   const buys = market('P'), sales = market('S'), other = trades.length - buys.length - sales.length;
-  const lines = trades.map((t) => `- ${t.date} (made public ${t.filed}) · ${t.owner} (${t.role}): ${CODES[t.code] ?? `transaction ${t.code} of`} ${fmt(t.shares, 4)} shares${t.price ? ` at ${fmt(t.price, 4)}` : ', no price'}${t.after !== null ? ` · holds ${fmt(t.after, 4)} after` : ''}${t.indirect ? ` · indirectly (${t.indirect})` : ''}${t.plan ? ' · under a 10b5-1 plan' : ''}`);
+  const when = (t: InsiderTrade) => (!t.corrected ? `made public ${t.filed}`
+    : `made public ${t.filed}${t.filed > from ? '' : ', before these days'}; corrected ${t.corrected} by an amended filing, a Form 4/A${t.filed > from ? '' : ', so not counted above'}`);
+  const lines = all.map((t) => `- ${t.date} (${when(t)}) · ${t.owner} (${t.role}): ${CODES[t.code] ?? `transaction ${t.code} of`} ${fmt(t.shares, 4)} shares${t.price ? ` at ${fmt(t.price, 4)}` : ', no price'}${t.after !== null ? ` · holds ${fmt(t.after, 4)} after` : ''}${t.indirect ? ` · indirectly (${t.indirect})` : ''}${t.plan ? ' · under a 10b5-1 plan' : ''}`);
   return [
-    `${head} (${read.length} of ${picked.length} filings read, newest first${failed ? `; ${failed} could not be read` : ''}). Each trade is dated by the day it happened and the day its filing made it public; only filings public by ${asOf} are shown.${gap}`,
+    `${head} (${read.length} of ${picked.length} filings read, newest first${failed ? `; ${failed} could not be read` : ''}${replaced ? `; ${replaced === 1 ? 'one is an amended filing, a Form 4/A, shown in place of the filing it corrects' : `${replaced} are amended filings, Form 4/A, each shown in place of the filing it corrects`}` : ''}). Each trade is dated by the day it happened and the day its filing made it public; only filings public by ${asOf} are shown.${gap}`,
     '',
     `In these ${days} days: bought (code P) ${total(buys)}; sold (code S) ${total(sales)}; other kinds (awards, option exercises, shares handed back for tax, gifts) ${other}.`,
     'P and S are purchases and sales on the market or in a private deal: a purchase is the insider spending their own money. A sale under a 10b5-1 plan was arranged months ahead. Awards, exercises, tax handbacks and gifts say little about what an insider thinks of the price.',

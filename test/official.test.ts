@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { configure, NoData } from '../src/data/http.js';
 import { averageDilutedShares, clearSecCache, sectorOfSic, sharesOutstanding, trailingYear, type Fact } from '../src/data/sec.js';
 import { clearYahooSession, companyOverview, insiderTransactions, profileSector } from '../src/data/company.js';
-import { parseForm4 } from '../src/data/insiders.js';
+import { amended, parseFiling, parseForm4 } from '../src/data/insiders.js';
 import { chartJson, series } from './chart.js';
 
 const json = (v: unknown, status = 200) => new Response(JSON.stringify(v), { status });
@@ -82,6 +82,57 @@ test("a US filer's insider trades come from its Form 4s at the SEC, only those m
   assert.match(past, /made public from 2026-06-23 to 2026-09-20 \(1 of 1 filings read/, 'a past day reads what was public then');
   assert.doesNotMatch(past, /COXE/);
   assert.match(await insiderTransactions('ACME', '2026-01-10'), /: none\. No director, officer or large owner reported a trade in these 90 days\. That is a fact from the SEC/);
+});
+
+/** A Form 4/A: the same document, amending the filing made public on `original`. */
+const AMEND = (form4: string, original: string) => form4.replace('<documentType>4</documentType>', `<documentType>4/A</documentType><dateOfOriginalSubmission>${original}</dateOfOriginalSubmission>`);
+
+test('an amended Form 4 (4/A) takes the place of the filing it corrects: one award, at its corrected size, counted once', async () => {
+  // NVIDIA's of round 1: a Form 4 of 11 Sep gave an award of 172,507 shares; a Form 4/A of 13 Oct corrected it to 160,418.
+  const filings = [
+    { form: '4/A', filed: '2026-10-13', acc: '0000009999-26-000007', doc: 'xslF345X06/fix.xml' },
+    { form: '4', filed: '2026-09-18', acc: '0000008888-26-000001', doc: 'xslF345X06/sale.xml' },
+    { form: '4', filed: '2026-09-11', acc: '0000009999-26-000005', doc: 'xslF345X06/award.xml' },
+  ];
+  configure({ fetch: route([TICKERS,
+    [/submissions\/CIK0000001234\.json/, () => json(record(filings))],
+    [/\/award\.xml$/, () => new Response(FORM4('PARKER NICHOLAS', ROW('2026-09-09', 'A', 172507, null, 'A', 172507), '0'))],
+    [/\/fix\.xml$/, () => new Response(AMEND(FORM4('PARKER NICHOLAS', ROW('2026-09-09', 'A', 160418, null, 'A', 160418), '0'), '2026-09-11'))],
+    [/\/sale\.xml$/, () => new Response(FORM4('KRESS COLETTE', ROW('2026-09-17', 'S', 20369, 219.0172, 'D', 774971)).replace('0000009999', '0000008888'))],
+  ]) });
+  const t = await insiderTransactions('ACME', '2026-10-21');
+  assert.match(t, /\(3 of 3 filings read, newest first; one is an amended filing, a Form 4\/A, shown in place of the filing it corrects\)/);
+  assert.match(t, /sold \(code S\) 1 \(20,369 shares, .*\); other kinds \(awards, option exercises, shares handed back for tax, gifts\) 1\./, 'the award is counted once');
+  assert.match(t, /^- 2026-09-09 \(made public 2026-09-11; corrected 2026-10-13 by an amended filing, a Form 4\/A\) · PARKER NICHOLAS \(EVP & Chief Financial Officer\): was awarded 160,418 shares, no price · holds 160,418 after$/m);
+  assert.doesNotMatch(t, /172,507/, 'the figure the amendment corrected is gone');
+  assert.deepEqual(t.split('\n').filter((l) => l.startsWith('- ')).map((l) => l.slice(2, 12)), ['2026-09-17', '2026-09-09'], 'the corrected trade sits where it was first made public');
+});
+
+test('an amendment replaces only the same insiders\' filing of the day it names; one with no trades in shares leaves it; a second replaces the first', () => {
+  const form4 = (owner: string, rows: string, cik = '0000009999') => FORM4(owner, rows, '0').replace('0000009999', cik);
+  const award = parseFiling(form4('PARKER', ROW('2026-09-09', 'A', 100, null, 'A', 100)), '4', '2026-09-11');
+  const other = parseFiling(form4('KRESS', ROW('2026-09-09', 'S', 5, 10, 'D', 0), '0000008888'), '4', '2026-09-11');
+  assert.deepEqual([award.owners, award.original, award.period], ['9999', null, '2026-10-07'], 'a Form 4 amends nothing');
+  const fix1 = parseFiling(AMEND(form4('PARKER', ROW('2026-09-09', 'A', 90, null, 'A', 90)), '2026-09-11'), '4/A', '2026-09-20');
+  const fix2 = parseFiling(AMEND(form4('PARKER', ROW('2026-09-09', 'A', 95, null, 'A', 95)), '2026-09-11'), '4/A', '2026-10-01');
+  assert.equal(fix1.original, '2026-09-11');
+  const sizes = (r: ReturnType<typeof amended>) => r.trades.map((t) => `${t.owner} ${t.shares} ${t.filed}${t.corrected ? ` fixed ${t.corrected}` : ''}`);
+  assert.deepEqual(sizes(amended([fix1, award, other])), ['PARKER 90 2026-09-11 fixed 2026-09-20', 'KRESS 5 2026-09-11'], 'another insider\'s filing of that day is not touched');
+  assert.deepEqual(sizes(amended([fix2, fix1, award, other])), ['PARKER 95 2026-09-11 fixed 2026-10-01', 'KRESS 5 2026-09-11'], 'the latest correction stands');
+  const holdingsOnly = parseFiling(AMEND(form4('PARKER', ''), '2026-09-11'), '4/A', '2026-09-20');
+  assert.deepEqual(amended([holdingsOnly, award]), { trades: [award.trades[0]!], replaced: 0 }, 'an amendment of something else (holdings, options) leaves the trades');
+  const unseen = parseFiling(AMEND(form4('PARKER', ROW('2026-05-01', 'G', 7, null, 'D', 0)), '2026-05-02'), '4/A', '2026-09-20');
+  assert.deepEqual(sizes(amended([unseen])), ['PARKER 7 2026-05-02 fixed 2026-09-20'], 'the filing it corrects was not read: dated by the day that filing was made public');
+});
+
+test('a correction of a trade made public before the window is listed, and not counted in it', async () => {
+  configure({ fetch: route([TICKERS,
+    [/submissions\/CIK0000001234\.json/, () => json(record([{ form: '4/A', filed: '2026-09-03', acc: '0000009999-26-000009', doc: 'fix.xml' }]))],
+    [/\/fix\.xml$/, () => new Response(AMEND(FORM4('PARKER MARK', ROW('2026-05-14', 'G', 22230, null, 'D', 625385), '0'), '2026-05-15'))],
+  ]) });
+  const t = await insiderTransactions('ACME', '2026-10-21');
+  assert.match(t, /bought \(code P\) none; sold \(code S\) none; other kinds .* 0\./);
+  assert.match(t, /^- 2026-05-14 \(made public 2026-05-15, before these days; corrected 2026-09-03 by an amended filing, a Form 4\/A, so not counted above\) · PARKER MARK/m);
 });
 
 test('when the SEC\'s list of recent filings does not reach back far enough, "none" is never said', async () => {
