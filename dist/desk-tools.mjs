@@ -37340,19 +37340,25 @@ function parseChart(json2, symbol4) {
   const r = json2.chart?.result?.[0];
   if (!r) throw new NoData(`Yahoo Finance has no prices for ${symbol4}${json2.chart?.error?.description ? ` (${json2.chart.error.description})` : ""}`);
   const m2 = r.meta ?? {}, q = r.indicators?.quote?.[0] ?? {}, adj = r.indicators?.adjclose?.[0]?.adjclose;
-  const offset = m2.gmtoffset ?? 0;
-  const bars = [];
+  const offset = m2.gmtoffset ?? 0, dayOf = (ts) => new Date((ts + offset) * 1e3).toISOString().slice(0, 10);
+  const bars = [], blank = [];
   (r.timestamp ?? []).forEach((ts, i) => {
     const open3 = num(q.open?.[i]), high = num(q.high?.[i]), low = num(q.low?.[i]), close = num(q.close?.[i]);
-    if (open3 === null || high === null || low === null || close === null || close <= 0) return;
+    if (open3 === null || high === null || low === null || close === null || close <= 0) {
+      blank.push(dayOf(ts));
+      return;
+    }
     const a = num(adj?.[i]), k = a !== null ? a / close : 1;
-    bars.push({ date: new Date((ts + offset) * 1e3).toISOString().slice(0, 10), open: open3 * k, high: high * k, low: low * k, close: close * k, volume: num(q.volume?.[i]) ?? 0 });
+    bars.push({ date: dayOf(ts), open: open3 * k, high: high * k, low: low * k, close: close * k, volume: num(q.volume?.[i]) ?? 0 });
   });
   const seen = /* @__PURE__ */ new Set();
   const unique = bars.filter((b) => seen.has(b.date) ? false : (seen.add(b.date), true));
+  const lastDay = unique.at(-1)?.date ?? "", unfilled = [...new Set(blank.filter((d) => d > lastDay))];
+  const reg = m2.currentTradingPeriod?.regular, session2 = reg?.start && reg.end ? { date: dayOf(reg.start), start: reg.start * 1e3, end: reg.end * 1e3 } : void 0;
   return {
-    meta: { symbol: m2.symbol ?? symbol4, currency: m2.currency, exchange: m2.fullExchangeName ?? m2.exchangeName, type: m2.instrumentType, name: m2.longName ?? m2.shortName, price: m2.regularMarketPrice, timezone: m2.exchangeTimezoneName },
-    bars: unique
+    meta: { symbol: m2.symbol ?? symbol4, currency: m2.currency, exchange: m2.fullExchangeName ?? m2.exchangeName, type: m2.instrumentType, name: m2.longName ?? m2.shortName, price: m2.regularMarketPrice, timezone: m2.exchangeTimezoneName, session: session2 },
+    bars: unique,
+    unfilled
   };
 }
 async function fetchDaily(symbol4, from, to) {
@@ -37376,7 +37382,8 @@ async function daily(raw, from, to) {
     p.catch(() => cache.delete(key));
   }
   const s = await cache.get(key);
-  return { meta: s.meta, bars: s.bars.filter((b) => b.date >= from && b.date <= to) };
+  const bars = s.bars.filter((b) => b.date >= from && b.date <= to), lastDay = bars.at(-1)?.date ?? "";
+  return { meta: s.meta, bars, unfilled: (s.unfilled ?? []).filter((d) => d > lastDay && d <= to) };
 }
 async function history(raw, analysis2, calendarDays = 420) {
   const s = await daily(raw, addDays(analysis2, -calendarDays), analysis2);
@@ -37396,24 +37403,42 @@ var resolved = (raw) => {
 };
 async function instrument(raw, analysis2) {
   const day3 = analysisDate(analysis2), s = await history(raw, day3, 30), last = s.bars[s.bars.length - 1];
-  const kind = typeWord(s.meta.type, raw), old = isHistorical(day3);
+  const kind = typeWord(s.meta.type, raw), old = isHistorical(day3), state = latestState(s, day3);
   const lines = [`Instrument: ${resolved(raw)}`, `Kind: ${kind}`];
   if (s.meta.name) lines.push(old ? `Name: ${s.meta.name} (its current name, given only to identify it; on ${day3} it may have been named differently)` : `Name: ${s.meta.name}`);
   if (!old && s.meta.exchange) lines.push(`Exchange: ${s.meta.exchange}`);
   if (s.meta.currency) lines.push(`Quote currency: ${s.meta.currency}`);
   lines.push(`Analysis date: ${day3}${old ? " (a past day: use only what was known by then)" : ""}`);
-  lines.push(`Latest trading day on or before it: ${last.date}, close ${f2(last.close)}`);
+  lines.push(state.open ? `Latest trading day on or before it: ${last.date}, still trading: latest price ${f2(last.close)} (not a close)` : `Latest trading day on or before it: ${last.date}, close ${f2(last.close)}`);
+  lines.push(...state.lines.map((l) => l.replace(/^- /, "")));
   lines.push("", `Refer to it by this exact ticker in every report, keeping any exchange suffix. Do not substitute a different company or ticker unless a tool result disproves this identity.${kind === "crypto asset" ? " It is a crypto asset, not a company: do not assume company fundamentals exist." : ""}`);
   return lines.join("\n");
+}
+var clock = (ms, zone = "UTC") => {
+  try {
+    return `${new Date(ms).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: zone })} ${zone} time`;
+  } catch {
+    return `${new Date(ms).toISOString().slice(11, 16)} UTC`;
+  }
+};
+function latestState(s, upTo, now = Date.now()) {
+  const last = s.bars[s.bars.length - 1], unfilled = s.unfilled?.at(-1), session2 = s.meta.session;
+  const open3 = !!session2 && session2.date === last.date && now >= session2.start && now < session2.end;
+  if (unfilled) return { open: false, lines: [`- **The source lists a session on ${unfilled}, but its prices are not filled in yet (this happens for a while after a session ends). Every figure here is as of ${last.date}. Do not call ${last.date} the latest session, and do not say ${unfilled} had no trading: say its prices were not available yet.**`] };
+  if (open3) return { open: open3, lines: [`- **The latest row, ${last.date}, is a session still trading (it closes at ${clock(session2.end, s.meta.timezone)}). Its "close" is the latest price so far, not a close; its high, low, volume and every indicator on it will change. Call it the latest price, never the close, and do not treat a level as broken or held on this row alone.**`] };
+  if (session2 && session2.date === last.date) return { open: open3, lines: [`- The latest row, ${last.date}, is a finished session: its figures are final.`] };
+  if (session2 && session2.date > last.date && session2.date <= upTo && now < session2.start) return { open: open3, lines: [`- ${session2.date}'s session has not opened yet (it opens at ${clock(session2.start, s.meta.timezone)}): the latest row, ${last.date}, is the latest finished session.`] };
+  if (!session2 && last.date === today()) return { open: open3, lines: ["- **The latest row is today's session. If the market is still open it is partial: its close, high, low and volume are the latest so far, and every indicator on it will change by the close. Do not treat a level as broken or held on this row alone.**"] };
+  return { open: open3, lines: [] };
 }
 var MAX_ROWS = 260;
 async function priceHistory(raw, analysis2, start, end) {
   const day3 = analysisDate(analysis2), [s, e] = window(start, end, day3);
   const series = await daily(raw, s, e);
   if (!series.bars.length) return `No trading rows for ${resolved(raw)} from ${s} to ${e}.`;
-  const rows = series.bars.slice(-MAX_ROWS);
+  const rows = series.bars.slice(-MAX_ROWS), notes = latestState(series, e).lines;
   const head2 = [`Daily prices for ${resolved(raw)} from ${s} to ${e} (${series.bars.length} trading days${series.bars.length > MAX_ROWS ? `, the last ${MAX_ROWS} shown` : ""}; adjusted for splits and dividends${series.meta.currency ? `; ${series.meta.currency}` : ""})`, "", "Date | Open | High | Low | Close | Volume", "---|---:|---:|---:|---:|---:"];
-  return head2.concat(rows.map((b) => `${b.date} | ${f2(b.open)} | ${f2(b.high)} | ${f2(b.low)} | ${f2(b.close)} | ${vol(b.volume)}`)).join("\n");
+  return head2.concat(rows.map((b) => `${b.date} | ${f2(b.open)} | ${f2(b.high)} | ${f2(b.low)} | ${f2(b.close)} | ${vol(b.volume)}`), notes.length ? ["", ...notes] : []).join("\n");
 }
 function indicatorList(input2) {
   const parts = (Array.isArray(input2) ? input2 : input2.split(",")).map((x) => x.trim().toLowerCase()).filter(Boolean);
@@ -37429,12 +37454,13 @@ async function indicatorWindow(raw, analysis2, names, lookBackDays = 30) {
     const rows = s.bars.map((b, i) => [b, values[i]]).filter(([b]) => b.date >= from);
     out.push(`## ${name} for ${resolved(raw)}, ${from} to ${day3} (trading days only)`, ...rows.map(([b, v]) => `${b.date}: ${f2(v)}`), "", INDICATORS[name], "");
   }
+  out.push(...latestState(s, day3).lines);
   if (unknown2.length) out.push(`Not computed (unknown names): ${unknown2.join(", ")}. Use: ${INDICATOR_NAMES.join(", ")}.`);
   return out.join("\n").trim();
 }
 var SNAPSHOT_INDICATORS = ["close_10_ema", "close_50_sma", "close_200_sma", "rsi", "boll", "boll_ub", "boll_lb", "macd", "macds", "macdh", "atr"];
 async function verifiedSnapshot(raw, analysis2, lookBack = 30) {
-  const day3 = analysisDate(analysis2), s = await history(raw, day3), bars = s.bars, last = bars[bars.length - 1];
+  const day3 = analysisDate(analysis2), s = await history(raw, day3), bars = s.bars, last = bars[bars.length - 1], state = latestState(s, day3);
   const recent = bars.slice(-Math.max(1, Math.min(30, Math.round(lookBack))));
   const lines = [
     `## Checked price table for ${resolved(raw)}`,
@@ -37442,7 +37468,7 @@ async function verifiedSnapshot(raw, analysis2, lookBack = 30) {
     `- Analysis date: ${day3}`,
     `- Latest trading row used: ${last.date}`,
     "- Rows after the analysis date are excluded.",
-    ...last.date === today() ? ["- **The latest row is today's session. If the market is still open it is partial: its close, high, low and volume are the latest so far, and every indicator on it will change by the close. Do not treat a level as broken or held on this row alone.**"] : [],
+    ...state.lines,
     `- Prices adjusted for splits and dividends${s.meta.currency ? `, in ${s.meta.currency}` : ""}.`,
     "",
     "### Latest row",
@@ -37452,7 +37478,7 @@ async function verifiedSnapshot(raw, analysis2, lookBack = 30) {
     `| Open | ${f2(last.open)} |`,
     `| High | ${f2(last.high)} |`,
     `| Low | ${f2(last.low)} |`,
-    `| Close | ${f2(last.close)} |`,
+    `| ${state.open ? "Latest price (still trading)" : "Close"} | ${f2(last.close)} |`,
     `| Volume | ${vol(last.volume)} |`,
     "",
     "### Indicators on the latest row",
