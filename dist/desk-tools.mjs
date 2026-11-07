@@ -17917,8 +17917,8 @@ var error43 = () => {
       case "not_multiple_of":
         return `N\xFAmero inv\xE1lido: deve ser m\xFAltiplo de ${issue2.divisor}`;
       case "unrecognized_keys": {
-        const plural2 = issue2.keys.length > 1 ? "s" : "";
-        return `Chave${plural2} inv\xE1lida${plural2}: ${joinValues(issue2.keys, ", ")}`;
+        const plural3 = issue2.keys.length > 1 ? "s" : "";
+        return `Chave${plural3} inv\xE1lida${plural3}: ${joinValues(issue2.keys, ", ")}`;
       }
       case "invalid_key":
         return `Entrada inv\xE1lida n${translateOriginWithArticle(issue2.origin, "definite")}`;
@@ -18062,8 +18062,8 @@ var error44 = () => {
       case "not_multiple_of":
         return `N\xFAmero inv\xE1lido: deve ser m\xFAltiplo de ${issue2.divisor}`;
       case "unrecognized_keys": {
-        const plural2 = issue2.keys.length > 1 ? "s" : "";
-        return `Chave${plural2} inv\xE1lida${plural2}: ${joinValues(issue2.keys, ", ")}`;
+        const plural3 = issue2.keys.length > 1 ? "s" : "";
+        return `Chave${plural3} inv\xE1lida${plural3}: ${joinValues(issue2.keys, ", ")}`;
       }
       case "invalid_key":
         return `Entrada inv\xE1lida n${translateOriginWithArticle(issue2.origin, "definite")}`;
@@ -37159,8 +37159,8 @@ function atr(bars, n2 = 14) {
 function vwma(bars, n2 = 14) {
   return bars.map((_, i) => {
     if (i < n2 - 1) return null;
-    const w = bars.slice(i - n2 + 1, i + 1), vol3 = w.reduce((a, b) => a + b.volume, 0);
-    return vol3 > 0 ? w.reduce((a, b) => a + b.close * b.volume, 0) / vol3 : null;
+    const w = bars.slice(i - n2 + 1, i + 1), vol4 = w.reduce((a, b) => a + b.volume, 0);
+    return vol4 > 0 ? w.reduce((a, b) => a + b.close * b.volume, 0) / vol4 : null;
   });
 }
 function mfi(bars, n2 = 14) {
@@ -37247,6 +37247,9 @@ function analysisDate(value) {
 }
 var isHistorical = (date5) => date5 < today();
 var addDays = (date5, days) => new Date(Date.parse(`${date5}T00:00:00Z`) + days * DAY).toISOString().slice(0, 10);
+var WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+var weekday = (date5) => WEEKDAYS[(/* @__PURE__ */ new Date(`${date5}T00:00:00Z`)).getUTCDay()];
+var withWeekday = (date5) => `${date5} (${weekday(date5)})`;
 var daysBetween = (from, to) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY);
 function window(start, end, analysis2) {
   let s = parseDate(start, "start date"), e = parseDate(end, "end date");
@@ -37498,6 +37501,208 @@ async function verifiedSnapshot(raw, analysis2, lookBack = 30) {
   return lines.join("\n");
 }
 
+// src/numbers.ts
+function signed(v, digits) {
+  const text4 = Math.abs(v).toFixed(digits);
+  return Number(text4) === 0 ? text4 : `${v > 0 ? "+" : "-"}${text4}`;
+}
+var signedPct = (fraction, digits = 1) => `${signed(fraction * 100, digits)}%`;
+var unsignZero = (text4) => text4.replace(/^[+\-−](0(?:\.0+)?%)$/, "$1");
+
+// src/data/facts.ts
+var WINDOWS = [[20, "about a month"], [63, "about three months"], [126, "about six months"], [252, "about a year"]];
+var CALENDAR_DAYS = 700;
+var CROSSES_SHOWN = 6;
+var TOP = 3;
+var f22 = (v) => v.toFixed(2);
+var vol2 = (v) => Math.round(v).toLocaleString("en-US");
+var cent = (v) => v === null || v === void 0 || !Number.isFinite(v) ? null : Math.round(v * 100) / 100;
+var cmp = (a, b) => {
+  const x = cent(a), y = cent(b);
+  return x === null || y === null ? null : x > y ? 1 : x < y ? -1 : 0;
+};
+var plural2 = (n2, one3, many = `${one3}s`) => `${n2} ${n2 === 1 ? one3 : many}`;
+async function priceFacts(raw, analysis2) {
+  const day3 = analysisDate(analysis2);
+  return priceFactsText(normalizeSymbol(raw), day3, await history(raw, day3, CALENDAR_DAYS));
+}
+function priceFactsText(sym2, day3, s) {
+  const bars = s.bars, n2 = bars.length, L = n2 - 1;
+  const d = (i) => withWeekday(bars[i].date);
+  const close = bars.map((b) => b.close), m2 = macd(close), bb = bollinger(close);
+  const ema10 = ema(close, 10), sma50 = sma(close, 50), sma200 = sma(close, 200), vw = vwma(bars), rsi14 = rsi(close), atr14 = atr(bars);
+  const change3 = close.map((c, i) => i && close[i - 1] ? (c / close[i - 1] - 1) * 100 : null);
+  const windows = WINDOWS.map(([size, words3]) => ({ size: Math.min(size, n2), words: size <= n2 ? words3 : "all on record", full: size }));
+  const from = (w) => n2 - w.size;
+  const out = [
+    `## Price facts for ${sym2}, worked out by the desk`,
+    "",
+    `- Analysis date: ${withWeekday(day3)}. Latest row: ${d(L)}. Rows after the analysis date are excluded.`,
+    "- From the same daily prices as the checked price table (adjusted for splits and dividends) and the same indicators (10 EMA, 50 SMA, 200 SMA, VWMA, RSI, MACD, Bollinger bands, ATR). A session is a trading day; every date carries its weekday.",
+    `- Windows count back from the latest row, which they include: ${windows.map((w) => `the last ${w.size} sessions${w.size < w.full ? " (all on record)" : ""} from ${d(from(w))}`).join("; ")}.`,
+    "- Directions and sides are judged on figures rounded to the cent, as the tables show them.",
+    ...latestState(s, day3).lines,
+    "",
+    'Quote a fact as it stands here, naming its window ("the lowest RSI of the last 63 sessions"). A run, a first or a last time, a record, a rank, a count of sessions or a crossing that is not here is not known to the desk: leave it out rather than count it by eye.',
+    ""
+  ];
+  const dir = (v, i) => i ? cmp(v[i], v[i - 1]) : null;
+  const trend = (name, v, up2 = "rising", down2 = "falling", rose = "rose", fell = "fell") => {
+    const now = dir(v, L);
+    if (now === null) return null;
+    let st = L;
+    while (st - 1 >= 1 && dir(v, st - 1) === now) st--;
+    const len = L - st + 1, word = now > 0 ? up2 : now < 0 ? down2 : "unchanged", before = st >= 2 ? dir(v, st - 1) : null;
+    const last20 = Array.from({ length: Math.min(20, n2 - 1) }, (_, k) => dir(v, L - k)).filter((x) => x !== null);
+    const tally = `Over the last ${last20.length} sessions it ${rose} on ${last20.filter((x) => x === 1).length} and ${fell} on ${last20.filter((x) => x === -1).length}${last20.some((x) => x === 0) ? `, unchanged on ${last20.filter((x) => x === 0).length}` : ""}.`;
+    const span2 = len === 1 ? `on the latest session, ${d(L)}` : `on each of the last ${len} sessions, ${d(st)} to ${d(L)}`;
+    const prior = before === null ? "" : `; on ${d(st - 1)} it ${before > 0 ? rose : before < 0 ? fell : "was unchanged"}`;
+    return `- ${name}: ${word} ${span2}, from ${f22(v[st - 1])} to ${f22(v[L])}${prior}. ${tally}`;
+  };
+  out.push("### Runs up to the latest row", "");
+  out.push(...[
+    trend("Close", close, "up", "down", "closed up", "closed down"),
+    trend("10 EMA", ema10),
+    trend("50 SMA", sma50),
+    trend("200 SMA", sma200),
+    trend("VWMA", vw),
+    trend("RSI", rsi14),
+    trend("MACD", m2.macd),
+    trend("MACD histogram", m2.hist),
+    trend("ATR", atr14)
+  ].filter((x) => x !== null));
+  const year = Math.max(0, n2 - 252);
+  const sides = (a, av, b, bv, what = "session") => {
+    const sd = (i) => cmp(av[i], bv[i]), now = sd(L);
+    if (now === null) return null;
+    let st = L;
+    while (st - 1 >= 0 && sd(st - 1) === now) st--;
+    const len = L - st + 1, word = now > 0 ? "above" : now < 0 ? "below" : "level with";
+    const prev = st - 1 >= 0 ? sd(st - 1) : null;
+    const before = st === 0 ? ` (every ${what} on record)` : prev === null ? `; before ${d(st)} the ${b} had no value yet` : prev === 0 ? `; on ${d(st - 1)} they were level to the cent` : `; the last ${what} ${prev > 0 ? "above" : "below"} it was ${d(st - 1)} (${f22(av[st - 1])} against ${f22(bv[st - 1])})`;
+    const crosses = [];
+    let last = null;
+    for (let i = 0; i < n2; i++) {
+      const x = sd(i);
+      if (x === null || x === 0) continue;
+      if (last !== null && x !== last && i >= year) crosses.push({ i, up: x > 0 });
+      last = x;
+    }
+    const span2 = len === 1 ? `on the latest ${what}, ${d(L)}` : `on each of the last ${plural2(len, what)}, since ${d(st)}`;
+    const list2 = crosses.length ? ` Crossings in the last ${L - year + 1} sessions (${crosses.length} in all${crosses.length > CROSSES_SHOWN ? `, the ${CROSSES_SHOWN} latest shown` : ""}, newest first): ${crosses.reverse().slice(0, CROSSES_SHOWN).map((c) => `${c.up ? "above" : "below"} on ${d(c.i)}`).join("; ")}.` : ` No crossing in the last ${L - year + 1} sessions.`;
+    return `- ${a} ${word} the ${b} ${span2}${before}.${list2}`;
+  };
+  const zero = close.map(() => 0);
+  out.push("", "### Sides and crossings", "");
+  out.push(...[
+    sides("Close", close, "10 EMA", ema10, "close"),
+    sides("Close", close, "50 SMA", sma50, "close"),
+    sides("Close", close, "200 SMA", sma200, "close"),
+    sides("Close", close, "VWMA", vw, "close"),
+    sides("Close", close, "Bollinger middle", bb.mid, "close"),
+    sides("10 EMA", ema10, "50 SMA", sma50),
+    sides("50 SMA", sma50, "200 SMA", sma200),
+    sides("MACD", m2.macd, "MACD signal", m2.signal),
+    sides("MACD", m2.macd, "zero line", zero)
+  ].filter((x) => x !== null));
+  const up = (i) => i ? dir(close, i) === null ? null : dir(close, i) === 1 : null;
+  const down = (i) => i ? dir(close, i) === null ? null : dir(close, i) === -1 : null;
+  const below = (v) => (i) => {
+    const x = cmp(close[i], v[i]);
+    return x === null ? null : x < 0;
+  };
+  const over = (a, v, sign) => (i) => {
+    const x = cmp(a(i), v[i]);
+    return x === null ? null : x === sign;
+  };
+  const level = (v, t) => (i) => cent(v[i]) === null ? null : t(cent(v[i]));
+  const counts = [
+    ["Up closes (above the close before)", up],
+    ["Down closes (below the close before)", down],
+    ["Closes below the 10 EMA", below(ema10)],
+    ["Closes below the 50 SMA", below(sma50)],
+    ["Closes below the 200 SMA", below(sma200)],
+    ["Closes below the VWMA", below(vw)],
+    ["Closes above the upper Bollinger band", over((i) => close[i], bb.upper, 1)],
+    ["Highs above the upper Bollinger band", over((i) => bars[i].high, bb.upper, 1)],
+    ["Closes below the lower Bollinger band", over((i) => close[i], bb.lower, -1)],
+    ["Lows below the lower Bollinger band", over((i) => bars[i].low, bb.lower, -1)],
+    ["RSI at 70 or above", level(rsi14, (x) => x >= 70)],
+    ["RSI at 30 or below", level(rsi14, (x) => x <= 30)],
+    ["RSI below 50", level(rsi14, (x) => x < 50)],
+    ["MACD below its signal", over((i) => m2.macd[i], m2.signal, -1)],
+    ["MACD below zero", level(m2.macd, (x) => x < 0)],
+    ["Days up 3% or more", level(change3, (x) => x >= 3)],
+    ["Days down 3% or more", level(change3, (x) => x <= -3)]
+  ];
+  out.push("", "### How often, in each window", "", `Fact | ${windows.map((w) => `Last ${w.size} sessions`).join(" | ")} | Latest in the last year`, `---|${windows.map(() => "---").join("|")}|---`);
+  for (const [name, t] of counts) {
+    const cells2 = windows.map((w) => {
+      const idx = Array.from({ length: w.size }, (_, k) => from(w) + k), known = idx.filter((i) => t(i) !== null), hits = known.filter((i) => t(i) === true);
+      const of = known.length < idx.length ? ` of ${plural2(known.length, "session")} with a value` : "";
+      return hits.length ? `${hits.length}${of}, first ${d(hits[0])}` : `0${of}`;
+    });
+    const latest = Array.from({ length: L - year + 1 }, (_, k) => L - k).find((i) => t(i) === true);
+    out.push(`${name} | ${cells2.join(" | ")} | ${latest === void 0 ? "\u2013" : d(latest)}`);
+  }
+  const pct2 = (i) => `${signed(change3[i], 2)}%`;
+  const extremes = [
+    ["Highest closes", (i) => close[i], 1, (i) => f22(close[i])],
+    ["Lowest closes", (i) => close[i], -1, (i) => f22(close[i])],
+    ["Highest intraday highs", (i) => bars[i].high, 1, (i) => f22(bars[i].high)],
+    ["Lowest intraday lows", (i) => bars[i].low, -1, (i) => f22(bars[i].low)],
+    ["Biggest daily rises", (i) => change3[i], 1, (i) => `${pct2(i)} (${signed(close[i] - close[i - 1], 2)})`, (i) => (change3[i] ?? 0) > 0],
+    ["Biggest daily falls", (i) => change3[i], -1, (i) => `${pct2(i)} (${signed(close[i] - close[i - 1], 2)})`, (i) => (change3[i] ?? 0) < 0],
+    ["Heaviest volume", (i) => bars[i].volume, 1, (i) => `${vol2(bars[i].volume)}${change3[i] === null ? "" : ` (close ${pct2(i)})`}`],
+    ["Heaviest volume on a down close", (i) => bars[i].volume, 1, (i) => `${vol2(bars[i].volume)} (close ${pct2(i)})`, (i) => down(i) === true],
+    ["Heaviest volume on an up close", (i) => bars[i].volume, 1, (i) => `${vol2(bars[i].volume)} (close ${pct2(i)})`, (i) => up(i) === true],
+    ["Lightest volume", (i) => bars[i].volume, -1, (i) => vol2(bars[i].volume)],
+    ["Highest RSI", (i) => rsi14[i], 1, (i) => f22(rsi14[i])],
+    ["Lowest RSI", (i) => rsi14[i], -1, (i) => f22(rsi14[i])],
+    ["Highest MACD", (i) => m2.macd[i], 1, (i) => f22(m2.macd[i])],
+    ["Lowest MACD", (i) => m2.macd[i], -1, (i) => f22(m2.macd[i])],
+    ["Highest MACD histogram", (i) => m2.hist[i], 1, (i) => f22(m2.hist[i])],
+    ["Lowest MACD histogram", (i) => m2.hist[i], -1, (i) => f22(m2.hist[i])],
+    ["Highest ATR", (i) => atr14[i], 1, (i) => f22(atr14[i])],
+    ["Lowest ATR", (i) => atr14[i], -1, (i) => f22(atr14[i])]
+  ];
+  out.push("", "### Highest and lowest in each window", "", `The ${TOP} highest or lowest of each window, first to ${TOP === 3 ? "third" : "last"}; a tie is ranked latest first.`);
+  for (const w of windows) {
+    out.push("", `Last ${w.size} sessions (${w.words}, from ${d(from(w))}) | First | Second | Third`, "---|---|---|---");
+    for (const [name, key, sign, show, keep3] of extremes) {
+      const idx = Array.from({ length: w.size }, (_, k) => from(w) + k).filter((i) => cent(key(i)) !== null && (!keep3 || keep3(i)));
+      const ranked = idx.sort((a, b) => sign * (key(b) - key(a)) || b - a).slice(0, TOP);
+      out.push(`${name} | ${[0, 1, 2].map((k) => ranked[k] === void 0 ? "\u2013" : `${show(ranked[k])} on ${d(ranked[k])}`).join(" | ")}`);
+    }
+  }
+  const since = (name, words3, v, show, bySign = false) => {
+    const x = v(L), p = bySign ? 0 : v(L - 1);
+    if (cent(x) === null || cent(p) === null || cent(x) === cent(p)) return null;
+    const high = x > p, j = Array.from({ length: L }, (_, k) => L - 1 - k).find((i) => cent(v(i)) !== null && (high ? v(i) >= x : v(i) <= x));
+    const valued = Array.from({ length: n2 }, (_, i) => i).filter((i) => cent(v(i)) !== null).length, what = words3[high ? 0 : 1];
+    return j === void 0 ? `- ${name} ${show(x)} on ${d(L)}: the ${what} of all ${plural2(valued, "session")} on record${valued < n2 ? " with a value" : ""}.` : `- ${name} ${show(x)} on ${d(L)}: the ${what} since ${d(j)} (${show(v(j))}), ${plural2(L - j, "session")} before.`;
+  };
+  out.push("", "### The latest row against the past", "");
+  out.push(...[
+    since("Close", ["highest close", "lowest close"], (i) => close[i], f22),
+    since("Volume", ["heaviest volume", "lightest volume"], (i) => bars[i].volume, vol2),
+    since("Daily move", ["biggest daily rise", "biggest daily fall"], (i) => change3[i], (x) => `${signed(x, 2)}%`, true),
+    since("RSI", ["highest RSI", "lowest RSI"], (i) => rsi14[i], f22),
+    since("MACD", ["highest MACD", "lowest MACD"], (i) => m2.macd[i], f22),
+    since("MACD histogram", ["highest MACD histogram", "lowest MACD histogram"], (i) => m2.hist[i], f22)
+  ].filter((x) => x !== null));
+  for (const w of windows.filter((w2) => w2.full === 63 || w2.full === 252)) {
+    const idx = Array.from({ length: w.size }, (_, k) => from(w) + k);
+    const hi = idx.reduce((a, i) => close[i] >= close[a] ? i : a), lo = idx.reduce((a, i) => close[i] <= close[a] ? i : a);
+    out.push(`- The close ${f22(close[L])} is ${f22(Math.abs((close[L] / close[hi] - 1) * 100))}% ${close[L] < close[hi] ? "below" : "at"} the highest close of the last ${w.size} sessions (${f22(close[hi])} on ${d(hi)}) and ${f22(Math.abs((close[L] / close[lo] - 1) * 100))}% ${close[L] > close[lo] ? "above" : "at"} the lowest (${f22(close[lo])} on ${d(lo)}).`);
+  }
+  const moves = [1, 5, 20, 63, 126, 252].filter((k) => k <= L).map((k) => `${plural2(k, "session")} ${signed((close[L] / close[L - k] - 1) * 100, 2)}% (from ${f22(close[L - k])} on ${d(L - k)})`);
+  const lastOfYear = Array.from({ length: L }, (_, k) => L - 1 - k).find((i) => bars[i].date.slice(0, 4) < bars[L].date.slice(0, 4));
+  if (lastOfYear !== void 0) moves.push(`this calendar year ${signed((close[L] / close[lastOfYear] - 1) * 100, 2)}% (from the last close of ${bars[lastOfYear].date.slice(0, 4)}, ${f22(close[lastOfYear])} on ${d(lastOfYear)})`);
+  out.push("", "### Change of the close to the latest row", "", `- ${moves.join("; ")}.`);
+  return out.join("\n");
+}
+
 // src/data/news.ts
 var stamp = (epoch3) => new Date(epoch3 * 1e3).toISOString().slice(0, 16).replace("T", " ");
 async function search(q, count) {
@@ -37628,14 +37833,6 @@ async function socialPosts(raw, analysis2, opts) {
   }
   return out.join("\n");
 }
-
-// src/numbers.ts
-function signed(v, digits) {
-  const text4 = Math.abs(v).toFixed(digits);
-  return Number(text4) === 0 ? text4 : `${v > 0 ? "+" : "-"}${text4}`;
-}
-var signedPct = (fraction, digits = 1) => `${signed(fraction * 100, digits)}%`;
-var unsignZero = (text4) => text4.replace(/^[+\-−](0(?:\.0+)?%)$/, "$1");
 
 // src/data/macro.ts
 var SERIES = {
@@ -39312,8 +39509,8 @@ ${lessons}` : "Lessons from past calls: none yet (no earlier call has been settl
 }
 
 // src/desk/window.ts
-var f22 = (v) => v === null || v === void 0 || !Number.isFinite(v) ? "N/A" : v.toFixed(2);
-var vol2 = (v) => Math.round(v).toLocaleString("en-US");
+var f23 = (v) => v === null || v === void 0 || !Number.isFinite(v) ? "N/A" : v.toFixed(2);
+var vol3 = (v) => Math.round(v).toLocaleString("en-US");
 async function windowRows(ticker, o) {
   const bars = (await history(ticker, o.exit)).bars;
   const rsi2 = compute("rsi", bars), macdh = compute("macdh", bars), ema10 = compute("close_10_ema", bars), sma50 = compute("close_50_sma", bars);
@@ -39323,7 +39520,7 @@ async function windowRows(ticker, o) {
   bars.forEach((b, i) => {
     if (b.date < o.entry || b.date > o.exit) return;
     const before = bars[i - 1], change3 = before ? signedPct(b.close / before.close - 1, 2) : "N/A";
-    rows.push(`${b.date} | ${f22(b.open)} | ${f22(b.high)} | ${f22(b.low)} | ${f22(b.close)} | ${change3} | ${vol2(b.volume)} | ${f22(rsi2[i])} | ${f22(macdh[i])} | ${f22(ema10[i])} | ${f22(sma50[i])} | ${f22(benchClose(b.date))}`);
+    rows.push(`${b.date} | ${f23(b.open)} | ${f23(b.high)} | ${f23(b.low)} | ${f23(b.close)} | ${change3} | ${vol3(b.volume)} | ${f23(rsi2[i])} | ${f23(macdh[i])} | ${f23(ema10[i])} | ${f23(sma50[i])} | ${f23(benchClose(b.date))}`);
   });
   return [
     `WHAT HAPPENED IN THE WINDOW: ${ticker}'s finished sessions from ${o.entry} (entry) to ${o.exit} (exit), prices adjusted for splits and dividends, each change against the session before, and ${o.benchmark}'s close beside each. Anything the lesson says about what happened in the window must be found in these rows.`,
@@ -39664,7 +39861,7 @@ function rerateWeekly(dir, today2, now = /* @__PURE__ */ new Date()) {
 
 // src/desk/routine.ts
 var DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-var weekday = (day3) => DAYS[(/* @__PURE__ */ new Date(`${day3}T12:00:00Z`)).getUTCDay()];
+var weekday2 = (day3) => DAYS[(/* @__PURE__ */ new Date(`${day3}T12:00:00Z`)).getUTCDay()];
 var reratedToday = (dir, today2) => {
   const r = readRerate(dir);
   return new Map(r?.day === today2 ? r.symbols.map((s) => [s.symbol, s]) : []);
@@ -39722,7 +39919,7 @@ function rerateLines(dir, today2) {
   return out;
 }
 function morningBrief(dir, today2, max, look) {
-  const day3 = weekday(today2), weekend = day3 === "Saturday" || day3 === "Sunday";
+  const day3 = weekday2(today2), weekend = day3 === "Saturday" || day3 === "Sunday";
   const m2 = morningList(dir, today2, max, look?.screen ?? null);
   const lines = [`MORNING ROUTINE for ${day3} ${today2}.`];
   if (weekend) lines.push(`US markets do not open on a ${day3}: score past calls (step 1), then stop and say so. Analyse nothing unless the person asked for it in words.`);
@@ -39748,7 +39945,7 @@ function eveningBrief(dir, today2, now) {
   const calls = new Journal(path18.join(dir, "journal.md")).load();
   const todays = calls.filter((e) => e.date === today2), pending = calls.filter((e) => e.pending).length;
   const orders = ordersOn(dir, now);
-  const lines = [`EVENING WRAP-UP for ${weekday(today2)} ${today2}.`, "", "1. Score what is ready: list_settlements, then record_outcome with a lesson for each READY call (the /settle playbook).", ""];
+  const lines = [`EVENING WRAP-UP for ${weekday2(today2)} ${today2}.`, "", "1. Score what is ready: list_settlements, then record_outcome with a lesson for each READY call (the /settle playbook).", ""];
   lines.push(todays.length ? `2. The desk's calls today (${todays.length}): ${todays.map((e) => `${e.ticker} ${e.rating}`).join(", ")}. Read each one's executive summary with read_run (section decision) for one sentence each.` : "2. The desk made no call today.");
   lines.push("");
   if (!orders.length) lines.push("3. The dashboard sent no order today.");
@@ -40073,9 +40270,9 @@ ${renderSummary(summarize(entries))}`;
   }, async (a) => act(async () => {
     const day3 = today();
     if (a.kind === "evening") return eveningBrief(dir, day3, /* @__PURE__ */ new Date());
-    const on = readPrefs(dir).morning === true, weekday2 = ![0, 6].includes((/* @__PURE__ */ new Date(`${day3}T12:00:00Z`)).getUTCDay());
+    const on = readPrefs(dir).morning === true, weekday3 = ![0, 6].includes((/* @__PURE__ */ new Date(`${day3}T12:00:00Z`)).getUTCDay());
     let look;
-    if (weekday2) {
+    if (weekday3) {
       try {
         rerateWeekly(dir, day3);
       } catch {
@@ -40264,6 +40461,12 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root) {
     inputSchema: { symbol: symbol3, analysis_date: analysis, look_back_days: external_exports.number().int().min(1).max(30).optional().describe("How many recent closes to list; 30 when left out") },
     annotations: READ
   }, async (a) => answer(`checked price table of ${a.symbol}`, () => verifiedSnapshot(a.symbol, a.analysis_date, a.look_back_days ?? 30)));
+  server.registerTool("get_price_facts", {
+    title: "Price facts",
+    description: "What the prices and indicators did, worked out by the desk so no one counts by eye: runs up to the latest row (how many sessions in a row), which side of each average and since when, every crossing of the last year, how often things happened in the last 20, 63, 126 and 252 sessions (closes below an average or beyond a band, RSI extremes, big days), the three highest and lowest of each window (closes, volume, daily moves, RSI, MACD, ATR), the latest row against the past (the lowest since when), and the change over each window. Every date carries its weekday. Call it before stating a streak, a first or last time, a record, a rank or a count of sessions.",
+    inputSchema: { symbol: symbol3, analysis_date: analysis },
+    annotations: READ
+  }, async (a) => answer(`price facts of ${a.symbol}`, () => priceFacts(a.symbol, a.analysis_date)));
   const days = external_exports.number().int().min(1).max(30).optional().describe("Calendar days before the analysis date; " + a0.newsLookbackDays + " when left out");
   server.registerTool("get_company_news", {
     title: "Company news",

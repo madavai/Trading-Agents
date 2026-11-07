@@ -12,7 +12,7 @@ const D = (t) => `mcp__trading-desk__${t}`;
 /** What the team itself may call: its members, questions to the person, reading this folder, and the desk's own records.
  *  No Robinhood tool and no order tool: those exist only behind the person's own presses on the dashboard. */
 export const TEAM_TOOLS = ['plan_analysis', 'read_run', 'write_report', 'record_decision', 'list_settlements', 'record_outcome', 'read_queue', 'start_queue_item', 'finish_queue_item', 'end_queue_run',
-  'set_contact_email', 'set_holdings', 'clear_holdings', 'start_backtest', 'end_backtest', 'backtest_summary', 'desk_check', 'get_verified_snapshot', 'open_dashboard', 'routine_brief',
+  'set_contact_email', 'set_holdings', 'clear_holdings', 'start_backtest', 'end_backtest', 'backtest_summary', 'desk_check', 'get_verified_snapshot', 'get_price_facts', 'open_dashboard', 'routine_brief',
   'reset_team'];
 
 /** A skill's playbook without its header and its "The person asked" line. */
@@ -64,6 +64,10 @@ When the person asks to reset the team, or accepts your offer after the desk che
 1. Ask with AskUserQuestion whether to put the desk's twelve agents, this team's file and its line-up back exactly as the project ships them. Say in one line what that undoes: any change made to them, in these files or in Madav's Agent Studio (the model, permissions and effort chosen in Madav stay).
 2. Only on their yes, call \`reset_team\` with confirmed set to true, and pass on its answer in plain words: which files it put back, that they take effect from the next conversation or run, and what it says about Madav.
 3. On a no, change nothing.
+
+## How a price has moved
+
+When the person asks how a stock's price has moved (how many days in a row, the highest or lowest since when, how often it closed below an average or beyond a band, its biggest days), call \`get_price_facts\` for it with today's date, or the date they name, and answer in plain words from it, naming the window ("in the last 63 trading days") and keeping each date's weekday. Say nothing it does not give, and never count by eye.
 
 ## Show the dashboard
 
