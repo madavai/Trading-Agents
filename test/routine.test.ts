@@ -32,6 +32,8 @@ test('the morning analyses what was asked for on the dashboard first, then the s
   const brief = morningBrief(dir, '2026-10-19', 3);
   assert.match(brief, /^MORNING ROUTINE for Monday 2026-10-19\./);
   assert.match(brief, /1\. Score past calls first/);
+  // no one may be watching: a call the desk cannot settle is left, never sent round again
+  assert.match(brief, /\(the \/settle playbook\)\. A call record_outcome answers LEFT or STOP for stays pending: do not send it again now, go on, and name it at the end with the reason it gave\./);
   assert.match(brief, /3 of at most 3 a morning[\s\S]*1\. NVDA \(asked for on the dashboard, deep depth\)[\s\S]*3\. TSLA/);
   assert.match(brief, /start_queue_item first \(it gives the depth\)/);
   assert.match(brief, /call end_queue_run once/);
@@ -70,6 +72,7 @@ test('the evening reports today\'s calls and the orders the dashboard sent, with
   assert.deepEqual(ordersOn(dir, now).map((o) => o.symbol), ['NVDA', 'AMD']);
   const brief = eveningBrief(dir, '2026-10-19', now);
   assert.match(brief, /^EVENING WRAP-UP for Monday 2026-10-19\./);
+  assert.match(brief, /1\. Score what is ready: .*\(the \/settle playbook\)\. A call record_outcome answers LEFT or STOP for stays pending: do not send it again now, go on, and name it at the end with the reason it gave\./);
   assert.match(brief, /The desk's calls today \(1\): NVDA Overweight/);
   assert.match(brief, /Buy 1 NVDA at limit 182\.40, 14:05 UTC, from the Buy call of 2026-10-16: taken, waiting for the person's approval on their phone \(state then: queued\)\./);
   assert.match(brief, /Buy 1 AMD at limit 182\.40, 15:00 UTC.*: refused: Market closed\./);

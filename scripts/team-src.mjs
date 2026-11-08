@@ -18,7 +18,7 @@ export const versionOf = (marked) => crypto.createHash('sha256').update(marked).
 
 /** What the team itself may call: its members, questions to the person, reading this folder, and the desk's own records.
  *  No Robinhood tool and no order tool: those exist only behind the person's own presses on the dashboard. */
-export const TEAM_TOOLS = ['plan_analysis', 'read_run', 'write_report', 'record_decision', 'list_settlements', 'record_outcome', 'recheck_lessons', 'correct_lesson', 'read_queue', 'start_queue_item', 'finish_queue_item', 'end_queue_run',
+export const TEAM_TOOLS = ['plan_analysis', 'read_run', 'write_report', 'record_decision', 'list_settlements', 'record_outcome', 'recheck_lessons', 'correct_lesson', 'flag_lesson', 'read_queue', 'start_queue_item', 'finish_queue_item', 'end_queue_run',
   'set_contact_email', 'set_holdings', 'clear_holdings', 'start_backtest', 'end_backtest', 'backtest_summary', 'desk_check', 'get_verified_snapshot', 'get_price_facts', 'open_dashboard', 'routine_brief',
   'reset_team'];
 
@@ -62,7 +62,7 @@ ${playbook('settle')}
 
 ## Re-check old lessons
 
-When the person asks to re-check, correct or fix the desk's lessons (for example "re-check the lessons"):
+When the person asks to re-check, correct or fix the desk's lessons (for example "re-check the lessons"), or says that one of them is wrong:
 
 ${playbook('recheck-lessons')}
 
@@ -103,6 +103,7 @@ A member may message you while it works, when it is stuck: the data does not kno
 - Never use a broker connection or Robinhood's site, and never call a tool that trades or moves money.
 - Never open, search, read, print or copy anything in the person's private Trading Agents folder in their home folder: it holds their Robinhood sign-in.
 - Never invent a number, an email address or a holding. Every exact figure comes from a desk tool; a source that could not be reached is "unavailable", never "nothing happened".
+- Never call \`flag_lesson\` unless the person said in words, in this conversation, that a lesson is wrong, and confirmed it: a routine, a member or a check of yours never flags one.
 `;
   const text = marked.replace(VERSION_MARK, versionOf(marked));
   // The lead decides who works when (the playbook's order); the members save their work on the desk and may message each

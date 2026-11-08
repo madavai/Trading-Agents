@@ -6,9 +6,11 @@
 // How a lesson was written is kept in its tag, so the desk can tell which lessons rest on the holding window's prices:
 // "lesson:prices" (written with the window's rows at hand), "lesson:no-prices" (the rows could not be had, so it may say
 // nothing about any day), "lesson:corrected:<day>" (rewritten from the rows that day; the first lesson is kept word for
-// word under FIRST LESSON, and LESSON CHECK says what the check found) and "lesson:unreliable:<day>" (it could not be
-// checked against the rows that day, so analyses do not read it). No mark: written before the desk showed the lesson
-// writer the window's prices.
+// word under FIRST LESSON, and LESSON CHECK says what the check found), "lesson:unreliable:<day>" (it could not be
+// checked against the rows that day, so analyses do not read it) and "lesson:flagged:<day>" (the person said that day
+// that it is wrong, so analyses do not read it until a re-check rewrites it). No mark: written before the desk showed the
+// lesson writer the window's prices. A lesson rewritten more than once keeps each corrected lesson it replaced, with its
+// check, under EARLIER CORRECTIONS (newest first), so no words are ever lost.
 import fs from 'node:fs';
 import path from 'node:path';
 import { REVIEW, RATINGS, parseRating } from './rating.js';
@@ -16,16 +18,20 @@ import { withLock, writeWhole } from './lock.js';
 import { signedPct as pct, unsignZero } from '../numbers.js';
 
 /** How a settled call's lesson was written: see the file's head. "unmarked" is the old way; "none" a call not settled. */
-export type LessonState = 'none' | 'unmarked' | 'prices' | 'no-prices' | 'corrected' | 'unreliable';
-/** The states whose lesson was not written from the window's prices, and so wait to be re-checked. */
-export const UNCHECKED: readonly LessonState[] = ['unmarked', 'no-prices', 'unreliable'];
+export type LessonState = 'none' | 'unmarked' | 'prices' | 'no-prices' | 'corrected' | 'unreliable' | 'flagged';
+/** The states whose lesson was not written from the window's prices, or that the person said is wrong, and so wait to be
+ *  re-checked. A lesson written from the prices or corrected waits again only once the person flags it. */
+export const UNCHECKED: readonly LessonState[] = ['unmarked', 'no-prices', 'unreliable', 'flagged'];
+/** The states whose words analyses never read. */
+export const WITHHELD: readonly LessonState[] = ['unreliable', 'flagged'];
 
 export interface Entry {
   date: string; ticker: string; rating: string; pending: boolean;
   raw: string | null; alpha: string | null; holding: string | null; resolved: string | null;
   decision: string; reflection: string;
-  /** How the lesson was written, the day it was corrected or marked unreliable, what that check found, and the first lesson's words. */
-  lesson: LessonState; lessonOn: string | null; lessonCheck: string; firstLesson: string;
+  /** How the lesson was written, the day it was corrected, marked unreliable or flagged, what that check found, the
+   *  corrected lessons it replaced with their checks (newest first), and the first lesson's words. */
+  lesson: LessonState; lessonOn: string | null; lessonCheck: string; earlier: string; firstLesson: string;
 }
 
 const SEPARATOR = '\n\n<!-- ENTRY_END -->\n\n';
@@ -37,10 +43,10 @@ const MARK = /<!--\s*ENTRY_END\s*-->/i;
 function keep(text: string): string {
   let s = text;
   while (MARK.test(s)) s = s.replace(MARK, '');
-  return s.replace(/^([ \t]*)(DECISION|REFLECTION|LESSON CHECK|FIRST LESSON):/gim, '$1$2 -').trim();
+  return s.replace(/^([ \t]*)(DECISION|REFLECTION|LESSON CHECK|EARLIER CORRECTIONS|FIRST LESSON):/gim, '$1$2 -').trim();
 }
 
-const LESSON_STATES = new Set<LessonState>(['prices', 'no-prices', 'corrected', 'unreliable']);
+const LESSON_STATES = new Set<LessonState>(['prices', 'no-prices', 'corrected', 'unreliable', 'flagged']);
 /** The tag's lesson field: "lesson:<state>" or "lesson:<state>:<day>". */
 function lessonOf(fields: string[], pending: boolean): { lesson: LessonState; lessonOn: string | null } {
   if (pending) return { lesson: 'none', lessonOn: null };
@@ -64,12 +70,26 @@ function parse(block: string): Entry | null {
   const body = lines.slice(1).join('\n').trim();
   const decision = /DECISION:\n([\s\S]*?)(?=\nREFLECTION:|$)/.exec(body)?.[1]?.trim() ?? '';
   // Each section runs to the next one's heading or the end ((?![\s\S]) is the end of the text, whatever the lines).
-  const reflection = /(?:^|\n)REFLECTION:\n([\s\S]*?)(?=\nLESSON CHECK:\n|\nFIRST LESSON:\n|(?![\s\S]))/.exec(body)?.[1]?.trim() ?? '';
-  const lessonCheck = /(?:^|\n)LESSON CHECK:\n([\s\S]*?)(?=\nFIRST LESSON:\n|(?![\s\S]))/.exec(body)?.[1]?.trim() ?? '';
+  const reflection = /(?:^|\n)REFLECTION:\n([\s\S]*?)(?=\nLESSON CHECK:\n|\nEARLIER CORRECTIONS:\n|\nFIRST LESSON:\n|(?![\s\S]))/.exec(body)?.[1]?.trim() ?? '';
+  const lessonCheck = /(?:^|\n)LESSON CHECK:\n([\s\S]*?)(?=\nEARLIER CORRECTIONS:\n|\nFIRST LESSON:\n|(?![\s\S]))/.exec(body)?.[1]?.trim() ?? '';
+  const earlier = /(?:^|\n)EARLIER CORRECTIONS:\n([\s\S]*?)(?=\nFIRST LESSON:\n|(?![\s\S]))/.exec(body)?.[1]?.trim() ?? '';
   const firstLesson = /(?:^|\n)FIRST LESSON:\n([\s\S]*)$/.exec(body)?.[1]?.trim() ?? '';
   const resolved = f.slice(6).find((x) => x.startsWith('resolved:'))?.slice('resolved:'.length).trim() ?? null;
   const pending = f[3] === 'pending', score = (s: string | undefined) => (s === undefined ? null : unsignZero(s));
-  return { date: f[0]!, ticker: f[1]!, rating: f[2]!, pending, raw: pending ? null : score(f[3]), alpha: score(f[4]), holding: f[5] ?? null, resolved, decision, reflection, ...lessonOf(f.slice(6), pending), lessonCheck, firstLesson };
+  return { date: f[0]!, ticker: f[1]!, rating: f[2]!, pending, raw: pending ? null : score(f[3]), alpha: score(f[4]), holding: f[5] ?? null, resolved, decision, reflection, ...lessonOf(f.slice(6), pending), lessonCheck, earlier, firstLesson };
+}
+
+/** A settled entry's lesson part: the lesson, then each section that has words, in the journal's order. */
+const lessonPart = (p: { lesson: string; check?: string; earlier?: string; first?: string }): string =>
+  [keep(p.lesson), ...([['LESSON CHECK', p.check], ['EARLIER CORRECTIONS', p.earlier], ['FIRST LESSON', p.first]] as const)
+    .filter(([, words]) => words?.trim()).map(([head, words]) => `${head}:\n${keep(words!)}`)].join('\n\n');
+
+/** The first line of a flagged lesson's check: the day, and what the person said is wrong (kept on one line). */
+const FLAG_LINE = /^(\d{4}-\d{2}-\d{2}): the person said this lesson is wrong, so later analyses do not read it until a re-check rewrites it from the holding window's prices\. What the person said is wrong: (.*)$/;
+/** What the person said is wrong about a flagged lesson, and the day they said it; null for any other lesson. */
+export function flagOf(e: Entry): { on: string; said: string } | null {
+  const m = e.lesson === 'flagged' ? FLAG_LINE.exec(e.lessonCheck.split('\n')[0] ?? '') : null;
+  return m ? { on: m[1]!, said: m[2]! } : null;
 }
 
 /** A settled entry with its lesson part rewritten. Everything before REFLECTION - the tag's call, rating and score, and the
@@ -82,13 +102,15 @@ function withLesson(block: string, mark: string, lessonPart: string): string {
 }
 
 /** What an analysis is told beside a lesson about how it was written. A lesson written from the window's prices needs no
- *  note; one marked unreliable is withheld, with this note in its place. */
-const LESSON_NOTE: Partial<Record<LessonState, (e: Entry) => string>> & { unreliable: (e: Entry) => string } = {
+ *  note; one marked unreliable or flagged by the person is withheld, with this note in its place. */
+const LESSON_NOTE: Partial<Record<LessonState, (e: Entry) => string>> & Record<'unreliable' | 'flagged', (e: Entry) => string> = {
   unmarked: () => "written before the desk showed the lesson writer the holding window's prices, and not re-checked since: what it says happened on a given day may be wrong",
   'no-prices': () => "written when the holding window's prices could not be had, and not re-checked since",
-  corrected: (e) => `corrected${e.lessonOn ? ` on ${e.lessonOn}` : ''}: rewritten from the holding window's real prices, replacing a first lesson written without them`,
+  corrected: (e) => `corrected${e.lessonOn ? ` on ${e.lessonOn}` : ''}: rewritten from the holding window's real prices, replacing an earlier lesson`,
   unreliable: (e) => `withheld. It was written without the holding window's prices, and they could not be had to check it${e.lessonOn ? ` on ${e.lessonOn}` : ''}.`,
+  flagged: (e) => `withheld. The person said${e.lessonOn ? ` on ${e.lessonOn}` : ''} that it is wrong, and it waits to be rewritten from the holding window's prices.`,
 };
+const withheld = (e: Entry) => (WITHHELD as LessonState[]).includes(e.lesson);
 
 export class Journal {
   /** @param maxResolved keep at most this many settled entries (the oldest go first); pending ones are never dropped */
@@ -150,26 +172,49 @@ export class Journal {
   }
 
   /** Replaces a settled call's lesson with one rewritten from its window's prices on `on`. The first lesson is kept word
-   *  for word under FIRST LESSON (one already kept stays: it is the first), and `check` - what the check found - under
-   *  LESSON CHECK. The tag's call, rating and score and the decision are not touched. False when not settled, or the
-   *  lesson was written from the window's prices or corrected already. */
+   *  for word under FIRST LESSON (one already kept stays: it is the first); a corrected lesson the person flagged, which
+   *  this replaces, is kept with its check under EARLIER CORRECTIONS, newest first; and `check` - what the check found -
+   *  goes under LESSON CHECK. The tag's call, rating and score and the decision are not touched. False when not settled,
+   *  or the lesson was written from the window's prices or corrected, and the person has not flagged it since. */
   correctLesson(ticker: string, date: string, lesson: string, check: string, on: string): boolean {
     if (!DATE.test(on)) throw new Error(`"${on}" is not a date in YYYY-MM-DD form`);
     return this.relesson(ticker, date, (e) => (!(UNCHECKED as LessonState[]).includes(e.lesson) ? null : {
       mark: `lesson:corrected:${on}`,
-      part: `${keep(lesson)}\n\nLESSON CHECK:\n${keep(check)}\n\nFIRST LESSON:\n${keep(e.firstLesson || e.reflection)}`,
+      part: lessonPart({
+        lesson, check,
+        // Only a lesson the desk already corrected has a first lesson kept beside it: that corrected lesson moves to the
+        // earlier corrections. Any other lesson being replaced is the first lesson itself.
+        earlier: e.firstLesson ? [`Lesson replaced on ${on}:\n${e.reflection}\nIts check: ${e.lessonCheck || 'none was kept'}`, e.earlier].filter(Boolean).join('\n\n') : e.earlier,
+        first: e.firstLesson || e.reflection,
+      }),
     }));
   }
 
   /** Marks a settled call's lesson unreliable on `on`: it could not be checked against its window's prices, for the reason
    *  `check` gives. Its words stay as they are; analyses stop reading them until a later check corrects them. False when
-   *  not settled, or the lesson was written from the window's prices or corrected already. */
+   *  not settled, or the lesson was written from the window's prices or corrected already, or the person flagged it (it
+   *  is withheld already, and keeps what they said). */
   markUnreliable(ticker: string, date: string, check: string, on: string): boolean {
     if (!DATE.test(on)) throw new Error(`"${on}" is not a date in YYYY-MM-DD form`);
-    return this.relesson(ticker, date, (e) => (!(UNCHECKED as LessonState[]).includes(e.lesson) ? null : {
+    return this.relesson(ticker, date, (e) => (!(UNCHECKED as LessonState[]).includes(e.lesson) || e.lesson === 'flagged' ? null : {
       mark: `lesson:unreliable:${on}`,
-      part: `${keep(e.reflection)}\n\nLESSON CHECK:\n${keep(check)}${e.firstLesson ? `\n\nFIRST LESSON:\n${keep(e.firstLesson)}` : ''}`,
+      part: lessonPart({ lesson: e.reflection, check, earlier: e.earlier, first: e.firstLesson }),
     }));
+  }
+
+  /** Flags a settled call's lesson on `on`, on the person's word that it is wrong (`said`, kept on one line): analyses stop
+   *  reading it at once, and a re-check lists it again to be rewritten from the window's prices. Its words stay; the check
+   *  it had is kept under the person's words. The tag's call, rating and score and the decision are not touched.
+   *  'flagged' when done; 'already' when it was flagged already (nothing written); 'none' when there is no such settled call. */
+  flagLesson(ticker: string, date: string, said: string, on: string): 'flagged' | 'already' | 'none' {
+    if (!DATE.test(on)) throw new Error(`"${on}" is not a date in YYYY-MM-DD form`);
+    let already = false;
+    const done = this.relesson(ticker, date, (e) => {
+      if (e.lesson === 'flagged') { already = true; return null; }
+      const line = `${on}: the person said this lesson is wrong, so later analyses do not read it until a re-check rewrites it from the holding window's prices. What the person said is wrong: ${said.replace(/\s+/g, ' ').trim()}`;
+      return { mark: `lesson:flagged:${on}`, part: lessonPart({ lesson: e.reflection, check: `${line}${e.lessonCheck ? `\nIts check before then: ${e.lessonCheck}` : ''}`, earlier: e.earlier, first: e.firstLesson }) };
+    });
+    return done ? 'flagged' : already ? 'already' : 'none';
   }
 
   private rotate(blocks: string[]): string[] {
@@ -181,21 +226,21 @@ export class Journal {
 
   /** The lessons for an analysis: the latest settled calls on this stock in full, and the latest on others as lessons only.
    *  With `asOf`, only calls whose outcome was already known on that day - a past-dated run must not learn from its future.
-   *  Each lesson says how it was written (see LESSON_NOTE); one marked unreliable is withheld, and is not counted among the
-   *  other stocks' lessons, since it brings none. */
+   *  Each lesson says how it was written (see LESSON_NOTE); one marked unreliable or flagged by the person is withheld, and
+   *  is not counted among the other stocks' lessons, since it brings none. */
   pastContext(ticker: string, o: { asOf?: string; sameLimit?: number; otherLimit?: number } = {}): string {
     const { sameLimit = 5, otherLimit = 3 } = o;
     let settled = this.load().filter((e) => !e.pending);
     if (o.asOf) settled = settled.filter((e) => e.resolved && e.resolved <= o.asOf!);
     const same: Entry[] = [], other: Entry[] = [];
     for (const e of settled.reverse()) {
-      if (e.ticker !== ticker && e.lesson === 'unreliable') continue;
+      if (e.ticker !== ticker && withheld(e)) continue;
       if (e.ticker === ticker ? same.length < sameLimit : other.length < otherLimit) (e.ticker === ticker ? same : other).push(e);
       if (same.length >= sameLimit && other.length >= otherLimit) break;
     }
     if (!same.length && !other.length) return '';
     const full = (e: Entry) => [`[${e.date} | ${e.ticker} | ${e.rating} | ${e.raw ?? 'n/a'} | ${e.alpha ?? 'n/a'} | ${e.holding ?? 'n/a'}]`, `DECISION:\n${e.decision}`,
-      ...(e.lesson === 'unreliable' ? [`REFLECTION: ${LESSON_NOTE.unreliable(e)}`] : e.reflection ? [`REFLECTION${LESSON_NOTE[e.lesson] ? ` (${LESSON_NOTE[e.lesson]!(e)})` : ''}:\n${e.reflection}`] : [])].join('\n\n');
+      ...(e.lesson === 'unreliable' || e.lesson === 'flagged' ? [`REFLECTION: ${LESSON_NOTE[e.lesson](e)}`] : e.reflection ? [`REFLECTION${LESSON_NOTE[e.lesson] ? ` (${LESSON_NOTE[e.lesson]!(e)})` : ''}:\n${e.reflection}`] : [])].join('\n\n');
     const short = (e: Entry) => `[${e.date} | ${e.ticker} | ${e.rating} | ${e.raw ?? 'n/a'}]${e.reflection && LESSON_NOTE[e.lesson] ? ` (lesson ${LESSON_NOTE[e.lesson]!(e)})` : ''}\n${e.reflection || e.decision.slice(0, 300) + (e.decision.length > 300 ? '...' : '')}`;
     const parts: string[] = [];
     if (same.length) parts.push(`Past analyses of ${ticker} (most recent first):`, ...same.map(full));

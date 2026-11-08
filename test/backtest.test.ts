@@ -32,7 +32,7 @@ test('cells are a stock at a time, with a stock or date given twice counted once
   assert.throws(() => cells(['../x'], ['2026-06-01']), /not a ticker/);
 });
 
-const e = (rating: string, alpha: string | null, pending = false, holding = '5d'): Entry => ({ date: '2026-06-01', ticker: 'X', rating, pending, raw: pending ? null : '+1.0%', alpha: pending ? null : alpha, holding: pending ? null : holding, resolved: null, decision: '', reflection: '', lesson: pending ? 'none' : 'prices', lessonOn: null, lessonCheck: '', firstLesson: '' });
+const e = (rating: string, alpha: string | null, pending = false, holding = '5d'): Entry => ({ date: '2026-06-01', ticker: 'X', rating, pending, raw: pending ? null : '+1.0%', alpha: pending ? null : alpha, holding: pending ? null : holding, resolved: null, decision: '', reflection: '', lesson: pending ? 'none' : 'prices', lessonOn: null, lessonCheck: '', earlier: '', firstLesson: '' });
 
 test('calls are scored by rating: direction hit rate for Buy and Sell, none for Hold, and unreadable ratings left out', () => {
   const s = summarize([e('Buy', '+7.0%'), e('Buy', '-2.0%'), e('Overweight', '+1.0%'), e('Sell', '-4.0%'), e('Sell', '+3.0%'), e('Hold', '+0.5%'), e('Hold', '-0.5%'), e('Needs review', '+9.0%'), e('Buy', null, true), e('Sell', 'n/a')]);

@@ -155,7 +155,15 @@ test('the lead never resets unasked, never stands one tool in for another, and n
   assert.match(deskCheck, /If it starts with DESK UPDATED, .*offer no reset in this one/);
   assert.match(deskCheck, /call the desk's `reset_team` tool once .*if it answers ALREADY RESET or "Not reset", never call it again/);
   const recheck = fs.readFileSync('.claude/skills/recheck-lessons/SKILL.md', 'utf8');
-  assert.match(recheck, /if it answers LEFT, it has refused that lesson twice: leave it, go on with the next, and name it at the end\. If `recheck_lessons` answers STOP, .*stop at once, call neither tool again, and tell the person what it says\./);
+  assert.match(recheck, /if it answers LEFT, it has refused that lesson twice: leave it, go on with the next, and name it at the end\. If it answers STOP for a lesson, it was sent again after it was left: leave it too, and never send it again in this re-check\. If `recheck_lessons` answers STOP, .*stop at once, call neither tool again, and tell the person what it says\./);
+});
+
+test('scoring never goes round in a loop either: a call record_outcome answers LEFT or STOP for is left pending, the team goes on, and names it at the end with why (8 Nov: the desk began refusing lessons of more than four sentences)', () => {
+  const settle = fs.readFileSync('.claude/skills/settle/SKILL.md', 'utf8'), lead = front('trading-desk').text;
+  const step = /If `record_outcome` refuses a lesson \(INPUT_ERROR\), correct what it says once and send it again: a lesson with too many sentences is refused with how the desk counts them and where it cut\. If it answers LEFT, it has failed to settle that call twice: leave it, go on with the next READY call, and name it at the end with the reason it gave\. If it answers STOP for a call, it was sent again after it was left: leave it too, and never send it again in this scoring\. A call `list_settlements` shows as LEFT is left the same way\. A call left stays pending and unscored, with no lesson; a later scoring, started an hour or more after `record_outcome` was last used, tries it again\./;
+  assert.match(settle, step);
+  assert.match(settle, /each call left \(date, ticker, the reason `record_outcome` gave, and that a later scoring tries it again\)/);
+  assert.match(lead, step, 'the lead carries the /settle playbook as it is');
 });
 
 test('the team\'s file carries the version of its own steps, worked out from them, which the desk check reads', async () => {
@@ -177,8 +185,14 @@ test('/recheck-lessons rewrites a lesson under /settle\'s rules, from the window
   assert.match(recheck, /never changes the call, its rating or its score/);
   for (const t of ['recheck_lessons', 'correct_lesson', 'what_was_wrong', 'UNRELIABLE', 'Nothing here is investment advice']) assert.ok(recheck.includes(t), t);
   const lead = front('trading-desk');
-  assert.match(lead.text, /\n## Re-check old lessons\n\nWhen the person asks to re-check, correct or fix the desk's lessons \(for example "re-check the lessons"\):\n\n1\. Call `recheck_lessons`/);
-  for (const t of ['recheck_lessons', 'correct_lesson']) {
+  assert.match(lead.text, /\n## Re-check old lessons\n\nWhen the person asks to re-check, correct or fix the desk's lessons \(for example "re-check the lessons"\), or says that one of them is wrong:\n\n[^\n]+\n\n1\. Call `recheck_lessons`/);
+  // a lesson is flagged as wrong only on the person's own words, confirmed, and never by a routine, a member or a check
+  for (const text of [recheck, lead.text]) {
+    assert.match(text, /A lesson the person says is wrong\n\nOnly on the person's own words in this conversation, naming for each lesson the stock, the call's date and what is wrong[\s\S]*?Never because a check of yours, or of a member, found that a lesson is wrong/);
+    assert.match(text, /Only on their yes, call `flag_lesson` once for each lesson, .*confirmed set to true\. If it answers ALREADY FLAGGED, do not call it again for that lesson\./);
+  }
+  assert.match(lead.text, /- Never call `flag_lesson` unless the person said in words, in this conversation, that a lesson is wrong, and confirmed it: a routine, a member or a check of yours never flags one\./);
+  for (const t of ['recheck_lessons', 'correct_lesson', 'flag_lesson']) {
     assert.ok(lead.fields.tools!.includes(`mcp__trading-desk__${t}`), `the lead has ${t}`);
     for (const agent of src.AGENTS) assert.ok(!front(agent.file).fields.tools!.includes(`mcp__trading-desk__${t}`), `${agent.file} cannot change a lesson`);
   }

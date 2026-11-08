@@ -1,0 +1,79 @@
+// A run's own notes beside the journal, so it cannot go round in a loop. A re-check (lesson-check.json) and a scoring
+// (settle-check.json) each keep their own: how many times the desk refused one call's words in this run and why, how many
+// were saved, and the last listing shown. The first refusal is said as one, to correct and send again; the second of the
+// same call's words is LEFT (leave that call and go on); the same call refused again after that, with nothing saved since
+// its last refusal, is STOP. The notes lapse an hour after the run's last step, so a later run starts afresh and tries
+// again what this one left.
+import fs from 'node:fs';
+import path from 'node:path';
+import type { Journal } from './journal.js';
+import { writeWhole } from './lock.js';
+
+/** After this many refusals of the same call's words in one run, the call is left for a later run. */
+export const REFUSALS_TO_LEAVE = 2;
+/** How long a run's notes are kept after its last step. A run asked for after that starts afresh, and tries the calls it
+ *  left again; one asked for within it goes on from where the last one stopped. */
+export const NOTES_IDLE_MS = 60 * 60_000;
+/** The longest refusal kept in the notes, to be named again in a later listing. */
+const MAX_WHY = 600;
+
+export type NotesKind = 'lesson-check' | 'settle-check';
+
+export interface Notes {
+  at: number;
+  saved: number;
+  /** Per call: how many refusals in this run, the last one's words, and how many saves the run had made by then. */
+  refused: Record<string, { n: number; why: string; saved: number }>;
+  listed?: { of: string; shown: string[]; saved: number; at: number };
+}
+
+export const keyOf = (ticker: string, date: string) => `${ticker}|${date}`;
+const fileOf = (j: Journal, kind: NotesKind) => path.join(path.dirname(j.file), `${kind}.json`);
+
+/** A run's notes, read field by field; fresh ones when there are none, or the last step was an hour ago or more. */
+export function readNotes(j: Journal, kind: NotesKind, now: number): Notes {
+  try {
+    const n = JSON.parse(fs.readFileSync(fileOf(j, kind), 'utf8')) as Record<string, unknown>;
+    if (typeof n.at === 'number' && now - n.at < NOTES_IDLE_MS && now >= n.at) {
+      const refused: Notes['refused'] = {};
+      for (const [k, v] of Object.entries((n.refused ?? {}) as Record<string, { n?: unknown; why?: unknown; saved?: unknown }>)) {
+        // a note kept before saves were counted per refusal can never be the same count: it is LEFT, not STOP
+        if (typeof v?.n === 'number' && typeof v.why === 'string') refused[k] = { n: v.n, why: v.why, saved: typeof v.saved === 'number' ? v.saved : -1 };
+      }
+      const l = n.listed as Notes['listed'] | undefined;
+      const listedOk = l && typeof l.of === 'string' && Array.isArray(l.shown) && l.shown.every((s) => typeof s === 'string') && typeof l.saved === 'number' && typeof l.at === 'number';
+      return { at: n.at, saved: typeof n.saved === 'number' ? n.saved : 0, refused, ...(listedOk ? { listed: l } : {}) };
+    }
+  } catch { /* none kept yet, or unreadable: start afresh */ }
+  return { at: now, saved: 0, refused: {} };
+}
+
+export function writeNotes(j: Journal, kind: NotesKind, notes: Notes, now: number): void {
+  try { writeWhole(fileOf(j, kind), JSON.stringify({ ...notes, at: now })); } catch { /* the run works on; only its loop guard forgets */ }
+}
+
+/** One step of the run that refused nothing: the notes' hour starts again, and a save (the call named) is counted, with
+ *  that call's refusals forgotten. */
+export function noteStep(j: Journal, kind: NotesKind, now: number, saved?: { ticker: string; date: string }): void {
+  const notes = readNotes(j, kind, now);
+  if (saved) { notes.saved++; delete notes.refused[keyOf(saved.ticker, saved.date)]; }
+  writeNotes(j, kind, notes, now);
+}
+
+/** Counts one refusal of a call's words in this run. AGAIN the first time: say the refusal, to correct and send again.
+ *  LEFT from the second: leave that call and go on. STOP when it is refused again after it was left, with nothing saved
+ *  since its last refusal: the run is going round in a loop. */
+export function countRefusal(j: Journal, kind: NotesKind, ticker: string, date: string, why: string, now: number): { n: number; answer: 'again' | 'left' | 'stop' } {
+  const notes = readNotes(j, kind, now), key = keyOf(ticker, date), before = notes.refused[key];
+  const n = (before?.n ?? 0) + 1;
+  notes.refused[key] = { n, why: why.slice(0, MAX_WHY), saved: notes.saved };
+  writeNotes(j, kind, notes, now);
+  if (n < REFUSALS_TO_LEAVE) return { n, answer: 'again' };
+  return { n, answer: before && before.n >= REFUSALS_TO_LEAVE && before.saved === notes.saved ? 'stop' : 'left' };
+}
+
+/** The call's refusals in this run when it was left after them, or null: what a listing names instead of showing it. */
+export function leftIn(notes: Notes, ticker: string, date: string): { n: number; why: string } | null {
+  const r = notes.refused[keyOf(ticker, date)];
+  return r && r.n >= REFUSALS_TO_LEAVE ? r : null;
+}

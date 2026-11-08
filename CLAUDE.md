@@ -17,7 +17,9 @@ In a chat here:
   journal. It proposes only; it never places an order.
 - `/settle`: scores past calls whose holding window has finished against their market index and writes the lessons.
 - `/recheck-lessons`: rewrites the lessons written before the desk showed them the holding window's real prices, from
-  those prices, keeping the first words beside the new ones. It never changes a call, its rating or its score.
+  those prices, keeping the first words beside the new ones; and, when the person says a lesson is wrong (the stock,
+  the call's date and what is wrong), stops analyses reading it and rewrites it the same way. It never changes a call,
+  its rating or its score.
 - `/backtest TICKERS START END`: runs the team over past dates in a journal of its own and scores the calls by rating.
   Slow and costly: every date is a full team run.
 - `/terminal`: opens the dashboard on this computer (`node dist/terminal.mjs`): markets, charts, watchlist, the desk's
