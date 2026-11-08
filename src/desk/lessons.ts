@@ -11,16 +11,15 @@
 // word, naming the stock, the call's date and what is wrong, does that, and analyses stop reading it from that moment
 // until it is rewritten. The team never flags a lesson by itself.
 //
-// A re-check keeps a few notes of its own beside the journal (lesson-check.json), so it cannot go round in a loop: a lesson
-// whose new words correct_lesson refused twice is left and named at the end, and a listing that would show the same
-// lessons again with nothing saved since says STOP instead. The notes lapse an hour after the re-check's last step.
-import fs from 'node:fs';
-import path from 'node:path';
+// A re-check keeps a few notes of its own beside the journal (lesson-check.json, loop-notes.ts), so it cannot go round in
+// a loop: a lesson whose new words correct_lesson refused twice is left and named at the end, the same lesson refused
+// again after that with nothing saved since answers STOP, and a listing that would show the same lessons again with
+// nothing saved since says STOP instead. The notes lapse an hour after the re-check's last step.
 import { Journal, UNCHECKED, flagOf, type Entry } from './journal.js';
 import { measure, resolveBenchmark, type Outcome, type Scoring } from './scoring.js';
 import { windowRows } from './window.js';
 import { lessonRefusal } from './settle.js';
-import { writeWhole } from './lock.js';
+import { REFUSALS_TO_LEAVE, countRefusal, keyOf, leftIn, noteStep, readNotes, writeNotes } from './loop-notes.js';
 import { listed, utcTime } from './agent-files.js';
 import { today } from '../data/dates.js';
 import { signedPct } from '../numbers.js';
@@ -31,42 +30,9 @@ export const PER_LISTING = 3;
 export const MAX_CHECK_NOTE = 900;
 /** The three labels what_was_wrong sorts each statement of the lesson as it stands under, in this order. */
 export const CHECK_LABELS = ['Contradicted:', 'Not known from the prices:', 'Right:'] as const;
-/** After this many refusals of a lesson's new words in one re-check, the lesson is left for a later one. */
-export const REFUSALS_TO_LEAVE = 2;
-/** How long a re-check's notes are kept after its last step. A re-check asked for after that starts afresh, and tries the
- *  lessons it left again; one asked for within it goes on from where the last one stopped. */
-export const NOTES_IDLE_MS = 60 * 60_000;
-
-interface Notes {
-  at: number;
-  saved: number;
-  refused: Record<string, { n: number; why: string }>;
-  listed?: { of: string; shown: string[]; saved: number; at: number };
-}
-
-const keyOf = (ticker: string, date: string) => `${ticker}|${date}`;
-const notesFile = (j: Journal) => path.join(path.dirname(j.file), 'lesson-check.json');
-
-/** The re-check's notes, read field by field; fresh ones when there are none, or the last step was an hour ago or more. */
-function readNotes(j: Journal, now: number): Notes {
-  try {
-    const n = JSON.parse(fs.readFileSync(notesFile(j), 'utf8')) as Record<string, unknown>;
-    if (typeof n.at === 'number' && now - n.at < NOTES_IDLE_MS && now >= n.at) {
-      const refused: Notes['refused'] = {};
-      for (const [k, v] of Object.entries((n.refused ?? {}) as Record<string, { n?: unknown; why?: unknown }>)) {
-        if (typeof v?.n === 'number' && typeof v.why === 'string') refused[k] = { n: v.n, why: v.why };
-      }
-      const l = n.listed as Notes['listed'] | undefined;
-      const listedOk = l && typeof l.of === 'string' && Array.isArray(l.shown) && l.shown.every((s) => typeof s === 'string') && typeof l.saved === 'number' && typeof l.at === 'number';
-      return { at: n.at, saved: typeof n.saved === 'number' ? n.saved : 0, refused, ...(listedOk ? { listed: l } : {}) };
-    }
-  } catch { /* none kept yet, or unreadable: start afresh */ }
-  return { at: now, saved: 0, refused: {} };
-}
-
-function writeNotes(j: Journal, notes: Notes, now: number): void {
-  try { writeWhole(notesFile(j), JSON.stringify({ ...notes, at: now })); } catch { /* the re-check works on; only its loop guard forgets */ }
-}
+/** The re-check's notes, beside the journal: lesson-check.json. */
+const CHECK = 'lesson-check';
+export { REFUSALS_TO_LEAVE, NOTES_IDLE_MS } from './loop-notes.js';
 
 /** The true words about what a later re-check does, for the team to pass on and nothing more. */
 function laterWords(ticker: string | undefined, o: { toRewrite?: number; unreliable?: number; flagged?: number; left?: number } = {}): string {
@@ -140,17 +106,17 @@ const RULES = [
  *  in full to rewrite. One whose window's rows cannot be had is marked unreliable here, by the desk, with why; one this
  *  re-check left after two refusals is named, not shown. The same lessons shown again with nothing saved since: STOP. */
 export async function lessonsToRecheck(journal: Journal, scoring: Scoring, ticker?: string, on: string = today(), now: number = Date.now()): Promise<string> {
-  const notes = readNotes(journal, now), of = ticker ?? '';
+  const notes = readNotes(journal, CHECK, now), of = ticker ?? '';
   const due = journal.load().filter((e) => !e.pending && UNCHECKED.includes(e.lesson) && (!ticker || e.ticker === ticker));
   if (!due.length) {
-    writeNotes(journal, { ...notes, listed: undefined }, now);
+    writeNotes(journal, CHECK, { ...notes, listed: undefined }, now);
     return `No lessons${ticker ? ` on ${ticker}` : ''} to re-check: every settled call's lesson was written from its window's prices, or corrected from them.\n\n${laterWords(ticker)}`;
   }
   const shown: string[] = [], keys: string[] = [], unreliable: string[] = [], flaggedOut: string[] = [], left: string[] = [];
   let later = 0;
   for (const e of due) {
-    const refused = notes.refused[keyOf(e.ticker, e.date)];
-    if (refused && refused.n >= REFUSALS_TO_LEAVE) {
+    const refused = leftIn(notes, e.ticker, e.date);
+    if (refused) {
       left.push(`${tagOf(e)} LEFT: correct_lesson refused its new lesson ${refused.n} times in this re-check (the last time: ${refused.why}). Leave it: its lesson stays as it stands${e.lesson === 'flagged' ? ', and later analyses still do not read it' : ''}. Name it to the person at the end, with that reason.`);
       continue;
     }
@@ -179,14 +145,14 @@ export async function lessonsToRecheck(journal: Journal, scoring: Scoring, ticke
   if (keys.length && last && last.of === of && last.saved === notes.saved && last.shown.join('\n') === keys.join('\n')) {
     // The same lessons as the last listing, and nothing saved since: the re-check is going round. The notes forget that
     // listing, so a person who asks again afterwards is shown the lessons in full.
-    writeNotes(journal, { ...notes, listed: undefined }, now);
+    writeNotes(journal, CHECK, { ...notes, listed: undefined }, now);
     return [
       `STOP: this is the same list of lessons to rewrite as the last one, at ${utcTime(new Date(last.at))}, and no lesson has been saved since, so the re-check is going round in a loop. They are not shown again.`,
       `Do not call recheck_lessons or correct_lesson again now. Tell the person which lessons are still to rewrite (${listed(keys.map((k) => k.replace('|', ' ')))}), and why any of them was not saved, as correct_lesson's answers said.${left.length ? ` Name the ${left.length} left after two refusals too, with why.` : ''}`,
       laterWords(ticker, { toRewrite: keys.length + later, unreliable: unreliable.length, flagged: flaggedOut.length, left: left.length }),
     ].join('\n\n');
   }
-  writeNotes(journal, { ...notes, listed: { of, shown: keys, saved: notes.saved, at: now } }, now);
+  writeNotes(journal, CHECK, { ...notes, listed: { of, shown: keys, saved: notes.saved, at: now } }, now);
   const counts = [
     `${shown.length} to rewrite below`,
     ...(later ? [`${later} more after these (call recheck_lessons again once these are saved)`] : []),
@@ -202,21 +168,18 @@ const sameWords = (a: string, b: string) => a.replace(/\s+/g, ' ').trim() === b.
 
 /** Replaces one settled call's lesson with one the agent rewrote from its window's rows (`correctOnce`), and keeps count:
  *  a refusal is said as one (INPUT_ERROR, to correct and send again) the first time, and the second time for the same
- *  lesson in this re-check as LEFT, so the team leaves it and goes on instead of sending it round again. */
+ *  lesson in this re-check as LEFT, so the team leaves it and goes on instead of sending it round again. Sent again after
+ *  that with no lesson saved since, and refused, it answers STOP. */
 export async function correctLesson(journal: Journal, scoring: Scoring, ticker: string, date: string, lesson: string, whatWasWrong: string, on: string = today(), now: number = Date.now()): Promise<string> {
-  const key = keyOf(ticker, date);
   let answer: string;
   try { answer = await correctOnce(journal, scoring, ticker, date, lesson, whatWasWrong, on); } catch (err) {
     if (!(err instanceof Error)) throw err;
-    const notes = readNotes(journal, now), n = (notes.refused[key]?.n ?? 0) + 1;
-    notes.refused[key] = { n, why: err.message.slice(0, 300) };
-    writeNotes(journal, notes, now);
-    if (n < REFUSALS_TO_LEAVE) throw err;
+    const { n, answer: count } = countRefusal(journal, CHECK, ticker, date, err.message, now);
+    if (count === 'again') throw err;
+    if (count === 'stop') return `STOP: correct_lesson has now refused the new lesson of ${ticker} on ${date} ${n} times in this re-check (this time: ${err.message}). It was left after ${REFUSALS_TO_LEAVE} refusals, and no lesson has been saved since, so the re-check is going round in a loop. Do not send it again now: its lesson stays as it stands. Go on with any other lesson listed to rewrite, and at the end tell the person it was left, and why.`;
     return `LEFT: correct_lesson has now refused the new lesson of ${ticker} on ${date} ${n} times in this re-check (this time: ${err.message}). Leave it: do not send it again in this re-check, and its lesson stays as it stands. Go on with the next lesson, and at the end tell the person it was left, and why.`;
   }
-  const notes = readNotes(journal, now);
-  if (answer.startsWith('Corrected: ')) { notes.saved++; delete notes.refused[key]; }
-  writeNotes(journal, notes, now);
+  noteStep(journal, CHECK, now, answer.startsWith('Corrected: ') ? { ticker, date } : undefined);
   return answer;
 }
 
@@ -274,9 +237,7 @@ export function flagLesson(journal: Journal, ticker: string, date: string, whatI
   const done = journal.flagLesson(ticker, date, said, on);
   if (done === 'already') return `ALREADY FLAGGED: the person said on ${e.lessonOn ?? 'an earlier day'} that the lesson of ${ticker} on ${date} is wrong; nothing was written. Do not call flag_lesson again for it: recheck_lessons lists it to rewrite.`;
   if (done === 'none') return `The lesson of ${ticker} on ${date} was changed by another run meanwhile; nothing was written.`;
-  const notes = readNotes(journal, now);
-  notes.saved++; delete notes.refused[keyOf(ticker, date)];
-  writeNotes(journal, notes, now);
+  noteStep(journal, CHECK, now, { ticker, date });
   const stay = listed(['its words', ...(e.lessonCheck ? ['its check'] : []), ...(e.earlier ? ['its earlier corrections'] : []), ...(e.firstLesson ? ['its first lesson'] : [])]);
   return `Flagged: the lesson of the ${e.rating} call on ${ticker} for ${date}, on the person's word that it is wrong. Later analyses stop reading it now. ${stay[0]!.toUpperCase()}${stay.slice(1)} stay in the journal, with what the person said, and recheck_lessons lists it to rewrite from its window's prices. The call, its rating and its score (${e.raw}, alpha ${e.alpha}) stay as they are.`;
 }

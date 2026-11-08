@@ -39175,9 +39175,9 @@ function extractRating(text4) {
   const lines = text4.normalize("NFKC").split(/\r?\n/).filter((l) => l.trim() && !SCALE.test(l));
   const first = lines.find((l) => !l.trimStart().startsWith("#") || LINE.test(l)) ?? "";
   const m2 = LINE.exec(first);
-  const opening = m2 && SET.has(m2.groups.value.toLowerCase()) ? m2 : null;
-  if (opening && !opening.groups.item) return cap(opening.groups.value);
-  const own2 = opening ? [cap(opening.groups.value)] : [], labels = [];
+  const opening2 = m2 && SET.has(m2.groups.value.toLowerCase()) ? m2 : null;
+  if (opening2 && !opening2.groups.item) return cap(opening2.groups.value);
+  const own2 = opening2 ? [cap(opening2.groups.value)] : [], labels = [];
   for (const line2 of lines) {
     const lm = LINE.exec(line2);
     if (lm && !lm.groups.item && SET.has(lm.groups.value.toLowerCase())) own2.push(cap(lm.groups.value));
@@ -39948,20 +39948,91 @@ async function windowRows(ticker, o) {
   ].join("\n");
 }
 
+// src/desk/loop-notes.ts
+import fs12 from "node:fs";
+import path13 from "node:path";
+var REFUSALS_TO_LEAVE = 2;
+var NOTES_IDLE_MS = 60 * 6e4;
+var MAX_WHY = 600;
+var keyOf2 = (ticker, date5) => `${ticker}|${date5}`;
+var fileOf = (j, kind) => path13.join(path13.dirname(j.file), `${kind}.json`);
+function readNotes(j, kind, now) {
+  try {
+    const n2 = JSON.parse(fs12.readFileSync(fileOf(j, kind), "utf8"));
+    if (typeof n2.at === "number" && now - n2.at < NOTES_IDLE_MS && now >= n2.at) {
+      const refused = {};
+      for (const [k, v] of Object.entries(n2.refused ?? {})) {
+        if (typeof v?.n === "number" && typeof v.why === "string") refused[k] = { n: v.n, why: v.why, saved: typeof v.saved === "number" ? v.saved : -1 };
+      }
+      const l = n2.listed;
+      const listedOk = l && typeof l.of === "string" && Array.isArray(l.shown) && l.shown.every((s) => typeof s === "string") && typeof l.saved === "number" && typeof l.at === "number";
+      return { at: n2.at, saved: typeof n2.saved === "number" ? n2.saved : 0, refused, ...listedOk ? { listed: l } : {} };
+    }
+  } catch {
+  }
+  return { at: now, saved: 0, refused: {} };
+}
+function writeNotes(j, kind, notes, now) {
+  try {
+    writeWhole(fileOf(j, kind), JSON.stringify({ ...notes, at: now }));
+  } catch {
+  }
+}
+function noteStep(j, kind, now, saved) {
+  const notes = readNotes(j, kind, now);
+  if (saved) {
+    notes.saved++;
+    delete notes.refused[keyOf2(saved.ticker, saved.date)];
+  }
+  writeNotes(j, kind, notes, now);
+}
+function countRefusal(j, kind, ticker, date5, why, now) {
+  const notes = readNotes(j, kind, now), key = keyOf2(ticker, date5), before = notes.refused[key];
+  const n2 = (before?.n ?? 0) + 1;
+  notes.refused[key] = { n: n2, why: why.slice(0, MAX_WHY), saved: notes.saved };
+  writeNotes(j, kind, notes, now);
+  if (n2 < REFUSALS_TO_LEAVE) return { n: n2, answer: "again" };
+  return { n: n2, answer: before && before.n >= REFUSALS_TO_LEAVE && before.saved === notes.saved ? "stop" : "left" };
+}
+function leftIn(notes, ticker, date5) {
+  const r = notes.refused[keyOf2(ticker, date5)];
+  return r && r.n >= REFUSALS_TO_LEAVE ? r : null;
+}
+
 // src/desk/settle.ts
 var line = (o, e) => `${e.ticker} ${signedPct(o.raw)} from ${o.entry} to ${o.exit} (${o.holdingDays} trading days); ${o.benchmark} ${signedPct(o.benchmarkReturn)}; alpha ${signedPct(o.alpha)}`;
 var MAX_REFLECTION = 1200;
 var MAX_SENTENCES = 4;
-var ABBREVIATIONS = /\b(?:e\.g|i\.e|vs|etc|approx|U\.S|U\.K|Inc|Corp|Co|Ltd|No|Mr|Ms|Mrs|Dr|St|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec|[A-Z])\./g;
-function sentencesIn(text4) {
-  const t = text4.replace(/\s+/g, " ").trim().replace(ABBREVIATIONS, (m2) => m2.replace(/\./g, "\xB7"));
-  return t ? (t.match(/[.!?]+["')\]”’]*(?= ["'(\[“‘]?[A-Z0-9$+\-−])/g) ?? []).length + 1 : 0;
+var SCORING = "settle-check";
+var DOTTED = /(?<![A-Za-z])(?:[A-Za-z]\.){2,}/g;
+var SHORT_WORDS = /\b(?:vs|etc|approx|est|Inc|Corp|Co|Ltd|No|Nos|Mr|Ms|Mrs|Dr|St|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\./gi;
+var INITIAL = /\b[A-Z]\./g;
+var ELLIPSIS = /\.{3,}/g;
+var END = /[.!?]+["')\]”’]*(?= ["'(\[“‘]?[A-Z0-9$+\-−])/g;
+var keepPoints = (m2) => m2.replace(/\./g, "\xB7");
+function sentencesOf(text4) {
+  const t = text4.replace(/\s+/g, " ").trim();
+  if (!t) return [];
+  const read2 = t.replace(DOTTED, keepPoints).replace(SHORT_WORDS, keepPoints).replace(INITIAL, keepPoints).replace(ELLIPSIS, keepPoints);
+  const out = [];
+  let from = 0;
+  for (const m2 of read2.matchAll(END)) {
+    const to = m2.index + m2[0].length;
+    out.push(t.slice(from, to).trim());
+    from = to;
+  }
+  out.push(t.slice(from).trim());
+  return out;
 }
+var opening = (s) => {
+  const w = s.split(" ");
+  return `"${w.slice(0, 3).join(" ")}${w.length > 3 ? "\u2026" : ""}"`;
+};
 function lessonRefusal(text4) {
   if (!text4) return "the lesson is empty: write 2 to 4 plain sentences";
   if (text4.length > MAX_REFLECTION) return `the lesson is ${text4.length} characters; keep it under ${MAX_REFLECTION}`;
-  const n2 = sentencesIn(text4);
-  if (n2 > MAX_SENTENCES) return `the lesson has ${n2} sentences; write 2 to ${MAX_SENTENCES} (the desk counts a sentence's end where . ! or ? is followed by a space and a capital letter or a figure)`;
+  const s = sentencesOf(text4);
+  if (s.length > MAX_SENTENCES) return `the lesson has ${s.length} sentences; write 2 to ${MAX_SENTENCES}. The desk ends a sentence at . ! or ? followed by a space and a capital letter, a figure or a sign, but not after a short form it knows (such as a.m., U.S., e.g., No., vs., approx. or a month), an initial or an ellipsis. It read these ${s.length}, beginning ${s.map(opening).join(", ")}`;
   return null;
 }
 async function windowText(ticker, o) {
@@ -39971,13 +40042,20 @@ async function windowText(ticker, o) {
     return `WHAT HAPPENED IN THE WINDOW: ${failureText(err, `the day-by-day rows of ${ticker}'s window`)} Write the lesson from the outcome line alone, and say nothing about what happened on any day of the window.`;
   }
 }
-async function dueSettlements(journal, scoring, ticker) {
+var LATER = "A later scoring, started an hour or more after record_outcome was last used, tries it again.";
+async function dueSettlements(journal, scoring, ticker, now = Date.now()) {
   const pending = journal.pending().filter((e) => !ticker || e.ticker === ticker);
   if (!pending.length) return ticker ? `No pending calls on ${ticker}.` : "No pending calls: every call in the journal is settled.";
-  const out = [];
-  let ready = 0;
+  const notes = readNotes(journal, SCORING, now), out = [];
+  let ready = 0, left = 0;
   for (const e of pending) {
     const head2 = `[${e.date} | ${e.ticker} | ${e.rating}]`;
+    const refused = leftIn(notes, e.ticker, e.date);
+    if (refused) {
+      left++;
+      out.push(`${head2} LEFT: record_outcome failed to settle it ${refused.n} times in this scoring (the last time: ${refused.why}). Leave it pending, unscored: do not send it again in this scoring. Name it to the person at the end, with that reason. ${LATER}`);
+      continue;
+    }
     try {
       const o = await measure(e.ticker, e.date, resolveBenchmark(e.ticker, scoring), scoring.holdingPeriodDays);
       if (!o) {
@@ -39994,9 +40072,27 @@ ${await windowText(e.ticker, o)}`);
       out.push(`${head2} ${failureText(err, `prices to settle ${e.ticker} on ${e.date}`)} Leave it pending.`);
     }
   }
-  return [`${pending.length} pending call(s), ${ready} ready to settle. Settle a ready one with record_outcome, using only the figures shown here. Before writing about a level, stop, target or trigger the decision named, find it in that call's window rows: say what happened only as a row shows it, naming its date.`, "", ...out].join("\n\n");
+  return [`${pending.length} pending call(s), ${ready} ready to settle${left ? `, ${left} left in this scoring after ${REFUSALS_TO_LEAVE} failed tries` : ""}. Settle a ready one with record_outcome, using only the figures shown here. Before writing about a level, stop, target or trigger the decision named, find it in that call's window rows: say what happened only as a row shows it, naming its date.`, "", ...out].join("\n\n");
 }
-async function settleOne(journal, scoring, ticker, date5, reflection) {
+async function settleOne(journal, scoring, ticker, date5, reflection, now = Date.now()) {
+  const pending = journal.pending().some((x) => x.ticker === ticker && x.date === date5);
+  let answer2;
+  try {
+    answer2 = await settleOnce(journal, scoring, ticker, date5, reflection);
+  } catch (err) {
+    if (!(err instanceof Error) || !pending) {
+      noteStep(journal, SCORING, now);
+      throw err;
+    }
+    const { n: n2, answer: count } = countRefusal(journal, SCORING, ticker, date5, err.message, now);
+    if (count === "again") throw err;
+    if (count === "stop") return `STOP: record_outcome has now failed to settle ${ticker} on ${date5} ${n2} times in this scoring (this time: ${err.message}). It was left after ${REFUSALS_TO_LEAVE} failed tries, and no call has been settled since, so the scoring is going round in a loop. Do not send it again now: it stays pending, unscored. Go on with any other READY call, and at the end tell the person it was left, and why. ${LATER}`;
+    return `LEFT: record_outcome has now failed to settle ${ticker} on ${date5} ${n2} times in this scoring (this time: ${err.message}). Leave it: do not send it again in this scoring. It stays pending, unscored. Go on with the next READY call, and at the end tell the person it was left, and why. ${LATER}`;
+  }
+  noteStep(journal, SCORING, now, answer2.startsWith("Settled: ") ? { ticker, date: date5 } : void 0);
+  return answer2;
+}
+async function settleOnce(journal, scoring, ticker, date5, reflection) {
   const text4 = reflection.trim(), refused = lessonRefusal(text4);
   if (refused) throw new Error(refused);
   const e = journal.pending().find((x) => x.ticker === ticker && x.date === date5);
@@ -40008,37 +40104,10 @@ async function settleOne(journal, scoring, ticker, date5, reflection) {
 }
 
 // src/desk/lessons.ts
-import fs12 from "node:fs";
-import path13 from "node:path";
 var PER_LISTING = 3;
 var MAX_CHECK_NOTE = 900;
 var CHECK_LABELS = ["Contradicted:", "Not known from the prices:", "Right:"];
-var REFUSALS_TO_LEAVE = 2;
-var NOTES_IDLE_MS = 60 * 6e4;
-var keyOf2 = (ticker, date5) => `${ticker}|${date5}`;
-var notesFile = (j) => path13.join(path13.dirname(j.file), "lesson-check.json");
-function readNotes(j, now) {
-  try {
-    const n2 = JSON.parse(fs12.readFileSync(notesFile(j), "utf8"));
-    if (typeof n2.at === "number" && now - n2.at < NOTES_IDLE_MS && now >= n2.at) {
-      const refused = {};
-      for (const [k, v] of Object.entries(n2.refused ?? {})) {
-        if (typeof v?.n === "number" && typeof v.why === "string") refused[k] = { n: v.n, why: v.why };
-      }
-      const l = n2.listed;
-      const listedOk = l && typeof l.of === "string" && Array.isArray(l.shown) && l.shown.every((s) => typeof s === "string") && typeof l.saved === "number" && typeof l.at === "number";
-      return { at: n2.at, saved: typeof n2.saved === "number" ? n2.saved : 0, refused, ...listedOk ? { listed: l } : {} };
-    }
-  } catch {
-  }
-  return { at: now, saved: 0, refused: {} };
-}
-function writeNotes(j, notes, now) {
-  try {
-    writeWhole(notesFile(j), JSON.stringify({ ...notes, at: now }));
-  } catch {
-  }
-}
+var CHECK = "lesson-check";
 function laterWords(ticker, o = {}) {
   const looks = [
     ...o.toRewrite ? ["the lessons still to rewrite"] : [],
@@ -40097,10 +40166,10 @@ var RULES = [
   "For a lesson the person said is wrong, what they said is shown beside it. Check it against the rows like every other statement, and write only what a row shows: never take their words, or a review's, as given."
 ].join("\n");
 async function lessonsToRecheck(journal, scoring, ticker, on = today(), now = Date.now()) {
-  const notes = readNotes(journal, now), of = ticker ?? "";
+  const notes = readNotes(journal, CHECK, now), of = ticker ?? "";
   const due = journal.load().filter((e) => !e.pending && UNCHECKED.includes(e.lesson) && (!ticker || e.ticker === ticker));
   if (!due.length) {
-    writeNotes(journal, { ...notes, listed: void 0 }, now);
+    writeNotes(journal, CHECK, { ...notes, listed: void 0 }, now);
     return `No lessons${ticker ? ` on ${ticker}` : ""} to re-check: every settled call's lesson was written from its window's prices, or corrected from them.
 
 ${laterWords(ticker)}`;
@@ -40108,8 +40177,8 @@ ${laterWords(ticker)}`;
   const shown2 = [], keys = [], unreliable = [], flaggedOut = [], left = [];
   let later = 0;
   for (const e of due) {
-    const refused = notes.refused[keyOf2(e.ticker, e.date)];
-    if (refused && refused.n >= REFUSALS_TO_LEAVE) {
+    const refused = leftIn(notes, e.ticker, e.date);
+    if (refused) {
       left.push(`${tagOf(e)} LEFT: correct_lesson refused its new lesson ${refused.n} times in this re-check (the last time: ${refused.why}). Leave it: its lesson stays as it stands${e.lesson === "flagged" ? ", and later analyses still do not read it" : ""}. Name it to the person at the end, with that reason.`);
       continue;
     }
@@ -40141,14 +40210,14 @@ ${e.reflection}`,
   }
   const last = notes.listed;
   if (keys.length && last && last.of === of && last.saved === notes.saved && last.shown.join("\n") === keys.join("\n")) {
-    writeNotes(journal, { ...notes, listed: void 0 }, now);
+    writeNotes(journal, CHECK, { ...notes, listed: void 0 }, now);
     return [
       `STOP: this is the same list of lessons to rewrite as the last one, at ${utcTime(new Date(last.at))}, and no lesson has been saved since, so the re-check is going round in a loop. They are not shown again.`,
       `Do not call recheck_lessons or correct_lesson again now. Tell the person which lessons are still to rewrite (${listed(keys.map((k) => k.replace("|", " ")))}), and why any of them was not saved, as correct_lesson's answers said.${left.length ? ` Name the ${left.length} left after two refusals too, with why.` : ""}`,
       laterWords(ticker, { toRewrite: keys.length + later, unreliable: unreliable.length, flagged: flaggedOut.length, left: left.length })
     ].join("\n\n");
   }
-  writeNotes(journal, { ...notes, listed: { of, shown: keys, saved: notes.saved, at: now } }, now);
+  writeNotes(journal, CHECK, { ...notes, listed: { of, shown: keys, saved: notes.saved, at: now } }, now);
   const counts = [
     `${shown2.length} to rewrite below`,
     ...later ? [`${later} more after these (call recheck_lessons again once these are saved)`] : [],
@@ -40161,24 +40230,17 @@ ${e.reflection}`,
 }
 var sameWords = (a, b) => a.replace(/\s+/g, " ").trim() === b.replace(/\s+/g, " ").trim();
 async function correctLesson(journal, scoring, ticker, date5, lesson, whatWasWrong, on = today(), now = Date.now()) {
-  const key = keyOf2(ticker, date5);
   let answer2;
   try {
     answer2 = await correctOnce(journal, scoring, ticker, date5, lesson, whatWasWrong, on);
   } catch (err) {
     if (!(err instanceof Error)) throw err;
-    const notes2 = readNotes(journal, now), n2 = (notes2.refused[key]?.n ?? 0) + 1;
-    notes2.refused[key] = { n: n2, why: err.message.slice(0, 300) };
-    writeNotes(journal, notes2, now);
-    if (n2 < REFUSALS_TO_LEAVE) throw err;
+    const { n: n2, answer: count } = countRefusal(journal, CHECK, ticker, date5, err.message, now);
+    if (count === "again") throw err;
+    if (count === "stop") return `STOP: correct_lesson has now refused the new lesson of ${ticker} on ${date5} ${n2} times in this re-check (this time: ${err.message}). It was left after ${REFUSALS_TO_LEAVE} refusals, and no lesson has been saved since, so the re-check is going round in a loop. Do not send it again now: its lesson stays as it stands. Go on with any other lesson listed to rewrite, and at the end tell the person it was left, and why.`;
     return `LEFT: correct_lesson has now refused the new lesson of ${ticker} on ${date5} ${n2} times in this re-check (this time: ${err.message}). Leave it: do not send it again in this re-check, and its lesson stays as it stands. Go on with the next lesson, and at the end tell the person it was left, and why.`;
   }
-  const notes = readNotes(journal, now);
-  if (answer2.startsWith("Corrected: ")) {
-    notes.saved++;
-    delete notes.refused[key];
-  }
-  writeNotes(journal, notes, now);
+  noteStep(journal, CHECK, now, answer2.startsWith("Corrected: ") ? { ticker, date: date5 } : void 0);
   return answer2;
 }
 var missingLabels = (note) => CHECK_LABELS.filter((l) => !new RegExp(`(?:^|[^a-z])${l.slice(0, -1).replace(/ /g, "\\s+")}\\W{0,3}:`, "i").test(note));
@@ -40218,10 +40280,7 @@ function flagLesson(journal, ticker, date5, whatIsWrong, on = today(), now = Dat
   const done = journal.flagLesson(ticker, date5, said, on);
   if (done === "already") return `ALREADY FLAGGED: the person said on ${e.lessonOn ?? "an earlier day"} that the lesson of ${ticker} on ${date5} is wrong; nothing was written. Do not call flag_lesson again for it: recheck_lessons lists it to rewrite.`;
   if (done === "none") return `The lesson of ${ticker} on ${date5} was changed by another run meanwhile; nothing was written.`;
-  const notes = readNotes(journal, now);
-  notes.saved++;
-  delete notes.refused[keyOf2(ticker, date5)];
-  writeNotes(journal, notes, now);
+  noteStep(journal, CHECK, now, { ticker, date: date5 });
   const stay = listed(["its words", ...e.lessonCheck ? ["its check"] : [], ...e.earlier ? ["its earlier corrections"] : [], ...e.firstLesson ? ["its first lesson"] : []]);
   return `Flagged: the lesson of the ${e.rating} call on ${ticker} for ${date5}, on the person's word that it is wrong. Later analyses stop reading it now. ${stay[0].toUpperCase()}${stay.slice(1)} stay in the journal, with what the person said, and recheck_lessons lists it to rewrite from its window's prices. The call, its rating and its score (${e.raw}, alpha ${e.alpha}) stay as they are.`;
 }
@@ -40512,6 +40571,7 @@ function rerateWeekly(dir, today2, now = /* @__PURE__ */ new Date()) {
 
 // src/desk/routine.ts
 var DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+var LEFT_CALLS = "A call record_outcome answers LEFT or STOP for stays pending: do not send it again now, go on, and name it at the end with the reason it gave.";
 var weekday2 = (day3) => DAYS[(/* @__PURE__ */ new Date(`${day3}T12:00:00Z`)).getUTCDay()];
 var reratedToday = (dir, today2) => {
   const r = readRerate(dir);
@@ -40574,7 +40634,7 @@ function morningBrief(dir, today2, max, look) {
   const m2 = morningList(dir, today2, max, look?.screen ?? null);
   const lines = [`MORNING ROUTINE for ${day3} ${today2}.`];
   if (weekend) lines.push(`US markets do not open on a ${day3}: score past calls (step 1), then stop and say so. Analyse nothing unless the person asked for it in words.`);
-  lines.push("", "1. Score past calls first: list_settlements, then record_outcome with a lesson for each READY call (the /settle playbook).");
+  lines.push("", `1. Score past calls first: list_settlements, then record_outcome with a lesson for each READY call (the /settle playbook). ${LEFT_CALLS}`);
   if (day3 === "Monday") lines.push(...rerateLines(dir, today2));
   if (!weekend) lines.push(...lookLines(look, today2));
   if (m2.running) lines.push("", `   ${m2.running} is being analysed now by another run: leave it alone.`);
@@ -40596,7 +40656,7 @@ function eveningBrief(dir, today2, now) {
   const calls = new Journal(path19.join(dir, "journal.md")).load();
   const todays = calls.filter((e) => e.date === today2), pending = calls.filter((e) => e.pending).length;
   const orders = ordersOn(dir, now);
-  const lines = [`EVENING WRAP-UP for ${weekday2(today2)} ${today2}.`, "", "1. Score what is ready: list_settlements, then record_outcome with a lesson for each READY call (the /settle playbook).", ""];
+  const lines = [`EVENING WRAP-UP for ${weekday2(today2)} ${today2}.`, "", `1. Score what is ready: list_settlements, then record_outcome with a lesson for each READY call (the /settle playbook). ${LEFT_CALLS}`, ""];
   lines.push(todays.length ? `2. The desk's calls today (${todays.length}): ${todays.map((e) => `${e.ticker} ${e.rating}`).join(", ")}. Read each one's executive summary with read_run (section decision) for one sentence each.` : "2. The desk made no call today.");
   lines.push("");
   if (!orders.length) lines.push("3. The dashboard sent no order today.");
@@ -40863,14 +40923,16 @@ Rating: ${rating}`;
   }));
   server.registerTool("list_settlements", {
     title: "Pending calls",
-    description: "List the calls in the journal that are not settled yet. For each whose holding window has finished trading, it shows the measured outcome (return, the index's return, alpha), the decision, and what happened in the window day by day (the stock's prices, volume and main indicators beside the index's close), so you can write the lesson from what happened; the others are marked NOT YET. The figures come from price rows only.",
+    description: "List the calls in the journal that are not settled yet. For each whose holding window has finished trading, it shows the measured outcome (return, the index's return, alpha), the decision, and what happened in the window day by day (the stock's prices, volume and main indicators beside the index's close), so you can write the lesson from what happened; the others are marked NOT YET. A call record_outcome failed to settle twice in this scoring is LEFT: named, not shown, and left pending. The figures come from price rows only.",
     inputSchema: { symbol: symbol2.optional() },
     annotations: { readOnlyHint: true, openWorldHint: true }
   }, async (a) => act(() => dueSettlements(journalOf(root, ws()), readSettings(root).scoring, a.symbol ? safeSymbol(a.symbol) : void 0)));
   server.registerTool("record_outcome", {
     title: "Settle a call",
-    description: 'Settle one pending call whose window has finished: the desk measures the outcome again itself and keeps it with your lesson. Give only the lesson - 2 to 4 plain sentences (the desk counts them and refuses more than 4) naming what the alpha shows, what part of the thesis it supports or undercuts, and one thing to do next time. The row marked "entry" is the close the call is scored from, not a session of the window. Say what happened in the window only as its rows from list_settlements show it, naming the day; never pass or invent a number.',
-    inputSchema: { symbol: symbol2, trade_date: day2, lesson: external_exports.string().min(1).max(1200) },
+    description: 'Settle one pending call whose window has finished: the desk measures the outcome again itself and keeps it with your lesson. Give only the lesson - 2 to 4 plain sentences (the desk counts them and refuses more than 4) naming what the alpha shows, what part of the thesis it supports or undercuts, and one thing to do next time. The row marked "entry" is the close the call is scored from, not a session of the window. Say what happened in the window only as its rows from list_settlements show it, naming the day; never pass or invent a number. Failing a second time for the same call in this scoring, it answers LEFT: leave that call pending and go on. The same call sent again after that with no call settled since answers STOP: leave it too.',
+    // The desk checks the length itself (under 1200 characters), so a refusal is counted and said in plain words: one
+    // refused by these input rules never reaches it, and could be sent round again and again.
+    inputSchema: { symbol: symbol2, trade_date: day2, lesson: external_exports.string().max(8e3).describe("The lesson: 2 to 4 plain sentences, under 1200 characters") },
     annotations: { readOnlyHint: false, openWorldHint: true }
   }, async (a) => act(() => settleOne(journalOf(root, ws()), readSettings(root).scoring, safeSymbol(a.symbol), a.trade_date, a.lesson)));
   server.registerTool("recheck_lessons", {
@@ -40881,7 +40943,7 @@ Rating: ${rating}`;
   }, async (a) => act(() => lessonsToRecheck(journalOf(root, ws()), readSettings(root).scoring, a.symbol ? safeSymbol(a.symbol) : void 0)));
   server.registerTool("correct_lesson", {
     title: "Correct a lesson",
-    description: `Replace the lesson of a call recheck_lessons listed TO REWRITE with one rewritten from its window's rows alone: 2 to 4 plain sentences, as for record_outcome (the desk counts them and refuses more than 4). what_was_wrong sorts each statement of the lesson as it stands under three labels, in this order: "Contradicted:" (each quoted, with the row's date and figure that shows otherwise), "Not known from the prices:" (each quoted) and "Right:" (the rest), with "none" under a label with nothing in it. The desk fetches the rows again first: if they cannot be had, nothing is saved and the lesson is marked unreliable (one the person flagged stays flagged). It keeps the first lesson word for word beside the new one, and any corrected lesson it replaces with its check, marked as corrected, and never touches the call, its rating or its score. A lesson written from the prices or corrected already is refused unless the person flagged it. Refused a second time for the same lesson in this re-check, it answers LEFT: leave that lesson and go on. Never pass or invent a number the rows do not show.`,
+    description: `Replace the lesson of a call recheck_lessons listed TO REWRITE with one rewritten from its window's rows alone: 2 to 4 plain sentences, as for record_outcome (the desk counts them and refuses more than 4). what_was_wrong sorts each statement of the lesson as it stands under three labels, in this order: "Contradicted:" (each quoted, with the row's date and figure that shows otherwise), "Not known from the prices:" (each quoted) and "Right:" (the rest), with "none" under a label with nothing in it. The desk fetches the rows again first: if they cannot be had, nothing is saved and the lesson is marked unreliable (one the person flagged stays flagged). It keeps the first lesson word for word beside the new one, and any corrected lesson it replaces with its check, marked as corrected, and never touches the call, its rating or its score. A lesson written from the prices or corrected already is refused unless the person flagged it. Refused a second time for the same lesson in this re-check, it answers LEFT: leave that lesson and go on. The same lesson sent again after that with no lesson saved since answers STOP: leave it too. Never pass or invent a number the rows do not show.`,
     // The desk checks the lengths itself (under 1200 and 900 characters), so a refusal is counted and said in plain words:
     // one refused by these input rules never reaches it, and could be sent round again and again.
     inputSchema: {

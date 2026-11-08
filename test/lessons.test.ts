@@ -7,7 +7,7 @@ import { configure } from '../src/data/http.js';
 import { clearCache } from '../src/data/yahoo.js';
 import { Journal } from '../src/desk/journal.js';
 import { correctLesson, flagLesson, lessonsToRecheck, NOTES_IDLE_MS, PER_LISTING, REFUSALS_TO_LEAVE } from '../src/desk/lessons.js';
-import { sentencesIn, settleOne } from '../src/desk/settle.js';
+import { lessonRefusal, sentencesIn, sentencesOf, settleOne } from '../src/desk/settle.js';
 import { CORRECTED_13, META_ENTRIES, META_ROWS, SPY_ROWS } from './lessons-2026-11-08.js';
 import { DEFAULTS } from '../src/settings.js';
 import { chartFetch, type Row } from './chart.js';
@@ -145,7 +145,7 @@ test('a correction is refused when it would not be honest: not settled, written 
     [' ', WRONG, /the lesson is empty/],
     ['x'.repeat(1300), WRONG, /keep it under 1200/],
     [NEW, 'x'.repeat(1000), /keep it under 900/],
-    [`${NEW} It held. It held again.`, WRONG, /^Error: the lesson has 5 sentences; write 2 to 4 \(the desk counts a sentence's end where \. ! or \? is followed by a space and a capital letter or a figure\)$/],
+    [`${NEW} It held. It held again.`, WRONG, /^Error: the lesson has 5 sentences; write 2 to 4\. The desk ends a sentence at \. ! or \? followed by a space and a capital letter, a figure or a sign, .* It read these 5, beginning "Alpha of \+7\.0%…", "The add trigger…", "Next time, act…", "It held\.", "It held again\."$/],
     [NEW, 'The first lesson said the band held; the 2026-09-07 row closed at 104.00.', /what_was_wrong has no "Contradicted:", "Not known from the prices:" and "Right:": sort each statement of the lesson as it stands under the three labels, in this order/],
     [NEW, '**Contradicted**: "the band held": the 2026-09-07 row closed at 104.00. RIGHT: none.', /^Error: what_was_wrong has no "Not known from the prices:": /],
   ] as const) {
@@ -203,6 +203,20 @@ test('a lesson whose new words are refused twice is left, named, and not shown a
   // within the hour it stays left; an hour after the last step a re-check starts afresh and shows it again
   assert.match(await lessonsToRecheck(j, S, undefined, '2026-11-07', t0 + 5000 + NOTES_IDLE_MS - 1000), /1 left after two refusals/);
   assert.match(await lessonsToRecheck(j, S, undefined, '2026-11-08', t0 + 5000 + 2 * NOTES_IDLE_MS), /^1 lesson\(s\) to re-check: 1 to rewrite below\.[\s\S]*\[2026-09-01 \| NVDA .*\] TO REWRITE/);
+});
+
+test('a lesson sent again after it was left, with nothing saved since, answers STOP; once another lesson is saved, a refusal is LEFT again', async () => {
+  configure({ fetch: feed() });
+  const j = oldJournal([{ tag: tag('2026-09-01', '2026-09-08') }, { tag: tag('2026-09-02', '2026-09-09') }]);
+  const t0 = Date.parse('2026-11-08T16:00:00Z');
+  await lessonsToRecheck(j, S, undefined, '2026-11-08', t0);
+  await assert.rejects(correctLesson(j, S, 'NVDA', '2026-09-01', 'x'.repeat(1300), WRONG, '2026-11-08', t0 + 1000), /keep it under 1200/);
+  assert.match(await correctLesson(j, S, 'NVDA', '2026-09-01', 'y'.repeat(1250), WRONG, '2026-11-08', t0 + 2000), /^LEFT: /);
+  const stop = await correctLesson(j, S, 'NVDA', '2026-09-01', 'z'.repeat(1260), WRONG, '2026-11-08', t0 + 3000);
+  assert.match(stop, /^STOP: correct_lesson has now refused the new lesson of NVDA on 2026-09-01 3 times in this re-check \(this time: the lesson is 1260 characters; keep it under 1200\)\. It was left after 2 refusals, and no lesson has been saved since, so the re-check is going round in a loop\. Do not send it again now: its lesson stays as it stands\. Go on with any other lesson listed to rewrite, and at the end tell the person it was left, and why\.$/);
+  assert.equal(j.load()[0]!.reflection, OLD, 'its lesson stays as it stands');
+  assert.match(await correctLesson(j, S, 'NVDA', '2026-09-02', NEW, WRONG, '2026-11-08', t0 + 4000), /^Corrected: /);
+  assert.match(await correctLesson(j, S, 'NVDA', '2026-09-01', 'y'.repeat(1250), WRONG, '2026-11-08', t0 + 5000), /^LEFT: .* 4 times in this re-check/, 'a lesson saved since: not a loop');
 });
 
 test('a lesson left after two refusals is shown again at once when the person says it is wrong: their word is new', async () => {
@@ -418,11 +432,24 @@ test('the desk counts a lesson\'s sentences and refuses more than four, the same
     ['The U.S. index rose vs. the stock, e.g. on 10-22. NVDA fell.', 2],
     ['It fell (-4.40%). "It held," it said. Then: 212.21? Yes!', 4],
     ['It fell. then it rose.', 1],   // a sentence that starts with a small letter is not counted
+    // short forms a lesson may hold, whose full stop is followed by a capital or a figure (8 Nov: a miscount must not
+    // refuse a lesson of four sentences, again and again)
+    ['META reported at 4:05 p.m. ET on 2026-10-21. It fell 6.98% in the next session.', 2],
+    ['NVDA opened at 9:30 a.m. Monday and closed at 221.97. The gap filled.', 2],
+    ['The U.S.A. index rose 0.7%. NVDA matched it.', 2],
+    ['Rung No. 2 never traded, and rung no. 3 did. The stop held.', 2],
+    ['Approx. 3% came on 2026-10-22, E.g. after the report. It held vs. SPY.', 2],
+    ['The histogram went from -2.16 to +0.7 while SPY moved −0.6% and -.5% on 2026-10-22. NVDA fell 3.0%. -0.6% was the index\'s whole move.', 3],
+    ['It rallied... Then it fell… Then it held at 212.21. The stop was 648.56.', 2],
+    ['J. Powell spoke on 2026-10-22. NVDA fell.', 2],
   ] as const) assert.equal(sentencesIn(text), n, text);
+  assert.deepEqual(sentencesOf('The U.S. index rose 0.7%. NVDA fell 3.0%, at 4 p.m. ET. It held.'), ['The U.S. index rose 0.7%.', 'NVDA fell 3.0%, at 4 p.m. ET.', 'It held.']);
   configure({ fetch: feed() });
   const j = new Journal(tmpFile());
   j.storeDecision('NVDA', '2026-09-01', DECISION);
-  await assert.rejects(settleOne(j, S, 'NVDA', '2026-09-01', 'One. Two. Three. Four. Five.'), /the lesson has 5 sentences; write 2 to 4/);
+  // the refusal says how the desk counts and where it cut, so the team can see a miscount and write around it
+  await assert.rejects(settleOne(j, S, 'NVDA', '2026-09-01', 'One. Two. Three. Four. Five.'), /^Error: the lesson has 5 sentences; write 2 to 4\. The desk ends a sentence at \. ! or \? followed by a space and a capital letter, a figure or a sign, but not after a short form it knows \(such as a\.m\., U\.S\., e\.g\., No\., vs\., approx\. or a month\), an initial or an ellipsis\. It read these 5, beginning "One\.", "Two\.", "Three\.", "Four\.", "Five\."$/);
+  assert.match(lessonRefusal('Alpha of +7.0% backs the Buy. NVDA closed at 104.00 on 2026-09-07. It rose. It held. Next time, act sooner.')!, /beginning "Alpha of \+7\.0%…", "NVDA closed at…", "It rose\.", "It held\.", "Next time, act…"$/);
   assert.equal(j.load()[0]!.pending, true, 'not settled');
   assert.match(await settleOne(j, S, 'NVDA', '2026-09-01', 'One. Two. Three. Four.'), /^Settled: /);
 });

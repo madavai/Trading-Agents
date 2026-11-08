@@ -77,8 +77,15 @@ built, which decisions stand, every document, and what is pending.
   finished sessions numbered from 1, with change, volume, RSI, MACD histogram, 10 EMA and 50 SMA beside the index's
   close, and a glance line over sessions 1 to N only. `list_settlements` shows it under each READY call, so a lesson
   says what a stock did only as a row shows it; the /settle skill holds the lesson to those rows. `settle.ts` counts a
-  lesson's sentences (`sentencesIn`) and refuses more than `MAX_SENTENCES` (four), in `record_outcome` and
-  `correct_lesson` alike (`lessonRefusal`).
+  lesson's sentences (`sentencesOf`, `sentencesIn`) and refuses more than `MAX_SENTENCES` (four), in `record_outcome`
+  and `correct_lesson` alike (`lessonRefusal`, which says how it counts and where it cut). A full stop in a run of
+  single letters (a.m., U.S.A.), a short word it knows (No., vs., approx., a month, any case), an initial or an
+  ellipsis never ends a sentence: a miscount must not refuse a lesson of four, so it errs on the low side. A scoring
+  keeps its own notes beside the journal (`settle-check.json`, the same `loop-notes.ts` as a re-check's): a call
+  `record_outcome` failed to settle `REFUSALS_TO_LEAVE` (two) times answers LEFT, stays pending, and is named, not
+  shown, by `list_settlements` (which only reads the notes); sent again after that with no call settled since, it
+  answers STOP. A call that is not pending is never counted. The notes lapse `NOTES_IDLE_MS` after `record_outcome`
+  was last used, so a later scoring tries the call again.
 - `src/desk/lessons.ts` - re-checking lessons that were not written from their window's rows (`recheck_lessons`,
   `correct_lesson`, `flag_lesson`, the /recheck-lessons skill). How a lesson was written is in its journal tag
   (`journal.ts`): `lesson:prices`, `lesson:no-prices`, `lesson:corrected:<day>`, `lesson:unreliable:<day>`,
@@ -90,10 +97,11 @@ built, which decisions stand, every document, and what is pending.
   or corrected already is rewritten only after `flag_lesson`, on the person's confirmed word: it is withheld at once
   and listed again with what they said. A call whose rows cannot be had is marked unreliable by the desk, never
   guessed. `pastContext` tells the analyses how each lesson was written and withholds an unreliable or flagged one
-  (`WITHHELD`). A re-check keeps its own notes beside the journal (`lesson-check.json`, forgotten `NOTES_IDLE_MS`, an
-  hour, after its last step) so it cannot go round: a lesson `correct_lesson` refused `REFUSALS_TO_LEAVE` (two) times
-  answers LEFT and is named, not shown, in later listings (a flag clears that); the same lessons listed again with
-  nothing saved since answer STOP, without the rows. With nothing left to rewrite, the answer ends with LATER
+  (`WITHHELD`). A re-check keeps its own notes beside the journal (`lesson-check.json`, in `loop-notes.ts`, forgotten
+  `NOTES_IDLE_MS`, an hour, after its last step) so it cannot go round: a lesson `correct_lesson` refused
+  `REFUSALS_TO_LEAVE` (two) times answers LEFT and is named, not shown, in later listings (a flag clears that); sent
+  again after that with no lesson saved since, it answers STOP; the same lessons listed again with nothing saved since
+  answer STOP, without the rows. With nothing left to rewrite, the answer ends with LATER
   RE-CHECKS: the true words about what a later re-check does (no corrected lesson, unless the person says it is wrong).
 - `src/private.ts` - the one way anything is written into the person's private folder (`paths.ts` `homeDir`): whole,
   and locked to their own account on every system (the file mode on Linux and macOS; on Windows an access list naming

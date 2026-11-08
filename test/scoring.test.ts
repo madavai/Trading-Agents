@@ -110,6 +110,57 @@ test('settling keeps the desk\'s own figures with the lesson, once', async () =>
   await assert.rejects(settleOne(journalWith(), S, 'NVDA', '2026-09-01', 'x'.repeat(1300)), /keep it under 1200/);
 });
 
+// 8 Nov 2026: the desk began refusing lessons of more than four sentences, and the routines score calls with no one
+// watching. A team refused again and again must not go round in a loop, as one did with reset_team on 7 Nov.
+const FIVE = 'One. Two. Three. Four. Five.';
+const LATER = 'A later scoring, started an hour or more after record_outcome was last used, tries it again.';
+const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+test('a call record_outcome fails to settle twice is LEFT: it stays pending, the listing names it without its rows, and sent again with nothing settled since it answers STOP', async () => {
+  const j = journalWith();
+  j.storeDecision('AMD', '2026-09-01', '**Rating**: Hold\n\nWait.');
+  configure({ fetch: feed({ AMD: NVDA }) });
+  const t0 = Date.parse('2026-10-12T08:00:00Z');
+  await assert.rejects(settleOne(j, S, 'NVDA', '2026-09-01', FIVE, t0), /^Error: the lesson has 5 sentences; write 2 to 4\./, 'the first time, said as a refusal to correct');
+  const left = await settleOne(j, S, 'NVDA', '2026-09-01', FIVE, t0 + 1000);
+  assert.match(left, new RegExp(`^LEFT: record_outcome has now failed to settle NVDA on 2026-09-01 2 times in this scoring \\(this time: the lesson has 5 sentences; write 2 to 4\\. .*\\)\\. Leave it: do not send it again in this scoring\\. It stays pending, unscored\\. Go on with the next READY call, and at the end tell the person it was left, and why\\. ${esc(LATER)}$`));
+  assert.deepEqual(j.pending().map((e) => e.ticker), ['NVDA', 'AMD'], 'nothing settled');
+
+  const listing = await dueSettlements(j, S, undefined, t0 + 2000);
+  assert.match(listing, /^2 pending call\(s\), 1 ready to settle, 1 left in this scoring after 2 failed tries\. /);
+  assert.match(listing, new RegExp(`\\[2026-09-01 \\| NVDA \\| Buy\\] LEFT: record_outcome failed to settle it 2 times in this scoring \\(the last time: the lesson has 5 sentences; .*\\)\\. Leave it pending, unscored: do not send it again in this scoring\\. Name it to the person at the end, with that reason\\. ${esc(LATER)}`));
+  assert.doesNotMatch(listing, /\[2026-09-01 \| NVDA \| Buy\] READY/, 'its rows are not shown again');
+  assert.match(listing, /\[2026-09-01 \| AMD \| Hold\] READY: /);
+
+  const stop = await settleOne(j, S, 'NVDA', '2026-09-01', FIVE, t0 + 3000);
+  assert.match(stop, new RegExp(`^STOP: record_outcome has now failed to settle NVDA on 2026-09-01 3 times in this scoring \\(this time: the lesson has 5 sentences; .*\\)\\. It was left after 2 failed tries, and no call has been settled since, so the scoring is going round in a loop\\. Do not send it again now: it stays pending, unscored\\. Go on with any other READY call, and at the end tell the person it was left, and why\\. ${esc(LATER)}$`));
+  assert.equal(j.pending().length, 2);
+
+  // once another call is settled, the team is not going round: a failure is LEFT again; a lesson the desk can keep is kept
+  assert.match(await settleOne(j, S, 'AMD', '2026-09-01', 'Alpha was +7.0%. The Hold was too careful.', t0 + 4000), /^Settled: AMD /);
+  assert.match(await settleOne(j, S, 'NVDA', '2026-09-01', FIVE, t0 + 5000), /^LEFT: .* 4 times in this scoring/);
+  assert.match(await settleOne(j, S, 'NVDA', '2026-09-01', 'Alpha was +7.0%. The add trigger fired.', t0 + 6000), /^Settled: NVDA /);
+  assert.match(await dueSettlements(j, S, undefined, t0 + 7000), /^No pending calls/);
+});
+
+test('an hour after record_outcome was last used, a scoring starts afresh and shows the call it left in full; the listing writes nothing, and a call that is not pending is never counted', async () => {
+  const j = journalWith(), notes = path.join(path.dirname(j.file), 'settle-check.json');
+  configure({ fetch: feed() });
+  const t0 = Date.parse('2026-10-12T08:00:00Z'), hour = 60 * 60_000;
+  assert.match(await dueSettlements(j, S, undefined, t0), /\[2026-09-01 \| NVDA \| Buy\] READY/);
+  assert.ok(!fs.existsSync(notes), 'list_settlements only reads');
+  await assert.rejects(settleOne(j, S, 'NVDA', '2026-09-01', FIVE, t0 + 1000));
+  assert.match(await settleOne(j, S, 'NVDA', '2026-09-01', FIVE, t0 + 2000), /^LEFT: /);
+  assert.match(await dueSettlements(j, S, undefined, t0 + 2000 + hour - 1), /LEFT: record_outcome failed to settle it 2 times/);
+  const later = await dueSettlements(j, S, undefined, t0 + 2000 + hour);
+  assert.match(later, /^1 pending call\(s\), 1 ready to settle\. /);
+  assert.match(later, /\[2026-09-01 \| NVDA \| Buy\] READY: [\s\S]*WHAT HAPPENED IN THE WINDOW/);
+  await assert.rejects(settleOne(j, S, 'NVDA', '2026-09-01', FIVE, t0 + 2000 + hour + 1), /the lesson has 5 sentences/, 'its first failure is said as one again');
+
+  // a call that is not pending has nothing to go round on: it is said as it is, every time
+  for (const t of [1, 2, 3]) await assert.rejects(settleOne(j, S, 'ZZZ', '2026-09-01', 'Alpha was +1.0%. Hold.', t0 + 3 * hour + t), /there is no pending call on ZZZ for 2026-09-01/);
+});
+
 test('a call whose window is open stays pending when settling is tried', async () => {
   const j = journalWith();
   j.storeDecision('LATE', '2026-10-10', '**Rating**: Sell\n\nExit.');

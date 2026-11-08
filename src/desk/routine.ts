@@ -17,6 +17,8 @@ export interface MorningLook { screen: Screen | null; failed?: string; on: boole
 
 export type Kind = 'morning' | 'evening';
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+/** What the scoring step does with a call it cannot settle, so a routine no one watches never goes round on it. */
+const LEFT_CALLS = 'A call record_outcome answers LEFT or STOP for stays pending: do not send it again now, go on, and name it at the end with the reason it gave.';
 const weekday = (day: string): string => DAYS[new Date(`${day}T12:00:00Z`).getUTCDay()]!;
 
 /** Today's re-rating as Monday's routine put it on the waiting list, by symbol. */
@@ -90,7 +92,7 @@ export function morningBrief(dir: string, today: string, max: number, look?: Mor
   const m = morningList(dir, today, max, look?.screen ?? null);
   const lines = [`MORNING ROUTINE for ${day} ${today}.`];
   if (weekend) lines.push(`US markets do not open on a ${day}: score past calls (step 1), then stop and say so. Analyse nothing unless the person asked for it in words.`);
-  lines.push('', '1. Score past calls first: list_settlements, then record_outcome with a lesson for each READY call (the /settle playbook).');
+  lines.push('', `1. Score past calls first: list_settlements, then record_outcome with a lesson for each READY call (the /settle playbook). ${LEFT_CALLS}`);
   if (day === 'Monday') lines.push(...rerateLines(dir, today));
   if (!weekend) lines.push(...lookLines(look, today));
   if (m.running) lines.push('', `   ${m.running} is being analysed now by another run: leave it alone.`);
@@ -113,7 +115,7 @@ export function eveningBrief(dir: string, today: string, now: Date): string {
   const calls = new Journal(path.join(dir, 'journal.md')).load();
   const todays = calls.filter((e) => e.date === today), pending = calls.filter((e) => e.pending).length;
   const orders = ordersOn(dir, now);
-  const lines = [`EVENING WRAP-UP for ${weekday(today)} ${today}.`, '', '1. Score what is ready: list_settlements, then record_outcome with a lesson for each READY call (the /settle playbook).', ''];
+  const lines = [`EVENING WRAP-UP for ${weekday(today)} ${today}.`, '', `1. Score what is ready: list_settlements, then record_outcome with a lesson for each READY call (the /settle playbook). ${LEFT_CALLS}`, ''];
   lines.push(todays.length ? `2. The desk's calls today (${todays.length}): ${todays.map((e) => `${e.ticker} ${e.rating}`).join(', ')}. Read each one's executive summary with read_run (section decision) for one sentence each.` : '2. The desk made no call today.');
   lines.push('');
   if (!orders.length) lines.push('3. The dashboard sent no order today.');
