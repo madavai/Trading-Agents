@@ -163,15 +163,21 @@ export function registerDeskTools(server: McpServer, root: string): void {
 
   server.registerTool('recheck_lessons', {
     title: 'Lessons to re-check',
-    description: 'Find the settled calls whose lesson was not written from the holding window\'s prices (written before the desk showed them, when they could not be had, or marked unreliable before). Up to three at a time are shown to rewrite: the call\'s score, which stays as it is, the decision, the lesson as it stands and the window\'s finished sessions day by day; call again once those are saved for the next ones. A call whose window\'s prices cannot be had is marked unreliable by the desk itself, so later analyses stop reading its lesson. Never changes a call, its rating or its score.',
+    description: 'Find the settled calls whose lesson was not written from the holding window\'s prices (written before the desk showed them, when they could not be had, or marked unreliable before). Up to three at a time are shown to rewrite: the call\'s score, which stays as it is, the decision, the lesson as it stands and the window\'s finished sessions day by day; call again once those are saved for the next ones. A call whose window\'s prices cannot be had is marked unreliable by the desk itself, so later analyses stop reading its lesson. A lesson correct_lesson refused twice in this re-check is LEFT, named but not shown; the same lessons asked for again with nothing saved since answer STOP. With nothing left to rewrite, its last words say what a later re-check does. Never changes a call, its rating or its score.',
     inputSchema: { symbol: symbol.optional() },
     annotations: { readOnlyHint: false, openWorldHint: true },
   }, async (a) => act(() => lessonsToRecheck(journalOf(root, ws()), readSettings(root).scoring, a.symbol ? safeSymbol(a.symbol) : undefined)));
 
   server.registerTool('correct_lesson', {
     title: 'Correct a lesson',
-    description: 'Replace the lesson of a call recheck_lessons listed TO REWRITE with one rewritten from its window\'s rows alone: 2 to 4 plain sentences, as for record_outcome. what_was_wrong quotes each statement of the lesson as it stands that the rows contradict, with the row (date and figure) that shows otherwise, or says that none is. The desk fetches the rows again first: if they cannot be had, nothing is saved and the lesson is marked unreliable. It keeps the first lesson word for word beside the new one, marked as corrected, and never touches the call, its rating or its score. Never pass or invent a number the rows do not show.',
-    inputSchema: { symbol, trade_date: day, lesson: z.string().min(1).max(1200), what_was_wrong: z.string().min(1).max(600) },
+    description: 'Replace the lesson of a call recheck_lessons listed TO REWRITE with one rewritten from its window\'s rows alone: 2 to 4 plain sentences, as for record_outcome. what_was_wrong quotes each statement of the lesson as it stands that the rows contradict, with the row (date and figure) that shows otherwise, or says that none is. The desk fetches the rows again first: if they cannot be had, nothing is saved and the lesson is marked unreliable. It keeps the first lesson word for word beside the new one, marked as corrected, and never touches the call, its rating or its score. Refused a second time for the same lesson in this re-check, it answers LEFT: leave that lesson and go on. Never pass or invent a number the rows do not show.',
+    // The desk checks the lengths itself (under 1200 and 600 characters), so a refusal is counted and said in plain words:
+    // one refused by these input rules never reaches it, and could be sent round again and again.
+    inputSchema: {
+      symbol, trade_date: day,
+      lesson: z.string().max(8000).describe('The new lesson: 2 to 4 plain sentences, under 1200 characters'),
+      what_was_wrong: z.string().max(8000).describe('Under 600 characters'),
+    },
     annotations: { readOnlyHint: false, openWorldHint: true },
   }, async (a) => act(() => correctLesson(journalOf(root, ws()), readSettings(root).scoring, safeSymbol(a.symbol), a.trade_date, a.lesson, a.what_was_wrong)));
 

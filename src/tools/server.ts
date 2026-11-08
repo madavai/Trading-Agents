@@ -18,9 +18,25 @@ import { predictionMarkets } from '../data/odds.js';
 import { companyOverview, financialStatement, fundProfile, insiderTransactions } from '../data/company.js';
 import { registerDeskTools } from './desk.js';
 import { VERSION } from '../version.js';
-import { listed, plainName, resetAgentFiles, shippedAgentFiles } from '../desk/agent-files.js';
+import { driftOf, lastReset, listed, noteReset, plainName, RESET_AGAIN_MS, resetAgainWords, resetAgentFiles, shippedAgentFiles } from '../desk/agent-files.js';
+import { Freshness, UPDATED_NOTE } from '../desk/freshness.js';
 
 const text = (t: string) => ({ content: [{ type: 'text' as const, text: t }] });
+
+type Answer = { content: Array<{ type: string; text?: string }> };
+
+/** Every tool's answer, once the desk in the folder was updated after this process started, opens with UPDATED_NOTE: the
+ *  first answer an old conversation gets after the update says so, whichever member asked and whichever tool, and so does
+ *  every one after it. Done here, once, for every tool registered on the server, those to come included. */
+function noteWhenUpdated(server: McpServer, fresh: Freshness): void {
+  const register = server.registerTool.bind(server) as (name: string, config: unknown, cb: (...args: unknown[]) => Promise<Answer>) => unknown;
+  (server as unknown as { registerTool: typeof register }).registerTool = (name, config, cb) => register(name, config, async (...args) => {
+    const r = await cb(...args);
+    if (!fresh.updated()) return r;
+    const [first, ...rest] = r.content;
+    return { ...r, content: first?.type === 'text' ? [{ ...first, text: `${UPDATED_NOTE}\n\n${first.text ?? ''}` }, ...rest] : [{ type: 'text', text: UPDATED_NOTE }, ...r.content] };
+  });
+}
 
 /** Runs a data tool: its answer, or the plain failure an agent must report as unavailable. */
 async function answer(what: string, run: () => Promise<string>) {
@@ -41,23 +57,35 @@ export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetc
   configure({ contact: settings.sources.contact, secEmail: () => readContactEmail(root) });
   if (fetchImpl) configure({ fetch: fetchImpl });
   const server = new McpServer({ name: 'trading-desk', version: VERSION });
+  const fresh = new Freshness(source);
+  noteWhenUpdated(server, fresh);
 
   server.registerTool('desk_check', {
     title: 'Desk check',
-    description: 'Check that this computer is ready for the Trading Agents desk: Node, the desk data folder, whether a Robinhood sign-in is saved, whether the desk\'s agents and team are as the project ships them, and whether each free data source answers. Read-only; it sends no order and reads no secret.',
+    description: 'Check that this computer is ready for the Trading Agents desk: Node, the desk data folder, whether a Robinhood sign-in is saved, whether the desk\'s agents and team are as the project ships them, whether this conversation\'s steps for the team are the ones in this folder, and whether each free data source answers. Read-only; it sends no order and reads no secret.',
+    inputSchema: { team_version: z.string().max(40).optional().describe('The version of the team\'s steps, exactly as the team\'s own "Check this computer" step gives it; left out when the steps give none') },
     annotations: READ,
-  }, async () => text(await deskCheck(root, fetchImpl, source)));
+  }, async (a) => text(await deskCheck(root, fetchImpl, source, { updated: fresh.updated(), teamVersion: a.team_version })));
 
   server.registerTool('reset_team', {
     title: 'Reset the team',
-    description: 'Put the desk\'s thirteen agents, the trading-desk team\'s file and its line-up back exactly as the project ships them: each file is written again, even one that already matches, which also brings Madav back to the project\'s version of the team in place of changes made in its Agent Studio. Only after the person asked for it and confirmed it in this conversation. It writes only those files in this folder; the model, permissions and effort the person chose in Madav stay theirs.',
-    inputSchema: { confirmed: z.literal(true).describe('true: the person confirmed this reset in this conversation') },
+    description: 'Put the desk\'s thirteen agents, the trading-desk team\'s file and its line-up back exactly as the project ships them: each file is written again, even one that already matches, which also brings Madav back to the project\'s version of the team in place of changes made in its Agent Studio. Only when the person asked in words, in this conversation, for the team to be reset or put back, and confirmed it: never in place of any other request. Call it once: asked again soon after a reset, with the files still matching, it writes nothing. It writes only those files in this folder; the model, permissions and effort the person chose in Madav stay theirs.',
+    inputSchema: { confirmed: z.literal(true).describe('true: the person asked for this reset in words and confirmed it in this conversation') },
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
   }, async () => {
+    // Tools started before an update hold the team's source as it was then: a reset from them would write the old team back.
+    if (fresh.updated()) return text("Not reset: the desk in this folder was updated after the desk's tools in this conversation started, so they could write the team back as it was before the update. Nothing was written. Do not call reset_team again here: tell the person in one plain line to start a new conversation in Madav and check this computer there; a reset is needed only if that check still finds a difference.");
     let wrote: string[];
-    try { wrote = resetAgentFiles(root, await shippedAgentFiles(source)); } catch (e) {
+    try {
+      const shipped = await shippedAgentFiles(source), last = lastReset(root), drift = driftOf(root, shipped);
+      // Soon after a reset, with nothing differing on disk, another one cannot add anything: it is refused, and nothing is
+      // written (a write would tell Madav once more to pause the desk's routines).
+      if (last && Date.now() - last.getTime() < RESET_AGAIN_MS && !drift.changed.length && !drift.missing.length) return text(resetAgainWords(last));
+      wrote = resetAgentFiles(root, shipped);
+    } catch (e) {
       return text(`The team could not be reset: ${(e as Error).message}. Nothing was changed.`);
     }
+    try { noteReset(root); } catch { /* the reset is done; only a repeat soon after will not be caught */ }
     const madav = 'Madav goes back to the project\'s version of the team too, in place of changes made in its Agent Studio; the model, permissions and effort chosen there stay as they are. If Madav runs the desk\'s routines, it pauses them until they are switched on again in Madav.';
     if (!wrote.length) return text(['The desk\'s agent files already matched the project\'s version on this computer; each was written again as the project ships it.', madav].join('\n'));
     return text([

@@ -51,7 +51,18 @@ built, which decisions stand, every document, and what is pending.
   compares the folder with it (an edit, or an older Madav, can change the files), and the desk tool `reset_team` writes it
   back on the person's confirmed yes (`src/desk/agent-files.ts`), every file each time, even one that matches: Madav
   keeps Agent Studio's changes inside itself and returns to the project's version of a file when that file is written.
-  Touches no other file. Agent files never set `permissionMode` (Madav ignores it in routine runs; the person's choice
+  Touches no other file. A reset is noted in `desk-data/team-reset.json`; asked again within `RESET_AGAIN_MS` (half an
+  hour) with nothing differing on disk, it writes nothing and answers ALREADY RESET. The team's file carries the version
+  of its own steps (`team_version "…"`: the first eight hex digits of the SHA-256 of its text with `VERSION_MARK` in
+  their place, `scripts/team-src.mjs`); the team passes it to `desk_check`, which says whether it is the folder's
+  (`teamLine`), since a conversation keeps its copy of the steps from when it began.
+- `src/desk/freshness.ts` - whether the desk in the folder was updated after this tool server started: a fingerprint
+  of the desk's own code (`CODE_FILES`: the built tool server, the team's source, and every skill) taken at start and
+  compared on each answer, read again only when a file's size or time changes. Once it differs, every answer opens with
+  `UPDATED_NOTE` ("DESK UPDATED: …", added once for every tool in `server.ts`), `reset_team` writes nothing (the
+  process holds the team's source as it was when it first loaded it, so it would write the old team back), and the
+  desk check compares no agent files. A conversation whose tools are started afresh for each step is not seen this way;
+  the team's version line covers it. Agent files never set `permissionMode` (Madav ignores it in routine runs; the person's choice
   rules), and each agent's name is in one file only (a name in two files is not started); a test keeps both true.
 - `.claude/routines.json` - the routines the project ships to Madav, each off until the person switches it on: the
   waiting list (`watch` the doorbell, `listener` the note, the same words as the desk's own listener, `RUN_WORDS`), and
@@ -71,7 +82,11 @@ built, which decisions stand, every document, and what is pending.
   before the rows were shown. A correction replaces only the lesson: the tag's call, rating and score and the decision
   stay byte for byte, the first lesson is kept word for word under FIRST LESSON, and LESSON CHECK says what the check
   found. A call whose rows cannot be had is marked unreliable by the desk, never guessed. `pastContext` tells the
-  analyses how each lesson was written and withholds an unreliable one.
+  analyses how each lesson was written and withholds an unreliable one. A re-check keeps its own notes beside the
+  journal (`lesson-check.json`, forgotten `NOTES_IDLE_MS`, an hour, after its last step) so it cannot go round: a lesson
+  `correct_lesson` refused `REFUSALS_TO_LEAVE` (two) times answers LEFT and is named, not shown, in later listings; the
+  same lessons listed again with nothing saved since answer STOP, without the rows. With nothing left to rewrite, the
+  answer ends with LATER RE-CHECKS: the true words about what a later re-check does (never a corrected lesson).
 - `src/private.ts` - the one way anything is written into the person's private folder (`paths.ts` `homeDir`): whole,
   and locked to their own account on every system (the file mode on Linux and macOS; on Windows an access list naming
   their account and the system alone, by `icacls`). The desk check reports who can open the folder (`lockState`).

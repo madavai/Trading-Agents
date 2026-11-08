@@ -3263,8 +3263,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path22) {
-      let input2 = path22;
+    function removeDotSegments(path24) {
+      let input2 = path24;
       const output2 = [];
       let nextSlash = -1;
       let len = 0;
@@ -3673,8 +3673,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path22 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path22 && path22 !== "/" ? path22 : void 0;
+        const path24 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path24 && path24 !== "/" ? path24 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -7187,12 +7187,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list2, fs18, exportName) {
+    function addFormats(ajv, list2, fs20, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list2)
-        ajv.addFormat(f, fs18[f]);
+        ajv.addFormat(f, fs20[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -7201,7 +7201,7 @@ var require_dist = __commonJS({
 });
 
 // src/tools/main.ts
-import path21 from "node:path";
+import path23 from "node:path";
 
 // node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
 import process2 from "node:process";
@@ -8023,10 +8023,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path22) {
-  if (!path22)
+function getElementAtPath(obj, path24) {
+  if (!path24)
     return obj;
-  return path22.reduce((acc, key) => acc?.[key], obj);
+  return path24.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -8366,11 +8366,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path22, issues) {
+function prefixIssues(path24, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path22);
+    iss.path.unshift(path24);
     return iss;
   });
 }
@@ -8832,16 +8832,16 @@ function flattenError(error62, mapper = (issue2) => issue2.message) {
 }
 function formatError(error62, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error63, path22 = []) => {
+  const processError = (error63, path24 = []) => {
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path22, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path24, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path22, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path24, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path22, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path24, ...issue2.path]);
       } else {
-        const fullpath = [...path22, ...issue2.path];
+        const fullpath = [...path24, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -8880,17 +8880,17 @@ function formatError(error62, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error62, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error63, path22 = []) => {
+  const processError = (error63, path24 = []) => {
     var _a3;
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path22, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path24, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path22, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path24, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path22, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path24, ...issue2.path]);
       } else {
-        const fullpath = [...path22, ...issue2.path];
+        const fullpath = [...path24, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -8929,8 +8929,8 @@ function treeifyError(error62, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path22 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path22) {
+  const path24 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path24) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -26068,13 +26068,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path22 = ref.slice(1).split("/").filter(Boolean);
-  if (path22.length === 0) {
+  const path24 = ref.slice(1).split("/").filter(Boolean);
+  if (path24.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path22[0] === defsKey) {
-    const key = path22[1] === void 0 ? void 0 : decodeJSONPointerSegment(path22[1]);
+  if (path24[0] === defsKey) {
+    const key = path24[1] === void 0 ? void 0 : decodeJSONPointerSegment(path24[1]);
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -28932,8 +28932,8 @@ function getErrorMap2() {
 
 // node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path22, errorMaps, issueData } = params;
-  const fullPath = [...path22, ...issueData.path || []];
+  const { data, path: path24, errorMaps, issueData } = params;
+  const fullPath = [...path24, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -29048,11 +29048,11 @@ var errorUtil;
 
 // node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path22, key) {
+  constructor(parent, value, path24, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path22;
+    this._path = path24;
     this._key = key;
   }
   get path() {
@@ -32603,11 +32603,11 @@ function normalizeObjectSchema(schema) {
   }
   return void 0;
 }
-function getDotPath(path22) {
-  if (path22.length === 0) {
+function getDotPath(path24) {
+  if (path24.length === 0) {
     return "object root";
   }
-  return path22.reduce((acc, seg, index) => {
+  return path24.reduce((acc, seg, index) => {
     if (index === 0) {
       return String(seg);
     }
@@ -36594,7 +36594,7 @@ var EMPTY_COMPLETION_RESULT = {
 };
 
 // src/check/desk-check.ts
-import fs5 from "node:fs";
+import fs6 from "node:fs";
 import path6 from "node:path";
 
 // src/paths.ts
@@ -36812,9 +36812,85 @@ function readSettings(root) {
 }
 
 // src/desk/agent-files.ts
-import fs4 from "node:fs";
+import fs5 from "node:fs";
 import path5 from "node:path";
 import { pathToFileURL } from "node:url";
+
+// src/desk/lock.ts
+import fs4 from "node:fs";
+var STALE_MS = 6e4;
+var nap = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+function withLock(file5, run, waitMs = 15e3) {
+  const lock = `${file5}.lock`, until = Date.now() + waitMs;
+  for (; ; ) {
+    try {
+      fs4.mkdirSync(lock);
+      break;
+    } catch (e) {
+      if (e.code !== "EEXIST") throw e;
+      try {
+        if (Date.now() - fs4.statSync(lock).mtimeMs > STALE_MS) {
+          fs4.rmdirSync(lock);
+          continue;
+        }
+      } catch {
+        continue;
+      }
+      if (Date.now() > until) throw new Error(`${file5} is in use by another run; try again in a moment`);
+      nap(40);
+    }
+  }
+  try {
+    return run();
+  } finally {
+    try {
+      fs4.rmdirSync(lock);
+    } catch {
+    }
+  }
+}
+function writeWhole(file5, text4) {
+  const temp = `${file5}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
+  try {
+    fs4.writeFileSync(temp, text4);
+    fs4.renameSync(temp, file5);
+  } catch (e) {
+    try {
+      fs4.rmSync(temp, { force: true });
+    } catch {
+    }
+    throw e;
+  }
+}
+
+// src/desk/agent-files.ts
+var TEAM_FILE = ".claude/agents/trading-desk.md";
+function teamVersionOf(shipped) {
+  return /team_version "([0-9a-f]{8})"/.exec(shipped.get(TEAM_FILE) ?? "")?.[1];
+}
+var RESET_AGAIN_MS = 30 * 6e4;
+var resetFile = (root) => path5.join(deskDataDir(root), "team-reset.json");
+function lastReset(root) {
+  try {
+    const at = JSON.parse(fs5.readFileSync(resetFile(root), "utf8")).at;
+    const d = typeof at === "string" ? new Date(at) : void 0;
+    return d && !Number.isNaN(d.getTime()) ? d : void 0;
+  } catch {
+    return void 0;
+  }
+}
+function noteReset(root, at = /* @__PURE__ */ new Date()) {
+  fs5.mkdirSync(path5.dirname(resetFile(root)), { recursive: true });
+  writeWhole(resetFile(root), JSON.stringify({ at: at.toISOString() }));
+}
+var utcTime = (d) => `${d.toISOString().slice(11, 16)} UTC`;
+function resetAgainWords(last) {
+  return [
+    `ALREADY RESET: the team was already put back as the project ships it at ${utcTime(last)}, and its files still match the project's version, so nothing was written now and nothing needs doing again.`,
+    `Do not call reset_team again: tell the person in one plain line that the team was put back at ${utcTime(last)}. If they did not ask for a reset, say that too, and that this conversation has no step for what they asked: a new conversation in Madav has the desk's newest steps.`,
+    `Only a change made in Madav's Agent Studio since then would need another reset, and that can be asked for after ${utcTime(new Date(last.getTime() + RESET_AGAIN_MS))}.`
+  ].join("\n");
+}
 async function shippedAgentFiles(source) {
   const mod = await import(pathToFileURL(path5.join(source, "scripts", "team-files.mjs")).href);
   return mod.deskAgentFiles();
@@ -36823,8 +36899,8 @@ function driftOf(root, shipped) {
   const changed = [], missing = [];
   for (const [p, text4] of shipped) {
     const file5 = path5.join(root, p);
-    if (!fs4.existsSync(file5)) missing.push(p);
-    else if (fs4.readFileSync(file5, "utf8").replace(/\r\n/g, "\n") !== text4) changed.push(p);
+    if (!fs5.existsSync(file5)) missing.push(p);
+    else if (fs5.readFileSync(file5, "utf8").replace(/\r\n/g, "\n") !== text4) changed.push(p);
   }
   return { changed, missing };
 }
@@ -36832,8 +36908,8 @@ function resetAgentFiles(root, shipped) {
   const { changed, missing } = driftOf(root, shipped);
   for (const [p, text4] of shipped) {
     const file5 = path5.join(root, p);
-    fs4.mkdirSync(path5.dirname(file5), { recursive: true });
-    fs4.writeFileSync(file5, text4);
+    fs5.mkdirSync(path5.dirname(file5), { recursive: true });
+    fs5.writeFileSync(file5, text4);
   }
   return [...changed, ...missing];
 }
@@ -36851,22 +36927,22 @@ function nodeLine(version2 = process.versions.node) {
 function dataLine(root) {
   const dir = deskDataDir(root);
   try {
-    fs5.mkdirSync(dir, { recursive: true });
+    fs6.mkdirSync(dir, { recursive: true });
     const probe2 = path6.join(dir, ".write-check");
-    fs5.writeFileSync(probe2, "ok");
-    fs5.rmSync(probe2);
+    fs6.writeFileSync(probe2, "ok");
+    fs6.rmSync(probe2);
     return { ok: true, text: `Desk data folder ${dir} (writable)` };
   } catch (e) {
     return { ok: false, text: `Desk data folder ${dir} cannot be written: ${e.message}` };
   }
 }
 function robinhoodLine(file5 = robinhoodFile()) {
-  if (!fs5.existsSync(file5)) return { ok: true, text: "Robinhood: not connected yet (only needed for trading; analysis works without it)" };
-  const when = fs5.statSync(file5).mtime;
+  if (!fs6.existsSync(file5)) return { ok: true, text: "Robinhood: not connected yet (only needed for trading; analysis works without it)" };
+  const when = fs6.statSync(file5).mtime;
   return { ok: true, text: `Robinhood: a sign-in is saved (last refreshed ${when.toISOString().slice(0, 16).replace("T", " ")} UTC)` };
 }
 function privateFolderLine(dir = homeDir()) {
-  if (!fs5.existsSync(dir)) return { ok: true, text: "Your private folder: not made yet. It is made, locked to your own account, when you connect Robinhood or open the dashboard" };
+  if (!fs6.existsSync(dir)) return { ok: true, text: "Your private folder: not made yet. It is made, locked to your own account, when you connect Robinhood or open the dashboard" };
   const state = lockState(dir);
   if (state === "locked") return { ok: true, text: `Your private folder: locked to your own account${process.platform === "win32" ? " and the system" : ""}. No other account on this computer can open it` };
   if (state === "open") return { ok: false, text: "Your private folder: other accounts on this computer may be able to open it. Open the dashboard once: that locks it to your own account" };
@@ -36880,6 +36956,12 @@ function agentsLine(drift) {
   const off = [...drift.changed, ...drift.missing].map(plainName);
   if (!off.length) return { ok: true, text: "The desk's agents and the trading-desk team are as the project ships them" };
   return { ok: false, text: `${off.length === 1 ? "One of the desk's agent files differs" : `${off.length} of the desk's agent files differ`} from the project's version (${listed(off)}). An edit, or an older version of Madav, can do this. Ask the desk to reset the team to put them back` };
+}
+var NOT_COMPARED = { ok: false, text: "The desk's agents were not compared with the project's version: the desk in this folder was updated after the desk's tools in this conversation started. Start a new conversation in Madav and check this computer there; reset nothing from this one" };
+function teamLine(given, folder2) {
+  if (!given || !/^[0-9a-f]{8}$/.test(given.trim())) return null;
+  if (!folder2) return { ok: false, text: `This conversation's steps for the team (version ${given.trim()}) could not be compared: the team's file in this folder carries no version` };
+  return given.trim() === folder2 ? { ok: true, text: `This conversation's steps for the team are the ones in this folder (version ${folder2})` } : { ok: false, text: `This conversation's steps for the team (version ${given.trim()}) are not the ones in this folder now (version ${folder2}): this conversation began before the desk was updated. Start a new conversation in Madav, where the new steps load, and check this computer there; reset nothing from this one` };
 }
 function render(lines, sources) {
   const mark = (ok) => ok ? "OK " : "NO ";
@@ -36898,65 +36980,28 @@ async function agentDrift(root, source = root) {
     return e.message;
   }
 }
-async function deskCheck(root = process.cwd(), fetchImpl2 = fetch, source = root) {
+async function deskCheck(root = process.cwd(), fetchImpl2 = fetch, source = root, asker = {}) {
   const settings = readSettings(root), email3 = readContactEmail(root);
   const sources = await probeAll(settings.sources.contact, email3, fetchImpl2);
-  return render([nodeLine(), dataLine(root), contactLine(email3), robinhoodLine(), privateFolderLine(), agentsLine(await agentDrift(root, source))], sources);
+  const lines = [nodeLine(), dataLine(root), contactLine(email3), robinhoodLine(), privateFolderLine()];
+  if (asker.updated) lines.push(NOT_COMPARED);
+  else {
+    lines.push(agentsLine(await agentDrift(root, source)));
+    let folder2;
+    try {
+      folder2 = teamVersionOf(await shippedAgentFiles(source));
+    } catch {
+    }
+    const team = teamLine(asker.teamVersion, folder2);
+    if (team) lines.unshift(team);
+  }
+  return render(lines, sources);
 }
 
 // src/data/http.ts
 import fs7 from "node:fs";
 import path7 from "node:path";
 import { createHash } from "node:crypto";
-
-// src/desk/lock.ts
-import fs6 from "node:fs";
-var STALE_MS = 6e4;
-var nap = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-function withLock(file5, run, waitMs = 15e3) {
-  const lock = `${file5}.lock`, until = Date.now() + waitMs;
-  for (; ; ) {
-    try {
-      fs6.mkdirSync(lock);
-      break;
-    } catch (e) {
-      if (e.code !== "EEXIST") throw e;
-      try {
-        if (Date.now() - fs6.statSync(lock).mtimeMs > STALE_MS) {
-          fs6.rmdirSync(lock);
-          continue;
-        }
-      } catch {
-        continue;
-      }
-      if (Date.now() > until) throw new Error(`${file5} is in use by another run; try again in a moment`);
-      nap(40);
-    }
-  }
-  try {
-    return run();
-  } finally {
-    try {
-      fs6.rmdirSync(lock);
-    } catch {
-    }
-  }
-}
-function writeWhole(file5, text4) {
-  const temp = `${file5}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
-  try {
-    fs6.writeFileSync(temp, text4);
-    fs6.renameSync(temp, file5);
-  } catch (e) {
-    try {
-      fs6.rmSync(temp, { force: true });
-    } catch {
-    }
-    throw e;
-  }
-}
-
-// src/data/http.ts
 var Unavailable = class extends Error {
   name = "Unavailable";
 };
@@ -37981,11 +38026,11 @@ async function reddit(raw, from, to, subs) {
   return { posts: all.filter((p) => within2(p.time, from, to)), oldest: oldestOf(all), full: all.length >= 100 };
 }
 var short = (s, from, to, what) => s.full && !reaches(s.oldest, from) ? ` ${what} serves only its latest posts, and the oldest it returned is from ${s.oldest} UTC: the rest of the window asked for (${from} to ${to}, New York days) was not reached, so these show the mood of those hours and say nothing about earlier in the window.` : "";
-function subredditsFor(raw, stock, crypto2) {
+function subredditsFor(raw, stock, crypto3) {
   const base = cryptoBase(raw);
   if (!base) return stock;
   const own2 = { BTC: "Bitcoin", ETH: "ethereum", SOL: "solana" };
-  return own2[base] ? [own2[base], ...crypto2] : crypto2;
+  return own2[base] ? [own2[base], ...crypto3] : crypto3;
 }
 async function socialPosts(raw, analysis2, opts) {
   const day3 = analysisDate(analysis2), from = addDays(day3, -opts.lookBackDays), sym2 = normalizeSymbol(raw);
@@ -38228,8 +38273,8 @@ function splitsIn(list2, asOf) {
     return Math.abs(up / k - 1) <= 0.03 ? r >= 1 ? k : 1 / k : null;
   };
   const found = [];
-  for (const fs18 of periods.values()) {
-    const byDay = fs18.sort((a, b) => a.filed.localeCompare(b.filed));
+  for (const fs20 of periods.values()) {
+    const byDay = fs20.sort((a, b) => a.filed.localeCompare(b.filed));
     for (let n2 = 1; n2 < byDay.length; n2++) {
       const a = byDay[n2 - 1], b = byDay[n2];
       if (a.filed === b.filed || !a.val || !b.val || Math.sign(a.val) !== Math.sign(b.val) || Math.min(Math.abs(a.val), Math.abs(b.val)) < 0.05) continue;
@@ -38698,11 +38743,11 @@ function yahooSession() {
   });
   return session;
 }
-async function yahooJson(path22) {
+async function yahooJson(path24) {
   for (let attempt = 0; ; attempt++) {
     const s = await yahooSession();
     try {
-      return await getJson(`${HOSTS[1]}${path22}&crumb=${encodeURIComponent(s.crumb)}`, { headers: { Cookie: s.cookie } });
+      return await getJson(`${HOSTS[1]}${path24}&crumb=${encodeURIComponent(s.crumb)}`, { headers: { Cookie: s.cookie } });
     } catch (e) {
       if (attempt === 0 && /HTTP 401/.test(e.message)) {
         session = null;
@@ -39039,8 +39084,8 @@ async function financialStatement(raw, kind, freq, analysis2) {
 }
 
 // src/tools/desk.ts
-import fs17 from "node:fs";
-import path20 from "node:path";
+import fs18 from "node:fs";
+import path21 from "node:path";
 
 // src/desk/holdings.ts
 import fs8 from "node:fs";
@@ -39917,8 +39962,45 @@ async function settleOne(journal, scoring, ticker, date5, reflection) {
 }
 
 // src/desk/lessons.ts
+import fs12 from "node:fs";
+import path13 from "node:path";
 var PER_LISTING = 3;
 var MAX_CHECK_NOTE = 600;
+var REFUSALS_TO_LEAVE = 2;
+var NOTES_IDLE_MS = 60 * 6e4;
+var keyOf2 = (ticker, date5) => `${ticker}|${date5}`;
+var notesFile = (j) => path13.join(path13.dirname(j.file), "lesson-check.json");
+function readNotes(j, now) {
+  try {
+    const n2 = JSON.parse(fs12.readFileSync(notesFile(j), "utf8"));
+    if (typeof n2.at === "number" && now - n2.at < NOTES_IDLE_MS && now >= n2.at) {
+      const refused = {};
+      for (const [k, v] of Object.entries(n2.refused ?? {})) {
+        if (typeof v?.n === "number" && typeof v.why === "string") refused[k] = { n: v.n, why: v.why };
+      }
+      const l = n2.listed;
+      const listedOk = l && typeof l.of === "string" && Array.isArray(l.shown) && l.shown.every((s) => typeof s === "string") && typeof l.saved === "number" && typeof l.at === "number";
+      return { at: n2.at, saved: typeof n2.saved === "number" ? n2.saved : 0, refused, ...listedOk ? { listed: l } : {} };
+    }
+  } catch {
+  }
+  return { at: now, saved: 0, refused: {} };
+}
+function writeNotes(j, notes, now) {
+  try {
+    writeWhole(notesFile(j), JSON.stringify({ ...notes, at: now }));
+  } catch {
+  }
+}
+function laterWords(ticker, o = {}) {
+  const looks = [
+    ...o.toRewrite ? ["the lessons still to rewrite"] : [],
+    ...o.unreliable ? ["each lesson marked unreliable (from its window's prices, if they can be had then)"] : [],
+    ...o.left ? ["each lesson left here after two refusals (once an hour has passed since this re-check's last step)"] : [],
+    "the lesson of any call settled from now on when its window's prices cannot be had"
+  ];
+  return `LATER RE-CHECKS (tell the person only this about them): a corrected lesson is never re-checked again, and neither is one written from its window's prices. A later re-check${ticker ? ` of ${ticker}` : ""} looks only at ${listed(looks)}.`;
+}
 var NoWindow = class extends Error {
 };
 var tagOf = (e) => `[${e.date} | ${e.ticker} | ${e.rating} | ${e.raw} | ${e.alpha} | ${e.holding} | resolved:${e.resolved}]`;
@@ -39947,12 +40029,23 @@ var RULES = [
   `Before writing about any level, stop, target or trigger the decision named, find it in the rows: say it was reached, held or broken, or that a trigger fired or not, only when a row shows it, naming that row's date and figure. What the rows cannot show (news, earnings, a filing, a figure they do not hold) is "not known from the prices", never a guess.`,
   "what_was_wrong: each statement of the lesson as it stands that the rows contradict, quoted, with the row that shows otherwise (its date and figure); or, if none is, say so. The desk keeps the first lesson word for word beside the new one, marked as corrected. The call, its rating and its score stay as they are."
 ].join("\n");
-async function lessonsToRecheck(journal, scoring, ticker, on = today()) {
+async function lessonsToRecheck(journal, scoring, ticker, on = today(), now = Date.now()) {
+  const notes = readNotes(journal, now), of = ticker ?? "";
   const due = journal.load().filter((e) => !e.pending && UNCHECKED.includes(e.lesson) && (!ticker || e.ticker === ticker));
-  if (!due.length) return `No lessons${ticker ? ` on ${ticker}` : ""} to re-check: every settled call's lesson was written from its window's prices, or corrected from them.`;
-  const shown2 = [], unreliable = [];
+  if (!due.length) {
+    writeNotes(journal, { ...notes, listed: void 0 }, now);
+    return `No lessons${ticker ? ` on ${ticker}` : ""} to re-check: every settled call's lesson was written from its window's prices, or corrected from them.
+
+${laterWords(ticker)}`;
+  }
+  const shown2 = [], keys = [], unreliable = [], left = [];
   let later = 0;
   for (const e of due) {
+    const refused = notes.refused[keyOf2(e.ticker, e.date)];
+    if (refused && refused.n >= REFUSALS_TO_LEAVE) {
+      left.push(`${tagOf(e)} LEFT: correct_lesson refused its new lesson ${refused.n} times in this re-check (the last time: ${refused.why}). Leave it: its lesson stays as it stands. Name it to the person at the end, with that reason.`);
+      continue;
+    }
     if (shown2.length >= PER_LISTING) {
       later++;
       continue;
@@ -39968,17 +40061,55 @@ ${e.decision}`,
 ${e.reflection}`,
         w.rows
       ].join("\n\n"));
+      keys.push(keyOf2(e.ticker, e.date));
     } catch (err) {
       if (!(err instanceof NoWindow)) throw err;
       journal.markUnreliable(e.ticker, e.date, unreliableNote(on, err.message), on);
       unreliable.push(`${tagOf(e)} UNRELIABLE: ${err.message}. The desk marked its lesson unreliable: its words stay in the journal, and later analyses no longer read them. Leave it: a later re-check tries again.`);
     }
   }
-  const counts = [`${shown2.length} to rewrite below`, ...later ? [`${later} more after these (call recheck_lessons again once these are saved)`] : [], ...unreliable.length ? [`${unreliable.length} marked unreliable`] : []];
-  return [`${due.length} lesson(s)${ticker ? ` on ${ticker}` : ""} to re-check: ${counts.join(", ")}.`, ...shown2.length ? [RULES] : [], "", ...shown2, ...unreliable].join("\n\n");
+  const last = notes.listed;
+  if (keys.length && last && last.of === of && last.saved === notes.saved && last.shown.join("\n") === keys.join("\n")) {
+    writeNotes(journal, { ...notes, listed: void 0 }, now);
+    return [
+      `STOP: this is the same list of lessons to rewrite as the last one, at ${utcTime(new Date(last.at))}, and no lesson has been saved since, so the re-check is going round in a loop. They are not shown again.`,
+      `Do not call recheck_lessons or correct_lesson again now. Tell the person which lessons are still to rewrite (${listed(keys.map((k) => k.replace("|", " ")))}), and why any of them was not saved, as correct_lesson's answers said.${left.length ? ` Name the ${left.length} left after two refusals too, with why.` : ""}`,
+      laterWords(ticker, { toRewrite: keys.length + later, unreliable: unreliable.length, left: left.length })
+    ].join("\n\n");
+  }
+  writeNotes(journal, { ...notes, listed: { of, shown: keys, saved: notes.saved, at: now } }, now);
+  const counts = [
+    `${shown2.length} to rewrite below`,
+    ...later ? [`${later} more after these (call recheck_lessons again once these are saved)`] : [],
+    ...unreliable.length ? [`${unreliable.length} marked unreliable`] : [],
+    ...left.length ? [`${left.length} left after two refusals`] : []
+  ];
+  const end = shown2.length ? [] : [`Nothing is left to rewrite now: tell the person what was corrected, and name each lesson marked unreliable or left, with why.`, laterWords(ticker, { unreliable: unreliable.length, left: left.length })];
+  return [`${due.length} lesson(s)${ticker ? ` on ${ticker}` : ""} to re-check: ${counts.join(", ")}.`, ...shown2.length ? [RULES] : [], "", ...shown2, ...unreliable, ...left, ...end].join("\n\n");
 }
 var sameWords = (a, b) => a.replace(/\s+/g, " ").trim() === b.replace(/\s+/g, " ").trim();
-async function correctLesson(journal, scoring, ticker, date5, lesson, whatWasWrong, on = today()) {
+async function correctLesson(journal, scoring, ticker, date5, lesson, whatWasWrong, on = today(), now = Date.now()) {
+  const key = keyOf2(ticker, date5);
+  let answer2;
+  try {
+    answer2 = await correctOnce(journal, scoring, ticker, date5, lesson, whatWasWrong, on);
+  } catch (err) {
+    if (!(err instanceof Error)) throw err;
+    const notes2 = readNotes(journal, now), n2 = (notes2.refused[key]?.n ?? 0) + 1;
+    notes2.refused[key] = { n: n2, why: err.message.slice(0, 300) };
+    writeNotes(journal, notes2, now);
+    if (n2 < REFUSALS_TO_LEAVE) throw err;
+    return `LEFT: correct_lesson has now refused the new lesson of ${ticker} on ${date5} ${n2} times in this re-check (this time: ${err.message}). Leave it: do not send it again in this re-check, and its lesson stays as it stands. Go on with the next lesson, and at the end tell the person it was left, and why.`;
+  }
+  const notes = readNotes(journal, now);
+  if (answer2.startsWith("Corrected: ")) {
+    notes.saved++;
+    delete notes.refused[key];
+  }
+  writeNotes(journal, notes, now);
+  return answer2;
+}
+async function correctOnce(journal, scoring, ticker, date5, lesson, whatWasWrong, on) {
   const text4 = lesson.trim(), note = whatWasWrong.trim();
   if (!text4) throw new Error("the lesson is empty: write 2 to 4 plain sentences");
   if (text4.length > MAX_REFLECTION) throw new Error(`the lesson is ${text4.length} characters; keep it under ${MAX_REFLECTION}`);
@@ -40005,10 +40136,10 @@ async function correctLesson(journal, scoring, ticker, date5, lesson, whatWasWro
 // src/terminal/launch.ts
 import crypto from "node:crypto";
 import http from "node:http";
-import path13 from "node:path";
+import path14 from "node:path";
 import { spawn } from "node:child_process";
 var PORTS = [47615, 47625];
-var deskIdOf = (root) => crypto.createHash("sha256").update(path13.resolve(root)).digest("hex").slice(0, 12);
+var deskIdOf = (root) => crypto.createHash("sha256").update(path14.resolve(root)).digest("hex").slice(0, 12);
 async function runningOn(root, timeoutMs = 700) {
   const ask = (port) => new Promise((resolve) => {
     const req = http.get({ host: "127.0.0.1", port, path: "/api/ping", timeout: timeoutMs }, (res) => {
@@ -40038,11 +40169,11 @@ async function openDashboard(root, opts = {}) {
   const already = await runningOn(root);
   const words3 = (port, started) => `The dashboard ${started ? "has started and opened" : "was already running and has opened"} in the person's browser (http://127.0.0.1:${port}/ , this computer only). The page it opened is the one to use: it was given the dashboard's key, and the address typed into another browser opens a page without one. It stays open until the person presses Stop on it. Everything on it - connecting Robinhood, choosing accounts, the trading switch and caps, and every order's Review, Place and Confirm - is the person's own to press: never press it for them or reach the page yourself.`;
   if (already) {
-    if (!opts.noOpen) spawn(process.execPath, [path13.join(root, "dist", "terminal.mjs")], { cwd: root, detached: true, stdio: "ignore", windowsHide: true }).on("error", () => {
+    if (!opts.noOpen) spawn(process.execPath, [path14.join(root, "dist", "terminal.mjs")], { cwd: root, detached: true, stdio: "ignore", windowsHide: true }).on("error", () => {
     }).unref();
     return words3(already, false);
   }
-  const child = spawn(process.execPath, [path13.join(root, "dist", "terminal.mjs"), ...opts.noOpen ? ["--no-open"] : []], { cwd: root, detached: true, stdio: "ignore", windowsHide: true });
+  const child = spawn(process.execPath, [path14.join(root, "dist", "terminal.mjs"), ...opts.noOpen ? ["--no-open"] : []], { cwd: root, detached: true, stdio: "ignore", windowsHide: true });
   child.on("error", () => {
   });
   child.unref();
@@ -40056,15 +40187,15 @@ async function openDashboard(root, opts = {}) {
 }
 
 // src/desk/routine.ts
-import path18 from "node:path";
+import path19 from "node:path";
 
 // src/desk/orders.ts
-import fs12 from "node:fs";
-import path14 from "node:path";
-var file4 = (dir) => path14.join(dir, "orders.jsonl");
+import fs13 from "node:fs";
+import path15 from "node:path";
+var file4 = (dir) => path15.join(dir, "orders.jsonl");
 function readOrders(dir) {
   try {
-    return fs12.readFileSync(file4(dir), "utf8").split("\n").flatMap((l) => {
+    return fs13.readFileSync(file4(dir), "utf8").split("\n").flatMap((l) => {
       try {
         const v = JSON.parse(l);
         return v && typeof v.at === "string" && typeof v.symbol === "string" && v.robinhood ? [v] : [];
@@ -40079,23 +40210,23 @@ function readOrders(dir) {
 var ordersOn = (dir, now) => readOrders(dir).filter((o) => marketDay(new Date(o.at)) === marketDay(now));
 
 // src/terminal/store.ts
-import fs13 from "node:fs";
-import path15 from "node:path";
+import fs14 from "node:fs";
+import path16 from "node:path";
 var read = (file5, ok) => {
   try {
-    const v = JSON.parse(fs13.readFileSync(file5, "utf8"));
+    const v = JSON.parse(fs14.readFileSync(file5, "utf8"));
     return Array.isArray(v) ? v.filter(ok) : [];
   } catch {
     return [];
   }
 };
 var isWatch = (v) => !!v && typeof v.symbol === "string" && typeof v.favourite === "boolean";
-var watchFile = (dir) => path15.join(dir, "watchlist.json");
+var watchFile = (dir) => path16.join(dir, "watchlist.json");
 var readWatchlist = (dir) => read(watchFile(dir), isWatch);
 
 // src/desk/screen.ts
-import fs14 from "node:fs";
-import path16 from "node:path";
+import fs15 from "node:fs";
+import path17 from "node:path";
 var MOVE_PCT = 3;
 var VOLUME_TIMES = 2;
 var USUAL_DAYS = 20;
@@ -40182,10 +40313,10 @@ async function workScreen(symbols, news, day3, now = /* @__PURE__ */ new Date())
     picks: rank(read2.filter((r) => !!r.bars))
   };
 }
-var screenFile = (dir) => path16.join(dir, "screen.json");
+var screenFile = (dir) => path17.join(dir, "screen.json");
 function readScreen(dir) {
   try {
-    const v = JSON.parse(fs14.readFileSync(screenFile(dir), "utf8"));
+    const v = JSON.parse(fs15.readFileSync(screenFile(dir), "utf8"));
     if (typeof v.day !== "string" || typeof v.at !== "string" || !Array.isArray(v.picks)) return null;
     return v;
   } catch {
@@ -40193,7 +40324,7 @@ function readScreen(dir) {
   }
 }
 function keep2(dir, s) {
-  fs14.mkdirSync(dir, { recursive: true });
+  fs15.mkdirSync(dir, { recursive: true });
   withLock(screenFile(dir), () => writeWhole(screenFile(dir), JSON.stringify(s, null, 2) + "\n"));
   return s;
 }
@@ -40212,7 +40343,7 @@ var newYorkHour = (now) => Number(new Intl.DateTimeFormat("en-US", { timeZone: "
 function queueTop(dir, screen, day3, ring, now = /* @__PURE__ */ new Date(), from = "") {
   if (!isWeekday(day3) || day3 < from || newYorkHour(now) >= MORNING_ENDS) return [];
   if (screen.day !== day3 || screen.queued?.day === day3 || readScreen(dir)?.queued?.day === day3) return [];
-  const called = new Set(new Journal(path16.join(dir, "journal.md")).load().filter((e) => e.date === day3).map((e) => e.ticker));
+  const called = new Set(new Journal(path17.join(dir, "journal.md")).load().filter((e) => e.date === day3).map((e) => e.ticker));
   const busy = new Set(readQueue(dir, now).filter((q) => q.state === "waiting" || q.state === "running").map((q) => q.symbol));
   const queued = [];
   for (const p of screen.picks) {
@@ -40232,8 +40363,8 @@ function queueTop(dir, screen, day3, ring, now = /* @__PURE__ */ new Date(), fro
 }
 
 // src/desk/care.ts
-import fs15 from "node:fs";
-import path17 from "node:path";
+import fs16 from "node:fs";
+import path18 from "node:path";
 var RERATE_DAYS = 7;
 var RERATE_MAX = 3;
 var agoWords = (days) => days <= 0 ? "today" : days === 1 ? "yesterday" : `${days} days ago`;
@@ -40245,10 +40376,10 @@ function viewOf(calls, symbol4, today2) {
   return { rating: latest.rating, date: latest.date, days, ago: agoWords(days) };
 }
 var isStale = (v) => !v || v.days >= RERATE_DAYS;
-var rerateFile = (dir) => path17.join(dir, "rerate.json");
+var rerateFile = (dir) => path18.join(dir, "rerate.json");
 function readRerate(dir) {
   try {
-    const v = JSON.parse(fs15.readFileSync(rerateFile(dir), "utf8"));
+    const v = JSON.parse(fs16.readFileSync(rerateFile(dir), "utf8"));
     if (typeof v.day !== "string" || !Array.isArray(v.symbols)) return null;
     const dayOrNull = (x) => x === null || typeof x === "string";
     return { day: v.day, symbols: v.symbols.filter((s) => typeof s?.symbol === "string" && dayOrNull(s.called) && dayOrNull(s.rating)) };
@@ -40260,13 +40391,13 @@ var isMonday = (day3) => (/* @__PURE__ */ new Date(`${day3}T12:00:00Z`)).getUTCD
 function dueForRerate(dir, today2, now = /* @__PURE__ */ new Date()) {
   const held = readHoldings(dir)?.positions ?? [];
   if (!held.length) return [];
-  const calls = new Journal(path17.join(dir, "journal.md")).load();
+  const calls = new Journal(path18.join(dir, "journal.md")).load();
   const busy = new Set(readQueue(dir, now).filter((q) => q.state === "waiting" || q.state === "running").map((q) => q.symbol));
   return [...new Set(held.map((p) => p.ticker))].filter((s) => !/[\^=]/.test(s) && !busy.has(s)).map((symbol4) => ({ symbol: symbol4, view: viewOf(calls, symbol4, today2) })).filter((x) => isStale(x.view)).sort((a, b) => (a.view?.date ?? "").localeCompare(b.view?.date ?? "")).map((x) => ({ symbol: x.symbol, called: x.view?.date ?? null, rating: x.view?.rating ?? null }));
 }
 function rerateWeekly(dir, today2, now = /* @__PURE__ */ new Date()) {
   if (!isMonday(today2)) return [];
-  fs15.mkdirSync(dir, { recursive: true });
+  fs16.mkdirSync(dir, { recursive: true });
   return withLock(rerateFile(dir), () => {
     const kept = readRerate(dir);
     if (kept?.day === today2) return kept.symbols;
@@ -40295,7 +40426,7 @@ var reratedToday = (dir, today2) => {
 };
 var lastView = (s) => s.called ? `its latest view: ${s.rating ?? "a call"} on ${s.called}` : "the desk has no view of it yet";
 function morningList(dir, today2, max, screen = null) {
-  const called = new Set(new Journal(path18.join(dir, "journal.md")).load().filter((e) => e.date === today2).map((e) => e.ticker));
+  const called = new Set(new Journal(path19.join(dir, "journal.md")).load().filter((e) => e.date === today2).map((e) => e.ticker));
   const queue2 = readQueue(dir), running = queue2.find((q) => q.state === "running")?.symbol ?? null;
   const wanted = [], seen = new Set(running ? [running] : []);
   const add = (symbol4, why2, queued) => {
@@ -40369,7 +40500,7 @@ function morningBrief(dir, today2, max, look) {
   return lines.join("\n");
 }
 function eveningBrief(dir, today2, now) {
-  const calls = new Journal(path18.join(dir, "journal.md")).load();
+  const calls = new Journal(path19.join(dir, "journal.md")).load();
   const todays = calls.filter((e) => e.date === today2), pending = calls.filter((e) => e.pending).length;
   const orders = ordersOn(dir, now);
   const lines = [`EVENING WRAP-UP for ${weekday2(today2)} ${today2}.`, "", "1. Score what is ready: list_settlements, then record_outcome with a lesson for each READY call (the /settle playbook).", ""];
@@ -40390,8 +40521,8 @@ function eveningBrief(dir, today2, now) {
 }
 
 // src/terminal/prefs.ts
-import fs16 from "node:fs";
-import path19 from "node:path";
+import fs17 from "node:fs";
+import path20 from "node:path";
 
 // src/desk/paper.ts
 var RECORD_WEEKS = 4;
@@ -40502,10 +40633,10 @@ function cleanPrefs(raw) {
   if (typeof r.readCall === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.readCall)) out.readCall = r.readCall;
   return out;
 }
-var prefsFile = (dir) => path19.join(dir, "dashboard.json");
+var prefsFile = (dir) => path20.join(dir, "dashboard.json");
 function readPrefs(dir) {
   try {
-    return cleanPrefs(JSON.parse(fs16.readFileSync(prefsFile(dir), "utf8")));
+    return cleanPrefs(JSON.parse(fs17.readFileSync(prefsFile(dir), "utf8")));
   } catch {
     return {};
   }
@@ -40529,10 +40660,10 @@ async function act(run) {
 function registerDeskTools(server, root) {
   const dir = deskDataDir(root);
   const write = { readOnlyHint: false, openWorldHint: false };
-  const activeFile = path20.join(dir, "backtest", "active.json"), IDLE_MS = 2 * 36e5;
+  const activeFile = path21.join(dir, "backtest", "active.json"), IDLE_MS = 2 * 36e5;
   const getSweep = () => {
     try {
-      const a = JSON.parse(fs17.readFileSync(activeFile, "utf8"));
+      const a = JSON.parse(fs18.readFileSync(activeFile, "utf8"));
       if (typeof a.sweep === "string" && SWEEP_ID.test(a.sweep) && typeof a.at === "number" && Date.now() - a.at < IDLE_MS) return a.sweep;
     } catch {
     }
@@ -40540,10 +40671,10 @@ function registerDeskTools(server, root) {
   };
   const setSweep = (id) => {
     if (id === null) {
-      fs17.rmSync(activeFile, { force: true });
+      fs18.rmSync(activeFile, { force: true });
       return;
     }
-    fs17.mkdirSync(path20.dirname(activeFile), { recursive: true });
+    fs18.mkdirSync(path21.dirname(activeFile), { recursive: true });
     writeWhole(activeFile, JSON.stringify({ sweep: id, at: Date.now() }));
   };
   const ws = () => {
@@ -40651,14 +40782,21 @@ Rating: ${rating}`;
   }, async (a) => act(() => settleOne(journalOf(root, ws()), readSettings(root).scoring, safeSymbol(a.symbol), a.trade_date, a.lesson)));
   server.registerTool("recheck_lessons", {
     title: "Lessons to re-check",
-    description: "Find the settled calls whose lesson was not written from the holding window's prices (written before the desk showed them, when they could not be had, or marked unreliable before). Up to three at a time are shown to rewrite: the call's score, which stays as it is, the decision, the lesson as it stands and the window's finished sessions day by day; call again once those are saved for the next ones. A call whose window's prices cannot be had is marked unreliable by the desk itself, so later analyses stop reading its lesson. Never changes a call, its rating or its score.",
+    description: "Find the settled calls whose lesson was not written from the holding window's prices (written before the desk showed them, when they could not be had, or marked unreliable before). Up to three at a time are shown to rewrite: the call's score, which stays as it is, the decision, the lesson as it stands and the window's finished sessions day by day; call again once those are saved for the next ones. A call whose window's prices cannot be had is marked unreliable by the desk itself, so later analyses stop reading its lesson. A lesson correct_lesson refused twice in this re-check is LEFT, named but not shown; the same lessons asked for again with nothing saved since answer STOP. With nothing left to rewrite, its last words say what a later re-check does. Never changes a call, its rating or its score.",
     inputSchema: { symbol: symbol2.optional() },
     annotations: { readOnlyHint: false, openWorldHint: true }
   }, async (a) => act(() => lessonsToRecheck(journalOf(root, ws()), readSettings(root).scoring, a.symbol ? safeSymbol(a.symbol) : void 0)));
   server.registerTool("correct_lesson", {
     title: "Correct a lesson",
-    description: "Replace the lesson of a call recheck_lessons listed TO REWRITE with one rewritten from its window's rows alone: 2 to 4 plain sentences, as for record_outcome. what_was_wrong quotes each statement of the lesson as it stands that the rows contradict, with the row (date and figure) that shows otherwise, or says that none is. The desk fetches the rows again first: if they cannot be had, nothing is saved and the lesson is marked unreliable. It keeps the first lesson word for word beside the new one, marked as corrected, and never touches the call, its rating or its score. Never pass or invent a number the rows do not show.",
-    inputSchema: { symbol: symbol2, trade_date: day2, lesson: external_exports.string().min(1).max(1200), what_was_wrong: external_exports.string().min(1).max(600) },
+    description: "Replace the lesson of a call recheck_lessons listed TO REWRITE with one rewritten from its window's rows alone: 2 to 4 plain sentences, as for record_outcome. what_was_wrong quotes each statement of the lesson as it stands that the rows contradict, with the row (date and figure) that shows otherwise, or says that none is. The desk fetches the rows again first: if they cannot be had, nothing is saved and the lesson is marked unreliable. It keeps the first lesson word for word beside the new one, marked as corrected, and never touches the call, its rating or its score. Refused a second time for the same lesson in this re-check, it answers LEFT: leave that lesson and go on. Never pass or invent a number the rows do not show.",
+    // The desk checks the lengths itself (under 1200 and 600 characters), so a refusal is counted and said in plain words:
+    // one refused by these input rules never reaches it, and could be sent round again and again.
+    inputSchema: {
+      symbol: symbol2,
+      trade_date: day2,
+      lesson: external_exports.string().max(8e3).describe("The new lesson: 2 to 4 plain sentences, under 1200 characters"),
+      what_was_wrong: external_exports.string().max(8e3).describe("Under 600 characters")
+    },
     annotations: { readOnlyHint: false, openWorldHint: true }
   }, async (a) => act(() => correctLesson(journalOf(root, ws()), readSettings(root).scoring, safeSymbol(a.symbol), a.trade_date, a.lesson, a.what_was_wrong)));
   server.registerTool("start_backtest", {
@@ -40676,10 +40814,10 @@ Rating: ${rating}`;
     if (!readContactEmail(root)) throw new NeedsEmail(ASK_FOR_EMAIL);
     const every = a.every_days ?? 7, dates = iterGrid(a.start_date, a.end_date, every), grid = cells(a.symbols, dates);
     const id = a.sweep_id ?? (/* @__PURE__ */ new Date()).toISOString().replace(/\D/g, "").slice(0, 14), w = workspaceOf(root, id);
-    fs17.mkdirSync(w.dir, { recursive: true });
+    fs18.mkdirSync(w.dir, { recursive: true });
     const recorded = new Set(journalOf(root, w).load().map((e) => `${e.ticker}|${e.date}`));
     const todo = grid.filter((c) => !recorded.has(`${c.symbol}|${c.date}`));
-    writeWhole(path20.join(w.dir, "sweep.json"), JSON.stringify({ symbols: [...new Set(grid.map((c) => c.symbol))], dates, every, cells: grid.length }));
+    writeWhole(path21.join(w.dir, "sweep.json"), JSON.stringify({ symbols: [...new Set(grid.map((c) => c.symbol))], dates, every, cells: grid.length }));
     setSweep(id);
     const symbols = new Set(grid.map((c) => c.symbol)).size;
     return [
@@ -40711,10 +40849,10 @@ Rating: ${rating}`;
     const id = a.sweep_id ?? getSweep();
     if (!id) throw new Error("no backtest is running: name the sweep to score");
     const w = workspaceOf(root, id);
-    if (!fs17.existsSync(path20.join(w.dir, "journal.md"))) throw new Error(`sweep ${id} has no recorded calls yet`);
+    if (!fs18.existsSync(path21.join(w.dir, "journal.md"))) throw new Error(`sweep ${id} has no recorded calls yet`);
     let meta3 = "";
     try {
-      const m2 = JSON.parse(fs17.readFileSync(path20.join(w.dir, "sweep.json"), "utf8"));
+      const m2 = JSON.parse(fs18.readFileSync(path21.join(w.dir, "sweep.json"), "utf8"));
       meta3 = ` of ${m2.cells} planned`;
     } catch {
     }
@@ -40756,7 +40894,7 @@ ${renderSummary(summarize(entries))}`;
   }, async () => act(() => openDashboard(root)));
   const perRun = () => readSettings(root).routines.maxAnalyses;
   const depthWords = (d) => d ? `${d} (debate_rounds ${DEPTHS[d]} and risk_rounds ${DEPTHS[d]})` : "the settings' depth (leave the rounds out)";
-  const called = (sym2, d) => new Journal(path20.join(dir, "journal.md")).load().find((e) => e.ticker === sym2 && e.date === d);
+  const called = (sym2, d) => new Journal(path21.join(dir, "journal.md")).load().find((e) => e.ticker === sym2 && e.date === d);
   const queueAct = (run) => act(() => {
     try {
       return run();
@@ -40842,8 +40980,75 @@ ${renderSummary(summarize(entries))}`;
   }, async () => act(() => forgetHoldings(dir) ? "Forgotten: the desk no longer knows what the person holds." : "Nothing was saved."));
 }
 
+// src/desk/freshness.ts
+import crypto2 from "node:crypto";
+import fs19 from "node:fs";
+import path22 from "node:path";
+var CODE_FILES = ["dist/desk-tools.mjs", "scripts/team-files.mjs", "scripts/team-src.mjs", "scripts/agents-src.mjs"];
+function codeFiles(source) {
+  let skills = [];
+  try {
+    skills = fs19.readdirSync(path22.join(source, ".claude", "skills")).sort().map((s) => `.claude/skills/${s}/SKILL.md`);
+  } catch {
+  }
+  return [...CODE_FILES, ...skills];
+}
+var looksOf = (source, files) => files.map((f) => {
+  try {
+    const s = fs19.statSync(path22.join(source, f));
+    return `${f}:${s.size}:${s.mtimeMs}`;
+  } catch {
+    return `${f}:-`;
+  }
+}).join("|");
+function codeStamp(source, files = codeFiles(source)) {
+  const h = crypto2.createHash("sha256");
+  for (const f of files) {
+    h.update(`${f}\0`);
+    try {
+      h.update(fs19.readFileSync(path22.join(source, f)));
+    } catch {
+      h.update("-");
+    }
+    h.update("\0");
+  }
+  return h.digest("hex");
+}
+var Freshness = class {
+  constructor(source) {
+    this.source = source;
+    this.started = codeStamp(source);
+    this.looks = looksOf(source, codeFiles(source));
+  }
+  source;
+  started;
+  looks;
+  changed = false;
+  /** True when the desk's code in the folder is no longer what this process started with. */
+  updated() {
+    const files = codeFiles(this.source), looks = looksOf(this.source, files);
+    if (looks !== this.looks) {
+      this.looks = looks;
+      this.changed = codeStamp(this.source, files) !== this.started;
+    }
+    return this.changed;
+  }
+};
+var UPDATED_NOTE = "DESK UPDATED: the desk in this folder was updated after the desk's tools in this conversation started, so this conversation still has the old desk tools, and most likely the old steps. Tell the person in one plain line to start a new conversation in Madav (in Claude Code, a new session), where the new ones load, and start nothing new here.";
+
 // src/tools/server.ts
 var text3 = (t) => ({ content: [{ type: "text", text: t }] });
+function noteWhenUpdated(server, fresh) {
+  const register = server.registerTool.bind(server);
+  server.registerTool = (name, config2, cb) => register(name, config2, async (...args) => {
+    const r = await cb(...args);
+    if (!fresh.updated()) return r;
+    const [first, ...rest] = r.content;
+    return { ...r, content: first?.type === "text" ? [{ ...first, text: `${UPDATED_NOTE}
+
+${first.text ?? ""}` }, ...rest] : [{ type: "text", text: UPDATED_NOTE }, ...r.content] };
+  });
+}
 async function answer(what, run) {
   try {
     return text3(await run());
@@ -40861,22 +41066,32 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root) {
   configure({ contact: settings.sources.contact, secEmail: () => readContactEmail(root) });
   if (fetchImpl2) configure({ fetch: fetchImpl2 });
   const server = new McpServer({ name: "trading-desk", version: VERSION });
+  const fresh = new Freshness(source);
+  noteWhenUpdated(server, fresh);
   server.registerTool("desk_check", {
     title: "Desk check",
-    description: "Check that this computer is ready for the Trading Agents desk: Node, the desk data folder, whether a Robinhood sign-in is saved, whether the desk's agents and team are as the project ships them, and whether each free data source answers. Read-only; it sends no order and reads no secret.",
+    description: "Check that this computer is ready for the Trading Agents desk: Node, the desk data folder, whether a Robinhood sign-in is saved, whether the desk's agents and team are as the project ships them, whether this conversation's steps for the team are the ones in this folder, and whether each free data source answers. Read-only; it sends no order and reads no secret.",
+    inputSchema: { team_version: external_exports.string().max(40).optional().describe(`The version of the team's steps, exactly as the team's own "Check this computer" step gives it; left out when the steps give none`) },
     annotations: READ
-  }, async () => text3(await deskCheck(root, fetchImpl2, source)));
+  }, async (a) => text3(await deskCheck(root, fetchImpl2, source, { updated: fresh.updated(), teamVersion: a.team_version })));
   server.registerTool("reset_team", {
     title: "Reset the team",
-    description: "Put the desk's thirteen agents, the trading-desk team's file and its line-up back exactly as the project ships them: each file is written again, even one that already matches, which also brings Madav back to the project's version of the team in place of changes made in its Agent Studio. Only after the person asked for it and confirmed it in this conversation. It writes only those files in this folder; the model, permissions and effort the person chose in Madav stay theirs.",
-    inputSchema: { confirmed: external_exports.literal(true).describe("true: the person confirmed this reset in this conversation") },
+    description: "Put the desk's thirteen agents, the trading-desk team's file and its line-up back exactly as the project ships them: each file is written again, even one that already matches, which also brings Madav back to the project's version of the team in place of changes made in its Agent Studio. Only when the person asked in words, in this conversation, for the team to be reset or put back, and confirmed it: never in place of any other request. Call it once: asked again soon after a reset, with the files still matching, it writes nothing. It writes only those files in this folder; the model, permissions and effort the person chose in Madav stay theirs.",
+    inputSchema: { confirmed: external_exports.literal(true).describe("true: the person asked for this reset in words and confirmed it in this conversation") },
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false }
   }, async () => {
+    if (fresh.updated()) return text3("Not reset: the desk in this folder was updated after the desk's tools in this conversation started, so they could write the team back as it was before the update. Nothing was written. Do not call reset_team again here: tell the person in one plain line to start a new conversation in Madav and check this computer there; a reset is needed only if that check still finds a difference.");
     let wrote;
     try {
-      wrote = resetAgentFiles(root, await shippedAgentFiles(source));
+      const shipped = await shippedAgentFiles(source), last = lastReset(root), drift = driftOf(root, shipped);
+      if (last && Date.now() - last.getTime() < RESET_AGAIN_MS && !drift.changed.length && !drift.missing.length) return text3(resetAgainWords(last));
+      wrote = resetAgentFiles(root, shipped);
     } catch (e) {
       return text3(`The team could not be reset: ${e.message}. Nothing was changed.`);
+    }
+    try {
+      noteReset(root);
+    } catch {
     }
     const madav = "Madav goes back to the project's version of the team too, in place of changes made in its Agent Studio; the model, permissions and effort chosen there stay as they are. If Madav runs the desk's routines, it pauses them until they are switched on again in Madav.";
     if (!wrote.length) return text3(["The desk's agent files already matched the project's version on this computer; each was written again as the project ships it.", madav].join("\n"));
@@ -41013,6 +41228,6 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root) {
 // src/tools/main.ts
 if (process.argv.includes("--check")) console.log(await deskCheck());
 else {
-  configure({ spacingMs: 250, cacheDir: path21.join(deskDataDir(process.cwd()), "cache") });
+  configure({ spacingMs: 250, cacheDir: path23.join(deskDataDir(process.cwd()), "cache") });
   await deskServer().connect(new StdioServerTransport());
 }

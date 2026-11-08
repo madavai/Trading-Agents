@@ -322,7 +322,7 @@ b, strong { font-weight: var(--weight-semibold); }
 <script type="application/json" id="walk">
 {
  "version": "0.9.0",
- "updated": "2026-11-07",
+ "updated": "2026-11-08",
  "sections": [
   { "id": "A", "name": "Getting started in Agent Studio",
     "sub": "The project is cloned, the team is where Madav reads it, and the desk check is green.",
@@ -345,17 +345,20 @@ b, strong { font-weight: var(--weight-semibold); }
         "Teams: trading-desk, with the 13 desk agents as its members.",
         "Agents: the 13 desk agents, and trading-desk is not among them.",
         "If Teams shows a sentence saying why trading-desk is not a team, paste that sentence in the note."] },
-    { "id": "A3", "title": "The desk check is green", "tags": [], "changed": "2026-10-21",
-      "about": "The desk check looks at your computer and at the free data sources the agents read, so you know everything is ready before the first analysis. Run it whenever something seems not to work.",
+    { "id": "A3", "title": "The desk check is green", "tags": [], "changed": "2026-11-08",
+      "about": "The desk check looks at your computer and at the free data sources the agents read, so you know everything is ready before the first analysis. Run it whenever something seems not to work, and in a new conversation after every update of the project: a conversation keeps the desk's tools and the team's steps from when it began.",
       "where": "Madav › Agent Studio › trading-desk › Put to work",
       "do": [
+        "If you updated the project since you last talked to the team, start a new conversation with the trading-desk team first.",
         "Ask the team: [[Check this computer]]"],
       "see": [
         "\"Trading Agents desk check\", with the same version as the top of this walk.",
+        "First under \"This computer\": \"This conversation's steps for the team are the ones in this folder (version …)\", the version being eight letters and digits.",
         "Under \"This computer\", OK for Node, the desk data folder (writable), the contact email for the SEC (yours) and Robinhood (\"a sign-in is saved\", or \"not connected yet (only needed for trading; analysis works without it)\").",
         "A line saying your private folder is locked to your own account and the system, and \"The desk's agents and the trading-desk team are as the project ships them\".",
         "Under \"Free data sources\", all seven answer: Yahoo Finance prices and news, StockTwits, Reddit, FRED, Polymarket and SEC EDGAR. Then \"Everything the desk reads is reachable.\"",
-        "SPY's checked price table comes back. The team does not test Robinhood here: it points you to Connect on the dashboard's Your account (section D)."] },
+        "SPY's checked price table comes back. The team does not test Robinhood here: it points you to Connect on the dashboard's Your account (section D).",
+        "If this happens: the team says first that this conversation began before the desk was updated (the check starts \"DESK UPDATED\", or says \"This conversation's steps for the team (version …) are not the ones in this folder now\"). Start a new conversation with the trading-desk team and check again there. Reset nothing from the old conversation: it would offer no reset, and the desk refuses one from it."] },
     { "id": "A4", "title": "Your email goes to the SEC alone", "tags": [], "changed": "2026-10-21",
       "about": "The SEC (the US body that keeps companies' official accounts) asks everyone who reads its filings for a contact email, so the desk needs yours once, before its first analysis. It is kept on your computer and sent to the SEC only.",
       "where": "The same answer as A3",
@@ -364,17 +367,20 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "\"Contact email for the SEC: <your email> (sent to sec.gov alone, kept in desk-data)\". No other source is named as receiving it.",
         "When you give it: \"Saved. The SEC will see <your email> as the contact for this desk's requests; no other source sees it.\""] },
-    { "id": "A5", "title": "Reset the team brings the project's team back", "tags": ["Optional"], "changed": "2026-10-21",
-      "about": "If the team stops behaving as described here, perhaps after a change in Agent Studio, \"reset the team\" puts the agents back exactly as the project ships them. Your own choices of model, permissions and effort stay.",
+    { "id": "A5", "title": "Reset the team brings the project's team back", "tags": ["Optional"], "changed": "2026-11-08",
+      "about": "If the team stops behaving as described here, perhaps after a change in Agent Studio, \"reset the team\" puts the agents back exactly as the project ships them. Your own choices of model, permissions and effort stay. The team resets only when you ask for it in words, and once: the desk itself refuses a second reset soon after the first.",
       "where": "Madav › Agent Studio, then trading-desk › Put to work",
       "do": [
         "In Agent Studio, change one word in the trader's description and save it.",
         "Ask the team: [[Reset the team]] and say yes when it asks.",
-        "Open Agent Studio again and look at the trader."],
+        "Open Agent Studio again and look at the trader.",
+        "Back in the same conversation, ask once more: [[Reset the team]] and say yes."],
       "see": [
         "The answer starts \"Put back as the project ships them\" and says the others were written again too, that it takes effect from the next conversation or run, and that Madav goes back to the project's version of the team too.",
         "Your change is gone. The model, permissions and effort you chose in Agent Studio stay yours.",
-        "If Madav runs the desk's routines, they are paused until you switch them on again (G5)."] },
+        "If Madav runs the desk's routines, they are paused until you switch them on again (G5).",
+        "Asked again within half an hour: nothing is written. The team says the team was already put back at the time the desk gives (in UTC) and that nothing needs doing again, and does not try again by itself. Since nothing was written, the routines are not paused again.",
+        "If this happens: \"Reset team\" shows in the team's list of actions when you asked for something else, or one action repeats over and over, or an answer starts \"DESK UPDATED\". The conversation began before the desk was updated: press Stop, start a new conversation with the trading-desk team, and ask there."] },
     { "id": "A6", "title": "The desk check names a changed agent file", "tags": ["Optional"], "changed": "2026-10-21",
       "about": "The desk check compares the agents' files in the folder with the project's own version, so a file changed by an edit or an older Madav is caught and named.",
       "where": "The file `.claude/agents/trader.md` in your Trading-Agents folder, then trading-desk › Put to work",
@@ -992,7 +998,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "After an update that changes the desk's agents, playbooks or settings, open Madav's Routines."],
       "see": [
         "The desk's routines are paused until you switch them on again, so nothing new runs without your yes."] },
-    { "id": "G6", "title": "Re-checking old lessons", "tags": ["Optional"], "changed": "2026-11-07",
+    { "id": "G6", "title": "Re-checking old lessons", "tags": ["Optional"], "changed": "2026-11-08",
       "about": "Lessons written before the desk showed the lesson writer the holding week's real prices could describe moves that never happened, and later analyses read them as experience. Re-checking rewrites each one from those prices and keeps the first words beside the new ones, marked as corrected. Only the lessons change: never a call, its rating or its score.",
       "where": "Madav › Agent Studio › trading-desk › Put to work",
       "do": [
@@ -1001,10 +1007,13 @@ b, strong { font-weight: var(--weight-semibold); }
         "Pick one corrected lesson that names a day and a price. Open that stock's page on the dashboard and check that day's price on the chart.",
         "Ask once more: [[Re-check the lessons]]"],
       "see": [
-        "A short list: each lesson corrected (its date, stock and rating), with one sentence on what the first lesson got wrong or that nothing in it was contradicted, and any lesson marked unreliable, with why. It says the calls, their ratings and their scores are unchanged.",
+        "A short list: each lesson corrected (its date, stock and rating), with one sentence on what the first lesson got wrong or that nothing in it was contradicted, any lesson marked unreliable, with why, and any lesson it left, with why. It says the calls, their ratings and their scores are unchanged.",
         "The corrected lesson names the day and the price of each move it describes, and the chart agrees. What prices can't show (news, earnings) it calls \"not known from the prices\".",
-        "Asked once more, it says there are no lessons to re-check.",
-        "If the prices could not be fetched, the team says that lesson was marked unreliable: later analyses stop reading it until you ask again and it is corrected."] }
+        "It ends with what a later re-check does: a corrected lesson is never re-checked again, and a later re-check looks only at lessons still not written from their week's prices. It never says that asking again will re-check the lessons it just corrected.",
+        "Asked once more, it says there are no lessons to re-check, with the same words about later re-checks.",
+        "If the prices could not be fetched, the team says that lesson was marked unreliable: later analyses stop reading it until you ask again and it is corrected.",
+        "If the desk refuses a lesson's new words twice, the team leaves that lesson, goes on with the others and names it at the end, with why. A re-check asked for an hour or more later tries it again.",
+        "If this happens: \"Reset team\" shows in the team's list of actions, or the team says it has no step for re-checking, or one action repeats with the same answer. The conversation began before the desk was updated: press Stop, start a new conversation with the trading-desk team, and ask there. If instead the team stops by itself, saying the same lessons came back with nothing saved, note which lessons it names and mark this test Fail."] }
   ] },
   { "id": "H", "name": "Safety",
     "sub": "The desk must refuse these, whatever it is told.",

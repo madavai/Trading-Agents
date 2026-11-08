@@ -6,7 +6,7 @@ import path from 'node:path';
 import { configure } from '../src/data/http.js';
 import { clearCache } from '../src/data/yahoo.js';
 import { Journal } from '../src/desk/journal.js';
-import { correctLesson, lessonsToRecheck, PER_LISTING } from '../src/desk/lessons.js';
+import { correctLesson, lessonsToRecheck, NOTES_IDLE_MS, PER_LISTING, REFUSALS_TO_LEAVE } from '../src/desk/lessons.js';
 import { settleOne } from '../src/desk/settle.js';
 import { DEFAULTS } from '../src/settings.js';
 import { chartFetch, type Row } from './chart.js';
@@ -46,7 +46,7 @@ test('a lesson settled now is marked by whether the window\'s prices were at han
   await settleOne(j, S, 'NVDA', '2026-09-01', 'Alpha was +7.0%.');
   assert.match(fs.readFileSync(j.file, 'utf8'), /^\[2026-09-01 \| NVDA \| Buy \| \+10\.0% \| \+7\.0% \| 5d \| resolved:2026-09-08 \| lesson:prices\]\n/);
   assert.equal(j.load()[0]!.lesson, 'prices');
-  assert.match(await lessonsToRecheck(j, S), /^No lessons to re-check: every settled call's lesson was written from its window's prices, or corrected from them\.$/);
+  assert.match(await lessonsToRecheck(j, S), /^No lessons to re-check: every settled call's lesson was written from its window's prices, or corrected from them\.\n\nLATER RE-CHECKS/);
 
   // the window's long history cannot be had: the outcome is still measured, and the lesson waits to be re-checked
   const k = new Journal(tmpFile()), base = feed();
@@ -135,12 +135,18 @@ test('a correction is refused when it would not be honest: not settled, written 
   j.storeDecision('LATE', '2026-10-10', '**Rating**: Sell\n\nExit.');
   await assert.rejects(correctLesson(j, S, 'LATE', '2026-10-10', NEW, WRONG), /the call on LATE for 2026-10-10 is not settled yet: settle it with record_outcome/);
   await assert.rejects(correctLesson(j, S, 'NVDA', '2026-09-02', NEW, WRONG), /there is no call on NVDA for 2026-09-02 in the journal/);
-  await assert.rejects(correctLesson(j, S, 'NVDA', '2026-09-01', `  ${OLD.replace(/ /g, '  ')}\n`, WRONG), /the new lesson is the lesson as it stands, word for word/);
-  await assert.rejects(correctLesson(j, S, 'NVDA', '2026-09-01', NEW, '  '), /what_was_wrong is empty/);
-  await assert.rejects(correctLesson(j, S, 'NVDA', '2026-09-01', ' ', WRONG), /the lesson is empty/);
-  await assert.rejects(correctLesson(j, S, 'NVDA', '2026-09-01', 'x'.repeat(1300), WRONG), /keep it under 1200/);
-  await assert.rejects(correctLesson(j, S, 'NVDA', '2026-09-01', NEW, 'x'.repeat(700)), /keep it under 600/);
-  assert.equal(j.load()[0]!.lesson, 'unmarked', 'nothing was changed by a refusal');
+  // each refusal the first time for its lesson (a second one leaves the lesson: below)
+  for (const [lesson, wrong, why] of [
+    [`  ${OLD.replace(/ /g, '  ')}\n`, WRONG, /the new lesson is the lesson as it stands, word for word/],
+    [NEW, '  ', /what_was_wrong is empty/],
+    [' ', WRONG, /the lesson is empty/],
+    ['x'.repeat(1300), WRONG, /keep it under 1200/],
+    [NEW, 'x'.repeat(700), /keep it under 600/],
+  ] as const) {
+    const k = oldJournal([{ tag: tag('2026-09-01', '2026-09-08') }]);
+    await assert.rejects(correctLesson(k, S, 'NVDA', '2026-09-01', lesson, wrong), why);
+    assert.equal(k.load()[0]!.lesson, 'unmarked', 'nothing was changed by a refusal');
+  }
 
   const k = new Journal(tmpFile());
   k.storeDecision('NVDA', '2026-09-01', DECISION);
@@ -165,6 +171,73 @@ test('a listing shows at most three to rewrite, oldest first, and counts the res
   assert.match(next, /^2 lesson\(s\) to re-check: 1 to rewrite below, 1 marked unreliable\./);
   assert.match(next, /\[2026-09-01 \| AMD .*\] TO REWRITE/);
   assert.match(await lessonsToRecheck(j, S, 'AMD'), /^1 lesson\(s\) on AMD to re-check: 1 to rewrite below\./);
+});
+
+test('a lesson whose new words are refused twice is left, named, and not shown again in this re-check; an hour later a re-check tries it again', async () => {
+  configure({ fetch: feed() });
+  const j = oldJournal([{ tag: tag('2026-09-01', '2026-09-08') }, { tag: tag('2026-09-02', '2026-09-09') }]);
+  const t0 = Date.parse('2026-11-07T21:00:00Z');
+  assert.equal(REFUSALS_TO_LEAVE, 2);
+  assert.match(await lessonsToRecheck(j, S, undefined, '2026-11-07', t0), /^2 lesson\(s\) to re-check: 2 to rewrite below\./);
+  await assert.rejects(correctLesson(j, S, 'NVDA', '2026-09-01', 'x'.repeat(1300), WRONG, '2026-11-07', t0 + 1000), /keep it under 1200/);
+  const left = await correctLesson(j, S, 'NVDA', '2026-09-01', 'y'.repeat(1250), WRONG, '2026-11-07', t0 + 2000);
+  assert.match(left, /^LEFT: correct_lesson has now refused the new lesson of NVDA on 2026-09-01 2 times in this re-check \(this time: the lesson is 1250 characters; keep it under 1200\)\. Leave it: do not send it again in this re-check, and its lesson stays as it stands\. Go on with the next lesson, and at the end tell the person it was left, and why\.$/);
+  assert.equal(j.load()[0]!.reflection, OLD, 'its lesson stays as it stands');
+
+  // the next listing names it, and shows the others in full
+  const next = await lessonsToRecheck(j, S, undefined, '2026-11-07', t0 + 3000);
+  assert.match(next, /^2 lesson\(s\) to re-check: 1 to rewrite below, 1 left after two refusals\./);
+  assert.match(next, /\[2026-09-01 \| NVDA .*\] LEFT: correct_lesson refused its new lesson 2 times in this re-check \(the last time: the lesson is 1250 characters; keep it under 1200\)\. Leave it: its lesson stays as it stands\. Name it to the person at the end, with that reason\./);
+  assert.deepEqual([...next.matchAll(/^\[(\S+) \| NVDA .*\] TO REWRITE/gm)].map((m) => m[1]), ['2026-09-02']);
+  assert.match(await correctLesson(j, S, 'NVDA', '2026-09-02', NEW, WRONG, '2026-11-07', t0 + 4000), /^Corrected: /);
+  const end = await lessonsToRecheck(j, S, undefined, '2026-11-07', t0 + 5000);
+  assert.match(end, /^1 lesson\(s\) to re-check: 0 to rewrite below, 1 left after two refusals\./);
+  assert.match(end, /Nothing is left to rewrite now: tell the person what was corrected, and name each lesson marked unreliable or left, with why\.\n\nLATER RE-CHECKS \(tell the person only this about them\): a corrected lesson is never re-checked again, and neither is one written from its window's prices\. A later re-check looks only at each lesson left here after two refusals \(once an hour has passed since this re-check's last step\) and the lesson of any call settled from now on when its window's prices cannot be had\.$/);
+
+  // within the hour it stays left; an hour after the last step a re-check starts afresh and shows it again
+  assert.match(await lessonsToRecheck(j, S, undefined, '2026-11-07', t0 + 5000 + NOTES_IDLE_MS - 1000), /1 left after two refusals/);
+  assert.match(await lessonsToRecheck(j, S, undefined, '2026-11-08', t0 + 5000 + 2 * NOTES_IDLE_MS), /^1 lesson\(s\) to re-check: 1 to rewrite below\.[\s\S]*\[2026-09-01 \| NVDA .*\] TO REWRITE/);
+});
+
+test('the same lessons listed again with nothing saved since answer STOP, without the rows; asked again after that, they are shown in full', async () => {
+  configure({ fetch: feed() });
+  const j = oldJournal([{ tag: tag('2026-09-01', '2026-09-08') }, { tag: tag('2026-09-02', '2026-09-09') }]);
+  const t0 = Date.parse('2026-11-07T21:42:00Z');
+  const first = await lessonsToRecheck(j, S, undefined, '2026-11-07', t0);
+  assert.match(first, /2 to rewrite below/);
+  await assert.rejects(correctLesson(j, S, 'NVDA', '2026-09-01', OLD, WRONG, '2026-11-07', t0 + 1000), /word for word/);   // a refusal saves nothing
+  const stop = await lessonsToRecheck(j, S, undefined, '2026-11-07', t0 + 2000);
+  assert.match(stop, /^STOP: this is the same list of lessons to rewrite as the last one, at 21:42 UTC, and no lesson has been saved since, so the re-check is going round in a loop\. They are not shown again\.\n\nDo not call recheck_lessons or correct_lesson again now\. Tell the person which lessons are still to rewrite \(NVDA 2026-09-01 and NVDA 2026-09-02\), and why any of them was not saved, as correct_lesson's answers said\./);
+  assert.match(stop, /LATER RE-CHECKS \(tell the person only this about them\): a corrected lesson is never re-checked again, and neither is one written from its window's prices\. A later re-check looks only at the lessons still to rewrite and the lesson of any call settled from now on/);
+  assert.doesNotMatch(stop, /WHAT HAPPENED IN THE WINDOW|LESSON AS IT STANDS/, 'nothing to go round on');
+  // the person asks again: shown in full, and once a lesson is saved the next listing is no repeat
+  assert.match(await lessonsToRecheck(j, S, undefined, '2026-11-07', t0 + 60_000), /^2 lesson\(s\) to re-check: 2 to rewrite below\.[\s\S]*LESSON AS IT STANDS/);
+  assert.match(await correctLesson(j, S, 'NVDA', '2026-09-01', NEW, WRONG, '2026-11-07', t0 + 61_000), /^Corrected: /);
+  assert.match(await lessonsToRecheck(j, S, undefined, '2026-11-07', t0 + 62_000), /^1 lesson\(s\) to re-check: 1 to rewrite below\./);
+  // a listing of one stock is not the same list as one of all
+  assert.match(await lessonsToRecheck(j, S, 'NVDA', '2026-11-07', t0 + 63_000), /^1 lesson\(s\) on NVDA to re-check: 1 to rewrite below\./);
+  assert.match(await lessonsToRecheck(j, S, 'NVDA', '2026-11-07', t0 + 64_000), /^STOP: /);
+});
+
+test('the last words say truly what a later re-check does: a corrected lesson is never re-checked (7 Nov: "will re-check these")', async () => {
+  configure({ fetch: feed() });
+  const j = oldJournal([{ tag: tag('2026-09-01', '2026-09-08') }]);
+  assert.match(await correctLesson(j, S, 'NVDA', '2026-09-01', NEW, WRONG, '2026-11-07'), /^Corrected: /);
+  const done = await lessonsToRecheck(j, S, undefined, '2026-11-07');
+  assert.equal(done, 'No lessons to re-check: every settled call\'s lesson was written from its window\'s prices, or corrected from them.\n\nLATER RE-CHECKS (tell the person only this about them): a corrected lesson is never re-checked again, and neither is one written from its window\'s prices. A later re-check looks only at the lesson of any call settled from now on when its window\'s prices cannot be had.');
+  assert.match(await lessonsToRecheck(j, S, 'NVDA', '2026-11-07'), /A later re-check of NVDA looks only at/);
+  // and they are true: the corrected lesson is not listed again, and correct_lesson will not take it
+  await assert.rejects(correctLesson(j, S, 'NVDA', '2026-09-01', `${NEW} Again.`, WRONG, '2026-11-08'), /corrected on 2026-11-07 already/);
+
+  // one marked unreliable is tried again from its prices
+  const k = oldJournal([{ tag: tag('2026-09-01', '2026-09-08') }]);
+  configure({ fetch: offline });
+  clearCache();
+  assert.match(await lessonsToRecheck(k, S, undefined, '2026-11-07'), /A later re-check looks only at each lesson marked unreliable \(from its window's prices, if they can be had then\) and the lesson of any call settled from now on/);
+  // and the playbook says only that
+  const skill = fs.readFileSync('.claude/skills/recheck-lessons/SKILL.md', 'utf8');
+  assert.match(skill, /About later re-checks, say only what the desk's last answer gives under LATER RE-CHECKS, in plain words: a corrected lesson is never re-checked again, so never say that asking again will re-check the lessons corrected here\./);
+  assert.doesNotMatch(skill, /asking again later re-checks those/);
 });
 
 test('words given for a lesson cannot fake its sections, and a score the journal wrote as "-0.0%" stays as written', () => {

@@ -64,7 +64,13 @@ line (see [Your first month](#your-first-month-get-started)).
 **To go back to the project's team:** ask the team to "reset the team". On your yes it writes the desk's agent files
 again exactly as the project ships them, and Madav goes back to them too, undoing changes made in Agent Studio (the
 model, permissions and effort you chose there stay yours). The desk check also names any agent file that differs
-from the project's version.
+from the project's version. Asked again within half an hour, with nothing differing, it writes nothing and says the
+team was already put back.
+
+**After you update the project,** start a new conversation with the team. A conversation keeps the desk's tools and
+the team's steps from when it began, so an older one can miss what the update added. When the desk can tell, it says
+so: its answers start with "DESK UPDATED", or the desk check says this conversation's steps are not the ones in the
+folder. It cannot reach back into a conversation opened before this warning was added.
 
 ## Where the information comes from
 
