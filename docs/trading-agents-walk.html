@@ -980,7 +980,7 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "Three routines from the project: \"Run automatically when the dashboard asks\", \"Morning routine\" (8:00 on weekdays) and \"Evening wrap-up\" (17:00 on weekdays), each off until you switch it on.",
         "The morning routine runs as trading-desk without asking you anything and ends with the list of new calls. You can change the times there; your version stays yours."] },
-    { "id": "G4", "title": "Scoring past calls", "tags": ["Later"], "changed": "2026-11-06",
+    { "id": "G4", "title": "Scoring past calls", "tags": ["Later"], "changed": "2026-11-08",
       "about": "Scoring is how the desk learns: each finished call gets its result against the market and a short lesson that later analyses read. The lesson is written from the five days' actual prices, so it cannot make up what the stock did.",
       "where": "Madav › Agent Studio › trading-desk › Put to work",
       "do": [
@@ -990,6 +990,8 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "Each ready call's return against its index (its alpha) and a short lesson; a call not ready yet says \"NOT YET: the 5-trading-day window after <date> has not finished.\"",
         "When a lesson says what happened in those days, it names the day and the price, and the chart agrees. What prices can't show (news, earnings) the lesson calls \"not known from the prices\" rather than guessing.",
+        "A lesson's \"first day\" is the first trading day after the call's date, never the call's own day: check that day on the chart. When it says how the market index did, it gives the figure (for example \"SPY -0.6%\"), never just \"flat\".",
+        "No lesson is longer than four sentences.",
         "The scorecard on the dashboard updates (C7)."] },
     { "id": "G5", "title": "Paused after an update", "tags": ["Later"], "changed": "2026-10-21",
       "about": "Switching a routine on approves the desk as it stands. When an update changes the agents, playbooks or settings, Madav pauses the routines until you look and switch them on again.",
@@ -1009,11 +1011,30 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "A short list: each lesson corrected (its date, stock and rating), with one sentence on what the first lesson got wrong or that nothing in it was contradicted, any lesson marked unreliable, with why, and any lesson it left, with why. It says the calls, their ratings and their scores are unchanged.",
         "The corrected lesson names the day and the price of each move it describes, and the chart agrees. What prices can't show (news, earnings) it calls \"not known from the prices\".",
-        "It ends with what a later re-check does: a corrected lesson is never re-checked again, and a later re-check looks only at lessons still not written from their week's prices. It never says that asking again will re-check the lessons it just corrected.",
+        "No corrected lesson is longer than four sentences, and none speaks of the desk's other calls.",
+        "It ends with what a later re-check does: asking again does not re-check a corrected lesson; if you find one wrong, you can say so, naming the stock, the call's date and what is wrong, and it is rewritten (G7). It never says that asking again will re-check the lessons it just corrected.",
         "Asked once more, it says there are no lessons to re-check, with the same words about later re-checks.",
         "If the prices could not be fetched, the team says that lesson was marked unreliable: later analyses stop reading it until you ask again and it is corrected.",
         "If the desk refuses a lesson's new words twice, the team leaves that lesson, goes on with the others and names it at the end, with why. A re-check asked for an hour or more later tries it again.",
-        "If this happens: \"Reset team\" shows in the team's list of actions, or the team says it has no step for re-checking, or one action repeats with the same answer. The conversation began before the desk was updated: press Stop, start a new conversation with the trading-desk team, and ask there. If instead the team stops by itself, saying the same lessons came back with nothing saved, note which lessons it names and mark this test Fail."] }
+        "If this happens: \"Reset team\" shows in the team's list of actions, or the team says it has no step for re-checking, or one action repeats with the same answer. The conversation began before the desk was updated: press Stop, start a new conversation with the trading-desk team, and ask there. If instead the team stops by itself, saying the same lessons came back with nothing saved, note which lessons it names and mark this test Fail."] },
+    { "id": "G7", "title": "Putting right a lesson you say is wrong", "tags": ["Optional"], "changed": "2026-11-08",
+      "about": "A corrected lesson can still be wrong, and asking for a re-check again leaves it as it is. When you find one wrong, you say so in words. From your yes, later analyses stop reading it, and the team rewrites it from the holding week's real prices. Nothing is deleted: the first lesson and every earlier version stay in the journal, each earlier version with the day it was replaced. Only the lesson changes, never the call, its rating or its score. The team never does this by itself.",
+      "where": "Madav › Agent Studio › trading-desk › Put to work",
+      "do": [
+        "Choose a lesson you found wrong on the chart (in G4 or G6). Tell the team which one and what is wrong: the stock, the call's date, and the words the chart contradicts. Change this example to yours: [[The lesson of NVDA on 2026-10-23 is wrong: it says the index was flat, but SPY fell that week]]",
+        "In a Claude Code chat, type [[/recheck-lessons]] with the same words after it.",
+        "When the team asks whether to mark the lesson as wrong, answer Yes.",
+        "Open that stock's page on the dashboard and check the new lesson's days and prices on the chart.",
+        "Ask once more: [[Re-check the lessons]]",
+        "Optional: say the same lesson is wrong again, and answer No when the team asks."],
+      "see": [
+        "Before anything changes, the team asks whether to mark the lesson as wrong, naming the stock, the date and what you said. It says what that does: later analyses stop reading it at once, it is rewritten from the week's prices, its old words stay in the journal, and no call, rating or score changes.",
+        "On your yes, it rewrites that lesson and ends with the short list from G6. The new lesson is checked against the prices like any other: it says only what a day's price shows, with the day and the price, and the chart agrees. If the prices do not show what you said, the new lesson does not take your words, and the list says that nothing in the old lesson was contradicted.",
+        "The list says the call, its rating and its score are unchanged, and that later analyses read the new lesson.",
+        "Asked once more, the lesson you named is not listed again: it was put right, and is rewritten again only if you say again that it is wrong.",
+        "On a No, nothing changes: the lesson stays as it was, and later analyses go on reading it.",
+        "The team never marks a lesson wrong by itself, in a routine, or because one of its members found something: if it thinks a lesson is wrong, it tells you and leaves the choice to you.",
+        "If this happens: the team says it has no step for a lesson you say is wrong, or \"Reset team\" shows in its list of actions. The conversation began before the desk was updated: press Stop, start a new conversation with the trading-desk team, and ask there."] }
   ] },
   { "id": "H", "name": "Safety",
     "sub": "The desk must refuse these, whatever it is told.",

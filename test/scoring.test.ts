@@ -73,11 +73,12 @@ test('a ready call lists its window day by day, so the lesson is written from wh
   assert.match(t, /find it in that call's window rows: say what happened only as a row shows it, naming its date/);
   const table = t.slice(t.indexOf('WHAT HAPPENED IN THE WINDOW'));
   assert.match(table, /^WHAT HAPPENED IN THE WINDOW: NVDA's finished sessions from 2026-09-01 \(entry\) to 2026-09-08 \(exit\)/);
-  assert.match(table, /\nDate \| Open \| High \| Low \| Close \| Change \| Volume \| RSI \| MACD histogram \| 10 EMA \| 50 SMA \| SPY close\n/);
-  const rows = table.split('\n').filter((l) => /^\d{4}-\d{2}-\d{2} \|/.test(l));
-  assert.deepEqual(rows.map((r) => r.slice(0, 10)), ['2026-09-01', '2026-09-02', '2026-09-03', '2026-09-04', '2026-09-07', '2026-09-08']);   // entry to exit, nothing after
-  assert.match(rows[0]!, /^2026-09-01 \| 100\.00 \| 100\.00 \| 100\.00 \| 100\.00 \| N\/A \| 1,000 \| .* \| 200\.00$/);   // no session before the first row
-  assert.match(rows[5]!, /^2026-09-08 \| 110\.00 \| 110\.00 \| 110\.00 \| 110\.00 \| \+5\.77% \| 1,000 \| .* \| 206\.00$/);   // 104 -> 110; the index's close beside it
+  assert.match(table, /\nSession \| Date \| Open \| High \| Low \| Close \| Change \| Volume \| RSI \| MACD histogram \| 10 EMA \| 50 SMA \| SPY close\n/);
+  const rows = table.split('\n').filter((l) => /^(entry|\d+) \| \d{4}-\d{2}-\d{2} \|/.test(l));
+  assert.deepEqual(rows.map((r) => r.split(' | ').slice(0, 2).join(' ')), ['entry 2026-09-01', '1 2026-09-02', '2 2026-09-03', '3 2026-09-04', '4 2026-09-07', '5 2026-09-08']);   // entry to exit, nothing after
+  // the entry row is the close the call is scored from, not a session of the window: its own move is left out
+  assert.match(rows[0]!, /^entry \| 2026-09-01 \| 100\.00 \| 100\.00 \| 100\.00 \| 100\.00 \| left out \| 1,000 \| .* \| 200\.00$/);
+  assert.match(rows[5]!, /^5 \| 2026-09-08 \| 110\.00 \| 110\.00 \| 110\.00 \| 110\.00 \| \+5\.77% \| 1,000 \| .* \| 206\.00$/);   // 104 -> 110; the index's close beside it
   assert.ok(t.indexOf('WHAT HAPPENED') > t.indexOf('DECISION:'));   // what was decided, then what happened
 });
 

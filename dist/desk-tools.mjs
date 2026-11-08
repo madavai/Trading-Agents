@@ -39249,15 +39249,16 @@ import path10 from "node:path";
 // src/desk/journal.ts
 import fs9 from "node:fs";
 import path9 from "node:path";
-var UNCHECKED = ["unmarked", "no-prices", "unreliable"];
+var UNCHECKED = ["unmarked", "no-prices", "unreliable", "flagged"];
+var WITHHELD = ["unreliable", "flagged"];
 var SEPARATOR = "\n\n<!-- ENTRY_END -->\n\n";
 var MARK = /<!--\s*ENTRY_END\s*-->/i;
 function keep(text4) {
   let s = text4;
   while (MARK.test(s)) s = s.replace(MARK, "");
-  return s.replace(/^([ \t]*)(DECISION|REFLECTION|LESSON CHECK|FIRST LESSON):/gim, "$1$2 -").trim();
+  return s.replace(/^([ \t]*)(DECISION|REFLECTION|LESSON CHECK|EARLIER CORRECTIONS|FIRST LESSON):/gim, "$1$2 -").trim();
 }
-var LESSON_STATES = /* @__PURE__ */ new Set(["prices", "no-prices", "corrected", "unreliable"]);
+var LESSON_STATES = /* @__PURE__ */ new Set(["prices", "no-prices", "corrected", "unreliable", "flagged"]);
 function lessonOf(fields, pending) {
   if (pending) return { lesson: "none", lessonOn: null };
   const [state, on] = (fields.find((x) => x.startsWith("lesson:"))?.slice("lesson:".length) ?? "").split(":");
@@ -39277,27 +39278,37 @@ function parse3(block) {
   if (f.length < 4) return null;
   const body = lines.slice(1).join("\n").trim();
   const decision = /DECISION:\n([\s\S]*?)(?=\nREFLECTION:|$)/.exec(body)?.[1]?.trim() ?? "";
-  const reflection = /(?:^|\n)REFLECTION:\n([\s\S]*?)(?=\nLESSON CHECK:\n|\nFIRST LESSON:\n|(?![\s\S]))/.exec(body)?.[1]?.trim() ?? "";
-  const lessonCheck = /(?:^|\n)LESSON CHECK:\n([\s\S]*?)(?=\nFIRST LESSON:\n|(?![\s\S]))/.exec(body)?.[1]?.trim() ?? "";
+  const reflection = /(?:^|\n)REFLECTION:\n([\s\S]*?)(?=\nLESSON CHECK:\n|\nEARLIER CORRECTIONS:\n|\nFIRST LESSON:\n|(?![\s\S]))/.exec(body)?.[1]?.trim() ?? "";
+  const lessonCheck = /(?:^|\n)LESSON CHECK:\n([\s\S]*?)(?=\nEARLIER CORRECTIONS:\n|\nFIRST LESSON:\n|(?![\s\S]))/.exec(body)?.[1]?.trim() ?? "";
+  const earlier = /(?:^|\n)EARLIER CORRECTIONS:\n([\s\S]*?)(?=\nFIRST LESSON:\n|(?![\s\S]))/.exec(body)?.[1]?.trim() ?? "";
   const firstLesson = /(?:^|\n)FIRST LESSON:\n([\s\S]*)$/.exec(body)?.[1]?.trim() ?? "";
   const resolved2 = f.slice(6).find((x) => x.startsWith("resolved:"))?.slice("resolved:".length).trim() ?? null;
   const pending = f[3] === "pending", score = (s) => s === void 0 ? null : unsignZero(s);
-  return { date: f[0], ticker: f[1], rating: f[2], pending, raw: pending ? null : score(f[3]), alpha: score(f[4]), holding: f[5] ?? null, resolved: resolved2, decision, reflection, ...lessonOf(f.slice(6), pending), lessonCheck, firstLesson };
+  return { date: f[0], ticker: f[1], rating: f[2], pending, raw: pending ? null : score(f[3]), alpha: score(f[4]), holding: f[5] ?? null, resolved: resolved2, decision, reflection, ...lessonOf(f.slice(6), pending), lessonCheck, earlier, firstLesson };
 }
-function withLesson(block, mark, lessonPart) {
+var lessonPart = (p) => [keep(p.lesson), ...[["LESSON CHECK", p.check], ["EARLIER CORRECTIONS", p.earlier], ["FIRST LESSON", p.first]].filter(([, words3]) => words3?.trim()).map(([head2, words3]) => `${head2}:
+${keep(words3)}`)].join("\n\n");
+var FLAG_LINE = /^(\d{4}-\d{2}-\d{2}): the person said this lesson is wrong, so later analyses do not read it until a re-check rewrites it from the holding window's prices\. What the person said is wrong: (.*)$/;
+function flagOf(e) {
+  const m2 = e.lesson === "flagged" ? FLAG_LINE.exec(e.lessonCheck.split("\n")[0] ?? "") : null;
+  return m2 ? { on: m2[1], said: m2[2] } : null;
+}
+function withLesson(block, mark, lessonPart2) {
   const b = block.trim(), nl = b.indexOf("\n"), at = b.search(/^REFLECTION:\r?$/m);
   const tag = b.slice(1, nl).replace(/\]\s*$/, "").split("|").map((s) => s.trim()).filter((x) => !x.startsWith("lesson:"));
   return `[${[...tag, mark].join(" | ")}]${at < 0 ? `${b.slice(nl)}
 
 ` : b.slice(nl, at)}REFLECTION:
-${lessonPart}`;
+${lessonPart2}`;
 }
 var LESSON_NOTE = {
   unmarked: () => "written before the desk showed the lesson writer the holding window's prices, and not re-checked since: what it says happened on a given day may be wrong",
   "no-prices": () => "written when the holding window's prices could not be had, and not re-checked since",
-  corrected: (e) => `corrected${e.lessonOn ? ` on ${e.lessonOn}` : ""}: rewritten from the holding window's real prices, replacing a first lesson written without them`,
-  unreliable: (e) => `withheld. It was written without the holding window's prices, and they could not be had to check it${e.lessonOn ? ` on ${e.lessonOn}` : ""}.`
+  corrected: (e) => `corrected${e.lessonOn ? ` on ${e.lessonOn}` : ""}: rewritten from the holding window's real prices, replacing an earlier lesson`,
+  unreliable: (e) => `withheld. It was written without the holding window's prices, and they could not be had to check it${e.lessonOn ? ` on ${e.lessonOn}` : ""}.`,
+  flagged: (e) => `withheld. The person said${e.lessonOn ? ` on ${e.lessonOn}` : ""} that it is wrong, and it waits to be rewritten from the holding window's prices.`
 };
+var withheld = (e) => WITHHELD.includes(e.lesson);
 var Journal = class {
   /** @param maxResolved keep at most this many settled entries (the oldest go first); pending ones are never dropped */
   constructor(file5, maxResolved = null) {
@@ -39381,37 +39392,54 @@ ${keep(reflection)}`;
     });
   }
   /** Replaces a settled call's lesson with one rewritten from its window's prices on `on`. The first lesson is kept word
-   *  for word under FIRST LESSON (one already kept stays: it is the first), and `check` - what the check found - under
-   *  LESSON CHECK. The tag's call, rating and score and the decision are not touched. False when not settled, or the
-   *  lesson was written from the window's prices or corrected already. */
+   *  for word under FIRST LESSON (one already kept stays: it is the first); a corrected lesson the person flagged, which
+   *  this replaces, is kept with its check under EARLIER CORRECTIONS, newest first; and `check` - what the check found -
+   *  goes under LESSON CHECK. The tag's call, rating and score and the decision are not touched. False when not settled,
+   *  or the lesson was written from the window's prices or corrected, and the person has not flagged it since. */
   correctLesson(ticker, date5, lesson, check3, on) {
     if (!DATE.test(on)) throw new Error(`"${on}" is not a date in YYYY-MM-DD form`);
     return this.relesson(ticker, date5, (e) => !UNCHECKED.includes(e.lesson) ? null : {
       mark: `lesson:corrected:${on}`,
-      part: `${keep(lesson)}
-
-LESSON CHECK:
-${keep(check3)}
-
-FIRST LESSON:
-${keep(e.firstLesson || e.reflection)}`
+      part: lessonPart({
+        lesson,
+        check: check3,
+        // Only a lesson the desk already corrected has a first lesson kept beside it: that corrected lesson moves to the
+        // earlier corrections. Any other lesson being replaced is the first lesson itself.
+        earlier: e.firstLesson ? [`Lesson replaced on ${on}:
+${e.reflection}
+Its check: ${e.lessonCheck || "none was kept"}`, e.earlier].filter(Boolean).join("\n\n") : e.earlier,
+        first: e.firstLesson || e.reflection
+      })
     });
   }
   /** Marks a settled call's lesson unreliable on `on`: it could not be checked against its window's prices, for the reason
    *  `check` gives. Its words stay as they are; analyses stop reading them until a later check corrects them. False when
-   *  not settled, or the lesson was written from the window's prices or corrected already. */
+   *  not settled, or the lesson was written from the window's prices or corrected already, or the person flagged it (it
+   *  is withheld already, and keeps what they said). */
   markUnreliable(ticker, date5, check3, on) {
     if (!DATE.test(on)) throw new Error(`"${on}" is not a date in YYYY-MM-DD form`);
-    return this.relesson(ticker, date5, (e) => !UNCHECKED.includes(e.lesson) ? null : {
+    return this.relesson(ticker, date5, (e) => !UNCHECKED.includes(e.lesson) || e.lesson === "flagged" ? null : {
       mark: `lesson:unreliable:${on}`,
-      part: `${keep(e.reflection)}
-
-LESSON CHECK:
-${keep(check3)}${e.firstLesson ? `
-
-FIRST LESSON:
-${keep(e.firstLesson)}` : ""}`
+      part: lessonPart({ lesson: e.reflection, check: check3, earlier: e.earlier, first: e.firstLesson })
     });
+  }
+  /** Flags a settled call's lesson on `on`, on the person's word that it is wrong (`said`, kept on one line): analyses stop
+   *  reading it at once, and a re-check lists it again to be rewritten from the window's prices. Its words stay; the check
+   *  it had is kept under the person's words. The tag's call, rating and score and the decision are not touched.
+   *  'flagged' when done; 'already' when it was flagged already (nothing written); 'none' when there is no such settled call. */
+  flagLesson(ticker, date5, said, on) {
+    if (!DATE.test(on)) throw new Error(`"${on}" is not a date in YYYY-MM-DD form`);
+    let already = false;
+    const done = this.relesson(ticker, date5, (e) => {
+      if (e.lesson === "flagged") {
+        already = true;
+        return null;
+      }
+      const line2 = `${on}: the person said this lesson is wrong, so later analyses do not read it until a re-check rewrites it from the holding window's prices. What the person said is wrong: ${said.replace(/\s+/g, " ").trim()}`;
+      return { mark: `lesson:flagged:${on}`, part: lessonPart({ lesson: e.reflection, check: `${line2}${e.lessonCheck ? `
+Its check before then: ${e.lessonCheck}` : ""}`, earlier: e.earlier, first: e.firstLesson }) };
+    });
+    return done ? "flagged" : already ? "already" : "none";
   }
   rotate(blocks2) {
     if (!this.maxResolved || this.maxResolved <= 0) return blocks2;
@@ -39431,15 +39459,15 @@ ${keep(e.firstLesson)}` : ""}`
   }
   /** The lessons for an analysis: the latest settled calls on this stock in full, and the latest on others as lessons only.
    *  With `asOf`, only calls whose outcome was already known on that day - a past-dated run must not learn from its future.
-   *  Each lesson says how it was written (see LESSON_NOTE); one marked unreliable is withheld, and is not counted among the
-   *  other stocks' lessons, since it brings none. */
+   *  Each lesson says how it was written (see LESSON_NOTE); one marked unreliable or flagged by the person is withheld, and
+   *  is not counted among the other stocks' lessons, since it brings none. */
   pastContext(ticker, o = {}) {
     const { sameLimit = 5, otherLimit = 3 } = o;
     let settled2 = this.load().filter((e) => !e.pending);
     if (o.asOf) settled2 = settled2.filter((e) => e.resolved && e.resolved <= o.asOf);
     const same = [], other = [];
     for (const e of settled2.reverse()) {
-      if (e.ticker !== ticker && e.lesson === "unreliable") continue;
+      if (e.ticker !== ticker && withheld(e)) continue;
       if (e.ticker === ticker ? same.length < sameLimit : other.length < otherLimit) (e.ticker === ticker ? same : other).push(e);
       if (same.length >= sameLimit && other.length >= otherLimit) break;
     }
@@ -39448,7 +39476,7 @@ ${keep(e.firstLesson)}` : ""}`
       `[${e.date} | ${e.ticker} | ${e.rating} | ${e.raw ?? "n/a"} | ${e.alpha ?? "n/a"} | ${e.holding ?? "n/a"}]`,
       `DECISION:
 ${e.decision}`,
-      ...e.lesson === "unreliable" ? [`REFLECTION: ${LESSON_NOTE.unreliable(e)}`] : e.reflection ? [`REFLECTION${LESSON_NOTE[e.lesson] ? ` (${LESSON_NOTE[e.lesson](e)})` : ""}:
+      ...e.lesson === "unreliable" || e.lesson === "flagged" ? [`REFLECTION: ${LESSON_NOTE[e.lesson](e)}`] : e.reflection ? [`REFLECTION${LESSON_NOTE[e.lesson] ? ` (${LESSON_NOTE[e.lesson](e)})` : ""}:
 ${e.reflection}`] : []
     ].join("\n\n");
     const short2 = (e) => `[${e.date} | ${e.ticker} | ${e.rating} | ${e.raw ?? "n/a"}]${e.reflection && LESSON_NOTE[e.lesson] ? ` (lesson ${LESSON_NOTE[e.lesson](e)})` : ""}
@@ -39901,22 +39929,41 @@ async function windowRows(ticker, o) {
   const rsi2 = compute("rsi", bars), macdh = compute("macdh", bars), ema10 = compute("close_10_ema", bars), sma50 = compute("close_50_sma", bars);
   const bench = (await daily(o.benchmark, addDays(o.entry, -7), o.exit)).bars;
   const benchClose = (date5) => [...bench].reverse().find((b) => b.date <= date5)?.close;
-  const rows = [];
+  const rows = [], after = [];
   bars.forEach((b, i) => {
     if (b.date < o.entry || b.date > o.exit) return;
-    const before = bars[i - 1], change3 = before ? signedPct(b.close / before.close - 1, 2) : "N/A";
-    rows.push(`${b.date} | ${f23(b.open)} | ${f23(b.high)} | ${f23(b.low)} | ${f23(b.close)} | ${change3} | ${vol3(b.volume)} | ${f23(rsi2[i])} | ${f23(macdh[i])} | ${f23(ema10[i])} | ${f23(sma50[i])} | ${f23(benchClose(b.date))}`);
+    const entry = b.date === o.entry, before = bars[i - 1];
+    const change3 = entry ? "left out" : before ? signedPct(b.close / before.close - 1, 2) : "N/A";
+    if (!entry) after.push({ date: b.date, high: b.high, low: b.low, close: b.close });
+    rows.push(`${entry ? "entry" : after.length} | ${b.date} | ${f23(b.open)} | ${f23(b.high)} | ${f23(b.low)} | ${f23(b.close)} | ${change3} | ${vol3(b.volume)} | ${f23(rsi2[i])} | ${f23(macdh[i])} | ${f23(ema10[i])} | ${f23(sma50[i])} | ${f23(benchClose(b.date))}`);
   });
+  const most = (pick2, top) => after.reduce((a, r) => (top ? pick2(r) > pick2(a) : pick2(r) < pick2(a)) ? r : a);
+  const glance = after.length ? [`IN SESSIONS 1 TO ${after.length} (the entry row left out): highest close ${f23(most((r) => r.close, true).close)} on ${most((r) => r.close, true).date}; lowest close ${f23(most((r) => r.close, false).close)} on ${most((r) => r.close, false).date}; highest high ${f23(most((r) => r.high, true).high)} on ${most((r) => r.high, true).date}; lowest low ${f23(most((r) => r.low, false).low)} on ${most((r) => r.low, false).date}.`] : [];
   return [
-    `WHAT HAPPENED IN THE WINDOW: ${ticker}'s finished sessions from ${o.entry} (entry) to ${o.exit} (exit), prices adjusted for splits and dividends, each change against the session before, and ${o.benchmark}'s close beside each. Anything the lesson says about what happened in the window must be found in these rows.`,
-    `Date | Open | High | Low | Close | Change | Volume | RSI | MACD histogram | 10 EMA | 50 SMA | ${o.benchmark} close`,
-    ...rows
+    `WHAT HAPPENED IN THE WINDOW: ${ticker}'s finished sessions from ${o.entry} (entry) to ${o.exit} (exit), prices adjusted for splits and dividends, and ${o.benchmark}'s close beside each. Anything the lesson says about what happened in the window must be found in these rows.`,
+    `The row marked "entry" is not a session of the window: the call is scored from its close, so its open, high, low and volume came before the window began, and its change, against the session before it, is left out. The window's sessions are numbered from 1${after[0] ? ` (${after[0].date})` : ""}; each one's change is against the session before it.`,
+    `Session | Date | Open | High | Low | Close | Change | Volume | RSI | MACD histogram | 10 EMA | 50 SMA | ${o.benchmark} close`,
+    ...rows,
+    ...glance
   ].join("\n");
 }
 
 // src/desk/settle.ts
 var line = (o, e) => `${e.ticker} ${signedPct(o.raw)} from ${o.entry} to ${o.exit} (${o.holdingDays} trading days); ${o.benchmark} ${signedPct(o.benchmarkReturn)}; alpha ${signedPct(o.alpha)}`;
 var MAX_REFLECTION = 1200;
+var MAX_SENTENCES = 4;
+var ABBREVIATIONS = /\b(?:e\.g|i\.e|vs|etc|approx|U\.S|U\.K|Inc|Corp|Co|Ltd|No|Mr|Ms|Mrs|Dr|St|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec|[A-Z])\./g;
+function sentencesIn(text4) {
+  const t = text4.replace(/\s+/g, " ").trim().replace(ABBREVIATIONS, (m2) => m2.replace(/\./g, "\xB7"));
+  return t ? (t.match(/[.!?]+["')\]”’]*(?= ["'(\[“‘]?[A-Z0-9$+\-−])/g) ?? []).length + 1 : 0;
+}
+function lessonRefusal(text4) {
+  if (!text4) return "the lesson is empty: write 2 to 4 plain sentences";
+  if (text4.length > MAX_REFLECTION) return `the lesson is ${text4.length} characters; keep it under ${MAX_REFLECTION}`;
+  const n2 = sentencesIn(text4);
+  if (n2 > MAX_SENTENCES) return `the lesson has ${n2} sentences; write 2 to ${MAX_SENTENCES} (the desk counts a sentence's end where . ! or ? is followed by a space and a capital letter or a figure)`;
+  return null;
+}
 async function windowText(ticker, o) {
   try {
     return await windowRows(ticker, o);
@@ -39950,9 +39997,8 @@ ${await windowText(e.ticker, o)}`);
   return [`${pending.length} pending call(s), ${ready} ready to settle. Settle a ready one with record_outcome, using only the figures shown here. Before writing about a level, stop, target or trigger the decision named, find it in that call's window rows: say what happened only as a row shows it, naming its date.`, "", ...out].join("\n\n");
 }
 async function settleOne(journal, scoring, ticker, date5, reflection) {
-  const text4 = reflection.trim();
-  if (!text4) throw new Error("the lesson is empty: write 2 to 4 plain sentences");
-  if (text4.length > MAX_REFLECTION) throw new Error(`the lesson is ${text4.length} characters; keep it under ${MAX_REFLECTION}`);
+  const text4 = reflection.trim(), refused = lessonRefusal(text4);
+  if (refused) throw new Error(refused);
   const e = journal.pending().find((x) => x.ticker === ticker && x.date === date5);
   if (!e) throw new Error(`there is no pending call on ${ticker} for ${date5}`);
   const o = await measure(ticker, date5, resolveBenchmark(ticker, scoring), scoring.holdingPeriodDays);
@@ -39965,7 +40011,8 @@ async function settleOne(journal, scoring, ticker, date5, reflection) {
 import fs12 from "node:fs";
 import path13 from "node:path";
 var PER_LISTING = 3;
-var MAX_CHECK_NOTE = 600;
+var MAX_CHECK_NOTE = 900;
+var CHECK_LABELS = ["Contradicted:", "Not known from the prices:", "Right:"];
 var REFUSALS_TO_LEAVE = 2;
 var NOTES_IDLE_MS = 60 * 6e4;
 var keyOf2 = (ticker, date5) => `${ticker}|${date5}`;
@@ -39996,15 +40043,28 @@ function laterWords(ticker, o = {}) {
   const looks = [
     ...o.toRewrite ? ["the lessons still to rewrite"] : [],
     ...o.unreliable ? ["each lesson marked unreliable (from its window's prices, if they can be had then)"] : [],
+    ...o.flagged ? ["each lesson the person said is wrong whose window's prices could not be had here (if they can be had then)"] : [],
     ...o.left ? ["each lesson left here after two refusals (once an hour has passed since this re-check's last step)"] : [],
+    "any lesson the person later says is wrong",
     "the lesson of any call settled from now on when its window's prices cannot be had"
   ];
-  return `LATER RE-CHECKS (tell the person only this about them): a corrected lesson is never re-checked again, and neither is one written from its window's prices. A later re-check${ticker ? ` of ${ticker}` : ""} looks only at ${listed(looks)}.`;
+  return `LATER RE-CHECKS (tell the person only this about them): asking for a re-check again does not re-check a corrected lesson, nor one written from its window's prices. If the person finds one of them wrong, they can say so, naming the stock, the call's date and what is wrong: later analyses then stop reading it at once, and a re-check rewrites it from its window's prices, keeping its earlier words. A later re-check${ticker ? ` of ${ticker}` : ""} looks only at ${listed(looks)}.`;
 }
 var NoWindow = class extends Error {
 };
 var tagOf = (e) => `[${e.date} | ${e.ticker} | ${e.rating} | ${e.raw} | ${e.alpha} | ${e.holding} | resolved:${e.resolved}]`;
-var whyOf = (e) => e.lesson === "unreliable" ? `it was marked unreliable${e.lessonOn ? ` on ${e.lessonOn}` : ""}, since the window's prices could not be had to check it` : e.lesson === "no-prices" ? "it was written when the window's prices could not be had" : "it was written before the desk showed the lesson writer the window's prices";
+var whyOf = (e) => e.lesson === "flagged" ? `the person said${e.lessonOn ? ` on ${e.lessonOn}` : ""} that it is wrong, so later analyses do not read it until it is rewritten` : e.lesson === "unreliable" ? `it was marked unreliable${e.lessonOn ? ` on ${e.lessonOn}` : ""}, since the window's prices could not be had to check it` : e.lesson === "no-prices" ? "it was written when the window's prices could not be had" : "it was written before the desk showed the lesson writer the window's prices";
+function flagWords(e) {
+  const flag = flagOf(e);
+  if (e.lesson !== "flagged") return [];
+  const before = e.lessonCheck.split("\n").slice(1).join("\n").replace(/^Its check before then: /, "").trim();
+  return [
+    `WHAT THE PERSON SAID IS WRONG (check it against the rows like every other statement; it is not a fact until a row shows it):
+${flag ? flag.said : e.lessonCheck}`,
+    ...flag && before ? [`ITS CHECK BEFORE THEN:
+${before}`] : []
+  ];
+}
 async function windowOf(e, scoring) {
   const days = Number(/^(\d+)d$/.exec(e.holding ?? "")?.[1]);
   if (!days || !e.resolved) throw new NoWindow("the journal does not record its holding window");
@@ -40023,11 +40083,18 @@ async function windowOf(e, scoring) {
   }
 }
 var unreliableNote = (on, why) => `${on}: unreliable. It was written without the holding window's prices, and they could not be had to check it: ${why}. Analyses do not read it until a later re-check rewrites it from them.`;
+function noWindow(journal, e, why, on) {
+  if (e.lesson === "flagged") return "flagged";
+  journal.markUnreliable(e.ticker, e.date, unreliableNote(on, why), on);
+  return "unreliable";
+}
 var RULES = [
-  "For each call TO REWRITE: check every statement of its lesson against its window's rows, then save a new lesson with correct_lesson (symbol, trade_date, lesson, what_was_wrong). Write only from the rows, the decision and the score shown here.",
-  "The lesson: 2 to 4 sentences of plain prose, no bullets, headings or markdown; (1) what the alpha over the window shows about the directional call, citing the figure as listed, and saying plainly if the window is too short to judge the thesis; (2) which part of the thesis the window supports or undercuts; (3) one concrete lesson for the next similar analysis.",
-  `Before writing about any level, stop, target or trigger the decision named, find it in the rows: say it was reached, held or broken, or that a trigger fired or not, only when a row shows it, naming that row's date and figure. What the rows cannot show (news, earnings, a filing, a figure they do not hold) is "not known from the prices", never a guess.`,
-  "what_was_wrong: each statement of the lesson as it stands that the rows contradict, quoted, with the row that shows otherwise (its date and figure); or, if none is, say so. The desk keeps the first lesson word for word beside the new one, marked as corrected. The call, its rating and its score stay as they are."
+  "For each call TO REWRITE: check every statement of its lesson against its window's rows, then save a new lesson with correct_lesson (symbol, trade_date, lesson, what_was_wrong). Write only from the rows, the decision and the score shown here: say nothing about the desk's other calls or its journal, which are not shown here.",
+  `The lesson: 2 to 4 sentences of plain prose (the desk counts them and refuses more than 4), no bullets, headings or markdown; (1) what the alpha over the window shows about the directional call, citing the figure as listed, and saying plainly if the window is too short to judge the thesis; (2) which part of the thesis the window supports or undercuts; (3) one concrete lesson for the next similar analysis.`,
+  `Read the rows as they are labelled: the row marked "entry" is the close the call is scored from, not a session of the window, so the call's first session is session 1. Say how the index moved with the figure the score line gives, never a word for it such as "flat". When the decision says an event comes after a session's close (a report after the bell), the first session that can show it is the next one.`,
+  `Before writing about any level, stop, target or trigger the decision named, find it in the rows: say it was reached, held or broken, or that a trigger fired or not, only when a row shows it, naming that row's date and figure. A trigger the decision tied to more than one condition fired only when every condition did: a condition the rows cannot show leaves it "not known from the prices". What the rows cannot show (news, earnings, a filing, a figure they do not hold) is "not known from the prices", never a guess.`,
+  `what_was_wrong sorts each statement of the lesson as it stands under three labels, in this order: "${CHECK_LABELS[0]}" each statement the rows contradict, quoted, with the row that shows otherwise (its date and figure); "${CHECK_LABELS[1]}" each statement the rows cannot show, quoted; "${CHECK_LABELS[2]}" the rest. Write "none" under a label with nothing in it. A statement is contradicted only when a row shows otherwise. The desk keeps the first lesson word for word beside the new one, and any corrected lesson it replaces, marked as corrected. The call, its rating and its score stay as they are.`,
+  "For a lesson the person said is wrong, what they said is shown beside it. Check it against the rows like every other statement, and write only what a row shows: never take their words, or a review's, as given."
 ].join("\n");
 async function lessonsToRecheck(journal, scoring, ticker, on = today(), now = Date.now()) {
   const notes = readNotes(journal, now), of = ticker ?? "";
@@ -40038,12 +40105,12 @@ async function lessonsToRecheck(journal, scoring, ticker, on = today(), now = Da
 
 ${laterWords(ticker)}`;
   }
-  const shown2 = [], keys = [], unreliable = [], left = [];
+  const shown2 = [], keys = [], unreliable = [], flaggedOut = [], left = [];
   let later = 0;
   for (const e of due) {
     const refused = notes.refused[keyOf2(e.ticker, e.date)];
     if (refused && refused.n >= REFUSALS_TO_LEAVE) {
-      left.push(`${tagOf(e)} LEFT: correct_lesson refused its new lesson ${refused.n} times in this re-check (the last time: ${refused.why}). Leave it: its lesson stays as it stands. Name it to the person at the end, with that reason.`);
+      left.push(`${tagOf(e)} LEFT: correct_lesson refused its new lesson ${refused.n} times in this re-check (the last time: ${refused.why}). Leave it: its lesson stays as it stands${e.lesson === "flagged" ? ", and later analyses still do not read it" : ""}. Name it to the person at the end, with that reason.`);
       continue;
     }
     if (shown2.length >= PER_LISTING) {
@@ -40054,18 +40121,22 @@ ${laterWords(ticker)}`;
       const w = await windowOf(e, scoring);
       shown2.push([
         `${tagOf(e)} TO REWRITE: ${whyOf(e)}.`,
-        `ITS SCORE, WHICH STAYS AS IT IS: ${e.ticker} ${e.raw} from ${w.o.entry} to ${w.o.exit} (${w.o.holdingDays} trading days); alpha ${e.alpha}.`,
+        `ITS SCORE, WHICH STAYS AS IT IS: ${e.ticker} ${e.raw} from ${w.o.entry} to ${w.o.exit} (${w.o.holdingDays} trading days); its index, ${w.o.benchmark}, ${signedPct(w.o.benchmarkReturn)} over the same days; alpha ${e.alpha}.`,
         `DECISION:
 ${e.decision}`,
         `LESSON AS IT STANDS:
 ${e.reflection}`,
+        ...flagWords(e),
         w.rows
       ].join("\n\n"));
       keys.push(keyOf2(e.ticker, e.date));
     } catch (err) {
       if (!(err instanceof NoWindow)) throw err;
-      journal.markUnreliable(e.ticker, e.date, unreliableNote(on, err.message), on);
-      unreliable.push(`${tagOf(e)} UNRELIABLE: ${err.message}. The desk marked its lesson unreliable: its words stay in the journal, and later analyses no longer read them. Leave it: a later re-check tries again.`);
+      if (noWindow(journal, e, err.message, on) === "flagged") {
+        flaggedOut.push(`${tagOf(e)} UNRELIABLE: ${err.message}. Its lesson stays as the person flagged it: its words stay in the journal, and later analyses still do not read them. Leave it: a later re-check tries again.`);
+      } else {
+        unreliable.push(`${tagOf(e)} UNRELIABLE: ${err.message}. The desk marked its lesson unreliable: its words stay in the journal, and later analyses no longer read them. Leave it: a later re-check tries again.`);
+      }
     }
   }
   const last = notes.listed;
@@ -40074,7 +40145,7 @@ ${e.reflection}`,
     return [
       `STOP: this is the same list of lessons to rewrite as the last one, at ${utcTime(new Date(last.at))}, and no lesson has been saved since, so the re-check is going round in a loop. They are not shown again.`,
       `Do not call recheck_lessons or correct_lesson again now. Tell the person which lessons are still to rewrite (${listed(keys.map((k) => k.replace("|", " ")))}), and why any of them was not saved, as correct_lesson's answers said.${left.length ? ` Name the ${left.length} left after two refusals too, with why.` : ""}`,
-      laterWords(ticker, { toRewrite: keys.length + later, unreliable: unreliable.length, left: left.length })
+      laterWords(ticker, { toRewrite: keys.length + later, unreliable: unreliable.length, flagged: flaggedOut.length, left: left.length })
     ].join("\n\n");
   }
   writeNotes(journal, { ...notes, listed: { of, shown: keys, saved: notes.saved, at: now } }, now);
@@ -40082,10 +40153,11 @@ ${e.reflection}`,
     `${shown2.length} to rewrite below`,
     ...later ? [`${later} more after these (call recheck_lessons again once these are saved)`] : [],
     ...unreliable.length ? [`${unreliable.length} marked unreliable`] : [],
+    ...flaggedOut.length ? [`${flaggedOut.length} the person said is wrong whose prices could not be had`] : [],
     ...left.length ? [`${left.length} left after two refusals`] : []
   ];
-  const end = shown2.length ? [] : [`Nothing is left to rewrite now: tell the person what was corrected, and name each lesson marked unreliable or left, with why.`, laterWords(ticker, { unreliable: unreliable.length, left: left.length })];
-  return [`${due.length} lesson(s)${ticker ? ` on ${ticker}` : ""} to re-check: ${counts.join(", ")}.`, ...shown2.length ? [RULES] : [], "", ...shown2, ...unreliable, ...left, ...end].join("\n\n");
+  const end = shown2.length ? [] : [`Nothing is left to rewrite now: tell the person what was corrected, and name each lesson marked unreliable or left, with why.`, laterWords(ticker, { unreliable: unreliable.length, flagged: flaggedOut.length, left: left.length })];
+  return [`${due.length} lesson(s)${ticker ? ` on ${ticker}` : ""} to re-check: ${counts.join(", ")}.`, ...shown2.length ? [RULES] : [], "", ...shown2, ...unreliable, ...flaggedOut, ...left, ...end].join("\n\n");
 }
 var sameWords = (a, b) => a.replace(/\s+/g, " ").trim() === b.replace(/\s+/g, " ").trim();
 async function correctLesson(journal, scoring, ticker, date5, lesson, whatWasWrong, on = today(), now = Date.now()) {
@@ -40109,28 +40181,49 @@ async function correctLesson(journal, scoring, ticker, date5, lesson, whatWasWro
   writeNotes(journal, notes, now);
   return answer2;
 }
+var missingLabels = (note) => CHECK_LABELS.filter((l) => !new RegExp(`(?:^|[^a-z])${l.slice(0, -1).replace(/ /g, "\\s+")}\\W{0,3}:`, "i").test(note));
 async function correctOnce(journal, scoring, ticker, date5, lesson, whatWasWrong, on) {
-  const text4 = lesson.trim(), note = whatWasWrong.trim();
-  if (!text4) throw new Error("the lesson is empty: write 2 to 4 plain sentences");
-  if (text4.length > MAX_REFLECTION) throw new Error(`the lesson is ${text4.length} characters; keep it under ${MAX_REFLECTION}`);
-  if (!note) throw new Error("what_was_wrong is empty: quote each statement the rows contradict, with the row, or say that none is");
+  const text4 = lesson.trim(), note = whatWasWrong.trim(), refused = lessonRefusal(text4);
+  if (refused) throw new Error(refused);
+  if (!note) throw new Error(`what_was_wrong is empty: sort each statement of the lesson as it stands under ${listed(CHECK_LABELS.map((l) => `"${l}"`))}`);
   if (note.length > MAX_CHECK_NOTE) throw new Error(`what_was_wrong is ${note.length} characters; keep it under ${MAX_CHECK_NOTE}`);
+  const missing = missingLabels(note);
+  if (missing.length) throw new Error(`what_was_wrong has no ${listed(missing.map((l) => `"${l}"`))}: sort each statement of the lesson as it stands under the three labels, in this order: "${CHECK_LABELS[0]}" (quoted, with the row's date and figure), "${CHECK_LABELS[1]}" (quoted) and "${CHECK_LABELS[2]}" (the rest), writing "none" under a label with nothing in it`);
   const e = journal.load().find((x) => x.ticker === ticker && x.date === date5);
   if (!e) throw new Error(`there is no call on ${ticker} for ${date5} in the journal`);
   if (e.pending) throw new Error(`the call on ${ticker} for ${date5} is not settled yet: settle it with record_outcome`);
-  if (e.lesson === "prices") throw new Error(`the lesson of ${ticker} on ${date5} was written from its window's prices already; it needs no re-check`);
-  if (e.lesson === "corrected") throw new Error(`the lesson of ${ticker} on ${date5} was corrected${e.lessonOn ? ` on ${e.lessonOn}` : ""} already`);
-  if (sameWords(text4, e.reflection)) throw new Error("the new lesson is the lesson as it stands, word for word: write it from the window's rows");
+  if (e.lesson === "prices") throw new Error(`the lesson of ${ticker} on ${date5} was written from its window's prices already; it is rewritten only after the person says it is wrong (flag_lesson)`);
+  if (e.lesson === "corrected") throw new Error(`the lesson of ${ticker} on ${date5} was corrected${e.lessonOn ? ` on ${e.lessonOn}` : ""} already; it is rewritten again only after the person says it is wrong (flag_lesson)`);
+  const same = sameWords(text4, e.reflection);
+  if (same && e.lesson !== "flagged") throw new Error("the new lesson is the lesson as it stands, word for word: write it from the window's rows");
   let o;
   try {
     ({ o } = await windowOf(e, scoring));
   } catch (err) {
     if (!(err instanceof NoWindow)) throw err;
-    journal.markUnreliable(ticker, date5, unreliableNote(on, err.message), on);
-    return `UNRELIABLE: ${err.message}. Your lesson is not saved, since it cannot be checked against the rows now. The desk marked the lesson as it stands unreliable: later analyses no longer read it, and a later re-check tries again.`;
+    return noWindow(journal, e, err.message, on) === "flagged" ? `UNRELIABLE: ${err.message}. Your lesson is not saved, since it cannot be checked against the rows now. The lesson stays as the person flagged it: later analyses still do not read it, and a later re-check tries again.` : `UNRELIABLE: ${err.message}. Your lesson is not saved, since it cannot be checked against the rows now. The desk marked the lesson as it stands unreliable: later analyses no longer read it, and a later re-check tries again.`;
   }
-  const check3 = `${on}: rewritten from the holding window's real prices (${o.entry} to ${o.exit}); the first lesson, below, was written without them. What the check found: ${note}`;
-  return journal.correctLesson(ticker, date5, text4, check3, on) ? `Corrected: the lesson of the ${e.rating} call on ${ticker} for ${date5}, from its window ${o.entry} to ${o.exit}. Only the lesson changed: the call, its rating and its score (${e.raw}, alpha ${e.alpha}) stay as they are. The first lesson is kept word for word in the journal beside the new one, with what the check found; later analyses read the new lesson, marked as corrected.` : `The lesson of ${ticker} on ${date5} was changed by another run meanwhile; nothing was saved. Call recheck_lessons again.`;
+  const flag = e.lesson === "flagged" ? flagOf(e) ?? { on: e.lessonOn ?? "an earlier day", said: "" } : null;
+  const check3 = flag ? `${on}: rewritten from the holding window's real prices (${o.entry} to ${o.exit}), after the person said on ${flag.on} that the lesson before it was wrong${flag.said ? ` ("${flag.said}")` : ""}. What the check found: ${note}` : `${on}: rewritten from the holding window's real prices (${o.entry} to ${o.exit}); the first lesson, below, was written without them. What the check found: ${note}`;
+  const kept = e.firstLesson ? "The first lesson and the corrected lesson this replaces, with its check, are kept word for word in the journal beside the new one" : "The first lesson is kept word for word in the journal beside the new one";
+  return journal.correctLesson(ticker, date5, text4, check3, on) ? `Corrected: the lesson of the ${e.rating} call on ${ticker} for ${date5}, from its window ${o.entry} to ${o.exit}${same ? " (its words are the same as before; only its check is new)" : ""}. Only the lesson changed: the call, its rating and its score (${e.raw}, alpha ${e.alpha}) stay as they are. ${kept}, with what the check found; later analyses read the new lesson, marked as corrected.` : `The lesson of ${ticker} on ${date5} was changed by another run meanwhile; nothing was saved. Call recheck_lessons again.`;
+}
+function flagLesson(journal, ticker, date5, whatIsWrong, on = today(), now = Date.now()) {
+  const said = whatIsWrong.replace(/\s+/g, " ").trim();
+  if (!said) throw new Error("what_is_wrong is empty: pass what the person said is wrong about this lesson");
+  if (said.length > MAX_CHECK_NOTE) throw new Error(`what_is_wrong is ${said.length} characters; keep it under ${MAX_CHECK_NOTE}`);
+  const e = journal.load().find((x) => x.ticker === ticker && x.date === date5);
+  if (!e) throw new Error(`there is no call on ${ticker} for ${date5} in the journal`);
+  if (e.pending) throw new Error(`the call on ${ticker} for ${date5} is not settled yet, so it has no lesson to flag`);
+  const done = journal.flagLesson(ticker, date5, said, on);
+  if (done === "already") return `ALREADY FLAGGED: the person said on ${e.lessonOn ?? "an earlier day"} that the lesson of ${ticker} on ${date5} is wrong; nothing was written. Do not call flag_lesson again for it: recheck_lessons lists it to rewrite.`;
+  if (done === "none") return `The lesson of ${ticker} on ${date5} was changed by another run meanwhile; nothing was written.`;
+  const notes = readNotes(journal, now);
+  notes.saved++;
+  delete notes.refused[keyOf2(ticker, date5)];
+  writeNotes(journal, notes, now);
+  const stay = listed(["its words", ...e.lessonCheck ? ["its check"] : [], ...e.earlier ? ["its earlier corrections"] : [], ...e.firstLesson ? ["its first lesson"] : []]);
+  return `Flagged: the lesson of the ${e.rating} call on ${ticker} for ${date5}, on the person's word that it is wrong. Later analyses stop reading it now. ${stay[0].toUpperCase()}${stay.slice(1)} stay in the journal, with what the person said, and recheck_lessons lists it to rewrite from its window's prices. The call, its rating and its score (${e.raw}, alpha ${e.alpha}) stay as they are.`;
 }
 
 // src/terminal/launch.ts
@@ -40776,29 +40869,40 @@ Rating: ${rating}`;
   }, async (a) => act(() => dueSettlements(journalOf(root, ws()), readSettings(root).scoring, a.symbol ? safeSymbol(a.symbol) : void 0)));
   server.registerTool("record_outcome", {
     title: "Settle a call",
-    description: "Settle one pending call whose window has finished: the desk measures the outcome again itself and keeps it with your lesson. Give only the lesson - 2 to 4 plain sentences naming what the alpha shows, what part of the thesis it supports or undercuts, and one thing to do next time. Say what happened in the window only as its rows from list_settlements show it, naming the day; never pass or invent a number.",
+    description: 'Settle one pending call whose window has finished: the desk measures the outcome again itself and keeps it with your lesson. Give only the lesson - 2 to 4 plain sentences (the desk counts them and refuses more than 4) naming what the alpha shows, what part of the thesis it supports or undercuts, and one thing to do next time. The row marked "entry" is the close the call is scored from, not a session of the window. Say what happened in the window only as its rows from list_settlements show it, naming the day; never pass or invent a number.',
     inputSchema: { symbol: symbol2, trade_date: day2, lesson: external_exports.string().min(1).max(1200) },
     annotations: { readOnlyHint: false, openWorldHint: true }
   }, async (a) => act(() => settleOne(journalOf(root, ws()), readSettings(root).scoring, safeSymbol(a.symbol), a.trade_date, a.lesson)));
   server.registerTool("recheck_lessons", {
     title: "Lessons to re-check",
-    description: "Find the settled calls whose lesson was not written from the holding window's prices (written before the desk showed them, when they could not be had, or marked unreliable before). Up to three at a time are shown to rewrite: the call's score, which stays as it is, the decision, the lesson as it stands and the window's finished sessions day by day; call again once those are saved for the next ones. A call whose window's prices cannot be had is marked unreliable by the desk itself, so later analyses stop reading its lesson. A lesson correct_lesson refused twice in this re-check is LEFT, named but not shown; the same lessons asked for again with nothing saved since answer STOP. With nothing left to rewrite, its last words say what a later re-check does. Never changes a call, its rating or its score.",
+    description: "Find the settled calls whose lesson was not written from the holding window's prices (written before the desk showed them, when they could not be had, or marked unreliable before), or that the person said is wrong (flag_lesson). Up to three at a time are shown to rewrite: the call's score and its index's return over the same days, which stay as they are, the decision, the lesson as it stands, what the person said is wrong (for a flagged one), and the window's entry and finished sessions day by day; call again once those are saved for the next ones. A call whose window's prices cannot be had is marked unreliable by the desk itself, so later analyses stop reading its lesson. A lesson correct_lesson refused twice in this re-check is LEFT, named but not shown; the same lessons asked for again with nothing saved since answer STOP. With nothing left to rewrite, its last words say what a later re-check does. Never changes a call, its rating or its score.",
     inputSchema: { symbol: symbol2.optional() },
     annotations: { readOnlyHint: false, openWorldHint: true }
   }, async (a) => act(() => lessonsToRecheck(journalOf(root, ws()), readSettings(root).scoring, a.symbol ? safeSymbol(a.symbol) : void 0)));
   server.registerTool("correct_lesson", {
     title: "Correct a lesson",
-    description: "Replace the lesson of a call recheck_lessons listed TO REWRITE with one rewritten from its window's rows alone: 2 to 4 plain sentences, as for record_outcome. what_was_wrong quotes each statement of the lesson as it stands that the rows contradict, with the row (date and figure) that shows otherwise, or says that none is. The desk fetches the rows again first: if they cannot be had, nothing is saved and the lesson is marked unreliable. It keeps the first lesson word for word beside the new one, marked as corrected, and never touches the call, its rating or its score. Refused a second time for the same lesson in this re-check, it answers LEFT: leave that lesson and go on. Never pass or invent a number the rows do not show.",
-    // The desk checks the lengths itself (under 1200 and 600 characters), so a refusal is counted and said in plain words:
+    description: `Replace the lesson of a call recheck_lessons listed TO REWRITE with one rewritten from its window's rows alone: 2 to 4 plain sentences, as for record_outcome (the desk counts them and refuses more than 4). what_was_wrong sorts each statement of the lesson as it stands under three labels, in this order: "Contradicted:" (each quoted, with the row's date and figure that shows otherwise), "Not known from the prices:" (each quoted) and "Right:" (the rest), with "none" under a label with nothing in it. The desk fetches the rows again first: if they cannot be had, nothing is saved and the lesson is marked unreliable (one the person flagged stays flagged). It keeps the first lesson word for word beside the new one, and any corrected lesson it replaces with its check, marked as corrected, and never touches the call, its rating or its score. A lesson written from the prices or corrected already is refused unless the person flagged it. Refused a second time for the same lesson in this re-check, it answers LEFT: leave that lesson and go on. Never pass or invent a number the rows do not show.`,
+    // The desk checks the lengths itself (under 1200 and 900 characters), so a refusal is counted and said in plain words:
     // one refused by these input rules never reaches it, and could be sent round again and again.
     inputSchema: {
       symbol: symbol2,
       trade_date: day2,
       lesson: external_exports.string().max(8e3).describe("The new lesson: 2 to 4 plain sentences, under 1200 characters"),
-      what_was_wrong: external_exports.string().max(8e3).describe("Under 600 characters")
+      what_was_wrong: external_exports.string().max(8e3).describe("Contradicted: ... Not known from the prices: ... Right: ...; under 900 characters")
     },
     annotations: { readOnlyHint: false, openWorldHint: true }
   }, async (a) => act(() => correctLesson(journalOf(root, ws()), readSettings(root).scoring, safeSymbol(a.symbol), a.trade_date, a.lesson, a.what_was_wrong)));
+  server.registerTool("flag_lesson", {
+    title: "Flag a lesson as wrong",
+    description: "Only on the person's own word in this conversation, after they confirmed it: they named the stock, the call's date and what is wrong with its lesson (their words, or a review's finding they pass on). Never because a check of yours, or of any member, found something: tell the person that instead, and let them decide. Marks that settled call's lesson as wrong by the person: later analyses stop reading it at once, and recheck_lessons lists it again to rewrite from its window's prices, with what the person said. Nothing is removed: its words, its check, its earlier corrections and its first lesson stay in the journal; the call, its rating and its score never change. Call it once for each lesson: one flagged already answers ALREADY FLAGGED and nothing is written.",
+    inputSchema: {
+      symbol: symbol2,
+      trade_date: day2,
+      what_is_wrong: external_exports.string().max(8e3).describe("What the person said is wrong with this lesson, in their words; under 900 characters"),
+      confirmed: external_exports.literal(true).describe("true: the person said in words, in this conversation, that this lesson is wrong, and confirmed flagging it")
+    },
+    annotations: { readOnlyHint: false, openWorldHint: false }
+  }, async (a) => act(() => flagLesson(journalOf(root, ws()), safeSymbol(a.symbol), a.trade_date, a.what_is_wrong)));
   server.registerTool("start_backtest", {
     title: "Start a backtest sweep",
     description: "Lay out a backtest: the team is run over every stock on every date from start to end (every few days) and the calls are scored later against the market index. From now until end_backtest every desk tool records into this sweep's own journal and runs, so the live journal and its lessons are untouched. Repeat the call with the same sweep_id to resume: cells already recorded are skipped. Every cell is a full team run, so tell the person the number of cells before running any.",

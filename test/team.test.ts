@@ -177,8 +177,14 @@ test('/recheck-lessons rewrites a lesson under /settle\'s rules, from the window
   assert.match(recheck, /never changes the call, its rating or its score/);
   for (const t of ['recheck_lessons', 'correct_lesson', 'what_was_wrong', 'UNRELIABLE', 'Nothing here is investment advice']) assert.ok(recheck.includes(t), t);
   const lead = front('trading-desk');
-  assert.match(lead.text, /\n## Re-check old lessons\n\nWhen the person asks to re-check, correct or fix the desk's lessons \(for example "re-check the lessons"\):\n\n1\. Call `recheck_lessons`/);
-  for (const t of ['recheck_lessons', 'correct_lesson']) {
+  assert.match(lead.text, /\n## Re-check old lessons\n\nWhen the person asks to re-check, correct or fix the desk's lessons \(for example "re-check the lessons"\), or says that one of them is wrong:\n\n[^\n]+\n\n1\. Call `recheck_lessons`/);
+  // a lesson is flagged as wrong only on the person's own words, confirmed, and never by a routine, a member or a check
+  for (const text of [recheck, lead.text]) {
+    assert.match(text, /A lesson the person says is wrong\n\nOnly on the person's own words in this conversation, naming for each lesson the stock, the call's date and what is wrong[\s\S]*?Never because a check of yours, or of a member, found that a lesson is wrong/);
+    assert.match(text, /Only on their yes, call `flag_lesson` once for each lesson, .*confirmed set to true\. If it answers ALREADY FLAGGED, do not call it again for that lesson\./);
+  }
+  assert.match(lead.text, /- Never call `flag_lesson` unless the person said in words, in this conversation, that a lesson is wrong, and confirmed it: a routine, a member or a check of yours never flags one\./);
+  for (const t of ['recheck_lessons', 'correct_lesson', 'flag_lesson']) {
     assert.ok(lead.fields.tools!.includes(`mcp__trading-desk__${t}`), `the lead has ${t}`);
     for (const agent of src.AGENTS) assert.ok(!front(agent.file).fields.tools!.includes(`mcp__trading-desk__${t}`), `${agent.file} cannot change a lesson`);
   }

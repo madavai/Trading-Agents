@@ -29,7 +29,7 @@ beforeEach(() => { process.env.TRADING_AGENTS_TODAY = '2026-10-12'; clearCache()
 test('the desk tools are offered, and none of them can order', async () => {
   const { client } = await connect();
   const names = (await client.listTools()).tools.map((t) => t.name);
-  for (const n of ['plan_analysis', 'save_run_section', 'correct_report', 'read_run', 'write_report', 'record_decision', 'list_settlements', 'record_outcome', 'recheck_lessons', 'correct_lesson', 'set_holdings', 'clear_holdings']) assert.ok(names.includes(n), n);
+  for (const n of ['plan_analysis', 'save_run_section', 'correct_report', 'read_run', 'write_report', 'record_decision', 'list_settlements', 'record_outcome', 'recheck_lessons', 'correct_lesson', 'flag_lesson', 'set_holdings', 'clear_holdings']) assert.ok(names.includes(n), n);
   assert.deepEqual(names.filter(isOrderTool), []);
   await client.close();
 });
@@ -135,15 +135,43 @@ test('an old lesson is re-checked and corrected through the desk tools, and no f
   assert.match(await call('recheck_lessons'), /^1 lesson\(s\) to re-check: 1 to rewrite below\.[\s\S]*TO REWRITE[\s\S]*LESSON AS IT STANDS:\nNVDA never closed above 103\.50\.[\s\S]*WHAT HAPPENED IN THE WINDOW/);
   const schema = (await client.listTools()).tools.find((t) => t.name === 'correct_lesson')!.inputSchema.properties as Record<string, unknown>;
   assert.deepEqual(Object.keys(schema).sort(), ['lesson', 'symbol', 'trade_date', 'what_was_wrong']);   // no field takes a return, an alpha or a price
-  assert.match(await call('correct_lesson', { symbol: 'nvda', trade_date: '2026-09-01', lesson: 'Alpha of +7.0% backs the Buy. NVDA closed at 104.00 on 2026-09-07, above 103.50.', what_was_wrong: '"never closed above 103.50": the 2026-09-07 row closed at 104.00.' }),
+  const sorted = 'Contradicted: "never closed above 103.50": the 2026-09-07 row closed at 104.00. Not known from the prices: none. Right: none.';
+  assert.match(await call('correct_lesson', { symbol: 'nvda', trade_date: '2026-09-01', lesson: 'Alpha of +7.0% backs the Buy. NVDA closed at 104.00 on 2026-09-07, above 103.50.', what_was_wrong: sorted }),
     /^Corrected: the lesson of the Buy call on NVDA for 2026-09-01, from its window 2026-09-01 to 2026-09-08\. Only the lesson changed/);
   assert.match(await call('recheck_lessons'), /^No lessons to re-check/);
-  assert.match(await call('correct_lesson', { symbol: 'NVDA', trade_date: '2026-09-01', lesson: 'x', what_was_wrong: 'y' }), /^INPUT_ERROR: the lesson of NVDA on 2026-09-01 was corrected on 2026-10-12 already\. Correct it and call again\.$/);
+  assert.match(await call('correct_lesson', { symbol: 'NVDA', trade_date: '2026-09-01', lesson: 'x', what_was_wrong: sorted }), /^INPUT_ERROR: the lesson of NVDA on 2026-09-01 was corrected on 2026-10-12 already; it is rewritten again only after the person says it is wrong \(flag_lesson\)\. Correct it and call again\.$/);
   // refused a second time, the desk says to leave it, never to call again
-  const left = await call('correct_lesson', { symbol: 'NVDA', trade_date: '2026-09-01', lesson: 'x', what_was_wrong: 'y' });
-  assert.match(left, /^LEFT: correct_lesson has now refused the new lesson of NVDA on 2026-09-01 2 times in this re-check \(this time: the lesson of NVDA on 2026-09-01 was corrected on 2026-10-12 already\)\. Leave it: do not send it again/);
+  const left = await call('correct_lesson', { symbol: 'NVDA', trade_date: '2026-09-01', lesson: 'x', what_was_wrong: sorted });
+  assert.match(left, /^LEFT: correct_lesson has now refused the new lesson of NVDA on 2026-09-01 2 times in this re-check \(this time: the lesson of NVDA on 2026-09-01 was corrected on 2026-10-12 already; it is rewritten again only after the person says it is wrong \(flag_lesson\)\)\. Leave it: do not send it again/);
   assert.doesNotMatch(left, /call again/);
-  assert.match(await call('recheck_lessons'), /^No lessons to re-check[\s\S]*LATER RE-CHECKS \(tell the person only this about them\): a corrected lesson is never re-checked again/);
+  assert.match(await call('recheck_lessons'), /^No lessons to re-check[\s\S]*LATER RE-CHECKS \(tell the person only this about them\): asking for a re-check again does not re-check a corrected lesson, nor one written from its window's prices\. If the person finds one of them wrong, they can say so/);
+  await client.close();
+});
+
+test('a lesson the person says is wrong is flagged through the desk only when confirmed, then listed and rewritten keeping its earlier words; no field takes a number', async () => {
+  const { root, call, client } = await connect();
+  const file = path.join(root, 'desk-data', 'journal.md');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, '[2026-09-01 | NVDA | Buy | +10.0% | +7.0% | 5d | resolved:2026-09-08 | lesson:corrected:2026-10-01]\n\nDECISION:\n**Rating**: Buy\n\nAdd on a close above 103.50.\n\nREFLECTION:\nNVDA stayed flat all week.\n\nLESSON CHECK:\n2026-10-01: rewritten from the window.\n\nFIRST LESSON:\nNVDA never closed above 103.50.\n\n<!-- ENTRY_END -->\n\n');
+  const schema = (await client.listTools()).tools.find((t) => t.name === 'flag_lesson')!.inputSchema as { properties: Record<string, unknown>; required?: string[] };
+  assert.deepEqual(Object.keys(schema.properties).sort(), ['confirmed', 'symbol', 'trade_date', 'what_is_wrong']);   // no field takes a return, an alpha or a price
+  assert.ok(schema.required?.includes('confirmed'), 'the person\'s confirmation is required');
+  const said = { symbol: 'NVDA', trade_date: '2026-09-01', what_is_wrong: 'It says NVDA stayed flat, but it rose 10% in the window.' };
+  assert.match(await call('flag_lesson', said), /^MCP error|Input validation error|Invalid/, 'never without the person\'s confirmation');
+  assert.match(await call('flag_lesson', { ...said, confirmed: false }), /^MCP error|Input validation error|Invalid/);
+  assert.match(await call('recheck_lessons'), /^No lessons to re-check/, 'nothing was flagged');
+  assert.match(await call('flag_lesson', { ...said, confirmed: true }), /^Flagged: the lesson of the Buy call on NVDA for 2026-09-01, on the person's word that it is wrong\. Later analyses stop reading it now\. Its words, its check and its first lesson stay in the journal/);
+  assert.match(await call('flag_lesson', { ...said, confirmed: true }), /^ALREADY FLAGGED: /);
+  assert.match(fs.readFileSync(file, 'utf8'), /\| lesson:flagged:2026-10-12\]/);
+  const listing = await call('recheck_lessons');
+  assert.match(listing, /^1 lesson\(s\) to re-check: 1 to rewrite below\.[\s\S]*WHAT THE PERSON SAID IS WRONG[^\n]*\nIt says NVDA stayed flat, but it rose 10% in the window\./);
+  assert.match(await call('correct_lesson', { symbol: 'NVDA', trade_date: '2026-09-01', lesson: 'Alpha of +7.0% backs the Buy. NVDA closed at 104.00 on 2026-09-07, above 103.50.', what_was_wrong: 'Contradicted: "stayed flat all week": the 2026-09-08 row closed at 110.00, from 100.00 at entry. Not known from the prices: none. Right: none.' }),
+    /^Corrected: [\s\S]*The first lesson and the corrected lesson this replaces, with its check, are kept word for word/);
+  const kept = fs.readFileSync(file, 'utf8');
+  assert.match(kept, /\| lesson:corrected:2026-10-12\]/);
+  assert.match(kept, /EARLIER CORRECTIONS:\nLesson replaced on 2026-10-12:\nNVDA stayed flat all week\./);
+  assert.match(kept, /FIRST LESSON:\nNVDA never closed above 103\.50\./);
+  assert.match(kept, /^\[2026-09-01 \| NVDA \| Buy \| \+10\.0% \| \+7\.0% \| 5d \| resolved:2026-09-08 \|/, 'the call, its rating and its score never change');
   await client.close();
 });
 
@@ -151,9 +179,9 @@ test('a lesson too long for the desk is refused by the desk itself, in plain wor
   const { root, call, client } = await connect();
   fs.mkdirSync(path.join(root, 'desk-data'), { recursive: true });
   fs.writeFileSync(path.join(root, 'desk-data', 'journal.md'), '[2026-09-01 | NVDA | Buy | +10.0% | +7.0% | 5d | resolved:2026-09-08]\n\nDECISION:\n**Rating**: Buy\n\nAdd on a close above 103.50.\n\nREFLECTION:\nNVDA never closed above 103.50.\n\n<!-- ENTRY_END -->\n\n');
-  const at = { symbol: 'NVDA', trade_date: '2026-09-01', what_was_wrong: '"never closed above 103.50": the 2026-09-07 row closed at 104.00.' };
+  const at = { symbol: 'NVDA', trade_date: '2026-09-01', what_was_wrong: 'Contradicted: "never closed above 103.50": the 2026-09-07 row closed at 104.00. Not known from the prices: none. Right: none.' };
   assert.match(await call('correct_lesson', { ...at, lesson: 'x'.repeat(1250) }), /^INPUT_ERROR: the lesson is 1250 characters; keep it under 1200\. Correct it and call again\.$/);
-  assert.match(await call('correct_lesson', { ...at, lesson: 'Alpha +7.0%.', what_was_wrong: 'w'.repeat(700) }), /^LEFT: correct_lesson has now refused the new lesson of NVDA on 2026-09-01 2 times in this re-check \(this time: what_was_wrong is 700 characters; keep it under 600\)/);
+  assert.match(await call('correct_lesson', { ...at, lesson: 'Alpha +7.0%.', what_was_wrong: 'w'.repeat(1000) }), /^LEFT: correct_lesson has now refused the new lesson of NVDA on 2026-09-01 2 times in this re-check \(this time: what_was_wrong is 1000 characters; keep it under 900\)/);
   assert.match(await call('recheck_lessons'), /^1 lesson\(s\) to re-check: 0 to rewrite below, 1 left after two refusals\.[\s\S]*\] LEFT: [\s\S]*LATER RE-CHECKS/);
   assert.equal(fs.readFileSync(path.join(root, 'desk-data', 'journal.md'), 'utf8').includes('NVDA never closed above 103.50.'), true, 'its lesson stays as it stands');
   await client.close();

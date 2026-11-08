@@ -20,7 +20,7 @@ import { writeWhole } from '../desk/lock.js';
 import { parseRating, RATINGS } from '../desk/rating.js';
 import { CONTEXT, correctSection, progress, readSections, savedPlan, saveSection, SECTIONS, writeReport } from '../desk/runs.js';
 import { dueSettlements, settleOne } from '../desk/settle.js';
-import { correctLesson, lessonsToRecheck } from '../desk/lessons.js';
+import { correctLesson, flagLesson, lessonsToRecheck } from '../desk/lessons.js';
 import { failureText, NoData, Unavailable } from '../data/http.js';
 import { openDashboard } from '../terminal/launch.js';
 import { eveningBrief, morningBrief, type MorningLook } from '../desk/routine.js';
@@ -156,30 +156,41 @@ export function registerDeskTools(server: McpServer, root: string): void {
 
   server.registerTool('record_outcome', {
     title: 'Settle a call',
-    description: 'Settle one pending call whose window has finished: the desk measures the outcome again itself and keeps it with your lesson. Give only the lesson - 2 to 4 plain sentences naming what the alpha shows, what part of the thesis it supports or undercuts, and one thing to do next time. Say what happened in the window only as its rows from list_settlements show it, naming the day; never pass or invent a number.',
+    description: 'Settle one pending call whose window has finished: the desk measures the outcome again itself and keeps it with your lesson. Give only the lesson - 2 to 4 plain sentences (the desk counts them and refuses more than 4) naming what the alpha shows, what part of the thesis it supports or undercuts, and one thing to do next time. The row marked "entry" is the close the call is scored from, not a session of the window. Say what happened in the window only as its rows from list_settlements show it, naming the day; never pass or invent a number.',
     inputSchema: { symbol, trade_date: day, lesson: z.string().min(1).max(1200) },
     annotations: { readOnlyHint: false, openWorldHint: true },
   }, async (a) => act(() => settleOne(journalOf(root, ws()), readSettings(root).scoring, safeSymbol(a.symbol), a.trade_date, a.lesson)));
 
   server.registerTool('recheck_lessons', {
     title: 'Lessons to re-check',
-    description: 'Find the settled calls whose lesson was not written from the holding window\'s prices (written before the desk showed them, when they could not be had, or marked unreliable before). Up to three at a time are shown to rewrite: the call\'s score, which stays as it is, the decision, the lesson as it stands and the window\'s finished sessions day by day; call again once those are saved for the next ones. A call whose window\'s prices cannot be had is marked unreliable by the desk itself, so later analyses stop reading its lesson. A lesson correct_lesson refused twice in this re-check is LEFT, named but not shown; the same lessons asked for again with nothing saved since answer STOP. With nothing left to rewrite, its last words say what a later re-check does. Never changes a call, its rating or its score.',
+    description: 'Find the settled calls whose lesson was not written from the holding window\'s prices (written before the desk showed them, when they could not be had, or marked unreliable before), or that the person said is wrong (flag_lesson). Up to three at a time are shown to rewrite: the call\'s score and its index\'s return over the same days, which stay as they are, the decision, the lesson as it stands, what the person said is wrong (for a flagged one), and the window\'s entry and finished sessions day by day; call again once those are saved for the next ones. A call whose window\'s prices cannot be had is marked unreliable by the desk itself, so later analyses stop reading its lesson. A lesson correct_lesson refused twice in this re-check is LEFT, named but not shown; the same lessons asked for again with nothing saved since answer STOP. With nothing left to rewrite, its last words say what a later re-check does. Never changes a call, its rating or its score.',
     inputSchema: { symbol: symbol.optional() },
     annotations: { readOnlyHint: false, openWorldHint: true },
   }, async (a) => act(() => lessonsToRecheck(journalOf(root, ws()), readSettings(root).scoring, a.symbol ? safeSymbol(a.symbol) : undefined)));
 
   server.registerTool('correct_lesson', {
     title: 'Correct a lesson',
-    description: 'Replace the lesson of a call recheck_lessons listed TO REWRITE with one rewritten from its window\'s rows alone: 2 to 4 plain sentences, as for record_outcome. what_was_wrong quotes each statement of the lesson as it stands that the rows contradict, with the row (date and figure) that shows otherwise, or says that none is. The desk fetches the rows again first: if they cannot be had, nothing is saved and the lesson is marked unreliable. It keeps the first lesson word for word beside the new one, marked as corrected, and never touches the call, its rating or its score. Refused a second time for the same lesson in this re-check, it answers LEFT: leave that lesson and go on. Never pass or invent a number the rows do not show.',
-    // The desk checks the lengths itself (under 1200 and 600 characters), so a refusal is counted and said in plain words:
+    description: 'Replace the lesson of a call recheck_lessons listed TO REWRITE with one rewritten from its window\'s rows alone: 2 to 4 plain sentences, as for record_outcome (the desk counts them and refuses more than 4). what_was_wrong sorts each statement of the lesson as it stands under three labels, in this order: "Contradicted:" (each quoted, with the row\'s date and figure that shows otherwise), "Not known from the prices:" (each quoted) and "Right:" (the rest), with "none" under a label with nothing in it. The desk fetches the rows again first: if they cannot be had, nothing is saved and the lesson is marked unreliable (one the person flagged stays flagged). It keeps the first lesson word for word beside the new one, and any corrected lesson it replaces with its check, marked as corrected, and never touches the call, its rating or its score. A lesson written from the prices or corrected already is refused unless the person flagged it. Refused a second time for the same lesson in this re-check, it answers LEFT: leave that lesson and go on. Never pass or invent a number the rows do not show.',
+    // The desk checks the lengths itself (under 1200 and 900 characters), so a refusal is counted and said in plain words:
     // one refused by these input rules never reaches it, and could be sent round again and again.
     inputSchema: {
       symbol, trade_date: day,
       lesson: z.string().max(8000).describe('The new lesson: 2 to 4 plain sentences, under 1200 characters'),
-      what_was_wrong: z.string().max(8000).describe('Under 600 characters'),
+      what_was_wrong: z.string().max(8000).describe('Contradicted: ... Not known from the prices: ... Right: ...; under 900 characters'),
     },
     annotations: { readOnlyHint: false, openWorldHint: true },
   }, async (a) => act(() => correctLesson(journalOf(root, ws()), readSettings(root).scoring, safeSymbol(a.symbol), a.trade_date, a.lesson, a.what_was_wrong)));
+
+  server.registerTool('flag_lesson', {
+    title: 'Flag a lesson as wrong',
+    description: 'Only on the person\'s own word in this conversation, after they confirmed it: they named the stock, the call\'s date and what is wrong with its lesson (their words, or a review\'s finding they pass on). Never because a check of yours, or of any member, found something: tell the person that instead, and let them decide. Marks that settled call\'s lesson as wrong by the person: later analyses stop reading it at once, and recheck_lessons lists it again to rewrite from its window\'s prices, with what the person said. Nothing is removed: its words, its check, its earlier corrections and its first lesson stay in the journal; the call, its rating and its score never change. Call it once for each lesson: one flagged already answers ALREADY FLAGGED and nothing is written.',
+    inputSchema: {
+      symbol, trade_date: day,
+      what_is_wrong: z.string().max(8000).describe('What the person said is wrong with this lesson, in their words; under 900 characters'),
+      confirmed: z.literal(true).describe('true: the person said in words, in this conversation, that this lesson is wrong, and confirmed flagging it'),
+    },
+    annotations: { readOnlyHint: false, openWorldHint: false },
+  }, async (a) => act(() => flagLesson(journalOf(root, ws()), safeSymbol(a.symbol), a.trade_date, a.what_is_wrong)));
 
   server.registerTool('start_backtest', {
     title: 'Start a backtest sweep',
