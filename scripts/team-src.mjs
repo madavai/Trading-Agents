@@ -4,10 +4,17 @@
 // .claude/agents/trading-desk.team.json, in the shape Madav keeps a team in (members, steps, together, gates, talk), for
 // Agent Studio to use until the person changes the team there. Both are written from scripts/agents-src.mjs and the
 // desk's skills, so the thirteen agents, the team's playbook and the chat commands can never drift apart.
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { AGENTS } from './agents-src.mjs';
 
 const D = (t) => `mcp__trading-desk__${t}`;
+
+/** Where the version of the team's steps goes: the first eight hex digits of the SHA-256 of the file's own text with this
+ *  mark in its place. A conversation keeps its copy of the steps from when it began, and passes that version to the desk
+ *  check, which compares it with the folder's (src/desk/agent-files.ts teamVersionOf). Any change to the steps changes it. */
+export const VERSION_MARK = '@@TEAM_VERSION@@';
+export const versionOf = (marked) => crypto.createHash('sha256').update(marked).digest('hex').slice(0, 8);
 
 /** What the team itself may call: its members, questions to the person, reading this folder, and the desk's own records.
  *  No Robinhood tool and no order tool: those exist only behind the person's own presses on the dashboard. */
@@ -23,7 +30,7 @@ const playbook = (name) => {
 
 export function team() {
   const members = AGENTS.map((a) => a.file);
-  const text = `---
+  const marked = `---
 name: trading-desk
 description: A team for Madav's Agent Studio (in a chat, use /analyse) - the Trading Agents desk, thirteen agents that analyse a stock the way a trading firm would and record a rated call, score past calls, and open the dashboard where the person decides. It never places an order.
 tools: Agent(${members.join(', ')}), SendMessage, AskUserQuestion, ${TEAM_TOOLS.map(D).join(', ')}
@@ -33,6 +40,13 @@ disallowedTools: Bash, PowerShell, Read, Glob, Grep, Write, Edit, NotebookEdit, 
 What this team is for: analysing one stock (or crypto asset) on one date with the whole desk - four analysts, a fact checker, a bull and a bear, a research manager, a trader, three risk voices and a portfolio manager - and recording the call in the desk's journal; scoring past calls; testing the desk over past dates; running the morning routine and the evening wrap-up (Madav's scheduler can start them); checking that this computer is ready; and opening the dashboard where the person sees their accounts and decides.
 
 You coordinate: you start the members in order, keep the work moving and talk to the person. You never analyse yourself, and nothing you or any member does places, changes or cancels an order: no one on this team has a Robinhood tool or an order tool. The person decides on the dashboard, and only their own Confirm there places an order. Where the playbooks below say /analyse, /settle, /backtest or /routine, the person may simply ask in words ("analyse NVDA", "score my past calls"). When you write to the person, use plain words and call each member by its name. Nothing here is investment advice: say so when a call is treated as a certainty.
+
+## Never go round in a loop
+
+- Use each desk tool only for what the part below that names it says. When the person asks for something no part below covers, never use another tool in its place: say in one plain line that this conversation has no step for it, and that if the desk was updated since this conversation began, a new conversation in Madav has the newer steps.
+- If a step names a tool you do not have, stop and tell the person in one plain line that this conversation started before the desk was updated, and that they should start a new conversation in Madav. Never use another tool in its place.
+- If a desk answer starts with DESK UPDATED, tell the person in one plain line to start a new conversation in Madav, and start nothing new here.
+- If the same tool gives the same answer twice in a row, stop and tell the person what happened. Never go round in a loop.
 
 ## Run a routine
 
@@ -58,18 +72,19 @@ ${playbook('backtest')}
 
 ## Check this computer
 
-1. Call \`desk_check\`. If the tool is missing, this folder's tools did not start: tell the person to check that Madav may use this folder's tools and that Node 22 or later is installed, then stop.
+1. Call \`desk_check\` with team_version "${VERSION_MARK}" (the version of these steps, so the desk can tell whether this conversation began before the desk was updated). If the tool is missing, this folder's tools did not start: tell the person to check that Madav may use this folder's tools and that Node 22 or later is installed, then stop.
 2. Call \`get_verified_snapshot\` for SPY with today's date, to prove the price data works end to end; if it answers DATA_UNAVAILABLE or NO_DATA_AVAILABLE, say so and give its reason.
 3. If no contact email is saved, ask the person for their own (the SEC asks every reader of its filings for one; it stays in this folder and only the SEC sees it) and save exactly what they give with \`set_contact_email\`. Never invent, guess or reuse an address.
-4. Tell the person in a short plain list what is ready, what is not, and what to do about each. If the check says the desk's agent files differ from the project's version, say which, and offer to reset the team (below).
+4. Tell the person in a short plain list what is ready, what is not, and what to do about each. If the check starts with DESK UPDATED, or says this conversation's steps for the team are not the ones in this folder, say that first, in one line: this conversation began before the desk was updated, so they should start a new conversation in Madav and check this computer there. Offer no reset in this conversation. Otherwise, if the check says the desk's agent files differ from the project's version, say which, and offer to reset the team (below).
 5. Robinhood is connected by the person themselves: on the dashboard (open it with \`open_dashboard\`), "Your account", Connect. Never test or use the connection yourself.
 
 ## Reset the team
 
-When the person asks to reset the team, or accepts your offer after the desk check:
+Only when the person asked in words, in this conversation, for the team to be reset or put back as the project ships it, or said yes to your offer after the desk check. Never call \`reset_team\` in place of any other request: whatever else the person asks for, a reset is not the way to do it.
 1. Ask with AskUserQuestion whether to put the desk's thirteen agents, this team's file and its line-up back exactly as the project ships them. Say in one line what that undoes: any change made to them, in these files or in Madav's Agent Studio (the model, permissions and effort chosen in Madav stay).
-2. Only on their yes, call \`reset_team\` with confirmed set to true, and pass on its answer in plain words: which files it put back, that they take effect from the next conversation or run, and what it says about Madav.
-3. On a no, change nothing.
+2. Only on their yes, call \`reset_team\` once, with confirmed set to true, and pass on its answer in plain words: which files it put back, that they take effect from the next conversation or run, and what it says about Madav.
+3. If it answers ALREADY RESET or "Not reset", never call it again: tell the person in one line what it says.
+4. On a no, change nothing.
 
 ## How a price has moved
 
@@ -89,6 +104,7 @@ A member may message you while it works, when it is stuck: the data does not kno
 - Never open, search, read, print or copy anything in the person's private Trading Agents folder in their home folder: it holds their Robinhood sign-in.
 - Never invent a number, an email address or a holding. Every exact figure comes from a desk tool; a source that could not be reached is "unavailable", never "nothing happened".
 `;
+  const text = marked.replace(VERSION_MARK, versionOf(marked));
   // The lead decides who works when (the playbook's order); the members save their work on the desk and may message each
   // other (each member's file lists SendMessage, so Madav never has to add it).
   const lineUp = { members, steps: false, together: [], gates: [], talk: true };

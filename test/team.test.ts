@@ -10,6 +10,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { deskServer } from '../src/tools/server.js';
 import { isOrderTool } from '../src/robinhood/connect.js';
 import { SECTIONS } from '../src/desk/runs.js';
+import { teamVersionOf } from '../src/desk/agent-files.js';
 
 interface Agent { file: string; section: string; tools: string[]; manager?: boolean; body: string }
 const src = await import(pathToFileURL(path.resolve('scripts/agents-src.mjs')).href) as { AGENTS: Agent[]; COMMON: string };
@@ -127,6 +128,44 @@ test('/analyse names every agent, and /analyse and /settle never order and never
   assert.match(analyse, /never places an order|nothing you or any agent does places, changes or cancels an order/i);
   assert.match(settle, /never a number of your own/);
   assert.match(settle, /exactly 2 to 4 sentences/);
+});
+
+test('the lead never resets unasked, never stands one tool in for another, and never goes round in a loop (7 Nov: "Re-check the lessons" became dozens of resets)', () => {
+  const lead = front('trading-desk').text;
+  const loop = /\n## Never go round in a loop\n\n([\s\S]*?)\n\n## /.exec(lead)?.[1] ?? '';
+  for (const rule of [
+    'When the person asks for something no part below covers, never use another tool in its place: say in one plain line that this conversation has no step for it, and that if the desk was updated since this conversation began, a new conversation in Madav has the newer steps.',
+    '- If a step names a tool you do not have, stop and tell the person in one plain line that this conversation started before the desk was updated, and that they should start a new conversation in Madav. Never use another tool in its place.',
+    '- If a desk answer starts with DESK UPDATED, tell the person in one plain line to start a new conversation in Madav, and start nothing new here.',
+    '- If the same tool gives the same answer twice in a row, stop and tell the person what happened. Never go round in a loop.',
+  ]) assert.ok(loop.includes(rule), rule);
+  assert.ok(lead.indexOf('## Never go round in a loop') < lead.indexOf('## Run a routine'), 'read before every playbook');
+
+  const reset = /\n## Reset the team\n\n([\s\S]*?)\n\n## /.exec(lead)?.[1] ?? '';
+  assert.match(reset, /^Only when the person asked in words, in this conversation, for the team to be reset or put back as the project ships it, or said yes to your offer after the desk check\. Never call `reset_team` in place of any other request/);
+  assert.match(reset, /2\. Only on their yes, call `reset_team` once, with confirmed set to true/);
+  assert.match(reset, /3\. If it answers ALREADY RESET or "Not reset", never call it again: tell the person in one line what it says\./);
+  const check = /\n## Check this computer\n\n([\s\S]*?)\n\n## /.exec(lead)?.[1] ?? '';
+  assert.match(check, /^1\. Call `desk_check` with team_version "[0-9a-f]{8}" \(the version of these steps/);
+  assert.match(check, /If the check starts with DESK UPDATED, or says this conversation's steps for the team are not the ones in this folder, say that first, in one line: this conversation began before the desk was updated, so they should start a new conversation in Madav and check this computer there\. Offer no reset in this conversation\./);
+
+  // every member stops too, and the Claude Code desk check
+  for (const agent of src.AGENTS) assert.match(front(agent.file).text, /If the same tool gives you the same answer twice in a row, do not call it a third time: note in your work what happened and go on with what you can\. Never go round in a loop\. If a desk answer starts with DESK UPDATED, end your one-line reply to the lead with the words "DESK UPDATED"\./, agent.file);
+  const deskCheck = fs.readFileSync('.claude/skills/desk-check/SKILL.md', 'utf8');
+  assert.match(deskCheck, /If it starts with DESK UPDATED, .*offer no reset in this one/);
+  assert.match(deskCheck, /call the desk's `reset_team` tool once .*if it answers ALREADY RESET or "Not reset", never call it again/);
+  const recheck = fs.readFileSync('.claude/skills/recheck-lessons/SKILL.md', 'utf8');
+  assert.match(recheck, /if it answers LEFT, it has refused that lesson twice: leave it, go on with the next, and name it at the end\. If `recheck_lessons` answers STOP, .*stop at once, call neither tool again, and tell the person what it says\./);
+});
+
+test('the team\'s file carries the version of its own steps, worked out from them, which the desk check reads', async () => {
+  const team = await import(pathToFileURL(path.resolve('scripts/team-src.mjs')).href) as { VERSION_MARK: string; versionOf: (s: string) => string; team: () => { text: string } };
+  const text = fs.readFileSync('.claude/agents/trading-desk.md', 'utf8').replace(/\r\n/g, '\n');
+  const v = teamVersionOf(new Map([['.claude/agents/trading-desk.md', text]]))!;
+  assert.match(v, /^[0-9a-f]{8}$/);
+  assert.equal(text.split(v).length, 2, 'it is in the file once');
+  assert.equal(team.versionOf(text.replace(`team_version "${v}"`, `team_version "${team.VERSION_MARK}"`)), v, 'the SHA-256 of the steps with the mark in its place');
+  assert.notEqual(team.versionOf(text.replace(v, team.VERSION_MARK).replace('Never go round in a loop', 'Never loop')), v, 'any change to the steps changes it');
 });
 
 test('/recheck-lessons rewrites a lesson under /settle\'s rules, from the window\'s rows, and never changes a call, its rating or its score; the lead does it when asked in words', () => {

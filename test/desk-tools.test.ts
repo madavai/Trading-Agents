@@ -138,6 +138,23 @@ test('an old lesson is re-checked and corrected through the desk tools, and no f
   assert.match(await call('correct_lesson', { symbol: 'nvda', trade_date: '2026-09-01', lesson: 'Alpha of +7.0% backs the Buy. NVDA closed at 104.00 on 2026-09-07, above 103.50.', what_was_wrong: '"never closed above 103.50": the 2026-09-07 row closed at 104.00.' }),
     /^Corrected: the lesson of the Buy call on NVDA for 2026-09-01, from its window 2026-09-01 to 2026-09-08\. Only the lesson changed/);
   assert.match(await call('recheck_lessons'), /^No lessons to re-check/);
-  assert.match(await call('correct_lesson', { symbol: 'NVDA', trade_date: '2026-09-01', lesson: 'x', what_was_wrong: 'y' }), /^INPUT_ERROR: the lesson of NVDA on 2026-09-01 was corrected on 2026-10-12 already/);
+  assert.match(await call('correct_lesson', { symbol: 'NVDA', trade_date: '2026-09-01', lesson: 'x', what_was_wrong: 'y' }), /^INPUT_ERROR: the lesson of NVDA on 2026-09-01 was corrected on 2026-10-12 already\. Correct it and call again\.$/);
+  // refused a second time, the desk says to leave it, never to call again
+  const left = await call('correct_lesson', { symbol: 'NVDA', trade_date: '2026-09-01', lesson: 'x', what_was_wrong: 'y' });
+  assert.match(left, /^LEFT: correct_lesson has now refused the new lesson of NVDA on 2026-09-01 2 times in this re-check \(this time: the lesson of NVDA on 2026-09-01 was corrected on 2026-10-12 already\)\. Leave it: do not send it again/);
+  assert.doesNotMatch(left, /call again/);
+  assert.match(await call('recheck_lessons'), /^No lessons to re-check[\s\S]*LATER RE-CHECKS \(tell the person only this about them\): a corrected lesson is never re-checked again/);
+  await client.close();
+});
+
+test('a lesson too long for the desk is refused by the desk itself, in plain words, so a second refusal leaves it (a real journal: the input rules refused it first, uncounted)', async () => {
+  const { root, call, client } = await connect();
+  fs.mkdirSync(path.join(root, 'desk-data'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'desk-data', 'journal.md'), '[2026-09-01 | NVDA | Buy | +10.0% | +7.0% | 5d | resolved:2026-09-08]\n\nDECISION:\n**Rating**: Buy\n\nAdd on a close above 103.50.\n\nREFLECTION:\nNVDA never closed above 103.50.\n\n<!-- ENTRY_END -->\n\n');
+  const at = { symbol: 'NVDA', trade_date: '2026-09-01', what_was_wrong: '"never closed above 103.50": the 2026-09-07 row closed at 104.00.' };
+  assert.match(await call('correct_lesson', { ...at, lesson: 'x'.repeat(1250) }), /^INPUT_ERROR: the lesson is 1250 characters; keep it under 1200\. Correct it and call again\.$/);
+  assert.match(await call('correct_lesson', { ...at, lesson: 'Alpha +7.0%.', what_was_wrong: 'w'.repeat(700) }), /^LEFT: correct_lesson has now refused the new lesson of NVDA on 2026-09-01 2 times in this re-check \(this time: what_was_wrong is 700 characters; keep it under 600\)/);
+  assert.match(await call('recheck_lessons'), /^1 lesson\(s\) to re-check: 0 to rewrite below, 1 left after two refusals\.[\s\S]*\] LEFT: [\s\S]*LATER RE-CHECKS/);
+  assert.equal(fs.readFileSync(path.join(root, 'desk-data', 'journal.md'), 'utf8').includes('NVDA never closed above 103.50.'), true, 'its lesson stays as it stands');
   await client.close();
 });
