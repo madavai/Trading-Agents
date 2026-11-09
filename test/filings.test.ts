@@ -3,6 +3,9 @@
 // company facts and Form 4s, the price source's split record, FRED's archive, N-PORT reports), with nothing personal.
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { configure, NoData } from '../src/data/http.js';
 import { clearSecCache, filedStatement, type Facts } from '../src/data/sec.js';
 import { clearYahooSession, companyOverview, financialStatement, insiderTransactions, renderTable, withWorkedRows } from '../src/data/company.js';
@@ -315,6 +318,34 @@ test("filings-5: a past day reads FRED's archive as it stood that day: no figure
   assert.match(await economicSeries('core_pce', '2026-11-06'), /Latest value known by 2026-11-06: 127\.90 \(for September 2026\)/, 'today reads FRED as it stands');
   configure({ fetch: route([[/fred\.stlouisfed\.org\/graph\/fredgraph\.csv/, () => new Response(now)]]) });
   await assert.rejects(economicSeries('core_pce', '2015-06-01'), (e: Error) => e instanceof NoData && /FRED's archive of past releases \(ALFRED\) does not hold PCEPILFE as it stood on 2015-06-01/.test(e.message) && /today's revised figures are not given for a past day/.test(e.message));
+});
+
+test('filings-5 (from prices-6): a web page FRED or its archive answers with in place of its data is neither kept nor served from the kept copy', async () => {
+  process.env.TRADING_AGENTS_TODAY = '2026-11-06';
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ta-fred-kept-'));
+  const page = () => new Response('<!DOCTYPE html><html><body>FRED is down for maintenance</body></html>');
+  // Monthly rows, the last at `last`: September 2026 from FRED today, July 2026 from its archive as of 2026-09-24.
+  const monthly = (head: string, last: number, top: number) => `observation_date,${head}\n${Array.from({ length: 13 }, (_, i) =>
+    `${new Date(Date.UTC(2026, last - 12 + i, 1)).toISOString().slice(0, 10)},${(top - (12 - i) * 0.25).toFixed(2)}`).join('\n')}\n`;
+  const today = monthly('PCEPILFE', 8, 127.9), then = monthly('PCEPILFE_20260924', 6, 127.2);
+  try {
+    // The first answer is a web page with status 200: it is read as an outage, as before ...
+    configure({ cacheDir: dir, fetch: route([[/graph\/(fred|alfred)graph\.csv/, page]]) });
+    for (const day of ['2026-11-06', '2026-09-24'])
+      await assert.rejects(economicSeries('core_pce', day), (e: Error) => e.name === 'Unavailable' && /something other than its data download/.test(e.message));
+    // ... and the next ask, within the hour a FRED answer is kept, goes to FRED again rather than reading that page back.
+    const seen: string[] = [];
+    configure({ fetch: route([[/alfredgraph\.csv\?id=PCEPILFE&vintage_date=2026-09-24&/, () => new Response(then)], [/fred\.stlouisfed\.org\/graph\/fredgraph\.csv\?id=PCEPILFE&/, () => new Response(today)]], seen) });
+    assert.match(await economicSeries('core_pce', '2026-11-06'), /Latest value known by 2026-11-06: 127\.90 \(for September 2026\)/);
+    assert.match(await economicSeries('core_pce', '2026-09-24'), /Latest value known by 2026-09-24: 127\.20 \(for July 2026\)/);
+    assert.equal(seen.length, 2, 'both were asked of FRED again');
+    // A real answer is kept as before: asked again, it is read from the kept copy.
+    assert.match(await economicSeries('core_pce', '2026-11-06'), /127\.90/);
+    assert.equal(seen.length, 2, 'a data answer is still kept for the hour');
+  } finally {
+    configure({ cacheDir: null });
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 // ---------- filings-8: an email the SEC can be sent ----------

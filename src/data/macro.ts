@@ -41,6 +41,10 @@ export const SERIES: Record<string, [id: string, title: string]> = {
 
 export interface Obs { date: string; value: number }
 
+/** Whether an answer is FRED's data download: its first line is the header, "observation_date,PCEPILFE" from FRED and
+ *  "observation_date,PCEPILFE_20260924" from its archive (ALFRED); "DATE," in its older downloads. */
+const isCsv = (text: string): boolean => /^\s*(observation_date|DATE)\s*,/i.test(text);
+
 /** FRED's CSV download as rows, missing values ('.') left out. Exported for the tests. */
 export function parseCsv(csv: string): Obs[] {
   return csv.trim().split(/\r?\n/).slice(1).map((line) => line.split(',')).filter((c) => c.length >= 2 && c[1] !== '.' && c[1] !== '')
@@ -83,12 +87,14 @@ export async function economicSeries(indicator: string, analysis: string, lookBa
   const url = past ? `https://alfred.stlouisfed.org/graph/alfredgraph.csv?id=${id}&vintage_date=${day}&cosd=${from}&coed=${day}`
     : `https://fred.stlouisfed.org/graph/fredgraph.csv?id=${id}&cosd=${from}&coed=${day}`;
   let read: { text: string; at: number };
-  try { read = await getTextAt(url); } catch (e) {
+  // Only FRED's data download is kept for the hour: a web page it answers with in its place (maintenance, a refusal) is
+  // read as an outage below, and the next ask goes to FRED again rather than reading that page back.
+  try { read = await getTextAt(url, { usable: isCsv }); } catch (e) {
     if (past && e instanceof NoData) throw new NoData(`FRED's archive of past releases (ALFRED) does not hold ${id} as it stood on ${day} (${(e as Error).message}); today's revised figures are not given for a past day, since they would carry what was published or revised later into it`);
     throw e;
   }
   const { text: csv, at } = read;
-  if (!/^\s*(observation_date|DATE)\s*,/i.test(csv)) throw new Unavailable(`${past ? "FRED's archive (ALFRED)" : 'FRED'} answered with something other than its data download (it may be down for maintenance)`);
+  if (!isCsv(csv)) throw new Unavailable(`${past ? "FRED's archive (ALFRED)" : 'FRED'} answered with something other than its data download (it may be down for maintenance)`);
   const all = parseCsv(csv).filter((o) => o.date <= day), freq = frequency(all);
   const obs = all.filter((o) => o.date >= addDays(day, -window));
   if (!obs.length) throw new NoData(`FRED has no ${id} values published by ${day} in this window`);
