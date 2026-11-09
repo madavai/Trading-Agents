@@ -103,3 +103,5 @@ export const oneLine = (s: string, max: number): string => { const t = s.replace
 /** A failure's words, short, with any word holding a long run of digits hidden whole (an account number, which can mix
  *  letters and digits). Dates and prices, with shorter runs, are left as they are. */
 export const masked = (s: string): string => oneLine(s, 300).replace(/\b[a-z0-9]*\d{5,}[a-z0-9]*\b/gi, '#####');
+/** What the person is told to do when it is not clear whether an order went through: never to send it again blind. */
+export const LOOK_FIRST = "Look at the Agentic account's orders in Robinhood's own app before you try again.";

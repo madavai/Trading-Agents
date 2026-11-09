@@ -21,10 +21,11 @@ import { followed, paperBook, readPaperStart, recordOf, RECORD_WEEKS, RECORD_WOR
 import { isCrypto, safeSymbol } from '../data/symbols.js';
 import { dashboardKeyFile, deskDataDir, robinhoodFile } from '../paths.js';
 import { writePrivate } from '../private.js';
-import { Link, plainFailure, type Snapshot } from '../robinhood/link.js';
+import { AnswerLost, Link, plainFailure, type Snapshot } from '../robinhood/link.js';
 import { saveAccountHoldings } from '../desk/holdings.js';
 import { careOf, deskSymbol, stopIn, toWatch, watched, type HoldingCare } from '../desk/care.js';
-import { lastBuy, logOrder, placedToday } from '../desk/orders.js';
+import { lastBuy, logOrder, placedToday, unanswered, type SentOrder } from '../desk/orders.js';
+import { marketDay } from '../data/dates.js';
 import { Sectors } from '../desk/sectors.js';
 export { placedToday };
 import { check, passes, propose, proposeOwn, type Check, type Order, type Proposal, type TicketContext } from '../desk/ticket.js';
@@ -74,7 +75,7 @@ export function shareHoldings(dir: string, snap: Snapshot, day: string): boolean
 
 const REVIEW_MS = 5 * 60_000;
 /** The exact words the person confirms: what is bought or sold, how many, at what limit. */
-export const confirmWords = (o: Order): string => `${o.side === 'buy' ? 'Buy' : 'Sell'} ${o.quantity} ${o.symbol} at $${o.limitPrice.toFixed(2)}`;
+export const confirmWords = (o: Pick<Order, 'side' | 'quantity' | 'symbol' | 'limitPrice'>): string => `${o.side === 'buy' ? 'Buy' : 'Sell'} ${o.quantity} ${o.symbol} at $${o.limitPrice.toFixed(2)}`;
 
 export interface Terminal {
   url: string; port: number; token: string; deskId: string;
@@ -220,13 +221,21 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
   };
 
   // The guard rails' facts for a ticket: the stock's sector and what the account already holds in it (from each holding's
-  // own profile, looked up once and remembered), and when the stock was last bought here, for the shortest hold.
+  // own profile, looked up once and remembered), when the stock was last bought here, for the shortest hold, and the
+  // orders sent today: Robinhood's count, or the desk's own log when that is higher (an order with no clear answer
+  // counts, though Robinhood may not list it).
   const sectors = opts.sectors ?? new Sectors();
   const limitedNow = (c: TicketContext): TicketContext => {
-    const positions = c.positions ?? [], bought = lastBuy(dir, c.symbol, new Date());
-    return { ...c, sector: sectors.context(c.symbol, positions), ...(bought ? bought : {}) };
+    // What the account holds and what its open buys wait to buy both count towards the sector.
+    const positions = [...(c.positions ?? []), ...(c.openBuys ?? []).map((o) => ({ ...o, open: true }))], bought = lastBuy(dir, c.symbol, new Date());
+    return { ...c, ordersToday: Math.max(c.ordersToday, placedToday(dir, new Date())), sector: sectors.context(c.symbol, positions), ...(bought ? bought : {}) };
   };
-  const limited = async (c: TicketContext): Promise<TicketContext> => { await sectors.warm([c.symbol, ...(c.positions ?? []).map((p) => p.symbol)]); return limitedNow(c); };
+  const limited = async (c: TicketContext): Promise<TicketContext> => { await sectors.warm([c.symbol, ...(c.positions ?? []).map((p) => p.symbol), ...(c.openBuys ?? []).map((p) => p.symbol)]); return limitedNow(c); };
+  /** An order of the stock sent from here in the last week whose answer was not clear: a new ticket says so first. */
+  const lostWords = (symbol: string): string | null => {
+    const o = unanswered(dir, symbol, new Date());
+    return o ? `An order sent from here on ${marketDay(new Date(o.at))} (${confirmWords(o)}) got no clear answer from Robinhood, so it may have gone through. Look in Robinhood's own app before you place another.` : null;
+  };
 
   // "Worth a look today" and "Market weather": each worked out at most once an hour, once however many pages ask. With
   // the person's morning switch on, the top three of the screen go on the waiting list once a market day, and the
@@ -261,12 +270,14 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
   /** A change to the waiting list; what the list refuses (full, or a stock being analysed now) is said in its own words. */
   const queued = <T>(job: () => T): T => { try { return job(); } catch (e) { if (e instanceof QueueRefusal) throw new Refused(409, e.message); throw e; } };
 
-  // Robinhood's failures are told in plain words; one of the person's own choices that is refused says why.
+  // Robinhood's failures are told in plain words; one of the person's own choices that is refused says why. When an
+  // order was on its way, `nothingSent` adds that nothing went to Robinhood (only said when that is so).
+  const refusalOf = (e: unknown, nothingSent = false): Refused => {
+    const m = e instanceof Error ? e.message : '', own = /not one of your Robinhood accounts|show your Agentic account|not the Agentic account|not complete, so it was not sent|no longer passes on Robinhood's latest figures|trading is switched off|trading switched itself off/.test(m);
+    return new Refused(own ? 400 : 502, own ? m : `${plainFailure(e)}${nothingSent ? ' Nothing was sent.' : ''}`);
+  };
   const askRobinhood = async <T>(job: () => Promise<T>): Promise<T> => {
-    try { return await job(); } catch (e) {
-      const m = e instanceof Error ? e.message : '', own = /not one of your Robinhood accounts|show your Agentic account|not the Agentic account|not complete, so it was not sent|no longer passes on Robinhood's latest figures|trading is switched off|trading switched itself off/.test(m);
-      throw new Refused(own ? 400 : 502, own ? m : plainFailure(e));
-    }
+    try { return await job(); } catch (e) { throw refusalOf(e); }
   };
 
   const handle = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
@@ -415,6 +426,7 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
     }
     if (p === '/api/stop' && method === 'POST') {
       if (!opts.stop) throw new Refused(404, 'not found');
+      if ([...tickets.values()].some((t) => t.placing)) throw new Refused(409, 'an order is being sent: stop when it is done');   // as Restart: its answer must reach the log
       const stop = opts.stop;
       res.once('finish', () => { setTimeout(stop, 100); });
       return json(res, 200, { stopping: true });
@@ -447,7 +459,7 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
       const trading = readSettings(root).trading, { caps } = robinhood.trading();
       const context: TicketContext = await limited({ ...(await askRobinhood(() => robinhood.ticketContext(symbol))), rating: call.rating, callDate: call.date });
       const t = opened(false, context, propose(context, trading, caps), trading, caps);
-      return json(res, 200, { id: t.id, own: false, context, proposal: t.proposal, checks: t.checks, caps });
+      return json(res, 200, { id: t.id, own: false, context, proposal: t.proposal, checks: t.checks, caps, lost: lostWords(symbol) });
     }
     // The person's own order: a stock they chose and a side, not one of the desk's calls. It starts at one share and then
     // takes exactly the road a call's ticket takes: the same checks, Robinhood's dry run, the switch and their Confirm.
@@ -460,7 +472,7 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
       const trading = readSettings(root).trading, { caps } = robinhood.trading();
       const context: TicketContext = await limited({ ...(await askRobinhood(() => robinhood.ticketContext(symbol))), rating: '', callDate: '' });
       const t = opened(true, context, proposeOwn(context, side, trading), trading, caps);
-      return json(res, 200, { id: t.id, own: true, context, proposal: t.proposal, checks: t.checks, caps });
+      return json(res, 200, { id: t.id, own: true, context, proposal: t.proposal, checks: t.checks, caps, lost: lostWords(symbol) });
     }
     if (p === '/api/ticket/check' && method === 'POST') {
       const t = ticketOf(b.id);
@@ -483,23 +495,40 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
     }
     // Placing: only a ticket Robinhood checked with no alerts in the last five minutes, unchanged since, with trading
     // switched on, and the person's Confirm naming exactly this order; every cap is checked again on Robinhood's latest
-    // figures just before it is sent, and a ticket sends at most one order.
+    // figures just before it is sent (its open orders included), one order at a time, and a ticket sends at most one
+    // order. The order is in the desk's log before it goes out; an answer that never comes is said as such, never as a
+    // failure, and that ticket then sends nothing more.
     if (p === '/api/ticket/place' && method === 'POST') {
       const t = ticketOf(b.id), tr = robinhood.trading();   // the switch and the caps, read together from the person's private folder just now
       if (!tr.on) throw new Refused(403, 'trading is switched off: switch it on in Your account first');
       if (t.placed || t.placing) throw new Refused(409, 'this ticket has already sent its order');
+      if ([...tickets.values()].some((x) => x.placing)) throw new Refused(409, 'another order is being sent to Robinhood: try again when it has been answered');
       if (!t.order || !t.review || !t.reviewedAt) throw new Refused(400, 'have Robinhood check this order first');
       if (Date.now() - t.reviewedAt > REVIEW_MS) throw new Refused(400, "Robinhood's check is more than five minutes old: review the order again");
-      if (!t.review.answered || t.review.alerts.length) throw new Refused(400, 'Robinhood raised alerts on this order, so it cannot be placed');
+      if (!t.review.answered) throw new Refused(400, "Robinhood's check of this order did not come back clean, so it cannot be placed");
+      if (t.review.alerts.length) throw new Refused(400, 'Robinhood raised alerts on this order, so it cannot be placed');
       if (b.confirm !== confirmWords(t.order)) throw new Refused(400, 'the confirmation does not name this order: nothing was sent');
       if (t.checks.some((c) => c.ask) && b.early !== true) throw new Refused(400, `${t.order.symbol} was bought here under your shortest hold: press "Sell anyway" to go on`);
-      const order = t.order, trading = readSettings(root).trading, sentToday = placedToday(dir, new Date());
+      const order = t.order, trading = readSettings(root).trading;
       tradable(order.symbol);
+      const line = (answer: SentOrder['robinhood']) => logOrder(dir, { at: new Date().toISOString(), symbol: order.symbol, side: order.side, quantity: order.quantity, limitPrice: order.limitPrice, timeInForce: order.timeInForce, ...(t.own ? { own: true as const } : { call: { date: t.context.callDate, rating: t.context.rating } }), ticket: t.id, robinhood: answer });
+      let sent = false;
       t.placing = true;
       try {
-        const { placed } = await askRobinhood(() => robinhood.placeChecked(order, t.refId, (fresh) => check(order, limitedNow({ ...fresh, rating: t.context.rating, callDate: t.context.callDate, ordersToday: Math.max(fresh.ordersToday, sentToday) }), trading, tr.caps)));
+        let placed: Placed;
+        try {
+          ({ placed } = await robinhood.placeChecked(order, t.refId,
+            async (fresh) => check(order, await limited({ ...fresh, rating: t.context.rating, callDate: t.context.callDate }), trading, tr.caps),
+            () => { line({ answered: false, unknown: true, approvalRequired: null, orderId: null, state: null, error: null }); sent = true; }));
+        } catch (e) {
+          if (!(e instanceof AnswerLost)) {
+            if (sent) line({ answered: false, approvalRequired: null, orderId: null, state: null, error: `not sent: ${plainFailure(e)}` });   // refused by this door after the log line: nothing went out
+            throw refusalOf(e, true);
+          }
+          placed = { answered: false, unknown: true, approvalRequired: null, orderId: null, state: null, facts: [], error: e.message };
+        }
         t.placed = placed;
-        logOrder(dir, { at: new Date().toISOString(), symbol: order.symbol, side: order.side, quantity: order.quantity, limitPrice: order.limitPrice, timeInForce: order.timeInForce, ...(t.own ? { own: true as const } : { call: { date: t.context.callDate, rating: t.context.rating } }), ticket: t.id, robinhood: { answered: placed.answered, approvalRequired: placed.approvalRequired, orderId: placed.orderId, state: placed.state, error: placed.error } });
+        line({ answered: placed.answered, unknown: placed.unknown, approvalRequired: placed.approvalRequired, orderId: placed.orderId, state: placed.state, error: placed.error });
         return json(res, 200, { placed });
       } finally { t.placing = false; }
     }

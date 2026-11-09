@@ -45,12 +45,14 @@ export class Sectors {
   /** Looks up every symbol at once, so a later sync check finds them all. */
   async warm(symbols: Iterable<string>): Promise<void> { await Promise.all([...new Set(symbols)].map((s) => this.of(s))); }
 
-  /** The sector a buy of `symbol` falls in, and how much the account already holds in it, from what is held now. A
-   *  symbol not looked up yet counts on its own. */
-  context(symbol: string, positions: ReadonlyArray<{ symbol: string; quantity: number; price: number | null }>): { name: string | null; label: string; heldUsd: number } {
+  /** The sector a buy of `symbol` falls in, and how much the account already holds in it, from what is held now and what
+   *  its open buys (`open`) wait to buy. A symbol not looked up yet counts on its own. A holding in the sector without a
+   *  price is named in `unpriced`, never counted as nothing. */
+  context(symbol: string, positions: ReadonlyArray<{ symbol: string; quantity: number; price: number | null; open?: boolean }>): { name: string | null; label: string; heldUsd: number; openUsd: number; unpriced: string[] } {
     const g = this.known.get(symbol) ?? ownGroup(symbol);
     const same = (s: string) => (this.known.get(s) ?? ownGroup(s)).name === g.name;
-    const heldUsd = g.name === null ? 0 : positions.filter((p) => same(p.symbol)).reduce((a, p) => a + p.quantity * (p.price ?? 0), 0);
-    return { ...g, heldUsd: Math.round(heldUsd * 100) / 100 };
+    const mine = g.name === null ? [] : positions.filter((p) => same(p.symbol));
+    const usd = (list: typeof mine) => Math.round(list.reduce((a, p) => a + p.quantity * (p.price ?? 0), 0) * 100) / 100;
+    return { ...g, heldUsd: usd(mine), openUsd: usd(mine.filter((p) => p.open)), unpriced: [...new Set(mine.filter((p) => p.price === null).map((p) => p.symbol))] };
   }
 }

@@ -32,7 +32,8 @@ export type { Match, Prefs, Recent, Caps, HoldingCare, Guide };
 export type Trading = TradingState;
 export type { Placed };
 /** An open ticket; own: the person's own order for a stock they chose, not one of the desk's calls. */
-export interface TicketOpen { id: string; own: boolean; context: TicketContext; proposal: Proposal; checks: Check[]; caps: Caps }
+/** lost: an order of this stock sent from here in the last week got no clear answer from Robinhood, in plain words. */
+export interface TicketOpen { id: string; own: boolean; context: TicketContext; proposal: Proposal; checks: Check[]; caps: Caps; lost: string | null }
 
 export type { Check, Proposal, Review, TicketContext };
 export type { DeskState, History, QuoteResult, WatchItem, QueueView, ListenerView, Depth, LinkInfo, Snapshot, Account, AccountView, Holding, Order };
