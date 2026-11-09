@@ -1,5 +1,6 @@
 // The free data sources the desk reads, each asked once with a small request, so a person sees which ones this computer
 // can reach before the desk relies on them. A source that cannot be reached is reported as such, never as "no data".
+// What it does not ask is named (`NOT_PROBED`), so "reachable" is said only of what was asked.
 import { ASK_FOR_EMAIL } from '../contact.js';
 
 export interface Source {
@@ -23,7 +24,13 @@ export const SOURCES: Source[] = [
   { name: 'Polymarket', url: 'https://gamma-api.polymarket.com/public-search?q=fed&limit_per_type=1', looksRight: (b) => b.trimStart().startsWith('{') },
   { name: 'SEC EDGAR', url: 'https://www.sec.gov/files/company_tickers.json', looksRight: (b) => b.includes('"ticker"'),
     onRefused: (emailSent) => (emailSent ? SEC_REFUSED_WITH_EMAIL : ASK_FOR_EMAIL) },
+  // a company's accounts and filing list come from the SEC's data address, another host than its website's (sec.ts)
+  { name: 'SEC company data', url: 'https://data.sec.gov/submissions/CIK0000320193.json', looksRight: (b) => b.includes('"cik"'),
+    onRefused: (emailSent) => (emailSent ? SEC_REFUSED_WITH_EMAIL : ASK_FOR_EMAIL) },
 ];
+
+/** What the desk reads that the check does not ask, in plain words. */
+export const NOT_PROBED = "Yahoo Finance's company data, read only for a company or fund the SEC does not list (Yahoo mostly refuses it to programs, so those reads are often unavailable, and say so)";
 
 export interface ProbeResult { name: string; ok: boolean; detail: string }
 
@@ -68,7 +75,7 @@ export async function probe(source: Source, userAgent: string, fetchImpl: Fetch 
 }
 
 /** The user agent a source sees: the project's name and address. The person's email goes to the SEC alone, which asks
- *  every caller for one; no other source ever sees it. The SEC is told the project's name and the email only: tried on
+ *  every program for one; no other source ever sees it. The SEC is told the project's name and the email only: tried on
  *  14 Oct 2026, it refused (HTTP 403, "Request Rate Threshold Exceeded") every introduction that carried a web address in
  *  brackets, even with the email, and answered the same request normally with just "name email". */
 export function userAgentFor(url: string, contact: string, email: string): string {

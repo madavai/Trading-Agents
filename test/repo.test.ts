@@ -6,6 +6,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { deskServer } from '../src/tools/server.js';
 import { isOrderTool } from '../src/robinhood/connect.js';
 import { DEFAULT_CAPS } from '../src/settings.js';
+import { awayHome } from './away.js';
 
 const json = (f: string) => JSON.parse(fs.readFileSync(f, 'utf8'));
 
@@ -45,7 +46,7 @@ test('the tool server Madav starts is the prebuilt one in the repository', () =>
 test('the desk tool server offers the desk check, and no tool that trades', async () => {
   const [a, b] = InMemoryTransport.createLinkedPair();
   const fake: typeof fetch = async () => new Response('{"chart":1,"news":1,"messages":1,"ticker":1} <feed observation_date', { status: 200 });
-  await deskServer(process.cwd(), fake).connect(a);
+  await deskServer(process.cwd(), fake, process.cwd(), awayHome()).connect(a);
   const client = new Client({ name: 'test', version: '0' });
   await client.connect(b);
   const { tools } = await client.listTools();

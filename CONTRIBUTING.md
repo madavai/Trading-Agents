@@ -10,6 +10,11 @@ built, which decisions stand, every document, and what is pending.
 
 ## Layout
 - `src/tools/` - the desk tool server, the one MCP server this folder gives the engine (`.mcp.json`).
+- `src/data/holidays.ts` - New York's market holidays by year, from the NYSE's "Holidays & Trading Hours" page (early
+  closes are market days): `marketClosed` (why a day is closed, or null), `isMarketDay`, `nextMarketDay`,
+  `firstMarketDayOfWeek` (Monday's re-rating day) and `marketDaysBetween` (the shortest hold, `orders.ts`
+  `tradingDaysBetween`). A year not in the list has only its weekends closed and the routine brief says so;
+  `test/holidays.test.ts` fails once next year is missing.
 - `src/data/` - the free sources, each held to the analysis date, official ones first. `company.ts` is a company's
   accounts, profile, valuation and insider trades: for a US filer all from the SEC as filed by the analysis date
   (`sec.ts`: statements, `submissions` for name and industry code, `sectorOfSic`, `trailingYear` for the last twelve
@@ -25,7 +30,10 @@ built, which decisions stand, every document, and what is pending.
   filings; its size, lines added up by issuer, assets, issuers, countries, bonds' years and interest, its own monthly
   returns, and the day its holdings are from. Amendments are not read. The yearly cost has no official free source and
   is said as unavailable; a fund the SEC does not list falls back to Yahoo, today only.
-- `src/check/` - the desk check: this computer, and the free data sources.
+- `src/check/` - the desk check: this computer, and the free data sources. `probes.ts` asks each host the desk reads
+  (SEC EDGAR and the SEC's company data among them); `NOT_PROBED` names the one it does not ask, and the check says so.
+  The contact email is shown masked (`contact.ts` `maskEmail`). `deskCheck` takes a `Home` (the private folder and
+  the sign-in file) so tests point it at a folder of their own, never the person's.
 - `src/robinhood/` - the connection to Robinhood's Trading MCP: sign-in (OAuth, kept in `~/.trading-agents`), and reads.
   `rules.ts` says what a Robinhood tool is (read, order or other) by its name and Robinhood's own read-only label;
   `reader.ts` is the ONLY place in `src/` that calls a Robinhood tool, and it refuses everything but reads (a test
@@ -169,20 +177,26 @@ built, which decisions stand, every document, and what is pending.
   holding of the accounts shown with its view, "re-rating" while it is on the waiting list, and in the Agentic account
   alone its stop and, for a Sell or Underweight, "the desk says sell" (the action the person's settings give the rating,
   whether a ticket can open, the shortest hold); `watched` holds each stop against Yahoo Finance's price (the dashboard's
-  `/api/care`; the page draws what it is sent and tells a new fall below a stop once). `rerateWeekly` is Monday's
-  re-rating from `routine_brief`: up to three of the holdings the desk sizes trades to (`holdings.ts` positions), with no
-  view or one a week old, the stalest first, go on the waiting list at shallow depth, once that Monday
+  `/api/care`; the page draws what it is sent and tells a new fall below a stop once). `rerateWeekly` is the week's
+  re-rating from `routine_brief`, on its first market day (`isRerateDay`: a Monday, or the Tuesday after a Monday
+  holiday): up to three of the holdings the desk sizes trades to (`holdings.ts` positions), with no
+  view or one a week old, the stalest first, go on the waiting list at shallow depth, once that week
   (`desk-data/rerate.json`), with no doorbell. A coin held is named as the desk calls it (BTC as BTC-USD), also in what
   the agents see.
 - `src/desk/screen.ts` - "Worth a look today": `signalsOf` reads a symbol's daily rows into plain signals (a move of 3%
   or more, volume twice its 20-day average, a 52-week high or low by the calendar, a close across the 50- or 200-day
-  average, news today), `rank` keeps five, `screenToday` works them out at most once an hour over `tiers.ts`
-  `screenUniverse` and keeps them in `desk-data/screen.json` (`{ day, at, looked, unavailable, picks, queued? }`), which
+  average, news today), `rank` keeps five (marking a move from a session still trading `live`), `screenToday` works them out at most once an hour over `tiers.ts`
+  `screenUniverse` and keeps them in `desk-data/screen.json` (`{ day, at, looked, unavailable, picks, queued?, news?,
+  session?, live? }`: `news` is how many names' news was read and which could not be, `session` the trading day the
+  moves are from), which
   the dashboard (`/api/screen`) and the morning routine (`routine_brief`) both read. `queueTop` is the person's morning
   switch (`prefs.ts` `morning` and `morningFrom`, set only by `/api/screen/morning`, which queues nothing itself and
-  starts the switch on the next weekday): on a weekday morning (before noon New York time, `MORNING_ENDS`) from
+  starts the switch on the next market day): on a market morning (`data/holidays.ts`; before noon New York time,
+  `MORNING_ENDS`) from
   `morningFrom`, once, the top three not called today nor already open go on the waiting list at shallow depth; the dashboard rings the doorbell, the routine does not.
-  `src/desk/weather.ts` - "Market weather": `trendOf` (the S&P 500 against its averages), `moodOf` (the VIX) and
+  `src/desk/weather.ts` - "Market weather": `trendOf` (the S&P 500 against its averages), `moodOf` (the VIX), both
+  saying "closed at" only for a session that has ended (`liveOf`, from Yahoo's session times: "still trading (not a
+  close)" while it trades, and plain about it when Yahoo gives no times), and
   `ratesOf` (Polymarket's next "Fed decision" event), each a line with a state, a tone, its figures and its meaning;
   `/api/weather` keeps it an hour. Neither ever forecasts, and a figure that cannot be had leaves its line unavailable.
 - `src/desk/ticket.ts` - the order ticket: sizing from the person's settings and every cap check, on real figures only,

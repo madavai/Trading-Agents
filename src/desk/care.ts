@@ -2,11 +2,13 @@
 // person. The Agentic account, the one account the desk may trade in, gets the care: the trader's proposed stop watched
 // against the price, and a Sell or Underweight call marked "the desk says sell" with a ticket. Every other account shows
 // the view as information only. Nothing here sells: a stop is never an order, and a sell is only ever the person's own
-// Confirm on a ticket. Each Monday the morning routine re-rates the holdings whose view is a week old or more, at most
-// three, at shallow depth, through the waiting list, so the dashboard shows them as re-rating meanwhile.
+// Confirm on a ticket. Each Monday (the Tuesday when Monday is a New York market holiday: the week's first market day) the
+// morning routine re-rates the holdings whose view is a week old or more, at most three, at shallow depth, through the
+// waiting list, so the dashboard shows them as re-rating meanwhile.
 import fs from 'node:fs';
 import path from 'node:path';
 import { daysBetween } from '../data/dates.js';
+import { firstMarketDayOfWeek } from '../data/holidays.js';
 import { normalizeSymbol } from '../data/symbols.js';
 import type { Caps, Trading } from '../settings.js';
 import type { AccountView } from '../robinhood/account.js';
@@ -139,7 +141,8 @@ export function readRerate(dir: string): Rerate | null {
   } catch { return null; }
 }
 
-const isMonday = (day: string) => new Date(`${day}T12:00:00Z`).getUTCDay() === 1;
+/** The day of the week's re-rating: its first market day, a Monday unless that is a New York market holiday. */
+export const isRerateDay = (day: string): boolean => firstMarketDayOfWeek(day) === day;
 
 /** The holdings due for a fresh view: those the desk sizes trades to (the Agentic account as the dashboard last read it,
  *  or what the person said they hold), with no view or one a week old or more, not on the waiting list already, the
@@ -157,11 +160,11 @@ export function dueForRerate(dir: string, today: string, now: Date = new Date())
     .map((x) => ({ symbol: x.symbol, called: x.view?.date ?? null, rating: x.view?.rating ?? null }));
 }
 
-/** Monday's re-rating, once a Monday: the stalest holdings, at most three, go on the waiting list at shallow depth. The
- *  routine analyses what waits itself, so no doorbell rings. Returns what it put on the list today (also when it already
- *  did, earlier this Monday); nothing on any other day. */
+/** Monday's re-rating, once a week on its first market day (`isRerateDay`): the stalest holdings, at most three, go on the
+ *  waiting list at shallow depth. The routine analyses what waits itself, so no doorbell rings. Returns what it put on
+ *  the list today (also when it already did, earlier that day); nothing on any other day. */
 export function rerateWeekly(dir: string, today: string, now: Date = new Date()): Rerate['symbols'] {
-  if (!isMonday(today)) return [];
+  if (!isRerateDay(today)) return [];
   fs.mkdirSync(dir, { recursive: true });
   return withLock(rerateFile(dir), () => {
     const kept = readRerate(dir);

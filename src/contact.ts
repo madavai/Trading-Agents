@@ -1,5 +1,8 @@
-// The person's own contact email. The SEC asks everyone who reads its filings for one, so the desk asks the person for
-// it before the first analysis. It is kept in this folder's desk-data (never committed) and sent to sec.gov alone.
+// The person's own contact email. The SEC asks every program that reads its filings to say who runs it, with a contact
+// email (its "Accessing EDGAR Data" page: "Please declare your user agent in request headers"), so the desk asks the person
+// for it before the first analysis. It is kept in this folder's desk-data (never committed) and sent to sec.gov alone. The
+// desk check and the dashboard show it masked (`maskEmail`), so a conversation that only checks the desk never carries
+// the address; only the answer to the person who has just typed it repeats it, for them to see it was read right.
 import fs from 'node:fs';
 import path from 'node:path';
 import { deskDataDir } from './paths.js';
@@ -36,4 +39,13 @@ export function saveContactEmail(root: string, raw: string): string {
   return email;
 }
 
-export const ASK_FOR_EMAIL = 'the SEC asks everyone who reads its filings for a contact email, and none is saved yet: ask the person for their own email (never invent one) and save it with set_contact_email';
+/** All of the address the desk's own words show: its first letter and its domain, "c…@example.org". */
+export function maskEmail(email: string): string {
+  const at = email.lastIndexOf('@');
+  return at > 0 ? `${email[0]}…${email.slice(at)}` : '';
+}
+
+/** Why the desk needs the email, in one plain sentence the desk's words share. */
+export const WHY_EMAIL = 'the SEC asks every program that reads its filings for a contact email';
+
+export const ASK_FOR_EMAIL = 'the SEC asks every program that reads its filings for a contact email, and none is saved yet: ask the person for their own email (never invent one) and save it with set_contact_email';

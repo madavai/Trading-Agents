@@ -613,7 +613,7 @@ p { text-wrap: pretty; }
   <section class="chapter" id="glance">
     <div class="ch-head">
       <div class="ch-title"><p class="kicker">The whole picture</p><h2>The desk on one page</h2></div>
-      <p>Information flows from left to right. Public data goes in, the agents turn it into a call, the call is kept on your computer, and you decide on the dashboard. Robinhood is reached by the dashboard alone.</p>
+      <p>Information flows from left to right. Public data goes in, the agents turn it into a call, the call is kept on your computer, and you decide on the dashboard. Robinhood is reached by the dashboard, and by the desk check's sign-in test when you say yes, which only reads.</p>
     </div>
     <figure class="at-box map" aria-label="How the desk fits together">
       <div class="flow">
@@ -638,7 +638,7 @@ p { text-wrap: pretty; }
         </div>
         <div class="link c-rh"><span class="lbl">three doors</span><span class="wire two"><span class="pulse" style="--d:1.5s"></span></span></div>
         <div class="lane c-rh">
-          <div class="lane-h"><span class="icbox"><svg class="ic"><use href="#i-bank"/></svg></span><div><p class="lane-name">Robinhood</p><p class="lane-sub">Reached by the dashboard only</p></div></div>
+          <div class="lane-h"><span class="icbox"><svg class="ic"><use href="#i-bank"/></svg></span><div><p class="lane-name">Robinhood</p><p class="lane-sub">Reached by the dashboard, and a read-only test on your yes</p></div></div>
           <ul><li>Agentic account<small>may trade, on your Confirm</small></li><li>Main account<small>view only</small></li><li>Phone approval<small>if you keep it on</small></li></ul>
         </div>
       </div>
@@ -653,7 +653,7 @@ p { text-wrap: pretty; }
   <section class="chapter" id="sources">
     <div class="ch-head">
       <div class="ch-title"><p class="kicker">Where the information comes from</p><h2>Seven sources, all public but one</h2></div>
-      <p>Six free public sources feed the agents, with no keys and no accounts. The seventh, Robinhood, is yours and private: only the dashboard reads it. A source that does not answer is reported as unavailable, never as "nothing happened".</p>
+      <p>Six free public sources feed the agents, with no keys and no accounts. The seventh, Robinhood, is yours and private: the dashboard reads it, and so does the desk check's sign-in test when you say yes, which counts what answers and shows no value. A source that does not answer is reported as unavailable, never as "nothing happened".</p>
     </div>
     <div class="joined src-grid">
       <article class="src edge c-src">
@@ -684,12 +684,12 @@ p { text-wrap: pretty; }
       <article class="src edge c-src">
         <div class="src-h"><span class="icbox"><svg class="ic"><use href="#i-ledger"/></svg></span><div><p class="src-name">SEC EDGAR</p><p class="src-kind">Company filings</p></div></div>
         <p>A US company's accounts exactly as filed, its shares and dividends for its valuation, its industry, and every trade its insiders report (Form 4); and what each US fund holds, from its quarterly report (form N-PORT). Each is dated by its filing, so a past day reads what was known then.</p>
-        <p class="note"><svg class="ic sm"><use href="#i-key"/></svg><span>The SEC asks every reader for a contact email, so the desk sends yours, to the SEC alone.</span></p>
+        <p class="note"><svg class="ic sm"><use href="#i-key"/></svg><span>The SEC asks every program that reads its filings for a contact email, and the desk is one, so it sends yours, to the SEC alone.</span></p>
       </article>
       <article class="src wide edge c-rh">
         <span class="icbox lg"><svg class="ic lg"><use href="#i-bank"/></svg></span>
         <div><p class="src-name">Robinhood</p><p class="src-kind">Private, and yours</p></div>
-        <p>Your accounts: value, cash, buying power, holdings, live prices, orders and whether trades need your phone's approval. Read by the dashboard alone, after you connect it yourself. The agents see only the holdings the dashboard shares with them.</p>
+        <p>Your accounts: value, cash, buying power, holdings, live prices, orders and whether trades need your phone's approval. Read by the dashboard, after you connect it yourself, and by the desk check's sign-in test on your yes, which reads only how many holdings answer, never their values. The agents see only the holdings the dashboard shares with them.</p>
       </article>
     </div>
     <div class="matrix-wrap at-box">
@@ -956,7 +956,7 @@ p { text-wrap: pretty; }
       </div>
     </div>
 
-    <div class="at-box aside"><svg class="ic"><use href="#i-clock"/></svg><span><b>The routines run this same line for you.</b> The morning routine scores past calls, on a Monday puts up to three of your holdings whose view is a week old on the waiting list to be re-rated, reads what is worth a look today (and, with your morning switch on, puts its top three on the waiting list), then analyses what is waiting and your starred stocks (at most five), and lists the new calls to decide on. The evening wrap-up scores what is ready and reports the day's calls and orders. Neither places an order.</span></div>
+    <div class="at-box aside"><svg class="ic"><use href="#i-clock"/></svg><span><b>The routines run this same line for you.</b> The morning routine scores past calls (on a day New York's market is closed, a weekend or one of its holidays, that is all it does), on a Monday (the Tuesday, when Monday is a market holiday) puts up to three of your holdings whose view is a week old on the waiting list to be re-rated, reads what is worth a look today (and, with your morning switch on, puts its top three on the waiting list), then analyses what is waiting and your starred stocks (at most five), and lists the new calls to decide on. The evening wrap-up scores what is ready and reports the day's calls and orders. Neither places an order.</span></div>
   </section>
 
   <!-- 5 -->
@@ -1020,9 +1020,9 @@ p { text-wrap: pretty; }
       <p class="leaves-h">What leaves this computer</p>
       <div class="joined leaves">
         <div class="leave edge c-src"><p class="leave-h"><svg class="ic sm"><use href="#i-globe"/></svg>To the free sources</p><p>Only what the desk asks for, such as a stock's prices or news, and what you type in the dashboard's search box.</p></div>
-        <div class="leave edge c-src"><p class="leave-h"><svg class="ic sm"><use href="#i-ledger"/></svg>To the SEC</p><p>The same, plus your email, which it asks every reader for.</p></div>
+        <div class="leave edge c-src"><p class="leave-h"><svg class="ic sm"><use href="#i-ledger"/></svg>To the SEC</p><p>The same, plus your email, which it asks of every program that reads its filings.</p></div>
         <div class="leave edge c-desk"><p class="leave-h"><svg class="ic sm"><use href="#i-spark"/></svg>To Claude</p><p>The agents think with Claude, so what they read and write passes through it while they work.</p></div>
-        <div class="leave edge c-rh"><p class="leave-h"><svg class="ic sm"><use href="#i-bank"/></svg>To Robinhood</p><p>The dashboard's reads, its dry-run checks, and the orders you confirm.</p></div>
+        <div class="leave edge c-rh"><p class="leave-h"><svg class="ic sm"><use href="#i-bank"/></svg>To Robinhood</p><p>The dashboard's reads, its dry-run checks, and the orders you confirm; and the desk check's read-only sign-in test, on your yes.</p></div>
       </div>
     </div>
   </section>
@@ -1031,7 +1031,7 @@ p { text-wrap: pretty; }
   <section class="chapter" id="robinhood">
     <div class="ch-head">
       <div class="ch-title"><p class="kicker">How it connects to Robinhood</p><h2>Three narrow doors</h2></div>
-      <p>Robinhood offers an agent connection with many tools. The desk uses it through three doors only, all inside your dashboard. Each door can do one thing, and the agents cannot reach any of them.</p>
+      <p>Robinhood offers an agent connection with many tools. The desk uses it through three doors only, all inside your dashboard. Each door can do one thing, and the agents cannot reach any of them. The one exception is the desk check's sign-in test: a chat runs it only when you say yes, and it uses the reading door to count what answers, never showing a value.</p>
     </div>
     <div class="doors">
       <div class="at-box d-agents c-desk">

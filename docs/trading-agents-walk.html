@@ -354,18 +354,18 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "\"Trading Agents desk check\", with the same version as the top of this walk.",
         "First under \"This computer\": \"This conversation's steps for the team are the ones in this folder (version …)\", the version being eight letters and digits.",
-        "Under \"This computer\", OK for Node, the desk data folder (writable), the contact email for the SEC (yours) and Robinhood (\"a sign-in is saved\", or \"not connected yet (only needed for trading; analysis works without it)\").",
-        "A line saying your private folder is locked to your own account and the system, and \"The desk's agents and the trading-desk team are as the project ships them\".",
-        "Under \"Free data sources\", all seven answer: Yahoo Finance prices and news, StockTwits, Reddit, FRED, Polymarket and SEC EDGAR. Then \"Everything the desk reads is reachable.\"",
+        "Under \"This computer\", OK for Node, the desk data folder (writable), the contact email for the SEC (yours, masked: its first letter, then …@ and its domain, never the whole address) and Robinhood (\"a sign-in is saved\", or \"not connected yet (it is for your accounts on the dashboard, and for trading; analysis works without it)\").",
+        "A line saying your private folder is locked to your own account and the system (nothing more: it never says that no other account can open it), and \"The desk's agents and the trading-desk team are as the project ships them\".",
+        "Under \"Free data sources\", all eight answer: Yahoo Finance prices and news, StockTwits, Reddit, FRED economic data, Polymarket, SEC EDGAR and SEC company data. Then \"Every source checked here is reachable.\" and \"Not checked here: Yahoo Finance's company data, …\", the one source the check does not ask, with why.",
         "SPY's checked price table comes back. The team does not test Robinhood here: it points you to Connect on the dashboard's Your account (section D).",
         "If this happens: the team says first that this conversation began before the desk was updated (the check starts \"DESK UPDATED\", or says \"This conversation's steps for the team (version …) are not the ones in this folder now\"). Start a new conversation with the trading-desk team and check again there. Reset nothing from the old conversation: it would offer no reset, and the desk refuses one from it."] },
-    { "id": "A4", "title": "Your email goes to the SEC alone", "tags": [], "changed": "2026-10-21",
-      "about": "The SEC (the US body that keeps companies' official accounts) asks everyone who reads its filings for a contact email, so the desk needs yours once, before its first analysis. It is kept on your computer and sent to the SEC only.",
+    { "id": "A4", "title": "Your email goes to the SEC alone", "tags": [], "changed": "2026-11-08",
+      "about": "The SEC (the US body that keeps companies' official accounts) asks every program that reads its filings for a contact email, and the desk is one, so it needs yours once, before its first analysis. It is kept on your computer and sent to the SEC only.",
       "where": "The same answer as A3",
       "do": [
         "Read the line about your email. If the desk asks for it (the first time), answer with your own email address."],
       "see": [
-        "\"Contact email for the SEC: <your email> (sent to sec.gov alone, kept in desk-data)\". No other source is named as receiving it.",
+        "\"Contact email for the SEC: <its first letter>…@<its domain> (shown masked; sent to sec.gov alone, kept in desk-data)\", for example \"j…@mail.com\". Your whole address is never in the check. No other source is named as receiving it.",
         "When you give it: \"Saved. The SEC will see <your email> as the contact for this desk's requests; no other source sees it.\""] },
     { "id": "A5", "title": "Reset the team brings the project's team back", "tags": ["Optional"], "changed": "2026-11-08",
       "about": "If the team stops behaving as described here, perhaps after a change in Agent Studio, \"reset the team\" puts the agents back exactly as the project ships them. Your own choices of model, permissions and effort stay. The team resets only when you ask for it in words, and once: the desk itself refuses a second reset soon after the first.",
@@ -953,15 +953,16 @@ b, strong { font-weight: var(--weight-semibold); }
     "about": "Routines are the desk's daily habits. The morning routine scores old calls, looks at what moved, analyses what you asked for and your starred companies, and lists the new calls to decide on; the evening wrap-up reports the day. Madav can run them on a schedule. They never place an order.",
     "before": "A few calls recorded (section B) and NVDA starred on your watchlist (C4).",
     "tests": [
-    { "id": "G1", "title": "The morning routine", "tags": [], "changed": "2026-10-21",
+    { "id": "G1", "title": "The morning routine", "tags": [], "changed": "2026-11-08",
       "about": "One prompt does a morning's work: at most five analyses, so it stays affordable.",
       "where": "Madav › Agent Studio › trading-desk › Put to work",
       "do": [
         "Ask the team: [[Run the morning routine]]",
         "In a Claude Code chat the same is [[/routine morning]]"],
       "see": [
-        "It scores past calls first, reads \"Worth a look today\", analyses what is waiting and your starred companies such as NVDA (at most five), then lists the new calls to decide on and the list worth a look.",
-        "On a Monday it first puts up to three of your holdings whose view is a week old on the waiting list (N6). On a Saturday or Sunday it only scores past calls and says so.",
+        "It scores past calls first, reads \"Worth a look today\" (naming the session its moves are from, and any names whose news could not be read, never as \"no news\"), analyses what is waiting and your starred companies such as NVDA (at most five), then lists the new calls to decide on and the list worth a look.",
+        "On a Monday (the Tuesday, when Monday is a New York market holiday) it first puts up to three of your holdings whose view is a week old on the waiting list (N6).",
+        "On a day New York's market is closed, a weekend or one of its holidays such as Thanksgiving (26 Nov 2026), it only scores past calls: \"New York's market is closed today (<why>)\", with the next market day. After \"Analyse nothing today\" it names no company to analyse; what is waiting stays on the dashboard's list.",
         "It ends with a one-line count, such as \"3 analysed, 1 skipped, 2 scored\". It never places an order."] },
     { "id": "G2", "title": "The evening wrap-up", "tags": [], "changed": "2026-10-21",
       "about": "A short report of the day: what the desk called and what was sent to Robinhood.",
@@ -1094,14 +1095,15 @@ b, strong { font-weight: var(--weight-semibold); }
     "about": "Everything the team does in Agent Studio also works in a Claude Code chat opened in the Trading-Agents folder, with short commands that start with a slash.",
     "before": "Claude Code, opened in your Trading-Agents folder.",
     "tests": [
-    { "id": "I1", "title": "Chat commands", "tags": ["Optional"], "changed": "2026-10-21",
+    { "id": "I1", "title": "Chat commands", "tags": ["Optional"], "changed": "2026-11-08",
       "about": "The four everyday commands: check the computer, analyse, open the dashboard, run the morning routine.",
       "where": "A Claude Code chat in your Trading-Agents folder",
       "do": [
         "Type, one at a time: [[/desk-check]] [[/analyse NVDA shallow]] [[/terminal]] [[/routine morning]]"],
       "see": [
         "The same results as asking the team in Agent Studio.",
-        "/desk-check in a chat also offers, on your yes, to test the Robinhood sign-in read-only: \"Connected to Robinhood. Its connection offers N tools.\""] },
+        "/desk-check in a chat also offers, on your yes, to test the Robinhood sign-in read-only, saying first what it reads: the tools Robinhood's connection offers and how many holdings answer, never their values. Then \"Connected to Robinhood. Its connection offers N tools.\"",
+        "If the test does not work: it says nothing was ordered, that the desk's analyses work without Robinhood, and that you can run the test again or press Connect on the dashboard's Your account. Never \"plan B\"."] },
     { "id": "I2", "title": "/analyse with no company runs the waiting list", "tags": ["Optional"], "changed": "2026-10-21",
       "about": "Without a company named, /analyse works through what you asked for on the dashboard.",
       "where": "The dashboard, then a Claude Code chat",
@@ -1154,31 +1156,35 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "The watchlist is grouped as The whole market, Sectors, Single names and Crypto.",
         "The tier folds away and stays folded after the reload; pressing its name opens it again."] },
-    { "id": "J4", "title": "Market weather", "tags": [], "changed": "2026-10-21",
+    { "id": "J4", "title": "Market weather", "tags": [], "changed": "2026-11-08",
       "about": "Three plain lines on the ground the market stands on, each from figures (never a forecast): the trend of the S&P 500, the mood from the VIX (the market's own measure of expected swings), and what the crowd expects from the Federal Reserve's next interest-rate decision.",
       "where": "Dashboard › This morning › Market weather",
       "do": [
         "Read \"Market weather\"."],
       "see": [
         "Marked \"never a forecast\", three lines: the trend (Rising, Mixed or Falling: the S&P 500 against its 50- and 200-day averages), the mood (Calm, Normal or Wild: the VIX) and rates (A cut, A rise or No change: Polymarket's odds on the Federal Reserve's next decision).",
+        "During New York's trading hours the trend and the mood give the figure so far, never \"closed at\": \"The S&P 500 is at <figure> at <time> New York time on <day>, still trading (not a close)\". After the close, \"closed at <figure> on <day>\".",
         "A line that cannot be read says \"Unavailable\", never a guess.",
         "\"From Yahoo Finance and Polymarket at <time>. Nothing here is investment advice.\""] },
-    { "id": "J5", "title": "Worth a look today", "tags": [], "changed": "2026-10-21",
+    { "id": "J5", "title": "Worth a look today", "tags": [], "changed": "2026-11-08",
       "about": "A cheap morning screen before the costly team run: up to five names that moved in a way worth reading about, each with its reason.",
       "where": "Dashboard › This morning › Worth a look today",
       "do": [
         "Read \"Worth a look today\"."],
       "see": [
         "Up to five from the whole market, the sectors and your watchlist, each with its reason in one line (for example \"Fell 4.2% on 3.1 times its usual volume, a new 52-week low\") and the robot.",
-        "Or \"Nothing stood out among the N looked at\". The first look of the day can take a minute; it is worked out at most once an hour."] },
-    { "id": "J6", "title": "The morning switch", "tags": ["Optional"], "changed": "2026-10-22",
+        "Or \"Nothing stood out among the N looked at\". The first look of the day can take a minute; it is worked out at most once an hour.",
+        "At its foot: \"From Yahoo Finance's daily prices at <time>; the moves are from the session of <day>\", and during New York's trading hours also \", still trading: so far, not a close\".",
+        "If some names' news could not be read: \"News could not be read just now for <names>: whether they are in the news today is not known.\" \"Nothing stood out\" then never says \"no news\" for them."] },
+    { "id": "J6", "title": "The morning switch", "tags": ["Optional"], "changed": "2026-11-08",
       "about": "Switched on, the top three of the morning screen are analysed by themselves each market morning, at shallow depth, starting the next market morning. Off as shipped, since each analysis uses your Claude plan.",
       "where": "Dashboard › This morning › under Worth a look today",
       "do": [
         "Read the switch \"Analyse the top 3 each market morning\", switch it on, then off again."],
       "see": [
         "Off as shipped: \"When on, it starts the next market morning: then the top 3 go on the waiting list at shallow depth once each market morning, and run when something is listening. Switching it on puts nothing on the list at once.\"",
-        "On: \"Switched on: nothing is queued now. From <day>, the top 3 go on the waiting list …\". Nothing joins Analyses you asked for until that morning; then the top three not already called today do, once, before noon New York time.",
+        "On: \"Switched on: nothing is queued now. From <day>, the top 3 go on the waiting list …\". Nothing joins Analyses you asked for until that morning; then the top three not already called today do, once, before noon New York time. <day> is the next market morning: switched on the day before Thanksgiving (25 Nov 2026), it is 27 Nov 2026.",
+        "On a weekend or one of New York's market holidays nothing joins the waiting list: it is not a market morning.",
         "Off: \"Switched off: nothing goes on the waiting list by itself.\""] }
   ] },
   { "id": "K", "name": "Analyses that run by themselves",
@@ -1343,8 +1349,8 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "A sector line, for example \"Sector Technology would be 28.6% of the account; your limit is 30%\".",
         "For SPY: \"SPY is a whole-market fund: it counts towards no sector\". A company the SEC does not list counts as its own (\"…, whose sector is not known, counted on its own\")."] },
-    { "id": "M4", "title": "The shortest hold", "tags": ["Later"], "changed": "2026-10-21",
-      "about": "To avoid jumping in and out, a company bought here is held five trading days before the desk proposes selling it. Your own early sale takes one more press.",
+    { "id": "M4", "title": "The shortest hold", "tags": ["Later"], "changed": "2026-11-08",
+      "about": "To avoid jumping in and out, a company bought here is held five trading days (days New York's market is open: weekends and its holidays, such as Thanksgiving, do not count) before the desk proposes selling it. Your own early sale takes one more press.",
       "where": "Dashboard › Trade… on a company bought here in the last five trading days",
       "do": [
         "Open \"Trade…\" on it and switch to Sell."],
@@ -1405,13 +1411,13 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "\"What you hold needs a look\" is not shown at all.",
         "When it is: \"In the Agentic account, as Robinhood was last read · nothing is ever sold by itself …\", with Holding, Mark and Why, and \"Read the call\" and \"Sell…\"."] },
-    { "id": "N6", "title": "Monday re-rating", "tags": ["Later"], "changed": "2026-10-21",
-      "about": "Each Monday the morning routine puts up to three holdings whose view is a week old (or that have none) on the waiting list, so what you hold is never judged on a stale call.",
+    { "id": "N6", "title": "Monday re-rating", "tags": ["Later"], "changed": "2026-11-08",
+      "about": "Each Monday (the Tuesday, when Monday is a New York market holiday such as Martin Luther King Jr. Day, 18 Jan 2027) the morning routine puts up to three holdings whose view is a week old (or that have none) on the waiting list, so what you hold is never judged on a stale call.",
       "where": "The morning routine, then the dashboard",
       "do": [
         "On a Monday, ask the team: [[Run the morning routine]] (or let Madav run it), then look at Analyses you asked for and your holdings."],
       "see": [
-        "Up to three Agentic holdings with no view or a view a week old go on the waiting list at shallow depth, once that Monday, and show \"re-rating\" until done.",
+        "Up to three Agentic holdings with no view or a view a week old go on the waiting list at shallow depth, once that week, and show \"re-rating\" until done. After a Monday holiday the routine says \"Monday's re-rating (on Tuesday: Monday was a New York market holiday)\".",
         "Their view is fresh afterwards."] }
   ] },
   { "id": "O", "name": "Your first month: Get started",

@@ -6959,7 +6959,7 @@ var require_formats = __commonJS({
       return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
     }
     var DATE2 = /^(\d\d\d\d)-(\d\d)-(\d\d)$/;
-    var DAYS2 = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    var DAYS3 = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
     function date5(str) {
       const matches = DATE2.exec(str);
       if (!matches)
@@ -6967,7 +6967,7 @@ var require_formats = __commonJS({
       const year = +matches[1];
       const month = +matches[2];
       const day3 = +matches[3];
-      return month >= 1 && month <= 12 && day3 >= 1 && day3 <= (month === 2 && isLeapYear(year) ? 29 : DAYS2[month]);
+      return month >= 1 && month <= 12 && day3 >= 1 && day3 <= (month === 2 && isLeapYear(year) ? 29 : DAYS3[month]);
     }
     function compareDate(d1, d2) {
       if (!(d1 && d2))
@@ -36647,7 +36647,12 @@ function saveContactEmail(root, raw) {
   fs2.writeFileSync(file2(root), JSON.stringify({ email: email3 }, null, 2) + "\n");
   return email3;
 }
-var ASK_FOR_EMAIL = "the SEC asks everyone who reads its filings for a contact email, and none is saved yet: ask the person for their own email (never invent one) and save it with set_contact_email";
+function maskEmail(email3) {
+  const at = email3.lastIndexOf("@");
+  return at > 0 ? `${email3[0]}\u2026${email3.slice(at)}` : "";
+}
+var WHY_EMAIL = "the SEC asks every program that reads its filings for a contact email";
+var ASK_FOR_EMAIL = "the SEC asks every program that reads its filings for a contact email, and none is saved yet: ask the person for their own email (never invent one) and save it with set_contact_email";
 
 // src/check/probes.ts
 var SEC_REFUSED_WITH_EMAIL = "the SEC refused even though a contact email was sent, so the email is not what is missing; it sometimes blocks a computer for a few minutes, so try again shortly";
@@ -36663,8 +36668,16 @@ var SOURCES = [
     url: "https://www.sec.gov/files/company_tickers.json",
     looksRight: (b) => b.includes('"ticker"'),
     onRefused: (emailSent) => emailSent ? SEC_REFUSED_WITH_EMAIL : ASK_FOR_EMAIL
+  },
+  // a company's accounts and filing list come from the SEC's data address, another host than its website's (sec.ts)
+  {
+    name: "SEC company data",
+    url: "https://data.sec.gov/submissions/CIK0000320193.json",
+    looksRight: (b) => b.includes('"cik"'),
+    onRefused: (emailSent) => emailSent ? SEC_REFUSED_WITH_EMAIL : ASK_FOR_EMAIL
   }
 ];
+var NOT_PROBED = "Yahoo Finance's company data, read only for a company or fund the SEC does not list (Yahoo mostly refuses it to programs, so those reads are often unavailable, and say so)";
 var MAX_BYTES = 64 * 1024;
 async function head(res) {
   if (!res.body) return "";
@@ -36937,19 +36950,19 @@ function dataLine(root) {
   }
 }
 function robinhoodLine(file5 = robinhoodFile()) {
-  if (!fs6.existsSync(file5)) return { ok: true, text: "Robinhood: not connected yet (only needed for trading; analysis works without it)" };
+  if (!fs6.existsSync(file5)) return { ok: true, text: "Robinhood: not connected yet (it is for your accounts on the dashboard, and for trading; analysis works without it)" };
   const when = fs6.statSync(file5).mtime;
   return { ok: true, text: `Robinhood: a sign-in is saved (last refreshed ${when.toISOString().slice(0, 16).replace("T", " ")} UTC)` };
 }
 function privateFolderLine(dir = homeDir()) {
   if (!fs6.existsSync(dir)) return { ok: true, text: "Your private folder: not made yet. It is made, locked to your own account, when you connect Robinhood or open the dashboard" };
   const state = lockState(dir);
-  if (state === "locked") return { ok: true, text: `Your private folder: locked to your own account${process.platform === "win32" ? " and the system" : ""}. No other account on this computer can open it` };
+  if (state === "locked") return { ok: true, text: `Your private folder: locked to your own account${process.platform === "win32" ? " and the system" : ""}` };
   if (state === "open") return { ok: false, text: "Your private folder: other accounts on this computer may be able to open it. Open the dashboard once: that locks it to your own account" };
   return { ok: true, text: "Your private folder: who can open it could not be told (a drive without access lists?). It is as protected as your other files" };
 }
 function contactLine(email3) {
-  return email3 ? { ok: true, text: `Contact email for the SEC: ${email3} (sent to sec.gov alone, kept in desk-data)` } : { ok: false, text: "Contact email for the SEC: not given yet. The desk needs it before the first analysis: the SEC asks everyone who reads its filings for one. Ask the person for their own email and save it with set_contact_email" };
+  return email3 ? { ok: true, text: `Contact email for the SEC: ${maskEmail(email3)} (shown masked; sent to sec.gov alone, kept in desk-data)` } : { ok: false, text: `Contact email for the SEC: not given yet. The desk needs it before the first analysis: ${WHY_EMAIL}. Ask the person for their own email and save it with set_contact_email` };
 }
 function agentsLine(drift) {
   if (typeof drift === "string") return { ok: false, text: `The desk's agents could not be compared with the project's version: ${drift}` };
@@ -36970,7 +36983,8 @@ function render(lines, sources) {
   out.push("", "Free data sources:");
   for (const s of sources) out.push(`- ${mark(s.ok)} ${s.name}: ${s.detail}`);
   const down = sources.filter((s) => !s.ok).length;
-  out.push("", down === 0 ? "Everything the desk reads is reachable." : `${down} source(s) could not be reached. The desk will report them as unavailable, never as "no news".`);
+  out.push("", down === 0 ? "Every source checked here is reachable." : `${down} source(s) could not be reached. The desk will report them as unavailable, never as "no news".`);
+  out.push(`Not checked here: ${NOT_PROBED}.`);
   return out.join("\n");
 }
 async function agentDrift(root, source = root) {
@@ -36980,10 +36994,11 @@ async function agentDrift(root, source = root) {
     return e.message;
   }
 }
-async function deskCheck(root = process.cwd(), fetchImpl2 = fetch, source = root, asker = {}) {
+var realHome = () => ({ folder: homeDir(), signIn: robinhoodFile() });
+async function deskCheck(root = process.cwd(), fetchImpl2 = fetch, source = root, asker = {}, home = realHome()) {
   const settings = readSettings(root), email3 = readContactEmail(root);
   const sources = await probeAll(settings.sources.contact, email3, fetchImpl2);
-  const lines = [nodeLine(), dataLine(root), contactLine(email3), robinhoodLine(), privateFolderLine()];
+  const lines = [nodeLine(), dataLine(root), contactLine(email3), robinhoodLine(home.signIn), privateFolderLine(home.folder)];
   if (asker.updated) lines.push(NOT_COMPARED);
   else {
     lines.push(agentsLine(await agentDrift(root, source)));
@@ -39087,6 +39102,69 @@ async function financialStatement(raw, kind, freq, analysis2) {
 import fs18 from "node:fs";
 import path21 from "node:path";
 
+// src/data/holidays.ts
+var HOLIDAYS = {
+  2026: [
+    ["2026-01-01", "New Year's Day"],
+    ["2026-01-19", "Martin Luther King, Jr. Day"],
+    ["2026-02-16", "Washington's Birthday"],
+    ["2026-04-03", "Good Friday"],
+    ["2026-05-25", "Memorial Day"],
+    ["2026-06-19", "Juneteenth"],
+    ["2026-07-03", "Independence Day (observed)"],
+    ["2026-09-07", "Labor Day"],
+    ["2026-11-26", "Thanksgiving Day"],
+    ["2026-12-25", "Christmas Day"]
+  ],
+  2027: [
+    ["2027-01-01", "New Year's Day"],
+    ["2027-01-18", "Martin Luther King, Jr. Day"],
+    ["2027-02-15", "Washington's Birthday"],
+    ["2027-03-26", "Good Friday"],
+    ["2027-05-31", "Memorial Day"],
+    ["2027-06-18", "Juneteenth (observed)"],
+    ["2027-07-05", "Independence Day (observed)"],
+    ["2027-09-06", "Labor Day"],
+    ["2027-11-25", "Thanksgiving Day"],
+    ["2027-12-24", "Christmas Day (observed)"]
+  ],
+  // 1 Jan 2028 is a Saturday: the NYSE keeps no New Year's Day holiday that year.
+  2028: [
+    ["2028-01-17", "Martin Luther King, Jr. Day"],
+    ["2028-02-21", "Washington's Birthday"],
+    ["2028-04-14", "Good Friday"],
+    ["2028-05-29", "Memorial Day"],
+    ["2028-06-19", "Juneteenth"],
+    ["2028-07-04", "Independence Day"],
+    ["2028-09-04", "Labor Day"],
+    ["2028-11-23", "Thanksgiving Day"],
+    ["2028-12-25", "Christmas Day"]
+  ]
+};
+var NAMES = new Map(Object.values(HOLIDAYS).flat().map(([day3, name]) => [day3, name]));
+var DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+var dayOfWeek = (day3) => (/* @__PURE__ */ new Date(`${day3}T12:00:00Z`)).getUTCDay();
+var holidaysKnown = (day3) => day3.slice(0, 4) in HOLIDAYS;
+function marketClosed(day3) {
+  const w = dayOfWeek(day3);
+  if (w === 0 || w === 6) return `a ${DAYS[w]}`;
+  return NAMES.get(day3) ?? null;
+}
+var isMarketDay = (day3) => marketClosed(day3) === null;
+function nextMarketDay(day3) {
+  let d = addDays(day3, 1);
+  while (!isMarketDay(d)) d = addDays(d, 1);
+  return d;
+}
+function firstMarketDayOfWeek(day3) {
+  const monday = addDays(day3, -((dayOfWeek(day3) + 6) % 7));
+  for (let i = 0; i < 5; i++) {
+    const d = addDays(monday, i);
+    if (isMarketDay(d)) return d;
+  }
+  return null;
+}
+
 // src/desk/holdings.ts
 import fs8 from "node:fs";
 import path8 from "node:path";
@@ -40425,7 +40503,7 @@ function whyOf2(signals) {
 function rank(candidates) {
   return candidates.map((c) => {
     const s = signalsOf(c.bars, c.news);
-    return { symbol: c.symbol, signals: s.signals, movePct: s.movePct, why: whyOf2(s.signals), session: c.bars[c.bars.length - 1]?.date ?? "" };
+    return { symbol: c.symbol, signals: s.signals, movePct: s.movePct, why: whyOf2(s.signals), session: c.bars[c.bars.length - 1]?.date ?? "", ...c.live ? { live: true } : {} };
   }).filter((p) => p.signals.length > 0).sort((a, b) => b.signals.length - a.signals.length || Math.abs(b.movePct ?? 0) - Math.abs(a.movePct ?? 0) || a.symbol.localeCompare(b.symbol)).slice(0, SHOWN2);
 }
 async function inTurn(items, width, job) {
@@ -40446,23 +40524,36 @@ async function newsOn(symbol4, day3) {
     return null;
   }
 }
+function commonSession(read2) {
+  const count = /* @__PURE__ */ new Map();
+  for (const r of read2) {
+    const d = r.bars.at(-1).date, c = count.get(d) ?? { n: 0, live: false };
+    count.set(d, { n: c.n + 1, live: c.live || r.live });
+  }
+  const top = [...count].sort((a, b) => b[1].n - a[1].n || b[0].localeCompare(a[0]))[0];
+  return top ? { session: top[0], ...top[1].live ? { live: true } : {} } : {};
+}
 async function workScreen(symbols, news, day3, now = /* @__PURE__ */ new Date()) {
   const list2 = [...new Set(symbols)].filter((s) => !/[\^=]/.test(s));
   const read2 = await inTurn(list2, 4, async (symbol4) => {
     try {
-      const bars = (await daily(symbol4, addDays(day3, -400), day3)).bars;
-      if (!bars.length || bars[bars.length - 1].date < addDays(day3, -7)) return { symbol: symbol4, bars: null, news: null };
-      return { symbol: symbol4, bars, news: news.has(symbol4) ? await newsOn(symbol4, day3) : null };
+      const s = await daily(symbol4, addDays(day3, -400), day3), bars = s.bars;
+      if (!bars.length || bars[bars.length - 1].date < addDays(day3, -7)) return { symbol: symbol4, bars: null, news: null, asked: false, live: false };
+      const asked2 = news.has(symbol4);
+      return { symbol: symbol4, bars, news: asked2 ? await newsOn(symbol4, day3) : null, asked: asked2, live: latestState(s, day3, now.getTime()).open };
     } catch {
-      return { symbol: symbol4, bars: null, news: null };
+      return { symbol: symbol4, bars: null, news: null, asked: false, live: false };
     }
   });
+  const ok = read2.filter((r) => !!r.bars), asked = ok.filter((r) => r.asked);
   return {
     day: day3,
     at: now.toISOString(),
     looked: list2.length,
     unavailable: read2.filter((r) => !r.bars).map((r) => r.symbol),
-    picks: rank(read2.filter((r) => !!r.bars))
+    picks: rank(ok),
+    news: { read: asked.filter((r) => r.news !== null).length, unread: asked.filter((r) => r.news === null).map((r) => r.symbol) },
+    ...commonSession(ok)
   };
 }
 var screenFile = (dir) => path17.join(dir, "screen.json");
@@ -40470,7 +40561,9 @@ function readScreen(dir) {
   try {
     const v = JSON.parse(fs15.readFileSync(screenFile(dir), "utf8"));
     if (typeof v.day !== "string" || typeof v.at !== "string" || !Array.isArray(v.picks)) return null;
-    return v;
+    const news = v.news && Number.isInteger(v.news.read) && Array.isArray(v.news.unread) && v.news.unread.every((s) => typeof s === "string") ? v.news : void 0;
+    const { news: _kept, ...rest } = v;
+    return news ? { ...rest, news } : rest;
   } catch {
     return null;
   }
@@ -40486,14 +40579,10 @@ async function screenToday(dir, symbols, news, day3, now = /* @__PURE__ */ new D
   const fresh = await work(symbols, news, day3, now);
   return keep2(dir, { ...fresh, ...kept?.queued?.day === day3 ? { queued: kept.queued } : {} });
 }
-var isWeekday = (day3) => {
-  const w = (/* @__PURE__ */ new Date(`${day3}T12:00:00Z`)).getUTCDay();
-  return w !== 0 && w !== 6;
-};
 var MORNING_ENDS = 12;
 var newYorkHour = (now) => Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "2-digit", hourCycle: "h23" }).format(now));
 function queueTop(dir, screen, day3, ring, now = /* @__PURE__ */ new Date(), from = "") {
-  if (!isWeekday(day3) || day3 < from || newYorkHour(now) >= MORNING_ENDS) return [];
+  if (!isMarketDay(day3) || day3 < from || newYorkHour(now) >= MORNING_ENDS) return [];
   if (screen.day !== day3 || screen.queued?.day === day3 || readScreen(dir)?.queued?.day === day3) return [];
   const called = new Set(new Journal(path17.join(dir, "journal.md")).load().filter((e) => e.date === day3).map((e) => e.ticker));
   const busy = new Set(readQueue(dir, now).filter((q) => q.state === "waiting" || q.state === "running").map((q) => q.symbol));
@@ -40539,7 +40628,7 @@ function readRerate(dir) {
     return null;
   }
 }
-var isMonday = (day3) => (/* @__PURE__ */ new Date(`${day3}T12:00:00Z`)).getUTCDay() === 1;
+var isRerateDay = (day3) => firstMarketDayOfWeek(day3) === day3;
 function dueForRerate(dir, today2, now = /* @__PURE__ */ new Date()) {
   const held = readHoldings(dir)?.positions ?? [];
   if (!held.length) return [];
@@ -40548,7 +40637,7 @@ function dueForRerate(dir, today2, now = /* @__PURE__ */ new Date()) {
   return [...new Set(held.map((p) => p.ticker))].filter((s) => !/[\^=]/.test(s) && !busy.has(s)).map((symbol4) => ({ symbol: symbol4, view: viewOf(calls, symbol4, today2) })).filter((x) => isStale(x.view)).sort((a, b) => (a.view?.date ?? "").localeCompare(b.view?.date ?? "")).map((x) => ({ symbol: x.symbol, called: x.view?.date ?? null, rating: x.view?.rating ?? null }));
 }
 function rerateWeekly(dir, today2, now = /* @__PURE__ */ new Date()) {
-  if (!isMonday(today2)) return [];
+  if (!isRerateDay(today2)) return [];
   fs16.mkdirSync(dir, { recursive: true });
   return withLock(rerateFile(dir), () => {
     const kept = readRerate(dir);
@@ -40570,9 +40659,9 @@ function rerateWeekly(dir, today2, now = /* @__PURE__ */ new Date()) {
 }
 
 // src/desk/routine.ts
-var DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+var DAYS2 = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 var LEFT_CALLS = "A call record_outcome answers LEFT or STOP for stays pending: do not send it again now, go on, and name it at the end with the reason it gave.";
-var weekday2 = (day3) => DAYS[(/* @__PURE__ */ new Date(`${day3}T12:00:00Z`)).getUTCDay()];
+var weekday2 = (day3) => DAYS2[(/* @__PURE__ */ new Date(`${day3}T12:00:00Z`)).getUTCDay()];
 var reratedToday = (dir, today2) => {
   const r = readRerate(dir);
   return new Map(r?.day === today2 ? r.symbols.map((s) => [s.symbol, s]) : []);
@@ -40591,7 +40680,7 @@ function morningList(dir, today2, max, screen = null) {
   const bySwitch = new Set(screen?.queued?.day === today2 ? screen.queued.symbols : []), rerated = reratedToday(dir, today2);
   const why = (q) => {
     const r = rerated.get(q.symbol);
-    if (r) return `a holding re-rated this Monday (${lastView(r)}), ${q.depth ?? "shallow"} depth`;
+    if (r) return `a holding re-rated this ${weekday2(today2) === "Monday" ? "Monday" : "week"} (${lastView(r)}), ${q.depth ?? "shallow"} depth`;
     return bySwitch.has(q.symbol) ? `worth a look today, put on the list by the morning switch, ${q.depth ?? "shallow"} depth` : `asked for on the dashboard, ${q.depth ?? "the settings'"} depth`;
   };
   for (const q of queue2) if (q.state === "waiting") add(q.symbol, why(q), true);
@@ -40603,13 +40692,21 @@ var holdingsLine = (dir) => {
   if (!h) return "Holdings: none saved. The analyses say so; they do not assume a flat book.";
   return h.source === "robinhood" ? `Holdings: as the dashboard last read them from Robinhood, on ${h.savedOn}. The team never reads Robinhood itself; for fresher figures the person presses "Refresh from Robinhood" on the dashboard.` : `Holdings: as the person gave them, on ${h.savedOn}.`;
 };
+var sessionWords = (session2, live) => `${withWeekday(session2)}${live ? ", still trading: a move so far, not a close" : ""}`;
+function quietNews(news) {
+  if (!news || !news.read) return "";
+  return news.unread.length ? ", no news today about the other companies and coins the person watches" : ", no news today about the companies and coins the person watches";
+}
 function lookLines(look, today2) {
   if (!look) return [];
   if (!look.screen) return ["", `   Worth a look today: unavailable (${look.failed ?? "it could not be worked out"}). Say so at the end.`];
-  const s = look.screen, out = ["", `   Worth a look today, from Yahoo Finance's prices at ${s.at.slice(11, 16)} UTC (figures only, never a forecast; ${s.looked} looked at):`];
-  if (!s.picks.length) out.push("   - nothing stood out: no move of 3% or more, no volume twice its usual, no 52-week high or low, no cross of an average, no news today.");
-  for (const p of s.picks) out.push(`   - ${p.symbol}: ${p.why}.`);
+  const s = look.screen, of = (p) => sessionWords(p.session, p.live), sessions = new Set(s.picks.map(of));
+  const one3 = sessions.size === 1 ? [...sessions][0] : !s.picks.length && s.session ? sessionWords(s.session, s.live) : "";
+  const out = ["", `   Worth a look today, from Yahoo Finance's daily prices at ${s.at.slice(11, 16)} UTC (figures only, never a forecast; ${s.looked} looked at${one3 ? `; the moves are from the session of ${one3}` : ""}):`];
+  if (!s.picks.length) out.push(`   - nothing stood out: no move of 3% or more, no volume twice its usual, no 52-week high or low, no cross of an average${quietNews(s.news)}.`);
+  for (const p of s.picks) out.push(`   - ${p.symbol}${one3 ? "" : ` (session of ${of(p)})`}: ${p.why}.`);
   if (s.unavailable.length) out.push(`   Could not be read: ${s.unavailable.join(", ")}.`);
+  if (s.news?.unread.length) out.push(`   News could not be read just now for ${s.news.unread.join(", ")}: whether ${s.news.unread.length === 1 ? "it is" : "they are"} in the news today is not known. Never say "no news" for ${s.news.unread.length === 1 ? "it" : "them"}.`);
   const queued = s.queued?.day === today2 ? s.queued.symbols : [];
   out.push(look.on ? `   The person's switch "Analyse the top ${TOP_QUEUED} each market morning" is on${queued.length ? `: ${queued.join(", ")} ${queued.length === 1 ? "was" : "were"} put on the waiting list at shallow depth, and ${queued.length === 1 ? "is" : "are"} analysed in step 2` : ": nothing more went on the waiting list today"}.` : `   The person's switch "Analyse the top ${TOP_QUEUED} each market morning" is off: this list is for the person to read, not for you to analyse.`);
   out.push("   In step 4, give this list in a line or two, with its reasons.");
@@ -40617,26 +40714,40 @@ function lookLines(look, today2) {
 }
 function rerateLines(dir, today2) {
   const held = readHoldings(dir), r = readRerate(dir), ran = r?.day === today2, done = ran ? r.symbols : [], due = dueForRerate(dir, today2);
-  const head2 = "   Monday's re-rating, of the holdings the desk sizes trades to";
+  const day3 = weekday2(today2), monday = day3 === "Monday" ? "" : ` (on ${day3}: Monday was a New York market holiday)`;
+  const head2 = `   Monday's re-rating${monday}, of the holdings the desk sizes trades to`;
   if (!held) return ["", `${head2}: they are not known (the dashboard has not read Robinhood, and the person gave none), so nothing was re-rated. Say so at the end.`];
   if (held.source === "robinhood" && !held.accounts?.some((a) => a.tradable)) return ["", `${head2}: the Agentic account is not among the accounts shown on the dashboard, so nothing was re-rated. Say so at the end.`];
   if (!held.positions.length) return ["", `${head2}: nothing is held, so there is nothing to re-rate.`];
   const out = [""], names = due.map((s) => s.symbol).join(", "), are = due.length === 1 ? "is" : "are";
-  if (done.length) out.push(`${head2}: ${done.map((s) => `${s.symbol} (${lastView(s)})`).join(", ")} ${done.length === 1 ? "was" : "were"} put on the waiting list at shallow depth, for a view under ${RERATE_DAYS} days old (at most ${RERATE_MAX} a Monday). ${done.length === 1 ? "It is" : "They are"} analysed in step 2 with the rest of the list.`);
+  if (done.length) out.push(`${head2}: ${done.map((s) => `${s.symbol} (${lastView(s)})`).join(", ")} ${done.length === 1 ? "was" : "were"} put on the waiting list at shallow depth, for a view under ${RERATE_DAYS} days old (at most ${RERATE_MAX} a week). ${done.length === 1 ? "It is" : "They are"} analysed in step 2 with the rest of the list.`);
   else if (due.length && ran) out.push(`${head2}: ${names} ${are} due, but the waiting list is full, so nothing went on it. Say so at the end.`);
   else if (due.length) out.push(`${head2}: ${names} ${are} due, but the re-rating could not put ${due.length === 1 ? "it" : "them"} on the waiting list today. Say so at the end.`);
   else out.push(`${head2}: each has a view under ${RERATE_DAYS} days old, or is already on the waiting list. Nothing to re-rate.`);
-  if (done.length && due.length) out.push(`   Due as well, left for next Monday: ${due.map((s) => s.symbol).join(", ")}.`);
+  if (done.length && due.length) out.push(`   Due as well, left for next week's re-rating: ${due.map((s) => s.symbol).join(", ")}.`);
   return out;
 }
+function closedBrief(dir, today2, why) {
+  const waiting = readQueue(dir).filter((q) => q.state === "waiting").map((q) => q.symbol), next = nextMarketDay(today2);
+  const lines = [`MORNING ROUTINE for ${weekday2(today2)} ${today2}.`, `New York's market is closed today (${why}): score past calls (step 1), then stop. Analyse nothing in this routine today; the next market day is ${weekday2(next)} ${next}.`];
+  lines.push("", `1. Score past calls first: list_settlements, then record_outcome with a lesson for each READY call (the /settle playbook). ${LEFT_CALLS}`);
+  lines.push("", "2. Analyse nothing today: the market is closed.");
+  if (waiting.length) lines.push(`   Left on the dashboard's waiting list: ${waiting.join(", ")}. Do not start them from this routine.`);
+  lines.push("", `3. Finish with a short plain list: what was scored, and that the market is closed today (${why}), so nothing was analysed; the next market day is ${weekday2(next)} ${next}. Not investment advice.`);
+  lines.push("", "No one may be watching: do not wait for an answer. If a step needs the person (for example no contact email is saved), skip what depends on it and say so at the end.");
+  return lines.join("\n");
+}
+var unknownHolidays = (today2) => holidaysKnown(today2) ? [] : ["", `   New York's market holidays for ${today2.slice(0, 4)} are not in the desk's list, so a weekday is taken as a market day. If the market is closed today, say so. Say at the end that the list needs that year added.`];
 function morningBrief(dir, today2, max, look) {
-  const day3 = weekday2(today2), weekend = day3 === "Saturday" || day3 === "Sunday";
+  const closed = marketClosed(today2);
+  if (closed) return closedBrief(dir, today2, closed);
+  const day3 = weekday2(today2);
   const m2 = morningList(dir, today2, max, look?.screen ?? null);
   const lines = [`MORNING ROUTINE for ${day3} ${today2}.`];
-  if (weekend) lines.push(`US markets do not open on a ${day3}: score past calls (step 1), then stop and say so. Analyse nothing unless the person asked for it in words.`);
+  lines.push(...unknownHolidays(today2));
   lines.push("", `1. Score past calls first: list_settlements, then record_outcome with a lesson for each READY call (the /settle playbook). ${LEFT_CALLS}`);
-  if (day3 === "Monday") lines.push(...rerateLines(dir, today2));
-  if (!weekend) lines.push(...lookLines(look, today2));
+  if (isRerateDay(today2)) lines.push(...rerateLines(dir, today2));
+  lines.push(...lookLines(look, today2));
   if (m2.running) lines.push("", `   ${m2.running} is being analysed now by another run: leave it alone.`);
   if (!m2.analyse.length) lines.push("", "2. Nothing to analyse: no stock is waiting on the dashboard and no starred watchlist stock is without a call today. Say so.");
   else {
@@ -41029,15 +41140,15 @@ ${renderSummary(summarize(entries))}`;
   }));
   server.registerTool("routine_brief", {
     title: "Today's routine",
-    description: `What the morning routine should do today (score past calls; on a Monday, re-rate the holdings whose view is a week old; "Worth a look today", the same list the dashboard shows, worked out from prices if it was not this hour; then the stocks to analyse in order, within the person's limit) or what the evening wrap-up has to report (today's calls, the orders the dashboard sent and Robinhood's answer, what is still to be scored). It changes nothing but the waiting list: on a Monday, up to three holdings with no view or one a week old or more go on it at shallow depth, once that Monday; and with the person's switch "Analyse the top three each market morning" on, the top three of the list go on it at shallow depth, once a market day. Call it first when asked to run the morning routine or the evening wrap-up.`,
+    description: `What the morning routine should do today (on a day New York's market is closed, a weekend or one of its holidays, only score past calls; otherwise score past calls; on a Monday, or the Tuesday after a Monday holiday, re-rate the holdings whose view is a week old; "Worth a look today", the same list the dashboard shows, worked out from prices if it was not this hour; then the stocks to analyse in order, within the person's limit) or what the evening wrap-up has to report (today's calls, the orders the dashboard sent and Robinhood's answer, what is still to be scored). It changes nothing but the waiting list: on a Monday (the Tuesday after a Monday holiday), up to three holdings with no view or one a week old or more go on it at shallow depth, once that week; and with the person's switch "Analyse the top three each market morning" on, the top three of the list go on it at shallow depth, once a market day. Call it first when asked to run the morning routine or the evening wrap-up.`,
     inputSchema: { kind: external_exports.enum(["morning", "evening"]).describe("morning: before the open; evening: after the close") },
     annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: true }
   }, async (a) => act(async () => {
     const day3 = today();
     if (a.kind === "evening") return eveningBrief(dir, day3, /* @__PURE__ */ new Date());
-    const on = readPrefs(dir).morning === true, weekday3 = ![0, 6].includes((/* @__PURE__ */ new Date(`${day3}T12:00:00Z`)).getUTCDay());
+    const on = readPrefs(dir).morning === true, open3 = isMarketDay(day3);
     let look;
-    if (weekday3) {
+    if (open3) {
       try {
         rerateWeekly(dir, day3);
       } catch {
@@ -41227,7 +41338,7 @@ async function answer(what, run) {
 var symbol3 = external_exports.string().min(1).max(20).describe("The ticker as the instrument context gives it, e.g. NVDA, 7203.T, BTC-USD");
 var analysis = external_exports.string().describe("The analysis date, YYYY-MM-DD. Nothing dated after it is ever returned.");
 var READ = { readOnlyHint: true, openWorldHint: true };
-function deskServer(root = process.cwd(), fetchImpl2, source = root) {
+function deskServer(root = process.cwd(), fetchImpl2, source = root, home) {
   const settings = readSettings(root), a0 = settings.analysis;
   configure({ contact: settings.sources.contact, secEmail: () => readContactEmail(root) });
   if (fetchImpl2) configure({ fetch: fetchImpl2 });
@@ -41236,10 +41347,10 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root) {
   noteWhenUpdated(server, fresh);
   server.registerTool("desk_check", {
     title: "Desk check",
-    description: "Check that this computer is ready for the Trading Agents desk: Node, the desk data folder, whether a Robinhood sign-in is saved, whether the desk's agents and team are as the project ships them, whether this conversation's steps for the team are the ones in this folder, and whether each free data source answers. Read-only; it sends no order and reads no secret.",
+    description: "Check that this computer is ready for the Trading Agents desk: Node, the desk data folder, whether a Robinhood sign-in is saved, whether the desk's agents and team are as the project ships them, whether this conversation's steps for the team are the ones in this folder, and whether each free data source answers (naming the one it does not ask). It sends no order and reads no secret; the contact email is shown masked. All it writes is a test file in desk-data, removed at once.",
     inputSchema: { team_version: external_exports.string().max(40).optional().describe(`The version of the team's steps, exactly as the team's own "Check this computer" step gives it; left out when the steps give none`) },
     annotations: READ
-  }, async (a) => text3(await deskCheck(root, fetchImpl2, source, { updated: fresh.updated(), teamVersion: a.team_version })));
+  }, async (a) => text3(await deskCheck(root, fetchImpl2, source, { updated: fresh.updated(), teamVersion: a.team_version }, home)));
   server.registerTool("reset_team", {
     title: "Reset the team",
     description: "Put the desk's thirteen agents, the trading-desk team's file and its line-up back exactly as the project ships them: each file is written again, even one that already matches, which also brings Madav back to the project's version of the team in place of changes made in its Agent Studio. Only when the person asked in words, in this conversation, for the team to be reset or put back, and confirmed it: never in place of any other request. Call it once: asked again soon after a reset, with the files still matching, it writes nothing. It writes only those files in this folder; the model, permissions and effort the person chose in Madav stay theirs.",
@@ -41268,7 +41379,7 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root) {
   });
   server.registerTool("set_contact_email", {
     title: "Save the contact email",
-    description: "Save the person's own email as the contact the SEC asks of everyone who reads its filings. Ask the person for it in plain words and pass exactly what they give; never invent, guess or reuse an address. It is kept in this folder's desk-data (never committed) and sent to sec.gov alone.",
+    description: "Save the person's own email as the contact the SEC asks of every program that reads its filings. Ask the person for it in plain words and pass exactly what they give; never invent, guess or reuse an address. It is kept in this folder's desk-data (never committed) and sent to sec.gov alone.",
     inputSchema: { email: external_exports.string().min(3).max(254).describe("The email address the person gave") },
     annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false }
   }, async (a) => {

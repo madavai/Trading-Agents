@@ -50,9 +50,25 @@ test('the morning analyses what was asked for on the dashboard first, then the s
   assert.match(morningBrief(dir, '2026-10-19', 3), /NVDA is being analysed now by another run: leave it alone/);
 });
 
-test('on a weekend the morning only scores past calls; holdings are said to be as the dashboard last read them, never fresher', () => {
+test('on a day New York is closed (a weekend or a holiday) the morning only scores past calls, and lists nothing to analyse', () => {
   const { dir } = desk();
-  assert.match(morningBrief(dir, '2026-10-17', 5), /US markets do not open on a Saturday: score past calls \(step 1\), then stop/);
+  addWatch(dir, 'NVDA', '2026-11-20'); setFavourite(dir, 'NVDA', true); enqueue(dir, 'META', '2026-11-20T12:00:00Z');   // a starred stock and one waiting
+  const saturday = morningBrief(dir, '2026-11-07', 5);
+  assert.match(saturday, /^MORNING ROUTINE for Saturday 2026-11-07\.\nNew York's market is closed today \(a Saturday\): score past calls \(step 1\), then stop\. Analyse nothing in this routine today; the next market day is Monday 2026-11-09\./);
+  for (const brief of [saturday, morningBrief(dir, '2026-11-26', 5)]) {
+    assert.match(brief, /2\. Analyse nothing today: the market is closed\./);
+    assert.doesNotMatch(brief, /Analyse, one after another|NVDA|start_queue_item|end_queue_run/, 'after "analyse nothing", no stock to analyse');
+    assert.match(brief, /Left on the dashboard's waiting list: META\. Do not start them from this routine\./);
+  }
+  assert.match(morningBrief(dir, '2026-11-26', 5), /New York's market is closed today \(Thanksgiving Day\)[\s\S]*the next market day is Friday 2026-11-27/);
+  assert.match(morningBrief(dir, '2027-01-18', 5), /closed today \(Martin Luther King, Jr\. Day\)[\s\S]*next market day is Tuesday 2027-01-19/);
+  assert.match(morningBrief(dir, '2026-11-27', 5), /2\. Analyse, one after another[\s\S]*META[\s\S]*NVDA/, 'the day after Thanksgiving, an early close, is a market day');
+  assert.match(morningBrief(dir, '2031-11-27', 5), /New York's market holidays for 2031 are not in the desk's list, so a weekday is taken as a market day\. If the market is closed today, say so\./);
+  assert.doesNotMatch(morningBrief(dir, '2026-11-27', 5), /not in the desk's list/);
+});
+
+test('holdings are said to be as the dashboard last read them, never fresher', () => {
+  const { dir } = desk();
   assert.match(morningBrief(dir, '2026-10-19', 5), /2\. Nothing to analyse/);
   saveAccountHoldings(dir, [{ label: 'Desk', tradable: true, positions: [] }], '2026-10-16');
   assert.match(morningBrief(dir, '2026-10-19', 5), /as the dashboard last read them from Robinhood, on 2026-10-16\. The team never reads Robinhood itself/);
@@ -95,7 +111,7 @@ test('the routine brief is a desk tool that changes nothing but what the person\
   assert.deepEqual([tool.annotations?.readOnlyHint, tool.annotations?.openWorldHint], [false, true], 'it reads prices, and may put the top three on the waiting list');
   const text = ((await client.callTool({ name: 'routine_brief', arguments: { kind: 'morning' } })) as { content: Array<{ text: string }> }).content[0]!.text;
   assert.match(text, /1 of at most 1 a morning[\s\S]*1\. AAPL[\s\S]*over the limit of 1: MSFT/);
-  assert.match(text, /Worth a look today, from Yahoo Finance's prices at \d\d:\d\d UTC \(figures only, never a forecast; 17 looked at\)/);
+  assert.match(text, /Worth a look today, from Yahoo Finance's daily prices at \d\d:\d\d UTC \(figures only, never a forecast; 17 looked at[;)]/);
   assert.match(text, /is off: this list is for the person to read, not for you to analyse/);
   assert.ok(asked.some((u) => u.includes('/chart/XLK')), 'the same list the dashboard shows: the sectors too');
   assert.equal(readQueue(dir).length, 0, 'with the switch off, nothing goes on the waiting list');

@@ -3,11 +3,15 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { probe, probeAll, SOURCES, userAgentFor } from '../src/check/probes.js';
+import { NOT_PROBED, probe, probeAll, SOURCES, userAgentFor } from '../src/check/probes.js';
 import { dataLine, deskCheck, nodeLine, privateFolderLine, robinhoodLine } from '../src/check/desk-check.js';
+import { saveContactEmail } from '../src/contact.js';
 import { writePrivate } from '../src/private.js';
+import { awayHome } from './away.js';
 
 const answer = (status: number, body: string): typeof fetch => async () => new Response(body, { status });
+/** An answer every probe takes for its data. */
+const ALL = '{"chart":1,"news":1,"messages":1,"ticker":1,"cik":1} <feed observation_date';
 const source = SOURCES.find((s) => s.name === 'SEC EDGAR')!;
 
 test('a source that answers with its data is ready', async () => {
@@ -19,7 +23,7 @@ test('a source that answers with its data is ready', async () => {
 test('a refusal is reported as a refusal, with what to do for the SEC', async () => {
   const r = await probe(source, 'ua', answer(403, 'Forbidden'));
   assert.equal(r.ok, false);
-  assert.match(r.detail, /refused \(HTTP 403\): the SEC asks everyone who reads its filings for a contact email.*set_contact_email/);
+  assert.match(r.detail, /refused \(HTTP 403\): the SEC asks every program that reads its filings for a contact email.*set_contact_email/);
 });
 
 test('an answer without the expected data is not counted as ready', async () => {
@@ -40,8 +44,9 @@ test('every source is asked with the contact as the user agent, and only the SEC
   const f: typeof fetch = async (url, init) => { seen.set(new URL(String(url)).hostname, String((init?.headers as Record<string, string>)['User-Agent'])); return new Response('{"chart":1,"news":1,"messages":1,"ticker":1} <feed observation_date', { status: 200 }); };
   const all = await probeAll('trading-agents (+x)', 'me@example.com', f);
   assert.equal(all.length, SOURCES.length);
-  for (const [host, ua] of seen) assert.equal(ua, host === 'www.sec.gov' ? 'trading-agents me@example.com' : 'trading-agents (+x)', host);
+  for (const [host, ua] of seen) assert.equal(ua, host.endsWith('sec.gov') ? 'trading-agents me@example.com' : 'trading-agents (+x)', host);
   assert.ok(seen.has('www.sec.gov'));
+  assert.ok(seen.has('data.sec.gov'), "the SEC's data address, where a company's accounts come from, is asked too");
   assert.equal(userAgentFor('https://data.sec.gov/x', 'c', 'me@example.com'), 'c me@example.com');
   assert.equal(userAgentFor('https://notsec.gov/x', 'c', 'me@example.com'), 'c');
   assert.equal(userAgentFor('https://www.sec.gov/x', 'c', '  '), 'c');
@@ -80,14 +85,33 @@ test('the machine lines say what is missing in plain words', () => {
   writePrivate(path.join(root, 'private', 'kept.json'), '{}');
   const locked = privateFolderLine(path.join(root, 'private'));
   assert.deepEqual([locked.ok, /locked to your own account/.test(locked.text)], [true, true], locked.text);
+  assert.doesNotMatch(locked.text, /no other account/i, 'an administrator can still take a folder over: the check says only what it saw');
+  assert.match(robinhoodLine(path.join(root, 'none.json')).text, /it is for your accounts on the dashboard, and for trading; analysis works without it/);
   if (process.platform !== 'win32') { fs.chmodSync(path.join(root, 'private'), 0o755); assert.match(privateFolderLine(path.join(root, 'private')).text, /other accounts on this computer may be able to open it/); }
 });
 
 test('the desk check reads the settings and reports every source', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ta-'));
   fs.copyFileSync('desk-settings.json', path.join(root, 'desk-settings.json'));
-  const text = await deskCheck(root, answer(200, '{"chart":1,"news":1,"messages":1,"ticker":1} <feed observation_date'));
+  const text = await deskCheck(root, answer(200, ALL), root, {}, awayHome());
   assert.match(text, /^Trading Agents desk check/);
   for (const s of SOURCES) assert.match(text, new RegExp(`OK  ${s.name.replace(/[()]/g, '\\$&')}`));
-  assert.match(text, /Everything the desk reads is reachable\./);
+  assert.match(text, /Every source checked here is reachable\.\nNot checked here: Yahoo Finance's company data, read only for a company or fund the SEC does not list/);
+  assert.doesNotMatch(text, /Everything the desk reads/, 'reachable is said only of what was asked');
+  assert.ok(text.endsWith(`Not checked here: ${NOT_PROBED}.`));
+});
+
+test('the desk check never shows the whole contact email: masked, as the dashboard shows it, so it reaches the SEC alone', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ta-'));
+  fs.copyFileSync('desk-settings.json', path.join(root, 'desk-settings.json'));
+  saveContactEmail(root, 'jane.roe@mail.com');
+  const text = await deskCheck(root, answer(200, ALL), root, {}, awayHome());
+  assert.match(text, /OK  Contact email for the SEC: j…@mail\.com \(shown masked; sent to sec\.gov alone, kept in desk-data\)/);
+  assert.doesNotMatch(text, /jane|[\w.+-]+@[\w-]+\.[a-z]{2,}/i, 'no whole address anywhere in the check');
+});
+
+test('no promise of a "plan B": a refused Robinhood test says what the person can do', () => {
+  for (const f of ['src/robinhood/cli.ts', '.claude/skills/desk-check/SKILL.md', '.claude/agents/trading-desk.md']) assert.doesNotMatch(fs.readFileSync(f, 'utf8'), /plan B/i, f);
+  assert.ok(fs.readFileSync('src/robinhood/cli.ts', 'utf8').includes("analyses do not need Robinhood: they work without it. To try again, run this test again, or press Connect on the dashboard\\'s Your account"));
+  assert.match(fs.readFileSync('.claude/skills/desk-check/SKILL.md', 'utf8'), /nothing was ordered, that the desk's analyses work without Robinhood, and what the person can do/);
 });

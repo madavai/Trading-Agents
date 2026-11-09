@@ -2,10 +2,13 @@
 // a forecast. The trend is the S&P 500 against its 50- and 200-day averages (above both rising, between them mixed, below
 // both falling); the mood is the VIX (under 15 calm, 15 to 25 normal, over 25 wild); the rates line is what Polymarket's
 // crowd prices for the Federal Reserve's next decision. A line whose figures cannot be had says so, and has no colour.
+// During New York's session the latest row is today's, still trading: its figure is the price so far, said as such and
+// never "closed at".
 import { addDays, marketDay } from '../data/dates.js';
 import { getJson } from '../data/http.js';
 import { sma } from '../data/indicators.js';
-import { daily, type Bar } from '../data/yahoo.js';
+import { latestState } from '../data/market.js';
+import { daily, type Bar, type Series } from '../data/yahoo.js';
 
 export type Tone = 'ok' | 'warn' | 'bad' | '';
 export interface WeatherLine {
@@ -30,22 +33,40 @@ const whole = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 
 const dayWords = (iso: string): string => { const [y, m, d] = iso.split('-'); return `${Number(d)} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][Number(m) - 1]} ${y}`; };
 const unavailable = (key: WeatherLine['key'], name: string, why: string): WeatherLine => ({ key, name, state: null, tone: '', words: `Unavailable: ${why}.`, meaning: MEANING[key] });
 
-/** The trend, from the S&P 500's daily rows (oldest first): its latest close against its 50- and 200-day averages. */
-export function trendOf(bars: readonly Bar[]): WeatherLine {
+/** When the latest row is a session still trading, the moment it was read (`at`), `unsure` when the source gave no session
+ *  to tell by and the row is today's; null when it is a finished session. */
+export type Live = { at: Date; unsure?: true } | null;
+/** 14:05 as New York's clock reads it. */
+const newYorkTime = (at: Date): string => at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' });
+/** "closed at X on DAY", or, during the session, "is at X at TIME New York time on DAY, still trading". */
+const figureWords = (name: string, figure: string, day: string, live: Live): string => (!live ? `${name} closed at ${figure} on ${dayWords(day)}`
+  : live.unsure ? `${name}'s latest figure on ${dayWords(day)}, read at ${newYorkTime(live.at)} New York time, is ${figure} (Yahoo Finance did not say whether that session had ended)`
+  : `${name} is at ${figure} at ${newYorkTime(live.at)} New York time on ${dayWords(day)}, still trading (not a close)`);
+
+/** Whether a series' latest row is New York's session still trading at `now`: then its figure is the price so far. */
+export function liveOf(s: Series, day: string, now: Date): Live {
+  const last = s.bars.at(-1);
+  if (!last) return null;
+  if (!s.meta.session) return last.date === day ? { at: now, unsure: true } : null;
+  return latestState(s, day, now.getTime()).open ? { at: now } : null;
+}
+
+/** The trend, from the S&P 500's daily rows (oldest first): its latest figure against its 50- and 200-day averages. */
+export function trendOf(bars: readonly Bar[], live: Live = null): WeatherLine {
   const closes = bars.map((b) => b.close), n = closes.length;
   const ma50 = sma(closes, 50)[n - 1], ma200 = sma(closes, 200)[n - 1], last = closes[n - 1];
   if (last === undefined || ma50 == null || ma200 == null) return unavailable('trend', 'Trend', 'too few days of S&P 500 prices for its 200-day average');
   const above = (ma: number) => (last > ma ? 'above' : 'below');
   const [state, tone]: [string, Tone] = last > ma50 && last > ma200 ? ['Rising', 'ok'] : last < ma50 && last < ma200 ? ['Falling', 'bad'] : ['Mixed', 'warn'];
-  return { key: 'trend', name: 'Trend', state, tone, words: `The S&P 500 closed at ${whole(last)} on ${dayWords(bars[n - 1]!.date)}, ${above(ma50)} its 50-day average (${whole(ma50)}) and ${above(ma200)} its 200-day average (${whole(ma200)}).`, meaning: MEANING.trend };
+  return { key: 'trend', name: 'Trend', state, tone, words: `${figureWords('The S&P 500', whole(last), bars[n - 1]!.date, live)}, ${above(ma50)} its 50-day average (${whole(ma50)}) and ${above(ma200)} its 200-day average (${whole(ma200)}).`, meaning: MEANING.trend };
 }
 
-/** The mood, from the VIX's latest close. */
-export function moodOf(bars: readonly Bar[]): WeatherLine {
+/** The mood, from the VIX's latest figure. */
+export function moodOf(bars: readonly Bar[], live: Live = null): WeatherLine {
   const last = bars[bars.length - 1];
   if (!last) return unavailable('mood', 'Mood', 'no VIX figure came from Yahoo Finance');
   const v = last.close, [state, tone]: [string, Tone] = v < 15 ? ['Calm', 'ok'] : v <= 25 ? ['Normal', ''] : ['Wild', 'bad'];
-  return { key: 'mood', name: 'Mood', state, tone, words: `The VIX closed at ${v.toFixed(1)} on ${dayWords(last.date)}.`, meaning: MEANING.mood };
+  return { key: 'mood', name: 'Mood', state, tone, words: `${figureWords('The VIX', v.toFixed(1), last.date, live)}.`, meaning: MEANING.mood };
 }
 
 interface PolyMarket { groupItemTitle?: string; outcomePrices?: string; closed?: boolean; active?: boolean }
@@ -78,8 +99,8 @@ export function ratesOf(events: readonly PolyEvent[], now: Date = new Date()): W
 /** The weather now, each line on its own: a source that fails leaves its line unavailable and the others standing. */
 export async function weatherNow(day: string, now: Date = new Date()): Promise<Weather> {
   const [trend, mood, rates] = await Promise.all([
-    daily('^GSPC', addDays(day, -400), day).then((s) => trendOf(s.bars), () => unavailable('trend', 'Trend', 'Yahoo Finance did not answer for the S&P 500')),
-    daily('^VIX', addDays(day, -14), day).then((s) => moodOf(s.bars), () => unavailable('mood', 'Mood', 'Yahoo Finance did not answer for the VIX')),
+    daily('^GSPC', addDays(day, -400), day).then((s) => trendOf(s.bars, liveOf(s, day, now)), () => unavailable('trend', 'Trend', 'Yahoo Finance did not answer for the S&P 500')),
+    daily('^VIX', addDays(day, -14), day).then((s) => moodOf(s.bars, liveOf(s, day, now)), () => unavailable('mood', 'Mood', 'Yahoo Finance did not answer for the VIX')),
     getJson<{ events?: PolyEvent[] }>('https://gamma-api.polymarket.com/public-search?q=fed%20decision&limit_per_type=20')
       .then((j) => ratesOf(j.events ?? [], now), () => unavailable('rates', 'Rates', 'Polymarket did not answer')),
   ]);

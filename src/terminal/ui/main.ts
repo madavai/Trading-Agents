@@ -190,7 +190,7 @@ function renderGuide(): void {
 
   const e = g.email, editing = !e.done || GUIDE.editing;
   const email = guideStep(1, e.done, 'Give the desk your email for the SEC',
-    `<p class="at-quiet ta-gwhy">The SEC, which keeps US companies' official accounts, asks everyone who reads them for a contact email. It is kept in the desk's records on this computer and sent to the SEC alone, with each request for a company's filings: no other source sees it, and this page never shows it in full.</p>
+    `<p class="at-quiet ta-gwhy">The SEC, which keeps US companies' official accounts, asks every program that reads them for a contact email, and the desk is one. It is kept in the desk's records on this computer and sent to the SEC alone, with each request for a company's filings: no other source sees it, and this page never shows it in full.</p>
     ${editing ? `<div class="at-row"><label class="at-field ta-grow"><span class="at-field-l">Your own email address</span><input class="at-input at-box" id="contactInput" type="email" autocomplete="email" maxlength="254" spellcheck="false"></label><button class="at-btn at-press primary" data-act="contact-save">Save</button>${e.done ? '<button class="at-btn at-press" data-act="contact-cancel">Cancel</button>' : ''}</div>`
       : `<div class="at-row"><span class="at-quiet">Saved: ${esc(e.saved)} · sent to the SEC alone</span><button class="at-btn at-press" data-act="contact-edit">Change…</button></div>`}`, e.done && !GUIDE.editing);
 
@@ -1035,7 +1035,7 @@ function renderWeather(): void {
 /** One stock worth a look: its name, the day's move, why, and the robot. */
 function lookRow(p: Worth): string {
   const it = tierItem(p.symbol), name = it?.name ?? quoteOf(p.symbol)?.name ?? p.symbol;
-  const move = p.movePct === null ? '<span class="at-chip">—</span>' : `<span class="at-chip ${tone(p.movePct)}" title="The move on ${esc(dayText(p.session))}, from the close before">${pct(p.movePct)}</span>`;
+  const move = p.movePct === null ? '<span class="at-chip">—</span>' : `<span class="at-chip ${tone(p.movePct)}" title="${p.live ? `The move so far on ${esc(dayText(p.session))}, still trading, from the close before` : `The move on ${esc(dayText(p.session))}, from the close before`}">${pct(p.movePct)}</span>`;
   return `<div class="ta-look">
     <button class="ta-look-go" data-act="select" data-symbol="${esc(p.symbol)}" title="Chart ${esc(p.symbol)}"><span class="ta-tier-top"><b class="at-tile-name">${esc(name)}</b>${move}</span><span class="at-tile-sub">${esc(p.symbol)} · ${esc(p.why)}</span></button>
     <span class="at-tail">${isOpen(p.symbol) ? openChip(p.symbol) : robot(p.symbol)}</span></div>`;
@@ -1048,9 +1048,11 @@ function renderLook(): void {
     <p class="at-quiet">${MORNING.on ? `On${MORNING.from ? `, from ${esc(dayText(MORNING.from))}` : ''}: each market morning (before noon in New York), the top ${MORNING.top} not already called go on the waiting list at shallow depth, once. Each analysis uses your Claude plan, like a chat.` : `Off as shipped. When on, it starts the next market morning: then the top ${MORNING.top} go on the waiting list at shallow depth once each market morning, and run when something is listening. Switching it on puts nothing on the list at once.`}</p>`;
   if (!s) { el.innerHTML = `${head}<p class="at-quiet">${esc(MORNING.screenFailed || "Looking over the whole market, the sectors and your names: the first look of the day takes a minute.")}</p>${sw}`; return; }
   const list = s.picks.length ? `<div class="ta-looks">${s.picks.map(lookRow).join('')}</div>`
-    : `<p class="at-lede">Nothing stood out among the ${s.looked} looked at: no move of 3% or more, no volume twice its usual, no 52-week high or low, no cross of an average, and no news today about your companies or coins.</p>`;
-  el.innerHTML = `${head}${list}${s.unavailable.length ? `<p class="at-quiet">Could not be read just now: ${esc(listWords(s.unavailable))}.</p>` : ''}${sw}
-    <p class="at-honest">Ranked by how many of these fire, then by the size of the move: a move of 3% or more in a day; volume at least twice its usual (its average over 20 days); a new 52-week high or low (the highest or lowest price in a year); a close across its 50- or 200-day average (its average closing price over that many days); and, for a company or a coin, news about it today. From Yahoo Finance's daily prices at ${esc(when(s.at))}. A move says what happened, not what comes next. Nothing here is investment advice.</p>`;
+    : `<p class="at-lede">Nothing stood out among the ${s.looked} looked at: no move of 3% or more, no volume twice its usual, no 52-week high or low, no cross of an average${!s.news?.read ? '' : s.news.unread.length ? ', and no news today about your other companies or coins' : ', and no news today about your companies or coins'}.</p>`;
+  // a name whose news did not come is said as such, never counted as quiet
+  const unread = s.news?.unread.length ? `<p class="at-quiet">News could not be read just now for ${esc(listWords(s.news.unread))}: whether ${s.news.unread.length === 1 ? 'it is' : 'they are'} in the news today is not known.</p>` : '';
+  el.innerHTML = `${head}${list}${s.unavailable.length ? `<p class="at-quiet">Could not be read just now: ${esc(listWords(s.unavailable))}.</p>` : ''}${unread}${sw}
+    <p class="at-honest">Ranked by how many of these fire, then by the size of the move: a move of 3% or more in a day; volume at least twice its usual (its average over 20 days); a new 52-week high or low (the highest or lowest price in a year); a close across its 50- or 200-day average (its average closing price over that many days); and, for a company or a coin, news about it today. From Yahoo Finance's daily prices at ${esc(when(s.at))}${s.session ? `; the moves are from the session of ${esc(dayText(s.session))}${s.live ? ', still trading: so far, not a close' : ''}` : ''}. A move says what happened, not what comes next. Nothing here is investment advice.</p>`;
 }
 
 function renderMorning(): void { renderWeather(); renderLook(); }

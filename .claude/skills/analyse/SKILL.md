@@ -22,7 +22,7 @@ Call `list_settlements`. For each call marked READY, write its lesson and save i
 
 ## 3. Plan
 Call `plan_analysis` with the ticker, date, and any rounds, analysts or language the person asked for (debate_rounds and risk_rounds both take the depth's number).
-- **NEEDS_EMAIL**: ask the person for their own email. Say in one sentence why: the SEC asks everyone who reads its filings for a contact address; it stays in this folder and only the SEC sees it. Save it with `set_contact_email`, never inventing one, then plan again.
+- **NEEDS_EMAIL**: ask the person for their own email. Say in one sentence why: the SEC asks every program that reads its filings for a contact address; it stays in this folder and is sent to the SEC alone. Save it with `set_contact_email`, never inventing one, then plan again.
 - **INPUT_ERROR**: tell the person what to correct and stop.
 - **Otherwise**: keep the plan. It lists the steps, marks any already done (a run that stopped is resumed), and gives the manager model. It also shows the holdings and the lessons it saved with the run: the agents read those from the desk themselves, so never copy them into a request.
 

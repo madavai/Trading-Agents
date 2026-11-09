@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { marketDay } from '../data/dates.js';
+import { marketDaysBetween } from '../data/holidays.js';
 
 export interface SentOrder {
   at: string; symbol: string; side: 'buy' | 'sell'; quantity: number; limitPrice: number; timeInForce?: string;
@@ -31,13 +32,9 @@ export const ordersOn = (dir: string, now: Date): SentOrder[] => readOrders(dir)
 /** How many orders the dashboard sent today, whatever Robinhood's own list says yet. */
 export const placedToday = (dir: string, now: Date): number => ordersOn(dir, now).length;
 
-/** Trading days (weekdays) after `from` up to and including `to`, both YYYY-MM-DD: 0 on the same day. Holidays are not
- *  known here, so a week with one counts a day more. */
-export function tradingDaysBetween(from: string, to: string): number {
-  let n = 0;
-  for (let d = Date.parse(`${from}T12:00:00Z`) + 86_400_000; d <= Date.parse(`${to}T12:00:00Z`); d += 86_400_000) { const w = new Date(d).getUTCDay(); if (w !== 0 && w !== 6) n++; }
-  return n;
-}
+/** Trading days after `from` up to and including `to`, both YYYY-MM-DD: 0 on the same day. Weekends and New York's
+ *  market holidays (data/holidays.ts) are not trading days. */
+export const tradingDaysBetween = (from: string, to: string): number => marketDaysBetween(from, to);
 
 /** When the dashboard last bought a stock that Robinhood took, as New York's day, and how many trading days ago: for the
  *  shortest hold. Nothing when it never bought it here. */

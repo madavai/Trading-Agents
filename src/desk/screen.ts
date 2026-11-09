@@ -4,11 +4,14 @@
 // published today. No model is asked and nothing here is a forecast. Ranked by how many signals fire, then by the size
 // of the move; five are shown. It is worked out at most once an hour and kept in desk-data/screen.json, so the dashboard
 // and the morning routine read the same list. With the person's morning switch on, the top three go on the waiting list
-// at shallow depth once each market day; the screen itself never analyses or orders anything.
+// at shallow depth once each market day (New York's, its holidays known); the screen itself never analyses or orders
+// anything. A name whose news could not be read is kept by name, never counted as quiet.
 import fs from 'node:fs';
 import path from 'node:path';
 import { addDays, marketDay } from '../data/dates.js';
+import { isMarketDay, nextMarketDay } from '../data/holidays.js';
 import { sma } from '../data/indicators.js';
+import { latestState } from '../data/market.js';
 import { search } from '../data/news.js';
 import { daily, type Bar } from '../data/yahoo.js';
 import { Journal } from './journal.js';
@@ -29,12 +32,19 @@ export interface Pick {
   why: string;
   /** The session the figures are from: the latest daily row. */
   session: string;
+  /** That session was still trading when the screen was worked out: its move is so far, not a close. */
+  live?: true;
 }
 export interface Screen {
   day: string; at: string;
   /** How many symbols were looked at, and which could not be read (their prices did not come). */
   looked: number; unavailable: string[];
   picks: Pick[];
+  /** The news read for the person's companies and coins: how many were read, and which could not be (never "no news").
+   *  Missing in a screen kept before it was recorded: then nothing is said about news. */
+  news?: { read: number; unread: string[] };
+  /** The latest session most of the names were read on, and whether it was still trading then. */
+  session?: string; live?: true;
   /** What the morning switch put on the waiting list, and on which day (once a day at most). */
   queued?: { day: string; symbols: string[] };
 }
@@ -82,8 +92,8 @@ export function whyOf(signals: readonly Signal[]): string {
 }
 
 /** The picks worth a look: those with a signal, by how many signals fire, then by the size of the move; at most five. */
-export function rank(candidates: ReadonlyArray<{ symbol: string; bars: readonly Bar[]; news: number | null }>): Pick[] {
-  return candidates.map((c) => { const s = signalsOf(c.bars, c.news); return { symbol: c.symbol, signals: s.signals, movePct: s.movePct, why: whyOf(s.signals), session: c.bars[c.bars.length - 1]?.date ?? '' }; })
+export function rank(candidates: ReadonlyArray<{ symbol: string; bars: readonly Bar[]; news: number | null; live?: boolean }>): Pick[] {
+  return candidates.map((c): Pick => { const s = signalsOf(c.bars, c.news); return { symbol: c.symbol, signals: s.signals, movePct: s.movePct, why: whyOf(s.signals), session: c.bars[c.bars.length - 1]?.date ?? '', ...(c.live ? { live: true as const } : {}) }; })
     .filter((p) => p.signals.length > 0)
     .sort((a, b) => b.signals.length - a.signals.length || Math.abs(b.movePct ?? 0) - Math.abs(a.movePct ?? 0) || a.symbol.localeCompare(b.symbol))
     .slice(0, SHOWN);
@@ -102,21 +112,34 @@ async function newsOn(symbol: string, day: string): Promise<number | null> {
   try { return (await search(symbol, 12)).filter((a) => a.tickers.includes(symbol) && marketDay(new Date(`${a.time.replace(' ', 'T')}:00Z`)) === day).length; } catch { return null; }
 }
 
+/** The latest session most of the read names share (a coin's day can run ahead of the stock market's), and whether it was
+ *  still trading; nothing when no name was read. */
+function commonSession(read: ReadonlyArray<{ bars: readonly Bar[]; live: boolean }>): { session?: string; live?: true } {
+  const count = new Map<string, { n: number; live: boolean }>();
+  for (const r of read) { const d = r.bars.at(-1)!.date, c = count.get(d) ?? { n: 0, live: false }; count.set(d, { n: c.n + 1, live: c.live || r.live }); }
+  const top = [...count].sort((a, b) => b[1].n - a[1].n || b[0].localeCompare(a[0]))[0];
+  return top ? { session: top[0], ...(top[1].live ? { live: true as const } : {}) } : {};
+}
+
 /** Works the screen out now from Yahoo's daily rows (and its news for the names in `news`). Indices, futures and currencies
  *  are left out: they cannot be held. A symbol whose rows do not come, or whose latest row is over a week old, is listed
- *  as unavailable, never as quiet. */
+ *  as unavailable, never as quiet; a name whose news did not come is listed by name, never as "no news". */
 export async function workScreen(symbols: readonly string[], news: ReadonlySet<string>, day: string, now: Date = new Date()): Promise<Screen> {
   const list = [...new Set(symbols)].filter((s) => !/[\^=]/.test(s));
   const read = await inTurn(list, 4, async (symbol) => {
     try {
-      const bars = (await daily(symbol, addDays(day, -400), day)).bars;
-      if (!bars.length || bars[bars.length - 1]!.date < addDays(day, -7)) return { symbol, bars: null, news: null };
-      return { symbol, bars, news: news.has(symbol) ? await newsOn(symbol, day) : null };
-    } catch { return { symbol, bars: null, news: null }; }
+      const s = await daily(symbol, addDays(day, -400), day), bars = s.bars;
+      if (!bars.length || bars[bars.length - 1]!.date < addDays(day, -7)) return { symbol, bars: null, news: null, asked: false, live: false };
+      const asked = news.has(symbol);
+      return { symbol, bars, news: asked ? await newsOn(symbol, day) : null, asked, live: latestState(s, day, now.getTime()).open };
+    } catch { return { symbol, bars: null, news: null, asked: false, live: false }; }
   });
+  const ok = read.filter((r): r is typeof r & { bars: Bar[] } => !!r.bars), asked = ok.filter((r) => r.asked);
   return {
     day, at: now.toISOString(), looked: list.length, unavailable: read.filter((r) => !r.bars).map((r) => r.symbol),
-    picks: rank(read.filter((r): r is { symbol: string; bars: Bar[]; news: number | null } => !!r.bars)),
+    picks: rank(ok),
+    news: { read: asked.filter((r) => r.news !== null).length, unread: asked.filter((r) => r.news === null).map((r) => r.symbol) },
+    ...commonSession(ok),
   };
 }
 
@@ -127,7 +150,10 @@ export function readScreen(dir: string): Screen | null {
   try {
     const v = JSON.parse(fs.readFileSync(screenFile(dir), 'utf8')) as Screen;
     if (typeof v.day !== 'string' || typeof v.at !== 'string' || !Array.isArray(v.picks)) return null;
-    return v;
+    // the news read is said only when it was kept whole: a screen from before it was recorded says nothing about news
+    const news = v.news && Number.isInteger(v.news.read) && Array.isArray(v.news.unread) && v.news.unread.every((s) => typeof s === 'string') ? v.news : undefined;
+    const { news: _kept, ...rest } = v;
+    return news ? { ...rest, news } : rest;
   } catch { return null; }
 }
 
@@ -146,24 +172,18 @@ export async function screenToday(dir: string, symbols: readonly string[], news:
   return keep(dir, { ...fresh, ...(kept?.queued?.day === day ? { queued: kept.queued } : {}) });
 }
 
-const isWeekday = (day: string) => { const w = new Date(`${day}T12:00:00Z`).getUTCDay(); return w !== 0 && w !== 6; };
-
 /** The switch acts in a market morning only: before this hour, New York time. */
 export const MORNING_ENDS = 12;
 const newYorkHour = (now: Date) => Number(new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: '2-digit', hourCycle: 'h23' }).format(now));
-/** The weekday after `day`: where the switch starts when it is switched on (market holidays are not known). */
-export function nextMarketDay(day: string): string {
-  let d = addDays(day, 1);
-  while (!isWeekday(d)) d = addDays(d, 1);
-  return d;
-}
+/** The market day after `day` (New York's, its holidays known): where the switch starts when it is switched on. */
+export { nextMarketDay };
 
-/** The morning switch: on a weekday morning (before noon in New York), from the day the switch starts (`from`, the market
- *  day after it was switched on), once, the top three picks not already called today nor waiting or being analysed go on
- *  the waiting list at shallow depth. `ring` rings the doorbell for whoever listens (the dashboard does; the morning
- *  routine, which analyses what is waiting itself, does not). Returns what it queued. */
+/** The morning switch: on a market morning (a day New York's market opens, before noon there), from the day the switch
+ *  starts (`from`, the market day after it was switched on), once, the top three picks not already called today nor
+ *  waiting or being analysed go on the waiting list at shallow depth. `ring` rings the doorbell for whoever listens (the
+ *  dashboard does; the morning routine, which analyses what is waiting itself, does not). Returns what it queued. */
 export function queueTop(dir: string, screen: Screen, day: string, ring: boolean, now: Date = new Date(), from = ''): string[] {
-  if (!isWeekday(day) || day < from || newYorkHour(now) >= MORNING_ENDS) return [];
+  if (!isMarketDay(day) || day < from || newYorkHour(now) >= MORNING_ENDS) return [];
   if (screen.day !== day || screen.queued?.day === day || readScreen(dir)?.queued?.day === day) return [];
   const called = new Set(new Journal(path.join(dir, 'journal.md')).load().filter((e) => e.date === day).map((e) => e.ticker));
   const busy = new Set(readQueue(dir, now).filter((q) => q.state === 'waiting' || q.state === 'running').map((q) => q.symbol));
