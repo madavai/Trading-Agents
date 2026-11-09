@@ -870,12 +870,12 @@ var require_codegen = __commonJS({
       }
       // `for-in` statement.
       // With option `ownProperties` replaced with a `for-of` loop for object keys
-      forIn(nameOrPrefix, obj3, forBody, varKind = this.opts.es5 ? scope_1.varKinds.var : scope_1.varKinds.const) {
+      forIn(nameOrPrefix, obj4, forBody, varKind = this.opts.es5 ? scope_1.varKinds.var : scope_1.varKinds.const) {
         if (this.opts.ownProperties) {
-          return this.forOf(nameOrPrefix, (0, code_1._)`Object.keys(${obj3})`, forBody);
+          return this.forOf(nameOrPrefix, (0, code_1._)`Object.keys(${obj4})`, forBody);
         }
         const name = this._scope.toName(nameOrPrefix);
-        return this._for(new ForIter("in", varKind, name, obj3), () => forBody(name));
+        return this._for(new ForIter("in", varKind, name, obj4), () => forBody(name));
       }
       // end `for` loop
       endFor() {
@@ -2695,11 +2695,11 @@ var require_validate = __commonJS({
         if (!this.allErrors)
           this.gen.if(cond);
       }
-      setParams(obj3, assign) {
+      setParams(obj4, assign) {
         if (assign)
-          Object.assign(this.params, obj3);
+          Object.assign(this.params, obj4);
         else
-          this.params = obj3;
+          this.params = obj4;
       }
       block$data(valid, codeBlock, $dataValid = codegen_1.nil) {
         this.gen.block(() => {
@@ -3263,8 +3263,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path3) {
-      let input = path3;
+    function removeDotSegments(path4) {
+      let input = path4;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3673,8 +3673,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path3 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path3 && path3 !== "/" ? path3 : void 0;
+        const path4 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path4 && path4 !== "/" ? path4 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -4626,7 +4626,7 @@ var require_core = __commonJS({
       errorsText(errors = this.errors, { separator = ", ", dataVar = "data" } = {}) {
         if (!errors || errors.length === 0)
           return "No errors";
-        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text, msg) => text + separator + msg);
+        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text2, msg) => text2 + separator + msg);
       }
       $dataMetaSchema(metaSchema, keywordsJsonPointers) {
         const rules = this.RULES.all;
@@ -7174,8 +7174,8 @@ var require_dist = __commonJS({
         return ajv;
       }
       const [formats, exportName] = opts.mode === "fast" ? [formats_1.fastFormats, fastName] : [formats_1.fullFormats, fullName];
-      const list = opts.formats || formats_1.formatNames;
-      addFormats(ajv, list, formats, exportName);
+      const list2 = opts.formats || formats_1.formatNames;
+      addFormats(ajv, list2, formats, exportName);
       if (opts.keywords)
         (0, limit_1.default)(ajv);
       return ajv;
@@ -7187,12 +7187,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list, fs4, exportName) {
+    function addFormats(ajv, list2, fs5, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
-      for (const f of list)
-        ajv.addFormat(f, fs4[f]);
+      for (const f of list2)
+        ajv.addFormat(f, fs5[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -7212,12 +7212,12 @@ var require_content_type = __commonJS({
     var TYPE_REGEXP = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+\/[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
     exports.format = format;
     exports.parse = parse3;
-    function format(obj3) {
-      if (!obj3 || typeof obj3 !== "object") {
+    function format(obj4) {
+      if (!obj4 || typeof obj4 !== "object") {
         throw new TypeError("argument obj is required");
       }
-      var parameters = obj3.parameters;
-      var type = obj3.type;
+      var parameters = obj4.parameters;
+      var type = obj4.type;
       if (!type || !TYPE_REGEXP.test(type)) {
         throw new TypeError("invalid type");
       }
@@ -7248,7 +7248,7 @@ var require_content_type = __commonJS({
       if (!TYPE_REGEXP.test(type)) {
         throw new TypeError("invalid media type");
       }
-      var obj3 = new ContentType(type.toLowerCase());
+      var obj4 = new ContentType(type.toLowerCase());
       if (index !== -1) {
         var key;
         var match;
@@ -7267,20 +7267,20 @@ var require_content_type = __commonJS({
               value = value.replace(QESC_REGEXP, "$1");
             }
           }
-          obj3.parameters[key] = value;
+          obj4.parameters[key] = value;
         }
         if (index !== header.length) {
           throw new TypeError("invalid parameter format");
         }
       }
-      return obj3;
+      return obj4;
     }
-    function getcontenttype(obj3) {
+    function getcontenttype(obj4) {
       var header;
-      if (typeof obj3.getHeader === "function") {
-        header = obj3.getHeader("content-type");
-      } else if (typeof obj3.headers === "object") {
-        header = obj3.headers && obj3.headers["content-type"];
+      if (typeof obj4.getHeader === "function") {
+        header = obj4.getHeader("content-type");
+      } else if (typeof obj4.headers === "object") {
+        header = obj4.headers && obj4.headers["content-type"];
       }
       if (typeof header !== "string") {
         throw new TypeError("content-type header is missing from object");
@@ -7305,7 +7305,7 @@ var require_content_type = __commonJS({
 });
 
 // src/robinhood/cli.ts
-import fs3 from "node:fs";
+import fs4 from "node:fs";
 
 // src/paths.ts
 import os from "node:os";
@@ -7482,8 +7482,8 @@ function defineLazy(object3, key, getter) {
     configurable: true
   });
 }
-function objectClone(obj3) {
-  return Object.create(Object.getPrototypeOf(obj3), Object.getOwnPropertyDescriptors(obj3));
+function objectClone(obj4) {
+  return Object.create(Object.getPrototypeOf(obj4), Object.getOwnPropertyDescriptors(obj4));
 }
 function assignProp(target, prop, value) {
   Object.defineProperty(target, prop, {
@@ -7554,10 +7554,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj3, path3) {
-  if (!path3)
-    return obj3;
-  return path3.reduce((acc, key) => acc?.[key], obj3);
+function getElementAtPath(obj4, path4) {
+  if (!path4)
+    return obj4;
+  return path4.reduce((acc, key) => acc?.[key], obj4);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -7897,11 +7897,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path3, issues) {
+function prefixIssues(path4, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path3);
+    iss.path.unshift(path4);
     return iss;
   });
 }
@@ -7993,9 +7993,9 @@ function parsedType(data) {
       if (Array.isArray(data)) {
         return "array";
       }
-      const obj3 = data;
-      if (obj3 && Object.getPrototypeOf(obj3) !== Object.prototype && "constructor" in obj3 && obj3.constructor) {
-        return obj3.constructor.name;
+      const obj4 = data;
+      if (obj4 && Object.getPrototypeOf(obj4) !== Object.prototype && "constructor" in obj4 && obj4.constructor) {
+        return obj4.constructor.name;
       }
     }
   }
@@ -8013,8 +8013,8 @@ function issue(...args) {
   }
   return { ...iss };
 }
-function cleanEnum(obj3) {
-  return Object.entries(obj3).filter(([k, _]) => {
+function cleanEnum(obj4) {
+  return Object.entries(obj4).filter(([k, _]) => {
     return Number.isNaN(Number.parseInt(k, 10));
   }).map((el) => el[1]);
 }
@@ -8338,15 +8338,15 @@ var $ZodError = $constructor("$ZodError", initializer);
 var $ZodRealError = $constructor("$ZodError", initializer, void 0, {
   Parent: Error
 });
-function node(obj3, key, make) {
-  if (!Object.prototype.hasOwnProperty.call(obj3, key)) {
+function node(obj4, key, make) {
+  if (!Object.prototype.hasOwnProperty.call(obj4, key)) {
     if (key === "__proto__") {
-      Object.defineProperty(obj3, key, { value: make(), writable: true, enumerable: true, configurable: true });
+      Object.defineProperty(obj4, key, { value: make(), writable: true, enumerable: true, configurable: true });
     } else {
-      obj3[key] = make();
+      obj4[key] = make();
     }
   }
-  return obj3[key];
+  return obj4[key];
 }
 function flattenError(error2, mapper = (issue2) => issue2.message) {
   const fieldErrors = {};
@@ -8362,16 +8362,16 @@ function flattenError(error2, mapper = (issue2) => issue2.message) {
 }
 function formatError(error2, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error3, path3 = []) => {
+  const processError = (error3, path4 = []) => {
     for (const issue2 of error3.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path3, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path4, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path3, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path4, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path3, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path4, ...issue2.path]);
       } else {
-        const fullpath = [...path3, ...issue2.path];
+        const fullpath = [...path4, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -12307,8 +12307,8 @@ var contributors = {
 function aggregateChecks(schema) {
   const agg = {};
   const def = schema._zod.def;
-  const list = schema._zod.traits.has("$ZodCheck") ? [schema, ...def.checks ?? []] : def.checks ?? [];
-  for (const ch of list)
+  const list2 = schema._zod.traits.has("$ZodCheck") ? [schema, ...def.checks ?? []] : def.checks ?? [];
+  for (const ch of list2)
     contributors[ch._zod.def.check]?.(agg, ch._zod.def);
   const bag = schema._zod.bag;
   if (bag.minimum !== void 0)
@@ -16789,15 +16789,15 @@ function applyElicitationDefaults(schema, data) {
   if (!schema || data === null || typeof data !== "object")
     return;
   if (schema.type === "object" && schema.properties && typeof schema.properties === "object") {
-    const obj3 = data;
+    const obj4 = data;
     const props = schema.properties;
     for (const key of Object.keys(props)) {
       const propSchema = props[key];
-      if (obj3[key] === void 0 && Object.prototype.hasOwnProperty.call(propSchema, "default")) {
-        obj3[key] = propSchema.default;
+      if (obj4[key] === void 0 && Object.prototype.hasOwnProperty.call(propSchema, "default")) {
+        obj4[key] = propSchema.default;
       }
-      if (obj3[key] !== void 0) {
-        applyElicitationDefaults(propSchema, obj3[key]);
+      if (obj4[key] !== void 0) {
+        applyElicitationDefaults(propSchema, obj4[key]);
       }
     }
   }
@@ -18539,8 +18539,8 @@ var StreamableHTTPClientTransport = class {
   }
   /** Error text for a redirect `response` that was not followed, or `undefined` for any other response. */
   _unfollowedRedirect(response, url2) {
-    const text = unfollowedRedirect(response, url2);
-    return text && !this._followRedirects ? `${text} (redirectPolicy: 'same-origin')` : text;
+    const text2 = unfollowedRedirect(response, url2);
+    return text2 && !this._followRedirects ? `${text2} (redirectPolicy: 'same-origin')` : text2;
   }
   async _authThenStart() {
     if (!this._authProvider) {
@@ -18775,7 +18775,7 @@ var StreamableHTTPClientTransport = class {
         this._sessionId = sessionId;
       }
       if (!response.ok) {
-        const text = await response.text().catch(() => null);
+        const text2 = await response.text().catch(() => null);
         if (response.status === 401 && this._authProvider) {
           if (this._hasCompletedAuthFlow) {
             throw new StreamableHTTPError(401, "Server returned 401 after successful authentication");
@@ -18821,7 +18821,7 @@ var StreamableHTTPClientTransport = class {
             return this.send(message);
           }
         }
-        throw new StreamableHTTPError(response.status, `Error POSTing to endpoint: ${this._unfollowedRedirect(response, this._url) ?? text}`);
+        throw new StreamableHTTPError(response.status, `Error POSTing to endpoint: ${this._unfollowedRedirect(response, this._url) ?? text2}`);
       }
       this._hasCompletedAuthFlow = false;
       this._lastUpscopingHeader = void 0;
@@ -18957,7 +18957,7 @@ function lockDown(target) {
   return icacls([target, "/reset"]) && icacls(lockArgs(target, folder, ownerOnWindows()));
 }
 var lockedFolders = /* @__PURE__ */ new Set();
-function writePrivate(file, text) {
+function writePrivate(file, text2) {
   const folder = path2.dirname(file);
   fs.mkdirSync(folder, { recursive: true, mode: 448 });
   if (!lockedFolders.has(folder)) {
@@ -18965,7 +18965,7 @@ function writePrivate(file, text) {
     lockedFolders.add(folder);
   }
   const tmp = `${file}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp, text, { mode: 384 });
+  fs.writeFileSync(tmp, text2, { mode: 384 });
   fs.renameSync(tmp, file);
   lockDown(file);
 }
@@ -19125,6 +19125,7 @@ var oneLine = (s, max) => {
   return t.length > max ? `${t.slice(0, max - 3)}...` : t;
 };
 var masked = (s) => oneLine(s, 300).replace(/\b[a-z0-9]*\d{5,}[a-z0-9]*\b/gi, "#####");
+var LOOK_FIRST = "Look at the Agentic account's orders in Robinhood's own app before you try again.";
 
 // src/robinhood/reader.ts
 var Refused = class extends Error {
@@ -19153,15 +19154,15 @@ var Reader = class {
     if (kind === "order") throw new Refused(`${name} orders or moves money, or reviews an order, so this part of the desk never calls it.`);
     if (kind !== "read") throw new Refused(`${name} is not labelled read-only by Robinhood, so this part of the desk never calls it.`);
     const r = await this.client.callTool({ name, arguments: args });
-    const text = (r.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
+    const text2 = (r.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
     let data = r.structuredContent ?? null;
     if (data === null) {
       try {
-        data = JSON.parse(text);
+        data = JSON.parse(text2);
       } catch {
       }
     }
-    return { data, text, failed: r.isError === true };
+    return { data, text: text2, failed: r.isError === true };
   }
 };
 
@@ -19176,8 +19177,19 @@ var words = (v) => {
   return own2 ? [own2.trim()] : Object.values(o).flatMap(words);
 };
 function parseReview(answer) {
-  if (answer.failed) return { answered: false, alerts: [], approvalRequired: null, facts: [], error: masked(answer.text) };
+  if (answer.failed) return { answered: false, unclear: false, alerts: [], approvalRequired: null, facts: [], error: masked(answer.text) };
   const d = obj(obj(answer.data).data);
+  if (d.order_checks === void 0 || d.order_checks === null) {
+    const said = answer.data === null ? answer.text.trim() : words(obj(answer.data).data).join(" ");
+    return {
+      answered: false,
+      unclear: true,
+      alerts: [],
+      approvalRequired: null,
+      facts: [],
+      error: `Robinhood answered without its list of order checks, so this order counts as not checked and cannot be placed.${said ? ` It said: ${masked(said).slice(0, 300)}` : ""}`
+    };
+  }
   const alerts = [.../* @__PURE__ */ new Set([...words(d.order_checks), ...words(d.alerts), ...words(d.warnings)])].slice(0, 12).map((x) => x.slice(0, 300));
   const facts = [];
   const walk = (o, prefix, depth) => {
@@ -19189,7 +19201,7 @@ function parseReview(answer) {
     }
   };
   walk(d, "", 0);
-  return { answered: true, alerts, approvalRequired: typeof d.customer_approval_required === "boolean" ? d.customer_approval_required : null, facts, error: null };
+  return { answered: true, unclear: false, alerts, approvalRequired: typeof d.customer_approval_required === "boolean" ? d.customer_approval_required : null, facts, error: null };
 }
 var Reviewer = class {
   constructor(client, tools) {
@@ -19213,26 +19225,29 @@ var Reviewer = class {
       time_in_force: o.timeInForce,
       market_hours: "regular_hours"
     } });
-    const text = (r.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
+    const text2 = (r.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
     let data = r.structuredContent ?? null;
     if (data === null) {
       try {
-        data = JSON.parse(text);
+        data = JSON.parse(text2);
       } catch {
       }
     }
-    return parseReview({ data, text, failed: r.isError === true });
+    return parseReview({ data, text: text2, failed: r.isError === true });
   }
 };
 
 // src/robinhood/order.ts
 var PLACE = "place_equity_order";
 var obj2 = (v) => v && typeof v === "object" && !Array.isArray(v) ? v : {};
+var REFUSED = /^(rejected|failed|cancell?ed|expired|voided)$/i;
 function parsePlaced(answer) {
-  if (answer.failed) return { answered: false, approvalRequired: null, orderId: null, state: null, facts: [], error: masked(answer.text) };
+  if (answer.failed) return { answered: false, unknown: false, approvalRequired: null, orderId: null, state: null, facts: [], error: masked(answer.text) };
   const d = obj2(obj2(answer.data).data), order = obj2(d.order);
   const id = [d.order_id, d.id, order.id, d.approval_id].find((v) => typeof v === "string" && v.trim());
   const state = [d.state, order.state, d.status].find((v) => typeof v === "string" && v.trim());
+  const said = [d.reject_reason, order.reject_reason, d.message, d.detail, d.reason].find((v) => typeof v === "string" && v.trim())?.trim() ?? (answer.data === null && answer.text.trim() ? answer.text.trim() : void 0);
+  const words2 = said === void 0 ? void 0 : masked(said).slice(0, 300);
   const facts = [];
   const walk = (o, prefix, depth) => {
     for (const [k, v] of Object.entries(o)) {
@@ -19243,7 +19258,10 @@ function parsePlaced(answer) {
     }
   };
   walk(d, "", 0);
-  return { answered: true, approvalRequired: typeof d.customer_approval_required === "boolean" ? d.customer_approval_required : null, orderId: id ?? null, state: state ?? null, facts, error: null };
+  const base = { approvalRequired: typeof d.customer_approval_required === "boolean" ? d.customer_approval_required : null, orderId: id ?? null, state: state ?? null, facts };
+  if (state && REFUSED.test(state)) return { ...base, answered: false, unknown: false, error: `Robinhood marked the order ${state}${words2 ? `: ${words2}` : "."}` };
+  if (!id) return { ...base, answered: false, unknown: true, error: `Robinhood answered without an order id, so it is not clear it took this order: it may have gone through. ${LOOK_FIRST}${words2 ? ` It said: ${words2}` : ""}` };
+  return { ...base, answered: true, unknown: false, error: null };
 }
 var Placer = class {
   constructor(client, tools) {
@@ -19252,11 +19270,15 @@ var Placer = class {
   }
   client;
   tools;
-  /** Places one limit order of whole shares on the Agentic account. Call only after the person's Confirm. */
-  async place(account, o, refId) {
+  /** Refuses, before anything is sent, an order this door would not send. */
+  ready(account, o, refId) {
     if (!account.agentic) throw new Refused("Only the Agentic account can trade, and this is not it.");
     if (!this.tools.some((t) => t.name === PLACE)) throw new Refused("Robinhood's connection no longer offers placing a stock order, so nothing was sent.");
     if (!Number.isInteger(o.quantity) || o.quantity < 1 || !(o.limitPrice > 0) || o.side !== "buy" && o.side !== "sell" || !/^[0-9a-f-]{36}$/.test(refId)) throw new Refused("That order is not complete, so it was not sent.");
+  }
+  /** Places one limit order of whole shares on the Agentic account. Call only after the person's Confirm. */
+  async place(account, o, refId) {
+    this.ready(account, o, refId);
     const r = await this.client.callTool({ name: PLACE, arguments: {
       account_number: account.accountNumber,
       symbol: o.symbol,
@@ -19268,15 +19290,15 @@ var Placer = class {
       market_hours: "regular_hours",
       ref_id: refId
     } });
-    const text = (r.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
+    const text2 = (r.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
     let data = r.structuredContent ?? null;
     if (data === null) {
       try {
-        data = JSON.parse(text);
+        data = JSON.parse(text2);
       } catch {
       }
     }
-    return parsePlaced({ data, text, failed: r.isError === true });
+    return parsePlaced({ data, text: text2, failed: r.isError === true });
   }
 };
 
@@ -19348,9 +19370,9 @@ function waitForCode(port, expectedState, timeoutMs = 5 * 6e4) {
 var toolLine = (t) => ({ name: t.name, readOnly: t.annotations?.readOnlyHint === true, kind: kindOf(t), order: isOrderTool(t.name), description: (t.description ?? "").split("\n")[0].slice(0, 120) });
 function summarise(result) {
   const content = result.content ?? [];
-  const text = content.filter((c) => c.type === "text").map((c) => c.text ?? "").join("");
+  const text2 = content.filter((c) => c.type === "text").map((c) => c.text ?? "").join("");
   try {
-    const data = JSON.parse(text);
+    const data = JSON.parse(text2);
     if (Array.isArray(data)) return `${data.length} item(s)`;
     if (data && typeof data === "object") {
       const lists = Object.entries(data).filter(([, v]) => Array.isArray(v));
@@ -19359,7 +19381,7 @@ function summarise(result) {
     }
   } catch {
   }
-  return `${text.length} characters of text`;
+  return `${text2.length} characters of text`;
 }
 var NotSignedIn = class extends Error {
   constructor(message) {
@@ -19460,18 +19482,550 @@ async function shapeOfRead(reader, name, args, opts = {}) {
   return shapeLines(r.data, opts.words === true);
 }
 
+// src/robinhood/link.ts
+import crypto4 from "node:crypto";
+import fs3 from "node:fs";
+import path3 from "node:path";
+
+// src/robinhood/account.ts
+import crypto3 from "node:crypto";
+var obj3 = (v) => v && typeof v === "object" && !Array.isArray(v) ? v : {};
+var list = (v) => Array.isArray(v) ? v : [];
+var text = (v) => typeof v === "string" && v.trim() ? v.trim() : null;
+var figure = (v) => {
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  if (typeof v !== "string" || !/^-?\d+(\.\d+)?$/.test(v.trim())) return null;
+  return Number(v.trim());
+};
+var dataOf = (answer) => obj3(obj3(answer).data);
+var keyOf = (accountNumber, secret) => crypto3.createHmac("sha256", secret).update(accountNumber).digest("hex").slice(0, 16);
+var TYPE_WORDS = { individual: "Individual", ira_traditional: "Traditional IRA", ira_roth: "Roth IRA", joint: "Joint", custodial: "Custodial" };
+var titleOf = (raw) => TYPE_WORDS[raw] ?? raw.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+function parseAccounts(answer, secret) {
+  return list(dataOf(answer).accounts).flatMap((v) => {
+    const a = obj3(v), number4 = text(a.account_number);
+    if (!number4) return [];
+    const kind = text(a.brokerage_account_type) ?? text(a.type);
+    const key = keyOf(number4, secret), agentic = a.agentic_allowed === true;
+    const label = text(a.nickname) ?? (agentic ? "Agentic account" : kind ? `${titleOf(kind)} account` : "Account");
+    return [{
+      key,
+      last4: number4.slice(-4),
+      label,
+      agentic,
+      isDefault: a.is_default === true,
+      deactivated: a.deactivated === true || a.permanently_deactivated === true,
+      ids: { key, accountNumber: number4, rhsAccountNumber: text(a.rhs_account_number) }
+    }];
+  });
+}
+var sortAccounts = (accounts) => [...accounts].sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || Number(b.agentic) - Number(a.agentic));
+function parsePortfolio(answer) {
+  const d = dataOf(answer);
+  return {
+    total: figure(d.total_value),
+    equities: figure(d.equity_value),
+    crypto: figure(d.crypto_value),
+    options: figure(d.options_value),
+    cash: figure(d.cash),
+    buyingPower: figure(obj3(d.buying_power).buying_power),
+    currency: text(d.currency) ?? "USD"
+  };
+}
+function parsePositions(answer) {
+  return list(dataOf(answer).positions).flatMap((v) => {
+    const p = obj3(v), symbol = text(p.symbol), quantity = figure(p.quantity);
+    return symbol && quantity !== null && quantity !== 0 ? [{ symbol: symbol.toUpperCase(), quantity, averageCost: figure(p.average_buy_price) }] : [];
+  });
+}
+function parseCrypto(answer) {
+  const rows = list(dataOf(answer).results);
+  const holdings = rows.flatMap((v) => {
+    const p = obj3(v), symbol = text(p.symbol) ?? text(obj3(p.currency).code) ?? text(p.asset_code), quantity = figure(p.quantity) ?? figure(p.quantity_available);
+    return symbol && quantity !== null && quantity !== 0 ? [{ symbol: symbol.toUpperCase(), quantity, averageCost: figure(p.average_cost) ?? figure(p.average_buy_price) }] : [];
+  });
+  return { holdings, unread: rows.length - holdings.length };
+}
+function parseQuotes(answer) {
+  const out = /* @__PURE__ */ new Map();
+  for (const v of list(dataOf(answer).results)) {
+    const q = obj3(obj3(v).quote), symbol = text(q.symbol), price = figure(q.last_trade_price);
+    if (symbol && price !== null) out.set(symbol.toUpperCase(), price);
+  }
+  return out;
+}
+var orderOf = (v) => {
+  const o = obj3(v);
+  return {
+    symbol: text(o.symbol)?.toUpperCase() ?? null,
+    side: text(o.side),
+    type: text(o.type),
+    state: text(o.state),
+    quantity: figure(o.quantity) ?? figure(o.cumulative_quantity),
+    price: figure(o.average_price) ?? figure(o.price) ?? figure(o.limit_price),
+    at: text(o.created_at) ?? text(o.updated_at)
+  };
+};
+function parseOrders(answer) {
+  const rows = list(dataOf(answer).orders);
+  return { count: rows.length, orders: rows.slice(0, 20).map(orderOf) };
+}
+var DONE = /^(filled|cancell?ed|rejected|failed|expired|voided)$/i;
+function openOrders(answer) {
+  const rows = list(dataOf(answer).orders), all = rows.map(orderOf);
+  const open2 = [];
+  let unread = 0;
+  rows.forEach((v, i) => {
+    const o = all[i], raw = obj3(v);
+    if (o.state && DONE.test(o.state)) return;
+    const quantity = figure(raw.quantity), filled = figure(raw.cumulative_quantity) ?? 0;
+    if (!o.state || !o.symbol || o.side !== "buy" && o.side !== "sell" || quantity === null) {
+      unread++;
+      return;
+    }
+    open2.push({ symbol: o.symbol, side: o.side, quantity: Math.max(0, quantity - filled), price: figure(raw.price) ?? figure(raw.limit_price) });
+  });
+  return { all, open: open2.filter((o) => o.quantity > 0), unread };
+}
+function parseApprovals(setting, approvals) {
+  const s = obj3(dataOf(setting).setting);
+  return { required: typeof s.human_must_approve_trades === "boolean" ? s.human_must_approve_trades : null, pending: list(dataOf(approvals).approvals).length };
+}
+var QUOTES_PER_CALL = 20;
+async function readAccount(reader, account, ids) {
+  const problems = [];
+  const read = async (what, name, args) => {
+    try {
+      const r = await reader.read(name, args);
+      if (!r.failed) return r.data;
+      problems.push(`${what}: Robinhood reported an error`);
+    } catch (e) {
+      problems.push(`${what}: ${e.message.replace(/\d{5,}/g, "#####").slice(0, 160)}`);
+    }
+    return null;
+  };
+  const p = await read("the value and buying power", "get_portfolio", { account_number: ids.accountNumber });
+  const stocks = await read("the stocks held", "get_equity_positions", { account_number: ids.accountNumber });
+  const coins = ids.rhsAccountNumber ? await read("the crypto held", "get_crypto_positions", { rhs_account_number: ids.rhsAccountNumber }) : null;
+  const crypto5 = coins === null ? { holdings: [], unread: 0 } : parseCrypto(coins);
+  const base = [...parsePositions(stocks).map((h) => ({ ...h, kind: "stock" })), ...crypto5.holdings.map((h) => ({ ...h, kind: "crypto" }))];
+  const prices = /* @__PURE__ */ new Map(), symbols = base.filter((h) => h.kind === "stock").map((h) => h.symbol);
+  for (let i = 0; i < symbols.length; i += QUOTES_PER_CALL) {
+    const q = await read("live prices", "get_equity_quotes", { symbols: symbols.slice(i, i + QUOTES_PER_CALL) });
+    for (const [s, v] of parseQuotes(q)) prices.set(s, v);
+  }
+  const holdings = base.map((h) => {
+    const price = prices.get(h.symbol) ?? null;
+    return { ...h, price, value: price === null ? null : price * h.quantity, gainPct: price !== null && h.averageCost ? (price / h.averageCost - 1) * 100 : null };
+  }).sort((a, b) => (b.value ?? -1) - (a.value ?? -1));
+  let orders = null, approvals = null;
+  if (account.agentic) {
+    const o = await read("the orders", "get_equity_orders", { account_number: ids.accountNumber });
+    orders = o === null ? null : parseOrders(o);
+    const setting = await read("the phone approval setting", "get_trade_approval_setting", { account_number: ids.accountNumber });
+    const pending = await read("the approvals waiting", "get_trade_approvals", { account_number: ids.accountNumber });
+    approvals = setting === null && pending === null ? null : parseApprovals(setting, pending);
+  }
+  return { account, portfolio: p === null ? null : parsePortfolio(p), holdings, unread: crypto5.unread, orders, approvals, problems };
+}
+
+// src/data/dates.ts
+var marketDay = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+
+// src/settings.ts
+var ANALYSTS = ["market", "sentiment", "news", "fundamentals"];
+var DEFAULT_CAPS = { perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 3, perSectorPercent: 30, cryptoPercent: 5, weeklyLossPercent: 5, minHoldDays: 5 };
+var CAP_RANGES = { perOrderUsd: [1, 1e5], perStockPercent: [1, 100], ordersPerDay: [1, 50], perSectorPercent: [1, 100], cryptoPercent: [0, 100], weeklyLossPercent: [1, 50], minHoldDays: [0, 60] };
+var WHOLE_CAPS = /* @__PURE__ */ new Set(["ordersPerDay", "minHoldDays"]);
+var CAP_RANGE_WORDS = ((r) => `caps are $${r.perOrderUsd[0]} to $${r.perOrderUsd[1].toLocaleString("en-US")} an order, ${r.perStockPercent[0]}% to ${r.perStockPercent[1]}% of the account in one stock, ${r.ordersPerDay[0]} to ${r.ordersPerDay[1]} orders a day, ${r.perSectorPercent[0]}% to ${r.perSectorPercent[1]}% in one sector, ${r.cryptoPercent[0]}% to ${r.cryptoPercent[1]}% in crypto, a weekly fall of ${r.weeklyLossPercent[0]}% to ${r.weeklyLossPercent[1]}% before trading switches itself off, and a shortest hold of ${r.minHoldDays[0]} to ${r.minHoldDays[1]} trading days; orders a day and the shortest hold are whole numbers`)(CAP_RANGES);
+var DEFAULTS = {
+  analysis: {
+    outputLanguage: "English",
+    debateRounds: 1,
+    riskRounds: 1,
+    analysts: [...ANALYSTS],
+    managerModel: "",
+    newsLookbackDays: 7,
+    companyNewsLimit: 20,
+    worldNewsLimit: 10,
+    // The news Yahoo files under the market's own symbols: US stocks, the 10-year Treasury yield, oil, gold, the euro. Its
+    // search finds no news under topic words such as "Federal Reserve".
+    worldNewsSearches: ["^GSPC", "^TNX", "CL=F", "GC=F", "EURUSD=X"],
+    stocktwitsLimit: 30,
+    subreddits: ["wallstreetbets", "stocks", "investing"],
+    cryptoSubreddits: ["CryptoCurrency", "CryptoMarkets"]
+  },
+  scoring: {
+    holdingPeriodDays: 5,
+    benchmark: "",
+    benchmarks: { "": "SPY", ".NS": "^NSEI", ".BO": "^BSESN", ".T": "^N225", ".TW": "^TWII", ".TWO": "^TWII", ".KS": "^KS11", ".KQ": "^KQ11", ".HK": "^HSI", ".SI": "^STI", ".L": "^FTSE", ".DE": "^GDAXI", ".PA": "^FCHI", ".AS": "^AEX", ".SW": "^SSMI", ".MI": "FTSEMIB.MI", ".TO": "^GSPTSE", ".AX": "^AXJO", ".SS": "000001.SS", ".SZ": "399001.SZ", ".SA": "^BVSP" }
+  },
+  journal: { maxResolvedEntries: null },
+  sources: { contact: "trading-agents (+https://github.com/madavai/trading-agents)" },
+  trading: {
+    enabled: false,
+    fullPositionPercent: 10,
+    ratingToOrder: { Buy: "buy a full position", Overweight: "buy half a position", Hold: "no order", Underweight: "sell half of what is held", Sell: "sell everything held", "Needs review": "no order" },
+    orderDefaults: { type: "limit", timeInForce: "gfd" }
+  },
+  routines: { maxAnalyses: 5 }
+};
+var within = (v, lo, hi, fallback) => typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi ? v : fallback;
+var int2 = (v, lo, hi, fallback) => Number.isInteger(v) && v >= lo && v <= hi ? v : fallback;
+var CAP_KEYS = Object.keys(DEFAULT_CAPS);
+function capsOf(raw) {
+  const c = raw && typeof raw === "object" ? raw : {};
+  const out = { ...DEFAULT_CAPS };
+  for (const k of CAP_KEYS) {
+    const [lo, hi] = CAP_RANGES[k];
+    out[k] = WHOLE_CAPS.has(k) ? int2(c[k], lo, hi, DEFAULT_CAPS[k]) : within(c[k], lo, hi, DEFAULT_CAPS[k]);
+  }
+  return out;
+}
+
+// src/robinhood/link.ts
+var AnswerLost = class extends Error {
+  constructor(why) {
+    super(`Robinhood's answer did not arrive (${why}), so this order may have gone through. ${LOOK_FIRST}`);
+    this.why = why;
+  }
+  why;
+};
+var Link = class {
+  constructor(file, opts = {}) {
+    this.file = file;
+    this.opts = opts;
+  }
+  file;
+  opts;
+  last = null;
+  signing = null;
+  checking = null;
+  ids = /* @__PURE__ */ new Map();
+  known = null;
+  last_snapshot = null;
+  refreshing = null;
+  /** Which accounts the person ticked, kept beside the sign-in as keys (never account numbers). */
+  get choiceFile() {
+    return path3.join(path3.dirname(this.file), "accounts.json");
+  }
+  chosen() {
+    try {
+      const v = JSON.parse(fs3.readFileSync(this.choiceFile, "utf8"));
+      return Array.isArray(v.show) ? v.show.filter((k) => typeof k === "string") : [];
+    } catch {
+      return [];
+    }
+  }
+  async withReader(job) {
+    const session = await openSession(this.file, { ...this.opts, signIn: false });
+    try {
+      return await job(session.reader);
+    } finally {
+      await session.close();
+    }
+  }
+  /** The secret the account fingerprints are made with: random, made once on this computer and kept beside the sign-in.
+   *  Without it a fingerprint says nothing about the account number, even to someone who knows the number. */
+  get secretFile() {
+    return path3.join(path3.dirname(this.file), "secrets.json");
+  }
+  secret() {
+    try {
+      const v = JSON.parse(fs3.readFileSync(this.secretFile, "utf8"));
+      if (typeof v.fingerprint === "string" && /^[0-9a-f]{64}$/.test(v.fingerprint)) return v.fingerprint;
+    } catch {
+    }
+    const fingerprint = crypto4.randomBytes(32).toString("hex");
+    writePrivate(this.secretFile, JSON.stringify({ fingerprint }, null, 2) + "\n");
+    return fingerprint;
+  }
+  learn(answer) {
+    const found = parseAccounts(answer, this.secret());
+    this.ids = new Map(found.map((a) => [a.key, a.ids]));
+    this.known = sortAccounts(found.map(({ ids: _ids, ...a }) => a));
+    return this.known;
+  }
+  /** The person's accounts, for them to tick the ones to show. Asks Robinhood. */
+  async accounts() {
+    const accounts = await this.withReader(async (r) => {
+      const a = await r.read("get_accounts");
+      if (a.failed) throw new Error("Robinhood could not list the accounts");
+      return this.learn(a.data);
+    });
+    return { accounts, chosen: this.chosen().filter((k) => accounts.some((a) => a.key === k)) };
+  }
+  /** Keeps the person's choice. Only accounts Robinhood listed can be chosen. */
+  async choose(keys) {
+    if (!this.known) await this.accounts();
+    const show = [...new Set(keys)].filter((k) => this.known.some((a) => a.key === k && !a.deactivated));
+    if (show.length !== new Set(keys).size) throw new Error("that is not one of your Robinhood accounts");
+    writePrivate(this.choiceFile, JSON.stringify({ show }, null, 2) + "\n");
+    this.last_snapshot = null;
+    return show;
+  }
+  /** The Agentic account's numbers, when the person chose to show it. A ticket is only ever for that account. */
+  agenticIds() {
+    const a = this.known?.find((x) => x.agentic && !x.deactivated);
+    if (!a || !this.chosen().includes(a.key)) throw new Error("show your Agentic account on the dashboard first: an order can only ever be for that account");
+    return this.ids.get(a.key);
+  }
+  /** The real figures a ticket for one stock is sized and checked on: the Agentic account's value, buying power and
+   *  holding of the stock, Robinhood's live price, how many orders the account has had today (New York's day), and its
+   *  orders still open, which count towards the caps as if they were filled. */
+  async ticketContext(symbol, now = /* @__PURE__ */ new Date()) {
+    return this.withReader((r) => this.contextWith(r, symbol, now));
+  }
+  async contextWith(r, symbol, now) {
+    {
+      const a = await r.read("get_accounts");
+      if (a.failed) throw new Error("Robinhood could not list the accounts");
+      this.learn(a.data);
+      const ids = this.agenticIds();
+      const data = async (name, args) => {
+        const x = await r.read(name, args);
+        if (x.failed) throw new Error(`Robinhood could not give ${name.replace(/^get_|_/g, " ").trim()}`);
+        return x.data;
+      };
+      const p = parsePortfolio(await data("get_portfolio", { account_number: ids.accountNumber }));
+      this.noteValue(p.total, now);
+      const all = parsePositions(await data("get_equity_positions", { account_number: ids.accountNumber }));
+      const held = all.find((x) => x.symbol === symbol)?.quantity ?? 0;
+      const orders = openOrders(await data("get_equity_orders", { account_number: ids.accountNumber }));
+      const ordersToday = orders.all.filter((o) => o.at && marketDay(new Date(o.at)) === marketDay(now)).length;
+      const wanted = [.../* @__PURE__ */ new Set([symbol, ...all.map((x) => x.symbol), ...orders.open.filter((o) => o.side === "buy" && o.price === null).map((o) => o.symbol)])];
+      const quotes = /* @__PURE__ */ new Map();
+      for (let i = 0; i < wanted.length; i += QUOTES_PER_CALL) for (const [s, v] of parseQuotes(await data("get_equity_quotes", { symbols: wanted.slice(i, i + QUOTES_PER_CALL) }))) quotes.set(s, v);
+      const price = quotes.get(symbol) ?? null;
+      const mine = (side) => orders.open.filter((o) => o.symbol === symbol && o.side === side).reduce((n, o) => n + o.quantity, 0);
+      return {
+        symbol,
+        accountValue: p.total,
+        buyingPower: p.buyingPower,
+        held,
+        price,
+        ordersToday,
+        positions: all.map((x) => ({ symbol: x.symbol, quantity: x.quantity, price: quotes.get(x.symbol) ?? null })),
+        open: { buy: mine("buy"), sell: mine("sell") },
+        unreadOrders: orders.unread,
+        openBuys: orders.open.filter((o) => o.side === "buy").map((o) => ({ symbol: o.symbol, quantity: o.quantity, price: o.price ?? quotes.get(o.symbol) ?? null }))
+      };
+    }
+  }
+  /** Whether the person has switched trading on, on the dashboard, and their caps. Kept together beside the sign-in, where
+   *  agents are refused: a cap missing or out of range is the shipped one, never a larger one. */
+  get switchFile() {
+    return path3.join(path3.dirname(this.file), "trading.json");
+  }
+  trading() {
+    let v = {};
+    try {
+      v = JSON.parse(fs3.readFileSync(this.switchFile, "utf8"));
+    } catch {
+    }
+    const off = v.on !== true && typeof v.offBecause?.at === "string" && typeof v.offBecause.words === "string" ? { at: v.offBecause.at, words: v.offBecause.words.slice(0, 300) } : null;
+    return { on: v.on === true, since: v.on === true && typeof v.since === "string" ? v.since : null, caps: capsOf(v.caps), offBecause: off };
+  }
+  keepTrading(on, caps, offBecause) {
+    writePrivate(this.switchFile, JSON.stringify(on ? { on: true, since: this.now(), caps } : { on: false, caps, ...offBecause ? { offBecause } : {} }, null, 2) + "\n");
+    return this.trading();
+  }
+  setTrading(on) {
+    const was = this.trading();
+    if (on && was.on) return was;
+    if (on && was.offBecause) fs3.rmSync(this.valuesFile, { force: true });
+    return this.keepTrading(on, was.caps);
+  }
+  /** The person's caps, as the dashboard's server checked them (settings.ts capsFrom). The switch is left as it is. */
+  setCaps(caps) {
+    const was = this.trading();
+    writePrivate(this.switchFile, JSON.stringify({ ...was.on ? { on: true, since: was.since } : { on: false, ...was.offBecause ? { offBecause: was.offBecause } : {} }, caps }, null, 2) + "\n");
+    return this.trading();
+  }
+  /** The Agentic account's value, day by day (New York's), kept beside the sign-in: the day's highest and latest reading,
+   *  for the last fourteen days. When trading is on and the value falls the person's weekly limit below its highest of
+   *  the last seven days, trading switches itself off and says why. A large withdrawal can trip it too; the person
+   *  switches it back on, and the limit then counts from that moment (setTrading). */
+  get valuesFile() {
+    return path3.join(path3.dirname(this.file), "values.json");
+  }
+  values() {
+    try {
+      const v = JSON.parse(fs3.readFileSync(this.valuesFile, "utf8"));
+      return Array.isArray(v) ? v.filter((d) => !!d && /^\d{4}-\d{2}-\d{2}$/.test(String(d.day)) && Number.isFinite(d.high) && Number.isFinite(d.last)) : [];
+    } catch {
+      return [];
+    }
+  }
+  noteValue(total, now = /* @__PURE__ */ new Date()) {
+    const state = this.trading();
+    if (total === null || !(total > 0)) return state;
+    const day = marketDay;
+    const today = day(now), weekAgo = day(new Date(now.getTime() - 7 * 864e5)), twoWeeks = day(new Date(now.getTime() - 14 * 864e5));
+    const days = this.values().filter((d) => d.day >= twoWeeks && d.day !== today);
+    const mine = this.values().find((d) => d.day === today);
+    days.push({ day: today, high: Math.max(mine?.high ?? 0, total), last: total });
+    days.sort((a, b) => a.day.localeCompare(b.day));
+    writePrivate(this.valuesFile, JSON.stringify(days, null, 2) + "\n");
+    const week = days.filter((d) => d.day >= weekAgo), top = week.reduce((a, d) => d.high > a.high ? d : a, week[0]);
+    const fall = (1 - total / top.high) * 100;
+    if (!state.on || fall < state.caps.weeklyLossPercent) return state;
+    const money = (n) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return this.keepTrading(false, state.caps, { at: now.toISOString(), words: `The Agentic account fell ${fall.toFixed(1)}% below its highest value of the last seven days (${money(top.high)} on ${top.day}, now ${money(total)}), past your weekly limit of ${state.caps.weeklyLossPercent}%. Trading switched itself off. A large withdrawal can do this too. When you switch it back on, the limit counts from then.` });
+  }
+  /** Places one order on the Agentic account, in one session: reads the account afresh, has `approve` check the order on
+   *  those figures, and only if every check passes sends it. The caller has already had the person Confirm it.
+   *  `sending` runs just before the order goes out (the desk logs it then, so a send whose answer never comes is still
+   *  known); a failure after that point is AnswerLost, never a plain failure: the order may have gone through. */
+  async placeChecked(order, refId, approve, sending = () => {
+  }) {
+    if (!this.trading().on) throw new Error("trading is switched off: switch it on in Your account first");
+    const session = await openSession(this.file, { ...this.opts, signIn: false });
+    try {
+      const context = await this.contextWith(session.reader, order.symbol, /* @__PURE__ */ new Date());
+      const now = this.trading();
+      if (!now.on) throw new Error(`trading switched itself off: ${now.offBecause?.words ?? "switch it on in Your account first"}`);
+      const failed = (await approve(context)).filter((c) => !c.ok);
+      if (failed.length) throw new Error(`the order no longer passes on Robinhood's latest figures: ${failed.map((c) => c.words).join("; ")}`);
+      const account = { accountNumber: this.agenticIds().accountNumber, agentic: true };
+      session.placer.ready(account, order, refId);
+      sending();
+      try {
+        return { placed: await session.placer.place(account, order, refId), context };
+      } catch (e) {
+        throw e instanceof Refused ? e : new AnswerLost(oneLine(masked(e instanceof Error ? e.message : String(e)), 120));
+      }
+    } finally {
+      await session.close().catch(() => void 0);
+    }
+  }
+  /** Robinhood's own check of an order on the Agentic account. Nothing is placed. */
+  async review(order) {
+    const session = await openSession(this.file, { ...this.opts, signIn: false });
+    try {
+      const a = await session.reader.read("get_accounts");
+      if (a.failed) throw new Error("Robinhood could not list the accounts");
+      this.learn(a.data);
+      return await session.reviewer.review({ accountNumber: this.agenticIds().accountNumber, agentic: true }, order);
+    } finally {
+      await session.close();
+    }
+  }
+  /** The last read of the chosen accounts, without asking Robinhood again. */
+  snapshot() {
+    return this.last_snapshot;
+  }
+  /** Reads the chosen accounts afresh: value, holdings at Robinhood's live prices, and the Agentic account's orders. */
+  refresh() {
+    this.refreshing ??= (async () => {
+      try {
+        return await this.withReader(async (r) => {
+          const a = await r.read("get_accounts");
+          if (a.failed) throw new Error("Robinhood could not list the accounts");
+          const accounts = this.learn(a.data), show = this.chosen();
+          const views = [];
+          for (const account of accounts.filter((x) => show.includes(x.key))) views.push(await readAccount(r, account, this.ids.get(account.key)));
+          const agentic = views.find((v) => v.account.agentic);
+          if (agentic) this.noteValue(agentic.portfolio?.total ?? null, this.opts.now?.() ?? /* @__PURE__ */ new Date());
+          this.last_snapshot = { at: this.now(), views };
+          return this.last_snapshot;
+        });
+      } finally {
+        this.refreshing = null;
+      }
+    })();
+    return this.refreshing;
+  }
+  now = () => (this.opts.now?.() ?? /* @__PURE__ */ new Date()).toISOString();
+  saved = () => !!readSaved(this.file).tokens;
+  info() {
+    if (this.signing) return { state: "waiting", message: "Waiting for you to finish signing in on Robinhood's page. This waits up to five minutes.", checkedAt: null, tools: null };
+    if (this.last?.state === "failed") return { ...this.last };
+    if (!this.saved()) return { state: "none", message: "Robinhood is not connected.", checkedAt: null, tools: null };
+    if (this.last) return { ...this.last };
+    return { state: "saved", message: "A Robinhood sign-in is saved. It has not been checked since the dashboard started.", checkedAt: null, tools: null };
+  }
+  good(reader) {
+    const k = reader.byKind(), total = reader.tools.length;
+    return {
+      state: "connected",
+      checkedAt: this.now(),
+      tools: { read: k.read.length, order: k.order.length, other: k.other.length },
+      // Of the order tools, the page calls two (review.ts, order.ts), and only on the person's own press; no agent gets any.
+      message: `Robinhood offers ${total} ${total === 1 ? "tool" : "tools"}: ${k.read.length} that only read, ${k.order.length} that order or move money (of these, this page uses only Robinhood's dry run, when you press Review, and the order itself, on your Confirm; no agent ever gets one) and ${k.other.length} others.`
+    };
+  }
+  bad(e) {
+    const words2 = oneLine(masked(e instanceof Error ? e.message : String(e)), 200);
+    const why = e instanceof NotSignedIn ? "Robinhood asks you to sign in again." : /^Robinhood refused/.test(words2) ? words2 : `Robinhood did not answer as expected: ${words2}`;
+    return { state: "failed", checkedAt: this.now(), tools: null, message: why };
+  }
+  /** Sends the person to Robinhood's sign-in page and waits for them to come back, in the background. */
+  startSignIn() {
+    if (this.signing) return this.info();
+    this.last = null;
+    this.signing = (async () => {
+      try {
+        const session = await openSession(this.file, { ...this.opts, signIn: true });
+        try {
+          this.last = this.good(session.reader);
+        } finally {
+          await session.close();
+        }
+      } catch (e) {
+        this.last = this.bad(e);
+      } finally {
+        this.signing = null;
+      }
+    })();
+    return this.info();
+  }
+  /** Asks Robinhood whether the saved sign-in still works, and what it offers. Never opens a browser. */
+  check() {
+    if (this.signing) return Promise.resolve(this.info());
+    this.checking ??= (async () => {
+      try {
+        const session = await openSession(this.file, { ...this.opts, signIn: false });
+        try {
+          this.last = this.good(session.reader);
+        } finally {
+          await session.close();
+        }
+      } catch (e) {
+        this.last = e instanceof NotSignedIn && !this.saved() ? null : this.bad(e);
+      } finally {
+        this.checking = null;
+      }
+      return this.info();
+    })();
+    return this.checking;
+  }
+  /** Deletes the saved sign-in. Robinhood is not told; the person can also end the access on Robinhood's side. */
+  forget() {
+    fs3.rmSync(this.file, { force: true });
+    fs3.rmSync(this.choiceFile, { force: true });
+    fs3.rmSync(this.valuesFile, { force: true });
+    if (fs3.existsSync(this.switchFile)) this.setTrading(false);
+    this.last = null;
+    this.last_snapshot = null;
+    this.known = null;
+    this.ids.clear();
+    return this.info();
+  }
+};
+
 // src/robinhood/cli.ts
 var say = (words2) => console.log(words2);
 async function main(args) {
   const words2 = args.includes("--words"), [command, ...rest] = args.filter((a) => a !== "--words");
   const file = robinhoodFile();
   if (command === "status") {
-    say(fs3.existsSync(file) ? `A Robinhood sign-in is saved (last refreshed ${fs3.statSync(file).mtime.toISOString().slice(0, 16).replace("T", " ")} UTC).` : "No Robinhood sign-in is saved yet.");
+    say(fs4.existsSync(file) ? `A Robinhood sign-in is saved (last refreshed ${fs4.statSync(file).mtime.toISOString().slice(0, 16).replace("T", " ")} UTC).` : "No Robinhood sign-in is saved yet.");
     return 0;
   }
   if (command === "forget") {
-    fs3.rmSync(file, { force: true });
-    say("The saved Robinhood sign-in is deleted. Connect again whenever you like.");
+    new Link(file).forget();
+    say("The saved Robinhood sign-in is deleted, and trading is switched off. Connect again whenever you like.");
     return 0;
   }
   if (command === "discover" || command === "shape") {

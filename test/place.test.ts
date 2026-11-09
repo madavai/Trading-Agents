@@ -12,7 +12,7 @@ import { Link } from '../src/robinhood/link.js';
 import { openSession } from '../src/robinhood/connect.js';
 import { Journal } from '../src/desk/journal.js';
 import { DEFAULT_CAPS, type Caps } from '../src/settings.js';
-import { logOrder } from '../src/desk/orders.js';
+import { logOrder, readOrders } from '../src/desk/orders.js';
 import { confirmWords, placedToday, startTerminal, type Assets, type TerminalOptions } from '../src/terminal/server.js';
 import { accountTools, AGENTIC, fakeRobinhood, MAIN, type Fake } from './fake-robinhood.js';
 import { today } from '../src/data/dates.js';
@@ -118,7 +118,8 @@ test('an order is placed only with trading switched on, after Robinhood\'s clean
     assert.equal((await post('/api/ticket/review', { id: t.id, quantity: 1, limitPrice: 182.4 })).status, 409);
     assert.equal(o.placed.length, 1);
     const log = fs.readFileSync(path.join(dir, 'orders.jsonl'), 'utf8');
-    assert.equal(log.trim().split('\n').length, 1);
+    assert.equal(log.trim().split('\n').length, 2, 'written once before it was sent, and once with Robinhood\'s answer');
+    assert.equal(readOrders(dir).length, 1, 'read back as one order');
     for (const n of [MAIN, AGENTIC]) assert.ok(!log.includes(n), 'no account number in the desk\'s order log');
     assert.equal(placedToday(dir, new Date()), 1);
   } finally { await term.close(); }
@@ -146,8 +147,8 @@ test('the person\'s own order takes the same road: one share to start, stocks on
     assert.equal(ok.status, 200, ok.body);
     assert.equal(o.placed.length, 1);
     assert.equal((await post('/api/ticket/place', { id: t.id, confirm: 'Buy 1 NVDA at $182.40' })).status, 409, 'a ticket sends one order');
-    const line = JSON.parse(fs.readFileSync(path.join(dir, 'orders.jsonl'), 'utf8').trim()) as Record<string, unknown>;
-    assert.deepEqual([line.own, line.call, line.symbol, line.side, line.quantity], [true, undefined, 'NVDA', 'buy', 1], 'logged as the person\'s own order, not a call\'s');
+    const [line] = readOrders(dir);
+    assert.deepEqual([line!.own, line!.call, line!.symbol, line!.side, line!.quantity], [true, undefined, 'NVDA', 'buy', 1], 'logged as the person\'s own order, not a call\'s');
   } finally { await term.close(); }
 });
 

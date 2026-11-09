@@ -27,9 +27,17 @@ export interface TicketContext {
   price: number | null;
   /** Orders the Agentic account has had today (Robinhood's own list). */
   ordersToday: number;
-  /** The stock's sector and how much of the account is already in it, for the sector limit. name null: a whole-market
-   *  fund, in no sector. Absent: not known, so the stock counts as a sector of its own. */
-  sector?: { name: string | null; label: string; heldUsd: number };
+  /** The stock's sector and how much of the account is already in it (orders not yet filled included), for the sector
+   *  limit. name null: a whole-market fund, in no sector. Absent: not known, so the stock counts as a sector of its own.
+   *  unpriced: holdings in the sector Robinhood gave no live price for, so the limit cannot be checked. */
+  sector?: { name: string | null; label: string; heldUsd: number; openUsd?: number; unpriced?: string[] };
+  /** Shares of this stock in the Agentic account's orders not yet filled: a buy counts towards the per-stock cap as if
+   *  filled, a sell has already promised what it sells. */
+  open?: { buy: number; sell: number };
+  /** Orders Robinhood listed that could not be read well enough to tell whether they are still open: the caps cannot be checked. */
+  unreadOrders?: number;
+  /** Every open buy of the Agentic account, at its own limit price (else the live one), for the sector limit. */
+  openBuys?: Array<{ symbol: string; quantity: number; price: number | null }>;
   /** How much of the account is already in crypto, for the crypto limit. */
   cryptoHeldUsd?: number;
   /** When this stock was last bought here, and how many trading days ago, for the shortest hold. Absent: not bought here. */
@@ -132,9 +140,10 @@ export function check(o: Order, c: TicketContext, t: Trading, caps: Caps): Check
     if (c.buyingPower === null) add(false, 'Robinhood gave no buying power for the Agentic account');
     else add(cost <= c.buyingPower, cost <= c.buyingPower ? `Buying power ${money(c.buyingPower)} covers it` : `Buying power is ${money(c.buyingPower)}: not enough`);
     if (c.accountValue === null || c.accountValue <= 0) add(false, 'Robinhood gave no total value for the Agentic account to check your per-stock cap');
+    else if (c.unreadOrders) add(false, `Robinhood listed ${c.unreadOrders} order(s) whose stock, side, size or state could not be read, so your per-stock and sector caps cannot be checked`);
     else {
-      const after = ((c.held + o.quantity) * o.limitPrice / c.accountValue) * 100;
-      add(after <= caps.perStockPercent, `${o.symbol} would be ${after.toFixed(1)}% of the account; your cap is ${caps.perStockPercent}%`);
+      const waiting = c.open?.buy ?? 0, after = ((c.held + waiting + o.quantity) * o.limitPrice / c.accountValue) * 100;
+      add(after <= caps.perStockPercent, `${o.symbol} would be ${after.toFixed(1)}% of the account${waiting ? `, counting ${waiting} share(s) in orders not yet filled` : ''}; your cap is ${caps.perStockPercent}%`);
       if (coin) {
         // Crypto has a limit of its own, in place of a sector's.
         const inCrypto = (((c.cryptoHeldUsd ?? 0) + cost) / c.accountValue) * 100;
@@ -142,15 +151,19 @@ export function check(o: Order, c: TicketContext, t: Trading, caps: Caps): Check
       } else {
         // The sector limit: a whole-market fund is in no sector; a stock whose sector is not known counts as one of its own.
         const s = c.sector ?? { name: `own:${o.symbol}`, label: 'not known, so counted as a sector of its own', heldUsd: c.held * o.limitPrice };
+        const named = s.label === '' ? 'Its sector' : `Sector ${s.label}`;
         if (s.name === null) add(true, `${o.symbol} is a whole-market fund: it counts towards no sector`);
+        else if (s.unpriced?.length) add(false, `${named} cannot be checked against your limit of ${caps.perSectorPercent}%: Robinhood gave no live price for ${s.unpriced.join(', ')}, held in the account`);
         else {
           const inSector = ((s.heldUsd + cost) / c.accountValue) * 100;
-          add(inSector <= caps.perSectorPercent, `${s.label === '' ? 'Its sector' : `Sector ${s.label}`} would be ${inSector.toFixed(1)}% of the account; your limit is ${caps.perSectorPercent}%`);
+          add(inSector <= caps.perSectorPercent, `${named} would be ${inSector.toFixed(1)}% of the account${s.openUsd ? ', counting orders not yet filled' : ''}; your limit is ${caps.perSectorPercent}%`);
         }
       }
     }
   } else {
-    add(o.quantity <= c.held, o.quantity <= c.held ? `Selling ${o.quantity} of the ${c.held} held` : `Only ${units(c.held, coin)} are held in the Agentic account`);
+    const promised = c.open?.sell ?? 0, free = c.held - promised;
+    if (promised) add(o.quantity <= free, o.quantity <= free ? `Selling ${o.quantity} of the ${c.held} held, ${promised} more already in sell orders not yet filled` : `Only ${Math.max(0, free)} of the ${c.held} held can be sold: ${promised} are in sell orders not yet filled`);
+    else add(o.quantity <= c.held, o.quantity <= c.held ? `Selling ${o.quantity} of the ${c.held} held` : `Only ${units(c.held, coin)} are held in the Agentic account`);
     if (early(c, caps)) out.push({ ok: true, ask: true, words: `${o.symbol} was bought here on ${c.boughtOn}, ${c.heldDays} trading day(s) ago, under your shortest hold of ${caps.minHoldDays}: selling it now takes one more press` });
   }
   add(c.ordersToday < caps.ordersPerDay, `${c.ordersToday} of your ${caps.ordersPerDay} orders a day used`);

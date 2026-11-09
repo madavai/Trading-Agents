@@ -1,12 +1,14 @@
 // node dist/robinhood.mjs connect | status | forget | discover [--words] | shape TOOL [JSON] [--words]
 // connect: sign in through Robinhood's own page if needed, list what its connection offers, and read the positions
-// once - read-only, nothing is ever ordered. status: whether a sign-in is saved. forget: delete the saved sign-in.
+// once - read-only, nothing is ever ordered. status: whether a sign-in is saved. forget: delete the saved sign-in and
+// switch trading off, as the dashboard's Disconnect does.
 // discover: each tool's arguments and the shape (never the values) of what the read tools answer, to build the desk on.
 // shape: the same for one read tool that needs arguments. --words also shows short lower-case words such as a status.
 import fs from 'node:fs';
 import { robinhoodFile } from '../paths.js';
 import { connect, openSession } from './connect.js';
 import { discover, shapeOfRead } from './discover.js';
+import { Link } from './link.js';
 import { masked } from './rules.js';
 
 const say = (words: string) => console.log(words);
@@ -19,8 +21,8 @@ async function main(args: string[]): Promise<number> {
     return 0;
   }
   if (command === 'forget') {
-    fs.rmSync(file, { force: true });
-    say('The saved Robinhood sign-in is deleted. Connect again whenever you like.');
+    new Link(file).forget();   // as the dashboard's Disconnect: the sign-in, the account choice and values go, and trading is switched off
+    say('The saved Robinhood sign-in is deleted, and trading is switched off. Connect again whenever you like.');
     return 0;
   }
   if (command === 'discover' || command === 'shape') {
