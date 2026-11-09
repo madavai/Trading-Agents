@@ -15,7 +15,7 @@ import { deskServer } from '../src/tools/server.js';
 import { clearQuotes, parseQuote } from '../src/terminal/quotes.js';
 import { clearSearches, parseSearch } from '../src/terminal/search.js';
 import { MAX_RECENT, readPrefs, savePrefs } from '../src/terminal/prefs.js';
-import { summaryOf, yardstickWords } from '../src/terminal/state.js';
+import { scoredBy, scoringNote, scoringShort, summaryOf } from '../src/terminal/state.js';
 import { lockState } from '../src/private.js';
 import { startTerminal, type Assets, type Terminal } from '../src/terminal/server.js';
 import { MAX_WATCH, addWatch } from '../src/terminal/store.js';
@@ -283,10 +283,11 @@ test('the page\'s state is the desk\'s own files: calls, how they turned out, an
   assert.equal(s.record.summary.byRating.Overweight.count, 1);
   assert.match(s.record.text, /Overweight: n=1, called the direction 100%, mean alpha \+7\.50%/);
   // the yardstick named for what it is: SPY is the fund that copies the S&P 500, not the index itself
-  assert.equal(s.record.benchmarkNote, "Each call is judged after 5 trading days against its market's index: for a US stock, SPY, the fund that copies the S&P 500. Both returns count dividends: they are worked out from prices adjusted for them.");
+  // 8 Nov 2026: every score is named as what it is, a first-week check against a named yardstick, not the call's horizon
+  assert.equal(s.record.benchmarkNote, "Each call is scored once, a first-week check against a named yardstick, not over the call's own time horizon (its decision states that). A US stock or fund: against SPY, the fund that copies the S&P 500, over the 5 trading days after the call. A coin: against SPY too, as the desk's settings name no yardstick for coins, over the 7 calendar days after the call. A coin trades every day and SPY only on New York's market days, so SPY's close on the coin's first and last day is used, or its last close before that day when New York's market was closed (a weekend or a New York holiday). A call is scored when a scoring runs after its window (/settle, an analysis or a routine), not by itself. Both returns count dividends: they are worked out from prices adjusted for them.");
   assert.equal(s.desk.benchmark, 'SPY');
-  assert.equal(yardstickWords({ benchmark: 'VOO', benchmarks: {} }), 'VOO, the yardstick set for every call', 'one yardstick set for every call is named as itself');
-  assert.equal(yardstickWords({ benchmark: '', benchmarks: { '': 'IVV' } }), "its market's index: for a US stock, IVV");
+  assert.equal(s.desk.scoring, 'each scored once, a first-week check, not its time horizon: a US stock or fund over 5 trading days, a coin over 7 calendar days, against SPY');
+  assert.deepEqual(s.calls.map((c: any) => [c.ticker, c.window, c.yardstick, c.check, c.why]), [['AAPL', '5 trading days', 'SPY', 'a first-week check', ''], ['META', '5 trading days', 'SPY', 'a first-week check', ''], ['NVDA', '5 trading days', 'SPY', 'a first-week check', '']]);
   const one = (await call(term, 'GET', '/api/call?symbol=nvda&date=2026-09-01')).json();
   assert.match(one.decision, /Overweight/); assert.deepEqual(Object.keys(one.sections), ['decision']);
   assert.equal((await call(term, 'GET', '/api/call?symbol=NVDA&date=2020-01-01')).status, 404);
@@ -653,4 +654,19 @@ test('"Get started" ticks itself off from the desk\'s own records, step by step'
   assert.equal((await guide()).show, true, 'reopened from the side list');
   assert.equal((await call(term, 'POST', '/api/prefs', { body: { guide: 'away' } })).status, 200);
   assert.equal((await guide()).show, false, 'put away');
+});
+
+// 8 Nov 2026: the round-1 Bitcoin call (16 Oct, scored over 5 rows) was recorded before the desk kept each call's window;
+// it keeps its score, and the scorecard names it as scored otherwise. A coin or an unlisted exchange says why SPY.
+test("the scorecard names each call scored otherwise, and why a call has its yardstick", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ta-sc-')), j = new Journal(path.join(dir, 'journal.md'));
+  j.storeDecision('BTC-USD', '2026-10-16', '**Rating**: Hold\n\nWait.'); j.recordOutcome('BTC-USD', '2026-10-16', 0.031, 0.018, 5, 'Alpha +1.8%.', '2026-10-21');
+  j.storeDecision('AMXL.MX', '2026-11-02', '**Rating**: Buy\n\nAdd.', undefined, { days: 5, unit: 'trading', yardstick: 'SPY', basis: 'unlisted' });
+  const S = { holdingPeriodDays: 5, benchmark: '', benchmarks: { '': 'SPY', '.T': '^N225' } };
+  const entries = j.load(), note = scoringNote(entries, S);
+  assert.match(note, /Scored otherwise: BTC-USD \(16 Oct 2026\): against SPY, the fund that copies the S&P 500 \(the desk's settings name no yardstick for coins, so a coin is scored against the one for US listings\), over the 5 calendar days after the call, as it was recorded before the desk kept each call's window with it, so it is scored as such calls were then; AMXL\.MX \(2 Nov 2026\): against SPY, the fund that copies the S&P 500 \(its exchange, \.MX, had no index in the desk's settings when the call was made, so it is scored against the one for US listings\), over the 5 trading days after the call\./);
+  assert.equal(entries[0]!.alpha, '+1.8%', 'its score is unchanged');
+  assert.deepEqual(scoredBy(entries[0]!, S), { window: '5 calendar days', yardstick: 'SPY', check: 'a check over its first 5 calendar days', why: "the desk's settings name no yardstick for coins, so a coin is scored against the one for US listings; it was recorded before the desk kept each call's window with it, so it is scored as such calls were then" });
+  assert.equal(scoringShort({ ...S, benchmark: 'VOO' }), 'each scored once, a first-week check, not its time horizon: a US stock or fund over 5 trading days, a coin over 7 calendar days, against VOO');
+  assert.match(scoringNote([], { ...S, benchmark: 'VOO' }), /A US stock or fund: against VOO \(the one yardstick the desk's settings set for every call\), over the 5 trading days after the call\. A coin: against VOO too, over the 7 calendar days after the call\./);
 });

@@ -17,9 +17,9 @@ export const GLOSSARY = {
 
   call: { group: desk, term: "The desk's call", means: "its thirteen agents' rating, from Buy to Sell, on the day they analysed it." },
   depth: { group: desk, term: 'Depth', means: 'how long the debates in an analysis run: shallow (one round each, quick), medium (three) or deep (five, the slowest and costliest).' },
-  alpha: { group: desk, term: 'Alpha', means: "how far the stock beat (+) or trailed (−) its market's index in the trading days after a call. Above zero is good for a Buy or Overweight; below zero is good for an Underweight or Sell." },
+  alpha: { group: desk, term: 'Alpha', means: "how far the stock beat (+) or trailed (−) its yardstick (SPY as shipped) over a call's first week (5 trading days; a coin, 7 days), not its time horizon. Above zero is good for a Buy or Overweight; below zero for an Underweight or Sell." },
   paper: { group: desk, term: 'On paper', means: "followed with pretend money only, to see what the desk's calls would have done before any real money is at stake." },
-  scorecard: { group: desk, term: 'Scorecard', means: "the desk's record, good or bad: its paper money against SPY, the S&P 500 fund, and each rating's average alpha." },
+  scorecard: { group: desk, term: 'Scorecard', means: "the desk's record, good or bad: its paper money against SPY, the S&P 500 fund, and each rating's average alpha in its calls' first checks." },
   rerating: { group: desk, term: 'Re-rating', means: "it is on the waiting list, so the desk analyses it again and its view is fresh. Monday's morning routine re-rates the Agentic account's holdings whose view is a week old." },
   stop: { group: desk, term: 'Stop', means: "the price under which the desk's trader proposed selling, to limit a loss. The dashboard watches it against Yahoo Finance's price and tells you when the price falls below it. Nothing is ever sold by itself." },
 

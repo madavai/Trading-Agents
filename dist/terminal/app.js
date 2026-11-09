@@ -125,9 +125,9 @@
     "Needs review": { group: ratings, term: "Needs review", means: "the decision gave no rating that could be read, so it asks for no order." },
     call: { group: desk, term: "The desk's call", means: "its thirteen agents' rating, from Buy to Sell, on the day they analysed it." },
     depth: { group: desk, term: "Depth", means: "how long the debates in an analysis run: shallow (one round each, quick), medium (three) or deep (five, the slowest and costliest)." },
-    alpha: { group: desk, term: "Alpha", means: "how far the stock beat (+) or trailed (\u2212) its market's index in the trading days after a call. Above zero is good for a Buy or Overweight; below zero is good for an Underweight or Sell." },
+    alpha: { group: desk, term: "Alpha", means: "how far the stock beat (+) or trailed (\u2212) its yardstick (SPY as shipped) over a call's first week (5 trading days; a coin, 7 days), not its time horizon. Above zero is good for a Buy or Overweight; below zero for an Underweight or Sell." },
     paper: { group: desk, term: "On paper", means: "followed with pretend money only, to see what the desk's calls would have done before any real money is at stake." },
-    scorecard: { group: desk, term: "Scorecard", means: "the desk's record, good or bad: its paper money against SPY, the S&P 500 fund, and each rating's average alpha." },
+    scorecard: { group: desk, term: "Scorecard", means: "the desk's record, good or bad: its paper money against SPY, the S&P 500 fund, and each rating's average alpha in its calls' first checks." },
     rerating: { group: desk, term: "Re-rating", means: "it is on the waiting list, so the desk analyses it again and its view is fresh. Monday's morning routine re-rates the Agentic account's holdings whose view is a week old." },
     stop: { group: desk, term: "Stop", means: "the price under which the desk's trader proposed selling, to limit a loss. The dashboard watches it against Yahoo Finance's price and tells you when the price falls below it. Nothing is ever sold by itself." },
     stock: { group: markets, term: "Stock", means: "a small share of one company; its price moves with what people will pay for that company." },
@@ -183,20 +183,23 @@
   var ratingMeaning = (r) => isTerm(r) && GLOSSARY[r].group === GLOSSARY.Buy.group ? means(r) : "";
   var claimOf = (rating) => ratingTone(rating) === "ok" ? "beats" : ratingTone(rating) === "danger" ? "trails" : "";
   var article = (word) => /^[AEIOU]/i.test(word) ? "An" : "A";
-  function resultOf(c, days) {
-    const alpha = `alpha ${c.alpha ?? "\u2014"}`, claim = claimOf(c.rating);
+  var scoredOver = (c) => `${c.yardstick} over the ${c.window} after the call`;
+  var notHorizon = (c) => `It is ${c.check}, not the call's own time horizon.`;
+  function resultOf(c) {
+    const alpha = `alpha ${c.alpha ?? "\u2014"}`, claim = claimOf(c.rating), over = scoredOver(c);
+    const tail = ` ${notHorizon(c)}${c.why ? ` Against ${c.yardstick}: ${c.why}.` : ""}`;
     if (c.worked === null || !claim) {
-      return c.rating === "Hold" ? { tone: "", words: alpha, verdict: "a Hold claims no direction", why: `A Hold claims no direction, so it neither worked nor failed: its ${alpha} only says how the stock did against its market's index over the ${days} trading days after the call.` } : { tone: "", words: alpha, verdict: "", why: means("alpha") };
+      return c.rating === "Hold" ? { tone: "", words: alpha, verdict: "a Hold claims no direction", why: `A Hold claims no direction, so it neither worked nor failed: its ${alpha} only says how the stock did against ${over}.${tail}` } : { tone: "", words: alpha, verdict: "", why: `${means("alpha")}${tail}` };
     }
-    const how = `${article(c.rating)} ${c.rating} works when the stock ${claim} its market's index over the ${days} trading days after the call.`;
-    return c.worked ? { tone: "ok", words: `worked \xB7 ${alpha}`, verdict: "the call worked", why: `${how} It did (${alpha}): the call worked.` } : { tone: "danger", words: `did not work \xB7 ${alpha}`, verdict: "the call did not work", why: `${how} It did not (${alpha}): the call did not work.` };
+    const how = `${article(c.rating)} ${c.rating} works when the stock ${claim} ${over}.`;
+    return c.worked ? { tone: "ok", words: `worked \xB7 ${alpha}`, verdict: "the call worked", why: `${how} It did (${alpha}): the call worked.${tail}` } : { tone: "danger", words: `did not work \xB7 ${alpha}`, verdict: "the call did not work", why: `${how} It did not (${alpha}): the call did not work.${tail}` };
   }
   function averageOf(rating, s) {
     const shown = Math.round(s.meanAlpha * 1e3) / 10, by = `${Math.abs(shown).toFixed(1)}%`;
-    if (!s.direction) return { tone: "", why: `${article(rating)} ${rating} claims no direction: its average alpha only says how its stocks did against their index.` };
-    if (shown === 0) return { tone: "", why: `On average the stocks rated ${rating} ended level with their index.` };
+    if (!s.direction) return { tone: "", why: `${article(rating)} ${rating} claims no direction: its average alpha only says how its stocks did against their yardstick in each call's first check.` };
+    if (shown === 0) return { tone: "", why: `On average the stocks rated ${rating} ended level with their yardstick in each call's first check.` };
     const beat = shown > 0, good = shown > 0 === s.direction > 0;
-    return { tone: good ? "ta-up" : "ta-down", why: `On average the stocks rated ${rating} ${beat ? "beat" : "trailed"} their index by ${by}: on average these calls ${good ? "worked" : "did not work"}.` };
+    return { tone: good ? "ta-up" : "ta-down", why: `On average the stocks rated ${rating} ${beat ? "beat" : "trailed"} their yardstick by ${by} in each call's first check: on average these calls ${good ? "worked" : "did not work"} so far.` };
   }
   var NOTES = {
     coinOnPaper: "Robinhood's agent doorway trades stocks and funds, so a coin never gets an order ticket.",
@@ -1382,13 +1385,10 @@
     }
     renderHero();
   }
-  var holdDays = (c) => {
-    const m = /^(\d+)d$/.exec(c.holding ?? "");
-    return m ? Number(m[1]) : S.desk?.desk.holdingDays ?? 5;
-  };
+  var notYetWords = (c) => `Not scored yet. It will be scored against ${scoredOver(c)}: ${c.check}, not the call's own time horizon.${c.why ? ` Against ${c.yardstick}: ${c.why}.` : ""} It is scored when a scoring runs after those days (/settle, an analysis or a routine), not by itself.`;
   var resultChip = (c) => {
-    if (c.pending) return `<span class="at-chip" title="${esc(`Not scored yet: ${S.desk?.desk.holdingDays ?? 5} trading days after the call, its alpha is worked out.`)}">not scored yet</span>`;
-    const r = resultOf(c, holdDays(c));
+    if (c.pending) return `<span class="at-chip" title="${esc(notYetWords(c))}">not scored yet</span>`;
+    const r = resultOf(c);
     return `<span class="at-chip ${r.tone}" title="${esc(r.why)}">${esc(r.words)}</span>`;
   };
   var readButton = (ticker, date, words = "Read") => `<button class="at-btn at-press" data-act="open-call" data-symbol="${esc(ticker)}" data-date="${esc(date)}"><svg class="g"><use href="#i-file"/></svg><span>${esc(words)}</span></button>`;
@@ -1401,7 +1401,7 @@
     }
     const label = `<span class="ta-callbar-l">The desk's call</span>`;
     if (isIndex(sym)) {
-      el.innerHTML = `${label}<span class="at-quiet ta-callbar-t">The desk analyses stocks, not indices.</span>`;
+      el.innerHTML = `${label}<span class="at-quiet ta-callbar-t">The desk analyses stocks, not ${term("index", "indices")}.</span>`;
       return;
     }
     if (!c) {
@@ -1476,7 +1476,9 @@
       held = rows.length ? `<dl class="at-facts ruled at-box">${rows.join("")}</dl><p class="at-quiet">Valued at Robinhood's live price, read at ${esc(when(A.snapshot.at))}.</p>` : `<p class="at-quiet">Not held in the accounts you show.</p>`;
     }
     const calls = d.calls.filter((c) => c.ticker === sym);
-    const list = calls.length ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>Date</th><th>Rating</th><th>Result</th><th></th></tr></thead><tbody>${calls.map((c) => `<tr class="ta-go" data-act="open-call" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}"><td>${esc(dayText(c.date))}</td><td>${ratingChip(c.rating)}</td><td>${resultChip(c)}</td><td><span class="at-quiet">Read</span></td></tr>`).join("")}</tbody></table></div>` : `<p class="at-quiet">The desk has no call on ${esc(sym)} yet.</p>`;
+    const ways = new Set(calls.map((c) => `${c.check}|${scoredOver(c)}`));
+    const how = calls[0] ? ways.size === 1 ? `<p class="at-quiet">Each result is ${esc(calls[0].check)} against ${esc(scoredOver(calls[0]))}, not the call's own time horizon.${calls[0].why ? ` Against ${esc(calls[0].yardstick)}: ${esc(calls[0].why)}.` : ""}</p>` : `<p class="at-quiet">Each result is a short first check against its yardstick, not the call's own time horizon: point at a result for its window and yardstick.</p>` : "";
+    const list = calls.length ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>Date</th><th>Rating</th><th>Result</th><th></th></tr></thead><tbody>${calls.map((c) => `<tr class="ta-go" data-act="open-call" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}"><td>${esc(dayText(c.date))}</td><td>${ratingChip(c.rating)}</td><td>${resultChip(c)}</td><td><span class="at-quiet">Read</span></td></tr>`).join("")}</tbody></table></div>${how}` : `<p class="at-quiet">The desk has no call on ${esc(sym)} yet.</p>`;
     const latest = calls[0];
     const ag = A.snapshot?.views.find((v) => v.account.agentic);
     const mine = (ag?.orders?.orders ?? []).filter((o) => (o.symbol ?? "").toUpperCase() === sym);
@@ -1644,7 +1646,7 @@
   function renderCalls() {
     const d = S.desk;
     if (!d) return;
-    $("#callsSub").textContent = d.calls.length ? `${d.calls.length} recorded \xB7 each is scored ${d.desk.holdingDays} trading days later against ${fundWords(d.desk.benchmark)} for a US stock` : "Every analysis the team records appears here";
+    $("#callsSub").textContent = d.calls.length ? `${d.calls.length} recorded \xB7 ${d.desk.scoring}` : "Every analysis the team records appears here";
     const rows = d.calls.map((c) => `<tr class="ta-go" data-act="open-call" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}" title="Press to read the call in full">
     <td>${esc(dayText(c.date))}</td><td><b>${esc(c.ticker)}</b></td><td>${ratingChip(c.rating)}</td>
     <td><span class="at-row compact">${resultChip(c)}${paperChip(c.ticker, c.date)}</span></td>
@@ -1652,9 +1654,11 @@
     <td><span class="at-row compact ta-row-do">${readButton(c.ticker, c.date)}${decideButton(c)}</span></td></tr>`).join("");
     $("#callsTable").innerHTML = `<thead><tr><th>Date</th><th>Stock</th><th>Rating</th><th>Result</th><th class="wrap">In a few words</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="ta-empty">No calls yet. Ask the team to analyse a stock in Madav / Claude, and its call appears here.</td></tr>'}</tbody>`;
   }
-  var PAPER = { book: null, key: "", editing: false, failed: false };
+  var PAPER = { book: null, key: "", editing: false, failed: false, at: 0 };
+  var PAPER_RETRY_MS = 6e4;
+  var paperStale = () => (PAPER.failed || !!PAPER.book?.missing.length) && Date.now() - PAPER.at > PAPER_RETRY_MS;
   var tradeOf = (ticker, date) => PAPER.book?.trades.find((t) => t.ticker === ticker && t.callDate === date);
-  var PAPER_WORDS = { filled: "paper", none: "paper: no order", waiting: "paper: next close", unavailable: "paper: prices unavailable", skipped: "not on paper" };
+  var PAPER_WORDS = { filled: "paper", none: "paper: no order", waiting: "paper: next close", unavailable: "paper: prices unavailable", skipped: "not on paper", withheld: "paper: not worked out" };
   function paperChip(ticker, date) {
     const t = tradeOf(ticker, date);
     if (!t) return "";
@@ -1668,6 +1672,7 @@
     return `<span class="at-chip" title="${esc(reason)}">${esc(PAPER_WORDS[t.status])}</span>`;
   }
   async function loadPaper() {
+    PAPER.at = Date.now();
     try {
       PAPER.book = await api.paper();
       PAPER.failed = false;
@@ -1687,12 +1692,13 @@
     let lede;
     if (!d.paper.since) lede = "No calls yet: the paper record starts with the desk's first call on a stock, a fund, Bitcoin or Ether.";
     else if (!b) lede = PAPER.failed ? "The paper record could not be worked out just now: Yahoo Finance did not answer. It tries again in a moment." : "Working out the paper record from the closing prices.";
-    else if (b.series.length < 2 || b.returnPct === null) lede = `Following the desk on paper since ${dayText(b.since ?? d.paper.since)}: nothing has filled yet. A call fills at the first closing price after its day.`;
+    else if (b.missing.length) lede = `The paper record cannot be worked out just now: the closing prices of ${listWords(b.missing)} could not be read from Yahoo Finance, and every order on paper is sized from the whole paper account, so no total is shown rather than one that leaves ${b.missing.length === 1 ? "it" : "them"} out. It tries again in a moment.`;
+    else if (b.series.length < 2 || b.returnPct === null || b.value === null) lede = `Following the desk on paper since ${dayText(b.since ?? d.paper.since)}: nothing has filled yet. A call fills at the first closing price after its day.`;
     else lede = `Following the desk on paper since ${dayText(b.since ?? d.paper.since)}: ${pct(b.returnPct * 100)} (${money(b.value)} from ${money(b.startUsd)}), ${fundWords(b.benchmark)} ${b.benchmarkPct === null ? "unavailable" : pct(b.benchmarkPct * 100)} over the same days.`;
-    const paidIn = b && b.dividendsUsd > 0 ? ` Dividends paid into paper cash so far: ${esc(money(b.dividendsUsd))}.` : "";
-    const held = b?.positions.length ? `<p class="at-quiet">${term("position", "Positions")} on paper now: ${b.positions.map((p) => `${esc(p.ticker)} ${p.quantity}`).join(", ")}, and ${esc(money(b.cash))} in cash.${paidIn}</p>` : paidIn ? `<p class="at-quiet">${paidIn.trim()}</p>` : "";
+    const paidIn = b && b.dividendsUsd !== null && b.dividendsUsd > 0 ? ` Dividends paid into paper cash so far: ${esc(money(b.dividendsUsd))}.` : "";
+    const held = b?.positions.length && b.cash !== null ? `<p class="at-quiet">${term("position", "Positions")} on paper now: ${b.positions.map((p) => `${esc(p.ticker)} ${p.quantity}`).join(", ")}, and ${esc(money(b.cash))} in cash.${paidIn}</p>` : paidIn ? `<p class="at-quiet">${paidIn.trim()}</p>` : "";
     $("#paperCard").innerHTML = `<div class="at-card-head"><h3>Your ${term("paper", "paper")} record</h3><span class="at-chip">${esc(weeksWords(d.paper))} of record</span></div>
-    <p class="at-lede">${esc(lede)}</p>${b && b.series.length > 1 ? `<div class="ta-spark-tall" id="paperChart"></div><p class="at-quiet">The solid line is the paper money; the dashed one is ${esc(b.benchmark)}${b.benchmark === "SPY" ? `, the fund that copies the ${term("sp500", "S&P 500")},` : ""} from the same start, each paid its dividends in cash.</p>` : ""}${held}
+    <p class="at-lede">${esc(lede)}</p>${b && !b.missing.length && b.series.length > 1 ? `<div class="ta-spark-tall" id="paperChart"></div><p class="at-quiet">The solid line is the paper money; the dashed one is ${esc(b.benchmark)}${b.benchmark === "SPY" ? `, the fund that copies the ${term("sp500", "S&P 500")},` : ""} from the same start, each paid its dividends in cash.</p>` : ""}${held}
     <p class="at-honest">Every call on a stock, a fund, Bitcoin or Ether is followed as its order ticket would size it, and fills at the first closing price after its day, as the market printed it. Each dividend is paid into paper cash on its ex-dividend day, as an account would receive it. Crypto is bought in fractions within your crypto limit, on paper only: Robinhood's agent doorway trades stocks and funds. No costs are counted (Robinhood charges no commission). A few weeks of record are noise, not proof, and nothing here is investment advice.</p>`;
     const el = document.getElementById("paperChart");
     if (el && b) paperChart(el, b.series);
@@ -1704,12 +1710,12 @@
     const r = d.record.summary, pctOf = (v) => pct(v * 100, 1);
     $("#scoreSub").textContent = `${r.resolved} scored \xB7 ${r.pending} waiting${r.unscored ? ` \xB7 ${r.unscored} unreadable` : ""}`;
     const names = [...RATINGS.filter((x) => r.byRating[x]), ...Object.keys(r.byRating).filter((x) => !RATINGS.includes(x))];
-    const grid = names.length ? `<div class="ta-score"><span class="head">Rating</span><span class="head">Calls</span><span class="head">Called the direction</span><span class="head">Average ${term("alpha", "alpha")} vs the ${term("index", "index")}</span>${names.map((n) => {
+    const grid = names.length ? `<div class="ta-score"><span class="head">Rating</span><span class="head">Calls</span><span class="head">Called the direction</span><span class="head">Average ${term("alpha", "alpha")} vs the yardstick</span>${names.map((n) => {
       const s = r.byRating[n], avg = averageOf(n, s);
       return `${ratingChip(n)}<b>${s.count}</b><b>${s.hitRate === null ? "\u2014" : `${Math.round(s.hitRate * 100)}%`}</b><b class="${avg.tone}" title="${esc(avg.why)}">${pctOf(s.meanAlpha)}</b>`;
-    }).join("")}</div>` : '<p class="at-quiet">Nothing has been scored yet. A call is scored once its window has traded; run /settle in Madav to score the ones that are ready.</p>';
+    }).join("")}</div>` : '<p class="at-quiet">Nothing has been scored yet. A call is scored once its window has passed and a scoring runs (/settle, an analysis or a routine), not by itself.</p>';
     const few = r.resolved > 0 && r.resolved < 30 ? " With so few scored calls these figures are noise, not a record." : "";
-    const key2 = names.length ? " Green means the calls went the way their rating said, red that they went against it: a Buy or Overweight works when its stock beats the index, an Underweight or Sell when its stock trails it. A Hold claims no direction, so it stays plain." : "";
+    const key2 = names.length ? " Green means the calls went the way their rating said in their first check, red that they went against it: a Buy or Overweight works when its stock beats its yardstick, an Underweight or Sell when its stock trails it. A Hold claims no direction, so it stays plain." : "";
     $("#score").innerHTML = `${grid}<p class="at-honest">${esc(d.record.benchmarkNote)}${esc(key2)}${esc(few)}</p>`;
   }
   var ROLE = {
@@ -1759,8 +1765,9 @@
     const rating = meta?.rating ?? (labelled(c.decision, "Rating") || "\u2014");
     const target = labelled(c.decision, "Price Target"), horizon = labelled(c.decision, "Time Horizon");
     const clip = (s, n = 150) => s.length > n ? `${s.slice(0, n - 1).trimEnd()}\u2026` : s;
-    const verdict = meta && !meta.pending ? resultOf(meta, holdDays(meta)).verdict : "";
-    const facts = [["Price target", target], ["Time horizon", horizon], ["Scored", meta ? meta.pending ? `not yet: ${S.desk?.desk.holdingDays ?? 5} trading days after the call` : `alpha ${meta.alpha ?? "\u2014"} against the index${verdict ? `: ${verdict}` : ""}` : ""]].filter(([, v]) => v).map(([k, v]) => `<div><dt>${esc(k)}</dt><dd title="${esc(v)}">${esc(clip(v))}</dd></div>`).join("");
+    const verdict = meta && !meta.pending ? resultOf(meta).verdict : "";
+    const scored = !meta ? "" : meta.pending ? `not yet: ${meta.check} against ${scoredOver(meta)}, not the call's own time horizon, once a scoring runs after them.` : `alpha ${meta.alpha ?? "\u2014"} against ${scoredOver(meta)}${verdict ? `: ${verdict}` : ""}. ${notHorizon(meta)}`;
+    const facts = [["Price target", target], ["Time horizon", horizon], ["Scored", scored]].filter(([, v]) => v).map(([k, v]) => `<div><dt>${esc(k)}</dt><dd title="${esc(v)}">${esc(k === "Scored" ? v : clip(v))}</dd></div>`).join("");
     const shown = new Set(STAGES.flatMap((s) => s.keys)), extra = Object.keys(c.sections).filter((k) => k !== "decision" && !shown.has(k) && c.sections[k]?.length);
     const stages = STAGES.map((s) => ({ ...s, keys: s.keys.filter((k) => c.sections[k]?.length) })).filter((s) => s.keys.length);
     dlg.innerHTML = `<div class="ta-pophead"><div class="ta-pop-id"><h2>${esc(symbol)}</h2><span class="at-quiet">${esc(nameOf(symbol))} \xB7 the desk's call of ${esc(dayText(date))}</span></div><button class="icon-btn" data-act="close-dialog" aria-label="Close"><svg class="g"><use href="#i-x"/></svg></button></div>
@@ -2554,7 +2561,7 @@
       if (v.version !== seen || S.lost) {
         seen = v.version;
         await refreshState();
-      }
+      } else if (S.desk?.paper.since && paperStale()) void loadPaper();
     } catch {
       S.lost = true;
       renderSub();
