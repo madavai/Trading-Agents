@@ -7,18 +7,20 @@
 // the same call sent again after that with no call settled since answers STOP. A scoring started an hour after
 // record_outcome was last used starts afresh, and tries the calls left again.
 import { Journal, type Entry } from './journal.js';
-import { checkName, COIN_YARDSTICK_WORDS, legacyRules, measure, windowWords, type Outcome, type Rules, type Scoring } from './scoring.js';
+import { basisWords, checkName, COIN_YARDSTICK_WORDS, legacyRules, measure, OWN_RETURN_WORDS, ownReturn, windowWords, type Outcome, type Rules, type Scoring } from './scoring.js';
 import { failureText } from '../data/http.js';
 import { signedPct as pct } from '../numbers.js';
 import { windowRows } from './window.js';
-import { REFUSALS_TO_LEAVE, countRefusal, leftIn, noteStep, readNotes } from './loop-notes.js';
+import { REFUSALS_TO_LEAVE, countRefusal, keyOf, leftIn, listedUnrowed, noteRows, noteStep, readNotes } from './loop-notes.js';
 
-const line = (o: Outcome, e: Entry) => `${e.ticker} ${pct(o.raw)} from ${o.entry} to ${o.exit} (${windowWords({ days: o.holdingDays, unit: o.unit })}); ${o.benchmark} ${pct(o.benchmarkReturn)}${o.unit === 'calendar' ? ` (its close of ${o.benchFrom} to its close of ${o.benchTo})` : ''}; alpha ${pct(o.alpha)}`;
+const line = (o: Outcome, e: Entry) => `${e.ticker} ${pct(o.raw)} from ${o.entry} to ${o.exit} (${windowWords({ days: o.holdingDays, unit: o.unit })}); ${o.own
+  ? `scored on its own return, not against ${o.benchmark}: score ${pct(o.alpha)}`
+  : `${o.benchmark} ${pct(o.benchmarkReturn)}${o.unit === 'calendar' ? ` (its close of ${o.benchFrom} to its close of ${o.benchTo})` : ''}; alpha ${pct(o.alpha)}`}`;
 /** The rules a pending call is scored by: those kept with it, or for a call recorded before the desk kept them, the rules
  *  it was made under. */
 export const rulesOf = (e: Entry, scoring: Scoring): Rules => e.rules ?? legacyRules(e.ticker, scoring, e.holding);
 /** What a ready call's score is, said beside it for the lesson writer: a first check, not the call's horizon. */
-const scoreIs = (o: Outcome, r: Rules) => `THIS SCORE IS ${checkName(r).toUpperCase()}: the ${windowWords(r)} after the call against ${o.benchmark}, not the call's own time horizon (its decision states that). Say in the lesson how much a window this short can show about the thesis.${r.unit === 'calendar' ? ` ${COIN_YARDSTICK_WORDS}` : ''}`;
+const scoreIs = (o: Outcome, r: Rules, ticker: string) => `THIS SCORE IS ${checkName(r).toUpperCase()}: the ${windowWords(r)} after the call ${o.own ? `on its own return (${basisWords(ticker, r)}). ${OWN_RETURN_WORDS} It is` : `against ${o.benchmark},`} not the call's own time horizon (its decision states that). Say in the lesson how much a window this short can show about the thesis.${r.unit === 'calendar' && !o.own ? ` ${COIN_YARDSTICK_WORDS}` : ''}`;
 export const MAX_REFLECTION = 1200;
 /** A lesson is 2 to 4 sentences (the /settle and /recheck-lessons rule); the desk refuses more. */
 export const MAX_SENTENCES = 4;
@@ -67,21 +69,23 @@ export function lessonRefusal(text: string): string | null {
   return null;
 }
 
-/** The window's rows, or why they could not be had - in which case the lesson may say nothing about any day. */
-async function windowText(ticker: string, o: Outcome): Promise<string> {
-  try { return await windowRows(ticker, o); }
-  catch (err) { return `WHAT HAPPENED IN THE WINDOW: ${failureText(err, `the day-by-day rows of ${ticker}'s window`)} Write the lesson from the outcome line alone, and say nothing about what happened on any day of the window.`; }
+/** The window's rows, or why they could not be had - in which case the lesson may say nothing about any day (and is kept
+ *  as written without them, `noteRows`). */
+async function windowText(ticker: string, o: Outcome): Promise<{ text: string; rows: boolean }> {
+  try { return { text: await windowRows(ticker, o), rows: true }; }
+  catch (err) { return { text: `WHAT HAPPENED IN THE WINDOW: ${failureText(err, `the day-by-day rows of ${ticker}'s window`)} Write the lesson from the outcome line alone, and say nothing about what happened on any day of the window.`, rows: false }; }
 }
 
 /** The true words about when a call left now is scored. */
 const LATER = 'A later scoring, started an hour or more after record_outcome was last used, tries it again.';
 
 /** Every pending call (of one stock, if named), with its outcome when the window has finished. A call this scoring left
- *  after two refusals is named, not shown. Reads the scoring's notes and writes nothing. */
+ *  after two refusals is named, not shown. Reads the scoring's notes, and writes to them only to note a call shown
+ *  without its window's rows (or shown with them again after that). */
 export async function dueSettlements(journal: Journal, scoring: Scoring, ticker?: string, now: number = Date.now()): Promise<string> {
   const pending = journal.pending().filter((e) => !ticker || e.ticker === ticker);
   if (!pending.length) return ticker ? `No pending calls on ${ticker}.` : 'No pending calls: every call in the journal is settled.';
-  const notes = readNotes(journal, SCORING, now), out: string[] = [];
+  const notes = readNotes(journal, SCORING, now), out: string[] = [], rows = { without: [] as string[], with: [] as string[] };
   let ready = 0, left = 0;
   for (const e of pending) {
     const head = `[${e.date} | ${e.ticker} | ${e.rating}]`;
@@ -93,13 +97,16 @@ export async function dueSettlements(journal: Journal, scoring: Scoring, ticker?
     }
     try {
       const r = rulesOf(e, scoring), o = await measure(e.ticker, e.date, r);
-      if (!o) { out.push(`${head} NOT YET: its window, the ${windowWords(r)} after ${e.date} (against ${r.yardstick}), has not finished. Leave it pending.`); continue; }
+      if (!o) { out.push(`${head} NOT YET: its window, the ${windowWords(r)} after ${e.date} (${ownReturn(r) ? 'on its own return' : `against ${r.yardstick}`}), has not finished. Leave it pending.`); continue; }
       ready++;
-      out.push(`${head} READY: ${line(o, e)}\n${scoreIs(o, r)}\nDECISION:\n${e.decision}\n\n${await windowText(e.ticker, o)}`);
+      const w = await windowText(e.ticker, o);
+      rows[w.rows ? 'with' : 'without'].push(keyOf(e.ticker, e.date));
+      out.push(`${head} READY: ${line(o, e)}\n${scoreIs(o, r, e.ticker)}\nDECISION:\n${e.decision}\n\n${w.text}`);
     } catch (err) {
       out.push(`${head} ${failureText(err, `prices to settle ${e.ticker} on ${e.date}`)} Leave it pending.`);
     }
   }
+  noteRows(journal, SCORING, rows, now);
   return [`${pending.length} pending call(s), ${ready} ready to settle${left ? `, ${left} left in this scoring after ${REFUSALS_TO_LEAVE} failed tries` : ''}. Settle a ready one with record_outcome, using only the figures shown here. Before writing about a level, stop, target or trigger the decision named, find it in that call's window rows: say what happened only as a row shows it, naming its date.`, '', ...out].join('\n\n');
 }
 
@@ -110,7 +117,7 @@ export async function dueSettlements(journal: Journal, scoring: Scoring, ticker?
 export async function settleOne(journal: Journal, scoring: Scoring, ticker: string, date: string, reflection: string, now: number = Date.now()): Promise<string> {
   const pending = journal.pending().some((x) => x.ticker === ticker && x.date === date);
   let answer: string;
-  try { answer = await settleOnce(journal, scoring, ticker, date, reflection); } catch (err) {
+  try { answer = await settleOnce(journal, scoring, ticker, date, reflection, now); } catch (err) {
     if (!(err instanceof Error) || !pending) { noteStep(journal, SCORING, now); throw err; }
     const { n, answer: count } = countRefusal(journal, SCORING, ticker, date, err.message, now);
     if (count === 'again') throw err;
@@ -122,15 +129,17 @@ export async function settleOne(journal: Journal, scoring: Scoring, ticker: stri
 }
 
 /** Settles one call: measures it again (so the figures cannot be an agent's), then keeps outcome and lesson. The lesson is
- *  marked by whether the window's rows - the ones list_settlements showed - can be had now: if not, it is re-checked later. */
-async function settleOnce(journal: Journal, scoring: Scoring, ticker: string, date: string, reflection: string): Promise<string> {
+ *  marked as written from the window's rows only when list_settlements did not show the call without them in this
+ *  scoring and they can be had now: if not, it is re-checked later. */
+async function settleOnce(journal: Journal, scoring: Scoring, ticker: string, date: string, reflection: string, now: number): Promise<string> {
   const text = reflection.trim(), refused = lessonRefusal(text);
   if (refused) throw new Error(refused);
   const e = journal.pending().find((x) => x.ticker === ticker && x.date === date);
   if (!e) throw new Error(`there is no pending call on ${ticker} for ${date}`);
   const r = rulesOf(e, scoring), o = await measure(ticker, date, r);
   if (!o) return `NOT_YET: its window, the ${windowWords(r)} after ${date}, has not finished, so ${ticker} stays pending.`;
-  const from = await windowRows(ticker, o).then(() => 'prices' as const, () => 'no-prices' as const);
+  const from = listedUnrowed(readNotes(journal, SCORING, now), ticker, date) ? 'no-prices' as const
+    : await windowRows(ticker, o).then(() => 'prices' as const, () => 'no-prices' as const);
   return journal.recordOutcome(ticker, date, o.raw, o.alpha, o.holdingDays, text, o.exit, from)
     ? `Settled: ${line(o, e)}. The lesson is kept and will be read by later analyses from ${o.exit} on.`
     : `${ticker} on ${date} was settled by another run already.`;

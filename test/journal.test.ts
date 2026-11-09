@@ -18,11 +18,12 @@ test('a stored call is a pending entry with its rating read from the decision', 
   assert.match(fs.readFileSync(j.file, 'utf8'), /^\[2026-09-01 \| NVDA \| Buy \| pending\]\n\nDECISION:\n\*\*Rating\*\*: Buy/);
 });
 
-test('an unreadable decision is tagged Needs review, never a tradeable Hold; a stated rating wins', () => {
+test('an unreadable decision is tagged Needs review, never a tradeable Hold, even with a rating passed beside it', () => {
   const { j } = tmp();
   j.storeDecision('AAA', '2026-09-01', 'I cannot decide.');
-  j.storeDecision('BBB', '2026-09-01', 'Consensus is split.', 'Sell');
-  assert.deepEqual(j.load().map((e) => e.rating), ['Needs review', 'Sell']);
+  j.storeDecision('BBB', '2026-09-01', 'Consensus is split.', 'Sell');   // the words state no rating: the journal does not invent one (audit 3, scoring-6)
+  j.storeDecision('CCC', '2026-09-01', '**Rating**: Sell\n\nExit.', 'Sell');
+  assert.deepEqual(j.load().map((e) => e.rating), ['Needs review', 'Needs review', 'Sell']);
 });
 
 test('one entry per stock and day, before and after it settles', () => {

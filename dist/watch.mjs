@@ -95,6 +95,10 @@ import path5 from "node:path";
 var FOREX = /* @__PURE__ */ new Set(["USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD", "CNY", "CNH", "HKD", "SGD", "SEK", "NOK", "DKK", "PLN", "MXN", "ZAR", "TRY", "INR", "KRW", "BRL", "RUB", "THB"]);
 var CRYPTO_BASES = /* @__PURE__ */ new Set(["BTC", "ETH", "SOL", "XRP", "ADA", "DOGE", "LTC", "BCH", "DOT", "AVAX", "LINK"]);
 var CRYPTO_QUOTES = ["USDT", "USDC", "USD"];
+var NOT_COINS = /* @__PURE__ */ new Set([...FOREX, "XAU", "XAG", "XPT", "XPD"]);
+var COIN_PAIR = /^([A-Z0-9]{1,15})-(USDT|USDC|USD)$/;
+var SHARE_CLASS = /^([A-Z]{1,5})\.([A-Z])$/;
+var ONE_LETTER_EXCHANGES = /* @__PURE__ */ new Set(["T", "L", "V", "F"]);
 var ALIASES = {
   XAUUSD: "GC=F",
   XAU: "GC=F",
@@ -106,7 +110,6 @@ var ALIASES = {
   XPDUSD: "PA=F",
   WTICOUSD: "CL=F",
   USOIL: "CL=F",
-  WTI: "CL=F",
   BCOUSD: "BZ=F",
   UKOIL: "BZ=F",
   BRENT: "BZ=F",
@@ -134,7 +137,10 @@ var ALIASES = {
   HK50: "^HSI"
 };
 function cryptoBase(raw) {
-  const compact = raw.trim().toUpperCase().replace(/\+$/, "").replaceAll("-", "");
+  const s = raw.trim().toUpperCase().replace(/\+$/, "");
+  const pair = COIN_PAIR.exec(s);
+  if (pair) return /[A-Z]/.test(pair[1]) && !NOT_COINS.has(pair[1]) ? pair[1] : null;
+  const compact = s.replaceAll("-", "");
   for (const q of CRYPTO_QUOTES) {
     if (compact.endsWith(q)) {
       const base = compact.slice(0, -q.length);
@@ -143,6 +149,10 @@ function cryptoBase(raw) {
   }
   return null;
 }
+var yahooClass = (s) => {
+  const m = SHARE_CLASS.exec(s);
+  return m && !ONE_LETTER_EXCHANGES.has(m[2]) ? `${m[1]}-${m[2]}` : s;
+};
 function normalizeSymbol(raw) {
   const s = raw.trim().toUpperCase().replace(/\+$/, "");
   if (!s) return s;
@@ -154,7 +164,7 @@ function normalizeSymbol(raw) {
   if (hk) return `${String(Number(hk[1])).padStart(4, "0")}.HK`;
   const sh = /^(\d{6})\.SH$/.exec(s);
   if (sh) return `${sh[1]}.SS`;
-  return s;
+  return yahooClass(s);
 }
 var isCrypto = (raw) => cryptoBase(raw) !== null;
 function safeSymbol(raw) {
@@ -249,6 +259,17 @@ function signed(v, digits) {
 var signedPct = (fraction, digits = 1) => `${signed(fraction * 100, digits)}%`;
 var unsignZero = (text) => text.replace(/^[+\-−](0(?:\.0+)?%)$/, "$1");
 
+// src/check/probes.ts
+var MAX_BYTES = 64 * 1024;
+
+// src/data/http.ts
+var MINUTE = 6e4;
+function keepFor(url) {
+  const u = new URL(url);
+  if (/(^|\.)sec\.gov$/.test(u.hostname)) return /^\/submissions\//.test(u.pathname) ? 60 * MINUTE : 24 * 60 * MINUTE;
+  return /fred/.test(u.hostname) ? 60 * MINUTE : 5 * MINUTE;
+}
+
 // src/data/holidays.ts
 var HOLIDAYS = {
   2026: [
@@ -290,17 +311,6 @@ var HOLIDAYS = {
 };
 var NAMES = new Map(Object.values(HOLIDAYS).flat().map(([day2, name]) => [day2, name]));
 
-// src/check/probes.ts
-var MAX_BYTES = 64 * 1024;
-
-// src/data/http.ts
-var MINUTE = 6e4;
-function keepFor(url) {
-  const u = new URL(url);
-  if (/(^|\.)sec\.gov$/.test(u.hostname)) return /^\/submissions\//.test(u.pathname) ? 60 * MINUTE : 24 * 60 * MINUTE;
-  return /fred/.test(u.hostname) ? 60 * MINUTE : 5 * MINUTE;
-}
-
 // src/data/yahoo.ts
 var HOSTS = ["https://query1.finance.yahoo.com", "https://query2.finance.yahoo.com"];
 var KEEP_MS = keepFor(`${HOSTS[0]}/v8/finance/chart/`);
@@ -317,6 +327,7 @@ function yardstickFor(ticker, s) {
   if (suffix) return { yardstick: normalizeSymbol(s.benchmarks[suffix]), basis: "market" };
   return { yardstick: normalizeSymbol(s.benchmarks[""] ?? "SPY"), basis: isCrypto(sym) ? "coin" : exchangeOf(sym) ? "unlisted" : "us" };
 }
+var ownReturn = (r) => r.basis === "same";
 function legacyRules(ticker, s, holding) {
   const kept = Number(/^(\d+)d$/.exec(holding ?? "")?.[1]);
   return { days: kept > 0 ? kept : s.holdingPeriodDays, unit: isCrypto(ticker) ? "calendar" : "trading", ...yardstickFor(ticker, s) };
@@ -330,6 +341,7 @@ var UNCHECKED = ["unmarked", "no-prices", "unreliable", "flagged"];
 var WITHHELD = ["unreliable", "flagged"];
 var SEPARATOR = "\n\n<!-- ENTRY_END -->\n\n";
 var MARK = /<!--\s*ENTRY_END\s*-->/i;
+var SPLIT = /\s*<!--\s*ENTRY_END\s*-->\s*/i;
 function keep(text) {
   let s = text;
   while (MARK.test(s)) s = s.replace(MARK, "");
@@ -343,7 +355,9 @@ function lessonOf(fields, pending) {
 }
 var DATE = /^\d{4}-\d{2}-\d{2}$/;
 var TICKER = /^[A-Za-z0-9.\-=^]{1,20}$/;
-var BASES = ["us", "coin", "unlisted", "market", "chosen"];
+var BASES = ["us", "coin", "unlisted", "market", "chosen", "same"];
+var RECORDED = /^recorded:(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z)$/;
+var recordedIn = (fields) => fields.map((x) => RECORDED.exec(x)?.[1]).find(Boolean) ?? null;
 var WINDOW = /^window:(\d{1,3}) (trading|calendar) days?$/;
 var YARDSTICK = /^yardstick:([A-Za-z0-9.\-=^]{1,20}) \(([a-z]+)\)$/;
 var rulesFields = (r) => [`window:${windowWords(r)}`, `yardstick:${r.yardstick} (${r.basis})`];
@@ -375,7 +389,7 @@ function parse(block) {
   const firstLesson = /(?:^|\n)FIRST LESSON:\n([\s\S]*)$/.exec(body)?.[1]?.trim() ?? "";
   const resolved = f.slice(6).find((x) => x.startsWith("resolved:"))?.slice("resolved:".length).trim() ?? null;
   const pending = f[3] === "pending", score = (s) => s === void 0 ? null : unsignZero(s);
-  return { date: f[0], ticker: f[1], rating: f[2], pending, raw: pending ? null : score(f[3]), alpha: pending ? null : score(f[4]), holding: pending ? null : f[5] ?? null, resolved, decision, reflection, ...lessonOf(f.slice(6), pending), lessonCheck, earlier, firstLesson, rules: rulesIn(f.slice(4)) };
+  return { date: f[0], ticker: f[1], rating: f[2], pending, raw: pending ? null : score(f[3]), alpha: pending ? null : score(f[4]), holding: pending ? null : f[5] ?? null, resolved, decision, reflection, ...lessonOf(f.slice(6), pending), lessonCheck, earlier, firstLesson, rules: rulesIn(f.slice(4)), recorded: recordedIn(f.slice(4)) };
 }
 var lessonPart = (p) => [keep(p.lesson), ...[["LESSON CHECK", p.check], ["EARLIER CORRECTIONS", p.earlier], ["FIRST LESSON", p.first]].filter(([, words2]) => words2?.trim()).map(([head, words2]) => `${head}:
 ${keep(words2)}`)].join("\n\n");
@@ -403,19 +417,23 @@ var Journal = class {
   }
   file;
   maxResolved;
+  /** The file's own line ends, as last read: written back the same way. */
+  eol = "\n";
   read() {
     try {
-      return fs3.readFileSync(this.file, "utf8");
+      const t = fs3.readFileSync(this.file, "utf8");
+      this.eol = t.includes("\r\n") ? "\r\n" : "\n";
+      return t.replace(/\r\n/g, "\n");
     } catch {
       return "";
     }
   }
   write(text) {
     fs3.mkdirSync(path3.dirname(this.file), { recursive: true });
-    writeWhole(this.file, text);
+    writeWhole(this.file, this.eol === "\n" ? text : text.replace(/\n/g, this.eol));
   }
   blocks() {
-    return this.read().split(SEPARATOR).filter((b) => b.trim());
+    return this.read().split(SPLIT).filter((b) => b.trim());
   }
   load() {
     return this.blocks().map(parse).filter((e) => e !== null);
@@ -424,17 +442,23 @@ var Journal = class {
     return this.load().filter((e) => e.pending);
   }
   /** Adds a pending entry, with the window and yardstick it will be scored by when they are given (every call the desk
-   *  records now). One entry per stock and day, settled or not: a re-run must not count the same call twice. */
-  storeDecision(ticker, date, decision, rating, rules) {
+   *  records now), and when it was recorded (`at`, which record_decision gives). The rating kept is the one the decision
+   *  states: a `rating` passed that differs from it is refused, and a decision that states none is Needs review. One
+   *  entry per stock and day, settled or not: a re-run must not count the same call twice. */
+  storeDecision(ticker, date, decision, rating, rules, at) {
     checkTag(ticker, date);
     if (rules) checkRules(rules);
+    const stated = parseRating(decision);
+    if (rating && RATINGS.includes(rating) && stated !== REVIEW && rating !== stated) throw new Error(`the decision states ${stated}, not ${rating}: the journal keeps the rating the decision's words give. Correct the decision, or pass ${stated}`);
     fs3.mkdirSync(path3.dirname(this.file), { recursive: true });
     return withLock(this.file, () => {
       if (this.load().some((e) => e.date === date && e.ticker === ticker)) return "exists";
-      const r = rating && RATINGS.includes(rating) ? rating : parseRating(decision);
-      const old = this.read();
-      const kept = rules ? rulesFields(rules).map((x) => ` | ${x}`).join("") : "";
-      this.write(`${old}${old && !old.endsWith(SEPARATOR) ? SEPARATOR : ""}[${date} | ${ticker} | ${r} | pending${kept}]
+      const old = this.read().replace(/\s+$/, "");
+      const kept = [...rules ? rulesFields(rules) : [], ...at ? [`recorded:${at.toISOString().slice(0, 16)}Z`] : []].map((x) => ` | ${x}`).join("");
+      const before = !old ? "" : /<!--\s*ENTRY_END\s*-->$/i.test(old) ? `${old}
+
+` : `${old}${SEPARATOR}`;
+      this.write(`${before}[${date} | ${ticker} | ${stated} | pending${kept}]
 
 DECISION:
 ${keep(decision)}${SEPARATOR}`);
@@ -451,7 +475,7 @@ ${keep(decision)}${SEPARATOR}`);
         const e = parse(block);
         if (done || !e || !e.pending || e.date !== date || e.ticker !== ticker) return block;
         done = true;
-        const kept = e.rules ? rulesFields(e.rules).map((x) => ` | ${x}`).join("") : "";
+        const kept = [...e.rules ? rulesFields(e.rules) : [], ...e.recorded ? [`recorded:${e.recorded}`] : []].map((x) => ` | ${x}`).join("");
         return `[${date} | ${ticker} | ${e.rating} | ${signedPct(raw)} | ${signedPct(alpha)} | ${holdingDays}d | resolved:${resolution}${kept}${from ? ` | lesson:${from}` : ""}]
 
 DECISION:
@@ -567,7 +591,7 @@ Its check before then: ${e.lessonCheck}` : ""}`, earlier: e.earlier, first: e.fi
     if (!same.length && !other.length) return "";
     const over = (e) => {
       const r = e.rules ?? (o.scoring ? legacyRules(e.ticker, o.scoring, e.holding) : null);
-      return r ? `${checkName(r)}: against ${r.yardstick} over the ${windowWords(r)} after the call, not the call's own time horizon` : `over ${e.holding ?? "n/a"}`;
+      return r ? `${checkName(r)}: ${ownReturn(r) ? `on its own return (${r.yardstick} is its own yardstick or copies the same index), so its alpha is its return,` : `against ${r.yardstick}`} over the ${windowWords(r)} after the call, not the call's own time horizon` : `over ${e.holding ?? "n/a"}`;
     };
     const head = (e) => `[${e.date} | ${e.ticker} | ${e.rating} | return ${e.raw ?? "n/a"} | alpha ${e.alpha ?? "n/a"} | ${over(e)}]`;
     const full = (e) => [

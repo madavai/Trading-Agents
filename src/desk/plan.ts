@@ -13,7 +13,7 @@ import { journalIn, workspaceOf, type Workspace } from './workspace.js';
 import { BACKTEST_HOLDINGS, readHoldings, renderHoldings } from './holdings.js';
 import { deleteRun, progress, saveContext, savedPlan, startRun, type RunContext, type Section } from './runs.js';
 import { DEPTHS, readQueue } from './queue.js';
-import { checkName, rulesFor, windowWords, yardstickWords, type Rules } from './scoring.js';
+import { againstWords, checkName, rulesFor, windowWords, type Rules } from './scoring.js';
 
 export class NeedsEmail extends Error { override name = 'NeedsEmail'; }
 
@@ -131,7 +131,7 @@ export function buildPlan(root: string, req: PlanRequest, ws: Workspace = worksp
 
 /** What the call will be scored over and against, for the plan and the report's head: its first check, not its horizon. */
 export const scoredWords = (p: Pick<Plan, 'symbol' | 'window' | 'holdingDays' | 'benchmark'>): string => p.window
-  ? `${checkName(p.window)} against ${yardstickWords(p.symbol, p.window)}, over the ${windowWords(p.window)} after the call, once a scoring runs after them. It is not the call's own time horizon.`
+  ? `${checkName(p.window)} ${againstWords(p.symbol, p.window)}, over the ${windowWords(p.window)} after the call, once a scoring runs after them. It is not the call's own time horizon.`
   : `after ${p.holdingDays} trading days against ${p.benchmark}`;
 
 export function renderPlan({ plan: p, holdings, lessons, resumed }: ReturnType<typeof buildPlan>): string {

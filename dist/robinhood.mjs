@@ -19632,6 +19632,37 @@ async function readAccount(reader, account, ids) {
 // src/data/dates.ts
 var marketDay = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
 
+// src/data/symbols.ts
+var FOREX = /* @__PURE__ */ new Set(["USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD", "CNY", "CNH", "HKD", "SGD", "SEK", "NOK", "DKK", "PLN", "MXN", "ZAR", "TRY", "INR", "KRW", "BRL", "RUB", "THB"]);
+var CRYPTO_BASES = /* @__PURE__ */ new Set(["BTC", "ETH", "SOL", "XRP", "ADA", "DOGE", "LTC", "BCH", "DOT", "AVAX", "LINK"]);
+var CRYPTO_QUOTES = ["USDT", "USDC", "USD"];
+var NOT_COINS = /* @__PURE__ */ new Set([...FOREX, "XAU", "XAG", "XPT", "XPD"]);
+var COIN_PAIR = /^([A-Z0-9]{1,15})-(USDT|USDC|USD)$/;
+var SHARE_CLASS = /^([A-Z]{1,5})\.([A-Z])$/;
+var ONE_LETTER_EXCHANGES = /* @__PURE__ */ new Set(["T", "L", "V", "F"]);
+function cryptoBase(raw) {
+  const s = raw.trim().toUpperCase().replace(/\+$/, "");
+  const pair = COIN_PAIR.exec(s);
+  if (pair) return /[A-Z]/.test(pair[1]) && !NOT_COINS.has(pair[1]) ? pair[1] : null;
+  const compact = s.replaceAll("-", "");
+  for (const q of CRYPTO_QUOTES) {
+    if (compact.endsWith(q)) {
+      const base = compact.slice(0, -q.length);
+      return CRYPTO_BASES.has(base) ? base : null;
+    }
+  }
+  return null;
+}
+var yahooClass = (s) => {
+  const m = SHARE_CLASS.exec(s);
+  return m && !ONE_LETTER_EXCHANGES.has(m[2]) ? `${m[1]}-${m[2]}` : s;
+};
+function deskSymbol(symbol, kind) {
+  const s = symbol.trim().toUpperCase();
+  return kind === "crypto" ? `${cryptoBase(s) ?? s}-USD` : yahooClass(s);
+}
+var brokerSymbol = (symbol) => symbol.replace(/^([A-Z]{1,5})-([A-Z])$/, "$1.$2");
+
 // src/settings.ts
 var ANALYSTS = ["market", "sentiment", "news", "fundamentals"];
 var DEFAULT_CAPS = { perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 3, perSectorPercent: 30, cryptoPercent: 5, weeklyLossPercent: 5, minHoldDays: 5 };
@@ -19789,15 +19820,16 @@ var Link = class {
       };
       const p = parsePortfolio(await data("get_portfolio", { account_number: ids.accountNumber }));
       this.noteValue(p.total, now);
-      const all = parsePositions(await data("get_equity_positions", { account_number: ids.accountNumber }));
-      const held = all.find((x) => x.symbol === symbol)?.quantity ?? 0;
+      const all = parsePositions(await data("get_equity_positions", { account_number: ids.accountNumber })), rh = brokerSymbol(symbol);
+      const same = (s) => deskSymbol(s, "stock") === deskSymbol(symbol, "stock");
+      const held = all.find((x) => same(x.symbol))?.quantity ?? 0;
       const orders = openOrders(await data("get_equity_orders", { account_number: ids.accountNumber }));
       const ordersToday = orders.all.filter((o) => o.at && marketDay(new Date(o.at)) === marketDay(now)).length;
-      const wanted = [.../* @__PURE__ */ new Set([symbol, ...all.map((x) => x.symbol), ...orders.open.filter((o) => o.side === "buy" && o.price === null).map((o) => o.symbol)])];
+      const wanted = [.../* @__PURE__ */ new Set([rh, ...all.map((x) => x.symbol), ...orders.open.filter((o) => o.side === "buy" && o.price === null).map((o) => o.symbol)])];
       const quotes = /* @__PURE__ */ new Map();
       for (let i = 0; i < wanted.length; i += QUOTES_PER_CALL) for (const [s, v] of parseQuotes(await data("get_equity_quotes", { symbols: wanted.slice(i, i + QUOTES_PER_CALL) }))) quotes.set(s, v);
-      const price = quotes.get(symbol) ?? null;
-      const mine = (side) => orders.open.filter((o) => o.symbol === symbol && o.side === side).reduce((n, o) => n + o.quantity, 0);
+      const price = quotes.get(rh) ?? null;
+      const mine = (side) => orders.open.filter((o) => same(o.symbol) && o.side === side).reduce((n, o) => n + o.quantity, 0);
       return {
         symbol,
         accountValue: p.total,
@@ -19805,10 +19837,10 @@ var Link = class {
         held,
         price,
         ordersToday,
-        positions: all.map((x) => ({ symbol: x.symbol, quantity: x.quantity, price: quotes.get(x.symbol) ?? null })),
+        positions: all.map((x) => ({ symbol: deskSymbol(x.symbol, "stock"), quantity: x.quantity, price: quotes.get(x.symbol) ?? null })),
         open: { buy: mine("buy"), sell: mine("sell") },
         unreadOrders: orders.unread,
-        openBuys: orders.open.filter((o) => o.side === "buy").map((o) => ({ symbol: o.symbol, quantity: o.quantity, price: o.price ?? quotes.get(o.symbol) ?? null }))
+        openBuys: orders.open.filter((o) => o.side === "buy").map((o) => ({ symbol: deskSymbol(o.symbol, "stock"), quantity: o.quantity, price: o.price ?? quotes.get(o.symbol) ?? null }))
       };
     }
   }
@@ -19887,11 +19919,11 @@ var Link = class {
       if (!now.on) throw new Error(`trading switched itself off: ${now.offBecause?.words ?? "switch it on in Your account first"}`);
       const failed = (await approve(context)).filter((c) => !c.ok);
       if (failed.length) throw new Error(`the order no longer passes on Robinhood's latest figures: ${failed.map((c) => c.words).join("; ")}`);
-      const account = { accountNumber: this.agenticIds().accountNumber, agentic: true };
-      session.placer.ready(account, order, refId);
+      const account = { accountNumber: this.agenticIds().accountNumber, agentic: true }, sent = { ...order, symbol: brokerSymbol(order.symbol) };
+      session.placer.ready(account, sent, refId);
       sending();
       try {
-        return { placed: await session.placer.place(account, order, refId), context };
+        return { placed: await session.placer.place(account, sent, refId), context };
       } catch (e) {
         throw e instanceof Refused ? e : new AnswerLost(oneLine(masked(e instanceof Error ? e.message : String(e)), 120));
       }
@@ -19906,7 +19938,7 @@ var Link = class {
       const a = await session.reader.read("get_accounts");
       if (a.failed) throw new Error("Robinhood could not list the accounts");
       this.learn(a.data);
-      return await session.reviewer.review({ accountNumber: this.agenticIds().accountNumber, agentic: true }, order);
+      return await session.reviewer.review({ accountNumber: this.agenticIds().accountNumber, agentic: true }, { ...order, symbol: brokerSymbol(order.symbol) });
     } finally {
       await session.close();
     }

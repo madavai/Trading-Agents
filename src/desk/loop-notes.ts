@@ -25,6 +25,9 @@ export interface Notes {
   /** Per call: how many refusals in this run, the last one's words, and how many saves the run had made by then. */
   refused: Record<string, { n: number; why: string; saved: number }>;
   listed?: { of: string; shown: string[]; saved: number; at: number };
+  /** A scoring's calls listed without their window's rows (they could not be read then): each one's lesson is written
+   *  from the outcome line alone, so it is kept as written without them even if the rows can be read when it is saved. */
+  unrowed?: string[];
 }
 
 export const keyOf = (ticker: string, date: string) => `${ticker}|${date}`;
@@ -42,7 +45,8 @@ export function readNotes(j: Journal, kind: NotesKind, now: number): Notes {
       }
       const l = n.listed as Notes['listed'] | undefined;
       const listedOk = l && typeof l.of === 'string' && Array.isArray(l.shown) && l.shown.every((s) => typeof s === 'string') && typeof l.saved === 'number' && typeof l.at === 'number';
-      return { at: n.at, saved: typeof n.saved === 'number' ? n.saved : 0, refused, ...(listedOk ? { listed: l } : {}) };
+      const unrowed = Array.isArray(n.unrowed) ? n.unrowed.filter((k): k is string => typeof k === 'string') : [];
+      return { at: n.at, saved: typeof n.saved === 'number' ? n.saved : 0, refused, ...(listedOk ? { listed: l } : {}), ...(unrowed.length ? { unrowed } : {}) };
     }
   } catch { /* none kept yet, or unreadable: start afresh */ }
   return { at: now, saved: 0, refused: {} };
@@ -56,9 +60,27 @@ export function writeNotes(j: Journal, kind: NotesKind, notes: Notes, now: numbe
  *  that call's refusals forgotten. */
 export function noteStep(j: Journal, kind: NotesKind, now: number, saved?: { ticker: string; date: string }): void {
   const notes = readNotes(j, kind, now);
-  if (saved) { notes.saved++; delete notes.refused[keyOf(saved.ticker, saved.date)]; }
+  if (saved) {
+    notes.saved++; delete notes.refused[keyOf(saved.ticker, saved.date)];
+    const unrowed = (notes.unrowed ?? []).filter((k) => k !== keyOf(saved.ticker, saved.date));
+    if (unrowed.length) notes.unrowed = unrowed; else delete notes.unrowed;
+  }
   writeNotes(j, kind, notes, now);
 }
+
+/** What a listing showed of each call's window: the calls shown without their rows are noted, and one shown with them
+ *  again is no longer. The file is written only when that changes, and the notes' hour is kept as it was (a listing is
+ *  not a step), so a listing that showed every call's rows writes nothing. */
+export function noteRows(j: Journal, kind: NotesKind, shown: { without: string[]; with: string[] }, now: number): void {
+  const notes = readNotes(j, kind, now), before = notes.unrowed ?? [];
+  const after = [...new Set([...before.filter((k) => !shown.with.includes(k)), ...shown.without])];
+  if (after.length === before.length && after.every((k) => before.includes(k))) return;
+  const { unrowed: _, ...rest } = notes;
+  try { writeWhole(fileOf(j, kind), JSON.stringify(after.length ? { ...rest, unrowed: after } : rest)); } catch { /* the lesson is then marked by the rows at save time, as before */ }
+}
+
+/** Whether a scoring listed this call without its window's rows. */
+export const listedUnrowed = (notes: Notes, ticker: string, date: string): boolean => (notes.unrowed ?? []).includes(keyOf(ticker, date));
 
 /** Counts one refusal of a call's words in this run. AGAIN the first time: say the refusal, to correct and send again.
  *  LEFT from the second: leave that call and go on. STOP when it is refused again after it was left, with nothing saved
