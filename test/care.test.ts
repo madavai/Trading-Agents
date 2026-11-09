@@ -139,6 +139,10 @@ test('each Monday the morning routine re-rates the Agentic account\'s holdings w
   assert.match(brief, /for a re-rated holding, its new rating beside its last one/);
   assert.match(brief, /"the desk says sell", with a Sell button that opens a ticket: nothing is ever sold by itself/);
   assert.deepEqual(morningList(dir, '2026-10-26', 3).later, ['TSLA'], 'within the routine\'s limit: the rest wait for another run');
+  const three = morningBrief(dir, '2026-10-26', 3);
+  assert.match(three, /Over the limit of 3, still waiting on the dashboard: TSLA\. Not left for another morning: end_queue_run asks for another run, which starts at once when something listens on this computer\./);
+  assert.doesNotMatch(three, /Left for another morning/, 'a stock waiting on the dashboard gets another run, not another morning');
+  assert.match(three, /Last, call end_queue_run once: it asks for another run when stocks are still waiting on the dashboard\./);
   assert.ok(!morningBrief(dir, '2026-10-27', 5).includes("Monday's re-rating"), 'only on a Monday');
 
   // holdings not known, a flat book, a full waiting list, and what the person said they hold
@@ -148,7 +152,15 @@ test('each Monday the morning routine re-rates the Agentic account\'s holdings w
   const full = desk().dir; saveHoldings(full, { positions: [{ ticker: 'NVDA', quantity: 2 }] }, '2026-10-24');
   for (let i = 0; i < MAX_OPEN; i++) enqueue(full, `S${String(i).padStart(2, '0')}`, '2026-10-25T20:00:00Z');
   assert.deepEqual(rerateWeekly(full, '2026-10-26', now), []);
-  assert.match(morningBrief(full, '2026-10-26', 5), /NVDA is due, but the waiting list is full, so nothing went on it/);
+  assert.equal(readRerate(full)?.full, true, 'the list refused it: kept, so the brief can say so');
+  assert.match(morningBrief(full, '2026-10-26', 5), /NVDA is due, but the waiting list was full, so nothing went on it/);
+  // the re-rating ran before the dashboard had read the holdings, so nothing was due then; read later that Monday, NVDA is due
+  const early = desk().dir;
+  assert.deepEqual(rerateWeekly(early, '2026-10-26', now), []);
+  saveHoldings(early, { positions: [{ ticker: 'NVDA', quantity: 2 }] }, '2026-10-26');
+  const late = morningBrief(early, '2026-10-26', 5);
+  assert.match(late, /NVDA is due now, but the re-rating ran earlier this Monday, when it was not due, and it runs once a Monday: left for next Monday\./);
+  assert.doesNotMatch(late, /waiting list (is|was) full/, 'never "the waiting list is full" when there is no waiting list at all');
   const said = desk().dir; saveHoldings(said, { positions: [{ ticker: 'NVDA', quantity: 2 }] }, '2026-10-24');
   assert.match(morningBrief(said, '2026-10-26', 5), /NVDA is due, but the re-rating could not put it on the waiting list today/, 'a re-rating that did not run is said, never taken for a full list');
   assert.deepEqual(rerateWeekly(said, '2026-10-26', now).map((s) => s.symbol), ['NVDA'], 'what the person said they hold is cared for too');

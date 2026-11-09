@@ -59,15 +59,24 @@ export function stopReason(output: string): string | null {
   return null;
 }
 
-/** One run of the team in `root`. Its words go to `log`; a run longer than `timeoutMs` (three hours) is stopped. */
-export function runClaude(cmd: Command, root: string, log: (text: string) => void, timeoutMs = 3 * 60 * 60_000, args: readonly string[] = RUN_ARGS): Promise<{ code: number | null; timedOut: boolean }> {
+/** When to stop a run: `stopIf` is asked every `everyMs` (a minute) and answers why to stop it, in plain words, or null
+ *  while the run is working (the watcher's `stopWhy`). */
+export interface RunLimits { stopIf?: () => string | null; everyMs?: number }
+
+/** One run of the team in `root`. Its words go to `log`; it is stopped when `limits.stopIf` gives a reason, which comes
+ *  back as `stopped`. */
+export function runClaude(cmd: Command, root: string, log: (text: string) => void, limits: RunLimits = {}, args: readonly string[] = RUN_ARGS): Promise<{ code: number | null; stopped?: string }> {
   return new Promise((resolve) => {
-    let timedOut = false;
+    let stopped: string | undefined;
     const child = spawn(cmd.command, [...cmd.args, ...args], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
-    const timer = setTimeout(() => { timedOut = true; child.kill(); }, timeoutMs);
+    const timer = limits.stopIf ? setInterval(() => {
+      let why: string | null = null;
+      try { why = limits.stopIf!(); } catch { /* a check that fails stops nothing */ }
+      if (why && !stopped) { stopped = why; child.kill(); }
+    }, limits.everyMs ?? 60_000) : undefined;
     child.stdout.on('data', (c: Buffer) => log(c.toString('utf8')));
     child.stderr.on('data', (c: Buffer) => log(c.toString('utf8')));
-    child.on('error', (e) => { clearTimeout(timer); log(`Claude Code could not be started: ${e.message}\n`); resolve({ code: null, timedOut: false }); });
-    child.on('close', (code) => { clearTimeout(timer); resolve({ code, timedOut }); });
+    child.on('error', (e) => { clearInterval(timer); log(`Claude Code could not be started: ${e.message}\n`); resolve({ code: null }); });
+    child.on('close', (code) => { clearInterval(timer); resolve(stopped ? { code, stopped } : { code }); });
   });
 }

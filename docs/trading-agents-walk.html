@@ -395,16 +395,16 @@ b, strong { font-weight: var(--weight-semibold); }
   { "id": "B", "name": "The analysis team",
     "sub": "Thirteen agents analyse NVIDIA, a fund or a coin from free public data, official sources first, and record a rated call.",
     "about": "An analysis is the desk's main job. You name a company and how deep to go; four analysts read prices, mood, news and the company's accounts, a fact checker corrects what they got wrong, a bull and a bear argue, and a portfolio manager gives a rating from Buy to Sell. The result is a \"call\", kept in the desk's journal on your computer. It only proposes: nothing is ever bought or sold by an analysis.",
-    "before": "Section A done, and your email given (A4). Depth: shallow is one round of debate (a few minutes, the least model time), medium three, deep five. Each analysis uses your Claude plan, like a chat.",
+    "before": "Section A done, and your email given (A4). Depth: shallow is one round of debate (the least model time: about 40 minutes in the desk's first real runs), medium three (nearly 3 hours), deep five. Each analysis uses your Claude plan, like a chat.",
     "tests": [
-    { "id": "B1", "title": "A shallow analysis of NVIDIA runs end to end", "tags": [], "changed": "2026-11-07",
+    { "id": "B1", "title": "A shallow analysis of NVIDIA runs end to end", "tags": [], "changed": "2026-11-08",
       "about": "This is the whole desk at work on one company. Watching it once shows you every role in turn.",
       "where": "Madav › Agent Studio › trading-desk › Put to work (or a Claude Code chat in this folder)",
       "do": [
         "Ask the team: [[Analyse NVDA shallow]]",
         "In a Claude Code chat the same is [[/analyse NVDA shallow]]"],
       "see": [
-        "First, in two lines: which analysts run, the rounds of debate and the language, and that it takes a few minutes.",
+        "First, in two lines: which analysts run, the rounds of debate and the language, and how long it can take: about 40 minutes at shallow depth and up to about 3 hours at medium, in the desk's first real runs. Never \"a few minutes\".",
         "Then the four analysts, the fact checker, the bull and the bear, the research manager, the trader, the three risk voices and the portfolio manager, in turn.",
         "It ends with NVDA's rating (Buy, Overweight, Hold, Underweight or Sell), a short summary, any data that was unavailable, where the report is, that the call is scored against its index after its holding window, \"not investment advice\", and Decide… on the dashboard to act."] },
     { "id": "B2", "title": "Real company figures for NVIDIA", "tags": [], "changed": "2026-11-07",
@@ -1252,24 +1252,28 @@ b, strong { font-weight: var(--weight-semibold); }
         "\"Runs by itself: Claude Code is listening on this computer\". About 20 seconds after you ask, the run starts. Its log is `desk-data/watcher.log`.",
         "It is still listening after the dashboard reopens.",
         "\"Analyses no longer run by themselves. A run in progress finishes first.\" Then \"Nothing is listening …\"."] },
-    { "id": "K5", "title": "Nothing listening, and Run now", "tags": [], "changed": "2026-10-21",
+    { "id": "K5", "title": "Nothing listening, and Run now", "tags": [], "changed": "2026-11-08",
       "about": "With nothing listening, your asks simply wait; a chat can run them, and with a listener \"Run now\" starts a run at once.",
       "where": "Dashboard, then trading-desk › Put to work",
       "do": [
         "With nothing listening, ask for an analysis and read the line under Analyses you asked for.",
-        "Ask the team: [[Analyse what is waiting]]"],
+        "Ask the team: [[Analyse what is waiting]]",
+        "When it is done, ask the same again."],
       "see": [
         "\"Nothing is listening, so analyses wait here. Switch on \"Run automatically\" in Madav, or run them with Claude Code on this computer, or ask the desk to \"analyse what is waiting\" in a chat.\"",
         "The chat runs them one at a time, never asking you anything.",
+        "Asked again with nothing waiting, the team says nothing is waiting, and that the finished analyses still on the list need no run. Never that you have not asked for any analysis.",
         "With a listener and something waiting, \"Run now\" asks for a run: \"Asked for a run of what is waiting.\""] },
-    { "id": "K6", "title": "A stopped run says why, and Retry carries on", "tags": ["Later"], "changed": "2026-10-21",
-      "about": "When a run stops early (a usage limit, a missing email), the company says why in plain words, and Retry carries on from the step it reached.",
+    { "id": "K6", "title": "A stopped run says why, and Retry carries on", "tags": ["Later"], "changed": "2026-11-08",
+      "about": "When a run stops early (a usage limit, a missing email), the company says why in plain words, and Retry carries on from the step it reached. With the desk's own Claude Code listener it says so at once. With Madav it can say so at once only when Madav's note gives the time its run ended, which it does not yet: until then the company shows \"Being analysed\" until nothing has been saved for it for two hours, and then says exactly that.",
       "where": "Dashboard › Analyses you asked for",
       "do": [
         "When a run stops early (for example at Claude Code's usage limit), read the company's row.",
+        "With Madav: when its run stops early, read the row again two hours after the last step it showed.",
         "Press \"Retry\" the same day."],
       "see": [
-        "\"Failed\" with the reason in plain words, for example \"Claude Code's weekly usage limit was reached; it resets 6am (America/Chicago). Press Retry after that.\"",
+        "With Claude Code, at once: \"Failed\" with the reason in plain words, for example \"Claude Code's weekly usage limit was reached; it resets 6am (America/Chicago). Press Retry after that.\"",
+        "With Madav: \"Being analysed\" with the last step it reached, then, two hours after that step, \"Failed\" with \"nothing was saved for this analysis for two hours, so its run has most likely stopped: press Retry. If it was still going, it shows done once its call is recorded\".",
         "What a run cannot do (for example no email saved for the SEC) marks it failed with the reason; it never asks you.",
         "\"<company> is asked for again.\", and on the same day it carries on from the step it stopped at."] },
     { "id": "K7", "title": "The desk's day is New York's", "tags": ["Optional"], "changed": "2026-10-21",
@@ -1287,7 +1291,16 @@ b, strong { font-weight: var(--weight-semibold); }
         "When it is done, open the call's reasoning."],
       "see": [
         "One turn each for the bull and the bear, and one for each of the three risk voices: the depth you chose, even if the team's lead planned more.",
-        "A Shallow run takes clearly less time than the Medium one in B7."] }
+        "A Shallow run takes clearly less time than the Medium one in B7."] },
+    { "id": "K9", "title": "A long analysis is never marked failed while it works", "tags": ["Later"], "changed": "2026-11-08",
+      "about": "An analysis can take hours: in the desk's first real runs about 40 minutes at shallow depth and 2 h 47 min at medium. A company stays \"Being analysed\" for as long as its analysis keeps saving its steps; it is marked failed only when nothing has been saved for it for two hours. If one marked failed that way was in fact still going, it shows done when its call is recorded. The desk's own Claude Code listener stops a run that has saved nothing for two hours, or that has analysed one company for six hours, in case the team is going round in a loop.",
+      "where": "Dashboard › Analyses you asked for",
+      "do": [
+        "Ask the desk for NVDA at Medium and let it run by itself. Look at Analyses you asked for every half hour or so, and once more after two hours."],
+      "see": [
+        "\"Being analysed\" all the way, its step moving on (\"analysts reading: …\", \"debate round 2 of 3\", \"risk round 3 of 3\", \"the portfolio manager is deciding\"), also past two hours.",
+        "Then its rating with \"done <time>\", and the notice \"NVDA: <rating>. Its call is in the desk's calls.\" Never \"Failed\" for a run that finished.",
+        "With Claude Code listening, the line under the list gives the last run's count, for example \"1 analysed, 0 failed\". A company already called today is counted apart: \"1 analysed, 1 already called today, 0 failed\"."] }
   ] },
   { "id": "L", "name": "Your paper record",
     "sub": "Before you risk money: every call followed on paper against SPY, the S&P 500 fund, from the same start, and four weeks of it before trading.",
@@ -1433,14 +1446,16 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "\"What you hold needs a look\" is not shown at all.",
         "When it is: \"In the Agentic account, as Robinhood was last read · nothing is ever sold by itself …\", with Holding, Mark and Why, and \"Read the call\" and \"Sell…\"."] },
-    { "id": "N6", "title": "Monday re-rating", "tags": ["Later"], "changed": "2026-10-21",
-      "about": "Each Monday the morning routine puts up to three holdings whose view is a week old (or that have none) on the waiting list, so what you hold is never judged on a stale call.",
+    { "id": "N6", "title": "Monday re-rating", "tags": ["Later"], "changed": "2026-11-08",
+      "about": "Each Monday the morning routine puts up to three holdings whose view is a week old (or that have none) on the waiting list, so what you hold is never judged on a stale call. When one that is due does not go on the list, the routine says the real reason.",
       "where": "The morning routine, then the dashboard",
       "do": [
-        "On a Monday, ask the team: [[Run the morning routine]] (or let Madav run it), then look at Analyses you asked for and your holdings."],
+        "On a Monday, ask the team: [[Run the morning routine]] (or let Madav run it), then look at Analyses you asked for and your holdings.",
+        "If it could happen to you: run the morning routine on a Monday before the dashboard has read your holdings from Robinhood, then press \"Refresh from Robinhood\" and run it again."],
       "see": [
         "Up to three Agentic holdings with no view or a view a week old go on the waiting list at shallow depth, once that Monday, and show \"re-rating\" until done.",
-        "Their view is fresh afterwards."] }
+        "Their view is fresh afterwards.",
+        "Run again after the refresh, it says the holdings now due were left for next Monday, because the re-rating ran earlier that Monday when they were not due. It says \"the waiting list was full\" only when the list really was full (20 waiting or being analysed)."] }
   ] },
   { "id": "O", "name": "Your first month: Get started",
     "sub": "A newcomer's safe first month in five steps on the dashboard, each ticked off from the desk's own records, and every trading word explained in one plain line.",

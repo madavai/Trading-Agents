@@ -3,8 +3,8 @@ import { createRequire as __cr } from 'node:module'; const require = __cr(import
 
 // src/watch/main.ts
 import crypto from "node:crypto";
-import fs4 from "node:fs";
-import path4 from "node:path";
+import fs5 from "node:fs";
+import path5 from "node:path";
 import { spawn as spawn2 } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
@@ -53,32 +53,39 @@ function stopReason(output) {
   }
   return null;
 }
-function runClaude(cmd, root2, log2, timeoutMs = 3 * 60 * 6e4, args = RUN_ARGS) {
+function runClaude(cmd, root2, log2, limits = {}, args = RUN_ARGS) {
   return new Promise((resolve) => {
-    let timedOut = false;
+    let stopped;
     const child = spawn(cmd.command, [...cmd.args, ...args], { cwd: root2, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
-    const timer = setTimeout(() => {
-      timedOut = true;
-      child.kill();
-    }, timeoutMs);
+    const timer = limits.stopIf ? setInterval(() => {
+      let why = null;
+      try {
+        why = limits.stopIf();
+      } catch {
+      }
+      if (why && !stopped) {
+        stopped = why;
+        child.kill();
+      }
+    }, limits.everyMs ?? 6e4) : void 0;
     child.stdout.on("data", (c) => log2(c.toString("utf8")));
     child.stderr.on("data", (c) => log2(c.toString("utf8")));
     child.on("error", (e) => {
-      clearTimeout(timer);
+      clearInterval(timer);
       log2(`Claude Code could not be started: ${e.message}
 `);
-      resolve({ code: null, timedOut: false });
+      resolve({ code: null });
     });
     child.on("close", (code) => {
-      clearTimeout(timer);
-      resolve({ code, timedOut });
+      clearInterval(timer);
+      resolve(stopped ? { code, stopped } : { code });
     });
   });
 }
 
 // src/desk/queue.ts
-import fs3 from "node:fs";
-import path3 from "node:path";
+import fs4 from "node:fs";
+import path4 from "node:path";
 
 // src/data/symbols.ts
 var FOREX = /* @__PURE__ */ new Set(["USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD", "CNY", "CNH", "HKD", "SGD", "SEK", "NOK", "DKK", "PLN", "MXN", "ZAR", "TRY", "INR", "KRW", "BRL", "RUB", "THB"]);
@@ -198,12 +205,30 @@ function writeWhole(file, text) {
   }
 }
 
+// src/desk/runs.ts
+import fs3 from "node:fs";
+import path3 from "node:path";
+var DEBATES = { investment_debate: ["bull", "bear"], risk_debate: ["aggressive", "conservative", "neutral"] };
+var TURNS = new Set(Object.values(DEBATES).flat());
+var folder = (dir2, ticker, date) => path3.join(dir2, "runs", `${safeSymbol(ticker).replace(/\^/g, "IDX_").replace(/=/g, "_EQ_")}_${date}`);
+var runFile = (dir2, ticker, date) => path3.join(folder(dir2, ticker, date), "run.json");
+function lastSaved(dir2, ticker, date) {
+  let latest = null;
+  for (const file of [runFile(dir2, ticker, date), path3.join(folder(dir2, ticker, date), "complete_report.md")]) {
+    try {
+      latest = Math.max(latest ?? 0, fs3.statSync(file).mtimeMs);
+    } catch {
+    }
+  }
+  return latest;
+}
+
 // src/desk/queue.ts
 var DEPTHS = { shallow: 1, medium: 3, deep: 5 };
 var isDepth = (v) => typeof v === "string" && Object.hasOwn(DEPTHS, v);
 var MAX_FINISHED = 20;
-var STALE_MS2 = 2 * 60 * 6e4;
-var STALE_REASON = "the run did not finish (it stopped, or took over two hours): press Retry";
+var QUIET_MS = 2 * 60 * 6e4;
+var QUIET_REASON = "nothing was saved for this analysis for two hours, so its run has most likely stopped: press Retry. If it was still going, it shows done once its call is recorded";
 var QueueRefusal = class extends Error {
   constructor(code, message) {
     super(message);
@@ -211,9 +236,9 @@ var QueueRefusal = class extends Error {
   }
   code;
 };
-var queueFile = (dir2) => path3.join(dir2, "queue.json");
-var doorbellFile = (dir2) => path3.join(dir2, "doorbell.json");
-var listenerFile = (dir2) => path3.join(dir2, "listener.json");
+var queueFile = (dir2) => path4.join(dir2, "queue.json");
+var doorbellFile = (dir2) => path4.join(dir2, "doorbell.json");
+var listenerFile = (dir2) => path4.join(dir2, "listener.json");
 var iso = (v) => typeof v === "string" && v.length <= 40 && !Number.isNaN(Date.parse(v)) ? v : void 0;
 var day = (v) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : void 0;
 var words = (v, max) => {
@@ -240,21 +265,29 @@ function itemOf(v) {
   if (startedAt) out.startedAt = startedAt;
   if (endedAt) out.endedAt = endedAt;
   if (state === "done" && rating) out.rating = rating;
+  if (state === "done" && r.already === true) out.already = true;
   if (state === "failed") out.reason = reason ?? "no reason was given";
+  if (state === "failed" && r.quiet === true) out.quiet = true;
   return out;
 }
-function settled(item, now, note) {
+function lastSignOf(dir2, item) {
+  const started = Date.parse(item.startedAt ?? item.requestedAt);
+  const saved = item.date ? lastSaved(dir2, item.symbol, item.date) : null;
+  return Math.max(started, saved ?? 0);
+}
+function settled(dir2, item, now, note) {
   if (item.state !== "running") return item;
   const last = note?.lastRun, started = Date.parse(item.startedAt ?? item.requestedAt);
   if (last?.started && Date.parse(last.started) <= started && started <= Date.parse(last.at)) {
     return { ...item, state: "failed", reason: words(`${note.listener}'s run ended before this stock was finished: ${last.result}`, 300), endedAt: last.at };
   }
-  return now.getTime() - started > STALE_MS2 ? { ...item, state: "failed", reason: STALE_REASON, endedAt: now.toISOString() } : item;
+  const sign = lastSignOf(dir2, item);
+  return now.getTime() - sign > QUIET_MS ? { ...item, state: "failed", reason: QUIET_REASON, quiet: true, endedAt: new Date(sign + QUIET_MS).toISOString() } : item;
 }
 function load(dir2, now) {
   let raw = [];
   try {
-    raw = JSON.parse(fs3.readFileSync(queueFile(dir2), "utf8"));
+    raw = JSON.parse(fs4.readFileSync(queueFile(dir2), "utf8"));
   } catch {
   }
   const seen = /* @__PURE__ */ new Set(), out = [], note = readListener(dir2, now);
@@ -262,7 +295,7 @@ function load(dir2, now) {
     const item = itemOf(v);
     if (!item || seen.has(item.symbol)) continue;
     seen.add(item.symbol);
-    out.push(settled(item, now, note));
+    out.push(settled(dir2, item, now, note));
   }
   return out;
 }
@@ -274,7 +307,7 @@ function trimmed(list) {
 }
 function change(dir2, now, edit) {
   const file = queueFile(dir2);
-  fs3.mkdirSync(dir2, { recursive: true });
+  fs4.mkdirSync(dir2, { recursive: true });
   return withLock(file, () => {
     const { list, result } = edit(load(dir2, now));
     writeWhole(file, JSON.stringify(trimmed(list), null, 2) + "\n");
@@ -288,16 +321,18 @@ function finishItem(dir2, raw, outcome, now = /* @__PURE__ */ new Date()) {
   return change(dir2, now, (list) => {
     const item = list.find((i) => i.symbol === symbol);
     if (!item) throw new QueueRefusal("NOT_ON_LIST", `${symbol} is not on the waiting list`);
-    if (!open(item)) throw new QueueRefusal("FINISHED", `${symbol} is already ${item.state}`);
-    const finished = "rating" in outcome ? { ...item, state: "done", rating: words(outcome.rating, 30) ?? "recorded", endedAt: now.toISOString() } : { ...item, state: "failed", reason: words(outcome.reason, 300) ?? "no reason was given", endedAt: now.toISOString() };
+    if (!open(item) && !item.quiet) throw new QueueRefusal("FINISHED", `${symbol} is already ${item.state}`);
+    const finished = "rating" in outcome ? { ...item, state: "done", rating: words(outcome.rating, 30) ?? "recorded", endedAt: now.toISOString(), ...outcome.already ? { already: true } : {} } : { ...item, state: "failed", reason: words(outcome.reason, 300) ?? "no reason was given", endedAt: now.toISOString() };
     if (finished.state === "done") delete finished.reason;
     else delete finished.rating;
+    delete finished.quiet;
+    if (!("rating" in outcome && outcome.already)) delete finished.already;
     return { list: list.map((i) => i === item ? finished : i), result: finished };
   });
 }
 function readDoorbell(dir2) {
   try {
-    const v = JSON.parse(fs3.readFileSync(doorbellFile(dir2), "utf8"));
+    const v = JSON.parse(fs4.readFileSync(doorbellFile(dir2), "utf8"));
     const at = iso(v.at);
     return at ? { at, waiting: Number.isInteger(v.waiting) ? v.waiting : 0, why: v.why === "more" ? "more" : "press" } : null;
   } catch {
@@ -307,7 +342,7 @@ function readDoorbell(dir2) {
 var LISTENER_FRESH_MS = 3 * 6e4;
 function readListener(dir2, now = /* @__PURE__ */ new Date()) {
   try {
-    const v = JSON.parse(fs3.readFileSync(listenerFile(dir2), "utf8"));
+    const v = JSON.parse(fs4.readFileSync(listenerFile(dir2), "utf8"));
     const listener = words(v.listener ?? v.listening, 40), since = iso(v.since), beat = iso(v.beat) ?? iso(v.checked) ?? since;
     if (!listener || !since || !beat) return null;
     const note = { listener, since, beat, fresh: now.getTime() - Date.parse(beat) <= LISTENER_FRESH_MS };
@@ -327,15 +362,29 @@ function readListener(dir2, now = /* @__PURE__ */ new Date()) {
   }
 }
 function writeListener(dir2, note) {
-  fs3.mkdirSync(dir2, { recursive: true });
+  fs4.mkdirSync(dir2, { recursive: true });
   writeWhole(listenerFile(dir2), JSON.stringify(note, null, 2) + "\n");
 }
 function removeListener(dir2, pid) {
   if (pid !== void 0 && readListener(dir2)?.pid !== pid) return;
-  fs3.rmSync(listenerFile(dir2), { force: true });
+  fs4.rmSync(listenerFile(dir2), { force: true });
 }
 
 // src/watch/watcher.ts
+var STOCK_MAX_MS = 6 * 60 * 6e4;
+var startedIn = (i, start) => (i.startedAt ?? "") >= start;
+var leftOpen = (i, start) => startedIn(i, start) && (i.state === "running" || i.quiet === true);
+function stopWhy(dir2, start, now = /* @__PURE__ */ new Date()) {
+  const list = readQueue(dir2, now);
+  let last = Date.parse(start);
+  for (const i of list) {
+    if (startedIn(i, start)) last = Math.max(last, lastSignOf(dir2, i));
+    if (!i.quiet && i.endedAt && i.endedAt >= start) last = Math.max(last, Date.parse(i.endedAt));
+  }
+  if (now.getTime() - last > QUIET_MS) return "nothing was saved for two hours, so the desk's listener stopped the run: press Retry";
+  const long = list.find((i) => leftOpen(i, start) && now.getTime() - Date.parse(i.startedAt) > STOCK_MAX_MS);
+  return long ? `${long.symbol} had been analysed for six hours, the most the desk's listener allows one stock, so it stopped the run: press Retry` : null;
+}
 var AlreadyListening = class extends Error {
 };
 function watch(o) {
@@ -367,15 +416,15 @@ function watch(o) {
     const start = now().toISOString();
     let trouble = "";
     try {
-      trouble = await o.run() ?? "";
+      trouble = await o.run(start) ?? "";
     } catch (e) {
       trouble = e.message;
     }
     const why = trouble || "the run stopped before this stock was finished: press Retry";
-    for (const i of readQueue(o.dir)) if (i.state === "running" && (i.startedAt ?? "") >= start) finishItem(o.dir, i.symbol, { reason: why });
+    for (const i of readQueue(o.dir)) if (leftOpen(i, start)) finishItem(o.dir, i.symbol, { reason: why });
     const ended = readQueue(o.dir).filter((i) => (i.endedAt ?? "") >= start);
-    const d = ended.filter((i) => i.state === "done").length, f = ended.filter((i) => i.state === "failed").length;
-    note.lastRun = { started: start, at: now().toISOString(), result: `${d} analysed, ${f} failed${trouble ? `; ${trouble}` : ""}` };
+    const done2 = ended.filter((i) => i.state === "done"), a = done2.filter((i) => i.already).length, f = ended.filter((i) => i.state === "failed").length;
+    note.lastRun = { started: start, at: now().toISOString(), result: `${done2.length - a} analysed${a ? `, ${a} already called today` : ""}, ${f} failed${trouble ? `; ${trouble}` : ""}` };
     running = false;
     beat();
     if (owed) {
@@ -417,11 +466,11 @@ function watch(o) {
 // src/watch/main.ts
 var root = process.cwd();
 var dir = deskDataDir(root);
-var logFile = path4.join(dir, "watcher.log");
+var logFile = path5.join(dir, "watcher.log");
 var self = fileURLToPath(import.meta.url);
 var print = () => {
   try {
-    return crypto.createHash("sha256").update(fs4.readFileSync(self)).digest("hex");
+    return crypto.createHash("sha256").update(fs5.readFileSync(self)).digest("hex");
   } catch {
     return "";
   }
@@ -431,11 +480,11 @@ var LOG_MAX = 1e6;
 var LOG_KEEP = 25e4;
 function log(text) {
   try {
-    fs4.mkdirSync(dir, { recursive: true });
-    fs4.appendFileSync(logFile, text);
-    if (fs4.statSync(logFile).size > LOG_MAX) {
-      const all = fs4.readFileSync(logFile, "utf8");
-      fs4.writeFileSync(logFile, all.slice(-LOG_KEEP));
+    fs5.mkdirSync(dir, { recursive: true });
+    fs5.appendFileSync(logFile, text);
+    if (fs5.statSync(logFile).size > LOG_MAX) {
+      const all = fs5.readFileSync(logFile, "utf8");
+      fs5.writeFileSync(logFile, all.slice(-LOG_KEEP));
     }
   } catch {
   }
@@ -451,7 +500,7 @@ try {
     dir,
     listener: "Claude Code",
     retire: () => print() !== born,
-    run: async () => {
+    run: async (start) => {
       log(`
 === ${(/* @__PURE__ */ new Date()).toISOString()} a run of the waiting list starts ===
 `);
@@ -459,11 +508,11 @@ try {
       const r = await runClaude(claude, root, (t) => {
         log(t);
         said = (said + t).slice(-8e3);
-      });
+      }, { stopIf: () => stopWhy(dir, start) });
       log(`
-=== ${(/* @__PURE__ */ new Date()).toISOString()} the run ended${r.timedOut ? " (stopped after three hours)" : ""}, code ${r.code ?? "none"} ===
+=== ${(/* @__PURE__ */ new Date()).toISOString()} the run ended${r.stopped ? ` (stopped: ${r.stopped})` : ""}, code ${r.code ?? "none"} ===
 `);
-      if (r.timedOut) return "the run took over three hours and was stopped: press Retry";
+      if (r.stopped) return r.stopped;
       if (r.code === 0) return void 0;
       return stopReason(said) ?? "Claude Code stopped before the run was finished (its words are in desk-data/watcher.log): press Retry";
     }

@@ -2,16 +2,40 @@
 // keeps a note saying so, with a heartbeat; when the doorbell rings it waits a moment (several presses make one run),
 // runs the team once, one run at a time, with at most one more owed; and it stops when its note is taken away (the person
 // switched it off), after the run in hand. It starts no run when nothing is waiting, so a ring costs nothing then.
-import { finishItem, readDoorbell, readListener, readQueue, removeListener, waitingIn, writeListener, type ListenerNote } from '../desk/queue.js';
+import { finishItem, lastSignOf, QUIET_MS, readDoorbell, readListener, readQueue, removeListener, waitingIn, writeListener, type ListenerNote, type QueueItem } from '../desk/queue.js';
+
+/** The longest the desk's own listener lets one stock be analysed before it stops the run, in case the team is going round
+ *  in a loop that keeps saving: more than twice the longest analysis seen in the desk's first real runs (2 h 47 min). */
+export const STOCK_MAX_MS = 6 * 60 * 60_000;
+
+const startedIn = (i: QueueItem, start: string) => (i.startedAt ?? '') >= start;
+/** A stock this run started that its run has not finished: still running, or read as failed only by the quiet rule. */
+const leftOpen = (i: QueueItem, start: string) => startedIn(i, start) && (i.state === 'running' || i.quiet === true);
+
+/** Why the desk's own listener stops the run in hand, in plain words for the stock it was on, or null while the run is
+ *  working. It stops a run only when nothing has been saved for `QUIET_MS` (the waiting list's own rule: the run is
+ *  stuck), or when one stock has been analysed for `STOCK_MAX_MS`. A long run that keeps saving its steps goes on,
+ *  however many stocks it takes. `start` is when the run began (ISO). */
+export function stopWhy(dir: string, start: string, now: Date = new Date()): string | null {
+  const list = readQueue(dir, now);
+  let last = Date.parse(start);
+  for (const i of list) {
+    if (startedIn(i, start)) last = Math.max(last, lastSignOf(dir, i));
+    if (!i.quiet && i.endedAt && i.endedAt >= start) last = Math.max(last, Date.parse(i.endedAt));
+  }
+  if (now.getTime() - last > QUIET_MS) return 'nothing was saved for two hours, so the desk\'s listener stopped the run: press Retry';
+  const long = list.find((i) => leftOpen(i, start) && now.getTime() - Date.parse(i.startedAt!) > STOCK_MAX_MS);
+  return long ? `${long.symbol} had been analysed for six hours, the most the desk's listener allows one stock, so it stopped the run: press Retry` : null;
+}
 
 export interface WatcherOptions {
   /** The desk's data folder (desk-data). */
   dir: string;
   /** Who is listening, as the person reads it on the dashboard. */
   listener: string;
-  /** Runs the team once. Resolves with nothing, or with a few plain words on why it stopped early, which the person reads
-   *  beside the stock it left unfinished. */
-  run: () => Promise<string | void>;
+  /** Runs the team once, from `start` (ISO, for `stopWhy`). Resolves with nothing, or with a few plain words on why it
+   *  stopped early, which the person reads beside the stock it left unfinished. */
+  run: (start: string) => Promise<string | void>;
   pid?: number;
   /** Wait this long after the last ring before a run (20 seconds); look this often (2 seconds); beat this often (a minute). */
   settleMs?: number; pollMs?: number; beatMs?: number;
@@ -51,13 +75,14 @@ export function watch(o: WatcherOptions): Watcher {
     running = true;
     const start = now().toISOString();
     let trouble = '';
-    try { trouble = (await o.run()) ?? ''; } catch (e) { trouble = (e as Error).message; }
-    // A stock this run started and left running did not finish: say so now, and why, rather than after two hours.
+    try { trouble = (await o.run(start)) ?? ''; } catch (e) { trouble = (e as Error).message; }
+    // A stock this run started and left unfinished did not finish: say so now, and why, rather than leave it to the
+    // waiting list's quiet rule (which may already read it as failed, in general words this run can put right).
     const why = trouble || 'the run stopped before this stock was finished: press Retry';
-    for (const i of readQueue(o.dir)) if (i.state === 'running' && (i.startedAt ?? '') >= start) finishItem(o.dir, i.symbol, { reason: why });
+    for (const i of readQueue(o.dir)) if (leftOpen(i, start)) finishItem(o.dir, i.symbol, { reason: why });
     const ended = readQueue(o.dir).filter((i) => (i.endedAt ?? '') >= start);
-    const d = ended.filter((i) => i.state === 'done').length, f = ended.filter((i) => i.state === 'failed').length;
-    note.lastRun = { started: start, at: now().toISOString(), result: `${d} analysed, ${f} failed${trouble ? `; ${trouble}` : ''}` };
+    const done = ended.filter((i) => i.state === 'done'), a = done.filter((i) => i.already).length, f = ended.filter((i) => i.state === 'failed').length;
+    note.lastRun = { started: start, at: now().toISOString(), result: `${done.length - a} analysed${a ? `, ${a} already called today` : ''}, ${f} failed${trouble ? `; ${trouble}` : ''}` };
     running = false;
     beat();
     if (owed) { owed = false; pending = true; }
