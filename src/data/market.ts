@@ -3,6 +3,7 @@
 // The checked price table and its rules are adapted from TradingAgents (tradingagents/dataflows/vendors/yahoo/
 // snapshot.py and agents/context.py), Apache License 2.0.
 import { analysisDate, addDays, isHistorical, today, window } from './dates.js';
+import { NoData } from './http.js';
 import { compute, INDICATORS, INDICATOR_NAMES, isIndicator, type IndicatorName } from './indicators.js';
 import { cryptoBase, normalizeSymbol } from './symbols.js';
 import { daily, history, type Bar, type Series } from './yahoo.js';
@@ -41,8 +42,8 @@ const clock = (ms: number, zone = 'UTC'): string => {
   try { return `${new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: zone })} ${zone} time`; } catch { return `${new Date(ms).toISOString().slice(11, 16)} UTC`; }
 };
 
-/** How long after a session ends its figures are taken as final at the source: the desk says Yahoo's prices may be up to
- *  15 minutes late, so a row read sooner than that after the close is not called final. */
+/** How long after a session ends its figures are taken as final at the source: a margin of 15 minutes, so a row read sooner
+ *  than that after the close is not called final. (How late Yahoo's live prices may be is said in data/delay.ts.) */
 export const SETTLE_MS = 15 * 60_000;
 
 /** What the latest row is. `open`: its close is not a final close; `label`: what the checked price table calls it;
@@ -82,6 +83,17 @@ export function latestState(s: Series, upTo: string, now = Date.now()): LatestSt
   }
   if (!session && last.date === today()) return said(final, ['- **The latest row is today\'s session. If the market is still open it is partial: its close, high, low and volume are the latest so far, and every indicator on it will change by the close. Do not treat a level as broken or held on this row alone.**']);
   return said(final, []);
+}
+
+/** The last final close of a symbol on or before `upTo`, for the evening wrap-up's stops: the latest row, or the one before
+ *  it when the latest is still trading or was read before its close was final. As traded (split-adjusted only), the price
+ *  printed that day. */
+export async function lastClose(raw: string, upTo: string, now = Date.now()): Promise<{ date: string; close: number }> {
+  const s = await daily(raw, addDays(upTo, -14), upTo), rows = s.traded?.length === s.bars.length ? s.traded : s.bars;
+  if (!rows.length) throw new NoData(`Yahoo Finance has no prices for ${normalizeSymbol(raw)} in the two weeks to ${upTo}`);
+  const last = latestState(s, upTo, now).open ? rows.at(-2) : rows.at(-1);
+  if (!last) throw new NoData(`Yahoo Finance has no finished session for ${normalizeSymbol(raw)} in the two weeks to ${upTo}`);
+  return { date: last.date, close: last.close };
 }
 
 const MAX_ROWS = 260;

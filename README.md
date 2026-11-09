@@ -84,7 +84,8 @@ folder. It cannot reach back into a conversation opened before this warning was 
 <details>
 <summary>The sources, in words</summary>
 
-Free public sources, with no keys: Yahoo Finance (prices, news, company profile), StockTwits, Reddit, FRED (economic
+Free public sources, with no keys: Yahoo Finance (prices, news, and the company data of a listing outside the US, which
+it mostly refuses to programs), StockTwits, Reddit, FRED (economic
 figures), Polymarket (odds) and SEC EDGAR (company filings). World news is the news Yahoo Finance files under the
 market's own symbols (the S&P 500, the 10-year Treasury yield, oil, gold, the euro; `worldNewsSearches` in
 `desk-settings.json`): its search finds none under topic words. Yahoo Finance has no official free service: the desk reads
@@ -136,8 +137,10 @@ the team's "talk" switch shows these messages in the Messages panel; with it off
    a few trading days later against its market's index (`/settle`), and the lessons go into later analyses.
    `/backtest NVDA,AAPL 2026-06-01 2026-08-01` runs the team over past dates in a journal of its own and reports, by
    rating, how often the direction was right and the mean alpha. It is slow and uses a lot of model time, and for past
-   dates only prices, indicators, economic figures and what US companies filed with the SEC (accounts, valuation,
-   insider trades) are as known then: news, posts and odds are recent-only, so they are thin.
+   dates it reads only what was out by then, though not all of it as it stood then: what US companies and funds filed
+   with the SEC (accounts, valuation, insider trades, holdings) as made public by that date; economic figures released
+   by then, at today's revised values; prices adjusted for every split and dividend since. News, posts and odds exist
+   only for recent days, so they are thin.
 2. **You see.** Ask the team to open the dashboard, or type `/terminal`: a page on your own computer that starts with
    the whole market, the eleven sectors and your own names side by side, then the market weather and what is worth a
    look today, then the markets, a chart of any stock (area
@@ -201,7 +204,8 @@ the team's "talk" switch shows these messages in the Messages panel; with it off
   cannot open it (an administrator still can, as with any file); the real protection is that agents get no free shell or
   file access outside this folder without your approval, so **never run this folder with permission checks bypassed**.
 - Nothing is ever sold by itself. A stop is a price the desk's trader proposed: the dashboard watches it and tells you
-  when the price falls below it, and never places a stop order. A Sell or Underweight on something you hold opens a
+  when the price falls below it, but only while its page is open in a browser, and never places a stop order. With the
+  page closed, the evening wrap-up names any holding whose last close is below its stop, when it runs. A Sell or Underweight on something you hold opens a
   ticket only on your press, with the same caps, Robinhood's check and your Confirm.
 - A source that cannot be reached is reported as unavailable, never as "no news". No number is invented.
 
@@ -229,8 +233,9 @@ Stop, at the top right, closes it.
 
 ### Your first month: Get started
 On your first visit, while the desk has no calls yet, the dashboard opens on **Get started**: a safe first month in five
-steps, each ticked off by itself as it is done, wherever you do it (on the page, or by asking the desk in a chat). The
-ticks are read from the desk's own records, never from what the page says happened:
+steps, each ticked off by itself as it is done, wherever you do it (on the page, or by asking the desk in a chat), except
+reading your first calls, which ticks when you open one on the page. The ticks are read from the desk's own records,
+never from what the page says happened:
 1. **Give the desk your email for the SEC**, once, in the field there (or in a chat). It ticks when the email is saved.
 2. **Pick three to five companies you know, plus the whole market and one or two sectors you understand.** Search your
    companies at the top and press Add to watchlist; on Start here, press + on a whole-market fund and on a sector or
@@ -287,7 +292,8 @@ forecast:
 Under the list, the switch **"Analyse the top 3 each market morning"** is off as shipped. Switching it on puts nothing
 on the list at once: it starts the next market morning. Then, once each market morning (before noon in New York; a
 weekend or one of New York's market holidays is not one), the top three that were not already called today go on the
-waiting list at shallow depth, and run when something is listening; each analysis uses your Claude plan, like a chat.
+waiting list at shallow depth, and run when something is listening; each analysis is a full team run on the models of
+whatever runs it (Madav's own, or your Claude plan with Claude Code).
 The morning routine reads the same list.
 
 ### What you hold: the desk's view, its stop, and sells you confirm
@@ -299,9 +305,11 @@ In the Agentic account the desk takes care of what you hold:
 - **Re-rating.** A view a week old or more is due again. On a Monday (the Tuesday, when Monday is one of New York's
   market holidays) the morning routine puts up to three such holdings (those with no view first, then the oldest) on the
   waiting list at shallow depth, within its limit of five a morning. Meanwhile they show "re-rating".
-- **Its stop.** The desk's trader writes the price under which it would sell to limit a loss. The dashboard watches
-  Yahoo Finance's price (up to 15 minutes late) against it. When the price falls below, a notice says so, and the
-  holding is marked "below its stop" for as long as it stays there. Nothing is sold: it is a prompt to look, and the
+- **Its stop.** The desk's trader writes the price under which it would sell to limit a loss. While the dashboard's
+  page is open in a browser, it watches Yahoo Finance's price against it. When the price falls below, a notice says so,
+  and the holding is marked "below its stop" for as long as it stays there. With the page closed nothing watches it
+  during the day: the evening wrap-up then names any holding whose last close is below its stop, but only when it runs
+  (your routines switched on in Madav, or asked for in a chat). Nothing is sold: it is a prompt to look, and the
   decision is yours.
 - **"The desk says sell".** When the latest call on a holding is Sell or Underweight, it is marked so, with a Sell…
   button. It opens that call's ticket: everything held for a Sell, half for an Underweight (as your settings say), only
@@ -309,7 +317,8 @@ In the Agentic account the desk takes care of what you hold:
   Robinhood's agent doorway trades stocks and funds.
 
 When a holding is below its stop or the desk says to sell it, it also shows at the top of the desk, under "What you hold
-needs a look", with the reason and what you can do. Nothing reaches you outside the dashboard (no email, no phone).
+needs a look", with the reason and what you can do. Outside the dashboard only the evening wrap-up says it, when it
+runs; nothing comes by email or to your phone.
 
 ### Your paper record
 Before you risk money, every call the desk makes on a stock, a fund, Bitcoin or Ether is followed on paper, and after
@@ -371,8 +380,9 @@ The trading-desk team has two routines, which Madav's scheduler can start for yo
   old (or that have none) on the waiting list, to be re-rated at shallow depth. On a day New York's market is closed (a
   weekend or one of its holidays, from the NYSE's published list), it only scores past calls, and lists nothing to
   analyse.
-- **Evening wrap-up**: scores what is ready and tells you the day's calls, the orders the dashboard sent and what
-  Robinhood answered.
+- **Evening wrap-up**: scores what is ready and tells you, first, any holding of the Agentic account whose last close
+  is below the stop the desk's trader proposed (it only reports: nothing is sold), then the day's calls, the orders the
+  dashboard sent and what Robinhood answered.
 
 The project ships them to Madav (`.claude/routines.json`), beside "Run automatically when the dashboard asks": in
 Madav's Routines list you find **Morning routine** (8:00 on weekdays) and **Evening wrap-up** (17:00 on weekdays), on

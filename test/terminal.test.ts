@@ -541,7 +541,7 @@ test('"Market weather": the trend, the mood and the rates, each from figures, an
   } });
   const w = (await call(term, 'GET', '/api/weather')).json().weather;
   assert.deepEqual(w.lines.map((l: any) => [l.name, l.state, l.tone]), [['Trend', 'Rising', 'ok'], ['Mood', 'Wild', 'bad'], ['Rates', 'No change', '']]);
-  assert.equal(w.lines[2].words, `For the Federal Reserve's next decision, by ${by}, Polymarket's crowd puts no change at 88% and a rise of 0.25% at 12%.`);
+  assert.equal(w.lines[2].words, `For the Federal Reserve's next decision, by ${by}, Polymarket's crowd puts no change at 88% and a rise of 0.25 percentage points at 12%.`);
   assert.ok(w.lines.every((l: any) => l.meaning.length > 40), 'every line says what it means');
   polymarket = false;
   const kept = (await call(term, 'GET', '/api/weather')).json().weather;

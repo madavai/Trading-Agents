@@ -42,7 +42,7 @@ test('Start here: the whole market and the eleven sectors always, the person\'s 
   assert.deepEqual(item('XLK').call, { rating: 'Overweight', date: '2026-10-01' });
   assert.equal(item('QQQ').call, null, 'no call yet is null, never a made-up rating');
   assert.deepEqual([item('SPY').watched, item('QQQ').watched, item('AAPL').favourite], [true, false, true]);
-  assert.deepEqual([item('SPY').name, item('SPY').meaning], ['S&P 500 fund', 'copies the S&P 500 index: the 500 largest US companies']);
+  assert.deepEqual([item('SPY').name, item('SPY').meaning], ['S&P 500 fund', 'copies the S&P 500 index: about 500 large US companies, chosen by S&P']);
   // Round 1 (7 Nov 2026): the watchlist's "S&P 500" was SPY at $735.29 while the Markets card's "S&P 500" was the index
   // at 7,377. A fund that copies an index is named as a fund, never with an index's own name.
   const cards = new Map(MARKETS.map((m) => [m.name, m.symbol]));

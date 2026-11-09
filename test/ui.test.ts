@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { markdown } from '../src/terminal/ui/md.js';
-import { averageOf, barOn, chipDay, clock, labelled, money, moveDayOf, num, nyDay, opening, pct, plain, points, priceDayWords, resultOf, shortDay, weekDay, when } from '../src/terminal/ui/fmt.js';
+import { averageOf, barOn, chipDay, clock, labelled, money, moveDayOf, num, nyDay, opening, pct, plain, points, priceDayWords, qty, resultOf, shortDay, weekDay, when } from '../src/terminal/ui/fmt.js';
+import { LATE } from '../src/data/delay.js';
 
 const ui = 'src/terminal/ui';
 const read = (f: string) => fs.readFileSync(path.join(ui, f), 'utf8');
@@ -90,7 +91,15 @@ test('the page names the day of a move or a time that is not today, and never ca
   assert.deepEqual([chipDay('2026-11-06', sat), chipDay('2026-10-30', sat)], ['Fri', '30 Oct'], 'its weekday within the week, else its date');
   assert.equal(priceDayWords('$188.08', '+2.78%', { open: false, asOf: fri }, sat), '$188.08, the close of Fri 6 Nov (+2.78% that day), from Yahoo Finance');
   assert.equal(priceDayWords('$188.08', '+2.78%', { open: false, asOf: fri }, new Date('2026-11-06T22:00:00Z')), "$188.08, today's close (+2.78% today), from Yahoo Finance");
-  assert.equal(priceDayWords('$188.08', '+2.78%', { open: true, asOf: fri }, new Date('2026-11-06T20:00:00Z')), '$188.08 (+2.78% today) on Yahoo Finance, up to 15 min late');
+  // how late a live price may be, by its market, as data/delay.ts says from Yahoo's own list: never one figure for every
+  // market (audit 1 F2: "up to 15 min late" everywhere, where Yahoo lists 20 and 30 minutes for some), and nothing
+  // about lateness beside a final close
+  const open = new Date('2026-11-06T20:00:00Z');
+  for (const market of ['us', 'coin', 'other'] as const) assert.equal(priceDayWords('$188.08', '+2.78%', { open: true, asOf: fri, market }, open), `$188.08 (+2.78% today) on Yahoo Finance, ${LATE[market]}`, market);
+  assert.equal(priceDayWords('$188.08', '+2.78%', { open: true, asOf: fri }, open), '$188.08 (+2.78% today) on Yahoo Finance, may be late', 'a quote whose market is not known gives no figure');
+  assert.doesNotMatch(priceDayWords('$188.08', '+2.78%', { open: false, asOf: fri, market: 'other' }, sat), /late|real-time|minute/, 'a final close says nothing of lateness');
+  // a quantity as held, never rounded to four places (a coin's 0.00012345) or to none (audit 1 F6)
+  assert.deepEqual([qty(12), qty(0.00012345), qty(2.5), qty(1234.5678), qty(null)], ['12', '0.00012345', '2.5', '1,234.5678', '—']);
   assert.equal(priceDayWords('$188.08', null, { open: false, asOf: fri }, sat), '$188.08, the close of Fri 6 Nov, from Yahoo Finance', 'no move given: none written');
   // a time today is its clock; another day's has its day, another year's its year (in the person's own time)
   const now = new Date(2026, 10, 7, 10, 0), run = new Date(2026, 9, 24, 0, 54).toISOString(), early = new Date(2026, 10, 7, 8, 5).toISOString();

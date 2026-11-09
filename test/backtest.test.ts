@@ -100,7 +100,11 @@ test('a sweep records into its own journal and runs, never the live ones, and ca
   const started = await call('start_backtest', { ...args, sweep_id: 'june' });
   assert.match(started, /^Backtest sweep june: 2 cell\(s\) \(1 stock\(s\) on 2 date\(s\), every 7 day\(s\), 2026-08-31 to 2026-09-07\); 0 already recorded, 2 to run\./);
   assert.match(started, /1\. NVDA 2026-08-31\n2\. NVDA 2026-09-07/);
-  assert.match(started, /news, posts, odds, the company profile and insider trades exist only for recent days/);
+  // Audit 1 E3/E4: a US filer's profile and insider trades are its filings as public then; prices carry later splits
+  assert.match(started, /A US company's accounts, profile and insider trades, and a US fund's holdings, are its SEC filings as made public by that date/);
+  assert.match(started, /economic figures are those released by then, at today's revised values; prices and indicators are adjusted for every split and dividend since/);
+  assert.match(started, /news, posts and odds exist only for recent days/);
+  assert.doesNotMatch(started, /the company profile and insider trades exist only for recent days/);
 
   assert.match(await call('plan_analysis', { symbol: 'NVDA', analysis_date: '2026-08-31', analysts: ['market'] }), /^\[Backtest sweep june: this run is recorded in the sweep's own journal, not the live one\.\]\nAnalysis plan for NVDA/);
   await call('save_run_section', { symbol: 'NVDA', analysis_date: '2026-08-31', section: 'decision', text: '**Rating**: Buy\n\nAdd.' });
