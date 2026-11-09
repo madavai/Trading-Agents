@@ -184,7 +184,7 @@ test('an ETF set up as a trust (SPY) reports under its own number; a company fil
   sec(seen);
   assert.equal((await latestReport('SPY', '2026-10-21'))?.filed, '2026-08-28');
   assert.ok(seen.some((u) => u.endsWith('/Archives/edgar/data/884394/000141036826089410/primary_doc.xml')));
-  assert.equal(await latestReport('NVDA', '2026-10-21'), null);
+  await assert.rejects(latestReport('NVDA', '2026-10-21'), (e: Error) => e instanceof NoData && /^NVDA reports to the SEC as a company or a trust, not as a fund that lists its holdings \(form N-PORT\): the one filing in the SEC's list of its recent filings is not one\./.test(e.message));
   assert.equal(await latestReport('7203.T', '2026-10-21'), null, 'not a US filer');
 });
 

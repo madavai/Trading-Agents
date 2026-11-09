@@ -3,7 +3,7 @@
 // trades known by then. An amended filing (Form 4/A) takes the place of the filing it corrects, never adds to it.
 // Free and official; the SEC asks every caller for a contact email (http.ts sends it).
 import { addDays } from './dates.js';
-import { getText, NoData, readWords } from './http.js';
+import { getText, NoData, readWords, Unavailable } from './http.js';
 import { filingsReadAt, submissions } from './sec.js';
 
 /** One line of a Form 4's table of shares: a trade (or an award, a gift, an option exercise) by one insider. */
@@ -119,30 +119,55 @@ export async function secInsiders(symbol: string, cik: string, asOf: string, day
     if (partial) throw new NoData(`the SEC's recent list of ${symbol}'s filings starts on ${oldest}, after ${addDays(from, 1)}, so the trades of those days cannot be read`);
     return `${head}: none. No director, officer or large owner reported a trade in these ${days} days. That is a fact from the SEC${listRead}, not a gap in the data.`;
   }
+  // A filing that cannot be read is never taken for one with no trades: the counts say which filings they come from.
   const read = picked.slice(0, limit), filings: Filing[] = [];
-  let failed = 0;
+  let failed = 0, why = '';
   for (const p of read) {
     const acc = r.accessionNumber?.[p.i] ?? '', doc = (r.primaryDocument?.[p.i] ?? '').replace(/^xsl[^/]*\//, '');
-    if (!/^[\d-]+$/.test(acc) || !/^[\w.-]+\.xml$/i.test(doc)) { failed++; continue; }
-    try { filings.push(parseFiling(await getText(`https://www.sec.gov/Archives/edgar/data/${Number(cik)}/${acc.replaceAll('-', '')}/${doc}`), p.form, p.filed)); } catch { failed++; }
+    try {
+      if (!/^[\d-]+$/.test(acc) || !/^[\w.-]+\.xml$/i.test(doc)) throw new NoData('its address in the SEC\'s list is not one the desk can read');
+      const xml = await getText(`https://www.sec.gov/Archives/edgar/data/${Number(cik)}/${acc.replaceAll('-', '')}/${doc}`);
+      // A web page in place of the filing (a refusal, a notice) has no table of trades: it is not read as a filing with none.
+      if (!/<ownershipDocument[\s>]/.test(xml)) throw new Unavailable('www.sec.gov answered with something that is not a Form 4');
+      filings.push(parseFiling(xml, p.form, p.filed));
+    } catch (e) { failed++; why ||= (e as Error).message; }
   }
+  const span = `made public from ${addDays(from, 1)} to ${asOf}`;
+  if (!filings.length) throw new Unavailable(`the SEC lists ${read.length === 1 ? 'one Form 4 filing' : `${read.length} Form 4 filings`} of ${symbol}'s insiders ${span}, but none of them could be read (${why}), so their trades are not known`);
   // Every trade is listed; the counts hold only those first made public in these days (a correction made now of a trade
   // made public before them is listed, not counted).
   const { trades: all, replaced } = amended(filings), trades = all.filter((t) => t.filed > from);
   const market = (code: string) => trades.filter((t) => t.code === code);
+  // A trade whose filing gives no price (one given only in a footnote) is left out of the sum in dollars, and counted.
   const total = (list: InsiderTrade[]) => {
-    const shares = list.reduce((a, t) => a + t.shares, 0), value = list.reduce((a, t) => a + t.shares * (t.price ?? 0), 0), planned = list.filter((t) => t.plan).length;
-    return list.length ? `${list.length} (${fmt(shares)} shares, about ${fmt(value)} USD at their own prices${planned ? `; ${planned} under a pre-arranged 10b5-1 plan` : ''})` : 'none';
+    if (!list.length) return 'none';
+    const shares = list.reduce((a, t) => a + t.shares, 0), priced = list.filter((t) => t.price !== null), planned = list.filter((t) => t.plan).length;
+    const value = priced.reduce((a, t) => a + t.shares * t.price!, 0), bare = list.length - priced.length;
+    const usd = !priced.length ? `${list.length === 1 ? 'its filing gives' : 'their filings give'} no price, so no sum in USD`
+      : `about ${fmt(value)} USD at their own prices${bare ? `; ${bare === 1 ? 'one gives' : `${bare} give`} no price and ${bare === 1 ? 'is' : 'are'} not in that sum` : ''}`;
+    return `${list.length} (${fmt(shares)} shares, ${usd}${planned ? `; ${planned} under a pre-arranged 10b5-1 plan` : ''})`;
   };
   const buys = market('P'), sales = market('S'), other = trades.length - buys.length - sales.length;
   const when = (t: InsiderTrade) => (!t.corrected ? `made public ${t.filed}`
     : `made public ${t.filed}${t.filed > from ? '' : ', before these days'}; corrected ${t.corrected} by an amended filing, a Form 4/A${t.filed > from ? '' : ', so not counted above'}`);
   const lines = all.map((t) => `- ${t.date} (${when(t)}) · ${t.owner} (${t.role}): ${CODES[t.code] ?? `transaction ${t.code} of`} ${fmt(t.shares, 4)} shares${t.price ? ` at ${fmt(t.price, 4)}` : ', no price'}${t.after !== null ? ` · holds ${fmt(t.after, 4)} after` : ''}${t.indirect ? ` · indirectly (${t.indirect})` : ''}${t.plan ? ' · under a 10b5-1 plan' : ''}`);
+  // What the counts leave out: filings that could not be read, older ones beyond the newest `limit`, days before the list.
+  const skipped = picked.length - read.length;
+  const missing = [
+    failed ? `${failed} of the filings could not be read (${why})` : '',
+    skipped ? `only the newest ${read.length} were asked for, made public from ${read.at(-1)!.filed}, so ${skipped === 1 ? 'the one older filing is' : `the ${skipped} older ones are`} not in them` : '',
+    partial ? `the SEC's recent list starts on ${oldest}` : '',
+  ].filter(Boolean);
+  const scope = missing.length
+    ? `Counted from only the ${filings.length} of the ${picked.length} filings ${span} that were read (${missing.join('; ')}). These counts are not the whole ${days} days: a "none" below is not a fact about the insiders`
+    : `In these ${days} days`;
   return [
-    `${head} (${read.length} of ${picked.length} filings read, newest first${failed ? `; ${failed} could not be read` : ''}${replaced ? `; ${replaced === 1 ? 'one is an amended filing, a Form 4/A, shown in place of the filing it corrects' : `${replaced} are amended filings, Form 4/A, each shown in place of the filing it corrects`}` : ''}). Each trade is dated by the day it happened and the day its filing made it public; only filings public by ${asOf} are shown${listRead}.${gap}`,
+    `${head} (${filings.length} of ${picked.length} filings read, newest first${failed ? `; ${failed} could not be read` : ''}${skipped ? `; the ${skipped} oldest not asked for` : ''}${replaced ? `; ${replaced === 1 ? 'one is an amended filing, a Form 4/A, shown in place of the filing it corrects' : `${replaced} are amended filings, Form 4/A, each shown in place of the filing it corrects`}` : ''}). Each trade is dated by the day it happened and the day its filing made it public; only filings public by ${asOf} are shown${listRead}.${gap}`,
     '',
-    `In these ${days} days: bought (code P) ${total(buys)}; sold (code S) ${total(sales)}; other kinds (awards, option exercises, shares handed back for tax, gifts) ${other}.`,
+    `${scope}: bought (code P) ${total(buys)}; sold (code S) ${total(sales)}; other kinds (awards, option exercises, shares handed back for tax, gifts) ${other}.`,
     'P and S are purchases and sales on the market or in a private deal: a purchase is the insider spending their own money. A sale under a 10b5-1 plan was arranged months ahead. Awards, exercises, tax handbacks and gifts say little about what an insider thinks of the price.',
-    '', ...(lines.length ? lines : ['(these filings list no trades in shares, only options or holdings)']),
+    '', ...(lines.length ? lines : [missing.length
+      ? `(the ${filings.length === 1 ? 'one filing' : `${filings.length} filings`} read ${filings.length === 1 ? 'lists' : 'list'} no trades in shares, only options or holdings; the others were not read, so nothing is known of their trades)`
+      : '(these filings list no trades in shares, only options or holdings)']),
   ].join('\n');
 }

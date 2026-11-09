@@ -190,6 +190,12 @@ test('audit 2 K2: an economic figure says when it was read from FRED, a kept cop
 
 const TICKERS = { 0: { cik_str: 1234, ticker: 'ACME' } };
 const LIST = (filed: string[]) => ({ name: 'ACME CORP', filings: { recent: { accessionNumber: filed.map((_, i) => `0000000000-26-00000${i}`), filingDate: filed, reportDate: filed, form: filed.map(() => '4'), primaryDocument: filed.map(() => 'form4.xml') } } });
+/** A readable Form 4 with no trades in shares: a filing the SEC cannot serve is unavailable, never one with none. */
+const FORM4 = `<?xml version="1.0"?><ownershipDocument><schemaVersion>X0609</schemaVersion><documentType>4</documentType><periodOfReport>2026-11-05</periodOfReport>
+  <issuer><issuerCik>0000001234</issuerCik><issuerName>ACME CORP</issuerName><issuerTradingSymbol>ACME</issuerTradingSymbol></issuer>
+  <reportingOwner><reportingOwnerId><rptOwnerCik>0000009999</rptOwnerCik><rptOwnerName>Doe Jane</rptOwnerName></reportingOwnerId>
+    <reportingOwnerRelationship><isDirector>1</isDirector></reportingOwnerRelationship></reportingOwner>
+  <aff10b5One>0</aff10b5One><nonDerivativeTable></nonDerivativeTable></ownershipDocument>`;
 
 test('audit 2 K1: the SEC\'s list of filings is read again after an hour, not a day, and "none" says when the list was read', async () => {
   let lists = 0, filed: string[] = [];
@@ -197,6 +203,7 @@ test('audit 2 K1: the SEC\'s list of filings is read again after an hour, not a 
     const url = String(input);
     if (/company_tickers\.json/.test(url)) return new Response(JSON.stringify(TICKERS));
     if (/submissions\/CIK0000001234\.json/.test(url)) { lists++; return new Response(JSON.stringify(LIST(filed))); }
+    if (/Archives\/edgar\/data\/1234\/\d+\/form4\.xml$/.test(url)) return new Response(FORM4);
     return new Response('no route', { status: 404 });
   } });
   at('2026-11-06T14:00:00Z');   // 09:00 New York time

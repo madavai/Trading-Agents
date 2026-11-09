@@ -19,7 +19,9 @@ export async function search(q: string, count: number): Promise<Article[]> {
   for (const host of HOSTS) {
     try {
       const j = await getJson<SearchJson>(`${host}/v1/finance/search?${qs}`);
-      return (j.news ?? []).filter((n) => n.title && n.providerPublishTime).map((n) => ({ title: n.title!, publisher: n.publisher ?? 'unknown', link: n.link ?? '', time: stamp(n.providerPublishTime!), tickers: (n.relatedTickers ?? []).map((t) => t.toUpperCase()) }));
+      // Its search always carries a list of articles, empty when there are none: an answer without one is broken.
+      if (!Array.isArray(j.news)) throw new Unavailable(`${new URL(host).host} answered its news search without a list of articles`);
+      return j.news.filter((n) => n.title && n.providerPublishTime).map((n) => ({ title: n.title!, publisher: n.publisher ?? 'unknown', link: n.link ?? '', time: stamp(n.providerPublishTime!), tickers: (n.relatedTickers ?? []).map((t) => t.toUpperCase()) }));
     } catch (e) { last = e; }
   }
   throw last;
@@ -58,7 +60,11 @@ export async function companyNews(raw: string, analysis: string, lookBackDays: n
   // Articles carry the tickers they are about; when the search sends none at all, its own match is all there is.
   const untagged = all.length > 0 && all.every((a) => a.tickers.length === 0);
   const found = untagged ? all : all.filter((a) => a.tickers.includes(sym));
-  if (!found.length) throw new Unavailable(`Yahoo Finance's search has no articles tagged ${sym} (it tags few listings outside the US)`);
+  if (!found.length) {
+    // Why it may have none is said only where it applies: a listing with an exchange suffix (7203.T, SHEL.L) is outside the US.
+    const abroad = /\.[A-Z]{1,4}$/.test(sym) ? ' (it carries few articles on listings outside the US)' : '';
+    throw new Unavailable(all.length ? `Yahoo Finance's search returned ${all.length} article${all.length === 1 ? '' : 's'} for ${sym}, none tagged ${sym}${abroad}` : `Yahoo Finance's search returned no articles for ${sym}${abroad}`);
+  }
   const within = found.filter((a) => inWindow(a, from, day)).sort((a, b) => b.time.localeCompare(a.time)), list = within.slice(0, limit);
   if (!list.length) return gap(found, from, day, `news about ${sym}`);
   const how = untagged ? `matched by Yahoo's search for "${sym}", not tagged: check each is about this company` : `tagged ${sym}`;
@@ -77,7 +83,7 @@ export async function worldNews(analysis: string, lookBackDays: number, limit: n
   const seen = new Set<string>(), all: Article[] = [];
   for (const r of results) if (r.status === 'fulfilled') for (const a of r.value) { const k = a.link || a.title; if (!seen.has(k)) { seen.add(k); all.push(a); } }
   const within = all.filter((a) => inWindow(a, from, day)).sort((a, b) => b.time.localeCompare(a.time)), list = within.slice(0, limit);
-  const note = failed ? `\n(${failed} of ${queries.length} searches could not be run: Yahoo Finance did not answer them.)` : '';
+  const note = failed ? `\n(${failed} of ${queries.length} searches could not be run: Yahoo Finance did not answer them, or answered without a list of articles.)` : '';
   if (!list.length) return gap(all, from, day, 'world and economic news') + note;
   // Each search returns only its latest articles: a busy one covers hours, a quiet one days.
   const short = queries.flatMap((q, i) => {
