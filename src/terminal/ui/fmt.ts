@@ -107,8 +107,12 @@ export const NOTES = {
 } as const;
 
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-/** 2026-10-09 as "9 Oct 2026". */
+/** A day as "9 Oct 2026". A market day ("2026-10-09") is that day wherever the person is. A full time
+ *  ("2026-11-07T02:30:00Z", when a stock was asked for or an order made) is on the person's own day, as their computer
+ *  keeps time, like when(): 8:30 PM on 6 Nov in Chicago is 6 Nov, never the 7 Nov of its UTC date. */
 export const dayText = (iso: string): string => {
+  const t = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(iso) ? new Date(iso) : null;
+  if (t && !Number.isNaN(t.getTime())) return `${t.getDate()} ${MON[t.getMonth()]} ${t.getFullYear()}`;
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
   return m ? `${Number(m[3])} ${MON[Number(m[2]) - 1]} ${m[1]}` : iso;
 };

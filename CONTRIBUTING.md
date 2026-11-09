@@ -17,11 +17,15 @@ built, which decisions stand, every document, and what is pending.
   `test/holidays.test.ts` fails once next year is missing.
 - `src/data/` - the free sources, each held to the analysis date, official ones first. `http.ts` keeps answers on disk
   (`keepFor`: a day for SEC documents and figures, an hour for a filer's list of filings and for FRED, five minutes for
-  the rest) and says when each was read (`getTextAt`, `getJsonAt`, `readWords`). `yahoo.ts` keeps a price series in
-  memory no longer than on disk, with when it was read (`fetchedAt`), a volume it does not give as null (never 0), and
-  the days it lists with no prices (`missing`, `unfilled`) and without a dividend-adjusted close (`unadjusted`).
+  the rest) and says when each was read (`getTextAt`, `getJsonAt`, `readWords`); an answer asked for as data that is
+  not data (a web page) is never kept (`usable`). `yahoo.ts` keeps a price series in memory for five minutes from when
+  the source was read (`fetchedAt`, so a disk copy does not start them again), dates each row in the exchange's own time
+  zone (`exchangeTimezoneName`, so a row stamped at its midnight keeps its day across a summer-time change), gives a
+  volume it does not have as null (never 0), and names the days it lists with no prices (`missing`, `unfilled`) and
+  without a dividend-adjusted close (`unadjusted`), and the market the prices are from (`market`, `delay.ts`).
   `market.ts` `latestState` calls a row final only when it was read 15 minutes or more after its session ended
-  (`SETTLE_MS`), and names a source behind its own session record; `adjustedWords` says how the rows are adjusted.
+  (`SETTLE_MS`), 45 for a market whose delay the desk has not checked (`SETTLE_OTHER_MS`), and names a source behind
+  its own session record; `adjustedWords` says how the rows are adjusted.
   `company.ts` is a company's
   accounts, profile, valuation and insider trades: for a US filer all from the SEC as filed by the analysis date
   (`sec.ts`: statements, `submissions` for name and industry code, `sectorOfSic`, `trailingYear` for the last twelve

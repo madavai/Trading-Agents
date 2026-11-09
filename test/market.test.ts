@@ -1,4 +1,7 @@
 import { test, beforeEach } from 'node:test';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import assert from 'node:assert/strict';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -171,4 +174,73 @@ test('the server offers the market tools, and turns failures into plain words fo
   assert.match(await call('get_verified_snapshot', { symbol: 'NVDA', analysis_date: '2027-01-01' }), /^INPUT_ERROR: the analysis date 2027-01-01 is in the future/);
   assert.match(await call('get_instrument', { symbol: 'GONE', analysis_date: '2026-10-09' }), /^NO_DATA_AVAILABLE: identity of GONE/);
   await client.close();
+});
+
+// Audit 3 prices-5 (9 Nov 2026), checked on Yahoo's real answers that day: GC=F's daily rows are stamped at 00:00 New
+// York time and EURUSD=X's at 00:00 London time, and the answer carries one offset, the one in force when it is read. Read
+// in November with it, every summer-time row of gold was dated the day before (Monday 29 June as Sunday 28 June).
+test('rows are dated in the exchange\'s own time zone, so a row stamped at its midnight keeps its day across a summer-time change', () => {
+  const at = (stamps: string[], meta: Record<string, unknown>) => {
+    const j = chartJson(String(meta.symbol), stamps.map((s) => ({ date: s.slice(0, 10), o: 10, h: 11, l: 9, c: 10, v: 5 })), meta);
+    j.chart.result[0]!.timestamp = stamps.map((s) => Date.parse(s) / 1000);
+    return parseChart(j, String(meta.symbol));
+  };
+  const gold = at(['2026-06-29T04:00:00Z', '2026-06-30T04:00:00Z', '2026-10-30T04:00:00Z', '2026-11-02T05:00:00Z', '2026-11-06T05:00:00Z'], { symbol: 'GC=F', instrumentType: 'FUTURE', gmtoffset: -18000, exchangeTimezoneName: 'America/New_York' });
+  assert.deepEqual(gold.bars.map((b) => b.date), ['2026-06-29', '2026-06-30', '2026-10-30', '2026-11-02', '2026-11-06']);
+  const euro = at(['2026-06-28T23:00:00Z', '2026-10-22T23:00:00Z', '2026-10-30T00:00:00Z'], { symbol: 'EURUSD=X', instrumentType: 'CURRENCY', gmtoffset: 0, exchangeTimezoneName: 'Europe/London' });
+  assert.deepEqual(euro.bars.map((b) => b.date), ['2026-06-29', '2026-10-23', '2026-10-30'], 'London on summer time until 25 October');
+  const nvda = at(['2026-07-06T13:30:00Z', '2026-11-06T14:30:00Z'], { symbol: 'NVDA', gmtoffset: -18000, exchangeTimezoneName: 'America/New_York' });
+  assert.deepEqual(nvda.bars.map((b) => b.date), ['2026-07-06', '2026-11-06'], 'US rows, stamped at the open, as before');
+  const noZone = at(['2026-07-06T13:30:00Z'], { symbol: 'X', gmtoffset: -14400, exchangeTimezoneName: undefined });
+  assert.deepEqual(noZone.bars.map((b) => b.date), ['2026-07-06'], 'with no zone named, the answer\'s offset');
+});
+
+// Audit 3 prices-8: the memory copy started its five minutes when it asked, while the answer could be the disk copy,
+// already up to five minutes old, so a price read during the session could be nearly ten minutes old.
+test('a price read is never kept past five minutes from when the source was read, even when it came from the disk copy', async () => {
+  const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ta-age-')), real = Date.now, base = Date.parse('2026-10-12T17:00:00Z');
+  let offset = 0, reads = 0, price = 180;
+  Date.now = () => base + offset;
+  const touch = () => { for (const f of fs.readdirSync(cacheDir)) { const t = new Date(base + offset); fs.utimesSync(path.join(cacheDir, f), t, t); } };
+  try {
+    configure({ cacheDir, fetch: async () => { reads++; return new Response(JSON.stringify(chartJson('NVDA', series('2026-10-12', 30).map((r, i, a) => (i === a.length - 1 ? { ...r, c: price, h: price + 1 } : r))))); } });
+    const last = async () => (await daily('NVDA', '2026-10-01', '2026-10-12')).bars.at(-1)!.close;
+    assert.equal(await last(), 180); touch();                                     // 13:00 in New York: one copy of the tool server reads
+    price = 183.5;
+    offset = 4 * 60_000 + 50_000; clearCache();                                   // another copy, 4 min 50 s later: the disk copy
+    assert.deepEqual([await last(), reads], [180, 1]);
+    offset = 5 * 60_000 + 10_000;                                                 // 5 min 10 s after the source was read
+    assert.deepEqual([await last(), reads], [183.5, 2], 'read again, not the 13:00 price');
+  } finally { Date.now = real; configure({ cacheDir: null }); fs.rmSync(cacheDir, { recursive: true, force: true }); }
+});
+
+// Audit 3 prices-10: asked for one day the source lists with blank prices, price history said "No trading rows".
+test('a window holding only a session the source lists with blank prices names it, never "No trading rows"', async () => {
+  configure({ fetch: withSession(series('2026-10-09', 300), MONDAY, '2026-10-12') });
+  const t = await priceHistory('NVDA', '2026-10-12', '2026-10-12', '2026-10-12');
+  assert.equal(t, 'No prices yet for NVDA from 2026-10-12 to 2026-10-12: the source lists a session on 2026-10-12, but its prices are not filled in yet (this happens for a while after a session ends). Do not say 2026-10-12 had no trading: say its prices were not available yet.');
+  configure({ fetch: chartFetch(() => series('2026-10-09', 300)) });
+  assert.equal(await priceHistory('NVDA', '2026-10-12', '2026-10-10', '2026-10-11'), 'No trading rows for NVDA from 2026-10-10 to 2026-10-11.', 'a weekend has none');
+});
+
+// Audit 3 prices-12: a day was taken as final 15 minutes after the close in every market, though Yahoo's own list has
+// markets up to 30 minutes late, and on 9 Nov 2026 its chart service had London, Frankfurt and Zurich 15 minutes late: read
+// then, the row could still miss the closing auction. A US stock or fund on a checked exchange, and a coin, come real-time.
+test('a day is taken as final 15 minutes after a US close, and 45 minutes after the close of a market whose delay the desk has not checked', () => {
+  const market = (meta: Record<string, unknown>) => parseChart(chartJson('X', series('2026-10-12', 3), meta), 'X').meta.market;
+  assert.deepEqual([
+    market({ instrumentType: 'EQUITY', exchangeName: 'NMS' }), market({ instrumentType: 'ETF', exchangeName: 'PCX' }), market({ instrumentType: 'CRYPTOCURRENCY', exchangeName: 'CCC' }),
+    market({ instrumentType: 'EQUITY', exchangeName: 'LSE' }), market({ instrumentType: 'FUTURE', exchangeName: 'CMX' }), market({ instrumentType: 'INDEX', exchangeName: 'CXI' }),
+  ], ['us', 'us', 'coin', 'other', 'other', 'other']);
+  const end = Date.parse('2026-10-12T15:30:00Z');   // 16:30 in London
+  const row = (m: 'us' | 'other', readAfterMin: number) => latestState({
+    meta: { symbol: 'X', timezone: 'Europe/London', market: m, session: { date: '2026-10-12', start: end - 8.5 * 3_600_000, end } },
+    bars: [{ date: '2026-10-12', open: 1, high: 1, low: 1, close: 1, volume: 1 }], fetchedAt: end + readAfterMin * 60_000,
+  }, '2026-10-12', end + 2 * 3_600_000);
+  assert.equal(row('us', 20).label, 'Close', 'a US close read 20 minutes after is final');
+  const early = row('other', 20);
+  assert.deepEqual([early.open, early.label], [true, 'Latest price (read at 16:50 Europe/London time, not the close)']);
+  assert.match(early.lines[0]!, /just after its session ended \(it ended at 16:30 Europe\/London time, and its figures are taken as final 45 minutes after\)/);
+  assert.equal(row('other', 44).open, true);
+  assert.deepEqual([row('other', 45).open, row('other', 45).lines], [false, ['- The latest row, 2026-10-12, is a finished session: its figures are final.']]);
 });

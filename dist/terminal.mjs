@@ -7493,7 +7493,7 @@ function pruneCache(dir) {
 var excerpt = (body) => body.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 140);
 async function getTextAt(url2, opts = {}) {
   const host = new URL(url2).host, cached3 = readCache(url2);
-  if (cached3 !== null) return cached3;
+  if (cached3 !== null && (!opts.usable || opts.usable(cached3.text))) return cached3;
   for (let attempt = 0; ; attempt++) {
     let res;
     await pace(host);
@@ -7522,7 +7522,7 @@ async function getTextAt(url2, opts = {}) {
       throw new Unavailable(`${host} refused (HTTP ${res.status})${said ? `, saying "${said}"` : ""}${res.status === 429 ? "; it is rate-limiting this computer, so try again in a few minutes" : ""}${sec ? emailNow().trim() ? " [a contact email was sent]" : " [no contact email was sent]" : ""}`);
     }
     const at = Date.now();
-    writeCache(url2, text2);
+    if (!opts.usable || opts.usable(text2)) writeCache(url2, text2);
     return { text: text2, at };
   }
 }
@@ -7530,12 +7530,19 @@ async function getJson(url2, opts = {}) {
   return (await getJsonAt(url2, opts)).value;
 }
 async function getJsonAt(url2, opts = {}) {
-  const { text: text2, at } = await getTextAt(url2, opts);
-  try {
-    return { value: JSON.parse(text2), at };
-  } catch {
-    throw new Unavailable(`${new URL(url2).host} answered with something that is not data`);
-  }
+  const read2 = {};
+  const usable = (text3) => {
+    try {
+      read2.value = JSON.parse(text3);
+      read2.text = text3;
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const { text: text2, at } = await getTextAt(url2, { ...opts, usable });
+  if (read2.text !== text2) throw new Unavailable(`${new URL(url2).host} answered with something that is not data`);
+  return { value: read2.value, at };
 }
 
 // src/terminal/server.ts
@@ -7554,6 +7561,14 @@ function today(now) {
 }
 var addDays = (date4, days) => new Date(Date.parse(`${date4}T00:00:00Z`) + days * DAY).toISOString().slice(0, 10);
 var daysBetween = (from, to) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY);
+
+// src/data/delay.ts
+var US_EXCHANGES = ["NMS", "NGM", "NCM", "NYQ", "PCX", "ASE", "BTS"];
+function priceMarket(listing) {
+  if (listing.instrumentType === "CRYPTOCURRENCY") return "coin";
+  if ((listing.instrumentType === "EQUITY" || listing.instrumentType === "ETF") && US_EXCHANGES.includes(listing.exchangeName ?? "")) return "us";
+  return "other";
+}
 
 // src/data/symbols.ts
 var FOREX = /* @__PURE__ */ new Set(["USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD", "CNY", "CNH", "HKD", "SGD", "SEK", "NOK", "DKK", "PLN", "MXN", "ZAR", "TRY", "INR", "KRW", "BRL", "RUB", "THB"]);
@@ -7652,11 +7667,21 @@ var HOSTS = ["https://query1.finance.yahoo.com", "https://query2.finance.yahoo.c
 var cache = /* @__PURE__ */ new Map();
 var epoch = (date4) => Math.floor(Date.parse(`${date4}T00:00:00Z`) / 1e3);
 var num = (v) => typeof v === "number" && Number.isFinite(v) ? v : null;
+function dayIn(zone, offset) {
+  const byOffset = (ts) => new Date((ts + offset) * 1e3).toISOString().slice(0, 10);
+  if (!zone) return byOffset;
+  try {
+    const f = new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" });
+    return (ts) => f.format(new Date(ts * 1e3));
+  } catch {
+    return byOffset;
+  }
+}
 function parseChart(json, symbol) {
   const r = json.chart?.result?.[0];
   if (!r) throw new NoData(`Yahoo Finance has no prices for ${symbol}${json.chart?.error?.description ? ` (${json.chart.error.description})` : ""}`);
   const m = r.meta ?? {}, q = r.indicators?.quote?.[0] ?? {}, adj = r.indicators?.adjclose?.[0]?.adjclose;
-  const offset = m.gmtoffset ?? 0, dayOf = (ts) => new Date((ts + offset) * 1e3).toISOString().slice(0, 10);
+  const dayOf = dayIn(m.exchangeTimezoneName, m.gmtoffset ?? 0);
   const rows = [], blank = [];
   (r.timestamp ?? []).forEach((ts, i) => {
     const open4 = num(q.open?.[i]), high = num(q.high?.[i]), low = num(q.low?.[i]), close = num(q.close?.[i]);
@@ -7679,7 +7704,7 @@ function parseChart(json, symbol) {
     if (amount !== null && amount > 0 && typeof d.date === "number" && Number.isFinite(d.date)) paid.set(dayOf(d.date), amount);
   }
   return {
-    meta: { symbol: m.symbol ?? symbol, currency: m.currency, exchange: m.fullExchangeName ?? m.exchangeName, type: m.instrumentType, name: m.longName ?? m.shortName, price: m.regularMarketPrice, timezone: m.exchangeTimezoneName, session },
+    meta: { symbol: m.symbol ?? symbol, currency: m.currency, exchange: m.fullExchangeName ?? m.exchangeName, type: m.instrumentType, name: m.longName ?? m.shortName, price: m.regularMarketPrice, timezone: m.exchangeTimezoneName, session, market: priceMarket(m) },
     bars: unique,
     unfilled,
     missing,
@@ -7706,9 +7731,11 @@ var KEEP_MS = keepFor(`${HOSTS[0]}/v8/finance/chart/`);
 async function daily(raw, from, to) {
   const symbol = normalizeSymbol(raw), key = `${symbol}|${from}|${to}`, hit = cache.get(key);
   if (!hit || Date.now() - hit.at >= KEEP_MS) {
-    const series = fetchDaily(symbol, from, to);
-    cache.set(key, { at: Date.now(), series });
-    series.catch(() => {
+    const series = fetchDaily(symbol, from, to), kept = { at: Date.now(), series };
+    cache.set(key, kept);
+    series.then((s2) => {
+      if (s2.fetchedAt !== void 0) kept.at = s2.fetchedAt;
+    }, () => {
       if (cache.get(key)?.series === series) cache.delete(key);
     });
   }
@@ -7879,6 +7906,8 @@ var clock = (ms, zone = "UTC") => {
   }
 };
 var SETTLE_MS = 15 * 6e4;
+var SETTLE_OTHER_MS = 45 * 6e4;
+var settleMs = (meta2) => meta2.market === "other" ? SETTLE_OTHER_MS : SETTLE_MS;
 function gapLines(s) {
   const days = s.missing ?? [];
   if (!days.length) return [];
@@ -7892,9 +7921,10 @@ function latestState(s, upTo, now = Date.now()) {
   if (unfilled) return said(final, [`- **The source lists a session on ${unfilled}, but its prices are not filled in yet (this happens for a while after a session ends). Every figure here is as of ${last.date}. Do not call ${last.date} the latest session, and do not say ${unfilled} had no trading: say its prices were not available yet.**`]);
   if (session && session.date === last.date) {
     if (now < session.end) return said({ open: true, label: "Latest price (still trading)", inline: "still trading: latest price" }, [`- **The latest row, ${last.date}, is a session still trading (it closes at ${clock(session.end, zone)}). Its "close" is the latest price so far, not a close; its high, low, volume and every indicator on it will change. Call it the latest price, never the close, and do not treat a level as broken or held on this row alone.**`]);
-    if (read2 < session.end + SETTLE_MS) {
+    const settle2 = settleMs(s.meta);
+    if (read2 < session.end + settle2) {
       const at = clock(read2, zone);
-      return said({ open: true, label: `Latest price (read at ${at}, not the close)`, inline: `latest price as read at ${at}` }, [`- **The latest row, ${last.date}, was read at ${at}, ${read2 < session.end ? "while its session was still trading" : "just after its session ended"} (it ended at ${clock(session.end, zone)}, and its figures are taken as final ${SETTLE_MS / 6e4} minutes after). Its "close" is the latest price as read then, not the close; its high, low, volume and every indicator on it may still change. Call it the latest price as read at ${at}, never the close, and do not treat a level as broken or held on this row alone.**`]);
+      return said({ open: true, label: `Latest price (read at ${at}, not the close)`, inline: `latest price as read at ${at}` }, [`- **The latest row, ${last.date}, was read at ${at}, ${read2 < session.end ? "while its session was still trading" : "just after its session ended"} (it ended at ${clock(session.end, zone)}, and its figures are taken as final ${settle2 / 6e4} minutes after). Its "close" is the latest price as read then, not the close; its high, low, volume and every indicator on it may still change. Call it the latest price as read at ${at}, never the close, and do not treat a level as broken or held on this row alone.**`]);
     }
     return said(final, [`- The latest row, ${last.date}, is a finished session: its figures are final.`]);
   }
@@ -21884,10 +21914,14 @@ var alphaOf = (e) => {
 };
 function summarize(entries) {
   const resolved = entries.filter((e) => !e.pending && e.rating !== REVIEW2).map((e) => ({ e, a: alphaOf(e) })).filter((x) => x.a !== null);
-  const byRating = {};
+  const byRating = {}, own2 = {};
+  const isOwn = (e) => e.rules !== null && ownReturn(e.rules);
   for (const rating of new Set(resolved.map((x) => x.e.rating))) {
-    const alphas = resolved.filter((x) => x.e.rating === rating).map((x) => x.a), dir = directionOf(rating);
-    byRating[rating] = { count: alphas.length, direction: dir, hitRate: dir ? alphas.filter((a) => worked(rating, a)).length / alphas.length : null, meanAlpha: alphas.reduce((s, a) => s + a, 0) / alphas.length };
+    const of = (mine) => resolved.filter((x) => x.e.rating === rating && isOwn(x.e) === mine).map((x) => x.a), dir = directionOf(rating);
+    const mean = (xs) => xs.reduce((s, a) => s + a, 0) / xs.length;
+    const alphas = of(false), returns = of(true);
+    if (alphas.length) byRating[rating] = { count: alphas.length, direction: dir, hitRate: dir ? alphas.filter((a) => worked(rating, a)).length / alphas.length : null, meanAlpha: mean(alphas) };
+    if (returns.length) own2[rating] = { count: returns.length, worked: dir ? returns.filter((a) => worked(rating, a)).length : null, meanReturn: mean(returns) };
   }
   const unscored = entries.filter((e) => e.rating === REVIEW2).length;
   const windows = [...new Set(resolved.map(({ e }) => {
@@ -21895,7 +21929,7 @@ function summarize(entries) {
     return days > 0 ? windowWords({ days, unit: e.rules?.unit ?? (isCrypto(e.ticker) ? "calendar" : "trading") }) : "";
   }).filter(Boolean))].sort();
   const yardsticks = [...new Set(resolved.map(({ e }) => e.rules?.yardstick ?? "").filter(Boolean))].sort();
-  return { resolved: resolved.length, pending: entries.length - resolved.length - unscored, unscored, byRating, holding: windows.join(", ") || "the configured window", yardsticks: yardsticks.join(", ") };
+  return { resolved: resolved.length, pending: entries.length - resolved.length - unscored, unscored, byRating, ownReturn: own2, holding: windows.join(", ") || "the configured window", yardsticks: yardsticks.join(", ") };
 }
 var pctText = (v) => signedPct(v, 2);
 function renderSummary(s) {
@@ -21903,6 +21937,8 @@ function renderSummary(s) {
   for (const [rating, sc] of Object.entries(s.byRating)) {
     lines.push(`- ${rating}: n=${sc.count}, ${sc.hitRate !== null ? `called the direction ${Math.round(sc.hitRate * 100)}%` : "no direction claimed"}, mean alpha ${pctText(sc.meanAlpha)} vs the yardstick`);
   }
+  const own2 = Object.entries(s.ownReturn);
+  if (own2.length) lines.push(`- On their own return, not in the lines above (a call on the yardstick itself or a fund that copies the same index): ${own2.map(([rating, o]) => `${rating} n=${o.count}, ${o.worked === null ? "no direction claimed" : `worked ${o.worked}`}, mean return ${pctText(o.meanReturn)}`).join("; ")}`);
   lines.push("");
   if (s.pending) lines.push("Pending cells are not scored above; settle them when their window has traded.");
   if (s.unscored) lines.push("Unscored cells had no readable rating (Needs review): they count neither for nor against the desk.");
@@ -22293,14 +22329,6 @@ function callOf(root2, ticker, date4) {
   return { decision: e.decision, sections: sectionsOf(dir, ticker, date4), hasReport: hasReport(dir, ticker, date4) };
 }
 
-// src/data/delay.ts
-var US_EXCHANGES = ["NMS", "NGM", "NCM", "NYQ", "PCX", "ASE", "BTS"];
-function priceMarket(listing) {
-  if (listing.instrumentType === "CRYPTOCURRENCY") return "coin";
-  if ((listing.instrumentType === "EQUITY" || listing.instrumentType === "ETF") && US_EXCHANGES.includes(listing.exchangeName ?? "")) return "us";
-  return "other";
-}
-
 // src/terminal/quotes.ts
 var finite2 = (v) => typeof v === "number" && Number.isFinite(v);
 function parseQuote(json, symbol, nowSec = Date.now() / 1e3) {
@@ -22531,7 +22559,7 @@ async function workScreen(symbols, news, day2, now = /* @__PURE__ */ new Date())
   const list3 = [...new Set(symbols)].filter((s) => !/[\^=]/.test(s));
   const read2 = await inTurn(list3, 4, async (symbol) => {
     try {
-      const s = await daily(symbol, addDays(day2, -400), day2), bars = s.bars;
+      const s = await daily(symbol, addDays(day2, -400), day2), bars = s.traded?.length === s.bars.length ? s.traded : s.bars;
       if (!bars.length || bars[bars.length - 1].date < addDays(day2, -7)) return { symbol, bars: null, news: null, asked: false, live: false };
       const asked2 = news.has(symbol);
       return { symbol, bars, news: asked2 ? await newsOn(symbol, day2) : null, asked: asked2, live: latestState(s, day2, now.getTime()).open };

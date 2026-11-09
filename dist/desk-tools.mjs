@@ -37139,7 +37139,7 @@ async function getText(url2, opts = {}) {
 }
 async function getTextAt(url2, opts = {}) {
   const host = new URL(url2).host, cached3 = readCache(url2);
-  if (cached3 !== null) return cached3;
+  if (cached3 !== null && (!opts.usable || opts.usable(cached3.text))) return cached3;
   for (let attempt = 0; ; attempt++) {
     let res;
     await pace(host);
@@ -37168,7 +37168,7 @@ async function getTextAt(url2, opts = {}) {
       throw new Unavailable(`${host} refused (HTTP ${res.status})${said ? `, saying "${said}"` : ""}${res.status === 429 ? "; it is rate-limiting this computer, so try again in a few minutes" : ""}${sec ? emailNow().trim() ? " [a contact email was sent]" : " [no contact email was sent]" : ""}`);
     }
     const at = Date.now();
-    writeCache(url2, text4);
+    if (!opts.usable || opts.usable(text4)) writeCache(url2, text4);
     return { text: text4, at };
   }
 }
@@ -37187,12 +37187,19 @@ async function getJson(url2, opts = {}) {
   return (await getJsonAt(url2, opts)).value;
 }
 async function getJsonAt(url2, opts = {}) {
-  const { text: text4, at } = await getTextAt(url2, opts);
-  try {
-    return { value: JSON.parse(text4), at };
-  } catch {
-    throw new Unavailable(`${new URL(url2).host} answered with something that is not data`);
-  }
+  const read2 = {};
+  const usable = (text5) => {
+    try {
+      read2.value = JSON.parse(text5);
+      read2.text = text5;
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const { text: text4, at } = await getTextAt(url2, { ...opts, usable });
+  if (read2.text !== text4) throw new Unavailable(`${new URL(url2).host} answered with something that is not data`);
+  return { value: read2.value, at };
 }
 function failureText(e, what) {
   if (e instanceof NoData) return `NO_DATA_AVAILABLE: ${what}: ${e.message}. Do not estimate or invent values; report that the data is not available.`;
@@ -37465,16 +37472,34 @@ function safeSymbol(raw) {
   return s;
 }
 
+// src/data/delay.ts
+var US_EXCHANGES = ["NMS", "NGM", "NCM", "NYQ", "PCX", "ASE", "BTS"];
+function priceMarket(listing) {
+  if (listing.instrumentType === "CRYPTOCURRENCY") return "coin";
+  if ((listing.instrumentType === "EQUITY" || listing.instrumentType === "ETF") && US_EXCHANGES.includes(listing.exchangeName ?? "")) return "us";
+  return "other";
+}
+
 // src/data/yahoo.ts
 var HOSTS = ["https://query1.finance.yahoo.com", "https://query2.finance.yahoo.com"];
 var cache = /* @__PURE__ */ new Map();
 var epoch = (date5) => Math.floor(Date.parse(`${date5}T00:00:00Z`) / 1e3);
 var num = (v) => typeof v === "number" && Number.isFinite(v) ? v : null;
+function dayIn(zone, offset) {
+  const byOffset = (ts) => new Date((ts + offset) * 1e3).toISOString().slice(0, 10);
+  if (!zone) return byOffset;
+  try {
+    const f = new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" });
+    return (ts) => f.format(new Date(ts * 1e3));
+  } catch {
+    return byOffset;
+  }
+}
 function parseChart(json2, symbol4) {
   const r = json2.chart?.result?.[0];
   if (!r) throw new NoData(`Yahoo Finance has no prices for ${symbol4}${json2.chart?.error?.description ? ` (${json2.chart.error.description})` : ""}`);
   const m2 = r.meta ?? {}, q = r.indicators?.quote?.[0] ?? {}, adj = r.indicators?.adjclose?.[0]?.adjclose;
-  const offset = m2.gmtoffset ?? 0, dayOf2 = (ts) => new Date((ts + offset) * 1e3).toISOString().slice(0, 10);
+  const dayOf2 = dayIn(m2.exchangeTimezoneName, m2.gmtoffset ?? 0);
   const rows = [], blank = [];
   (r.timestamp ?? []).forEach((ts, i) => {
     const open3 = num(q.open?.[i]), high = num(q.high?.[i]), low = num(q.low?.[i]), close = num(q.close?.[i]);
@@ -37497,7 +37522,7 @@ function parseChart(json2, symbol4) {
     if (amount !== null && amount > 0 && typeof d.date === "number" && Number.isFinite(d.date)) paid.set(dayOf2(d.date), amount);
   }
   return {
-    meta: { symbol: m2.symbol ?? symbol4, currency: m2.currency, exchange: m2.fullExchangeName ?? m2.exchangeName, type: m2.instrumentType, name: m2.longName ?? m2.shortName, price: m2.regularMarketPrice, timezone: m2.exchangeTimezoneName, session: session2 },
+    meta: { symbol: m2.symbol ?? symbol4, currency: m2.currency, exchange: m2.fullExchangeName ?? m2.exchangeName, type: m2.instrumentType, name: m2.longName ?? m2.shortName, price: m2.regularMarketPrice, timezone: m2.exchangeTimezoneName, session: session2, market: priceMarket(m2) },
     bars: unique,
     unfilled,
     missing,
@@ -37524,9 +37549,11 @@ var KEEP_MS = keepFor(`${HOSTS[0]}/v8/finance/chart/`);
 async function daily(raw, from, to) {
   const symbol4 = normalizeSymbol(raw), key = `${symbol4}|${from}|${to}`, hit = cache.get(key);
   if (!hit || Date.now() - hit.at >= KEEP_MS) {
-    const series = fetchDaily(symbol4, from, to);
-    cache.set(key, { at: Date.now(), series });
-    series.catch(() => {
+    const series = fetchDaily(symbol4, from, to), kept = { at: Date.now(), series };
+    cache.set(key, kept);
+    series.then((s2) => {
+      if (s2.fetchedAt !== void 0) kept.at = s2.fetchedAt;
+    }, () => {
       if (cache.get(key)?.series === series) cache.delete(key);
     });
   }
@@ -37588,6 +37615,8 @@ var clock = (ms, zone = "UTC") => {
   }
 };
 var SETTLE_MS = 15 * 6e4;
+var SETTLE_OTHER_MS = 45 * 6e4;
+var settleMs = (meta3) => meta3.market === "other" ? SETTLE_OTHER_MS : SETTLE_MS;
 function gapLines(s) {
   const days = s.missing ?? [];
   if (!days.length) return [];
@@ -37601,9 +37630,10 @@ function latestState(s, upTo, now = Date.now()) {
   if (unfilled) return said(final, [`- **The source lists a session on ${unfilled}, but its prices are not filled in yet (this happens for a while after a session ends). Every figure here is as of ${last.date}. Do not call ${last.date} the latest session, and do not say ${unfilled} had no trading: say its prices were not available yet.**`]);
   if (session2 && session2.date === last.date) {
     if (now < session2.end) return said({ open: true, label: "Latest price (still trading)", inline: "still trading: latest price" }, [`- **The latest row, ${last.date}, is a session still trading (it closes at ${clock(session2.end, zone)}). Its "close" is the latest price so far, not a close; its high, low, volume and every indicator on it will change. Call it the latest price, never the close, and do not treat a level as broken or held on this row alone.**`]);
-    if (read2 < session2.end + SETTLE_MS) {
+    const settle2 = settleMs(s.meta);
+    if (read2 < session2.end + settle2) {
       const at = clock(read2, zone);
-      return said({ open: true, label: `Latest price (read at ${at}, not the close)`, inline: `latest price as read at ${at}` }, [`- **The latest row, ${last.date}, was read at ${at}, ${read2 < session2.end ? "while its session was still trading" : "just after its session ended"} (it ended at ${clock(session2.end, zone)}, and its figures are taken as final ${SETTLE_MS / 6e4} minutes after). Its "close" is the latest price as read then, not the close; its high, low, volume and every indicator on it may still change. Call it the latest price as read at ${at}, never the close, and do not treat a level as broken or held on this row alone.**`]);
+      return said({ open: true, label: `Latest price (read at ${at}, not the close)`, inline: `latest price as read at ${at}` }, [`- **The latest row, ${last.date}, was read at ${at}, ${read2 < session2.end ? "while its session was still trading" : "just after its session ended"} (it ended at ${clock(session2.end, zone)}, and its figures are taken as final ${settle2 / 6e4} minutes after). Its "close" is the latest price as read then, not the close; its high, low, volume and every indicator on it may still change. Call it the latest price as read at ${at}, never the close, and do not treat a level as broken or held on this row alone.**`]);
     }
     return said(final, [`- The latest row, ${last.date}, is a finished session: its figures are final.`]);
   }
@@ -37625,7 +37655,11 @@ var MAX_ROWS = 260;
 async function priceHistory(raw, analysis2, start, end) {
   const day3 = analysisDate(analysis2), [s, e] = window(start, end, day3);
   const series = await daily(raw, s, e);
-  if (!series.bars.length) return `No trading rows for ${resolved(raw)} from ${s} to ${e}.`;
+  if (!series.bars.length) {
+    const blank = [.../* @__PURE__ */ new Set([...series.unfilled ?? [], ...series.missing ?? []])].filter((d) => d >= s && d <= e).sort(), one3 = blank.length === 1;
+    if (!blank.length) return `No trading rows for ${resolved(raw)} from ${s} to ${e}.`;
+    return `No prices yet for ${resolved(raw)} from ${s} to ${e}: the source lists ${one3 ? "a session" : "sessions"} on ${listDays(blank)}, but ${one3 ? "its" : "their"} prices are not filled in yet (this happens for a while after a session ends). Do not say ${listDays(blank)} had no trading: say ${one3 ? "its" : "their"} prices were not available yet.`;
+  }
   const rows = series.bars.slice(-MAX_ROWS), notes = latestState(series, e).lines;
   const head2 = [`Daily prices for ${resolved(raw)} from ${s} to ${e} (${series.bars.length} trading days${series.bars.length > MAX_ROWS ? `, the last ${MAX_ROWS} shown` : ""}; ${adjustedWords(series)}${series.meta.currency ? `; ${series.meta.currency}` : ""})`, "", "Date | Open | High | Low | Close | Volume", "---|---:|---:|---:|---:|---:"];
   return head2.concat(rows.map((b) => `${b.date} | ${f2(b.open)} | ${f2(b.high)} | ${f2(b.low)} | ${f2(b.close)} | ${vol(b.volume)}`), notes.length ? ["", ...notes] : []).join("\n");
@@ -37699,6 +37733,7 @@ var unsignZero = (text4) => text4.replace(/^[+\-−](0(?:\.0+)?%)$/, "$1");
 
 // src/data/facts.ts
 var WINDOWS = [[20, "about a month"], [63, "about three months"], [126, "about six months"], [252, "about a year"]];
+var COIN_WINDOWS = [[30, "about a month"], [91, "about three months"], [182, "about six months"], [365, "about a year"]];
 var CALENDAR_DAYS = 700;
 var CROSSES_SHOWN = 6;
 var TOP = 3;
@@ -37720,21 +37755,24 @@ function priceFactsText(sym2, day3, s) {
   const close = bars.map((b) => b.close), m2 = macd(close), bb = bollinger(close);
   const ema10 = ema(close, 10), sma50 = sma(close, 50), sma200 = sma(close, 200), vw = vwma(bars), rsi14 = rsi(close), atr14 = atr(bars);
   const change3 = close.map((c, i) => i && close[i - 1] ? (c / close[i - 1] - 1) * 100 : null);
-  const windows = WINDOWS.map(([size, words3]) => ({ size: Math.min(size, n2), words: size <= n2 ? words3 : "all on record", full: size }));
+  const coin = s.meta.type === "CRYPTOCURRENCY", sizes = coin ? COIN_WINDOWS : WINDOWS;
+  const windows = sizes.map(([size, words3]) => ({ size: Math.min(size, n2), words: size <= n2 ? words3 : "all on record", full: size }));
   const from = (w) => n2 - w.size;
-  const anyVolume = bars.some((b) => b.volume !== null && b.volume > 0);
-  const volumeOf2 = (i) => anyVolume ? bars[i].volume : null;
+  const state = latestState(s, day3);
+  const anyVolume = bars.some((b) => b.volume !== null && b.volume > 0), partial2 = state.open && anyVolume && bars[L].volume !== null;
+  const volumeOf2 = (i) => anyVolume && !(partial2 && i === L) ? bars[i].volume : null;
   const noVolume = bars.map((b, i) => b.volume === null ? i : -1).filter((i) => i >= 0);
   const volumeNote = !anyVolume ? ["- The source gives no volume for these rows (or none traded): there are no volume facts here, and VWMA has no value."] : noVolume.length ? [`- The source gives no volume for ${plural2(noVolume.length, "session")} (${noVolume.slice(-5).map(d).join("; ")}${noVolume.length > 5 ? ", and earlier ones" : ""}): ${noVolume.length === 1 ? "it is" : "they are"} left out of every volume fact, and VWMA has no value on a window that includes ${noVolume.length === 1 ? "it" : "them"}.`] : [];
+  if (partial2) volumeNote.push(`- The latest row, ${d(L)}, is not a finished session: its volume so far is not a whole day's, so it is left out of every volume fact here.`);
   const out = [
     `## Price facts for ${sym2}, worked out by the desk`,
     "",
     `- Analysis date: ${withWeekday(day3)}. Latest row: ${d(L)}. Rows after the analysis date are excluded.`,
-    `- From the same daily prices as the checked price table (${adjustedWords(s)}) and the same indicators (10 EMA, 50 SMA, 200 SMA, VWMA, RSI, MACD, Bollinger bands, ATR). A session is a trading day; every date carries its weekday.`,
+    `- From the same daily prices as the checked price table (${adjustedWords(s)}) and the same indicators (10 EMA, 50 SMA, 200 SMA, VWMA, RSI, MACD, Bollinger bands, ATR). ${coin ? "A coin trades every day, so a session here is a calendar day" : "A session is a trading day"}; every date carries its weekday.`,
     ...volumeNote,
     `- Windows count back from the latest row, which they include: ${windows.map((w) => `the last ${w.size} sessions${w.size < w.full ? " (all on record)" : ""} from ${d(from(w))}`).join("; ")}.`,
     "- Directions and sides are judged on figures rounded to the cent, as the tables show them.",
-    ...latestState(s, day3).lines,
+    ...state.lines,
     "",
     'Quote a fact as it stands here, naming its window ("the lowest RSI of the last 63 sessions"). A run, a first or a last time, a record, a rank, a count of sessions or a crossing that is not here is not known to the desk: leave it out rather than count it by eye.',
     ""
@@ -37764,7 +37802,7 @@ function priceFactsText(sym2, day3, s) {
     trend("MACD histogram", m2.hist),
     trend("ATR", atr14)
   ].filter((x) => x !== null));
-  const year = Math.max(0, n2 - 252);
+  const year = Math.max(0, n2 - sizes.at(-1)[0]);
   const sides = (a, av, b, bv, what = "session") => {
     const sd = (i) => cmp(av[i], bv[i]), now = sd(L);
     if (now === null) return null;
@@ -37884,12 +37922,12 @@ function priceFactsText(sym2, day3, s) {
     since("MACD", ["highest MACD", "lowest MACD"], (i) => m2.macd[i], f22),
     since("MACD histogram", ["highest MACD histogram", "lowest MACD histogram"], (i) => m2.hist[i], f22)
   ].filter((x) => x !== null));
-  for (const w of windows.filter((w2) => w2.full === 63 || w2.full === 252)) {
+  for (const w of windows.filter((_, k) => k === 1 || k === 3)) {
     const idx = Array.from({ length: w.size }, (_, k) => from(w) + k);
     const hi = idx.reduce((a, i) => close[i] >= close[a] ? i : a), lo = idx.reduce((a, i) => close[i] <= close[a] ? i : a);
     out.push(`- The close ${f22(close[L])} is ${f22(Math.abs((close[L] / close[hi] - 1) * 100))}% ${close[L] < close[hi] ? "below" : "at"} the highest close of the last ${w.size} sessions (${f22(close[hi])} on ${d(hi)}) and ${f22(Math.abs((close[L] / close[lo] - 1) * 100))}% ${close[L] > close[lo] ? "above" : "at"} the lowest (${f22(close[lo])} on ${d(lo)}).`);
   }
-  const moves = [1, 5, 20, 63, 126, 252].filter((k) => k <= L).map((k) => `${plural2(k, "session")} ${signed((close[L] / close[L - k] - 1) * 100, 2)}% (from ${f22(close[L - k])} on ${d(L - k)})`);
+  const moves = [1, 5, ...sizes.map(([k]) => k)].filter((k) => k <= L).map((k) => `${plural2(k, "session")} ${signed((close[L] / close[L - k] - 1) * 100, 2)}% (from ${f22(close[L - k])} on ${d(L - k)})`);
   const lastOfYear = Array.from({ length: L }, (_, k) => L - 1 - k).find((i) => bars[i].date.slice(0, 4) < bars[L].date.slice(0, 4));
   if (lastOfYear !== void 0) moves.push(`this calendar year ${signed((close[L] / close[lastOfYear] - 1) * 100, 2)}% (from the last close of ${bars[lastOfYear].date.slice(0, 4)}, ${f22(close[lastOfYear])} on ${d(lastOfYear)})`);
   out.push("", "### Change of the close to the latest row", "", `- ${moves.join("; ")}.`);
@@ -37902,10 +37940,7 @@ var FUNCTIONS = {
   share: { args: [2, 2], run: ([a, b]) => a / b * 100, says: "share(a, b) is a as a percent of b" },
   abs: { args: [1, 1], run: ([a]) => Math.abs(a), says: "abs(a) is a without its sign" },
   sqrt: { args: [1, 1], run: ([a]) => Math.sqrt(a), says: "sqrt(a) is the square root" },
-  round: { args: [1, 2], run: ([a, d]) => {
-    const k = 10 ** (d ?? 0);
-    return Math.round(a * k) / k;
-  }, says: "round(a, d) rounds to d decimals" },
+  round: { args: [1, 2], run: ([a, d]) => roundHalfAway(a, d ?? 0), says: "round(a, d) rounds to d decimals, a half away from zero" },
   sum: { args: [1, 100], run: (xs) => xs.reduce((p, x) => p + x, 0), says: "sum(...) adds them" },
   avg: { args: [1, 100], run: (xs) => xs.reduce((p, x) => p + x, 0) / xs.length, says: "avg(...) is their average" },
   min: { args: [1, 100], run: (xs) => Math.min(...xs), says: "min(...) and max(...) are the smallest and largest" },
@@ -37914,9 +37949,16 @@ var FUNCTIONS = {
 var helper = (name) => Object.hasOwn(FUNCTIONS, name.toLowerCase()) ? FUNCTIONS[name.toLowerCase()] : void 0;
 var Refused = class extends Error {
 };
+function roundHalfAway(a, d) {
+  if (!Number.isInteger(d) || Math.abs(d) > 15) throw new Refused("round(a, d) needs d as a whole number of decimals, from -15 to 15");
+  const shift = (x, by) => String(x).includes("e") ? x * 10 ** by : Number(`${x}e${by}`);
+  const r = shift(Math.floor(shift(Math.abs(a), d) + 0.5), -d);
+  return a < 0 && r !== 0 ? -r : r;
+}
+var THOUSANDS = /^\d+(?:,\d{3})+(?!\d)(?:\.\d*)?/;
 function evaluate(expression) {
   const src = expression.replace(/[−–]/g, "-").replace(/[×·]/g, "*").replace(/÷/g, "/");
-  let i = 0;
+  let i = 0, inHelper = 0;
   const space = () => {
     while (i < src.length && /\s/.test(src[i])) i++;
   };
@@ -37933,6 +37975,8 @@ function evaluate(expression) {
   };
   const number4 = () => {
     space();
+    const t = inHelper ? THOUSANDS.exec(src.slice(i)) : null;
+    if (t) throw new Refused(`"${t[0]}" reads as a number written with a thousands comma: write numbers without them (1234567, not 1,234,567), and put a space after each comma between numbers (avg(100, 200))`);
     const m2 = /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?/i.exec(src.slice(i));
     if (!m2) throw new Refused(src[i] === void 0 ? "it ends where a number should be" : `"${src.slice(i, i + 12)}" is not a number`);
     i += m2[0].length;
@@ -37951,8 +37995,10 @@ function evaluate(expression) {
       if (!f) throw new Refused(`"${id[0]}" is not something it knows: use numbers, + - * / ^, brackets, % and ${Object.keys(FUNCTIONS).join(", ")}`);
       i += id[0].length;
       if (!take("(")) throw new Refused(`${id[0]} needs its numbers in brackets`);
+      inHelper++;
       const xs = [expr()];
       while (take(",")) xs.push(expr());
+      inHelper--;
       if (!take(")")) throw new Refused(`the brackets of ${id[0]} are not closed`);
       if (xs.length < f.args[0] || xs.length > f.args[1]) throw new Refused(`${id[0]} takes ${f.args[0] === f.args[1] ? f.args[0] : `${f.args[0]} to ${f.args[1]}`} number${f.args[1] > 1 ? "s" : ""}, not ${xs.length} (write numbers without thousands commas: 1234567, not 1,234,567)`);
       return f.run(xs);
@@ -38014,6 +38060,10 @@ function unpriced(s, end, now = Date.now()) {
   const stopped = !!session2 && now >= session2.start && !!last && last < end && session2.date > last;
   return { blank: /* @__PURE__ */ new Set([...s.missing ?? [], ...s.unfilled ?? []]), stopsAt: stopped ? last : null };
 }
+function notOpen(s, now = Date.now()) {
+  const x = s.meta.session;
+  return x && now < x.start ? { date: x.date, opens: clock(x.start, s.meta.timezone) } : null;
+}
 async function dateAnswer(q, day3) {
   const sym2 = q.symbol ? normalizeSymbol(q.symbol) : "";
   const past = (end) => {
@@ -38027,7 +38077,8 @@ async function dateAnswer(q, day3) {
     if (d > day3) return `${line2} ${sym2}'s sessions after the analysis date, ${day3}, are not known to the desk.`;
     const s = await daily(sym2, addDays(d, -10), past(d)), last = s.bars.filter((r) => r.date <= d).at(-1), gaps = unpriced(s, d);
     if (last?.date === d) return `${line2} ${sym2} traded that day.`;
-    const before = last ? `; its session on or before it: ${withWeekday(last.date)}` : "";
+    const before = last ? `; its session on or before it: ${withWeekday(last.date)}` : "", soon = notOpen(s);
+    if (soon?.date === d) return `${line2} ${sym2}'s session that day has not opened yet (it opens at ${soon.opens})${last ? `; its latest session before it: ${withWeekday(last.date)}` : ""}.`;
     if (gaps.blank.has(d)) return `${line2} The source lists ${d} as a session of ${sym2} but gives no prices for it (yet): its prices are not available${last ? ` (the latest session with prices before it: ${withWeekday(last.date)})` : ""}. Do not say ${sym2} did not trade that day.`;
     if (gaps.stopsAt) return `${line2} Whether ${sym2} traded that day is not known from the source: its own record shows a session on ${s.meta.session.date}, but its prices stop at ${withWeekday(gaps.stopsAt)}. Do not say ${sym2} did not trade that day.`;
     return `${line2} ${sym2} did not trade that day${before}.`;
@@ -38042,8 +38093,9 @@ async function dateAnswer(q, day3) {
     const end = b > day3 ? day3 : b, s = await daily(sym2, a, past(end)), rows = s.bars.filter((r) => r.date <= end), gaps = unpriced(s, end);
     const after = rows.filter((r) => r.date > a), traded = rows.length && rows[0].date === a;
     const blank = [...gaps.blank].filter((x) => x >= a && x <= end).sort();
-    const sure = !blank.length && !gaps.stopsAt;
-    parts.push(` ${sym2} ${sure ? "traded" : "has prices"} on ${after.length} session${after.length === 1 ? "" : "s"} after ${a} up to and including ${end}${after.length ? ` (the first ${withWeekday(after[0].date)}, the last ${withWeekday(after.at(-1).date)})` : ""}; ${a} itself ${traded ? "was a session, so both included it is " + (after.length + 1) : blank[0] === a ? "is listed by the source with no prices" : sure ? "was not a session" : "has no prices from the source"}.`);
+    const sure = !blank.length && !gaps.stopsAt, soon = notOpen(s), later = soon && soon.date >= a && soon.date <= end ? soon : null;
+    parts.push(` ${sym2} ${sure ? "traded" : "has prices"} on ${after.length} session${after.length === 1 ? "" : "s"} after ${a} up to and including ${end}${after.length ? ` (the first ${withWeekday(after[0].date)}, the last ${withWeekday(after.at(-1).date)})` : ""}; ${a} itself ${traded ? "was a session, so both included it is " + (after.length + 1) : blank[0] === a ? "is listed by the source with no prices" : later?.date === a ? `has not opened yet (it opens at ${later.opens})` : sure ? "was not a session" : "has no prices from the source"}.`);
+    if (later && later.date > a) parts.push(` ${later.date}'s session has not opened yet (it opens at ${later.opens}): it is not counted.`);
     if (blank.length) parts.push(` The source lists ${blank.map(withWeekday).join(", ")} as ${blank.length === 1 ? "a session" : "sessions"} with no prices: not counted here, so the true count may be higher. Do not say ${blank.length === 1 ? "that day" : "those days"} had no trading.`);
     if (gaps.stopsAt) parts.push(` The source's prices stop at ${withWeekday(gaps.stopsAt)}, though its own record shows a session on ${s.meta.session.date}: the sessions after ${gaps.stopsAt} are not known from it, so the true count may be higher.`);
   }
@@ -39625,10 +39677,14 @@ var alphaOf = (e) => {
 };
 function summarize(entries) {
   const resolved2 = entries.filter((e) => !e.pending && e.rating !== REVIEW).map((e) => ({ e, a: alphaOf(e) })).filter((x) => x.a !== null);
-  const byRating = {};
+  const byRating = {}, own2 = {};
+  const isOwn = (e) => e.rules !== null && ownReturn(e.rules);
   for (const rating of new Set(resolved2.map((x) => x.e.rating))) {
-    const alphas = resolved2.filter((x) => x.e.rating === rating).map((x) => x.a), dir = directionOf(rating);
-    byRating[rating] = { count: alphas.length, direction: dir, hitRate: dir ? alphas.filter((a) => worked(rating, a)).length / alphas.length : null, meanAlpha: alphas.reduce((s, a) => s + a, 0) / alphas.length };
+    const of = (mine) => resolved2.filter((x) => x.e.rating === rating && isOwn(x.e) === mine).map((x) => x.a), dir = directionOf(rating);
+    const mean = (xs) => xs.reduce((s, a) => s + a, 0) / xs.length;
+    const alphas = of(false), returns = of(true);
+    if (alphas.length) byRating[rating] = { count: alphas.length, direction: dir, hitRate: dir ? alphas.filter((a) => worked(rating, a)).length / alphas.length : null, meanAlpha: mean(alphas) };
+    if (returns.length) own2[rating] = { count: returns.length, worked: dir ? returns.filter((a) => worked(rating, a)).length : null, meanReturn: mean(returns) };
   }
   const unscored = entries.filter((e) => e.rating === REVIEW).length;
   const windows = [...new Set(resolved2.map(({ e }) => {
@@ -39636,7 +39692,7 @@ function summarize(entries) {
     return days > 0 ? windowWords({ days, unit: e.rules?.unit ?? (isCrypto(e.ticker) ? "calendar" : "trading") }) : "";
   }).filter(Boolean))].sort();
   const yardsticks = [...new Set(resolved2.map(({ e }) => e.rules?.yardstick ?? "").filter(Boolean))].sort();
-  return { resolved: resolved2.length, pending: entries.length - resolved2.length - unscored, unscored, byRating, holding: windows.join(", ") || "the configured window", yardsticks: yardsticks.join(", ") };
+  return { resolved: resolved2.length, pending: entries.length - resolved2.length - unscored, unscored, byRating, ownReturn: own2, holding: windows.join(", ") || "the configured window", yardsticks: yardsticks.join(", ") };
 }
 var pctText = (v) => signedPct(v, 2);
 function renderSummary(s) {
@@ -39644,6 +39700,8 @@ function renderSummary(s) {
   for (const [rating, sc] of Object.entries(s.byRating)) {
     lines.push(`- ${rating}: n=${sc.count}, ${sc.hitRate !== null ? `called the direction ${Math.round(sc.hitRate * 100)}%` : "no direction claimed"}, mean alpha ${pctText(sc.meanAlpha)} vs the yardstick`);
   }
+  const own2 = Object.entries(s.ownReturn);
+  if (own2.length) lines.push(`- On their own return, not in the lines above (a call on the yardstick itself or a fund that copies the same index): ${own2.map(([rating, o]) => `${rating} n=${o.count}, ${o.worked === null ? "no direction claimed" : `worked ${o.worked}`}, mean return ${pctText(o.meanReturn)}`).join("; ")}`);
   lines.push("");
   if (s.pending) lines.push("Pending cells are not scored above; settle them when their window has traded.");
   if (s.unscored) lines.push("Unscored cells had no readable rating (Needs review): they count neither for nor against the desk.");
@@ -40958,7 +41016,7 @@ async function workScreen(symbols, news, day3, now = /* @__PURE__ */ new Date())
   const list2 = [...new Set(symbols)].filter((s) => !/[\^=]/.test(s));
   const read2 = await inTurn(list2, 4, async (symbol4) => {
     try {
-      const s = await daily(symbol4, addDays(day3, -400), day3), bars = s.bars;
+      const s = await daily(symbol4, addDays(day3, -400), day3), bars = s.traded?.length === s.bars.length ? s.traded : s.bars;
       if (!bars.length || bars[bars.length - 1].date < addDays(day3, -7)) return { symbol: symbol4, bars: null, news: null, asked: false, live: false };
       const asked2 = news.has(symbol4);
       return { symbol: symbol4, bars, news: asked2 ? await newsOn(symbol4, day3) : null, asked: asked2, live: latestState(s, day3, now.getTime()).open };
