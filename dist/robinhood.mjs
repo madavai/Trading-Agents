@@ -19320,10 +19320,10 @@ function waitForCode(port, expectedState, timeoutMs = 5 * 6e4) {
         return;
       }
       if (!got || !want || state !== want) {
-        answer(res, 400, "This sign-in link does not match. Start again from Madav.");
+        answer(res, 400, "This sign-in link does not match. Start again from where you began it: the dashboard's Connect, or the desk check.");
         return;
       }
-      answer(res, 200, "Signed in to Robinhood. You can close this tab and go back to Madav.");
+      answer(res, 200, "Signed in to Robinhood. You can close this tab and go back to where you started it.");
       finish();
       resolve(got);
     });
