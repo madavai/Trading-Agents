@@ -678,6 +678,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "Open the NVDA call (\"Read\").",
         "Press inside the window where nothing is written: its margin, and the gap between two reports. Then press the shaded page outside it."],
       "see": [
+        "The window's title is \"NVDA\", with \"NVIDIA Corporation · the desk's call of 6 Nov 2026\" (its own date) beside it. A call on a stock whose name the page has not read (one not on your watchlist, say) shows its ticker alone, with \"The desk's call of …\" beside it, never the name of the stock charted behind it.",
         "\"The portfolio manager's rating\" first, with the price target, the time horizon and how it scored, and the \"Portfolio manager's decision\" open.",
         "How it scored names the call's own window and yardstick, and that it is not the time horizon just above it: \"Scored: not yet: a first-week check against SPY over the 5 trading days after the call, not the call's own time horizon, once a scoring runs after them.\", or for a scored call \"alpha -12.1% against SPY over the 5 trading days after the call: the call did not work. It is a first-week check, not the call's own time horizon.\", \"…: the call worked\", or for a Hold \"…: a Hold claims no direction\". A coin's says \"the 7 calendar days\".",
         "Then \"Gathering the facts\", \"The research debate\", \"The trade\" and \"The risk debate\", each readable.",
@@ -1243,14 +1244,17 @@ b, strong { font-weight: var(--weight-semibold); }
     "about": "Pressing the robot puts a company on a waiting list. Something then has to run the team: Madav's routine \"Run automatically when the dashboard asks\", the desk's own listener for Claude Code (one press on the dashboard), or you, by asking in a chat. The dashboard always says who is listening and where each analysis stands.",
     "before": "The dashboard open (C1), and Madav or Claude Code on this computer.",
     "tests": [
-    { "id": "K1", "title": "Ask the desk, at a depth", "tags": [], "changed": "2026-10-21",
-      "about": "The robot asks for one analysis, at the depth you choose. A company already analysed today is not asked twice.",
+    { "id": "K1", "title": "Ask the desk, at a depth", "tags": [], "changed": "2026-11-09",
+      "about": "The robot asks for one analysis, at the debate rounds in the desk's settings or at a depth you choose. A company already analysed today is not asked twice.",
       "where": "Dashboard › the robot beside NVDA (or any company or fund)",
       "do": [
-        "Press the robot beside a company not analysed today, for example AAPL. Choose Shallow, Medium or Deep and press \"Ask the desk\".",
+        "Press the robot beside a company not analysed today, for example AAPL. Leave \"Settings\" chosen and press \"Ask the desk\".",
+        "Press the robot beside another, for example MSFT, choose Shallow, Medium or Deep and ask.",
         "Press the robot beside NVDA (analysed today in B1) and ask again."],
       "see": [
-        "\"Analyse AAPL\" with the three depths (your settings' depth chosen first) and who will run it: \"It runs by itself: Madav is listening.\" or \"Nothing is listening on this computer yet, so it waits until a run starts …\"",
+        "\"Analyse AAPL\" with \"Settings (1 and 1 rounds)\" chosen first (the debate and risk rounds in the desk's settings, 1 and 1 as the project ships them), then Shallow, Medium and Deep, and who will run it: \"It runs by itself: Madav is listening.\" or \"Nothing is listening on this computer yet, so it waits until a run starts …\"",
+        "Under the choices, for Settings: \"The rounds in the desk's settings when it runs, now one round of the bull and bear debate and one of the risk debate.\"",
+        "In Analyses you asked for, AAPL's depth reads \"Settings\" and MSFT's the depth you chose. If one of them fails, Retry asks for it again the same way: at Settings, or at its depth.",
         "A notice: \"AAPL is asked for: it runs by itself, and its call appears here.\" or \"AAPL is waiting. Nothing is listening yet: see Analyses you asked for.\"",
         "For NVDA: refused, \"NVDA was already analysed today …: its call is in the journal. Ask again tomorrow\"."] },
     { "id": "K2", "title": "Where each one stands", "tags": [], "changed": "2026-11-09",

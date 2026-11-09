@@ -1083,3 +1083,6 @@ details[open] > .at-input.at-select { border-color: var(--accent); }
 
 /* a style that sets display would otherwise show an element the page has hidden */
 .ta-suggest[hidden], .ta-update-wrap[hidden] { display: none; }
+
+/* the Analyse box's choices (the settings' rounds and the three depths): on a phone, on two lines rather than out of the box */
+#askDialog .at-seg { flex-wrap: wrap; }

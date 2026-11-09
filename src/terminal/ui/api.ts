@@ -110,7 +110,8 @@ export const api = {
   removeWatch: (symbol: string) => call<{ watchlist: WatchItem[] }>('DELETE', `/api/watchlist?${q({ symbol })}`),
   favourite: (symbol: string, favourite: boolean) => call<{ watchlist: WatchItem[] }>('POST', '/api/favourite', { symbol, favourite }),
   /** Asks the desk to analyse a stock at a depth (Analyse, Retry); rings for whoever listens. */
-  enqueue: (symbol: string, depth: Depth) => call<{ queue: QueueView[] }>('POST', '/api/queue', { symbol, depth }),
+  /** With no depth, the desk's settings' own rounds: nothing is sent for it. */
+  enqueue: (symbol: string, depth?: Depth) => call<{ queue: QueueView[] }>('POST', '/api/queue', depth ? { symbol, depth } : { symbol }),
   dequeue: (symbol: string) => call<{ queue: QueueView[] }>('DELETE', `/api/queue?${q({ symbol })}`),
   /** Rings again for what is waiting (Run now). */
   runQueue: () => call<{ queue: QueueView[] }>('POST', '/api/queue/run', {}),

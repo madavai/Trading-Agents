@@ -127,3 +127,37 @@ test('page-15: the page saves only the choices that changed, so an older tab can
   assert.match(page, /void api\.savePrefs\(send\)/);
   assert.match(page, /remember\(\{ \.\.\.P \}\)/, "the first visit after an update still keeps this browser's older choices in the desk's folder");
 });
+
+test('call window: a stock is named only by its own name, never by the one charted, else by its ticker alone', () => {
+  // Before: with no quote of AAPL loaded and Shiba Inu charted, AAPL's call read "AAPL · Shiba Inu USD · the desk's call of …".
+  assert.doesNotMatch(page, /\?\? S\.history\?\.name \?\?/, "the chart's name for whatever stock it shows");
+  assert.match(page, /const nameOf = \(sym: string\): string => quoteOf\(sym\)\?\.name \?\? \(S\.history\?\.symbol === sym \? S\.history\.name : undefined\) \?\? marketOf\(sym\)\?\.name \?\? sym;/);
+  // a call on a stock whose name is not known says the ticker once, in the title, and not again beside it
+  assert.match(page, /const named = nameOf\(symbol\), of = `the desk's call of \$\{dayText\(date\)\}`;/);
+  assert.match(page, /\$\{esc\(named !== symbol \? `\$\{named\} · \$\{of\}` : of\[0\]!\.toUpperCase\(\) \+ of\.slice\(1\)\)\}/);
+});
+
+test('server-11: the Analyse box offers the settings\' own rounds first and asks for them with no depth; Retry asks at the depth first asked', async () => {
+  const { depthChoices, retryDepth } = await import('../src/terminal/ui/depth.js');
+  // A desk that says its settings' rounds keeps an analysis asked with no depth at exactly those rounds (2 and 3 here,
+  // which no depth is): offered first and chosen, then the three depths.
+  const said = depthChoices({ depth: 'shallow', rounds: { debate: 2, risk: 3 } });
+  assert.deepEqual(said.choices.map((c) => [c.depth, c.label]), [[null, 'Settings (2 and 3 rounds)'], ['shallow', 'Shallow'], ['medium', 'Medium'], ['deep', 'Deep']]);
+  assert.equal(said.first, null, 'the settings chosen first, sent as no depth');
+  assert.equal(said.choices[0]!.means, "The rounds in the desk's settings when it runs, now 2 rounds of the bull and bear debate and 3 of the risk debate.");
+  assert.equal(depthChoices({ depth: 'shallow', rounds: { debate: 1, risk: 1 } }).choices[0]!.means, "The rounds in the desk's settings when it runs, now one round of the bull and bear debate and one of the risk debate.");
+  // A desk that does not say them turns a request with no depth into the nearest depth, so the page offers only the
+  // three, the nearest chosen, as before: no "Settings" it could not keep.
+  const unsaid = depthChoices({ depth: 'medium' });
+  assert.deepEqual(unsaid.choices.map((c) => c.label), ['Shallow', 'Medium', 'Deep']);
+  assert.equal(unsaid.first, 'medium');
+  // Retry asks again exactly as first asked: at its depth, or with none (the settings' own rounds), never the nearest depth
+  assert.equal(retryDepth({ depth: 'deep' }), 'deep');
+  assert.equal(retryDepth({}), undefined);
+  assert.equal(retryDepth(undefined), undefined);
+  assert.doesNotMatch(page, /api\.enqueue\(sym, x\?\.depth \?\? S\.desk\?\.analyses\.depth/, 'before: Retry asked a Settings one again at the nearest depth');
+  assert.match(page, /await api\.enqueue\(sym, retryDepth\(x\)\)/);
+  assert.match(page, /ASK\.depth = depthChoices\(S\.desk\?\.analyses \?\? \{ depth: 'shallow' \}\)\.first;/);
+  assert.match(page, /await api\.enqueue\(sym, ASK\.depth \?\? undefined\);/);
+  assert.match(fs.readFileSync('src/terminal/ui/api.ts', 'utf8'), /enqueue: \(symbol: string, depth\?: Depth\) => call<\{ queue: QueueView\[\] \}>\('POST', '\/api\/queue', depth \? \{ symbol, depth \} : \{ symbol \}\)/, 'no depth sent at all for the settings');
+});
