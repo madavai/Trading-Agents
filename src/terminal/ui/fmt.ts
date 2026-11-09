@@ -87,6 +87,17 @@ export function averageOf(rating: string, s: { direction: number; meanAlpha: num
   return { tone: good ? 'ta-up' : 'ta-down', why: `On average, what the desk rated ${rating} ${beat ? 'beat' : 'trailed'} its yardstick by ${by} in each call's first check: on average these calls ${good ? 'worked' : 'did not work'} so far.` };
 }
 
+/** The scorecard's line for the calls scored on their own return, which its averages against the yardstick leave out:
+ *  their return is how far the fund rose or fell, not how far it beat anything. `ratings` in the scorecard's order. */
+export function ownReturnLine(own: Record<string, { count: number; worked: number | null; meanReturn: number }>, ratings: string[]): string {
+  const n = ratings.reduce((s, r) => s + (own[r]?.count ?? 0), 0), calls = (k: number) => `${k} ${k === 1 ? 'call' : 'calls'}`;
+  const parts = ratings.filter((r) => own[r]).map((r) => {
+    const o = own[r]!;
+    return `${r}: ${calls(o.count)}, ${o.worked === null ? 'no direction claimed' : `${o.worked} of ${o.count} worked`}, average return ${pct(o.meanReturn * 100, 1)}`;
+  });
+  return `Left out of the table: ${calls(n)} on the yardstick itself or a fund that copies the same index, scored on ${n === 1 ? 'its' : 'their'} own return rather than against it. ${parts.join('; ')}.`;
+}
+
 /** Why a mark is there, each in one plain line. The trading words themselves are in the glossary (glossary.ts). */
 export const NOTES = {
   coinOnPaper: "Robinhood's agent doorway trades stocks and funds, so a coin never gets an order ticket.",

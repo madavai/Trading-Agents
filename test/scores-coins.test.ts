@@ -21,11 +21,11 @@ import { readHoldings, renderHoldings } from '../src/desk/holdings.js';
 import { deskSymbol, dueForRerate, rerateWeekly } from '../src/desk/care.js';
 import { finishItem, startItem } from '../src/desk/queue.js';
 import { morningList } from '../src/desk/routine.js';
-import { worked } from '../src/desk/backtest.js';
+import { renderSummary, summarize, worked } from '../src/desk/backtest.js';
 import { ticketable } from '../src/terminal/tiers.js';
 import { shareHoldings, startTerminal, type Assets, type Terminal } from '../src/terminal/server.js';
 import { nounOf, stateOf } from '../src/terminal/state.js';
-import { againstOver, averageOf, rangeFor, resultOf } from '../src/terminal/ui/fmt.js';
+import { againstOver, averageOf, ownReturnLine, rangeFor, resultOf } from '../src/terminal/ui/fmt.js';
 import { Link } from '../src/robinhood/link.js';
 import type { AccountView } from '../src/robinhood/account.js';
 import { DEFAULT_CAPS, DEFAULTS } from '../src/settings.js';
@@ -288,6 +288,27 @@ test('a coin\'s result says the coin, a fund\'s the fund, and the scorecard name
   assert.match(own.why, /^A Buy works when the fund rises over the 5 trading days after the call\. It did \(its return \+2\.0%\): the call worked\. It is a first-week check, not the call's own time horizon\. Scored on its own return: SPY is the yardstick itself/);
   assert.equal(againstOver({ yardstick: 'SPY', window: '5 trading days', own: true }), 'on its own return over the 5 trading days after the call');
   assert.equal(nounOf('BTC-USD'), 'coin'); assert.equal(nounOf('XLK'), 'fund'); assert.equal(nounOf('VOO'), 'fund'); assert.equal(nounOf('NVDA'), 'stock');
+});
+
+test('a call scored on its own return is kept out of the averages against the yardstick, and counted on a line of its own (coordinator-2)', () => {
+  const j = new Journal(path.join(tmp('own-avg'), 'journal.md'));
+  const scored = (t: string, d: string, rating: string, raw: number, alpha: number, rules = rulesFor(t, S)) => {
+    j.storeDecision(t, d, decision(rating), undefined, rules ?? undefined);
+    j.recordOutcome(t, d, raw, alpha, 5, 'A lesson.', '2026-11-09');
+  };
+  scored('NVDA', '2026-10-01', 'Buy', 0.03, 0.02);
+  scored('SPY', '2026-10-02', 'Buy', 0.01, 0.01);       // its own return: SPY rose 1%, not "beat SPY by 1%"
+  scored('VOO', '2026-10-05', 'Sell', 0.005, 0.005);    // a Sell on a fund that rose: did not work
+  scored('SPY', '2026-03-02', 'Buy', 0.004, 0.0, null as never);   // an old SPY call with no rules kept: against SPY, as then
+  const s = summarize(j.load());
+  assert.equal(s.resolved, 4, 'every scored call is still counted as scored');
+  assert.equal(s.byRating['Buy']!.count, 2, 'the NVDA call and the old SPY call, measured against a yardstick');
+  assert.ok(Math.abs(s.byRating['Buy']!.meanAlpha - 0.01) < 1e-12);
+  assert.equal(s.byRating['Sell'], undefined, 'no yardstick average is made of a return');
+  assert.deepEqual(s.ownReturn, { Buy: { count: 1, worked: 1, meanReturn: 0.01 }, Sell: { count: 1, worked: 0, meanReturn: 0.005 } });
+  assert.match(renderSummary(s), /- On their own return, not in the lines above \(a call on the yardstick itself or a fund that copies the same index\): Buy n=1, worked 1, mean return \+1\.00%; Sell n=1, worked 0, mean return \+0\.50%/);
+  assert.equal(ownReturnLine(s.ownReturn, ['Buy', 'Sell']), 'Left out of the table: 2 calls on the yardstick itself or a fund that copies the same index, scored on their own return rather than against it. Buy: 1 call, 1 of 1 worked, average return +1.0%; Sell: 1 call, 0 of 1 worked, average return +0.5%.');
+  assert.match(ownReturnLine({ Hold: { count: 1, worked: null, meanReturn: -0.003 } }, ['Hold']), /^Left out of the table: 1 call on .*, scored on its own return rather than against it\. Hold: 1 call, no direction claimed, average return −?-?0\.3%\.$/);
 });
 
 test("a call's window on the stock page reads a range that reaches back to the call, never always six months (page-13)", () => {

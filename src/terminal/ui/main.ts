@@ -4,7 +4,7 @@
 // (Decide…) or the person's own (Trade…) - and is placed only on their Confirm, with trading switched on by them.
 import { api, ApiError, claimKey, hasKey, KEY_LOST, type CallDetail, type DeskState, type Depth, type History, type LinkInfo, type Market, type Match, type Prefs, type Caps, type PaperView, type PaperTrade, type QueueView, type QuoteResult, type Account, type AccountView, type Holding, type Order, type Recent, type Snapshot, type TicketOpen, type Check, type Review, type Placed, type Trading, type Tier, type TierItem, type TierView, type Worth, type Screen, type Weather, type WeatherLine, type HoldingCare } from './api.js';
 import { heroChart, paperChart, sparkline } from './chart.js';
-import { againstOver, averageOf, barOn, chipDay, dayText, esc, labelled, money, moveDayOf, notHorizon, NOTES, num, nyDay, opening, pct, plain, points, priceDayWords, qty, rangeFor, ratingMeaning, ratingTone, resultOf, scoreWords, SECTION_NAMES, shortDay, tone, weekDay, when, yardstickWhy } from './fmt.js';
+import { againstOver, averageOf, barOn, chipDay, dayText, esc, labelled, money, moveDayOf, notHorizon, NOTES, num, nyDay, opening, ownReturnLine, pct, plain, points, priceDayWords, qty, rangeFor, ratingMeaning, ratingTone, resultOf, scoreWords, SECTION_NAMES, shortDay, tone, weekDay, when, yardstickWhy } from './fmt.js';
 import { DELAY_SENTENCE, DELAY_SHORT, LATE } from '../../data/delay.js';
 import { GLOSSARY, glossaryGroups, isTerm, means, type TermKey } from './glossary.js';
 import { markdown } from './md.js';
@@ -1191,10 +1191,13 @@ function renderScore(): void {
         const s = r.byRating[n]!, avg = averageOf(n, s);
         return `${ratingChip(n)}<b>${s.count}</b><b>${s.hitRate === null ? '—' : `${Math.round(s.hitRate * 100)}%`}</b><b class="${avg.tone}" title="${esc(avg.why)}">${pctOf(s.meanAlpha)}</b>`;
       }).join('')}</div>`
-    : '<p class="at-quiet">Nothing has been scored yet. A call is scored once its window has passed and a scoring runs (/settle, an analysis or a routine), not by itself.</p>';
+    : r.resolved ? '' : '<p class="at-quiet">Nothing has been scored yet. A call is scored once its window has passed and a scoring runs (/settle, an analysis or a routine), not by itself.</p>';
+  // calls on the yardstick itself, scored on their own return: never averaged with the beats above, counted on their own
+  const ownNames = [...RATINGS.filter((x) => r.ownReturn[x]), ...Object.keys(r.ownReturn).filter((x) => !RATINGS.includes(x))];
+  const own = ownNames.length ? `<p class="at-quiet">${esc(ownReturnLine(r.ownReturn, ownNames))}</p>` : '';
   const few = r.resolved > 0 && r.resolved < 30 ? ' With so few scored calls these figures are noise, not a record.' : '';
   const key = names.length ? ' Green means the calls went the way their rating said in their first check, red that they went against it: a Buy or Overweight works when its stock beats its yardstick, an Underweight or Sell when its stock trails it. A Hold claims no direction, so it stays plain.' : '';
-  $('#score').innerHTML = `${grid}<p class="at-honest">${esc(d.record.benchmarkNote)}${esc(key)}${esc(few)}</p>`;
+  $('#score').innerHTML = `${grid}${own}<p class="at-honest">${esc(d.record.benchmarkNote)}${esc(key)}${esc(few)}</p>`;
 }
 
 // ---------- the call in full ----------
