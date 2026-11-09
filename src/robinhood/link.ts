@@ -4,7 +4,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { parseAccounts, parseOrders, parsePortfolio, parsePositions, parseQuotes, readAccount, sortAccounts, type Account, type AccountIds, type AccountView } from './account.js';
+import { openOrders, parseAccounts, parsePortfolio, parsePositions, parseQuotes, QUOTES_PER_CALL, readAccount, sortAccounts, type Account, type AccountIds, type AccountView } from './account.js';
 import { marketDay } from '../data/dates.js';
 import { brokerSymbol, deskSymbol } from '../data/symbols.js';
 import type { Check, Order, TicketContext } from '../desk/ticket.js';
@@ -15,7 +15,8 @@ import type { Reader } from './reader.js';
 import type { Review } from './review.js';
 import { NotSignedIn, openSession, type SessionOptions } from './connect.js';
 import { readSaved } from './store.js';
-import { masked, oneLine } from './rules.js';
+import { LOOK_FIRST, masked, oneLine } from './rules.js';
+import { Refused } from './reader.js';
 
 export type LinkState = 'none' | 'saved' | 'waiting' | 'connected' | 'failed';
 export interface LinkInfo {
@@ -36,6 +37,12 @@ export interface TradingState { on: boolean; since: string | null; caps: Caps; o
 
 /** A failure of Robinhood's, in plain words for the page. */
 export const plainFailure = (e: unknown): string => e instanceof NotSignedIn ? 'Robinhood asks you to sign in again: press Connect.' : `Robinhood did not answer as expected: ${masked(e instanceof Error ? e.message : String(e))}`;
+
+/** An order was sent to Robinhood, but its answer never came back (a dropped connection, a timeout): it may have gone
+ *  through. Never told as a plain failure, which would invite a second order. */
+export class AnswerLost extends Error {
+  constructor(readonly why: string) { super(`Robinhood's answer did not arrive (${why}), so this order may have gone through. ${LOOK_FIRST}`); }
+}
 
 type Last = { state: 'connected' | 'failed'; message: string; checkedAt: string; tools: LinkInfo['tools'] };
 
@@ -106,7 +113,8 @@ export class Link {
   }
 
   /** The real figures a ticket for one stock is sized and checked on: the Agentic account's value, buying power and
-   *  holding of the stock, Robinhood's live price, and how many orders the account has had today (New York's day). */
+   *  holding of the stock, Robinhood's live price, how many orders the account has had today (New York's day), and its
+   *  orders still open, which count towards the caps as if they were filled. */
   async ticketContext(symbol: string, now: Date = new Date()): Promise<Omit<TicketContext, 'rating' | 'callDate'>> {
     return this.withReader((r) => this.contextWith(r, symbol, now));
   }
@@ -122,11 +130,20 @@ export class Link {
       this.noteValue(p.total, now);   // every read of the account's value counts towards the weekly loss limit
       // The desk names a share class as Yahoo does (BRK-B), Robinhood with a dot (BRK.B): its figures are read by its own.
       const all = parsePositions(await data('get_equity_positions', { account_number: ids.accountNumber })), rh = brokerSymbol(symbol);
-      const held = all.find((x) => deskSymbol(x.symbol, 'stock') === deskSymbol(symbol, 'stock'))?.quantity ?? 0;
-      const quotes = parseQuotes(await data('get_equity_quotes', { symbols: [...new Set([rh, ...all.map((x) => x.symbol)])] }));
+      const same = (s: string) => deskSymbol(s, 'stock') === deskSymbol(symbol, 'stock');
+      const held = all.find((x) => same(x.symbol))?.quantity ?? 0;
+      const orders = openOrders(await data('get_equity_orders', { account_number: ids.accountNumber }));
+      const ordersToday = orders.all.filter((o) => o.at && marketDay(new Date(o.at)) === marketDay(now)).length;
+      // Live prices for the stock, every holding and every open buy without a price of its own, twenty at a time as
+      // Robinhood answers them: a holding left unpriced would count nothing towards its sector.
+      const wanted = [...new Set([rh, ...all.map((x) => x.symbol), ...orders.open.filter((o) => o.side === 'buy' && o.price === null).map((o) => o.symbol)])];
+      const quotes = new Map<string, number>();
+      for (let i = 0; i < wanted.length; i += QUOTES_PER_CALL) for (const [s, v] of parseQuotes(await data('get_equity_quotes', { symbols: wanted.slice(i, i + QUOTES_PER_CALL) }))) quotes.set(s, v);
       const price = quotes.get(rh) ?? null;
-      const ordersToday = parseOrders(await data('get_equity_orders', { account_number: ids.accountNumber })).orders.filter((o) => o.at && marketDay(new Date(o.at)) === marketDay(now)).length;
-      return { symbol, accountValue: p.total, buyingPower: p.buyingPower, held, price, ordersToday, positions: all.map((x) => ({ symbol: deskSymbol(x.symbol, 'stock'), quantity: x.quantity, price: quotes.get(x.symbol) ?? null })) };
+      const mine = (side: 'buy' | 'sell') => orders.open.filter((o) => same(o.symbol) && o.side === side).reduce((n, o) => n + o.quantity, 0);
+      return { symbol, accountValue: p.total, buyingPower: p.buyingPower, held, price, ordersToday, positions: all.map((x) => ({ symbol: deskSymbol(x.symbol, 'stock'), quantity: x.quantity, price: quotes.get(x.symbol) ?? null })),
+        open: { buy: mine('buy'), sell: mine('sell') }, unreadOrders: orders.unread,
+        openBuys: orders.open.filter((o) => o.side === 'buy').map((o) => ({ symbol: deskSymbol(o.symbol, 'stock'), quantity: o.quantity, price: o.price ?? quotes.get(o.symbol) ?? null })) };
     }
   }
 
@@ -146,6 +163,9 @@ export class Link {
   setTrading(on: boolean): TradingState {
     const was = this.trading();
     if (on && was.on) return was;   // already on: the day it was switched on stands
+    // Switched back on after the weekly loss limit tripped: the limit counts from now. The readings before (the high it
+    // fell from, a withdrawal) would trip it again at the next read, for up to a week.
+    if (on && was.offBecause) fs.rmSync(this.valuesFile, { force: true });
     return this.keepTrading(on, was.caps);
   }
   /** The person's caps, as the dashboard's server checked them (settings.ts capsFrom). The switch is left as it is. */
@@ -158,7 +178,7 @@ export class Link {
   /** The Agentic account's value, day by day (New York's), kept beside the sign-in: the day's highest and latest reading,
    *  for the last fourteen days. When trading is on and the value falls the person's weekly limit below its highest of
    *  the last seven days, trading switches itself off and says why. A large withdrawal can trip it too; the person
-   *  switches it back on. */
+   *  switches it back on, and the limit then counts from that moment (setTrading). */
   private get valuesFile(): string { return path.join(path.dirname(this.file), 'values.json'); }
   values(): Array<{ day: string; high: number; last: number }> {
     try {
@@ -180,12 +200,14 @@ export class Link {
     const fall = (1 - total / top.high) * 100;
     if (!state.on || fall < state.caps.weeklyLossPercent) return state;
     const money = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    return this.keepTrading(false, state.caps, { at: now.toISOString(), words: `The Agentic account fell ${fall.toFixed(1)}% below its highest value of the last seven days (${money(top.high)} on ${top.day}, now ${money(total)}), past your weekly limit of ${state.caps.weeklyLossPercent}%. Trading switched itself off. A large withdrawal can do this too; switch it back on when you are ready.` });
+    return this.keepTrading(false, state.caps, { at: now.toISOString(), words: `The Agentic account fell ${fall.toFixed(1)}% below its highest value of the last seven days (${money(top.high)} on ${top.day}, now ${money(total)}), past your weekly limit of ${state.caps.weeklyLossPercent}%. Trading switched itself off. A large withdrawal can do this too. When you switch it back on, the limit counts from then.` });
   }
 
   /** Places one order on the Agentic account, in one session: reads the account afresh, has `approve` check the order on
-   *  those figures, and only if every check passes sends it. The caller has already had the person Confirm it. */
-  async placeChecked(order: Order, refId: string, approve: (context: Omit<TicketContext, 'rating' | 'callDate'>) => Check[]): Promise<{ placed: Placed; context: Omit<TicketContext, 'rating' | 'callDate'> }> {
+   *  those figures, and only if every check passes sends it. The caller has already had the person Confirm it.
+   *  `sending` runs just before the order goes out (the desk logs it then, so a send whose answer never comes is still
+   *  known); a failure after that point is AnswerLost, never a plain failure: the order may have gone through. */
+  async placeChecked(order: Order, refId: string, approve: (context: Omit<TicketContext, 'rating' | 'callDate'>) => Check[] | Promise<Check[]>, sending: () => void = () => {}): Promise<{ placed: Placed; context: Omit<TicketContext, 'rating' | 'callDate'> }> {
     if (!this.trading().on) throw new Error('trading is switched off: switch it on in Your account first');
     const session = await openSession(this.file, { ...this.opts, signIn: false });
     try {
@@ -193,11 +215,14 @@ export class Link {
       // Reading the account just now may have tripped the weekly loss limit: then nothing is sent.
       const now = this.trading();
       if (!now.on) throw new Error(`trading switched itself off: ${now.offBecause?.words ?? 'switch it on in Your account first'}`);
-      const failed = approve(context).filter((c) => !c.ok);
+      const failed = (await approve(context)).filter((c) => !c.ok);
       if (failed.length) throw new Error(`the order no longer passes on Robinhood's latest figures: ${failed.map((c) => c.words).join('; ')}`);
-      const placed = await session.placer.place({ accountNumber: this.agenticIds().accountNumber, agentic: true }, { ...order, symbol: brokerSymbol(order.symbol) }, refId);
-      return { placed, context };
-    } finally { await session.close(); }
+      const account = { accountNumber: this.agenticIds().accountNumber, agentic: true }, sent = { ...order, symbol: brokerSymbol(order.symbol) };
+      session.placer.ready(account, sent, refId);   // what this door would refuse is refused before anything is logged or sent
+      sending();
+      try { return { placed: await session.placer.place(account, sent, refId), context }; }
+      catch (e) { throw e instanceof Refused ? e : new AnswerLost(oneLine(masked(e instanceof Error ? e.message : String(e)), 120)); }
+    } finally { await session.close().catch(() => undefined); }   // closing the session afterwards never hides the answer
   }
 
   /** Robinhood's own check of an order on the Agentic account. Nothing is placed. */

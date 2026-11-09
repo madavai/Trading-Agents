@@ -39431,7 +39431,7 @@ function forgetHoldings(dir) {
     return false;
   }
 }
-var n = (v) => v.toLocaleString("en-US", { maximumSignificantDigits: 4 });
+var n = (v) => v.toLocaleString("en-US", { maximumFractionDigits: 8 });
 var m = (v) => v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 var holdingOf = (positions, ticker) => positions.find((p) => deskSymbol(p.ticker, "stock") === deskSymbol(ticker, "stock"));
 function renderAccounts(h, ticker) {
@@ -40835,8 +40835,9 @@ import fs13 from "node:fs";
 import path15 from "node:path";
 var file4 = (dir) => path15.join(dir, "orders.jsonl");
 function readOrders(dir) {
+  let lines;
   try {
-    return fs13.readFileSync(file4(dir), "utf8").split("\n").flatMap((l) => {
+    lines = fs13.readFileSync(file4(dir), "utf8").split("\n").flatMap((l) => {
       try {
         const v = JSON.parse(l);
         return v && typeof v.at === "string" && typeof v.symbol === "string" && v.robinhood ? [v] : [];
@@ -40847,6 +40848,15 @@ function readOrders(dir) {
   } catch {
     return [];
   }
+  const out = [], at = /* @__PURE__ */ new Map();
+  for (const v of lines) {
+    const i = v.ticket ? at.get(v.ticket) : void 0;
+    if (i === void 0) {
+      if (v.ticket) at.set(v.ticket, out.length);
+      out.push(v);
+    } else out[i] = { ...v, at: out[i].at };
+  }
+  return out;
 }
 var ordersOn = (dir, now) => readOrders(dir).filter((o) => marketDay(new Date(o.at)) === marketDay(now));
 
@@ -41246,7 +41256,7 @@ function eveningBrief(dir, today2, now, stops) {
   else {
     lines.push(`3. Orders the dashboard sent today (${orders.length}), with what Robinhood answered when each was sent:`);
     for (const o of orders) {
-      const r = o.robinhood, answer2 = !r.answered ? `refused${r.error ? `: ${r.error}` : ""}` : r.approvalRequired === true ? "taken, waiting for the person's approval on their phone" : r.approvalRequired === false ? "taken and sent to the market" : "taken";
+      const r = o.robinhood, answer2 = r.unknown ? `no clear answer from Robinhood, so it may have gone through${r.error ? ` (${r.error})` : ""}` : !r.answered ? `refused${r.error ? `: ${r.error}` : ""}` : r.approvalRequired === true ? "taken, waiting for the person's approval on their phone" : r.approvalRequired === false ? "taken and sent to the market" : "taken";
       lines.push(`   - ${o.side === "buy" ? "Buy" : "Sell"} ${o.quantity} ${o.symbol} at limit ${o.limitPrice.toFixed(2)}, ${o.at.slice(11, 16)} UTC${o.call ? `, from the ${o.call.rating} call of ${o.call.date}` : o.own ? ", your own order" : ""}: ${answer2}${r.state ? ` (state then: ${r.state})` : ""}.`);
     }
     lines.push("   What happened since (filled, approved, cancelled) is on the dashboard and in the Robinhood app: the team does not read Robinhood. Say so; do not guess.");

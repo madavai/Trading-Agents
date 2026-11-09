@@ -279,5 +279,8 @@
 .ta-term { text-decoration: underline dotted; text-decoration-color: var(--text-3); text-underline-offset: 0.2em; cursor: help; }
 .ta-gloss dt { color: var(--text); font-weight: var(--weight-medium); }
 
+/* a ticket's checks are sentences, some long: each wraps inside the ticket, never cut off at its edge */
+.ta-checks > .at-chip { flex: 0 1 auto; max-width: 100%; height: auto; min-height: var(--chip-height); white-space: normal; line-height: var(--line-tight); padding-block: var(--space-1); }
+
 /* a style that sets display would otherwise show an element the page has hidden */
 .ta-suggest[hidden], .ta-update-wrap[hidden] { display: none; }

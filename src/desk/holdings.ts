@@ -80,7 +80,8 @@ export function forgetHoldings(dir: string): boolean {
   try { fs.rmSync(file(dir)); return true; } catch { return false; }
 }
 
-const n = (v: number) => v.toLocaleString('en-US', { maximumSignificantDigits: 4 });
+/** A quantity as Robinhood gave it, never rounded (12,345 shares, 0.12345678 of a coin). */
+const n = (v: number) => v.toLocaleString('en-US', { maximumFractionDigits: 8 });
 const m = (v: number) => v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 /** The position in the stock being analysed: a share class saved in either spelling (BRK.B, BRK-B) is the same stock. */
 const holdingOf = (positions: Position[], ticker: string): Position | undefined => positions.find((p) => deskSymbol(p.ticker, 'stock') === deskSymbol(ticker, 'stock'));

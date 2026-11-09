@@ -515,6 +515,16 @@
     return out.join("");
   }
 
+  // src/terminal/ui/typed.ts
+  function typedNumber(typed) {
+    const s = typed.replace(/[$%\s]/g, "");
+    if (/^[1-9]\d{0,2}(,\d{3})+(\.\d+)?$/.test(s)) return Number(s.replace(/,/g, ""));
+    if (/^\d+,\d{1,2}$/.test(s)) return Number(s.replace(",", "."));
+    if (/^\d+(\.\d+)?$/.test(s)) return Number(s);
+    return NaN;
+  }
+  var sameFigures = (asked, now) => asked.id === now.id && asked.quantity === now.quantity && asked.limit === now.limit;
+
   // src/data/symbols.ts
   var FOREX = /* @__PURE__ */ new Set(["USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD", "CNY", "CNH", "HKD", "SGD", "SEK", "NOK", "DKK", "PLN", "MXN", "ZAR", "TRY", "INR", "KRW", "BRL", "RUB", "THB"]);
   var CRYPTO_BASES = /* @__PURE__ */ new Set(["BTC", "ETH", "SOL", "XRP", "ADA", "DOGE", "LTC", "BCH", "DOT", "AVAX", "LINK"]);
@@ -660,7 +670,6 @@
     return `<span class="at-chip ${tone(q2.changePct)}" title="${esc(day ? `${means("today")} This move is from ${weekDay(day)}.` : means("today"))}">${moveText(q2)}${day ? ` \xB7 ${chipDay(day)}` : ""}</span>`;
   };
   var noTicketChip = (paper, late = "") => paper ? `<span class="at-chip" title="${esc(`${means("paper")} ${NOTES.coinOnPaper}`)}">on paper only</span>` : `<span class="at-chip" title="${esc(late ? `${NOTES.coinOnPaper} ${daysInWords(late)}` : NOTES.noTicket)}">no order ticket</span>`;
-  var daysInWords = (s) => s.replace(/\b\d{4}-\d{2}-\d{2}\b/g, (day) => dayText(day));
   var robot = (sym) => `<button class="icon-btn" data-act="analyse" data-symbol="${esc(sym)}" title="Ask the desk to analyse ${esc(sym)}" aria-label="Ask the desk to analyse ${esc(sym)}"><svg class="g"><use href="#i-bot"/></svg></button>`;
   var listWords = (xs) => xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
   var priceText = (sym, q2) => {
@@ -1089,6 +1098,7 @@
       renderCall();
       renderStock();
       void loadCare();
+      void loadTrading();
     }
   }
   async function openPicker() {
@@ -1143,7 +1153,7 @@
     <div class="at-row">${rhButton("caps-edit", "Change the caps\u2026")}</div>`;
   }
   var capsTyped = () => {
-    const n = (id) => Number($(id).value.replace(/[$,%\s]/g, ""));
+    const n = (id) => typedNumber($(id).value);
     return { perOrderUsd: n("#capOrder"), perStockPercent: n("#capStock"), ordersPerDay: n("#capDay"), perSectorPercent: n("#capSector"), cryptoPercent: n("#capCrypto"), weeklyLossPercent: n("#capWeek"), minHoldDays: n("#capHold") };
   };
   function switchBlock() {
@@ -1151,12 +1161,13 @@
     <p class="at-lede">You can place an order from a ticket, from one of the desk's calls (Decide\u2026) or your own (Trade\u2026), in the Agentic account only, within your caps, after Robinhood's check and your Confirm.</p>
     <div class="at-row">${rhButton("tr-off", "Switch trading off")}</div>`;
     if (!TR.asking) return `<div class="at-card-head"><h3>Trading</h3><span class="at-chip">Off</span></div>
-    ${TR.state?.offBecause ? `<p class="at-honest bad">${esc(TR.state.offBecause.words)}</p>` : ""}<p class="at-lede">With trading off, a ticket can be checked by Robinhood but never placed.</p>${recordLine()}<div class="at-row">${rhButton("tr-ask", "Switch trading on\u2026")}</div>`;
+    ${TR.state?.offBecause ? `<p class="at-honest bad">${esc(daysInWords(TR.state.offBecause.words))}</p>` : ""}<p class="at-lede">With trading off, a ticket can be checked by Robinhood but never placed.</p>${recordLine()}<div class="at-row">${rhButton("tr-ask", "Switch trading on\u2026")}</div>`;
     return `<div class="at-card-head"><h3>Switch trading on?</h3></div>
     <p class="at-lede">From then on, a ticket you open, from one of the desk's calls or your own, can place a real order with real money in your Agentic account. Every order still needs Robinhood's check with no alerts, your caps, and your own Confirm naming the exact order. Keep Robinhood's approval on your phone switched on until you trust the desk. This is not investment advice.</p>
     ${recordLine()}${young() ? `<p class="at-honest bad">That is under ${esc(S.desk?.paper.minWords ?? "")}: too little to tell whether the desk's calls are any good. Read your paper record first.</p><div class="at-row">${TR.understood ? '<span class="at-chip ok">You understand</span>' : rhButton("tr-understood", "I understand")}</div>` : ""}
     <div class="at-row">${young() && !TR.understood ? "" : rhButton("tr-on", "Yes, switch trading on", { primary: true })}${rhButton("tr-cancel", "Cancel")}</div>`;
   }
+  var daysInWords = (said) => said.replace(/\b\d{4}-\d{2}-\d{2}\b/g, dayText);
   async function loadTrading() {
     try {
       TR.state = await api.trading();
@@ -1172,17 +1183,18 @@
     const t = T.open;
     if (!t) return;
     const asks = T.checks.filter((c) => c.ask), ok = T.checks.length > 0 && T.checks.every((c) => c.ok) && (!asks.length || T.early);
-    const checks = t.proposal.order ? `<div class="at-card-head"><h3>Your checks</h3></div><div class="at-row">${T.checks.map((c) => `<span class="at-chip ${c.ask ? "warn" : c.ok ? "ok" : "danger"}">${esc(c.words)}</span>`).join("")}</div>` : "";
+    const checks = t.proposal.order ? `<div class="at-card-head"><h3>Your checks</h3></div><div class="at-row ta-checks">${T.checks.map((c) => `<span class="at-chip ${c.ask ? "warn" : c.ok ? "ok" : "danger"}">${esc(c.words)}</span>`).join("")}</div>` : "";
     const r = T.review;
-    const review = r ? `<div class="at-card at-box"><div class="at-card-head"><h3>${term("dryRun")}</h3>${!r.answered ? '<span class="at-chip danger">Robinhood reported an error</span>' : r.alerts.length ? `<span class="at-chip danger">${r.alerts.length} alert(s)</span>` : '<span class="at-chip ok">No alerts</span>'}</div>
+    const review = r ? `<div class="at-card at-box"><div class="at-card-head"><h3>${term("dryRun")}</h3>${!r.answered ? `<span class="at-chip danger">${r.unclear ? "Not checked" : "Robinhood reported an error"}</span>` : r.alerts.length ? `<span class="at-chip danger">${r.alerts.length} alert(s)</span>` : '<span class="at-chip ok">No alerts</span>'}</div>
       ${r.error ? `<p class="at-honest bad">${esc(r.error)}</p>` : ""}${r.alerts.map((a) => `<p class="at-honest bad">${esc(a)}</p>`).join("")}
       ${r.approvalRequired === null ? "" : `<p class="at-lede">${r.approvalRequired ? "Robinhood would ask you to approve this order on your phone before it is sent." : "Robinhood would not ask for your approval on your phone: an order would be sent at once."}</p>`}
       ${r.facts.length ? `<dl class="at-facts ruled at-box">${r.facts.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>` : ""}
       <p class="at-quiet">This was Robinhood's dry run: nothing was placed.</p></div>` : "";
     const clean = !!r && r.answered && r.alerts.length === 0;
     const p = T.placed;
-    const placed = p ? `<div class="at-card at-box"><div class="at-card-head"><h3>Sent to Robinhood</h3>${p.answered ? '<span class="at-chip ok">Robinhood took it</span>' : '<span class="at-chip danger">Robinhood refused it</span>'}</div>
+    const placed = p ? `<div class="at-card at-box"><div class="at-card-head"><h3>Sent to Robinhood</h3>${p.answered ? '<span class="at-chip ok">Robinhood took it</span>' : p.unknown ? '<span class="at-chip warn">No clear answer</span>' : '<span class="at-chip danger">Robinhood refused it</span>'}</div>
       ${p.error ? `<p class="at-honest bad">${esc(p.error)}</p>` : ""}
+      ${p.unknown ? `<p class="at-lede">It is in the desk's order log as sent, so it counts towards your orders a day. This ticket sends nothing more.</p>` : ""}
       ${p.answered ? `<p class="at-lede">${p.approvalRequired === true ? "Robinhood now asks you to approve it on your phone: it is not sent to the market until you do." : p.approvalRequired === false ? "Robinhood sent it to the market." : "Check the order in Robinhood."}${p.state ? ` State: ${esc(p.state)}.` : ""}</p>` : ""}
       ${p.facts.length ? `<dl class="at-facts ruled at-box">${p.facts.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>` : ""}</div>` : "";
     let buttons = "";
@@ -1203,7 +1215,7 @@
     renderTicketDyn();
     try {
       T.placed = (await api.placeTicket(t.id, T.confirm, T.early)).placed;
-      toast(T.placed.answered ? "The order is with Robinhood." : "Robinhood refused the order.", T.placed.answered ? "ok" : "bad");
+      toast(T.placed.answered ? "The order is with Robinhood." : T.placed.unknown ? "No clear answer from Robinhood: look in its app before you try again." : "Robinhood refused the order.", T.placed.answered ? "ok" : "bad");
       void readAccounts();
       void loadTrading();
     } catch (e) {
@@ -1222,7 +1234,7 @@
     const head = t.own ? `<div class="ta-pophead"><h2>${esc(`${side === "buy" ? "Buy" : "Sell"} ${c.symbol}`)}</h2><div class="at-seg" role="tablist" aria-label="Buy or sell">${["buy", "sell"].map((s) => `<button class="at-seg-b${s === side ? " on" : ""}" data-act="tk-side" data-side="${s}" data-symbol="${esc(c.symbol)}">${s === "buy" ? "Buy" : "Sell"}</button>`).join("")}</div>${close}</div>
     <p class="at-lede">Your own order, not one of the desk's calls: in the Agentic account only, within your caps, after Robinhood's check and your Confirm.</p>` : `<div class="ta-pophead"><h2>${esc(o ? `${o.side === "buy" ? "Buy" : "Sell"} ${c.symbol}` : `No order for ${c.symbol}`)}</h2>${ratingChip(c.rating)}${close}</div>
     <p class="at-lede">The desk rated ${esc(c.symbol)} ${esc(c.rating)} on ${esc(dayText(c.callDate))}: ${esc(t.proposal.action)}. In the Agentic account only.</p>`;
-    $("#tkHead").innerHTML = `${head}
+    $("#tkHead").innerHTML = `${head}${t.lost ? `<p class="at-honest bad">${esc(daysInWords(t.lost))}</p>` : ""}
     <dl class="at-facts ruled at-box"><div><dt>Account value</dt><dd>${money(c.accountValue)}</dd></div><div><dt>Buying power</dt><dd>${money(c.buyingPower)}</dd></div><div><dt>Held now</dt><dd>${esc(String(c.held))} share(s)</dd></div><div><dt>Live price</dt><dd>${money(c.price)}</dd></div><div><dt>Orders today</dt><dd>${c.ordersToday} of ${t.caps.ordersPerDay}</dd></div></dl>
     ${t.proposal.why.map((w) => `<p class="at-quiet">${esc(w)}</p>`).join("")}`;
     $("#tkFields").innerHTML = o ? `<div class="at-row">
@@ -1254,12 +1266,13 @@
       dlg.close();
       toast(say(e), "bad");
     }
+    void loadTrading();
   }
   function ticketEdited() {
     const t = T.open;
     if (!t?.proposal.order) return;
     T.quantity = Number($("#tkQty").value);
-    T.limit = Number($("#tkLimit").value.replace(/[$,\s]/g, ""));
+    T.limit = typedNumber($("#tkLimit").value);
     T.review = null;
     T.checks = [];
     T.confirming = false;
@@ -1274,16 +1287,18 @@
   async function reviewTicket() {
     const t = T.open;
     if (!t || T.busy) return;
+    const asked = { id: t.id, quantity: T.quantity, limit: T.limit };
     T.busy = true;
     renderTicketDyn();
     try {
       const r = await api.reviewTicket(t.id, T.quantity, T.limit, T.early);
+      TR.state = { ...TR.state, ...r.trading };
+      renderTrading();
+      if (!sameFigures(asked, { id: T.open?.id, quantity: T.quantity, limit: T.limit })) return;
       T.checks = r.checks;
       T.review = r.review;
       T.confirm = r.confirm;
       T.confirming = false;
-      TR.state = { ...TR.state, ...r.trading };
-      renderTrading();
     } catch (e) {
       toast(say(e), "bad");
     } finally {
@@ -2365,7 +2380,8 @@
           renderAccount();
           renderViews();
           renderCare();
-          toast("The saved Robinhood sign-in is deleted from this computer.");
+          void loadTrading();
+          toast("The saved Robinhood sign-in is deleted from this computer, and trading is switched off.");
         });
         break;
       case "acc-pick":

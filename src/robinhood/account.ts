@@ -88,18 +88,37 @@ export function parseQuotes(answer: unknown): Map<string, number> {
 }
 
 export interface Order { symbol: string | null; side: string | null; type: string | null; state: string | null; quantity: number | null; price: number | null; at: string | null }
+const orderOf = (v: unknown): Order => {
+  const o = obj(v);
+  return { symbol: text(o.symbol)?.toUpperCase() ?? null, side: text(o.side), type: text(o.type), state: text(o.state),
+    quantity: figure(o.quantity) ?? figure(o.cumulative_quantity), price: figure(o.average_price) ?? figure(o.price) ?? figure(o.limit_price), at: text(o.created_at) ?? text(o.updated_at) };
+};
 /** Orders. The Agentic account had none on 16 Oct 2026, so the fields are read as Robinhood's tool description names
  *  them; whatever cannot be read is null and shown as a dash. */
 export function parseOrders(answer: unknown): { orders: Order[]; count: number } {
   const rows = list(dataOf(answer).orders);
-  return {
-    count: rows.length,
-    orders: rows.slice(0, 20).map((v) => {
-      const o = obj(v);
-      return { symbol: text(o.symbol)?.toUpperCase() ?? null, side: text(o.side), type: text(o.type), state: text(o.state),
-        quantity: figure(o.quantity) ?? figure(o.cumulative_quantity), price: figure(o.average_price) ?? figure(o.price) ?? figure(o.limit_price), at: text(o.created_at) ?? text(o.updated_at) };
-    }),
-  };
+  return { count: rows.length, orders: rows.slice(0, 20).map(orderOf) };
+}
+
+/** A state Robinhood gives an order that is done: filled, or never to be filled. Any other state is still open. */
+const DONE = /^(filled|cancell?ed|rejected|failed|expired|voided)$/i;
+/** An order still open at Robinhood (queued, confirmed, partly filled...): what it still waits to buy or sell, at its own
+ *  price. A filled part is already among the holdings, so only the rest counts. */
+export interface OpenOrder { symbol: string; side: 'buy' | 'sell'; quantity: number; price: number | null }
+/** Every order Robinhood listed (all of them, not the page's twenty), for a ticket's checks: the ones still open, and how
+ *  many could not be read well enough to tell (no stock, side, size or state): those are never taken as done. */
+export function openOrders(answer: unknown): { all: Order[]; open: OpenOrder[]; unread: number } {
+  const rows = list(dataOf(answer).orders), all = rows.map(orderOf);
+  const open: OpenOrder[] = [];
+  let unread = 0;
+  rows.forEach((v, i) => {
+    const o = all[i]!, raw = obj(v);
+    if (o.state && DONE.test(o.state)) return;
+    const quantity = figure(raw.quantity), filled = figure(raw.cumulative_quantity) ?? 0;
+    if (!o.state || !o.symbol || (o.side !== 'buy' && o.side !== 'sell') || quantity === null) { unread++; return; }
+    open.push({ symbol: o.symbol, side: o.side, quantity: Math.max(0, quantity - filled), price: figure(raw.price) ?? figure(raw.limit_price) });
+  });
+  return { all, open: open.filter((o) => o.quantity > 0), unread };
 }
 
 export interface Approvals { required: boolean | null; pending: number }
@@ -121,7 +140,8 @@ export interface AccountView {
   problems: string[];
 }
 
-const QUOTES_PER_CALL = 20;
+/** Robinhood's live quotes are asked for at most this many symbols at a time. */
+export const QUOTES_PER_CALL = 20;
 
 /** One account, read whole: its value, what it holds priced at Robinhood's live quotes, and for the Agentic account its orders. */
 export async function readAccount(reader: Reader, account: Account, ids: AccountIds): Promise<AccountView> {
