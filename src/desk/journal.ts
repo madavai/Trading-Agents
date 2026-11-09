@@ -17,12 +17,21 @@
 // "yardstick:SPY (us)", the yardstick with why it is that one (scoring.ts Basis). Scoring reads them from there, so a
 // later change to the settings never re-scores a call. A call recorded before has neither, and keeps the rules it was
 // made under (scoring.ts legacyRules).
+//
+// A call recorded since 9 Nov 2026 also keeps when it was recorded, "recorded:2026-11-09T15:04Z" (UTC, to the minute), so
+// the paper record can tell an analysis dated in the past from a call made on its day (paper.ts lateWhy).
+//
+// The rating kept is the one the decision's words state: a rating passed that differs from it is refused, and a decision
+// whose words state none is "Needs review", whatever was passed, so the journal never says what the decision does not.
+//
+// The file is read whatever its line ends (a journal saved by a Windows editor has CR LF) and written back with its own;
+// an entry ends at its separator line, with or without the blank lines around it.
 import fs from 'node:fs';
 import path from 'node:path';
 import { REVIEW, RATINGS, parseRating } from './rating.js';
 import { withLock, writeWhole } from './lock.js';
 import { signedPct as pct, unsignZero } from '../numbers.js';
-import { checkName, legacyRules, windowWords, type Basis, type Rules, type Scoring } from './scoring.js';
+import { checkName, legacyRules, ownReturn, windowWords, type Basis, type Rules, type Scoring } from './scoring.js';
 
 /** How a settled call's lesson was written: see the file's head. "unmarked" is the old way; "none" a call not settled. */
 export type LessonState = 'none' | 'unmarked' | 'prices' | 'no-prices' | 'corrected' | 'unreliable' | 'flagged';
@@ -41,11 +50,16 @@ export interface Entry {
   lesson: LessonState; lessonOn: string | null; lessonCheck: string; earlier: string; firstLesson: string;
   /** The window and yardstick kept with the call when it was recorded; null for a call recorded before the desk kept them. */
   rules: Rules | null;
+  /** When the call was recorded (ISO, UTC, to the minute); null for a call recorded before the desk kept it. */
+  recorded: string | null;
 }
 
 const SEPARATOR = '\n\n<!-- ENTRY_END -->\n\n';
 
 const MARK = /<!--\s*ENTRY_END\s*-->/i;
+/** Where one entry ends and the next begins: the separator's line, with any blank lines around it. keep() means no
+ *  model's words hold one, so each is the journal's own. */
+const SPLIT = /\s*<!--\s*ENTRY_END\s*-->\s*/i;
 
 /** A model's words made safe to keep: they can never end the entry early or fake a section of it. The separator is removed
  *  until none is left, since taking one out can join the pieces around it into another. */
@@ -64,7 +78,10 @@ function lessonOf(fields: string[], pending: boolean): { lesson: LessonState; le
 }
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/, TICKER = /^[A-Za-z0-9.\-=^]{1,20}$/;
-const BASES: readonly Basis[] = ['us', 'coin', 'unlisted', 'market', 'chosen'];
+const BASES: readonly Basis[] = ['us', 'coin', 'unlisted', 'market', 'chosen', 'same'];
+const RECORDED = /^recorded:(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z)$/;
+/** When a call was recorded, as its tag keeps it. */
+const recordedIn = (fields: string[]): string | null => fields.map((x) => RECORDED.exec(x)?.[1]).find(Boolean) ?? null;
 const WINDOW = /^window:(\d{1,3}) (trading|calendar) days?$/, YARDSTICK = /^yardstick:([A-Za-z0-9.\-=^]{1,20}) \(([a-z]+)\)$/;
 /** A call's rules as its tag keeps them: the window, then the yardstick with why. */
 const rulesFields = (r: Rules): string[] => [`window:${windowWords(r)}`, `yardstick:${r.yardstick} (${r.basis})`];
@@ -101,7 +118,7 @@ function parse(block: string): Entry | null {
   const firstLesson = /(?:^|\n)FIRST LESSON:\n([\s\S]*)$/.exec(body)?.[1]?.trim() ?? '';
   const resolved = f.slice(6).find((x) => x.startsWith('resolved:'))?.slice('resolved:'.length).trim() ?? null;
   const pending = f[3] === 'pending', score = (s: string | undefined) => (s === undefined ? null : unsignZero(s));
-  return { date: f[0]!, ticker: f[1]!, rating: f[2]!, pending, raw: pending ? null : score(f[3]), alpha: pending ? null : score(f[4]), holding: pending ? null : f[5] ?? null, resolved, decision, reflection, ...lessonOf(f.slice(6), pending), lessonCheck, earlier, firstLesson, rules: rulesIn(f.slice(4)) };
+  return { date: f[0]!, ticker: f[1]!, rating: f[2]!, pending, raw: pending ? null : score(f[3]), alpha: pending ? null : score(f[4]), holding: pending ? null : f[5] ?? null, resolved, decision, reflection, ...lessonOf(f.slice(6), pending), lessonCheck, earlier, firstLesson, rules: rulesIn(f.slice(4)), recorded: recordedIn(f.slice(4)) };
 }
 
 /** A settled entry's lesson part: the lesson, then each section that has words, in the journal's order. */
@@ -141,25 +158,33 @@ export class Journal {
   /** @param maxResolved keep at most this many settled entries (the oldest go first); pending ones are never dropped */
   constructor(readonly file: string, private maxResolved: number | null = null) {}
 
-  private read(): string { try { return fs.readFileSync(this.file, 'utf8'); } catch { return ''; } }
-  private write(text: string): void { fs.mkdirSync(path.dirname(this.file), { recursive: true }); writeWhole(this.file, text); }
-  private blocks(): string[] { return this.read().split(SEPARATOR).filter((b) => b.trim()); }
+  /** The file's own line ends, as last read: written back the same way. */
+  private eol = '\n';
+  private read(): string {
+    try { const t = fs.readFileSync(this.file, 'utf8'); this.eol = t.includes('\r\n') ? '\r\n' : '\n'; return t.replace(/\r\n/g, '\n'); } catch { return ''; }
+  }
+  private write(text: string): void { fs.mkdirSync(path.dirname(this.file), { recursive: true }); writeWhole(this.file, this.eol === '\n' ? text : text.replace(/\n/g, this.eol)); }
+  private blocks(): string[] { return this.read().split(SPLIT).filter((b) => b.trim()); }
 
   load(): Entry[] { return this.blocks().map(parse).filter((e): e is Entry => e !== null); }
   pending(): Entry[] { return this.load().filter((e) => e.pending); }
 
   /** Adds a pending entry, with the window and yardstick it will be scored by when they are given (every call the desk
-   *  records now). One entry per stock and day, settled or not: a re-run must not count the same call twice. */
-  storeDecision(ticker: string, date: string, decision: string, rating?: string, rules?: Rules): 'stored' | 'exists' {
+   *  records now), and when it was recorded (`at`, which record_decision gives). The rating kept is the one the decision
+   *  states: a `rating` passed that differs from it is refused, and a decision that states none is Needs review. One
+   *  entry per stock and day, settled or not: a re-run must not count the same call twice. */
+  storeDecision(ticker: string, date: string, decision: string, rating?: string, rules?: Rules, at?: Date): 'stored' | 'exists' {
     checkTag(ticker, date);
     if (rules) checkRules(rules);
+    const stated = parseRating(decision);
+    if (rating && (RATINGS as readonly string[]).includes(rating) && stated !== REVIEW && rating !== stated) throw new Error(`the decision states ${stated}, not ${rating}: the journal keeps the rating the decision's words give. Correct the decision, or pass ${stated}`);
     fs.mkdirSync(path.dirname(this.file), { recursive: true });
     return withLock(this.file, () => {
       if (this.load().some((e) => e.date === date && e.ticker === ticker)) return 'exists';
-      const r = rating && (RATINGS as readonly string[]).includes(rating) ? rating : parseRating(decision);
-      const old = this.read();
-      const kept = rules ? rulesFields(rules).map((x) => ` | ${x}`).join('') : '';
-      this.write(`${old}${old && !old.endsWith(SEPARATOR) ? SEPARATOR : ''}[${date} | ${ticker} | ${r} | pending${kept}]\n\nDECISION:\n${keep(decision)}${SEPARATOR}`);
+      const old = this.read().replace(/\s+$/, '');
+      const kept = [...(rules ? rulesFields(rules) : []), ...(at ? [`recorded:${at.toISOString().slice(0, 16)}Z`] : [])].map((x) => ` | ${x}`).join('');
+      const before = !old ? '' : /<!--\s*ENTRY_END\s*-->$/i.test(old) ? `${old}\n\n` : `${old}${SEPARATOR}`;
+      this.write(`${before}[${date} | ${ticker} | ${stated} | pending${kept}]\n\nDECISION:\n${keep(decision)}${SEPARATOR}`);
       return 'stored';
     });
   }
@@ -174,8 +199,8 @@ export class Journal {
         const e = parse(block);
         if (done || !e || !e.pending || e.date !== date || e.ticker !== ticker) return block;
         done = true;
-        // The window and yardstick the call kept stay in its tag once scored, before the lesson's mark.
-        const kept = e.rules ? rulesFields(e.rules).map((x) => ` | ${x}`).join('') : '';
+        // The window and yardstick the call kept, and when it was recorded, stay in its tag once scored, before the lesson's mark.
+        const kept = [...(e.rules ? rulesFields(e.rules) : []), ...(e.recorded ? [`recorded:${e.recorded}`] : [])].map((x) => ` | ${x}`).join('');
         return `[${date} | ${ticker} | ${e.rating} | ${pct(raw)} | ${pct(alpha)} | ${holdingDays}d | resolved:${resolution}${kept}${from ? ` | lesson:${from}` : ''}]\n\nDECISION:\n${e.decision}\n\nREFLECTION:\n${keep(reflection)}`;
       });
       if (!done) return false;
@@ -274,7 +299,7 @@ export class Journal {
     if (!same.length && !other.length) return '';
     const over = (e: Entry): string => {
       const r = e.rules ?? (o.scoring ? legacyRules(e.ticker, o.scoring, e.holding) : null);
-      return r ? `${checkName(r)}: against ${r.yardstick} over the ${windowWords(r)} after the call, not the call's own time horizon` : `over ${e.holding ?? 'n/a'}`;
+      return r ? `${checkName(r)}: ${ownReturn(r) ? `on its own return (${r.yardstick} is its own yardstick or copies the same index), so its alpha is its return,` : `against ${r.yardstick}`} over the ${windowWords(r)} after the call, not the call's own time horizon` : `over ${e.holding ?? 'n/a'}`;
     };
     const head = (e: Entry) => `[${e.date} | ${e.ticker} | ${e.rating} | return ${e.raw ?? 'n/a'} | alpha ${e.alpha ?? 'n/a'} | ${over(e)}]`;
     const full = (e: Entry) => [head(e), `DECISION:\n${e.decision}`,

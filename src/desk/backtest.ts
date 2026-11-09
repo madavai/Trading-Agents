@@ -6,7 +6,7 @@
 // Adapted from TradingAgents (tradingagents/backtest.py), Apache License 2.0; rewritten in TypeScript.
 import { addDays, parseDate, today } from '../data/dates.js';
 import { isCrypto, safeSymbol } from '../data/symbols.js';
-import { windowWords } from './scoring.js';
+import { ownReturn, windowWords } from './scoring.js';
 import { signedPct } from '../numbers.js';
 import type { Entry } from './journal.js';
 import { REVIEW } from './rating.js';
@@ -56,8 +56,13 @@ export function worked(rating: string, alpha: number | null): boolean | null {
 }
 
 export interface RatingScore { count: number; direction: number; hitRate: number | null; meanAlpha: number }
-/** `holding`: the windows the scored calls were measured over, in words; `yardsticks`: those their entries keep. */
-export interface Summary { resolved: number; pending: number; unscored: number; byRating: Record<string, RatingScore>; holding: string; yardsticks: string }
+/** One rating's calls scored on their own return (a call on the yardstick itself, or on a fund copying its index): how
+ *  many, how many worked (null for a rating with no direction) and their average return, which is not a beat of anything. */
+export interface OwnScore { count: number; worked: number | null; meanReturn: number }
+/** `byRating`: the calls measured against a yardstick only; `ownReturn`: those scored on their own return, kept apart so
+ *  no average against the yardstick is made of a return. `resolved` counts both. `holding`: the windows the scored calls
+ *  were measured over, in words; `yardsticks`: those their entries keep. */
+export interface Summary { resolved: number; pending: number; unscored: number; byRating: Record<string, RatingScore>; ownReturn: Record<string, OwnScore>; holding: string; yardsticks: string }
 
 /** A settled entry's alpha as a fraction ("+7.1%" is 0.071), or null when it has none. The journal keeps one decimal of a
  *  percentage point, so aggregates are accurate to 0.1 of a point, not to the raw quote. */
@@ -71,10 +76,14 @@ export const alphaOf = (e: Pick<Entry, 'alpha'>): number | null => {
  *  the desk: it is reported as unscored. */
 export function summarize(entries: Entry[]): Summary {
   const resolved = entries.filter((e) => !e.pending && e.rating !== REVIEW).map((e) => ({ e, a: alphaOf(e) })).filter((x): x is { e: Entry; a: number } => x.a !== null);
-  const byRating: Record<string, RatingScore> = {};
+  const byRating: Record<string, RatingScore> = {}, own: Record<string, OwnScore> = {};
+  const isOwn = (e: Entry) => e.rules !== null && ownReturn(e.rules);   // an old call with no rules kept was scored against its yardstick
   for (const rating of new Set(resolved.map((x) => x.e.rating))) {
-    const alphas = resolved.filter((x) => x.e.rating === rating).map((x) => x.a), dir = directionOf(rating);
-    byRating[rating] = { count: alphas.length, direction: dir, hitRate: dir ? alphas.filter((a) => worked(rating, a)).length / alphas.length : null, meanAlpha: alphas.reduce((s, a) => s + a, 0) / alphas.length };
+    const of = (mine: boolean) => resolved.filter((x) => x.e.rating === rating && isOwn(x.e) === mine).map((x) => x.a), dir = directionOf(rating);
+    const mean = (xs: number[]) => xs.reduce((s, a) => s + a, 0) / xs.length;
+    const alphas = of(false), returns = of(true);
+    if (alphas.length) byRating[rating] = { count: alphas.length, direction: dir, hitRate: dir ? alphas.filter((a) => worked(rating, a)).length / alphas.length : null, meanAlpha: mean(alphas) };
+    if (returns.length) own[rating] = { count: returns.length, worked: dir ? returns.filter((a) => worked(rating, a)).length : null, meanReturn: mean(returns) };
   }
   const unscored = entries.filter((e) => e.rating === REVIEW).length;
   // Each scored call's window, in its own unit (a coin's is calendar days, kept or as it was scored before the desk kept
@@ -84,7 +93,7 @@ export function summarize(entries: Entry[]): Summary {
     return days > 0 ? windowWords({ days, unit: e.rules?.unit ?? (isCrypto(e.ticker) ? 'calendar' : 'trading') }) : '';
   }).filter(Boolean))].sort();
   const yardsticks = [...new Set(resolved.map(({ e }) => e.rules?.yardstick ?? '').filter(Boolean))].sort();
-  return { resolved: resolved.length, pending: entries.length - resolved.length - unscored, unscored, byRating, holding: windows.join(', ') || 'the configured window', yardsticks: yardsticks.join(', ') };
+  return { resolved: resolved.length, pending: entries.length - resolved.length - unscored, unscored, byRating, ownReturn: own, holding: windows.join(', ') || 'the configured window', yardsticks: yardsticks.join(', ') };
 }
 
 const pctText = (v: number) => signedPct(v, 2);
@@ -94,6 +103,8 @@ export function renderSummary(s: Summary): string {
   for (const [rating, sc] of Object.entries(s.byRating)) {
     lines.push(`- ${rating}: n=${sc.count}, ${sc.hitRate !== null ? `called the direction ${Math.round(sc.hitRate * 100)}%` : 'no direction claimed'}, mean alpha ${pctText(sc.meanAlpha)} vs the yardstick`);
   }
+  const own = Object.entries(s.ownReturn);
+  if (own.length) lines.push(`- On their own return, not in the lines above (a call on the yardstick itself or a fund that copies the same index): ${own.map(([rating, o]) => `${rating} n=${o.count}, ${o.worked === null ? 'no direction claimed' : `worked ${o.worked}`}, mean return ${pctText(o.meanReturn)}`).join('; ')}`);
   lines.push('');
   if (s.pending) lines.push('Pending cells are not scored above; settle them when their window has traded.');
   if (s.unscored) lines.push('Unscored cells had no readable rating (Needs review): they count neither for nor against the desk.');

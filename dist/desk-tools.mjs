@@ -7921,12 +7921,12 @@ function cleanRegex(source) {
   return source.slice(start, end);
 }
 function floatSafeRemainder(val, step) {
-  const ratio = val / step;
-  const roundedRatio = Math.round(ratio);
-  const tolerance = 4 * Number.EPSILON * Math.max(Math.abs(ratio), 1);
-  if (Math.abs(ratio - roundedRatio) < tolerance)
+  const ratio2 = val / step;
+  const roundedRatio = Math.round(ratio2);
+  const tolerance = 4 * Number.EPSILON * Math.max(Math.abs(ratio2), 1);
+  if (Math.abs(ratio2 - roundedRatio) < tolerance)
     return 0;
-  return ratio - roundedRatio;
+  return ratio2 - roundedRatio;
 }
 var EVALUATING = /* @__PURE__ */ Symbol("evaluating");
 function defineLazy(object3, key, getter) {
@@ -36628,8 +36628,10 @@ var file2 = (root) => path3.join(deskDataDir(root), "contact.json");
 var EMAIL = /^[^\s@<>()",;:]+@[^\s@<>()",;:]+\.[a-z]{2,}$/i;
 var RESERVED = /@(?:[^@]*\.)?(?:example\.(?:com|net|org)|example|test|invalid|localhost)$/i;
 function checkEmail(raw) {
-  const email3 = String(raw ?? "").trim();
+  const email3 = String(raw ?? "").replace(new RegExp("\\p{Cf}", "gu"), "").trim();
   if (!EMAIL.test(email3)) throw new Error(`"${raw}" is not an email address`);
+  const odd = [...email3].find((c) => c < "!" || c > "~");
+  if (odd) throw new Error(`"${email3}" cannot be sent to the SEC: it has "${odd}", and the SEC can only be sent an address written with the letters a to z, digits and marks such as . _ - + (it goes in the header of every request)`);
   if (RESERVED.test(email3)) throw new Error(`${email3} is a made-up example address: the SEC needs one that reaches the person`);
   return email3;
 }
@@ -37390,6 +37392,10 @@ function window(start, end, analysis2) {
 var FOREX = /* @__PURE__ */ new Set(["USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD", "CNY", "CNH", "HKD", "SGD", "SEK", "NOK", "DKK", "PLN", "MXN", "ZAR", "TRY", "INR", "KRW", "BRL", "RUB", "THB"]);
 var CRYPTO_BASES = /* @__PURE__ */ new Set(["BTC", "ETH", "SOL", "XRP", "ADA", "DOGE", "LTC", "BCH", "DOT", "AVAX", "LINK"]);
 var CRYPTO_QUOTES = ["USDT", "USDC", "USD"];
+var NOT_COINS = /* @__PURE__ */ new Set([...FOREX, "XAU", "XAG", "XPT", "XPD"]);
+var COIN_PAIR = /^([A-Z0-9]{1,15})-(USDT|USDC|USD)$/;
+var SHARE_CLASS = /^([A-Z]{1,5})\.([A-Z])$/;
+var ONE_LETTER_EXCHANGES = /* @__PURE__ */ new Set(["T", "L", "V", "F"]);
 var ALIASES = {
   XAUUSD: "GC=F",
   XAU: "GC=F",
@@ -37401,7 +37407,6 @@ var ALIASES = {
   XPDUSD: "PA=F",
   WTICOUSD: "CL=F",
   USOIL: "CL=F",
-  WTI: "CL=F",
   BCOUSD: "BZ=F",
   UKOIL: "BZ=F",
   BRENT: "BZ=F",
@@ -37429,7 +37434,10 @@ var ALIASES = {
   HK50: "^HSI"
 };
 function cryptoBase(raw) {
-  const compact = raw.trim().toUpperCase().replace(/\+$/, "").replaceAll("-", "");
+  const s = raw.trim().toUpperCase().replace(/\+$/, "");
+  const pair = COIN_PAIR.exec(s);
+  if (pair) return /[A-Z]/.test(pair[1]) && !NOT_COINS.has(pair[1]) ? pair[1] : null;
+  const compact = s.replaceAll("-", "");
   for (const q of CRYPTO_QUOTES) {
     if (compact.endsWith(q)) {
       const base = compact.slice(0, -q.length);
@@ -37438,6 +37446,10 @@ function cryptoBase(raw) {
   }
   return null;
 }
+var yahooClass = (s) => {
+  const m2 = SHARE_CLASS.exec(s);
+  return m2 && !ONE_LETTER_EXCHANGES.has(m2[2]) ? `${m2[1]}-${m2[2]}` : s;
+};
 function normalizeSymbol(raw) {
   const s = raw.trim().toUpperCase().replace(/\+$/, "");
   if (!s) return s;
@@ -37449,9 +37461,13 @@ function normalizeSymbol(raw) {
   if (hk) return `${String(Number(hk[1])).padStart(4, "0")}.HK`;
   const sh = /^(\d{6})\.SH$/.exec(s);
   if (sh) return `${sh[1]}.SS`;
-  return s;
+  return yahooClass(s);
 }
 var isCrypto = (raw) => cryptoBase(raw) !== null;
+function deskSymbol(symbol4, kind) {
+  const s = symbol4.trim().toUpperCase();
+  return kind === "crypto" ? `${cryptoBase(s) ?? s}-USD` : yahooClass(s);
+}
 function safeSymbol(raw) {
   const s = normalizeSymbol(raw);
   if (!/^[A-Z0-9.\-=^]{1,20}$/.test(s)) throw new Error(`"${raw}" is not a ticker symbol this desk can look up`);
@@ -38295,6 +38311,7 @@ var SERIES = {
   germany_10y: ["IRLTLT01DEM156N", "Germany 10-year government bond yield (percent)"],
   eur_usd: ["DEXUSEU", "US dollars per euro"]
 };
+var isCsv = (text4) => /^\s*(observation_date|DATE)\s*,/i.test(text4);
 function parseCsv(csv) {
   return csv.trim().split(/\r?\n/).slice(1).map((line2) => line2.split(",")).filter((c) => c.length >= 2 && c[1] !== "." && c[1] !== "").map(([d, v]) => ({ date: d.trim(), value: Number(v) })).filter((o) => /^\d{4}-\d{2}-\d{2}$/.test(o.date) && Number.isFinite(o.value));
 }
@@ -38303,7 +38320,6 @@ function frequency(obs) {
   const median = gaps[Math.floor(gaps.length / 2)] ?? 1;
   return median <= 3 ? "daily" : median <= 10 ? "weekly" : median <= 45 ? "monthly" : median <= 120 ? "quarterly" : "yearly";
 }
-var releaseLag = (obs) => ({ daily: 1, weekly: 6, monthly: 45, quarterly: 120, yearly: 120 })[frequency(obs)];
 function periodOf(date5, freq) {
   const y = date5.slice(0, 4), m2 = Number(date5.slice(5, 7));
   if (freq === "monthly") return `${new Date(Date.UTC(Number(y), m2 - 1, 1)).toLocaleString("en-US", { month: "long", timeZone: "UTC" })} ${y}`;
@@ -38320,12 +38336,18 @@ async function economicSeries(indicator, analysis2, lookBackDays = 365) {
   const id = known?.[0] ?? indicator.trim().toUpperCase();
   if (!/^[A-Z0-9_]{1,40}$/.test(id)) throw new Error(`"${indicator}" is not a series name or a FRED series id`);
   const window2 = Math.max(30, Math.min(3650, lookBackDays));
-  const from = addDays(day3, -Math.max(window2, 365) - 400);
-  const { text: csv, at } = await getTextAt(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${id}&cosd=${from}&coed=${day3}`);
-  if (!/^\s*(observation_date|DATE)\s*,/i.test(csv)) throw new Unavailable(`FRED answered with something other than its data download (it may be down for maintenance)`);
-  let all = parseCsv(csv).filter((o) => o.date <= day3);
-  const past = isHistorical(day3), freq = frequency(all), lag = releaseLag(all);
-  if (past) all = all.filter((o) => addDays(o.date, lag) <= day3);
+  const from = addDays(day3, -Math.max(window2, 365) - 400), past = isHistorical(day3);
+  const url2 = past ? `https://alfred.stlouisfed.org/graph/alfredgraph.csv?id=${id}&vintage_date=${day3}&cosd=${from}&coed=${day3}` : `https://fred.stlouisfed.org/graph/fredgraph.csv?id=${id}&cosd=${from}&coed=${day3}`;
+  let read2;
+  try {
+    read2 = await getTextAt(url2, { usable: isCsv });
+  } catch (e) {
+    if (past && e instanceof NoData) throw new NoData(`FRED's archive of past releases (ALFRED) does not hold ${id} as it stood on ${day3} (${e.message}); today's revised figures are not given for a past day, since they would carry what was published or revised later into it`);
+    throw e;
+  }
+  const { text: csv, at } = read2;
+  if (!isCsv(csv)) throw new Unavailable(`${past ? "FRED's archive (ALFRED)" : "FRED"} answered with something other than its data download (it may be down for maintenance)`);
+  const all = parseCsv(csv).filter((o) => o.date <= day3), freq = frequency(all);
   const obs = all.filter((o) => o.date >= addDays(day3, -window2));
   if (!obs.length) throw new NoData(`FRED has no ${id} values published by ${day3} in this window`);
   const first = obs[0], last = obs[obs.length - 1], ago = yearBefore(all, last.date);
@@ -38347,8 +38369,8 @@ async function economicSeries(indicator, analysis2, lookBackDays = 365) {
     `- Latest value known by ${day3}: ${fmt2(last.value)} (for ${periodOf(last.date, freq)})`,
     ago ? `- Year over year, from ${fmt2(ago.value)} for ${periodOf(ago.date, freq)}: ${changeOf(ago)}` : `- Year over year: not available (no value for ${periodOf(`${Number(last.date.slice(0, 4)) - 1}${last.date.slice(4)}`, freq)} in FRED's data). Do not work one out from other rows.`,
     `- Change over the look-back window, from ${periodOf(first.date, freq)} to ${periodOf(last.date, freq)}: ${changeOf(first)}${first.date !== ago?.date ? " (not a yearly rate)" : ""}`,
-    past ? `- A past analysis date: values are kept only if published by ${day3} (a ${lag}-day release lag for this series), and are today's revised figures; first releases may have differed slightly.` : "- Values as FRED published them, revisions included.",
-    `- Read from FRED at ${readWords(at)} (the desk keeps a read for up to an hour): a figure released after that is not here.`,
+    past ? `- A past analysis date: these are the figures as FRED's archive of past releases (ALFRED) held them on ${day3}: only what was published by then, before any later revision.` : "- Values as FRED published them, revisions included.",
+    past ? `- Read from FRED's archive at ${readWords(at)}.` : `- Read from FRED at ${readWords(at)} (the desk keeps a read for up to an hour): a figure released after that is not here.`,
     "",
     freq === "monthly" || freq === "quarterly" ? "Date (the first day of the period it stands for) | Value" : "Date | Value",
     "---|---:",
@@ -38422,7 +38444,8 @@ var STATEMENTS = {
     ["Gross Profit", ["GrossProfit"]],
     ["Operating Income", ["OperatingIncomeLoss"]],
     ["Net Income", ["NetIncomeLoss"]],
-    ["Diluted EPS", ["EarningsPerShareDiluted"]]
+    // A company with nothing that dilutes its shares files one figure for both, under its own tag.
+    ["Diluted EPS", ["EarningsPerShareDiluted", "EarningsPerShareBasicAndDiluted"]]
   ] },
   cashflow: { title: "Cash flow statement", lines: [
     ["Operating Cash Flow", ["NetCashProvidedByUsedInOperatingActivities", "NetCashProvidedByUsedInOperatingActivitiesContinuingOperations"]],
@@ -38470,32 +38493,85 @@ var spanWords = (f) => {
   const d = f.start ? daysBetween(f.start, f.end) : 0;
   return d <= QUARTER[1] ? "the quarter" : d <= 200 ? "the six months" : d <= 290 ? "the nine months" : "the year";
 };
-function quartersOf(values, years) {
-  const out = /* @__PURE__ */ new Map();
+function refilingsOf(facts, tags, asOf) {
+  const recasts = [], kept = [];
+  for (const tag of tags) for (const list2 of Object.values(facts[tag]?.units ?? {})) {
+    const periods = /* @__PURE__ */ new Map();
+    for (const f of list2) if (f.filed <= asOf && f.start) (periods.get(`${f.start}|${f.end}`) ?? periods.set(`${f.start}|${f.end}`, []).get(`${f.start}|${f.end}`)).push(f);
+    for (const fs20 of periods.values()) {
+      const byDay = [...fs20].sort((a, b) => a.filed.localeCompare(b.filed));
+      for (let n2 = 1; n2 < byDay.length; n2++) {
+        const a = byDay[n2 - 1], b = byDay[n2];
+        if (a.filed === b.filed) continue;
+        if (Math.abs(b.val - a.val) > 1e-3 * Math.max(Math.abs(a.val), Math.abs(b.val))) recasts.push({ filed: b.filed, prev: a.filed, start: b.start, end: b.end, first: byDay[0].val, now: b.val });
+        else kept.push([a.filed, b.filed]);
+      }
+    }
+  }
+  return { recasts: recasts.sort((a, b) => a.filed.localeCompare(b.filed)), kept };
+}
+function changesOf({ recasts, kept }) {
+  const out = [];
+  for (const r of recasts) {
+    const last = out.at(-1);
+    if (last && r.prev < last.by) last.from = r.prev > last.from ? r.prev : last.from;
+    else out.push({ from: r.prev, by: r.filed, r });
+  }
+  for (const c of out) {
+    for (let moved = true; moved; ) {
+      moved = false;
+      for (const [a, b] of kept) {
+        if (a <= c.from && b > c.from && b < c.by) {
+          c.from = b;
+          moved = true;
+        } else if (a > c.from && a < c.by && b >= c.by) {
+          c.by = a;
+          moved = true;
+        }
+      }
+    }
+  }
+  return out;
+}
+function quartersOf(values, years, changes) {
+  const out = /* @__PURE__ */ new Map(), blocked = /* @__PURE__ */ new Map();
   const all = [...values.values(), ...years.values()].filter((f) => f.start);
-  for (const f of all) if (daysBetween(f.start, f.end) <= QUARTER[1]) out.set(f.end, { val: f.val, start: f.start });
+  for (const f of all) if (daysBetween(f.start, f.end) <= QUARTER[1]) out.set(f.end, { val: f.val, start: f.start, lo: f.filed, hi: f.filed });
   const near = (a, b, lo, hi) => {
     const d = daysBetween(a, b);
     return d >= lo && d <= hi;
   };
+  const across = (lo, hi) => changes.find((c) => lo < c.by && hi > c.from);
+  const min = (a, b) => a < b ? a : b, max = (a, b) => a > b ? a : b;
   for (const c of all.filter((f) => daysBetween(f.start, f.end) > QUARTER[1]).sort((a, b) => daysBetween(a.start, a.end) - daysBetween(b.start, b.end))) {
     if (out.has(c.end)) continue;
     const prior = all.find((p) => p !== c && Math.abs(daysBetween(c.start, p.start)) <= 7 && near(p.end, c.end, 80, 100));
     if (prior) {
-      out.set(c.end, { val: c.val - prior.val, start: prior.end, how: `${spanWords(c)} to ${c.end} less ${spanWords(prior)} to ${prior.end}` });
-      continue;
+      const lo2 = min(c.filed, prior.filed), hi2 = max(c.filed, prior.filed), ch2 = across(lo2, hi2);
+      if (!ch2) {
+        out.set(c.end, { val: c.val - prior.val, start: prior.end, how: `${spanWords(c)} to ${c.end} less ${spanWords(prior)} to ${prior.end}`, lo: lo2, hi: hi2 });
+        continue;
+      }
+      if (!blocked.has(c.end)) blocked.set(c.end, { c, other: `${spanWords(prior)} to ${prior.end} (filed ${prior.filed})`, ch: ch2, lo: lo2, hi: hi2 });
     }
-    let sum = 0, at = "", parts = 0;
+    let sum = 0, at = "", parts = 0, qlo = "9999-12-31", qhi = "";
     for (let q = [...out.entries()].find(([, v]) => Math.abs(daysBetween(c.start, v.start)) <= 7); q; ) {
       sum += q[1].val;
       at = q[0];
       parts++;
+      qlo = min(qlo, q[1].lo);
+      qhi = max(qhi, q[1].hi);
       if (near(at, c.end, 80, 100)) break;
       q = [...out.entries()].find(([e, v]) => e > at && near(at, v.start, 0, 7) && !v.how?.includes(c.end));
     }
-    if (parts && near(at, c.end, 80, 100)) out.set(c.end, { val: c.val - sum, start: at, how: `${spanWords(c)} to ${c.end} less its ${parts} quarter${parts > 1 ? "s" : ""} to ${at}` });
+    if (!parts || !near(at, c.end, 80, 100)) continue;
+    const lo = min(c.filed, qlo), hi = max(c.filed, qhi), ch = across(lo, hi);
+    if (!ch) {
+      out.set(c.end, { val: c.val - sum, start: at, how: `${spanWords(c)} to ${c.end} less its ${parts} quarter${parts > 1 ? "s" : ""} to ${at}`, lo, hi });
+      blocked.delete(c.end);
+    } else if (!blocked.has(c.end)) blocked.set(c.end, { c, other: `its ${parts} quarter${parts > 1 ? "s" : ""} to ${at} (filed by ${qhi})`, ch, lo, hi });
   }
-  return out;
+  return { quarters: out, blocked };
 }
 function splitsIn(list2, asOf) {
   const periods = /* @__PURE__ */ new Map();
@@ -38531,13 +38607,20 @@ function splitsIn(list2, asOf) {
 }
 var splitWords = (k) => k >= 1 ? `${k === 1.5 ? "3-for-2" : `${k}-for-1`} split` : `1-for-${Math.round(1 / k)} reverse split`;
 var plain2 = (n2) => Number(n2.toFixed(6)).toString();
-function filedStatement(usGaap, kind, freq, asOf) {
+var filingSplits = (list2, asOf) => splitsIn(list2, asOf).map((s) => ({ date: s.from, factor: s.factor, old: s.old, words: `the ${splitWords(s.factor)} the filings show between ${s.old} and ${s.from}` }));
+function rebase(basis, filed, day3) {
+  const after = basis.filter((s) => filed < s.date), named = after.filter((s) => s.date <= day3);
+  return { k: after.reduce((a, s) => a * s.factor, 1), named, silent: named.length < after.length };
+}
+var splitList = (splits) => splits.map((s) => s.words).join(" and ");
+function filedStatement(usGaap, kind, freq, asOf, basis) {
   const quarterly = freq === "quarterly", flows = kind !== "balance_sheet";
   const spans = quarterly ? [QUARTER, ...YEAR_TO_DATE.map(([lo, hi]) => [lo, hi])] : [YEAR];
   const names = quarterly ? ["", ...YEAR_TO_DATE.map(([, , m2]) => ` (${m2} months to date)`)] : [""];
   const lines = STATEMENTS[kind].lines.map(([label, tags]) => ({ label, ...lineAsOf(usGaap, tags, asOf, spans, quarterly ? [] : ANNUAL_FORMS) }));
   const notes = [];
-  const quarters = lines.map((l, n2) => quarterly && flows && !perShareUnit(l.unit) ? quartersOf(l.values, lineAsOf(usGaap, STATEMENTS[kind].lines[n2][1], asOf, [YEAR], ANNUAL_FORMS).values) : /* @__PURE__ */ new Map());
+  const worked2 = lines.map((l, n2) => quarterly && flows && !perShareUnit(l.unit) ? quartersOf(l.values, lineAsOf(usGaap, STATEMENTS[kind].lines[n2][1], asOf, [YEAR], ANNUAL_FORMS).values, changesOf(refilingsOf(usGaap, STATEMENTS[kind].lines[n2][1], asOf))) : { quarters: /* @__PURE__ */ new Map(), blocked: /* @__PURE__ */ new Map() });
+  const quarters = worked2.map((w) => w.quarters);
   const chosen = lines.map((l, n2) => {
     const m2 = /* @__PURE__ */ new Map();
     for (const key of l.values.keys()) {
@@ -38553,23 +38636,35 @@ function filedStatement(usGaap, kind, freq, asOf) {
   const derived2 = /* @__PURE__ */ new Map();
   for (const q of quarters) for (const [end, v] of q) if (v.how && ends.includes(end)) (derived2.get(end) ?? derived2.set(end, /* @__PURE__ */ new Set()).get(end)).add(v.how);
   for (const [end, how] of [...derived2].sort((a, b) => b[0].localeCompare(a[0]))) notes.push(`The quarter to ${end} is derived (no filing states it): ${[...how].join("; or ")}.`);
+  const million = (v) => (v / 1e6).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  worked2.forEach((w, n2) => {
+    for (const [end, { c, other, ch, lo, hi }] of [...w.blocked].sort((a, b) => b[0].localeCompare(a[0]))) {
+      if (quarters[n2].has(end) || !ends.length || end < ends.at(-1)) continue;
+      const r = ch.r, what = `a filing of ${r.filed} restated an earlier figure of it (${spanWords({ ...r, val: 0 })} to ${r.end}, first filed as ${million(r.first)} million ${lines[n2].unit}, refiled then as ${million(r.now)} million), as when a business is sold or spun off`;
+      notes.push(lo <= ch.from && hi >= ch.by ? `${lines[n2].label} for the quarter to ${end} is not derived: ${spanWords(c)} to ${c.end} (filed ${c.filed}) and ${other} are on different bases, since ${what}. The one less the other would not be a quarter.` : `${lines[n2].label} for the quarter to ${end} is not derived: ${spanWords(c)} to ${c.end} (filed ${c.filed}) and ${other} may be on different bases: ${what}, and the filings show only that the change came after ${ch.from} and by ${ch.by}. The one less the other may not be a quarter.`);
+    }
+  });
+  const onto = "the basis of the later filings";
+  let perShare = false;
   const rows = lines.map((l, n2) => {
     const every = STATEMENTS[kind].lines[n2][1].flatMap((tag) => Object.entries(usGaap[tag]?.units ?? {}).filter(([u]) => perShareUnit(u)).flatMap(([, list2]) => list2));
-    const splits = perShareUnit(l.unit) ? splitsIn(every, asOf) : [];
+    const splits = !perShareUnit(l.unit) ? [] : basis ?? filingSplits(every, asOf);
     const cells2 = periods.map((p) => {
       if (chosen[n2].get(p.end) !== p.i) return null;
       const q = p.i === 0 ? quarters[n2].get(p.end) : void 0;
       if (q) return q.val;
       const f = l.values.get(`${p.end}|${p.i}`);
       if (!f) return null;
-      const k = splits.filter((s) => f.filed < s.from).reduce((a, s) => a * s.factor, 1);
+      if (perShareUnit(l.unit)) perShare = true;
+      const { k, named, silent } = rebase(splits, f.filed, asOf);
       if (k === 1) return f.val;
       const v = Number((f.val / k).toFixed(6));
-      notes.push(`${l.label} for ${spanWords(f)} to ${f.end} was filed on ${f.filed} as ${plain2(f.val)}, before ${splits.filter((s) => f.filed < s.from).map((s) => `the ${splitWords(s.factor)} the filings show between ${s.old} and ${s.from}`).join(" and ")}; shown here on the basis of the later filings: ${plain2(v)}.`);
+      if (named.length && !basis) notes.push(silent ? `${l.label} for ${spanWords(f)} to ${f.end} was filed on ${f.filed}, before ${splitList(named)}; shown here on ${onto}.` : `${l.label} for ${spanWords(f)} to ${f.end} was filed on ${f.filed} as ${plain2(f.val)}, before ${splitList(named)}; shown here on ${onto}: ${plain2(v)}.`);
       return v;
     });
     return { label: l.label, unit: l.unit, cells: cells2 };
   });
+  if (basis && perShare) notes.push("Per-share figures are on the price source's share basis of today, the one its prices are on: a figure filed before a share split since then is divided by that split's ratio, so it can differ from the number in its filing.");
   return { columns: periods.map((p) => p.end + (p.i === 0 && derived2.has(p.end) ? " (derived)" : names[p.i])), rows, notes };
 }
 var cache2 = /* @__PURE__ */ new Map();
@@ -38595,12 +38690,20 @@ async function cikFor(symbol4) {
   return hit ? String(hit.cik_str).padStart(10, "0") : null;
 }
 var companyFacts = (cik) => cached2(`https://data.sec.gov/api/xbrl/companyfacts/CIK${cik}.json`, 45e3);
-async function secStatement(symbol4, kind, freq, asOf) {
+async function secStatement(symbol4, kind, freq, asOf, basis) {
   const cik = await cikFor(symbol4);
   if (!cik) throw new NoData(`${symbol4} is not in the SEC's list of US filers`);
   const usGaap = (await companyFacts(cik)).facts?.["us-gaap"];
   if (!usGaap) throw new NoData(`${symbol4} files with the SEC but not in US GAAP terms`);
-  return filedStatement(usGaap, kind, freq, asOf);
+  return filedStatement(usGaap, kind, freq, asOf, basis);
+}
+function annualFormIn(facts, day3) {
+  let best = null;
+  const lists = [facts?.dei?.EntityCommonStockSharesOutstanding, facts?.["us-gaap"]?.StockholdersEquity, facts?.["us-gaap"]?.Assets, facts?.["us-gaap"]?.EarningsPerShareDiluted];
+  for (const x of lists) for (const list2 of Object.values(x?.units ?? {})) for (const f of list2) {
+    if (f.filed <= day3 && /^(10-K|20-F|40-F)/.test(f.form ?? "") && (!best || f.filed > best.filed)) best = f;
+  }
+  return best ? /^(10-K|20-F|40-F)/.exec(best.form)[1] : null;
 }
 var submissions = (cik) => cached2(`https://data.sec.gov/submissions/CIK${cik}.json`, 3e4);
 function sectorOfSic(raw) {
@@ -38665,16 +38768,33 @@ function knownBy(list2, asOf) {
   }
   return [...best.values()];
 }
-function trailingYear(list2, asOf) {
+function trailingYear(list2, asOf, basis = []) {
   const known = knownBy(list2, asOf).filter((f) => f.start);
-  const year = known.filter((f) => ANNUAL(f) && span(f) >= YEAR[0] && span(f) <= YEAR[1]).sort((a, b) => b.end.localeCompare(a.end))[0];
+  const year = known.filter((f) => ANNUAL(f) && span(f) >= YEAR[0] && span(f) <= YEAR[1]).sort((a2, b2) => b2.end.localeCompare(a2.end))[0];
   if (!year) return null;
-  const after = known.filter((f) => f.end > year.end && daysBetween(year.end, f.start) >= 0 && daysBetween(year.end, f.start) <= 7 && span(f) >= 60 && span(f) <= 290).sort((a, b) => b.end.localeCompare(a.end) || span(b) - span(a))[0];
+  const after = known.filter((f) => f.end > year.end && daysBetween(year.end, f.start) >= 0 && daysBetween(year.end, f.start) <= 7 && span(f) >= 60 && span(f) <= 290).sort((a2, b2) => b2.end.localeCompare(a2.end) || span(b2) - span(a2))[0];
   const round = (n2) => Number(n2.toFixed(6));
-  if (!after) return { value: round(year.val), parts: `the full year to ${year.end}, ${year.val}` };
+  const on = (f) => {
+    const { k, named, silent } = rebase(basis, f.filed, asOf), v = round(f.val / k);
+    return { v, words: `${plain2(v)}${!named.length ? "" : silent ? ` (filed before ${splitList(named)})` : ` (${plain2(f.val)} as filed, before ${splitList(named)})`}` };
+  };
+  const y = on(year);
+  if (!after) return { value: y.v, parts: `the full year to ${year.end}, ${y.words}` };
   const before = known.find((f) => Math.abs(daysBetween(f.end, after.end) - 365) <= 10 && Math.abs(span(f) - span(after)) <= 10);
-  if (!before) return { value: round(year.val), parts: `the full year to ${year.end}, ${year.val} (the same span a year before ${after.end} was not filed, so the year to date cannot be added)` };
-  return { value: round(year.val + after.val - before.val), parts: `the full year to ${year.end}, ${year.val}, plus ${after.start} to ${after.end}, ${after.val}, less ${before.start} to ${before.end}, ${before.val}` };
+  if (!before) return { value: y.v, parts: `the full year to ${year.end}, ${y.words} (the same span a year before ${after.end} was not filed, so the year to date cannot be added)` };
+  const a = on(after), b = on(before);
+  return { value: round(y.v + a.v - b.v), parts: `the full year to ${year.end}, ${y.words}, plus ${after.start} to ${after.end}, ${a.words}, less ${before.start} to ${before.end}, ${b.words}` };
+}
+function firstTagPerPeriod(...lists) {
+  const seen = /* @__PURE__ */ new Set(), out = [];
+  for (const list2 of lists) {
+    const mine = list2.filter((f) => !seen.has(`${f.start ?? ""}|${f.end}`));
+    for (const f of mine) {
+      out.push(f);
+    }
+    for (const f of mine) seen.add(`${f.start ?? ""}|${f.end}`);
+  }
+  return out;
 }
 function latestBalance(list2, asOf) {
   return knownBy(list2, asOf).filter((f) => !f.start).sort((a, b) => b.end.localeCompare(a.end) || b.filed.localeCompare(a.filed))[0] ?? null;
@@ -38714,25 +38834,34 @@ function parseForm4(xml, filed) {
     yes(field(r, "isTenPercentOwner")) && "owner of over 10%",
     yes(field(r, "isOther")) && (field(r, "otherText") || "other")
   ].filter(Boolean).join(", ") || "insider";
-  const plan = yes(field(xml, "aff10b5One"));
-  return blocks(xml, "nonDerivativeTransaction").map((t) => ({
-    owner,
-    role,
-    filed,
-    plan,
-    date: field(t, "transactionDate").slice(0, 10),
-    code: field(t, "transactionCode").toUpperCase(),
-    shares: num2(field(t, "transactionShares")) ?? 0,
-    price: num2(field(t, "transactionPricePerShare")),
-    acquired: field(t, "transactionAcquiredDisposedCode").toUpperCase() === "A",
-    after: num2(field(t, "sharesOwnedFollowingTransaction")),
-    indirect: field(t, "directOrIndirectOwnership").toUpperCase() === "I" ? field(t, "natureOfOwnership") || "indirectly" : null
-  })).filter((t) => t.date && t.code);
+  const box = yes(field(xml, "aff10b5One"));
+  const notes = new Map([...xml.matchAll(/<footnote\s+id="([^"]+)"\s*>([\s\S]*?)<\/footnote>/g)].map((m2) => [m2[1], decode4(m2[2].replace(/<[^>]*>/g, ""))]));
+  const planNotes = new Set([...notes].filter(([, text4]) => /10b5-1/i.test(text4) && !/\bnot\b[^.]{0,60}10b5-1/i.test(text4)).map(([id]) => id));
+  return blocks(xml, "nonDerivativeTransaction").map((t) => {
+    const code = field(t, "transactionCode").toUpperCase();
+    const tied = [...t.matchAll(/<footnoteId\s+id="([^"]+)"/g)].some((m2) => planNotes.has(m2[1]));
+    const plan = box && tied, planBox = box && !planNotes.size && (code === "P" || code === "S");
+    return {
+      owner,
+      role,
+      filed,
+      plan,
+      ...planBox ? { planBox } : {},
+      date: field(t, "transactionDate").slice(0, 10),
+      code,
+      shares: num2(field(t, "transactionShares")) ?? 0,
+      price: num2(field(t, "transactionPricePerShare")),
+      acquired: field(t, "transactionAcquiredDisposedCode").toUpperCase() === "A",
+      after: num2(field(t, "sharesOwnedFollowingTransaction")),
+      indirect: field(t, "directOrIndirectOwnership").toUpperCase() === "I" ? field(t, "natureOfOwnership") || "indirectly" : null
+    };
+  }).filter((t) => t.date && t.code);
 }
 function parseFiling(xml, form, filed) {
   const owners = blocks(xml, "reportingOwner").map((o) => field(o, "rptOwnerCik").replace(/^0+/, "") || field(o, "rptOwnerName").toUpperCase()).sort().join("+");
   const original = form.endsWith("/A") ? field(xml, "dateOfOriginalSubmission").slice(0, 10) || null : null;
-  return { form, filed, owners, original, period: field(xml, "periodOfReport").slice(0, 10), trades: parseForm4(xml, filed) };
+  const issuer = field(xml, "issuerCik").replace(/^0+/, ""), large = blocks(xml, "reportingOwner").some((o) => yes(field(o, "isTenPercentOwner")));
+  return { form, filed, owners, original, period: field(xml, "periodOfReport").slice(0, 10), trades: parseForm4(xml, filed), issuer, issuerName: field(xml, "issuerName"), large };
 }
 function amended(filings2) {
   const state = new Map(filings2.map((f) => [f, { first: f.filed, by: null }]));
@@ -38798,18 +38927,26 @@ async function secInsiders(symbol4, cik, asOf, days = 90, limit = 25) {
   }
   const span2 = `made public from ${addDays(from, 1)} to ${asOf}`;
   if (!filings2.length) throw new Unavailable(`the SEC lists ${read2.length === 1 ? "one Form 4 filing" : `${read2.length} Form 4 filings`} of ${symbol4}'s insiders ${span2}, but none of them could be read (${why}), so their trades are not known`);
-  const { trades: all, replaced } = amended(filings2), trades = all.filter((t) => t.filed > from);
+  const self = Number(cik).toString(), others = filings2.filter((f) => f.issuer && f.issuer !== self), own2 = filings2.filter((f) => !others.includes(f));
+  const names = [...new Set(others.map((f) => f.issuerName || `the SEC filer ${f.issuer}`))].join(", "), large = others.every((f) => f.large);
+  const elsewhere = others.length === 1 ? `${symbol4}'s own trade in another company's shares (${names}), filed as ${large ? "that company's large owner" : "one of that company's insiders"}` : `${symbol4}'s own trades in other companies' shares (${names}), filed as ${large ? "a large owner of each" : "an insider of each"}`;
+  if (others.length && !own2.length && !failed && read2.length === picked.length && !partial2) {
+    const n2 = others.length === 1 ? `The one Form 4 filing in its SEC list for these days is ${elsewhere}: not a trade in ${symbol4}, so it is left out` : `The ${others.length} Form 4 filings in its SEC list for these days are ${elsewhere}: not trades in ${symbol4}, so they are left out`;
+    return `${head2}: none by its own insiders. ${n2}. That is a fact from the SEC${listRead}, not a gap in the data.`;
+  }
+  const { trades: all, replaced } = amended(own2), trades = all.filter((t) => t.filed > from);
   const market = (code) => trades.filter((t) => t.code === code);
   const total = (list2) => {
     if (!list2.length) return "none";
-    const shares2 = list2.reduce((a, t) => a + t.shares, 0), priced = list2.filter((t) => t.price !== null), planned = list2.filter((t) => t.plan).length;
+    const shares2 = list2.reduce((a, t) => a + t.shares, 0), priced = list2.filter((t) => t.price !== null), planned = list2.filter((t) => t.plan).length, boxed = list2.filter((t) => t.planBox).length;
     const value = priced.reduce((a, t) => a + t.shares * t.price, 0), bare = list2.length - priced.length;
     const usd = !priced.length ? `${list2.length === 1 ? "its filing gives" : "their filings give"} no price, so no sum in USD` : `about ${fmt(value)} USD at their own prices${bare ? `; ${bare === 1 ? "one gives" : `${bare} give`} no price and ${bare === 1 ? "is" : "are"} not in that sum` : ""}`;
-    return `${list2.length} (${fmt(shares2)} shares, ${usd}${planned ? `; ${planned} under a pre-arranged 10b5-1 plan` : ""})`;
+    const box = boxed ? `; ${boxed}${planned ? " more" : ""} in a filing whose 10b5-1 box covers at least one of its trades without saying which` : "";
+    return `${list2.length} (${fmt(shares2)} shares, ${usd}${planned ? `; ${planned} under a pre-arranged 10b5-1 plan` : ""}${box})`;
   };
   const buys = market("P"), sales = market("S"), other = trades.length - buys.length - sales.length;
   const when = (t) => !t.corrected ? `made public ${t.filed}` : `made public ${t.filed}${t.filed > from ? "" : ", before these days"}; corrected ${t.corrected} by an amended filing, a Form 4/A${t.filed > from ? "" : ", so not counted above"}`;
-  const lines = all.map((t) => `- ${t.date} (${when(t)}) \xB7 ${t.owner} (${t.role}): ${CODES[t.code] ?? `transaction ${t.code} of`} ${fmt(t.shares, 4)} shares${t.price ? ` at ${fmt(t.price, 4)}` : ", no price"}${t.after !== null ? ` \xB7 holds ${fmt(t.after, 4)} after` : ""}${t.indirect ? ` \xB7 indirectly (${t.indirect})` : ""}${t.plan ? " \xB7 under a 10b5-1 plan" : ""}`);
+  const lines = all.map((t) => `- ${t.date} (${when(t)}) \xB7 ${t.owner} (${t.role}): ${CODES[t.code] ?? `transaction ${t.code} of`} ${fmt(t.shares, 4)} shares${t.price ? ` at ${fmt(t.price, 4)}` : ", no price"}${t.after !== null ? ` \xB7 holds ${fmt(t.after, 4)} after` : ""}${t.indirect ? ` \xB7 indirectly (${t.indirect})` : ""}${t.plan ? " \xB7 under a 10b5-1 plan" : t.planBox ? " \xB7 its filing's 10b5-1 box is ticked: at least one trade in that filing was under a plan, and the filing does not say which" : ""}`);
   const skipped = picked.length - read2.length;
   const missing = [
     failed ? `${failed} of the filings could not be read (${why})` : "",
@@ -38818,12 +38955,12 @@ async function secInsiders(symbol4, cik, asOf, days = 90, limit = 25) {
   ].filter(Boolean);
   const scope = missing.length ? `Counted from only the ${filings2.length} of the ${picked.length} filings ${span2} that were read (${missing.join("; ")}). These counts are not the whole ${days} days: a "none" below is not a fact about the insiders` : `In these ${days} days`;
   return [
-    `${head2} (${filings2.length} of ${picked.length} filings read, newest first${failed ? `; ${failed} could not be read` : ""}${skipped ? `; the ${skipped} oldest not asked for` : ""}${replaced ? `; ${replaced === 1 ? "one is an amended filing, a Form 4/A, shown in place of the filing it corrects" : `${replaced} are amended filings, Form 4/A, each shown in place of the filing it corrects`}` : ""}). Each trade is dated by the day it happened and the day its filing made it public; only filings public by ${asOf} are shown${listRead}.${gap2}`,
+    `${head2} (${filings2.length} of ${picked.length} filings read, newest first${failed ? `; ${failed} could not be read` : ""}${skipped ? `; the ${skipped} oldest not asked for` : ""}${replaced ? `; ${replaced === 1 ? "one is an amended filing, a Form 4/A, shown in place of the filing it corrects" : `${replaced} are amended filings, Form 4/A, each shown in place of the filing it corrects`}` : ""}${others.length ? `; ${others.length === 1 ? "one is" : `${others.length} are`} ${elsewhere}, and ${others.length === 1 ? "is" : "are"} left out` : ""}). Each trade is dated by the day it happened and the day its filing made it public; only filings public by ${asOf} are shown${listRead}.${gap2}`,
     "",
     `${scope}: bought (code P) ${total(buys)}; sold (code S) ${total(sales)}; other kinds (awards, option exercises, shares handed back for tax, gifts) ${other}.`,
     "P and S are purchases and sales on the market or in a private deal: a purchase is the insider spending their own money. A sale under a 10b5-1 plan was arranged months ahead. Awards, exercises, tax handbacks and gifts say little about what an insider thinks of the price.",
     "",
-    ...lines.length ? lines : [missing.length ? `(the ${filings2.length === 1 ? "one filing" : `${filings2.length} filings`} read ${filings2.length === 1 ? "lists" : "list"} no trades in shares, only options or holdings; the others were not read, so nothing is known of their trades)` : "(these filings list no trades in shares, only options or holdings)"]
+    ...lines.length ? lines : [missing.length ? own2.length ? `(the ${own2.length === 1 ? "one filing" : `${own2.length} filings`}${others.length ? " of its insiders" : ""} read ${own2.length === 1 ? "lists" : "list"} no trades in shares, only options or holdings; the others were not read, so nothing is known of their trades)` : "(no filing read is one of its own insiders'; the others were not read, so nothing is known of their trades)" : `(${others.length ? "its insiders' filings" : "these filings"} list no trades in shares, only options or holdings)`]
   ].join("\n");
 }
 
@@ -38837,15 +38974,24 @@ function parseReport(xml, cls) {
   const gen = blocks(xml, "genInfo")[0], info = blocks(xml, "fundInfo")[0];
   const asOf = gen ? text(gen, "repPdDate") : "", netAssets = info ? num3(text(info, "netAssets")) : null;
   if (!gen || !DAY2.test(asOf) || netAssets === null) throw new Unavailable("the SEC answered with something that is not a fund's portfolio report");
-  const holdings = blocks(xml, "invstOrSec").map((h) => ({
-    name: text(h, "name") || text(h, "title") || "unnamed",
-    pct: num3(text(h, "pctVal")) ?? 0,
-    asset: text(h, "assetCat") || attr(h, "assetConditional", "assetCat") || "OTHER",
-    issuer: text(h, "issuerCat") || attr(h, "issuerConditional", "issuerCat") || "OTHER",
-    country: text(h, "invCountry"),
-    maturity: DAY2.test(text(h, "maturityDt")) ? text(h, "maturityDt") : null,
-    coupon: num3(text(h, "annualizedRt"))
-  }));
+  const holdings = blocks(xml, "invstOrSec").map((h) => {
+    const d = blocks(h, "derivativeInfo")[0], ref = d === void 0 ? "" : blocks(d, "descRefInstrmnt")[0] ?? "";
+    return {
+      name: text(h, "name") || text(h, "title") || "unnamed",
+      pct: num3(text(h, "pctVal")) ?? 0,
+      asset: text(h, "assetCat") || attr(h, "assetConditional", "assetCat") || "OTHER",
+      issuer: text(h, "issuerCat") || attr(h, "issuerConditional", "issuerCat") || "OTHER",
+      country: text(h, "invCountry"),
+      maturity: DAY2.test(text(h, "maturityDt")) ? text(h, "maturityDt") : null,
+      coupon: num3(text(h, "annualizedRt")),
+      ...d === void 0 ? {} : { derivative: {
+        kind: /\bderivCat="([^"]*)"/.exec(d)?.[1] ?? "OTH",
+        notional: num3(text(d, "notionalAmt")),
+        currency: text(d, "curCd"),
+        ref: text(ref, "indexName") || text(ref, "issueTitle") || text(ref, "name")
+      } }
+    };
+  });
   const rows = [...xml.matchAll(/<monthlyTotReturn\s([^>]*)\/?>/g)].map((m2) => m2[1]);
   const row = rows.find((r) => cls && r.includes(`classId="${cls}"`)) ?? (rows.length === 1 ? rows[0] : void 0);
   const returns = row ? ["rtn1", "rtn2", "rtn3"].map((k) => num3(new RegExp(`\\b${k}="([^"]*)"`).exec(row)?.[1] ?? "")) : null;
@@ -38855,7 +39001,8 @@ function parseReport(xml, cls) {
     asOf,
     netAssets,
     holdings,
-    returns: returns && returns.every((r) => r !== null) ? returns : null
+    returns: returns && returns.every((r) => r !== null) ? returns : null,
+    classes: rows.length
   };
 }
 async function fromSec(what, ask) {
@@ -38904,6 +39051,7 @@ var ASSETS = {
   LON: "loans",
   COMM: "commodities",
   SN: "structured notes",
+  RA: "repurchase agreements",
   DCO: "derivatives",
   DCR: "derivatives",
   DE: "derivatives",
@@ -38922,6 +39070,15 @@ var ISSUERS = {
   RF: "other funds",
   PF: "private funds",
   OTHER: "other"
+};
+var KINDS = {
+  SWP: ["swap", "swaps"],
+  FUT: ["future", "futures"],
+  FWD: ["forward", "forwards"],
+  OPT: ["option", "options"],
+  SWO: ["swaption", "swaptions"],
+  WAR: ["warrant", "warrants"],
+  OTH: ["other derivative", "other derivatives"]
 };
 var MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 var regions = null;
@@ -38951,7 +39108,9 @@ function renderReport(sym2, day3, r, topN = 10) {
     "",
     `Name: ${r.series}`,
     ...r.registrant && r.registrant.toLowerCase() !== r.series.toLowerCase() ? [`Filed by: ${r.registrant}`] : [],
-    `Net assets (its size): ${Math.round(r.netAssets).toLocaleString("en-US")} USD on ${r.asOf}`,
+    // A trust's report covers the fund with all its share classes (an ETF is often one of a mutual fund's): its size is
+    // theirs together, and the report does not split it.
+    `Net assets (its size): ${Math.round(r.netAssets).toLocaleString("en-US")} USD on ${r.asOf}${(r.classes ?? 1) > 1 ? `, for the whole fund: all its ${r.classes} share classes together, of which ${sym2} is one; the report does not give ${sym2}'s own part` : ""}`,
     `Holdings: ${r.holdings.length.toLocaleString("en-US")} lines`,
     `Held in: ${shares(r.holdings, (h) => ASSETS[h.asset] ?? h.asset).map(([k, p]) => `${k} ${pct(p)}`).join(", ") || "not given"}`,
     `Issued by: ${shares(r.holdings, (h) => ISSUERS[h.issuer] ?? h.issuer).map(([k, p]) => `${k} ${pct(p)}`).join(", ") || "not given"}`
@@ -38968,6 +39127,22 @@ function renderReport(sym2, day3, r, topN = 10) {
     const paying = bonds.filter((h) => h.coupon !== null), w2 = paying.reduce((a, h) => a + h.pct, 0);
     const coupon = w2 ? paying.reduce((a, h) => a + h.pct * h.coupon, 0) / w2 : null;
     lines.push(`Bonds (${pct(weight)} of the fund): on average ${years.toFixed(1)} years to repayment${coupon !== null ? ` and ${coupon.toFixed(2)}% yearly interest` : ""}, weighted by value (worked out here from each bond's maturity and rate)`);
+  }
+  const derivs = r.holdings.filter((h) => h.derivative);
+  if (derivs.length) {
+    const kinds = /* @__PURE__ */ new Map();
+    for (const h of derivs) kinds.set(h.derivative.kind, (kinds.get(h.derivative.kind) ?? 0) + 1);
+    const kindWords = [...kinds].sort((a, b) => b[1] - a[1]).map(([k, n2]) => {
+      const [one3, many] = KINDS[k] ?? KINDS.OTH;
+      return `${n2} ${n2 === 1 ? one3 : many}`;
+    }).join(", ");
+    const refs = [...new Set(derivs.map((h) => h.derivative.ref).filter(Boolean))];
+    const tied = refs.length ? `, tied to: ${refs.slice(0, 5).join(", ")}${refs.length > 5 ? `, and ${refs.length - 5} more` : ""}` : "";
+    const usd = derivs.filter((h) => h.derivative.notional !== null && h.derivative.currency === "USD"), left = derivs.length - usd.length;
+    const sum = usd.reduce((a, h) => a + h.derivative.notional, 0), abs = usd.reduce((a, h) => a + Math.abs(h.derivative.notional), 0);
+    const whole2 = (n2) => Math.round(n2).toLocaleString("en-US"), share = (n2) => r.netAssets > 0 ? pct(n2 / r.netAssets * 100) : "its net assets are not above zero";
+    const sums = !usd.length ? "The report gives none of their notional amounts in US dollars, so the exposure they give is not known here." : `As the report gives them, their notional amounts add up to ${whole2(sum)} USD (${share(sum)} of its net assets); counted without their signs, ${whole2(abs)} USD (${share(abs)}).${left ? ` ${left === 1 ? "One more gives" : `${left} more give`} no notional amount in US dollars and ${left === 1 ? "is" : "are"} not in these sums.` : ""} Added up here from the report's figures; whether each is long or short is not worked out.`;
+    lines.push(`Derivatives: ${derivs.length === 1 ? "1 line" : `${derivs.length} lines`} (${kindWords})${tied}. The shares above count a derivative only at its value (its gain or loss so far), not at the exposure it gives, which is its notional amount. ${sums}`);
   }
   if (r.returns) {
     const end = /* @__PURE__ */ new Date(`${r.asOf}T12:00:00Z`), month = (back) => {
@@ -39046,6 +39221,44 @@ var units = (facts, unit) => facts?.units?.[unit] ?? [];
 var fixed = (n2, d = 2) => n2.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
 var whole = (n2) => Math.round(n2).toLocaleString("en-US");
 var yearBefore2 = (day3) => `${Number(day3.slice(0, 4)) - 1}${day3.slice(4) === "-02-29" ? "-02-28" : day3.slice(4)}`;
+var ratio = (n2) => Number(n2.toFixed(4)).toString();
+async function priceSplits(sym2) {
+  const qs = `period1=${epoch2("2009-01-01")}&period2=${epoch2(addDays(today(), 1))}&interval=1mo&events=split`;
+  let last;
+  for (const host of HOSTS) {
+    try {
+      const r = (await getJson(`${host}/v8/finance/chart/${encodeURIComponent(sym2)}?${qs}`)).chart?.result?.[0];
+      if (!r?.timestamp?.length) throw new Unavailable(`the price source answered with no record for ${sym2}`);
+      const offset = r.meta?.gmtoffset ?? 0;
+      return Object.values(r.events?.splits ?? {}).flatMap((e) => {
+        const n2 = Number(e.numerator), d = Number(e.denominator);
+        if (!(n2 > 0 && d > 0 && Number.isFinite(n2 / d)) || n2 === d || typeof e.date !== "number") return [];
+        const date5 = new Date((e.date + offset) * 1e3).toISOString().slice(0, 10);
+        return [{ date: date5, factor: n2 / d, words: `the ${ratio(n2)}-for-${ratio(d)}${n2 < d ? " reverse" : ""} split of ${date5}` }];
+      }).sort((a, b) => a.date.localeCompare(b.date));
+    } catch (e) {
+      if (e instanceof NoData) throw e;
+      last = e;
+    }
+  }
+  throw last;
+}
+async function shareBasis(sym2, perShare) {
+  const filed = filingSplits(perShare, today());
+  try {
+    const splits = await priceSplits(sym2);
+    const missing = filed.find((f) => !splits.some((s) => Math.abs(s.factor / f.factor - 1) <= 0.03 && s.date > f.old && s.date <= f.date));
+    return missing ? { splits: filed, why: `its record does not show ${missing.words}` } : { splits };
+  } catch (e) {
+    return { splits: filed, why: e.message };
+  }
+}
+function foreignForm(s, facts, day3) {
+  const r = s?.filings?.recent, at = (r?.form ?? []).findIndex((f, i) => /^(10-K|20-F|40-F)/.test(f) && (r?.filingDate?.[i] ?? "") <= day3);
+  const form = at >= 0 ? /^(10-K|20-F|40-F)/.exec(r.form[at])[1] : annualFormIn(facts, day3);
+  return form === "20-F" || form === "40-F" ? form : null;
+}
+var NO_MULTIPLES = (why) => `Market value, price to earnings and price to book: unavailable. The price source's record of share splits could not be read (${why}), so the filed figures cannot be put on the share basis of its prices: a split since a figure was filed would put a multiple off by its ratio.`;
 async function secOverview(sym2, cik, day3) {
   const [s, facts] = await Promise.all([submissions(cik), companyFacts(cik)]);
   const g = facts.facts?.["us-gaap"] ?? {}, dei = facts.facts?.dei ?? {};
@@ -39054,37 +39267,59 @@ async function secOverview(sym2, cik, day3) {
   if (s.sic) lines.push(`Industry (the SEC's code ${s.sic}): ${s.sicDescription || "not named"}`, `Sector (worked out from that code, so approximate): ${sectorOfSic(s.sic) ?? "not known"}`);
   const fy = /^(\d\d)(\d\d)$/.exec(s.fiscalYearEnd ?? "");
   if (fy && Number(fy[1]) >= 1 && Number(fy[1]) <= 12) lines.push(`Fiscal year ends: ${Number(fy[2])} ${MONTHS2[Number(fy[1]) - 1]}`);
+  const epsFacts = firstTagPerPeriod(units(g.EarningsPerShareDiluted, "USD/shares"), units(g.EarningsPerShareBasicAndDiluted, "USD/shares"));
+  const foreign = foreignForm(s, facts.facts, day3);
+  const basis = foreign ? { splits: filingSplits(epsFacts, day3) } : await shareBasis(sym2, epsFacts);
+  const priced = !foreign && basis.why === void 0;
   let close = null, paid = [];
   try {
-    const h = await history(sym2, day3), last = h.bars.at(-1), state = latestState(h, day3);
-    close = { date: last.date, close: Math.round(last.close * 100) / 100, currency: h.meta.currency, open: state.open, label: state.open ? state.label : "Close" };
+    const h = await history(sym2, day3), bar = h.bars.at(-1), state = latestState(h, day3), traded = h.traded?.at(-1);
+    const row = traded?.date === bar.date ? traded : bar, cents = (n2) => Math.round(n2 * 100) / 100;
+    close = { date: row.date, close: cents(row.close), table: cents(bar.close), currency: h.meta.currency, open: state.open, label: state.open ? state.label : "Close" };
     paid = h.dividends ?? [];
   } catch {
   }
-  const usd = !close?.currency || close.currency === "USD", px = close?.open ? "latest price" : "close";
-  lines.push(close ? `${close.label}: ${fixed(close.close)} ${close.currency ?? ""} on ${close.date} (the checked price table's latest row on or before ${day3}${close.open ? "; not a close, so every multiple below moves with it" : ""})`.replace("  ", " ") : "Close: unavailable (the prices could not be read), so no multiple can be worked out");
+  const usd = !close?.currency || close.currency === "USD", px = close?.open ? "latest price" : "close", past = isHistorical(day3);
+  if (close) {
+    const where = past ? `the price it traded at that day, on the price source's share basis of today: it adjusts every past price for any share split since${priced ? ", and the filed per-share figures and share counts below are put on that same basis" : ""}` : `the checked price table's latest row on or before ${day3}`;
+    const table = close.table !== close.close ? `; the checked price table shows ${fixed(close.table)} for that day, lowered by the dividends paid since` : "";
+    lines.push(`${close.label}: ${fixed(close.close)} ${close.currency ?? ""} on ${close.date} (${where}${close.open ? "; not a close, so every multiple below moves with it" : ""}${table})`.replace("  ", " "));
+  } else lines.push("Close: unavailable (the prices could not be read), so no multiple can be worked out");
+  const counted = (val, filed) => {
+    if (foreign) return { n: val, words: "" };
+    const { k, named, silent } = rebase(basis.splits, filed, day3), n2 = Math.round(val * k);
+    return { n: n2, words: !named.length ? "" : silent ? `, before ${splitList(named)}` : ` as ${whole(val)}, before ${splitList(named)}` };
+  };
   const cover = sharesOutstanding(units(dei.EntityCommonStockSharesOutstanding, "shares"), day3);
-  const average = cover ? null : averageDilutedShares(units(g.WeightedAverageNumberOfDilutedSharesOutstanding, "shares"), day3);
-  const shares2 = cover ?? average, which = average ? "average diluted shares" : "shares";
-  if (cover) lines.push(`Shares outstanding: ${whole(cover.shares)} (counted on ${cover.end}, filed ${cover.filed})`);
-  else if (average) lines.push(`Shares outstanding: no single count on a cover page filed by then (a company with more than one class of shares gives one per class there, which the SEC's data leaves out). In its place, the weighted average diluted shares from its accounts for ${average.start} to ${average.end}: ${whole(average.shares)} (filed ${average.filed}), so the figures worked out from it are close, not exact`);
-  else lines.push("Shares outstanding: unavailable (not on a cover page filed by then)");
-  if (shares2 && close && usd) lines.push(`Market value (derived: ${which} \xD7 ${px}): ${whole(shares2.shares * close.close)} USD`);
-  const eps = trailingYear(units(g.EarningsPerShareDiluted, "USD/shares"), day3);
+  const dilutedAvg = cover ? null : averageDilutedShares(units(g.WeightedAverageNumberOfDilutedSharesOutstanding, "shares"), day3);
+  const bothAvg = cover || dilutedAvg ? null : averageDilutedShares(units(g.WeightedAverageNumberOfShareOutstandingBasicAndDiluted, "shares"), day3);
+  const average = dilutedAvg ?? bothAvg, which = average ? "average diluted shares" : "shares";
+  const shares2 = cover ? counted(cover.shares, cover.filed).n : average ? counted(average.shares, average.filed).n : null;
+  if (cover) {
+    const c = counted(cover.shares, cover.filed);
+    lines.push(`Shares outstanding: ${whole(c.n)}${foreign ? " ordinary shares" : ""} (counted on ${cover.end}, filed ${cover.filed}${c.words})`);
+  } else if (average) {
+    const c = counted(average.shares, average.filed);
+    lines.push(`Shares outstanding: no single count on a cover page filed by then (a company with more than one class of shares gives one per class there, which the SEC's data leaves out). In its place, the weighted average ${bothAvg ? "shares from its accounts (one figure, filed as both basic and diluted)" : "diluted shares from its accounts"} for ${average.start} to ${average.end}: ${whole(c.n)} (filed ${average.filed}${c.words}), so the figures worked out from it are close, not exact`);
+  } else lines.push("Shares outstanding: unavailable (not on a cover page filed by then)");
+  if (foreign) lines.push(`Market value, price to earnings and price to book: not worked out. ${sym2} files with the SEC as a foreign company (its yearly report is a form ${foreign}): the count on its cover and any per-share figure in its accounts are of its ordinary shares, and its US listing may be depositary shares (ADS) that each stand for several of them, a ratio its SEC filings do not give in a form the desk can read. A multiple from these figures and the price of one US share could be off by that ratio.`);
+  else if (!priced) lines.push(NO_MULTIPLES(basis.why));
+  else if (shares2 && close && usd) lines.push(`Market value (derived: ${which} \xD7 ${px}): ${whole(shares2 * close.close)} USD`);
+  const eps = trailingYear(epsFacts, day3, basis.splits);
   if (eps) {
-    lines.push(`Diluted EPS, last twelve months (derived from ${eps.parts}): ${fixed(eps.value)} USD`);
-    if (close && usd) lines.push(eps.value > 0 ? `Price to earnings (derived: ${px} \xF7 that): ${fixed(close.close / eps.value)}` : "Price to earnings: not meaningful (the last twelve months lost money)");
-  } else lines.push("Diluted EPS, last twelve months: unavailable (not filed in US dollars by then)");
+    lines.push(`Diluted EPS, last twelve months${foreign ? ", per ordinary share" : priced ? "" : ", on the basis of its latest filings"} (derived from ${eps.parts}): ${fixed(eps.value)} USD`);
+    if (priced && close && usd) lines.push(eps.value > 0 ? `Price to earnings (derived: ${px} \xF7 that): ${fixed(close.close / eps.value)}` : "Price to earnings: not meaningful (the last twelve months lost money)");
+  } else lines.push("Diluted EPS, last twelve months: unavailable (no full year of it in US dollars among its filed figures by then)");
   const equity = latestBalance(units(g.StockholdersEquity, "USD"), day3);
   if (equity) {
     lines.push(`Stockholders' equity: ${whole(equity.val)} USD (at ${equity.end}, filed ${equity.filed})`);
-    if (shares2 && shares2.shares > 0) {
-      const bv = equity.val / shares2.shares;
-      lines.push(`Book value per share (derived: equity \xF7 ${which}): ${fixed(bv)} USD`);
-      if (close && usd && bv > 0) lines.push(`Price to book (derived: ${px} \xF7 that): ${fixed(close.close / bv)}`);
+    if (!foreign && shares2 && shares2 > 0) {
+      const bv = equity.val / shares2;
+      lines.push(`Book value per share (derived: equity \xF7 ${which}${priced ? "" : ", on the basis of its latest filings"}): ${fixed(bv)} USD`);
+      if (priced && close && usd && bv > 0) lines.push(`Price to book (derived: ${px} \xF7 that): ${fixed(close.close / bv)}`);
     }
   }
-  const dps = trailingYear(units(g.CommonStockDividendsPerShareDeclared, "USD/shares"), day3) ?? trailingYear(units(g.CommonStockDividendsPerShareCashPaid, "USD/shares"), day3);
+  const dps = trailingYear(units(g.CommonStockDividendsPerShareDeclared, "USD/shares"), day3, basis.splits) ?? trailingYear(units(g.CommonStockDividendsPerShareCashPaid, "USD/shares"), day3, basis.splits);
   if (close) {
     const after = yearBefore2(day3), year = paid.filter((d) => d.date > after && d.date <= day3), unit = close.currency ?? "USD";
     const sum = Number(year.reduce((a, d) => a + d.amount, 0).toFixed(6)), span2 = `${addDays(after, 1)} to ${day3}`;
@@ -39178,8 +39413,8 @@ async function fundProfile(raw, analysis2, topN = 10) {
   const p = r.price ?? {}, d = r.summaryDetail ?? {}, k = r.defaultKeyStatistics ?? {}, f = r.fundProfile ?? {}, fees = f.feesExpensesInvestment ?? {}, t = r.topHoldings ?? {};
   const main = p.currency ? MAIN_UNIT[p.currency] ?? p.currency : void 0;
   const inception = has(k.fundInceptionDate) ? new Date(k.fundInceptionDate.raw * 1e3).toISOString().slice(0, 10) : null;
-  const ratio = [fees.annualReportExpenseRatio, fees.netExpRatio, k.annualReportExpenseRatio].find(has);
-  const cost = ratio ? `${Number((ratio.raw * 100).toPrecision(3))}%` : null;
+  const ratio2 = [fees.annualReportExpenseRatio, fees.netExpRatio, k.annualReportExpenseRatio].find(has);
+  const cost = ratio2 ? `${Number((ratio2.raw * 100).toPrecision(3))}%` : null;
   const size = money(d.totalAssets ?? k.totalAssets, main);
   const lines = [];
   const line2 = (label, v, always = false) => {
@@ -39248,7 +39483,7 @@ function withWorkedRows(t, kind, freq) {
     const v = f(i);
     return v === null || !Number.isFinite(v) ? null : v;
   });
-  const ratio = (a, b, label, worked2, abs = false) => {
+  const ratio2 = (a, b, label, worked2, abs = false) => {
     if (!a || !b) return null;
     const cells2 = each((i) => {
       const x = a.cells[i] ?? null, y = b.cells[i] ?? null;
@@ -39278,9 +39513,9 @@ function withWorkedRows(t, kind, freq) {
       return r === null || c === null ? null : r - c;
     }) };
     out.push(
-      ratio(gross, revenue, `Gross margin (worked out: gross profit \xF7 revenue${row("Gross Profit") ? "" : ", gross profit being revenue less cost of revenue"})`, "percent"),
-      ratio(op, revenue, "Operating margin (worked out: operating income \xF7 revenue)", "percent"),
-      ratio(net, revenue, "Net margin (worked out: net income \xF7 revenue)", "percent")
+      ratio2(gross, revenue, `Gross margin (worked out: gross profit \xF7 revenue${row("Gross Profit") ? "" : ", gross profit being revenue less cost of revenue"})`, "percent"),
+      ratio2(op, revenue, "Operating margin (worked out: operating income \xF7 revenue)", "percent"),
+      ratio2(net, revenue, "Net margin (worked out: net income \xF7 revenue)", "percent")
     );
     if (freq === "quarterly") out.push(growth(revenue, "Revenue growth on the quarter just before (worked out)", 80, 100));
     const year = freq === "quarterly" ? "the same quarter a year before" : "the year before";
@@ -39293,11 +39528,11 @@ function withWorkedRows(t, kind, freq) {
         return o === null || c === null ? null : o - Math.abs(c);
       });
       if (fcf.some((c) => c !== null)) out.push({ label: "Free cash flow (worked out: operating cash flow less capital expenditure)", unit: money2, cells: fcf, worked: "money" });
-      out.push(ratio(capex, ocf, "Capital expenditure as a share of operating cash flow (worked out)", "percent", true));
+      out.push(ratio2(capex, ocf, "Capital expenditure as a share of operating cash flow (worked out)", "percent", true));
     }
   } else {
     const ca = row("Current Assets"), cl = row("Current Liabilities"), tl = row("Total Liabilities"), eq = row("Stockholders Equity"), cash = row("Cash and Equivalents");
-    out.push(ratio(ca, cl, "Current ratio (worked out: current assets \xF7 current liabilities)", "times"), ratio(tl, eq, "Liabilities to equity (worked out: total liabilities \xF7 equity)", "times"));
+    out.push(ratio2(ca, cl, "Current ratio (worked out: current assets \xF7 current liabilities)", "times"), ratio2(tl, eq, "Liabilities to equity (worked out: total liabilities \xF7 equity)", "times"));
     const less = (a, b, label) => {
       if (!a || !b) return null;
       const cells2 = each((i) => {
@@ -39333,13 +39568,27 @@ var reason = (e) => {
   const m2 = e.message;
   return /sec\.gov refused \(HTTP 403\)/.test(m2) && m2.includes("[no contact email was sent]") ? `${m2}: ${ASK_FOR_EMAIL}` : m2;
 };
+async function statementBasis(sym2, day3) {
+  try {
+    const cik = await cikFor(sym2);
+    if (!cik) return { note: "" };
+    const [s, facts] = await Promise.all([submissions(cik).catch(() => null), companyFacts(cik)]);
+    if (foreignForm(s, facts.facts, day3)) return { note: "" };
+    const g = facts.facts?.["us-gaap"] ?? {};
+    const b = await shareBasis(sym2, firstTagPerPeriod(units(g.EarningsPerShareDiluted, "USD/shares"), units(g.EarningsPerShareBasicAndDiluted, "USD/shares")));
+    return b.why === void 0 ? { splits: b.splits, note: "" } : { note: ` The price source's record of share splits could not be used (${b.why}), so per-share figures are on the basis of the company's latest filings by that day; a split since then would put them off its prices by the split's ratio.` };
+  } catch {
+    return { note: "" };
+  }
+}
 async function financialStatement(raw, kind, freq, analysis2) {
   const day3 = analysisDate(analysis2), sym2 = companySymbol(raw), title = STATEMENTS[kind].title;
   let secFailure;
   try {
-    const t = withWorkedRows(await secStatement(sym2, kind, freq, day3), kind, freq);
+    const basis = kind === "income_statement" ? await statementBasis(sym2, day3) : { note: "" };
+    const t = withWorkedRows(await secStatement(sym2, kind, freq, day3, basis.splits), kind, freq);
     const q = kind !== "balance_sheet" && freq === "quarterly" ? ' Every column is one quarter in a row of quarters; a quarter no filing states (a fourth quarter, which only the annual report covers, or one filed only inside a year to date) is derived from two filed figures of the same year, its column marked "(derived)", and the notes below say from which. Per-share figures are never derived.' : "";
-    return renderTable(t, `${title} for ${sym2} (${freq}), as filed with the SEC on or before ${day3}`, `Each figure is the latest filing of it by that day; a restatement counts only from the day it was filed.${q}`);
+    return renderTable(t, `${title} for ${sym2} (${freq}), as filed with the SEC on or before ${day3}`, `Each figure is the latest filing of it by that day; a restatement counts only from the day it was filed.${q}${basis.note}`);
   } catch (e) {
     secFailure = e;
   }
@@ -39471,9 +39720,10 @@ function forgetHoldings(dir) {
 }
 var n = (v) => v.toLocaleString("en-US", { maximumFractionDigits: 8 });
 var m = (v) => v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+var holdingOf = (positions, ticker) => positions.find((p) => deskSymbol(p.ticker, "stock") === deskSymbol(ticker, "stock"));
 function renderAccounts(h, ticker) {
   const lines = (h.accounts ?? []).map((a) => {
-    const held = a.positions.find((p) => p.ticker === ticker), others = a.positions.filter((p) => p !== held), cur = a.currency ? ` ${a.currency}` : "";
+    const held = holdingOf(a.positions, ticker), others = a.positions.filter((p) => p !== held), cur = a.currency ? ` ${a.currency}` : "";
     const parts = [held ? `position in ${ticker}: ${n(held.quantity)} units${held.averagePrice ? `, average price ${m(held.averagePrice)}` : ""}` : `no position in ${ticker}`];
     if (a.cash !== void 0) parts.push(`cash ${m(a.cash)}${cur}`);
     if (a.buyingPower !== void 0) parts.push(`buying power ${m(a.buyingPower)}${cur}`);
@@ -39488,7 +39738,7 @@ var BACKTEST_HOLDINGS = "Portfolio context: not used in a backtest. A backtest j
 function renderHoldings(h, ticker) {
   if (h?.accounts?.length) return renderAccounts(h, ticker);
   if (!h) return NO_HOLDINGS;
-  const held = h.positions.find((p) => p.ticker === ticker);
+  const held = holdingOf(h.positions, ticker);
   const lines = [held ? `- Current position in ${ticker}: ${n(held.quantity)} units${held.averagePrice ? `, average price ${m(held.averagePrice)}` : ""}` : `- No current position in ${ticker}`];
   if (h.cash !== void 0) lines.push(`- Cash available: ${m(h.cash)}${h.currency ? ` ${h.currency}` : ""}`);
   const others = h.positions.filter((p) => p !== held);
@@ -39510,10 +39760,17 @@ function yardstickFor(ticker, s) {
   if (suffix) return { yardstick: normalizeSymbol(s.benchmarks[suffix]), basis: "market" };
   return { yardstick: normalizeSymbol(s.benchmarks[""] ?? "SPY"), basis: isCrypto(sym2) ? "coin" : exchangeOf(sym2) ? "unlisted" : "us" };
 }
+var SAME_INDEX = [["SPY", "VOO", "IVV"]];
+var copiesOf = (yardstick) => (SAME_INDEX.find((g) => g.includes(yardstick)) ?? []).filter((x) => x !== yardstick);
+var isOwnYardstick = (ticker, yardstick) => {
+  const sym2 = normalizeSymbol(ticker);
+  return sym2 === yardstick || copiesOf(yardstick).includes(sym2);
+};
 function rulesFor(ticker, s) {
-  const coin = isCrypto(ticker);
-  return { days: coin ? coinDays(s.holdingPeriodDays) : s.holdingPeriodDays, unit: coin ? "calendar" : "trading", ...yardstickFor(ticker, s) };
+  const coin = isCrypto(ticker), y = yardstickFor(ticker, s);
+  return { days: coin ? coinDays(s.holdingPeriodDays) : s.holdingPeriodDays, unit: coin ? "calendar" : "trading", yardstick: y.yardstick, basis: isOwnYardstick(ticker, y.yardstick) ? "same" : y.basis };
 }
+var ownReturn = (r) => r.basis === "same";
 function legacyRules(ticker, s, holding) {
   const kept = Number(/^(\d+)d$/.exec(holding ?? "")?.[1]);
   return { days: kept > 0 ? kept : s.holdingPeriodDays, unit: isCrypto(ticker) ? "calendar" : "trading", ...yardstickFor(ticker, s) };
@@ -39535,13 +39792,17 @@ function basisWords(ticker, r) {
       return `the index the desk's settings give its exchange${ex ? `, ${ex}` : ""}`;
     case "chosen":
       return "the one yardstick the desk's settings set for every call";
+    case "same":
+      return normalizeSymbol(ticker) === r.yardstick ? `${r.yardstick} is the yardstick itself, so against it the alpha would always be zero` : `${normalizeSymbol(ticker)} copies the same index as ${r.yardstick}, so against it the alpha would be about zero whatever happened`;
   }
 }
 function yardstickWords(ticker, r) {
   const why = basisWords(ticker, r);
   return `${yardstickName(r.yardstick)}${why ? ` (${why})` : ""}`;
 }
-var checkWords = (ticker, r) => `${checkName(r)} against ${yardstickWords(ticker, r)}, over the ${windowWords(r)} after the call`;
+var checkWords = (ticker, r) => `${checkName(r)} ${againstWords(ticker, r)}, over the ${windowWords(r)} after the call`;
+var againstWords = (ticker, r) => ownReturn(r) ? `on its own return (${basisWords(ticker, r)})` : `against ${yardstickWords(ticker, r)}`;
+var OWN_RETURN_WORDS = "A Buy or Overweight works when it rose over the window, an Underweight or Sell when it fell; a Hold is shown, not judged.";
 var COIN_YARDSTICK_WORDS = "A coin trades every day, so its window is calendar days; its yardstick trades only on New York's market days, so it is taken at its close on the coin's first and last day, or at its last close before that day when New York's market was closed (a weekend or a New York holiday).";
 var WHEN_SCORED = "A call is scored when a scoring runs after its window (/settle, an analysis or a routine), not by itself.";
 var rowOn = (bars, date5) => [...bars].reverse().find((b) => b.date <= date5);
@@ -39551,11 +39812,21 @@ function lastMarketDay(day3) {
   return d;
 }
 async function measure(ticker, tradeDate, r) {
-  return r.unit === "calendar" ? measureCalendar(ticker, tradeDate, r) : measureTrading(ticker, tradeDate, r);
+  const o = r.unit === "calendar" ? await measureCalendar(ticker, tradeDate, r) : await measureTrading(ticker, tradeDate, r);
+  return o && r.basis === "same" ? { ...o, alpha: o.raw, benchmarkReturn: 0, benchFrom: o.entry, benchTo: o.exit, own: true } : o;
 }
+var STOPPED_DAYS = 10;
 async function measureTrading(ticker, tradeDate, r) {
-  const end = addDays(tradeDate, Math.round(r.days * 7 / 5) + 7);
-  const stock = (await daily(ticker, tradeDate, end)).bars;
+  let end = addDays(tradeDate, Math.round(r.days * 7 / 5) + 7);
+  let stock = (await daily(ticker, tradeDate, end)).bars;
+  if (stock.length <= r.days && end < today()) {
+    end = today();
+    stock = (await daily(ticker, tradeDate, end)).bars;
+    const last = stock.at(-1)?.date;
+    if (stock.length <= r.days && last && daysBetween(last, today()) > STOPPED_DAYS) {
+      throw new NoData(`Yahoo Finance gives no price for ${normalizeSymbol(ticker)} after ${last}, ${plural3(stock.length - 1, "session")} into its ${plural3(r.days, "trading day")} window: it may have stopped trading or been halted, so this call cannot be scored unless it trades again`);
+    }
+  }
   if (stock.length <= r.days) return null;
   const entry = stock[0].date, exit = stock[r.days].date;
   if (exit >= today()) return null;
@@ -39641,10 +39912,14 @@ var alphaOf = (e) => {
 };
 function summarize(entries) {
   const resolved2 = entries.filter((e) => !e.pending && e.rating !== REVIEW).map((e) => ({ e, a: alphaOf(e) })).filter((x) => x.a !== null);
-  const byRating = {};
+  const byRating = {}, own2 = {};
+  const isOwn = (e) => e.rules !== null && ownReturn(e.rules);
   for (const rating of new Set(resolved2.map((x) => x.e.rating))) {
-    const alphas = resolved2.filter((x) => x.e.rating === rating).map((x) => x.a), dir = directionOf(rating);
-    byRating[rating] = { count: alphas.length, direction: dir, hitRate: dir ? alphas.filter((a) => worked(rating, a)).length / alphas.length : null, meanAlpha: alphas.reduce((s, a) => s + a, 0) / alphas.length };
+    const of = (mine) => resolved2.filter((x) => x.e.rating === rating && isOwn(x.e) === mine).map((x) => x.a), dir = directionOf(rating);
+    const mean = (xs) => xs.reduce((s, a) => s + a, 0) / xs.length;
+    const alphas = of(false), returns = of(true);
+    if (alphas.length) byRating[rating] = { count: alphas.length, direction: dir, hitRate: dir ? alphas.filter((a) => worked(rating, a)).length / alphas.length : null, meanAlpha: mean(alphas) };
+    if (returns.length) own2[rating] = { count: returns.length, worked: dir ? returns.filter((a) => worked(rating, a)).length : null, meanReturn: mean(returns) };
   }
   const unscored = entries.filter((e) => e.rating === REVIEW).length;
   const windows = [...new Set(resolved2.map(({ e }) => {
@@ -39652,7 +39927,7 @@ function summarize(entries) {
     return days > 0 ? windowWords({ days, unit: e.rules?.unit ?? (isCrypto(e.ticker) ? "calendar" : "trading") }) : "";
   }).filter(Boolean))].sort();
   const yardsticks = [...new Set(resolved2.map(({ e }) => e.rules?.yardstick ?? "").filter(Boolean))].sort();
-  return { resolved: resolved2.length, pending: entries.length - resolved2.length - unscored, unscored, byRating, holding: windows.join(", ") || "the configured window", yardsticks: yardsticks.join(", ") };
+  return { resolved: resolved2.length, pending: entries.length - resolved2.length - unscored, unscored, byRating, ownReturn: own2, holding: windows.join(", ") || "the configured window", yardsticks: yardsticks.join(", ") };
 }
 var pctText = (v) => signedPct(v, 2);
 function renderSummary(s) {
@@ -39660,6 +39935,8 @@ function renderSummary(s) {
   for (const [rating, sc] of Object.entries(s.byRating)) {
     lines.push(`- ${rating}: n=${sc.count}, ${sc.hitRate !== null ? `called the direction ${Math.round(sc.hitRate * 100)}%` : "no direction claimed"}, mean alpha ${pctText(sc.meanAlpha)} vs the yardstick`);
   }
+  const own2 = Object.entries(s.ownReturn);
+  if (own2.length) lines.push(`- On their own return, not in the lines above (a call on the yardstick itself or a fund that copies the same index): ${own2.map(([rating, o]) => `${rating} n=${o.count}, ${o.worked === null ? "no direction claimed" : `worked ${o.worked}`}, mean return ${pctText(o.meanReturn)}`).join("; ")}`);
   lines.push("");
   if (s.pending) lines.push("Pending cells are not scored above; settle them when their window has traded.");
   if (s.unscored) lines.push("Unscored cells had no readable rating (Needs review): they count neither for nor against the desk.");
@@ -39677,6 +39954,7 @@ var UNCHECKED = ["unmarked", "no-prices", "unreliable", "flagged"];
 var WITHHELD = ["unreliable", "flagged"];
 var SEPARATOR = "\n\n<!-- ENTRY_END -->\n\n";
 var MARK = /<!--\s*ENTRY_END\s*-->/i;
+var SPLIT = /\s*<!--\s*ENTRY_END\s*-->\s*/i;
 function keep(text4) {
   let s = text4;
   while (MARK.test(s)) s = s.replace(MARK, "");
@@ -39690,7 +39968,9 @@ function lessonOf(fields, pending) {
 }
 var DATE = /^\d{4}-\d{2}-\d{2}$/;
 var TICKER = /^[A-Za-z0-9.\-=^]{1,20}$/;
-var BASES = ["us", "coin", "unlisted", "market", "chosen"];
+var BASES = ["us", "coin", "unlisted", "market", "chosen", "same"];
+var RECORDED = /^recorded:(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z)$/;
+var recordedIn = (fields) => fields.map((x) => RECORDED.exec(x)?.[1]).find(Boolean) ?? null;
 var WINDOW = /^window:(\d{1,3}) (trading|calendar) days?$/;
 var YARDSTICK = /^yardstick:([A-Za-z0-9.\-=^]{1,20}) \(([a-z]+)\)$/;
 var rulesFields = (r) => [`window:${windowWords(r)}`, `yardstick:${r.yardstick} (${r.basis})`];
@@ -39722,7 +40002,7 @@ function parse3(block) {
   const firstLesson = /(?:^|\n)FIRST LESSON:\n([\s\S]*)$/.exec(body)?.[1]?.trim() ?? "";
   const resolved2 = f.slice(6).find((x) => x.startsWith("resolved:"))?.slice("resolved:".length).trim() ?? null;
   const pending = f[3] === "pending", score = (s) => s === void 0 ? null : unsignZero(s);
-  return { date: f[0], ticker: f[1], rating: f[2], pending, raw: pending ? null : score(f[3]), alpha: pending ? null : score(f[4]), holding: pending ? null : f[5] ?? null, resolved: resolved2, decision, reflection, ...lessonOf(f.slice(6), pending), lessonCheck, earlier, firstLesson, rules: rulesIn(f.slice(4)) };
+  return { date: f[0], ticker: f[1], rating: f[2], pending, raw: pending ? null : score(f[3]), alpha: pending ? null : score(f[4]), holding: pending ? null : f[5] ?? null, resolved: resolved2, decision, reflection, ...lessonOf(f.slice(6), pending), lessonCheck, earlier, firstLesson, rules: rulesIn(f.slice(4)), recorded: recordedIn(f.slice(4)) };
 }
 var lessonPart = (p) => [keep(p.lesson), ...[["LESSON CHECK", p.check], ["EARLIER CORRECTIONS", p.earlier], ["FIRST LESSON", p.first]].filter(([, words3]) => words3?.trim()).map(([head2, words3]) => `${head2}:
 ${keep(words3)}`)].join("\n\n");
@@ -39755,19 +40035,23 @@ var Journal = class {
   }
   file;
   maxResolved;
+  /** The file's own line ends, as last read: written back the same way. */
+  eol = "\n";
   read() {
     try {
-      return fs9.readFileSync(this.file, "utf8");
+      const t = fs9.readFileSync(this.file, "utf8");
+      this.eol = t.includes("\r\n") ? "\r\n" : "\n";
+      return t.replace(/\r\n/g, "\n");
     } catch {
       return "";
     }
   }
   write(text4) {
     fs9.mkdirSync(path9.dirname(this.file), { recursive: true });
-    writeWhole(this.file, text4);
+    writeWhole(this.file, this.eol === "\n" ? text4 : text4.replace(/\n/g, this.eol));
   }
   blocks() {
-    return this.read().split(SEPARATOR).filter((b) => b.trim());
+    return this.read().split(SPLIT).filter((b) => b.trim());
   }
   load() {
     return this.blocks().map(parse3).filter((e) => e !== null);
@@ -39776,17 +40060,23 @@ var Journal = class {
     return this.load().filter((e) => e.pending);
   }
   /** Adds a pending entry, with the window and yardstick it will be scored by when they are given (every call the desk
-   *  records now). One entry per stock and day, settled or not: a re-run must not count the same call twice. */
-  storeDecision(ticker, date5, decision, rating, rules) {
+   *  records now), and when it was recorded (`at`, which record_decision gives). The rating kept is the one the decision
+   *  states: a `rating` passed that differs from it is refused, and a decision that states none is Needs review. One
+   *  entry per stock and day, settled or not: a re-run must not count the same call twice. */
+  storeDecision(ticker, date5, decision, rating, rules, at) {
     checkTag(ticker, date5);
     if (rules) checkRules(rules);
+    const stated = parseRating(decision);
+    if (rating && RATINGS.includes(rating) && stated !== REVIEW && rating !== stated) throw new Error(`the decision states ${stated}, not ${rating}: the journal keeps the rating the decision's words give. Correct the decision, or pass ${stated}`);
     fs9.mkdirSync(path9.dirname(this.file), { recursive: true });
     return withLock(this.file, () => {
       if (this.load().some((e) => e.date === date5 && e.ticker === ticker)) return "exists";
-      const r = rating && RATINGS.includes(rating) ? rating : parseRating(decision);
-      const old = this.read();
-      const kept = rules ? rulesFields(rules).map((x) => ` | ${x}`).join("") : "";
-      this.write(`${old}${old && !old.endsWith(SEPARATOR) ? SEPARATOR : ""}[${date5} | ${ticker} | ${r} | pending${kept}]
+      const old = this.read().replace(/\s+$/, "");
+      const kept = [...rules ? rulesFields(rules) : [], ...at ? [`recorded:${at.toISOString().slice(0, 16)}Z`] : []].map((x) => ` | ${x}`).join("");
+      const before = !old ? "" : /<!--\s*ENTRY_END\s*-->$/i.test(old) ? `${old}
+
+` : `${old}${SEPARATOR}`;
+      this.write(`${before}[${date5} | ${ticker} | ${stated} | pending${kept}]
 
 DECISION:
 ${keep(decision)}${SEPARATOR}`);
@@ -39803,7 +40093,7 @@ ${keep(decision)}${SEPARATOR}`);
         const e = parse3(block);
         if (done || !e || !e.pending || e.date !== date5 || e.ticker !== ticker) return block;
         done = true;
-        const kept = e.rules ? rulesFields(e.rules).map((x) => ` | ${x}`).join("") : "";
+        const kept = [...e.rules ? rulesFields(e.rules) : [], ...e.recorded ? [`recorded:${e.recorded}`] : []].map((x) => ` | ${x}`).join("");
         return `[${date5} | ${ticker} | ${e.rating} | ${signedPct(raw)} | ${signedPct(alpha)} | ${holdingDays}d | resolved:${resolution}${kept}${from ? ` | lesson:${from}` : ""}]
 
 DECISION:
@@ -39919,7 +40209,7 @@ Its check before then: ${e.lessonCheck}` : ""}`, earlier: e.earlier, first: e.fi
     if (!same.length && !other.length) return "";
     const over = (e) => {
       const r = e.rules ?? (o.scoring ? legacyRules(e.ticker, o.scoring, e.holding) : null);
-      return r ? `${checkName(r)}: against ${r.yardstick} over the ${windowWords(r)} after the call, not the call's own time horizon` : `over ${e.holding ?? "n/a"}`;
+      return r ? `${checkName(r)}: ${ownReturn(r) ? `on its own return (${r.yardstick} is its own yardstick or copies the same index), so its alpha is its return,` : `against ${r.yardstick}`} over the ${windowWords(r)} after the call, not the call's own time horizon` : `over ${e.holding ?? "n/a"}`;
     };
     const head2 = (e) => `[${e.date} | ${e.ticker} | ${e.rating} | return ${e.raw ?? "n/a"} | alpha ${e.alpha ?? "n/a"} | ${over(e)}]`;
     const full = (e) => [
@@ -40354,7 +40644,7 @@ function buildPlan(root, req, ws = workspaceOf(root)) {
   saveContext(dir, symbol4, day3, ctx);
   return { plan, ...ctx, resumed };
 }
-var scoredWords = (p) => p.window ? `${checkName(p.window)} against ${yardstickWords(p.symbol, p.window)}, over the ${windowWords(p.window)} after the call, once a scoring runs after them. It is not the call's own time horizon.` : `after ${p.holdingDays} trading days against ${p.benchmark}`;
+var scoredWords = (p) => p.window ? `${checkName(p.window)} ${againstWords(p.symbol, p.window)}, over the ${windowWords(p.window)} after the call, once a scoring runs after them. It is not the call's own time horizon.` : `after ${p.holdingDays} trading days against ${p.benchmark}`;
 function renderPlan({ plan: p, holdings, lessons, resumed }) {
   const next = p.steps.find((x) => !x.done);
   const step = (x) => `${x.section}${x.turn > 1 || p.steps.filter((y) => y.section === x.section).length > 1 ? ` (turn ${x.turn})` : ""}`;
@@ -40436,7 +40726,8 @@ function readNotes(j, kind, now) {
       }
       const l = n2.listed;
       const listedOk = l && typeof l.of === "string" && Array.isArray(l.shown) && l.shown.every((s) => typeof s === "string") && typeof l.saved === "number" && typeof l.at === "number";
-      return { at: n2.at, saved: typeof n2.saved === "number" ? n2.saved : 0, refused, ...listedOk ? { listed: l } : {} };
+      const unrowed = Array.isArray(n2.unrowed) ? n2.unrowed.filter((k) => typeof k === "string") : [];
+      return { at: n2.at, saved: typeof n2.saved === "number" ? n2.saved : 0, refused, ...listedOk ? { listed: l } : {}, ...unrowed.length ? { unrowed } : {} };
     }
   } catch {
   }
@@ -40453,9 +40744,23 @@ function noteStep(j, kind, now, saved) {
   if (saved) {
     notes.saved++;
     delete notes.refused[keyOf2(saved.ticker, saved.date)];
+    const unrowed = (notes.unrowed ?? []).filter((k) => k !== keyOf2(saved.ticker, saved.date));
+    if (unrowed.length) notes.unrowed = unrowed;
+    else delete notes.unrowed;
   }
   writeNotes(j, kind, notes, now);
 }
+function noteRows(j, kind, shown2, now) {
+  const notes = readNotes(j, kind, now), before = notes.unrowed ?? [];
+  const after = [.../* @__PURE__ */ new Set([...before.filter((k) => !shown2.with.includes(k)), ...shown2.without])];
+  if (after.length === before.length && after.every((k) => before.includes(k))) return;
+  const { unrowed: _, ...rest } = notes;
+  try {
+    writeWhole(fileOf(j, kind), JSON.stringify(after.length ? { ...rest, unrowed: after } : rest));
+  } catch {
+  }
+}
+var listedUnrowed = (notes, ticker, date5) => (notes.unrowed ?? []).includes(keyOf2(ticker, date5));
 function countRefusal(j, kind, ticker, date5, why, now) {
   const notes = readNotes(j, kind, now), key = keyOf2(ticker, date5), before = notes.refused[key];
   const n2 = (before?.n ?? 0) + 1;
@@ -40470,9 +40775,9 @@ function leftIn(notes, ticker, date5) {
 }
 
 // src/desk/settle.ts
-var line = (o, e) => `${e.ticker} ${signedPct(o.raw)} from ${o.entry} to ${o.exit} (${windowWords({ days: o.holdingDays, unit: o.unit })}); ${o.benchmark} ${signedPct(o.benchmarkReturn)}${o.unit === "calendar" ? ` (its close of ${o.benchFrom} to its close of ${o.benchTo})` : ""}; alpha ${signedPct(o.alpha)}`;
+var line = (o, e) => `${e.ticker} ${signedPct(o.raw)} from ${o.entry} to ${o.exit} (${windowWords({ days: o.holdingDays, unit: o.unit })}); ${o.own ? `scored on its own return, not against ${o.benchmark}: score ${signedPct(o.alpha)}` : `${o.benchmark} ${signedPct(o.benchmarkReturn)}${o.unit === "calendar" ? ` (its close of ${o.benchFrom} to its close of ${o.benchTo})` : ""}; alpha ${signedPct(o.alpha)}`}`;
 var rulesOf = (e, scoring) => e.rules ?? legacyRules(e.ticker, scoring, e.holding);
-var scoreIs = (o, r) => `THIS SCORE IS ${checkName(r).toUpperCase()}: the ${windowWords(r)} after the call against ${o.benchmark}, not the call's own time horizon (its decision states that). Say in the lesson how much a window this short can show about the thesis.${r.unit === "calendar" ? ` ${COIN_YARDSTICK_WORDS}` : ""}`;
+var scoreIs = (o, r, ticker) => `THIS SCORE IS ${checkName(r).toUpperCase()}: the ${windowWords(r)} after the call ${o.own ? `on its own return (${basisWords(ticker, r)}). ${OWN_RETURN_WORDS} It is` : `against ${o.benchmark},`} not the call's own time horizon (its decision states that). Say in the lesson how much a window this short can show about the thesis.${r.unit === "calendar" && !o.own ? ` ${COIN_YARDSTICK_WORDS}` : ""}`;
 var MAX_REFLECTION = 1200;
 var MAX_SENTENCES = 4;
 var SCORING = "settle-check";
@@ -40509,16 +40814,16 @@ function lessonRefusal(text4) {
 }
 async function windowText(ticker, o) {
   try {
-    return await windowRows(ticker, o);
+    return { text: await windowRows(ticker, o), rows: true };
   } catch (err) {
-    return `WHAT HAPPENED IN THE WINDOW: ${failureText(err, `the day-by-day rows of ${ticker}'s window`)} Write the lesson from the outcome line alone, and say nothing about what happened on any day of the window.`;
+    return { text: `WHAT HAPPENED IN THE WINDOW: ${failureText(err, `the day-by-day rows of ${ticker}'s window`)} Write the lesson from the outcome line alone, and say nothing about what happened on any day of the window.`, rows: false };
   }
 }
 var LATER = "A later scoring, started an hour or more after record_outcome was last used, tries it again.";
 async function dueSettlements(journal, scoring, ticker, now = Date.now()) {
   const pending = journal.pending().filter((e) => !ticker || e.ticker === ticker);
   if (!pending.length) return ticker ? `No pending calls on ${ticker}.` : "No pending calls: every call in the journal is settled.";
-  const notes = readNotes(journal, SCORING, now), out = [];
+  const notes = readNotes(journal, SCORING, now), out = [], rows = { without: [], with: [] };
   let ready = 0, left = 0;
   for (const e of pending) {
     const head2 = `[${e.date} | ${e.ticker} | ${e.rating}]`;
@@ -40531,27 +40836,30 @@ async function dueSettlements(journal, scoring, ticker, now = Date.now()) {
     try {
       const r = rulesOf(e, scoring), o = await measure(e.ticker, e.date, r);
       if (!o) {
-        out.push(`${head2} NOT YET: its window, the ${windowWords(r)} after ${e.date} (against ${r.yardstick}), has not finished. Leave it pending.`);
+        out.push(`${head2} NOT YET: its window, the ${windowWords(r)} after ${e.date} (${ownReturn(r) ? "on its own return" : `against ${r.yardstick}`}), has not finished. Leave it pending.`);
         continue;
       }
       ready++;
+      const w = await windowText(e.ticker, o);
+      rows[w.rows ? "with" : "without"].push(keyOf2(e.ticker, e.date));
       out.push(`${head2} READY: ${line(o, e)}
-${scoreIs(o, r)}
+${scoreIs(o, r, e.ticker)}
 DECISION:
 ${e.decision}
 
-${await windowText(e.ticker, o)}`);
+${w.text}`);
     } catch (err) {
       out.push(`${head2} ${failureText(err, `prices to settle ${e.ticker} on ${e.date}`)} Leave it pending.`);
     }
   }
+  noteRows(journal, SCORING, rows, now);
   return [`${pending.length} pending call(s), ${ready} ready to settle${left ? `, ${left} left in this scoring after ${REFUSALS_TO_LEAVE} failed tries` : ""}. Settle a ready one with record_outcome, using only the figures shown here. Before writing about a level, stop, target or trigger the decision named, find it in that call's window rows: say what happened only as a row shows it, naming its date.`, "", ...out].join("\n\n");
 }
 async function settleOne(journal, scoring, ticker, date5, reflection, now = Date.now()) {
   const pending = journal.pending().some((x) => x.ticker === ticker && x.date === date5);
   let answer2;
   try {
-    answer2 = await settleOnce(journal, scoring, ticker, date5, reflection);
+    answer2 = await settleOnce(journal, scoring, ticker, date5, reflection, now);
   } catch (err) {
     if (!(err instanceof Error) || !pending) {
       noteStep(journal, SCORING, now);
@@ -40565,14 +40873,14 @@ async function settleOne(journal, scoring, ticker, date5, reflection, now = Date
   noteStep(journal, SCORING, now, answer2.startsWith("Settled: ") ? { ticker, date: date5 } : void 0);
   return answer2;
 }
-async function settleOnce(journal, scoring, ticker, date5, reflection) {
+async function settleOnce(journal, scoring, ticker, date5, reflection, now) {
   const text4 = reflection.trim(), refused = lessonRefusal(text4);
   if (refused) throw new Error(refused);
   const e = journal.pending().find((x) => x.ticker === ticker && x.date === date5);
   if (!e) throw new Error(`there is no pending call on ${ticker} for ${date5}`);
   const r = rulesOf(e, scoring), o = await measure(ticker, date5, r);
   if (!o) return `NOT_YET: its window, the ${windowWords(r)} after ${date5}, has not finished, so ${ticker} stays pending.`;
-  const from = await windowRows(ticker, o).then(() => "prices", () => "no-prices");
+  const from = listedUnrowed(readNotes(journal, SCORING, now), ticker, date5) ? "no-prices" : await windowRows(ticker, o).then(() => "prices", () => "no-prices");
   return journal.recordOutcome(ticker, date5, o.raw, o.alpha, o.holdingDays, text4, o.exit, from) ? `Settled: ${line(o, e)}. The lesson is kept and will be read by later analyses from ${o.exit} on.` : `${ticker} on ${date5} was settled by another run already.`;
 }
 
@@ -40664,7 +40972,7 @@ ${laterWords(ticker)}`;
       const w = await windowOf(e, scoring);
       shown2.push([
         `${tagOf(e)} TO REWRITE: ${whyOf(e)}.`,
-        `ITS SCORE, WHICH STAYS AS IT IS: ${e.ticker} ${e.raw} from ${w.o.entry} to ${w.o.exit} (${windowWords({ days: w.o.holdingDays, unit: w.o.unit })}); its yardstick, ${w.o.benchmark}, ${signedPct(w.o.benchmarkReturn)} over the same days; alpha ${e.alpha}. It is ${checkName({ days: w.o.holdingDays, unit: w.o.unit })}, not the call's own time horizon.`,
+        `ITS SCORE, WHICH STAYS AS IT IS: ${e.ticker} ${e.raw} from ${w.o.entry} to ${w.o.exit} (${windowWords({ days: w.o.holdingDays, unit: w.o.unit })}); ${w.o.own ? `scored on its own return, not against ${w.o.benchmark} (it is its own yardstick or copies the same index), so its alpha is its return: ${e.alpha}` : `its yardstick, ${w.o.benchmark}, ${signedPct(w.o.benchmarkReturn)} over the same days; alpha ${e.alpha}`}. It is ${checkName({ days: w.o.holdingDays, unit: w.o.unit })}, not the call's own time horizon.`,
         `DECISION:
 ${e.decision}`,
         `LESSON AS IT STANDS:
@@ -41061,23 +41369,41 @@ async function stopsAtClose(dir, today2, closeOf) {
   return { state: "checked", held: symbols.length, stops };
 }
 var rerateFile = (dir) => path18.join(dir, "rerate.json");
+var DAY3 = /^\d{4}-\d{2}-\d{2}$/;
 function readRerate(dir) {
   try {
     const v = JSON.parse(fs16.readFileSync(rerateFile(dir), "utf8"));
     if (typeof v.day !== "string" || !Array.isArray(v.symbols)) return null;
     const dayOrNull = (x) => x === null || typeof x === "string";
-    return { day: v.day, symbols: v.symbols.filter((s) => typeof s?.symbol === "string" && dayOrNull(s.called) && dayOrNull(s.rating)), ...v.full === true ? { full: true } : {} };
+    const tried = Object.fromEntries(Object.entries(v.tried && typeof v.tried === "object" ? v.tried : {}).filter(([, d]) => typeof d === "string" && DAY3.test(d)));
+    return {
+      day: v.day,
+      symbols: v.symbols.filter((s) => typeof s?.symbol === "string" && dayOrNull(s.called) && dayOrNull(s.rating)).map((s) => ({ symbol: s.symbol, called: s.called, rating: s.rating, ...typeof s.tried === "string" && DAY3.test(s.tried) ? { tried: s.tried } : {} })),
+      ...v.full === true ? { full: true } : {},
+      ...Object.keys(tried).length ? { tried } : {}
+    };
   } catch {
     return null;
   }
+}
+function leftNoCall(kept, calls, today2) {
+  const out = {};
+  if (!kept) return out;
+  const add = (symbol4, day3) => {
+    if (day3 >= today2 || calls.some((c) => c.ticker === symbol4 && c.date >= day3) || out[symbol4] !== void 0 && out[symbol4] <= day3) return;
+    out[symbol4] = day3;
+  };
+  for (const [symbol4, day3] of Object.entries(kept.tried ?? {})) add(symbol4, day3);
+  for (const s of kept.symbols) add(s.symbol, kept.day);
+  return out;
 }
 var isRerateDay = (day3) => firstMarketDayOfWeek(day3) === day3;
 function dueForRerate(dir, today2, now = /* @__PURE__ */ new Date()) {
   const held = readHoldings(dir)?.positions ?? [];
   if (!held.length) return [];
-  const calls = new Journal(path18.join(dir, "journal.md")).load();
+  const calls = new Journal(path18.join(dir, "journal.md")).load(), tried = leftNoCall(readRerate(dir), calls, today2);
   const busy = new Set(readQueue(dir, now).filter((q) => q.state === "waiting" || q.state === "running").map((q) => q.symbol));
-  return [...new Set(held.map((p) => p.ticker))].filter((s) => !/[\^=]/.test(s) && !busy.has(s)).map((symbol4) => ({ symbol: symbol4, view: viewOf(calls, symbol4, today2) })).filter((x) => isStale(x.view)).sort((a, b) => (a.view?.date ?? "").localeCompare(b.view?.date ?? "")).map((x) => ({ symbol: x.symbol, called: x.view?.date ?? null, rating: x.view?.rating ?? null }));
+  return [...new Set(held.map((p) => p.ticker))].filter((s) => !/[\^=]/.test(s) && !busy.has(s)).map((symbol4) => ({ symbol: symbol4, view: viewOf(calls, symbol4, today2), tried: tried[symbol4] })).filter((x) => isStale(x.view)).sort((a, b) => Number(a.tried !== void 0) - Number(b.tried !== void 0) || (a.view?.date ?? "").localeCompare(b.view?.date ?? "") || (a.tried ?? "").localeCompare(b.tried ?? "")).map((x) => ({ symbol: x.symbol, called: x.view?.date ?? null, rating: x.view?.rating ?? null, ...x.tried ? { tried: x.tried } : {} }));
 }
 function rerateWeekly(dir, today2, now = /* @__PURE__ */ new Date()) {
   if (!isRerateDay(today2)) return [];
@@ -41085,7 +41411,7 @@ function rerateWeekly(dir, today2, now = /* @__PURE__ */ new Date()) {
   return withLock(rerateFile(dir), () => {
     const kept = readRerate(dir);
     if (kept?.day === today2) return kept.symbols;
-    const queued = [];
+    const tried = leftNoCall(kept, new Journal(path18.join(dir, "journal.md")).load(), today2), queued = [];
     let full = false;
     for (const due of dueForRerate(dir, today2, now)) {
       if (queued.length >= RERATE_MAX) break;
@@ -41098,7 +41424,7 @@ function rerateWeekly(dir, today2, now = /* @__PURE__ */ new Date()) {
         break;
       }
     }
-    writeWhole(rerateFile(dir), JSON.stringify({ day: today2, symbols: queued, ...full ? { full: true } : {} }, null, 2) + "\n");
+    writeWhole(rerateFile(dir), JSON.stringify({ day: today2, symbols: queued, ...full ? { full: true } : {}, ...Object.keys(tried).length ? { tried } : {} }, null, 2) + "\n");
     return queued;
   });
 }
@@ -41111,7 +41437,7 @@ var reratedToday = (dir, today2) => {
   const r = readRerate(dir);
   return new Map(r?.day === today2 ? r.symbols.map((s) => [s.symbol, s]) : []);
 };
-var lastView = (s) => s.called ? `its latest view: ${s.rating ?? "a call"} on ${s.called}` : "the desk has no view of it yet";
+var lastView = (s) => s.called ? `its latest view: ${s.rating ?? "a call"} on ${s.called}` : s.tried ? `the desk has no view of it yet: the re-rating of ${s.tried} left no call on it, so it may not be one the desk can analyse` : "the desk has no view of it yet";
 function morningList(dir, today2, max, screen = null) {
   const called = new Set(new Journal(path19.join(dir, "journal.md")).load().filter((e) => e.date === today2).map((e) => e.ticker));
   const queue2 = readQueue(dir), running = queue2.find((q) => q.state === "running")?.symbol ?? null;
@@ -41490,7 +41816,7 @@ Rating: ${rating}`;
   }));
   server.registerTool("record_decision", {
     title: "Record the decision",
-    description: "Put the portfolio manager's saved decision in the journal as a pending call, with the window and yardstick it will be scored by (the plan's), so a later change to the settings never re-scores it. It is scored once a scoring runs after that window (/settle, an analysis or a routine): a short first check, not the call's own time horizon. The text is the one saved in the run, so the journal always matches the report. One call per stock and day: a repeat is ignored. Pass the rating the decision states; without one it is read from the text, and a decision with no readable rating is recorded as Needs review.",
+    description: "Put the portfolio manager's saved decision in the journal as a pending call, with the window and yardstick it will be scored by (the plan's), so a later change to the settings never re-scores it. It is scored once a scoring runs after that window (/settle, an analysis or a routine): a short first check, not the call's own time horizon. The text is the one saved in the run, so the journal always matches the report. One call per stock and day: a repeat is ignored. The rating kept is the one the decision's words state: a rating passed that differs from it is refused, and a decision whose words state none is recorded as Needs review.",
     inputSchema: { symbol: symbol2, analysis_date: day2, rating: external_exports.enum(RATINGS).optional() },
     annotations: write
   }, async (a) => act(() => {
@@ -41499,8 +41825,8 @@ Rating: ${rating}`;
     if (!progress(ws().dir, sym2, d)["decision"]) throw new Error(`the portfolio manager's decision is not saved yet for ${sym2} on ${d}`);
     const body = decision.replace(/^## [^\n]*\n/, "");
     const rules = savedPlan(ws().dir, sym2, d)?.window ?? rulesFor(sym2, readSettings(root).scoring);
-    const r = journalOf(root, ws()).storeDecision(sym2, d, body, a.rating ?? void 0, rules);
-    const rating = a.rating ?? parseRating(body);
+    const r = journalOf(root, ws()).storeDecision(sym2, d, body, a.rating ?? void 0, rules, /* @__PURE__ */ new Date());
+    const rating = parseRating(body);
     return r === "stored" ? `Recorded: ${sym2} on ${d}, ${rating}, pending. It will be scored as ${checkWords(sym2, rules)}, kept with the call so a later change to the settings does not change it. It is not the call's own time horizon. ${WHEN_SCORED} Until then it stays pending: for the ${windowWords(rules)} after the call, and after them until a scoring runs.` : `${sym2} on ${d} is already in the journal; nothing changed.`;
   }));
   server.registerTool("list_settlements", {

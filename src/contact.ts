@@ -16,8 +16,14 @@ const RESERVED = /@(?:[^@]*\.)?(?:example\.(?:com|net|org)|example|test|invalid|
 
 /** The address checked and trimmed; throws with plain words when it is not a usable address of the person's own. */
 export function checkEmail(raw: string): string {
-  const email = String(raw ?? '').trim();
+  // An invisible mark pasted with the address (a zero-width space, a byte-order mark, a word joiner) is dropped: no one
+  // means it, and it would stop every request to the SEC.
+  const email = String(raw ?? '').replace(/\p{Cf}/gu, '').trim();
   if (!EMAIL.test(email)) throw new Error(`"${raw}" is not an email address`);
+  // The address travels in every request's header, which carries only plain ASCII letters: one written with any other
+  // letter (an accent, another alphabet) could never reach the SEC, so it is refused now rather than failing every request.
+  const odd = [...email].find((c) => c < '!' || c > '~');
+  if (odd) throw new Error(`"${email}" cannot be sent to the SEC: it has "${odd}", and the SEC can only be sent an address written with the letters a to z, digits and marks such as . _ - + (it goes in the header of every request)`);
   if (RESERVED.test(email)) throw new Error(`${email} is a made-up example address: the SEC needs one that reaches the person`);
   return email;
 }

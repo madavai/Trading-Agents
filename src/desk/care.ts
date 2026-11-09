@@ -10,7 +10,7 @@ import path from 'node:path';
 import { daysBetween } from '../data/dates.js';
 import type { PriceMarket } from '../data/delay.js';
 import { firstMarketDayOfWeek } from '../data/holidays.js';
-import { normalizeSymbol } from '../data/symbols.js';
+import { deskSymbol } from '../data/symbols.js';
 import type { Caps, Trading } from '../settings.js';
 import type { AccountView } from '../robinhood/account.js';
 import { readHoldings } from './holdings.js';
@@ -43,8 +43,8 @@ export const isStale = (v: View | null): boolean => !v || v.days >= RERATE_DAYS;
 /** The two ratings that say to sell (all, or half). */
 export const saysSell = (rating: string): boolean => rating === 'Sell' || rating === 'Underweight';
 
-/** The desk's name for what Robinhood lists: a coin is followed as its dollar pair (BTC is BTC-USD), a stock as itself. */
-export const deskSymbol = (symbol: string, kind: 'stock' | 'crypto'): string => (kind === 'crypto' ? normalizeSymbol(/USD/i.test(symbol) ? symbol : `${symbol}-USD`) : symbol);
+/** The desk's name for what Robinhood lists (data/symbols.ts): a coin as its dollar pair, a share class as Yahoo spells it. */
+export { deskSymbol };
 
 /** The trader's proposed stop: the labelled line "**Stop Loss**: 185.30" of its plan. `level` is the price, or null when
  *  the trader gave none ("not provided") or wrote something that is not one plain price level, which is never guessed at
@@ -168,18 +168,37 @@ export async function stopsAtClose(dir: string, today: string, closeOf: (symbol:
 
 // ---------- Monday's re-rating ----------
 /** What the week's re-rating put on the waiting list, so it does so once a week and the brief can say why each is there;
- *  `full` when the waiting list refused one, so the brief can say that, and only then, was the reason. */
-export interface Rerate { day: string; symbols: Array<{ symbol: string; called: string | null; rating: string | null }>; full?: true }
+ *  `full` when the waiting list refused one, so the brief can say that, and only then, was the reason. Each holding an
+ *  earlier re-rating put on the list that has had no call since is kept in `tried`, with the day it was first put there:
+ *  its analysis left no call (it failed, or the desk cannot analyse it), and `tried` on a symbol says so to the brief. */
+export interface Rerate { day: string; symbols: Array<{ symbol: string; called: string | null; rating: string | null; tried?: string }>; full?: true; tried?: Record<string, string> }
 
 const rerateFile = (dir: string) => path.join(dir, 'rerate.json');
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 export function readRerate(dir: string): Rerate | null {
   try {
     const v = JSON.parse(fs.readFileSync(rerateFile(dir), 'utf8')) as Rerate;
     if (typeof v.day !== 'string' || !Array.isArray(v.symbols)) return null;
     const dayOrNull = (x: unknown) => x === null || typeof x === 'string';
-    return { day: v.day, symbols: v.symbols.filter((s) => typeof s?.symbol === 'string' && dayOrNull(s.called) && dayOrNull(s.rating)), ...(v.full === true ? { full: true as const } : {}) };
+    const tried = Object.fromEntries(Object.entries(v.tried && typeof v.tried === 'object' ? v.tried : {}).filter(([, d]) => typeof d === 'string' && DAY.test(d)));
+    return { day: v.day, symbols: v.symbols.filter((s) => typeof s?.symbol === 'string' && dayOrNull(s.called) && dayOrNull(s.rating)).map((s) => ({ symbol: s.symbol, called: s.called, rating: s.rating, ...(typeof s.tried === 'string' && DAY.test(s.tried) ? { tried: s.tried } : {}) })),
+      ...(v.full === true ? { full: true as const } : {}), ...(Object.keys(tried).length ? { tried } : {}) };
   } catch { return null; }
+}
+
+/** The holdings an earlier re-rating put on the waiting list with no call on them since, each with the day it first did:
+ *  their analysis left no call. A call recorded on one since takes it off. */
+function leftNoCall(kept: Rerate | null, calls: ReadonlyArray<{ ticker: string; date: string }>, today: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!kept) return out;
+  const add = (symbol: string, day: string) => {
+    if (day >= today || calls.some((c) => c.ticker === symbol && c.date >= day) || (out[symbol] !== undefined && out[symbol]! <= day)) return;
+    out[symbol] = day;
+  };
+  for (const [symbol, day] of Object.entries(kept.tried ?? {})) add(symbol, day);
+  for (const s of kept.symbols) add(s.symbol, kept.day);
+  return out;
 }
 
 /** The day of the week's re-rating: its first market day, a Monday unless that is a New York market holiday. */
@@ -187,18 +206,19 @@ export const isRerateDay = (day: string): boolean => firstMarketDayOfWeek(day) =
 
 /** The holdings due for a fresh view: those the desk sizes trades to (the Agentic account as the dashboard last read it,
  *  or what the person said they hold), with no view or one a week old or more, not on the waiting list already, the
- *  stalest first. Indices are never analysed. */
+ *  stalest first. A holding an earlier re-rating left with no call (`tried`) comes after those with a real view, so one
+ *  the desk cannot analyse never takes the first place every Monday. Indices are never analysed. */
 export function dueForRerate(dir: string, today: string, now: Date = new Date()): Rerate['symbols'] {
   const held = readHoldings(dir)?.positions ?? [];
   if (!held.length) return [];
-  const calls = new Journal(path.join(dir, 'journal.md')).load();
+  const calls = new Journal(path.join(dir, 'journal.md')).load(), tried = leftNoCall(readRerate(dir), calls, today);
   const busy = new Set(readQueue(dir, now).filter((q) => q.state === 'waiting' || q.state === 'running').map((q) => q.symbol));
   return [...new Set(held.map((p) => p.ticker))]
     .filter((s) => !/[\^=]/.test(s) && !busy.has(s))
-    .map((symbol) => ({ symbol, view: viewOf(calls, symbol, today) }))
+    .map((symbol) => ({ symbol, view: viewOf(calls, symbol, today), tried: tried[symbol] }))
     .filter((x) => isStale(x.view))
-    .sort((a, b) => (a.view?.date ?? '').localeCompare(b.view?.date ?? ''))
-    .map((x) => ({ symbol: x.symbol, called: x.view?.date ?? null, rating: x.view?.rating ?? null }));
+    .sort((a, b) => Number(a.tried !== undefined) - Number(b.tried !== undefined) || (a.view?.date ?? '').localeCompare(b.view?.date ?? '') || (a.tried ?? '').localeCompare(b.tried ?? ''))
+    .map((x) => ({ symbol: x.symbol, called: x.view?.date ?? null, rating: x.view?.rating ?? null, ...(x.tried ? { tried: x.tried } : {}) }));
 }
 
 /** Monday's re-rating, once a week on its first market day (`isRerateDay`): the stalest holdings, at most three, go on the
@@ -210,13 +230,13 @@ export function rerateWeekly(dir: string, today: string, now: Date = new Date())
   return withLock(rerateFile(dir), () => {
     const kept = readRerate(dir);
     if (kept?.day === today) return kept.symbols;
-    const queued: Rerate['symbols'] = [];
+    const tried = leftNoCall(kept, new Journal(path.join(dir, 'journal.md')).load(), today), queued: Rerate['symbols'] = [];
     let full = false;
     for (const due of dueForRerate(dir, today, now)) {
       if (queued.length >= RERATE_MAX) break;
       try { enqueue(dir, due.symbol, now.toISOString(), 'shallow', now); queued.push(due); } catch (e) { if (!(e instanceof QueueRefusal)) throw e; full = true; break; }   // a full list takes no more
     }
-    writeWhole(rerateFile(dir), JSON.stringify({ day: today, symbols: queued, ...(full ? { full: true } : {}) }, null, 2) + '\n');
+    writeWhole(rerateFile(dir), JSON.stringify({ day: today, symbols: queued, ...(full ? { full: true } : {}), ...(Object.keys(tried).length ? { tried } : {}) }, null, 2) + '\n');
     return queued;
   });
 }

@@ -53,7 +53,7 @@ test('each holding shows the desk\'s latest view and its age; another account sh
   // on the waiting list: re-rating, waiting or being analysed now
   const queued = careOf(input({ calls, views: [account('ag', true, [['NVDA', 3], ['AMD', 2]])], queue: [{ symbol: 'AMD', requestedAt: '2026-10-21T08:00:00Z', state: 'waiting' }, { symbol: 'NVDA', requestedAt: '2026-10-21T08:00:00Z', state: 'running' }, { symbol: 'TSLA', requestedAt: '2026-10-21T08:00:00Z', state: 'done' }] }));
   assert.deepEqual(queued.map((c) => c.rerating), ['running', 'waiting']);
-  assert.deepEqual([deskSymbol('ETH', 'crypto'), deskSymbol('BTCUSD', 'crypto'), deskSymbol('BRK.B', 'stock')], ['ETH-USD', 'BTC-USD', 'BRK.B']);
+  assert.deepEqual([deskSymbol('ETH', 'crypto'), deskSymbol('BTCUSD', 'crypto'), deskSymbol('BRK.B', 'stock')], ['ETH-USD', 'BTC-USD', 'BRK-B'], 'a share class as Yahoo spells it');
 });
 
 test('the trader\'s stop is its labelled line, one price level alone; a sum, a percentage or "not provided" is never taken for one', () => {

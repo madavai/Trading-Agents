@@ -127,7 +127,7 @@ export async function lessonsToRecheck(journal: Journal, scoring: Scoring, ticke
       const w = await windowOf(e, scoring);
       shown.push([
         `${tagOf(e)} TO REWRITE: ${whyOf(e)}.`,
-        `ITS SCORE, WHICH STAYS AS IT IS: ${e.ticker} ${e.raw} from ${w.o.entry} to ${w.o.exit} (${windowWords({ days: w.o.holdingDays, unit: w.o.unit })}); its yardstick, ${w.o.benchmark}, ${signedPct(w.o.benchmarkReturn)} over the same days; alpha ${e.alpha}. It is ${checkName({ days: w.o.holdingDays, unit: w.o.unit })}, not the call's own time horizon.`,
+        `ITS SCORE, WHICH STAYS AS IT IS: ${e.ticker} ${e.raw} from ${w.o.entry} to ${w.o.exit} (${windowWords({ days: w.o.holdingDays, unit: w.o.unit })}); ${w.o.own ? `scored on its own return, not against ${w.o.benchmark} (it is its own yardstick or copies the same index), so its alpha is its return: ${e.alpha}` : `its yardstick, ${w.o.benchmark}, ${signedPct(w.o.benchmarkReturn)} over the same days; alpha ${e.alpha}`}. It is ${checkName({ days: w.o.holdingDays, unit: w.o.unit })}, not the call's own time horizon.`,
         `DECISION:\n${e.decision}`,
         `LESSON AS IT STANDS:\n${e.reflection}`,
         ...flagWords(e),

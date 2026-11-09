@@ -91,6 +91,10 @@ import path4 from "node:path";
 var FOREX = /* @__PURE__ */ new Set(["USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD", "CNY", "CNH", "HKD", "SGD", "SEK", "NOK", "DKK", "PLN", "MXN", "ZAR", "TRY", "INR", "KRW", "BRL", "RUB", "THB"]);
 var CRYPTO_BASES = /* @__PURE__ */ new Set(["BTC", "ETH", "SOL", "XRP", "ADA", "DOGE", "LTC", "BCH", "DOT", "AVAX", "LINK"]);
 var CRYPTO_QUOTES = ["USDT", "USDC", "USD"];
+var NOT_COINS = /* @__PURE__ */ new Set([...FOREX, "XAU", "XAG", "XPT", "XPD"]);
+var COIN_PAIR = /^([A-Z0-9]{1,15})-(USDT|USDC|USD)$/;
+var SHARE_CLASS = /^([A-Z]{1,5})\.([A-Z])$/;
+var ONE_LETTER_EXCHANGES = /* @__PURE__ */ new Set(["T", "L", "V", "F"]);
 var ALIASES = {
   XAUUSD: "GC=F",
   XAU: "GC=F",
@@ -102,7 +106,6 @@ var ALIASES = {
   XPDUSD: "PA=F",
   WTICOUSD: "CL=F",
   USOIL: "CL=F",
-  WTI: "CL=F",
   BCOUSD: "BZ=F",
   UKOIL: "BZ=F",
   BRENT: "BZ=F",
@@ -130,7 +133,10 @@ var ALIASES = {
   HK50: "^HSI"
 };
 function cryptoBase(raw) {
-  const compact = raw.trim().toUpperCase().replace(/\+$/, "").replaceAll("-", "");
+  const s = raw.trim().toUpperCase().replace(/\+$/, "");
+  const pair = COIN_PAIR.exec(s);
+  if (pair) return /[A-Z]/.test(pair[1]) && !NOT_COINS.has(pair[1]) ? pair[1] : null;
+  const compact = s.replaceAll("-", "");
   for (const q of CRYPTO_QUOTES) {
     if (compact.endsWith(q)) {
       const base = compact.slice(0, -q.length);
@@ -139,6 +145,10 @@ function cryptoBase(raw) {
   }
   return null;
 }
+var yahooClass = (s) => {
+  const m = SHARE_CLASS.exec(s);
+  return m && !ONE_LETTER_EXCHANGES.has(m[2]) ? `${m[1]}-${m[2]}` : s;
+};
 function normalizeSymbol(raw) {
   const s = raw.trim().toUpperCase().replace(/\+$/, "");
   if (!s) return s;
@@ -150,7 +160,7 @@ function normalizeSymbol(raw) {
   if (hk) return `${String(Number(hk[1])).padStart(4, "0")}.HK`;
   const sh = /^(\d{6})\.SH$/.exec(s);
   if (sh) return `${sh[1]}.SS`;
-  return s;
+  return yahooClass(s);
 }
 function safeSymbol(raw) {
   const s = normalizeSymbol(raw);

@@ -126,7 +126,7 @@
     "Needs review": { group: ratings, term: "Needs review", means: "the decision gave no rating that could be read, so it asks for no order." },
     call: { group: desk, term: "The desk's call", means: "its thirteen agents' rating, from Buy to Sell, on the day they analysed it." },
     depth: { group: desk, term: "Depth", means: "how long the debates in an analysis run: shallow (one round each, quick), medium (three) or deep (five, the slowest and costliest)." },
-    alpha: { group: desk, term: "Alpha", means: "how far the stock beat (+) or trailed (\u2212) its yardstick (SPY as shipped) over a call's first week (5 trading days; a coin, 7 days), not its time horizon. Above zero is good for a Buy or Overweight; below zero for an Underweight or Sell." },
+    alpha: { group: desk, term: "Alpha", means: "how far a stock or coin beat (+) or trailed (\u2212) its yardstick (SPY as shipped) in a call's first week (5 trading days; a coin, 7 days), not its time horizon. Above zero is good for a Buy or Overweight; below zero for an Underweight or Sell." },
     paper: { group: desk, term: "On paper", means: "followed with pretend money only, to see what the desk's calls would have done before any real money is at stake." },
     scorecard: { group: desk, term: "Scorecard", means: "the desk's record, good or bad: its paper money against SPY, the S&P 500 fund, and each rating's average alpha in its calls' first checks." },
     rerating: { group: desk, term: "Re-rating", means: "it is on the waiting list, so the desk analyses it again and its view is fresh. When it runs, Monday's morning routine (Tuesday's after a Monday holiday) re-rates up to three Agentic holdings with no view or one a week old, oldest first." },
@@ -188,25 +188,36 @@
   var tone = (n) => n === null || n === void 0 || !Number.isFinite(n) ? "" : n >= 0 ? "ok" : "danger";
   var ratingTone = (r) => r === "Buy" || r === "Overweight" ? "ok" : r === "Underweight" || r === "Sell" ? "danger" : r === "Hold" ? "" : "warn";
   var ratingMeaning = (r) => isTerm(r) && GLOSSARY[r].group === GLOSSARY.Buy.group ? means(r) : "";
-  var claimOf = (rating) => ratingTone(rating) === "ok" ? "beats" : ratingTone(rating) === "danger" ? "trails" : "";
+  var claimOf = (rating, own = false) => ratingTone(rating) === "ok" ? own ? "rises" : "beats" : ratingTone(rating) === "danger" ? own ? "falls" : "trails" : "";
   var article = (word) => /^[AEIOU]/i.test(word) ? "An" : "A";
   var scoredOver = (c) => `${c.yardstick} over the ${c.window} after the call`;
+  var againstOver = (c) => c.own ? `on its own return over the ${c.window} after the call` : `against ${scoredOver(c)}`;
+  var yardstickWhy = (c) => c.why ? c.own ? ` Scored on its own return: ${c.why}.` : ` Against ${c.yardstick}: ${c.why}.` : "";
+  var scoreWords = (c) => `${c.own ? "its return" : "alpha"} ${c.alpha ?? "\u2014"}`;
   var notHorizon = (c) => `It is ${c.check}, not the call's own time horizon.`;
   function resultOf(c) {
-    const alpha = `alpha ${c.alpha ?? "\u2014"}`, claim = claimOf(c.rating), over = scoredOver(c);
-    const tail = ` ${notHorizon(c)}${c.why ? ` Against ${c.yardstick}: ${c.why}.` : ""}`;
+    const alpha = scoreWords(c), claim = claimOf(c.rating, c.own), over = c.own ? `over the ${c.window} after the call` : scoredOver(c), noun = `the ${c.noun ?? "stock"}`;
+    const tail = ` ${notHorizon(c)}${yardstickWhy(c)}`;
     if (c.worked === null || !claim) {
-      return c.rating === "Hold" ? { tone: "", words: alpha, verdict: "a Hold claims no direction", why: `A Hold claims no direction, so it neither worked nor failed: its ${alpha} only says how the stock did against ${over}.${tail}` } : { tone: "", words: alpha, verdict: "", why: `${means("alpha")}${tail}` };
+      return c.rating === "Hold" ? { tone: "", words: alpha, verdict: "a Hold claims no direction", why: `A Hold claims no direction, so it neither worked nor failed: ${c.own ? `its return only says how ${noun} did ${over}` : `its ${alpha} only says how ${noun} did against ${over}`}.${tail}` } : { tone: "", words: alpha, verdict: "", why: `${c.own ? `Its return over the ${c.window} after the call: it is scored on its own return, not against ${c.yardstick}.` : means("alpha")}${tail}` };
     }
-    const how = `${article(c.rating)} ${c.rating} works when the stock ${claim} ${over}.`;
+    const how = `${article(c.rating)} ${c.rating} works when ${noun} ${claim} ${over}.`;
     return c.worked ? { tone: "ok", words: `worked \xB7 ${alpha}`, verdict: "the call worked", why: `${how} It did (${alpha}): the call worked.${tail}` } : { tone: "danger", words: `did not work \xB7 ${alpha}`, verdict: "the call did not work", why: `${how} It did not (${alpha}): the call did not work.${tail}` };
   }
   function averageOf(rating, s) {
     const shown = Math.round(s.meanAlpha * 1e3) / 10, by = `${Math.abs(shown).toFixed(1)}%`;
-    if (!s.direction) return { tone: "", why: `${article(rating)} ${rating} claims no direction: its average alpha only says how its stocks did against their yardstick in each call's first check.` };
-    if (shown === 0) return { tone: "", why: `On average the stocks rated ${rating} ended level with their yardstick in each call's first check.` };
+    if (!s.direction) return { tone: "", why: `${article(rating)} ${rating} claims no direction: its average alpha only says how what the desk rated ${rating} did against its yardstick in each call's first check.` };
+    if (shown === 0) return { tone: "", why: `On average, what the desk rated ${rating} ended level with its yardstick in each call's first check.` };
     const beat = shown > 0, good = shown > 0 === s.direction > 0;
-    return { tone: good ? "ta-up" : "ta-down", why: `On average the stocks rated ${rating} ${beat ? "beat" : "trailed"} their yardstick by ${by} in each call's first check: on average these calls ${good ? "worked" : "did not work"} so far.` };
+    return { tone: good ? "ta-up" : "ta-down", why: `On average, what the desk rated ${rating} ${beat ? "beat" : "trailed"} its yardstick by ${by} in each call's first check: on average these calls ${good ? "worked" : "did not work"} so far.` };
+  }
+  function ownReturnLine(own, ratings2) {
+    const n = ratings2.reduce((s, r) => s + (own[r]?.count ?? 0), 0), calls = (k) => `${k} ${k === 1 ? "call" : "calls"}`;
+    const parts = ratings2.filter((r) => own[r]).map((r) => {
+      const o = own[r];
+      return `${r}: ${calls(o.count)}, ${o.worked === null ? "no direction claimed" : `${o.worked} of ${o.count} worked`}, average return ${pct(o.meanReturn * 100, 1)}`;
+    });
+    return `Left out of the table: ${calls(n)} on the yardstick itself or a fund that copies the same index, scored on ${n === 1 ? "its" : "their"} own return rather than against it. ${parts.join("; ")}.`;
   }
   var NOTES = {
     coinOnPaper: "Robinhood's agent doorway trades stocks and funds, so a coin never gets an order ticket.",
@@ -221,6 +232,10 @@
     const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
     return m ? `${Number(m[3])} ${MON[Number(m[2]) - 1]} ${m[1]}` : iso;
   };
+  function rangeFor(day, today) {
+    const ago = (Date.parse(`${today}T12:00:00Z`) - Date.parse(`${day}T12:00:00Z`)) / 864e5 + 7;
+    return ago <= 31 ? "1M" : ago <= 92 ? "3M" : ago <= 183 ? "6M" : ago <= 366 ? "1Y" : "5Y";
+  }
   var shortDay = (iso) => {
     const m = /^\d{4}-(\d{2})-(\d{2})/.exec(iso);
     return m ? `${Number(m[2])} ${MON[Number(m[1]) - 1]}` : iso;
@@ -556,10 +571,18 @@
   var retryDepth = (item) => item?.depth;
 
   // src/data/symbols.ts
+  var FOREX = /* @__PURE__ */ new Set(["USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD", "CNY", "CNH", "HKD", "SGD", "SEK", "NOK", "DKK", "PLN", "MXN", "ZAR", "TRY", "INR", "KRW", "BRL", "RUB", "THB"]);
   var CRYPTO_BASES = /* @__PURE__ */ new Set(["BTC", "ETH", "SOL", "XRP", "ADA", "DOGE", "LTC", "BCH", "DOT", "AVAX", "LINK"]);
   var CRYPTO_QUOTES = ["USDT", "USDC", "USD"];
+  var NOT_COINS = /* @__PURE__ */ new Set([...FOREX, "XAU", "XAG", "XPT", "XPD"]);
+  var COIN_PAIR = /^([A-Z0-9]{1,15})-(USDT|USDC|USD)$/;
+  var SHARE_CLASS = /^([A-Z]{1,5})\.([A-Z])$/;
+  var ONE_LETTER_EXCHANGES = /* @__PURE__ */ new Set(["T", "L", "V", "F"]);
   function cryptoBase(raw) {
-    const compact2 = raw.trim().toUpperCase().replace(/\+$/, "").replaceAll("-", "");
+    const s = raw.trim().toUpperCase().replace(/\+$/, "");
+    const pair = COIN_PAIR.exec(s);
+    if (pair) return /[A-Z]/.test(pair[1]) && !NOT_COINS.has(pair[1]) ? pair[1] : null;
+    const compact2 = s.replaceAll("-", "");
     for (const q2 of CRYPTO_QUOTES) {
       if (compact2.endsWith(q2)) {
         const base = compact2.slice(0, -q2.length);
@@ -568,7 +591,15 @@
     }
     return null;
   }
+  var yahooClass = (s) => {
+    const m = SHARE_CLASS.exec(s);
+    return m && !ONE_LETTER_EXCHANGES.has(m[2]) ? `${m[1]}-${m[2]}` : s;
+  };
   var isCrypto = (raw) => cryptoBase(raw) !== null;
+  function deskSymbol(symbol, kind) {
+    const s = symbol.trim().toUpperCase();
+    return kind === "crypto" ? `${cryptoBase(s) ?? s}-USD` : yahooClass(s);
+  }
 
   // src/terminal/ui/main.ts
   var RANGES = ["1M", "3M", "6M", "1Y", "5Y"];
@@ -688,7 +719,7 @@
     const day = moveDayOf(q2.asOf);
     return `<span class="at-chip ${tone(q2.changePct)}" title="${esc(day ? `${means("today")} This move is from ${weekDay(day)}.` : means("today"))}">${moveText(q2)}${day ? ` \xB7 ${chipDay(day)}` : ""}</span>`;
   };
-  var noTicketChip = (paper) => paper ? `<span class="at-chip" title="${esc(`${means("paper")} ${NOTES.coinOnPaper}`)}">on paper only</span>` : `<span class="at-chip" title="${esc(NOTES.noTicket)}">no order ticket</span>`;
+  var noTicketChip = (paper, late = "") => paper ? `<span class="at-chip" title="${esc(`${means("paper")} ${NOTES.coinOnPaper}`)}">on paper only</span>` : `<span class="at-chip" title="${esc(late ? `${NOTES.coinOnPaper} ${daysInWords(late)}` : NOTES.noTicket)}">no order ticket</span>`;
   var robot = (sym) => `<button class="icon-btn" data-act="analyse" data-symbol="${esc(sym)}" title="Ask the desk to analyse ${esc(sym)}" aria-label="Ask the desk to analyse ${esc(sym)}"><svg class="g"><use href="#i-bot"/></svg></button>`;
   var listWords = (xs) => xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
   var priceText = (sym, q2) => {
@@ -1458,14 +1489,14 @@
     }
     renderHero();
   }
-  var notYetWords = (c) => `Not scored yet. It will be scored against ${scoredOver(c)}: ${c.check}, not the call's own time horizon.${c.why ? ` Against ${c.yardstick}: ${c.why}.` : ""} It is scored when a scoring runs after those days (/settle, an analysis or a routine), not by itself.`;
+  var notYetWords = (c) => `Not scored yet. It will be scored ${againstOver(c)}: ${c.check}, not the call's own time horizon.${yardstickWhy(c)} It is scored when a scoring runs after those days (/settle, an analysis or a routine), not by itself.`;
   var resultChip = (c) => {
     if (c.pending) return `<span class="at-chip" title="${esc(notYetWords(c))}">not scored yet</span>`;
     const r = resultOf(c);
     return `<span class="at-chip ${r.tone}" title="${esc(r.why)}">${esc(r.words)}</span>`;
   };
   var readButton = (ticker, date, words = "Read") => `<button class="at-btn at-press" data-act="open-call" data-symbol="${esc(ticker)}" data-date="${esc(date)}"><svg class="g"><use href="#i-file"/></svg><span>${esc(words)}</span></button>`;
-  var decideButton = (c) => c.ticket ? `<button class="at-btn at-press primary" data-act="decide" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}" title="${esc(means("ticket"))}"><span>Decide\u2026</span></button>` : noTicketChip(c.paper);
+  var decideButton = (c) => c.ticket ? `<button class="at-btn at-press primary" data-act="decide" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}" title="${esc(means("ticket"))}"><span>Decide\u2026</span></button>` : noTicketChip(c.paper, c.late);
   function renderCall() {
     const sym = S.symbol, c = latestCall(sym), d = S.desk, el = $("#callCard");
     if (!d || !sym) {
@@ -1535,7 +1566,7 @@
     if (!signedIn()) held = '<p class="at-quiet">Connect Robinhood in Your account to see what you hold of it.</p>';
     else if (!A.snapshot) held = '<p class="at-quiet">Read your accounts (Your account, Refresh from Robinhood) to see what you hold of it.</p>';
     else {
-      const rows = A.snapshot.views.flatMap((v) => v.holdings.filter((h) => h.symbol === sym).map((h) => {
+      const rows = A.snapshot.views.flatMap((v) => v.holdings.filter((h) => deskSymbol(h.symbol, h.kind) === sym).map((h) => {
         const cur = v.portfolio?.currency ?? "USD";
         const c = careFor(v.account.key, h.symbol), marks = c ? careMarks(c) : "";
         return `<div><dt>${esc(v.account.label)} \xB7 ${v.account.agentic ? "Agentic" : "view only"}</dt><dd>${qty(h.quantity)} at ${money(h.averageCost, cur)} average \xB7 now ${money(h.value, cur)}${h.gainPct === null ? "" : ` <span class="at-chip ${tone(h.gainPct)}">${pct(h.gainPct)}</span>`}${marks ? ` ${marks}` : ""}</dd></div>`;
@@ -1543,12 +1574,12 @@
       held = rows.length ? `<dl class="at-facts ruled at-box">${rows.join("")}</dl><p class="at-quiet">Valued at Robinhood's live price, read at ${esc(when(A.snapshot.at))}.</p>` : `<p class="at-quiet">Not held in the accounts you show.</p>`;
     }
     const calls = d.calls.filter((c) => c.ticker === sym);
-    const ways = new Set(calls.map((c) => `${c.check}|${scoredOver(c)}`));
-    const how = calls[0] ? ways.size === 1 ? `<p class="at-quiet">Each result is ${esc(calls[0].check)} against ${esc(scoredOver(calls[0]))}, not the call's own time horizon.${calls[0].why ? ` Against ${esc(calls[0].yardstick)}: ${esc(calls[0].why)}.` : ""}</p>` : `<p class="at-quiet">Each result is a short first check against its yardstick, not the call's own time horizon: point at a result for its window and yardstick.</p>` : "";
+    const ways = new Set(calls.map((c) => `${c.check}|${againstOver(c)}`));
+    const how = calls[0] ? ways.size === 1 ? `<p class="at-quiet">Each result is ${esc(calls[0].check)} ${esc(againstOver(calls[0]))}, not the call's own time horizon.${esc(yardstickWhy(calls[0]))}</p>` : `<p class="at-quiet">Each result is a short first check against its yardstick, not the call's own time horizon: point at a result for its window and yardstick.</p>` : "";
     const list = calls.length ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>Date</th><th>Rating</th><th>Result</th><th></th></tr></thead><tbody>${calls.map((c) => `<tr class="ta-go" data-act="open-call" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}"><td>${esc(dayText(c.date))}</td><td>${ratingChip(c.rating)}</td><td>${resultChip(c)}</td><td><span class="at-quiet">Read</span></td></tr>`).join("")}</tbody></table></div>${how}` : `<p class="at-quiet">The desk has no call on ${esc(sym)} yet.</p>`;
     const latest = calls[0];
     const ag = A.snapshot?.views.find((v) => v.account.agentic);
-    const mine = (ag?.orders?.orders ?? []).filter((o) => (o.symbol ?? "").toUpperCase() === sym);
+    const mine = (ag?.orders?.orders ?? []).filter((o) => deskSymbol(o.symbol ?? "", "stock") === sym);
     const count = ag?.orders?.count ?? 0, shown = ag?.orders?.orders.length ?? 0, rest = count - shown, at = A.snapshot ? when(A.snapshot.at) : "";
     const restWords = rest === 1 ? "the other one is not read here" : `the other ${rest} are not read here`;
     const orders = !A.snapshot ? '<p class="at-quiet">Read your accounts to see your orders on it.</p>' : !ag ? '<p class="at-quiet">Show your Agentic account to see its orders.</p>' : ag.orders === null ? '<p class="at-quiet">The orders could not be read.</p>' : isCrypto(sym) ? `<p class="at-quiet">The dashboard reads the Agentic account's stock and fund orders only, so a coin's orders are not shown here.</p>` : mine.length ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>When</th><th>Order</th><th class="num">Quantity</th><th class="num">Price</th><th>State</th></tr></thead><tbody>${mine.map((x) => `<tr><td>${esc(x.at ? dayText(x.at) : "\u2014")}</td><td>${esc(sideWord(x.side))}${x.type ? ` <small class="at-quiet">${esc(x.type)}</small>` : ""}</td><td class="num">${qty(x.quantity)}</td><td class="num">${money(x.price)}</td><td>${esc(x.state ?? "\u2014")}</td></tr>`).join("")}</tbody></table></div>${rest > 0 ? `<p class="at-quiet">Read from ${shown} of the ${count} orders Robinhood listed at ${esc(at)}: ${restWords}.</p>` : ""}` : !count ? `<p class="at-quiet">Robinhood listed no orders for the Agentic account at ${esc(at)}.</p>` : rest > 0 ? `<p class="at-quiet">No orders on ${esc(sym)} among the ${shown} the dashboard reads of the ${count} orders Robinhood listed for the Agentic account at ${esc(at)}: ${restWords}, so ${rest === 1 ? "it" : "one of them"} may be.</p>` : `<p class="at-quiet">No orders on ${esc(sym)} among the ${count === 1 ? "one order" : `${count} orders`} Robinhood listed for the Agentic account at ${esc(at)}.</p>`;
@@ -1732,10 +1763,10 @@
   function paperChip(ticker, date) {
     const t = tradeOf(ticker, date);
     if (!t) return "";
-    const reason = t.why.replace(/\b\d{4}-\d{2}-\d{2}\b/g, (day) => dayText(day));
+    const reason = daysInWords(t.why);
     if (t.status === "filled" && t.side === "buy") {
       const since = t.sincePct === void 0 ? null : pct(t.sincePct * 100);
-      const why = `${reason}${since ? ` ${t.ticker} has moved ${since} since that close, to the latest close: the stock's move since the paper buy, not the call's result.` : ""}`;
+      const why = `${reason}${since ? ` ${t.ticker} has moved ${since} since that close, to the latest close: its move since the paper buy, not the call's result.` : ""}`;
       return `<span class="at-chip ${tone(t.sincePct ?? null)}" title="${esc(why)}">paper: bought ${esc(String(t.quantity ?? ""))}${since ? ` \xB7 ${esc(t.ticker)} ${since} since` : ""}</span>`;
     }
     if (t.status === "filled") return `<span class="at-chip" title="${esc(reason)}">paper: sold ${esc(String(t.quantity ?? ""))}</span>`;
@@ -1762,8 +1793,10 @@
     let lede;
     if (!d.paper.since) lede = "No calls yet: the paper record starts with the desk's first call on a stock, a fund, Bitcoin or Ether.";
     else if (!b) lede = PAPER.failed ? "The paper record could not be worked out just now: Yahoo Finance did not answer. It tries again in a moment." : "Working out the paper record from the closing prices.";
-    else if (b.missing.length) lede = `The paper record cannot be worked out just now: the closing prices of ${listWords(b.missing)} could not be read from Yahoo Finance, and every order on paper is sized from the whole paper account, so no total is shown rather than one that leaves ${b.missing.length === 1 ? "it" : "them"} out. It tries again in a moment.`;
-    else if (b.series.length < 2 || b.returnPct === null || b.value === null) lede = `Following the desk on paper since ${dayText(b.since ?? d.paper.since)}: nothing has filled yet. A call fills at the first closing price after its day.`;
+    else if (b.missing.length) {
+      const stocks = b.missing.filter((x) => x !== b.benchmark), bench = b.missing.includes(b.benchmark);
+      lede = `The paper record cannot be worked out just now: the closing prices of ${listWords(b.missing)} could not be read from Yahoo Finance.${stocks.length ? ` Every order on paper is sized from the whole paper account, so no total is shown rather than one that leaves ${stocks.length === 1 ? "it" : "them"} out.` : ""}${bench ? ` The paper account is valued on ${b.benchmark}'s trading days and measured against it, so no total is shown rather than one stopped at an earlier day.` : ""} It tries again in a moment.`;
+    } else if (b.series.length < 2 || b.returnPct === null || b.value === null) lede = `Following the desk on paper since ${dayText(b.since ?? d.paper.since)}: nothing has filled yet. A call fills at the first closing price after its day.`;
     else lede = `Following the desk on paper since ${dayText(b.since ?? d.paper.since)}: ${pct(b.returnPct * 100)} (${money(b.value)} from ${money(b.startUsd)}), ${fundWords(b.benchmark)} ${b.benchmarkPct === null ? "unavailable" : pct(b.benchmarkPct * 100)} over the same days.`;
     if (b && PAPER.failed) lede += " The latest try to work it out again failed, so this may be out of date. It tries again in a moment.";
     const paidIn = b && b.dividendsUsd !== null && b.dividendsUsd > 0 ? ` Dividends paid into paper cash so far: ${esc(money(b.dividendsUsd))}.` : "";
@@ -1784,10 +1817,12 @@
     const grid = names.length ? `<div class="ta-score"><span class="head">Rating</span><span class="head">Calls</span><span class="head">Called the direction</span><span class="head">Average ${term("alpha", "alpha")} vs the yardstick</span>${names.map((n) => {
       const s = r.byRating[n], avg = averageOf(n, s);
       return `${ratingChip(n)}<b>${s.count}</b><b>${s.hitRate === null ? "\u2014" : `${Math.round(s.hitRate * 100)}%`}</b><b class="${avg.tone}" title="${esc(avg.why)}">${pctOf(s.meanAlpha)}</b>`;
-    }).join("")}</div>` : '<p class="at-quiet">Nothing has been scored yet. A call is scored once its window has passed and a scoring runs (/settle, an analysis or a routine), not by itself.</p>';
+    }).join("")}</div>` : r.resolved ? "" : '<p class="at-quiet">Nothing has been scored yet. A call is scored once its window has passed and a scoring runs (/settle, an analysis or a routine), not by itself.</p>';
+    const ownNames = [...RATINGS.filter((x) => r.ownReturn[x]), ...Object.keys(r.ownReturn).filter((x) => !RATINGS.includes(x))];
+    const own = ownNames.length ? `<p class="at-quiet">${esc(ownReturnLine(r.ownReturn, ownNames))}</p>` : "";
     const few = r.resolved > 0 && r.resolved < 30 ? " With so few scored calls these figures are noise, not a record." : "";
     const key2 = names.length ? " Green means the calls went the way their rating said in their first check, red that they went against it: a Buy or Overweight works when its stock beats its yardstick, an Underweight or Sell when its stock trails it. A Hold claims no direction, so it stays plain." : "";
-    $("#score").innerHTML = `${grid}<p class="at-honest">${esc(d.record.benchmarkNote)}${esc(key2)}${esc(few)}</p>`;
+    $("#score").innerHTML = `${grid}${own}<p class="at-honest">${esc(d.record.benchmarkNote)}${esc(key2)}${esc(few)}</p>`;
   }
   var ROLE = {
     market: { icon: "i-candle", tone: "accent", who: "Market analyst" },
@@ -1837,7 +1872,7 @@
     const target = labelled(c.decision, "Price Target"), horizon = labelled(c.decision, "Time Horizon");
     const clip = (s, n = 150) => s.length > n ? `${s.slice(0, n - 1).trimEnd()}\u2026` : s;
     const verdict = meta && !meta.pending ? resultOf(meta).verdict : "";
-    const scored = !meta ? "" : meta.pending ? `not yet: ${meta.check} against ${scoredOver(meta)}, not the call's own time horizon, once a scoring runs after them.` : `alpha ${meta.alpha ?? "\u2014"} against ${scoredOver(meta)}${verdict ? `: ${verdict}` : ""}. ${notHorizon(meta)}`;
+    const scored = !meta ? "" : meta.pending ? `not yet: ${meta.check} ${againstOver(meta)}, not the call's own time horizon, once a scoring runs after them.` : `${scoreWords(meta)} ${againstOver(meta)}${verdict ? `: ${verdict}` : ""}. ${notHorizon(meta)}`;
     const facts = [["Price target", target], ["Time horizon", horizon], ["Scored", scored]].filter(([, v]) => v).map(([k, v]) => `<div><dt>${esc(k)}</dt><dd title="${esc(v)}">${esc(k === "Scored" ? v : clip(v))}</dd></div>`).join("");
     const shown = new Set(STAGES.flatMap((s) => s.keys)), extra = Object.keys(c.sections).filter((k) => k !== "decision" && !shown.has(k) && c.sections[k]?.length);
     const stages = STAGES.map((s) => ({ ...s, keys: s.keys.filter((k) => c.sections[k]?.length) })).filter((s) => s.keys.length);
@@ -1869,9 +1904,10 @@
       say2("");
       return;
     }
+    const range = rangeFor(date, S.desk?.today ?? nyDay(/* @__PURE__ */ new Date()));
     let h;
     try {
-      h = S.history && S.history.symbol === symbol && S.history.range === "6M" ? S.history : await api.history(symbol, "6M");
+      h = S.history && S.history.symbol === symbol && S.history.range === range ? S.history : await api.history(symbol, range);
     } catch {
       say2("The price since the call could not be read.");
       return;

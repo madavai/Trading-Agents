@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { openOrders, parseAccounts, parsePortfolio, parsePositions, parseQuotes, QUOTES_PER_CALL, readAccount, sortAccounts, type Account, type AccountIds, type AccountView } from './account.js';
 import { marketDay } from '../data/dates.js';
+import { brokerSymbol, deskSymbol } from '../data/symbols.js';
 import type { Check, Order, TicketContext } from '../desk/ticket.js';
 import { writePrivate } from '../private.js';
 import { capsOf, type Caps } from '../settings.js';
@@ -127,20 +128,22 @@ export class Link {
       const data = async (name: string, args: Record<string, unknown>) => { const x = await r.read(name, args); if (x.failed) throw new Error(`Robinhood could not give ${name.replace(/^get_|_/g, ' ').trim()}`); return x.data; };
       const p = parsePortfolio(await data('get_portfolio', { account_number: ids.accountNumber }));
       this.noteValue(p.total, now);   // every read of the account's value counts towards the weekly loss limit
-      const all = parsePositions(await data('get_equity_positions', { account_number: ids.accountNumber }));
-      const held = all.find((x) => x.symbol === symbol)?.quantity ?? 0;
+      // The desk names a share class as Yahoo does (BRK-B), Robinhood with a dot (BRK.B): its figures are read by its own.
+      const all = parsePositions(await data('get_equity_positions', { account_number: ids.accountNumber })), rh = brokerSymbol(symbol);
+      const same = (s: string) => deskSymbol(s, 'stock') === deskSymbol(symbol, 'stock');
+      const held = all.find((x) => same(x.symbol))?.quantity ?? 0;
       const orders = openOrders(await data('get_equity_orders', { account_number: ids.accountNumber }));
       const ordersToday = orders.all.filter((o) => o.at && marketDay(new Date(o.at)) === marketDay(now)).length;
       // Live prices for the stock, every holding and every open buy without a price of its own, twenty at a time as
       // Robinhood answers them: a holding left unpriced would count nothing towards its sector.
-      const wanted = [...new Set([symbol, ...all.map((x) => x.symbol), ...orders.open.filter((o) => o.side === 'buy' && o.price === null).map((o) => o.symbol)])];
+      const wanted = [...new Set([rh, ...all.map((x) => x.symbol), ...orders.open.filter((o) => o.side === 'buy' && o.price === null).map((o) => o.symbol)])];
       const quotes = new Map<string, number>();
       for (let i = 0; i < wanted.length; i += QUOTES_PER_CALL) for (const [s, v] of parseQuotes(await data('get_equity_quotes', { symbols: wanted.slice(i, i + QUOTES_PER_CALL) }))) quotes.set(s, v);
-      const price = quotes.get(symbol) ?? null;
-      const mine = (side: 'buy' | 'sell') => orders.open.filter((o) => o.symbol === symbol && o.side === side).reduce((n, o) => n + o.quantity, 0);
-      return { symbol, accountValue: p.total, buyingPower: p.buyingPower, held, price, ordersToday, positions: all.map((x) => ({ symbol: x.symbol, quantity: x.quantity, price: quotes.get(x.symbol) ?? null })),
+      const price = quotes.get(rh) ?? null;
+      const mine = (side: 'buy' | 'sell') => orders.open.filter((o) => same(o.symbol) && o.side === side).reduce((n, o) => n + o.quantity, 0);
+      return { symbol, accountValue: p.total, buyingPower: p.buyingPower, held, price, ordersToday, positions: all.map((x) => ({ symbol: deskSymbol(x.symbol, 'stock'), quantity: x.quantity, price: quotes.get(x.symbol) ?? null })),
         open: { buy: mine('buy'), sell: mine('sell') }, unreadOrders: orders.unread,
-        openBuys: orders.open.filter((o) => o.side === 'buy').map((o) => ({ symbol: o.symbol, quantity: o.quantity, price: o.price ?? quotes.get(o.symbol) ?? null })) };
+        openBuys: orders.open.filter((o) => o.side === 'buy').map((o) => ({ symbol: deskSymbol(o.symbol, 'stock'), quantity: o.quantity, price: o.price ?? quotes.get(o.symbol) ?? null })) };
     }
   }
 
@@ -214,10 +217,10 @@ export class Link {
       if (!now.on) throw new Error(`trading switched itself off: ${now.offBecause?.words ?? 'switch it on in Your account first'}`);
       const failed = (await approve(context)).filter((c) => !c.ok);
       if (failed.length) throw new Error(`the order no longer passes on Robinhood's latest figures: ${failed.map((c) => c.words).join('; ')}`);
-      const account = { accountNumber: this.agenticIds().accountNumber, agentic: true };
-      session.placer.ready(account, order, refId);   // what this door would refuse is refused before anything is logged or sent
+      const account = { accountNumber: this.agenticIds().accountNumber, agentic: true }, sent = { ...order, symbol: brokerSymbol(order.symbol) };
+      session.placer.ready(account, sent, refId);   // what this door would refuse is refused before anything is logged or sent
       sending();
-      try { return { placed: await session.placer.place(account, order, refId), context }; }
+      try { return { placed: await session.placer.place(account, sent, refId), context }; }
       catch (e) { throw e instanceof Refused ? e : new AnswerLost(oneLine(masked(e instanceof Error ? e.message : String(e)), 120)); }
     } finally { await session.close().catch(() => undefined); }   // closing the session afterwards never hides the answer
   }
@@ -229,7 +232,7 @@ export class Link {
       const a = await session.reader.read('get_accounts');
       if (a.failed) throw new Error('Robinhood could not list the accounts');
       this.learn(a.data);
-      return await session.reviewer.review({ accountNumber: this.agenticIds().accountNumber, agentic: true }, order);
+      return await session.reviewer.review({ accountNumber: this.agenticIds().accountNumber, agentic: true }, { ...order, symbol: brokerSymbol(order.symbol) });
     } finally { await session.close(); }
   }
 

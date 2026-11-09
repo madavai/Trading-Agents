@@ -5,7 +5,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { configure } from '../src/data/http.js';
 import { companyNews, worldNews } from '../src/data/news.js';
 import { parseAtom, socialPosts, subredditsFor } from '../src/data/social.js';
-import { economicSeries, parseCsv, releaseLag } from '../src/data/macro.js';
+import { economicSeries, parseCsv } from '../src/data/macro.js';
 import { predictionMarkets } from '../src/data/odds.js';
 import { deskServer } from '../src/tools/server.js';
 import { readSettings } from '../src/settings.js';
@@ -174,14 +174,14 @@ test('a source that fails is named unavailable while the other still answers', a
 });
 
 const CPI = 'observation_date,CPIAUCSL\n2026-06-01,320.1\n2026-07-01,320.9\n2026-08-01,321.5\n2026-09-01,.\n';
-test('FRED: missing values left out, monthly series lag their release, a past day never sees later releases', async () => {
+test('FRED: missing values left out, a past day reads the archive as it stood then and never sees later releases', async () => {
   assert.deepEqual(parseCsv(CPI).map((o) => o.date), ['2026-06-01', '2026-07-01', '2026-08-01']);
-  assert.equal(releaseLag(parseCsv(CPI)), 45);
-  assert.equal(releaseLag(parseCsv('DATE,DGS10\n2026-10-06,4.1\n2026-10-07,4.12\n2026-10-08,4.15\n')), 1);
-  configure({ fetch: route([[/fredgraph\.csv\?id=CPIAUCSL/, () => new Response(CPI)]]) });
-  const past = await economicSeries('cpi', '2026-09-10', 365);   // August's figure (dated 08-01) not yet published
-  assert.match(past, /Latest value known by 2026-09-10: 320\.90 \(for July 2026\)/);
-  assert.match(past, /45-day release lag/);
+  // As FRED's archive held CPI on 2026-09-10: August's figure (dated 08-01) not yet published, July's as first given.
+  const then = 'observation_date,CPIAUCSL_20260910\n2026-06-01,320.0\n2026-07-01,320.8\n';
+  configure({ fetch: route([[/alfredgraph\.csv\?id=CPIAUCSL&vintage_date=2026-09-10&/, () => new Response(then)], [/fredgraph\.csv\?id=CPIAUCSL/, () => new Response(CPI)]]) });
+  const past = await economicSeries('cpi', '2026-09-10', 365);
+  assert.match(past, /Latest value known by 2026-09-10: 320\.80 \(for July 2026\)/);
+  assert.match(past, /as FRED's archive of past releases \(ALFRED\) held them on 2026-09-10/);
   const now = await economicSeries('CPI', '2026-10-12', 365);
   assert.match(now, /Latest value known by 2026-10-12: 321\.50 \(for August 2026\)/);
   assert.match(now, /- Year over year: not available \(no value for August 2025 in FRED's data\)\. Do not work one out from other rows\./);
