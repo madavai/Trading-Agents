@@ -42,6 +42,9 @@ const YAHOO_SESSION: Array<[RegExp, (url: string) => Response]> = [
   [/fc\.yahoo\.com/, () => new Response('', { status: 404, headers: { 'set-cookie': 'A3=abc; Domain=.yahoo.com; Path=/; Secure' } })],
   [/getcrumb/, () => new Response('crumb1')],
 ];
+/** The SEC's list of US filers, read, with no such company in it: Yahoo is asked only then (a list that cannot be read is
+ *  the SEC's outage, never "not a filer"). */
+const NOT_AT_THE_SEC: [RegExp, (url: string) => Response] = [/company_tickers\.json/, () => json({})];
 
 beforeEach(() => { process.env.TRADING_AGENTS_TODAY = '2026-10-12'; clearSecCache(); clearYahooSession(); configure({ secEmail: '' }); });
 
@@ -209,7 +212,7 @@ const SUMMARY = { quoteSummary: { result: [{
 
 test('profile and ratios come from Yahoo with its session, each in its own unit; withheld for a past day', async () => {
   const seen: Array<{ url: string; headers: Record<string, string> }> = [];
-  configure({ fetch: route([...YAHOO_SESSION, [/quoteSummary/, () => json(SUMMARY)]], seen) });
+  configure({ fetch: route([NOT_AT_THE_SEC, ...YAHOO_SESSION, [/quoteSummary/, () => json(SUMMARY)]], seen) });
   const t = await companyOverview('acme', '2026-10-12');
   assert.match(t, /Name: Acme Corporation\nSector: Technology\nIndustry: Semiconductors\nMarket Cap: 4,200,000,000,000 USD\nPE Ratio \(TTM\): 52\.3123/);
   assert.match(t, /Dividend Yield: 0\.02%/);
@@ -221,7 +224,7 @@ test('profile and ratios come from Yahoo with its session, each in its own unit;
 });
 
 test('insider trades come newest first; withheld for a past day', async () => {
-  configure({ fetch: route([...YAHOO_SESSION, [/quoteSummary/, () => json(SUMMARY)]]) });
+  configure({ fetch: route([NOT_AT_THE_SEC, ...YAHOO_SESSION, [/quoteSummary/, () => json(SUMMARY)]]) });
   const t = await insiderTransactions('ACME', '2026-10-12');
   assert.match(t, /- 2026-10-01 · JOHN DOE \(Chief Executive Officer\): no description · 75,000 shares · held indirectly\n- 2026-09-10 · JANE ROE \(Director\): Sale at price 180\.00 per share\. · 5,000 shares · value 900,000/);
   assert.match(await insiderTransactions('ACME', '2026-10-01'), /withheld for 2026-10-01/);
@@ -266,7 +269,7 @@ test("a fund the SEC does not list is read from Yahoo: what it holds and what it
 
 test('an expired session key is renewed once', async () => {
   let crumbs = 0;
-  configure({ fetch: route([
+  configure({ fetch: route([NOT_AT_THE_SEC,
     [/fc\.yahoo\.com/, () => new Response('', { status: 404, headers: { 'set-cookie': 'A3=abc; Path=/' } })],
     [/getcrumb/, () => new Response(`crumb${++crumbs}`)],
     [/quoteSummary.*crumb=crumb1/, () => new Response('Unauthorized', { status: 401 })],

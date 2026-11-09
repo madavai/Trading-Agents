@@ -15,8 +15,14 @@ import { latestReport, renderReport } from './nport.js';
 import { latestState } from './market.js';
 import { ASK_FOR_EMAIL } from '../contact.js';
 
-/** The filer's CIK, or null when the SEC does not list it (or its list could not be read). */
-const filer = (sym: string): Promise<string | null> => cikFor(sym).catch(() => null);
+/** The filer's CIK, or null when the SEC's list of filers was read and does not name it. A list that cannot be read is
+ *  the SEC's outage, said as one: never taken for a company that does not file with the SEC, which would send the desk to
+ *  Yahoo Finance or to a "withheld" notice and hide the outage. */
+async function filer(sym: string): Promise<string | null> {
+  try { return await cikFor(sym); } catch (e) {
+    throw new Unavailable(`the SEC's list of US filers could not be read (${reason(e)}), so whether ${sym} files with the SEC is not known`);
+  }
+}
 
 /** The symbol of a company; a crypto asset, an index, a future or a currency pair has no company accounts. */
 function companySymbol(raw: string): string {
@@ -227,10 +233,10 @@ const FUND_SECTORS: Record<string, string> = {
 export async function fundProfile(raw: string, analysis: string, topN = 10): Promise<string> {
   const day = analysisDate(analysis), sym = companySymbol(raw);
   // A US fund reports what it holds to the SEC (form N-PORT), dated by the day it was filed: official, and right for a
-  // past day too. Yahoo, as it stands today, is left for a fund that does not report there (one outside the US).
+  // past day too. Yahoo, as it stands today, is left for a fund the SEC's lists were read and do not name (one outside the
+  // US); a company or trust that files no such report, and an SEC list that cannot be read, are said by latestReport.
   const report = await latestReport(sym, day);
   if (report) return renderReport(sym, day, report, topN);
-  if (await cikFor(sym)) throw new NoData(`${sym} reports to the SEC as a company or a trust, not as a fund that lists its holdings (form N-PORT): for a company, use the company tools; a trust that holds gold or bitcoin holds just that`);
   if (isHistorical(day)) return `The fund profile of ${sym} is withheld for ${day}: Yahoo Finance serves it only as it stands today. Today's holdings and their weights carry the prices of every day since ${day}, and its size and yearly cost may have changed; they would put later knowledge into an analysis of ${day}. Say the profile is unavailable for a past day.`;
   const r = await summary(sym, 'price,quoteType,fundProfile,topHoldings,summaryDetail,defaultKeyStatistics');
   const type = r.quoteType?.quoteType ?? '';

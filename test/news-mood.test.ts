@@ -42,7 +42,7 @@ test('a window the search cannot reach is said to be unavailable, not quiet', as
   configure({ fetch: route([[/finance\/search/, () => json(NEWS)]]) });
   assert.match(await companyNews('NVDA', '2026-09-01', 7, 20), /^Unavailable for 2026-08-25 to 2026-09-01: .*not an absence of news about NVDA/);
   configure({ fetch: route([[/finance\/search/, () => json({ news: [] })]]) });
-  await assert.rejects(companyNews('7203.T', '2026-10-10', 7, 20), /has no articles tagged 7203.T/);
+  await assert.rejects(companyNews('7203.T', '2026-10-10', 7, 20), /returned no articles for 7203\.T \(it carries few articles on listings outside the US\)/);
 });
 
 test('when the search tags no article at all, its matches are kept and said to be untagged', async () => {

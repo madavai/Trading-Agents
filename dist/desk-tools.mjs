@@ -37650,7 +37650,7 @@ function priceFactsText(sym2, day3, s) {
   const windows = WINDOWS.map(([size, words3]) => ({ size: Math.min(size, n2), words: size <= n2 ? words3 : "all on record", full: size }));
   const from = (w) => n2 - w.size;
   const anyVolume = bars.some((b) => b.volume !== null && b.volume > 0);
-  const volumeOf = (i) => anyVolume ? bars[i].volume : null;
+  const volumeOf2 = (i) => anyVolume ? bars[i].volume : null;
   const noVolume = bars.map((b, i) => b.volume === null ? i : -1).filter((i) => i >= 0);
   const volumeNote = !anyVolume ? ["- The source gives no volume for these rows (or none traded): there are no volume facts here, and VWMA has no value."] : noVolume.length ? [`- The source gives no volume for ${plural2(noVolume.length, "session")} (${noVolume.slice(-5).map(d).join("; ")}${noVolume.length > 5 ? ", and earlier ones" : ""}): ${noVolume.length === 1 ? "it is" : "they are"} left out of every volume fact, and VWMA has no value on a window that includes ${noVolume.length === 1 ? "it" : "them"}.`] : [];
   const out = [
@@ -37773,10 +37773,10 @@ function priceFactsText(sym2, day3, s) {
     ["Lowest intraday lows", (i) => bars[i].low, -1, (i) => f22(bars[i].low)],
     ["Biggest daily rises", (i) => change3[i], 1, (i) => `${pct2(i)} (${signed(close[i] - close[i - 1], 2)})`, (i) => (change3[i] ?? 0) > 0],
     ["Biggest daily falls", (i) => change3[i], -1, (i) => `${pct2(i)} (${signed(close[i] - close[i - 1], 2)})`, (i) => (change3[i] ?? 0) < 0],
-    ["Heaviest volume", volumeOf, 1, (i) => `${vol2(volumeOf(i))}${change3[i] === null ? "" : ` (close ${pct2(i)})`}`],
-    ["Heaviest volume on a down close", volumeOf, 1, (i) => `${vol2(volumeOf(i))} (close ${pct2(i)})`, (i) => down(i) === true],
-    ["Heaviest volume on an up close", volumeOf, 1, (i) => `${vol2(volumeOf(i))} (close ${pct2(i)})`, (i) => up(i) === true],
-    ["Lightest volume", volumeOf, -1, (i) => vol2(volumeOf(i))],
+    ["Heaviest volume", volumeOf2, 1, (i) => `${vol2(volumeOf2(i))}${change3[i] === null ? "" : ` (close ${pct2(i)})`}`],
+    ["Heaviest volume on a down close", volumeOf2, 1, (i) => `${vol2(volumeOf2(i))} (close ${pct2(i)})`, (i) => down(i) === true],
+    ["Heaviest volume on an up close", volumeOf2, 1, (i) => `${vol2(volumeOf2(i))} (close ${pct2(i)})`, (i) => up(i) === true],
+    ["Lightest volume", volumeOf2, -1, (i) => vol2(volumeOf2(i))],
     ["Highest RSI", (i) => rsi14[i], 1, (i) => f22(rsi14[i])],
     ["Lowest RSI", (i) => rsi14[i], -1, (i) => f22(rsi14[i])],
     ["Highest MACD", (i) => m2.macd[i], 1, (i) => f22(m2.macd[i])],
@@ -37805,7 +37805,7 @@ function priceFactsText(sym2, day3, s) {
   out.push("", "### The latest row against the past", "");
   out.push(...[
     since("Close", ["highest close", "lowest close"], (i) => close[i], f22),
-    since("Volume", ["heaviest volume", "lightest volume"], volumeOf, vol2),
+    since("Volume", ["heaviest volume", "lightest volume"], volumeOf2, vol2),
     since("Daily move", ["biggest daily rise", "biggest daily fall"], (i) => change3[i], (x) => `${signed(x, 2)}%`, true),
     since("RSI", ["highest RSI", "lowest RSI"], (i) => rsi14[i], f22),
     since("MACD", ["highest MACD", "lowest MACD"], (i) => m2.macd[i], f22),
@@ -38017,7 +38017,8 @@ async function search(q, count) {
   for (const host of HOSTS) {
     try {
       const j = await getJson(`${host}/v1/finance/search?${qs}`);
-      return (j.news ?? []).filter((n2) => n2.title && n2.providerPublishTime).map((n2) => ({ title: n2.title, publisher: n2.publisher ?? "unknown", link: n2.link ?? "", time: stamp(n2.providerPublishTime), tickers: (n2.relatedTickers ?? []).map((t) => t.toUpperCase()) }));
+      if (!Array.isArray(j.news)) throw new Unavailable(`${new URL(host).host} answered its news search without a list of articles`);
+      return j.news.filter((n2) => n2.title && n2.providerPublishTime).map((n2) => ({ title: n2.title, publisher: n2.publisher ?? "unknown", link: n2.link ?? "", time: stamp(n2.providerPublishTime), tickers: (n2.relatedTickers ?? []).map((t) => t.toUpperCase()) }));
     } catch (e) {
       last = e;
     }
@@ -38048,7 +38049,10 @@ async function companyNews(raw, analysis2, lookBackDays, limit) {
   const all = await search(sym2, Math.max(limit * 2, 20));
   const untagged = all.length > 0 && all.every((a) => a.tickers.length === 0);
   const found = untagged ? all : all.filter((a) => a.tickers.includes(sym2));
-  if (!found.length) throw new Unavailable(`Yahoo Finance's search has no articles tagged ${sym2} (it tags few listings outside the US)`);
+  if (!found.length) {
+    const abroad = /\.[A-Z]{1,4}$/.test(sym2) ? " (it carries few articles on listings outside the US)" : "";
+    throw new Unavailable(all.length ? `Yahoo Finance's search returned ${all.length} article${all.length === 1 ? "" : "s"} for ${sym2}, none tagged ${sym2}${abroad}` : `Yahoo Finance's search returned no articles for ${sym2}${abroad}`);
+  }
   const within3 = found.filter((a) => inWindow(a, from, day3)).sort((a, b) => b.time.localeCompare(a.time)), list2 = within3.slice(0, limit);
   if (!list2.length) return gap(found, from, day3, `news about ${sym2}`);
   const how = untagged ? `matched by Yahoo's search for "${sym2}", not tagged: check each is about this company` : `tagged ${sym2}`;
@@ -38071,7 +38075,7 @@ async function worldNews(analysis2, lookBackDays, limit, queries) {
   }
   const within3 = all.filter((a) => inWindow(a, from, day3)).sort((a, b) => b.time.localeCompare(a.time)), list2 = within3.slice(0, limit);
   const note = failed ? `
-(${failed} of ${queries.length} searches could not be run: Yahoo Finance did not answer them.)` : "";
+(${failed} of ${queries.length} searches could not be run: Yahoo Finance did not answer them, or answered without a list of articles.)` : "";
   if (!list2.length) return gap(all, from, day3, "world and economic news") + note;
   const short2 = queries.flatMap((q, i) => {
     const r = results[i], oldest = r.status === "fulfilled" ? r.value.map((a) => a.time).sort()[0] : void 0;
@@ -38091,8 +38095,14 @@ var oldestOf = (posts) => posts.map((p) => p.time).sort()[0];
 async function stocktwits(raw, from, to, limit) {
   const base = cryptoBase(raw), sym2 = base ? `${base}.X` : normalizeSymbol(raw);
   const j = await getJson(`https://api.stocktwits.com/api/2/streams/symbol/${encodeURIComponent(sym2)}.json`);
-  const all = (j.messages ?? []).filter((m2) => m2.body && m2.created_at).map((m2) => ({ time: m2.created_at.slice(0, 16).replace("T", " "), text: clip(m2.body.replace(/\s+/g, " ").trim(), 280), tag: m2.entities?.sentiment?.basic ?? void 0 }));
-  return { posts: all.filter((p) => within2(p.time, from, to)).slice(0, limit), oldest: oldestOf(all), full: (j.messages ?? []).length >= 30 };
+  if (!Array.isArray(j.messages)) {
+    const said = j.errors?.map((e) => e.message).filter(Boolean).join("; ");
+    throw new Unavailable(`api.stocktwits.com answered without its list of messages${said ? `, saying "${clip(said, 140)}"` : ""}`);
+  }
+  if (!j.messages.length) throw new Unavailable(`the stream for ${sym2} came back with no messages at all, though it serves its latest messages however old they are: an empty stream is a fault, or a symbol no one has posted about`);
+  const all = j.messages.filter((m2) => m2.body && m2.created_at).map((m2) => ({ time: m2.created_at.slice(0, 16).replace("T", " "), text: clip(m2.body.replace(/\s+/g, " ").trim(), 280), tag: m2.entities?.sentiment?.basic ?? void 0 }));
+  if (!all.length) throw new Unavailable(`none of the ${j.messages.length} messages in the stream for ${sym2} came with a text and a time`);
+  return { posts: all.filter((p) => within2(p.time, from, to)).slice(0, limit), oldest: oldestOf(all), full: j.messages.length >= 30 };
 }
 function parseAtom(xml) {
   return xml.split(/<entry[\s>]/).slice(1).map((chunk) => {
@@ -38104,7 +38114,12 @@ function parseAtom(xml) {
 async function reddit(raw, from, to, subs) {
   const base = cryptoBase(raw), q = base ?? normalizeSymbol(raw).replace(/\..*$/, "");
   const url2 = `https://www.reddit.com/r/${subs.map(encodeURIComponent).join("+")}/search.rss?q=${encodeURIComponent(q)}&restrict_sr=on&sort=new&t=week&limit=100`;
-  const all = parseAtom(await getText(url2, { headers: { Accept: "application/atom+xml" } }));
+  const body = await getText(url2, { headers: { Accept: "application/atom+xml" } });
+  if (!/<feed[\s>]/.test(body)) {
+    const title = plain(/<title[^>]*>([\s\S]*?)<\/title>/i.exec(body)?.[1] ?? "");
+    throw new Unavailable(`www.reddit.com answered with something that is not its feed of posts${title ? ` (a page titled "${clip(title, 80)}")` : ""}`);
+  }
+  const all = parseAtom(body);
   return { posts: all.filter((p) => within2(p.time, from, to)), oldest: oldestOf(all), full: all.length >= 100 };
 }
 var short = (s, from, to, what) => s.full && !reaches(s.oldest, from) ? ` ${what} serves only its latest posts, and the oldest it returned is from ${s.oldest} UTC: the rest of the window asked for (${from} to ${to}, New York days) was not reached, so these show the mood of those hours and say nothing about earlier in the window.` : "";
@@ -38211,7 +38226,9 @@ async function economicSeries(indicator, analysis2, lookBackDays = 365) {
   const points = /\((percent|percentage points)\)/.test(known?.[1] ?? "");
   const changeOf = (from2) => {
     const d = last.value - from2.value;
-    return points ? `${plusMinus(d)} percentage points` : `${plusMinus(d)} (${signed(from2.value ? d / Math.abs(from2.value) * 100 : 0, 1)}%)`;
+    if (points) return `${plusMinus(d)} percentage points`;
+    if (!known) return `${plusMinus(d)} in the series' own units (no percentage change: the desk does not know this series' units)`;
+    return from2.value ? `${plusMinus(d)} (${signed(d / Math.abs(from2.value) * 100, 1)}%)` : `${plusMinus(d)} (no percentage change from zero)`;
   };
   const lines = [
     `## ${known?.[1] ?? id} - FRED series ${id}`,
@@ -38239,20 +38256,43 @@ var list = (s) => {
     return [];
   }
 };
+function eventsOf(j) {
+  if (Array.isArray(j.events)) return j.events;
+  if (j.error === void 0 && typeof j.pagination === "object" && j.pagination !== null) return [];
+  throw new Unavailable(`gamma-api.polymarket.com answered without its search results${typeof j.error === "string" && j.error ? `, saying "${j.error.slice(0, 140)}"` : ""}`);
+}
+function firstPrice(outcomePrices) {
+  const s = list(outcomePrices)[0]?.trim();
+  const p = s ? Number(s) : NaN;
+  return Number.isFinite(p) && p >= 0 && p <= 1 ? p : null;
+}
+var volumeOf = (m2) => {
+  const v = typeof m2.volumeNum === "number" ? m2.volumeNum : m2.volume?.trim() ? Number(m2.volume) : NaN;
+  return Number.isFinite(v) ? v : null;
+};
 async function predictionMarkets(topic, analysis2, limit = 6, now = /* @__PURE__ */ new Date()) {
   const day3 = analysisDate(analysis2);
   if (isHistorical(day3)) return `Prediction-market odds are withheld for ${day3}: Polymarket serves only today's odds on open markets, and those would put later knowledge into an analysis of ${day3}.`;
   const j = await getJson(`https://gamma-api.polymarket.com/public-search?q=${encodeURIComponent(topic)}&limit_per_type=20`);
-  const open3 = (j.events ?? []).flatMap((e) => e.markets ?? []).filter((m2) => m2.question && !m2.closed && m2.active !== false && list(m2.outcomePrices).length && list(m2.outcomes).length && (!m2.endDate || Date.parse(m2.endDate) > now.getTime())).sort((a, b) => (b.volumeNum ?? 0) - (a.volumeNum ?? 0)).slice(0, Math.max(1, Math.min(10, limit)));
+  const open3 = eventsOf(j).flatMap((e) => e.markets ?? []).filter((m2) => m2.question && !m2.closed && m2.active !== false && list(m2.outcomePrices).length && list(m2.outcomes).length && (!m2.endDate || Date.parse(m2.endDate) > now.getTime()));
+  const traded = open3.filter((m2) => (volumeOf(m2) ?? 0) > 0), shown2 = traded.filter((m2) => firstPrice(m2.outcomePrices) !== null).sort((a, b) => volumeOf(b) - volumeOf(a)).slice(0, Math.max(1, Math.min(10, limit)));
+  const idle = open3.length - traded.length, blank = traded.length - traded.filter((m2) => firstPrice(m2.outcomePrices) !== null).length;
+  const left = [idle ? `${idle} with no traded volume (Polymarket gives none, or $0), so ${idle === 1 ? "its price is" : "their prices are"} not yet a crowd's` : "", blank ? `${blank} with no price given` : ""].filter(Boolean);
+  const note = left.length ? `
+Left out of the ${open3.length} open market${open3.length === 1 ? "" : "s"} that matched: ${left.join("; ")}.` : "";
   const head2 = `## Polymarket: "${topic}"
 Live odds: the crowd's priced chance of each event (more traded volume, more reliable). A price is not a forecast to take as certain. The date after each market is when it stops trading, not the date of the event it asks about: take an event's own date from the news or a filing.
 `;
   if (!open3.length) return `${head2}
 No open markets matched "${topic}". Polymarket covers mostly economic, political, geopolitical and crypto events; a single company may have none.`;
-  return head2 + "\n" + open3.map((m2) => {
-    const p = Number(list(m2.outcomePrices)[0]), wk = m2.oneWeekPriceChange;
-    return `- ${m2.question}: ${list(m2.outcomes)[0]} ${(p * 100).toFixed(0)}% \xB7 volume $${Math.round(m2.volumeNum ?? 0).toLocaleString("en-US")}${m2.endDate ? ` \xB7 trading closes ${m2.endDate.slice(0, 10)}` : ""}${typeof wk === "number" ? ` \xB7 ${signed(wk * 100, 1)} points this week` : ""}`;
-  }).join("\n");
+  if (!shown2.length) return `${head2}
+No open market that matched "${topic}" has a traded price to show.${note}`;
+  const chance = (p) => p > 0 && p < 5e-3 ? "under 1%" : p < 1 && p >= 0.995 ? "over 99%" : `${(p * 100).toFixed(0)}%`;
+  const dollars = (v) => v < 1 ? "under $1" : `$${Math.round(v).toLocaleString("en-US")}`;
+  return head2 + "\n" + shown2.map((m2) => {
+    const p = firstPrice(m2.outcomePrices), wk = m2.oneWeekPriceChange;
+    return `- ${m2.question}: ${list(m2.outcomes)[0]} ${chance(p)} \xB7 volume ${dollars(volumeOf(m2))}${m2.endDate ? ` \xB7 trading closes ${m2.endDate.slice(0, 10)}` : ""}${typeof wk === "number" ? ` \xB7 ${signed(wk * 100, 1)} points this week` : ""}`;
+  }).join("\n") + note;
 }
 
 // src/data/sec.ts
@@ -38632,35 +38672,47 @@ async function secInsiders(symbol4, cik, asOf, days = 90, limit = 25) {
     return `${head2}: none. No director, officer or large owner reported a trade in these ${days} days. That is a fact from the SEC${listRead}, not a gap in the data.`;
   }
   const read2 = picked.slice(0, limit), filings2 = [];
-  let failed = 0;
+  let failed = 0, why = "";
   for (const p of read2) {
     const acc = r.accessionNumber?.[p.i] ?? "", doc = (r.primaryDocument?.[p.i] ?? "").replace(/^xsl[^/]*\//, "");
-    if (!/^[\d-]+$/.test(acc) || !/^[\w.-]+\.xml$/i.test(doc)) {
-      failed++;
-      continue;
-    }
     try {
-      filings2.push(parseFiling(await getText(`https://www.sec.gov/Archives/edgar/data/${Number(cik)}/${acc.replaceAll("-", "")}/${doc}`), p.form, p.filed));
-    } catch {
+      if (!/^[\d-]+$/.test(acc) || !/^[\w.-]+\.xml$/i.test(doc)) throw new NoData("its address in the SEC's list is not one the desk can read");
+      const xml = await getText(`https://www.sec.gov/Archives/edgar/data/${Number(cik)}/${acc.replaceAll("-", "")}/${doc}`);
+      if (!/<ownershipDocument[\s>]/.test(xml)) throw new Unavailable("www.sec.gov answered with something that is not a Form 4");
+      filings2.push(parseFiling(xml, p.form, p.filed));
+    } catch (e) {
       failed++;
+      why ||= e.message;
     }
   }
+  const span2 = `made public from ${addDays(from, 1)} to ${asOf}`;
+  if (!filings2.length) throw new Unavailable(`the SEC lists ${read2.length === 1 ? "one Form 4 filing" : `${read2.length} Form 4 filings`} of ${symbol4}'s insiders ${span2}, but none of them could be read (${why}), so their trades are not known`);
   const { trades: all, replaced } = amended(filings2), trades = all.filter((t) => t.filed > from);
   const market = (code) => trades.filter((t) => t.code === code);
   const total = (list2) => {
-    const shares2 = list2.reduce((a, t) => a + t.shares, 0), value = list2.reduce((a, t) => a + t.shares * (t.price ?? 0), 0), planned = list2.filter((t) => t.plan).length;
-    return list2.length ? `${list2.length} (${fmt(shares2)} shares, about ${fmt(value)} USD at their own prices${planned ? `; ${planned} under a pre-arranged 10b5-1 plan` : ""})` : "none";
+    if (!list2.length) return "none";
+    const shares2 = list2.reduce((a, t) => a + t.shares, 0), priced = list2.filter((t) => t.price !== null), planned = list2.filter((t) => t.plan).length;
+    const value = priced.reduce((a, t) => a + t.shares * t.price, 0), bare = list2.length - priced.length;
+    const usd = !priced.length ? `${list2.length === 1 ? "its filing gives" : "their filings give"} no price, so no sum in USD` : `about ${fmt(value)} USD at their own prices${bare ? `; ${bare === 1 ? "one gives" : `${bare} give`} no price and ${bare === 1 ? "is" : "are"} not in that sum` : ""}`;
+    return `${list2.length} (${fmt(shares2)} shares, ${usd}${planned ? `; ${planned} under a pre-arranged 10b5-1 plan` : ""})`;
   };
   const buys = market("P"), sales = market("S"), other = trades.length - buys.length - sales.length;
   const when = (t) => !t.corrected ? `made public ${t.filed}` : `made public ${t.filed}${t.filed > from ? "" : ", before these days"}; corrected ${t.corrected} by an amended filing, a Form 4/A${t.filed > from ? "" : ", so not counted above"}`;
   const lines = all.map((t) => `- ${t.date} (${when(t)}) \xB7 ${t.owner} (${t.role}): ${CODES[t.code] ?? `transaction ${t.code} of`} ${fmt(t.shares, 4)} shares${t.price ? ` at ${fmt(t.price, 4)}` : ", no price"}${t.after !== null ? ` \xB7 holds ${fmt(t.after, 4)} after` : ""}${t.indirect ? ` \xB7 indirectly (${t.indirect})` : ""}${t.plan ? " \xB7 under a 10b5-1 plan" : ""}`);
+  const skipped = picked.length - read2.length;
+  const missing = [
+    failed ? `${failed} of the filings could not be read (${why})` : "",
+    skipped ? `only the newest ${read2.length} were asked for, made public from ${read2.at(-1).filed}, so ${skipped === 1 ? "the one older filing is" : `the ${skipped} older ones are`} not in them` : "",
+    partial2 ? `the SEC's recent list starts on ${oldest}` : ""
+  ].filter(Boolean);
+  const scope = missing.length ? `Counted from only the ${filings2.length} of the ${picked.length} filings ${span2} that were read (${missing.join("; ")}). These counts are not the whole ${days} days: a "none" below is not a fact about the insiders` : `In these ${days} days`;
   return [
-    `${head2} (${read2.length} of ${picked.length} filings read, newest first${failed ? `; ${failed} could not be read` : ""}${replaced ? `; ${replaced === 1 ? "one is an amended filing, a Form 4/A, shown in place of the filing it corrects" : `${replaced} are amended filings, Form 4/A, each shown in place of the filing it corrects`}` : ""}). Each trade is dated by the day it happened and the day its filing made it public; only filings public by ${asOf} are shown${listRead}.${gap2}`,
+    `${head2} (${filings2.length} of ${picked.length} filings read, newest first${failed ? `; ${failed} could not be read` : ""}${skipped ? `; the ${skipped} oldest not asked for` : ""}${replaced ? `; ${replaced === 1 ? "one is an amended filing, a Form 4/A, shown in place of the filing it corrects" : `${replaced} are amended filings, Form 4/A, each shown in place of the filing it corrects`}` : ""}). Each trade is dated by the day it happened and the day its filing made it public; only filings public by ${asOf} are shown${listRead}.${gap2}`,
     "",
-    `In these ${days} days: bought (code P) ${total(buys)}; sold (code S) ${total(sales)}; other kinds (awards, option exercises, shares handed back for tax, gifts) ${other}.`,
+    `${scope}: bought (code P) ${total(buys)}; sold (code S) ${total(sales)}; other kinds (awards, option exercises, shares handed back for tax, gifts) ${other}.`,
     "P and S are purchases and sales on the market or in a private deal: a purchase is the insider spending their own money. A sale under a 10b5-1 plan was arranged months ahead. Awards, exercises, tax handbacks and gifts say little about what an insider thinks of the price.",
     "",
-    ...lines.length ? lines : ["(these filings list no trades in shares, only options or holdings)"]
+    ...lines.length ? lines : [missing.length ? `(the ${filings2.length === 1 ? "one filing" : `${filings2.length} filings`} read ${filings2.length === 1 ? "lists" : "list"} no trades in shares, only options or holdings; the others were not read, so nothing is known of their trades)` : "(these filings list no trades in shares, only options or holdings)"]
   ].join("\n");
 }
 
@@ -38695,22 +38747,34 @@ function parseReport(xml, cls) {
     returns: returns && returns.every((r) => r !== null) ? returns : null
   };
 }
-async function filings(cik, series) {
-  let list2;
-  if (series) {
-    const atom = await getText(`https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${series}&type=NPORT-P&dateb=&owner=include&count=40&output=atom`, { timeoutMs: 3e4 });
-    list2 = blocks(atom, "entry").map((e) => ({ form: text(e, "filing-type"), accession: text(e, "accession-number"), filed: text(e, "filing-date") }));
-  } else {
-    const r = (await submissions(cik)).filings?.recent ?? {};
-    list2 = (r.form ?? []).map((form, i) => ({ form, accession: r.accessionNumber?.[i] ?? "", filed: r.filingDate?.[i] ?? "" }));
+async function fromSec(what, ask) {
+  try {
+    return await ask();
+  } catch (e) {
+    throw new Unavailable(`${what} could not be read (${e.message})`);
   }
-  return list2.filter((f) => f.form === "NPORT-P" && ACCESSION.test(f.accession) && DAY2.test(f.filed)).sort((a, b) => b.filed.localeCompare(a.filed));
+}
+async function filings(sym2, cik, series) {
+  const reports = (list3) => list3.filter((f) => f.form === "NPORT-P" && ACCESSION.test(f.accession) && DAY2.test(f.filed)).sort((a, b) => b.filed.localeCompare(a.filed));
+  if (series) {
+    const atom = await fromSec(`the SEC's list of ${sym2}'s portfolio reports`, () => getText(`https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${series}&type=NPORT-P&dateb=&owner=include&count=40&output=atom`, { timeoutMs: 3e4 }));
+    if (!/<feed[\s>]/.test(atom)) throw new Unavailable(`the SEC answered with something that is not its list of ${sym2}'s portfolio reports`);
+    const found2 = reports(blocks(atom, "entry").map((e) => ({ form: text(e, "filing-type"), accession: text(e, "accession-number"), filed: text(e, "filing-date") })));
+    if (!found2.length) throw new Unavailable(`the SEC lists ${sym2} as a fund, but its list of the fund's portfolio reports (form N-PORT) came back empty`);
+    return found2;
+  }
+  const r = (await fromSec(`the SEC's list of ${sym2}'s filings`, () => submissions(cik))).filings?.recent ?? {};
+  const list2 = (r.form ?? []).map((form, i) => ({ form, accession: r.accessionNumber?.[i] ?? "", filed: r.filingDate?.[i] ?? "" }));
+  if (!list2.length) throw new Unavailable(`the SEC's list of ${sym2}'s filings came back empty`);
+  const found = reports(list2);
+  const seen = list2.length === 1 ? "the one filing in the SEC's list of its recent filings is not one" : `none of the ${list2.length.toLocaleString("en-US")} filings in the SEC's list of its recent filings is one`;
+  if (!found.length) throw new NoData(`${sym2} reports to the SEC as a company or a trust, not as a fund that lists its holdings (form N-PORT): ${seen}. For a company, use the company tools; a trust that holds gold or bitcoin holds just that`);
+  return found;
 }
 async function latestReport(sym2, day3) {
-  const fund = await fundOf(sym2), cik = fund?.cik ?? await cikFor(sym2);
+  const fund = await fromSec("the SEC's list of funds", () => fundOf(sym2)), cik = fund?.cik ?? await fromSec("the SEC's list of US filers", () => cikFor(sym2));
   if (!cik) return null;
-  const all = await filings(cik, fund?.series ?? null);
-  if (!all.length) return null;
+  const all = await filings(sym2, cik, fund?.series ?? null);
   const pick2 = all.find((f) => f.filed <= day3);
   if (!pick2) throw new NoData(`${sym2}'s first portfolio report to the SEC (form N-PORT) was filed on ${all.at(-1).filed}, after ${day3}`);
   const xml = await getText(`https://www.sec.gov/Archives/edgar/data/${Number(cik)}/${pick2.accession.replace(/-/g, "")}/primary_doc.xml`, { timeoutMs: 6e4 });
@@ -38750,8 +38814,9 @@ var ISSUERS = {
 };
 var MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 var regions = null;
+var NO_COUNTRY = "not given";
 var country = (code) => {
-  if (!/^[A-Z]{2}$/.test(code)) return "not given";
+  if (!/^[A-Z]{2}$/.test(code)) return NO_COUNTRY;
   try {
     regions ??= new Intl.DisplayNames(["en"], { type: "region" });
     return regions.of(code) ?? code;
@@ -38782,8 +38847,8 @@ function renderReport(sym2, day3, r, topN = 10) {
   ];
   const where = shares(r.holdings, (h) => country(h.country));
   if (where.length) {
-    const us = where.find(([k]) => k === "United States")?.[1] ?? 0, total = where.reduce((a, [, p]) => a + p, 0);
-    lines.push(`Countries: ${where.slice(0, 5).map(([k, p]) => `${k} ${pct(p)}`).join(", ")}${where.length > 5 ? `, and ${where.length - 5} more` : ""} (outside the US together: ${pct(total - us)})`);
+    const of = (k) => where.find(([c]) => c === k)?.[1] ?? 0, us = of("United States"), none = of(NO_COUNTRY), total = where.reduce((a, [, p]) => a + p, 0);
+    lines.push(`Countries: ${where.slice(0, 5).map(([k, p]) => `${k} ${pct(p)}`).join(", ")}${where.length > 5 ? `, and ${where.length - 5} more` : ""} (outside the US together: ${pct(total - us - none)}${none ? `; no country given for ${pct(none)}` : ""})`);
   }
   const bonds = r.holdings.filter((h) => h.maturity && h.pct > 0);
   const weight = bonds.reduce((a, h) => a + h.pct, 0);
@@ -38814,7 +38879,13 @@ function renderReport(sym2, day3, r, topN = 10) {
 }
 
 // src/data/company.ts
-var filer = (sym2) => cikFor(sym2).catch(() => null);
+async function filer(sym2) {
+  try {
+    return await cikFor(sym2);
+  } catch (e) {
+    throw new Unavailable(`the SEC's list of US filers could not be read (${reason(e)}), so whether ${sym2} files with the SEC is not known`);
+  }
+}
 function companySymbol(raw) {
   const sym2 = normalizeSymbol(raw);
   if (cryptoBase(raw) || /[\^=]/.test(sym2)) throw new NoData(`${sym2} is not a company: a crypto asset, index, future or currency pair has no company accounts`);
@@ -38989,7 +39060,6 @@ async function fundProfile(raw, analysis2, topN = 10) {
   const day3 = analysisDate(analysis2), sym2 = companySymbol(raw);
   const report = await latestReport(sym2, day3);
   if (report) return renderReport(sym2, day3, report, topN);
-  if (await cikFor(sym2)) throw new NoData(`${sym2} reports to the SEC as a company or a trust, not as a fund that lists its holdings (form N-PORT): for a company, use the company tools; a trust that holds gold or bitcoin holds just that`);
   if (isHistorical(day3)) return `The fund profile of ${sym2} is withheld for ${day3}: Yahoo Finance serves it only as it stands today. Today's holdings and their weights carry the prices of every day since ${day3}, and its size and yearly cost may have changed; they would put later knowledge into an analysis of ${day3}. Say the profile is unavailable for a past day.`;
   const r = await summary(sym2, "price,quoteType,fundProfile,topHoldings,summaryDetail,defaultKeyStatistics");
   const type = r.quoteType?.quoteType ?? "";
