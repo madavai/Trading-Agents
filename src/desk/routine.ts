@@ -28,7 +28,7 @@ const reratedToday = (dir: string, today: string): Map<string, Rerate['symbols']
   const r = readRerate(dir);
   return new Map(r?.day === today ? r.symbols.map((s) => [s.symbol, s]) : []);
 };
-const lastView = (s: Rerate['symbols'][number]): string => (s.called ? `its latest view: ${s.rating ?? 'a call'} on ${s.called}` : 'the desk has no view of it yet');
+const lastView = (s: Rerate['symbols'][number]): string => (s.called ? `its latest view: ${s.rating ?? 'a call'} on ${s.called}` : s.tried ? `the desk has no view of it yet: the re-rating of ${s.tried} left no call on it, so it may not be one the desk can analyse` : 'the desk has no view of it yet');
 
 /** What the morning routine analyses, in order: what is waiting on the dashboard first (asked for there, re-rated on a
  *  Monday or put there by the morning switch, each at its depth), then the person's starred watchlist stocks, leaving

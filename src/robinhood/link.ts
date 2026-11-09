@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseAccounts, parseOrders, parsePortfolio, parsePositions, parseQuotes, readAccount, sortAccounts, type Account, type AccountIds, type AccountView } from './account.js';
 import { marketDay } from '../data/dates.js';
+import { brokerSymbol, deskSymbol } from '../data/symbols.js';
 import type { Check, Order, TicketContext } from '../desk/ticket.js';
 import { writePrivate } from '../private.js';
 import { capsOf, type Caps } from '../settings.js';
@@ -119,12 +120,13 @@ export class Link {
       const data = async (name: string, args: Record<string, unknown>) => { const x = await r.read(name, args); if (x.failed) throw new Error(`Robinhood could not give ${name.replace(/^get_|_/g, ' ').trim()}`); return x.data; };
       const p = parsePortfolio(await data('get_portfolio', { account_number: ids.accountNumber }));
       this.noteValue(p.total, now);   // every read of the account's value counts towards the weekly loss limit
-      const all = parsePositions(await data('get_equity_positions', { account_number: ids.accountNumber }));
-      const held = all.find((x) => x.symbol === symbol)?.quantity ?? 0;
-      const quotes = parseQuotes(await data('get_equity_quotes', { symbols: [...new Set([symbol, ...all.map((x) => x.symbol)])] }));
-      const price = quotes.get(symbol) ?? null;
+      // The desk names a share class as Yahoo does (BRK-B), Robinhood with a dot (BRK.B): its figures are read by its own.
+      const all = parsePositions(await data('get_equity_positions', { account_number: ids.accountNumber })), rh = brokerSymbol(symbol);
+      const held = all.find((x) => deskSymbol(x.symbol, 'stock') === deskSymbol(symbol, 'stock'))?.quantity ?? 0;
+      const quotes = parseQuotes(await data('get_equity_quotes', { symbols: [...new Set([rh, ...all.map((x) => x.symbol)])] }));
+      const price = quotes.get(rh) ?? null;
       const ordersToday = parseOrders(await data('get_equity_orders', { account_number: ids.accountNumber })).orders.filter((o) => o.at && marketDay(new Date(o.at)) === marketDay(now)).length;
-      return { symbol, accountValue: p.total, buyingPower: p.buyingPower, held, price, ordersToday, positions: all.map((x) => ({ symbol: x.symbol, quantity: x.quantity, price: quotes.get(x.symbol) ?? null })) };
+      return { symbol, accountValue: p.total, buyingPower: p.buyingPower, held, price, ordersToday, positions: all.map((x) => ({ symbol: deskSymbol(x.symbol, 'stock'), quantity: x.quantity, price: quotes.get(x.symbol) ?? null })) };
     }
   }
 
@@ -193,7 +195,7 @@ export class Link {
       if (!now.on) throw new Error(`trading switched itself off: ${now.offBecause?.words ?? 'switch it on in Your account first'}`);
       const failed = approve(context).filter((c) => !c.ok);
       if (failed.length) throw new Error(`the order no longer passes on Robinhood's latest figures: ${failed.map((c) => c.words).join('; ')}`);
-      const placed = await session.placer.place({ accountNumber: this.agenticIds().accountNumber, agentic: true }, order, refId);
+      const placed = await session.placer.place({ accountNumber: this.agenticIds().accountNumber, agentic: true }, { ...order, symbol: brokerSymbol(order.symbol) }, refId);
       return { placed, context };
     } finally { await session.close(); }
   }
@@ -205,7 +207,7 @@ export class Link {
       const a = await session.reader.read('get_accounts');
       if (a.failed) throw new Error('Robinhood could not list the accounts');
       this.learn(a.data);
-      return await session.reviewer.review({ accountNumber: this.agenticIds().accountNumber, agentic: true }, order);
+      return await session.reviewer.review({ accountNumber: this.agenticIds().accountNumber, agentic: true }, { ...order, symbol: brokerSymbol(order.symbol) });
     } finally { await session.close(); }
   }
 

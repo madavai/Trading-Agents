@@ -136,7 +136,7 @@ export function registerDeskTools(server: McpServer, root: string): void {
 
   server.registerTool('record_decision', {
     title: 'Record the decision',
-    description: 'Put the portfolio manager\'s saved decision in the journal as a pending call, with the window and yardstick it will be scored by (the plan\'s), so a later change to the settings never re-scores it. It is scored once a scoring runs after that window (/settle, an analysis or a routine): a short first check, not the call\'s own time horizon. The text is the one saved in the run, so the journal always matches the report. One call per stock and day: a repeat is ignored. Pass the rating the decision states; without one it is read from the text, and a decision with no readable rating is recorded as Needs review.',
+    description: 'Put the portfolio manager\'s saved decision in the journal as a pending call, with the window and yardstick it will be scored by (the plan\'s), so a later change to the settings never re-scores it. It is scored once a scoring runs after that window (/settle, an analysis or a routine): a short first check, not the call\'s own time horizon. The text is the one saved in the run, so the journal always matches the report. One call per stock and day: a repeat is ignored. The rating kept is the one the decision\'s words state: a rating passed that differs from it is refused, and a decision whose words state none is recorded as Needs review.',
     inputSchema: { symbol, analysis_date: day, rating: z.enum(RATINGS).optional() },
     annotations: write,
   }, async (a) => act(() => {
@@ -146,8 +146,9 @@ export function registerDeskTools(server: McpServer, root: string): void {
     const body = decision.replace(/^## [^\n]*\n/, '');
     // The window and yardstick the plan gave this run; a run planned before the desk kept them gets the settings' now.
     const rules: Rules = (savedPlan(ws().dir, sym, d) as Plan | undefined)?.window ?? rulesFor(sym, readSettings(root).scoring);
-    const r = journalOf(root, ws()).storeDecision(sym, d, body, a.rating ?? undefined, rules);
-    const rating = a.rating ?? parseRating(body);
+    // Recorded now: the paper record follows a call only from when it was made (an analysis dated in the past is not).
+    const r = journalOf(root, ws()).storeDecision(sym, d, body, a.rating ?? undefined, rules, new Date());
+    const rating = parseRating(body);
     return r === 'stored' ? `Recorded: ${sym} on ${d}, ${rating}, pending. It will be scored as ${checkWords(sym, rules)}, kept with the call so a later change to the settings does not change it. It is not the call's own time horizon. ${WHEN_SCORED} Until then it stays pending: for the ${windowWords(rules)} after the call, and after them until a scoring runs.` : `${sym} on ${d} is already in the journal; nothing changed.`;
   }));
 

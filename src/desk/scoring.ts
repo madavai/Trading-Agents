@@ -16,8 +16,13 @@
 // before the journal kept them (no window in its entry) keeps the rules it was made under (`legacyRules`): the settings'
 // count of price rows (trading days for a stock; for a coin, which has a row every day, calendar days) and its yardstick
 // by exchange, as the desk scored it then.
+//
+// A call on the yardstick itself (SPY), or on a fund that copies the same index (VOO, IVV), is not scored against it:
+// its alpha would always be about zero, so no Buy on it could ever work. It is scored on its own return (basis `same`):
+// a Buy or Overweight works when it rose over the window, an Underweight or Sell when it fell.
 // Adapted from TradingAgents (tradingagents/memory/settlement.py), Apache License 2.0; rewritten in TypeScript.
-import { addDays, today } from '../data/dates.js';
+import { addDays, daysBetween, today } from '../data/dates.js';
+import { NoData } from '../data/http.js';
 import { isMarketDay } from '../data/holidays.js';
 import { isCrypto, normalizeSymbol } from '../data/symbols.js';
 import { daily, type Bar } from '../data/yahoo.js';
@@ -28,8 +33,9 @@ export interface Scoring { holdingPeriodDays: number; benchmark: string; benchma
 export type Unit = 'trading' | 'calendar';
 /** Why a call has its yardstick: a US listing (the settings' default), a coin (the settings name none for coins, so the
  *  default), a stock on an exchange the settings do not list (so the default), the index the settings give its exchange,
- *  or the one yardstick the person set for every call. */
-export type Basis = 'us' | 'coin' | 'unlisted' | 'market' | 'chosen';
+ *  or the one yardstick the person set for every call; `same` for the yardstick itself or a fund that copies the same
+ *  index, which is scored on its own return instead (its alpha against the yardstick would always be about zero). */
+export type Basis = 'us' | 'coin' | 'unlisted' | 'market' | 'chosen' | 'same';
 /** A call's window and yardstick, as its journal entry keeps them. */
 export interface Rules { days: number; unit: Unit; yardstick: string; basis: Basis }
 
@@ -37,8 +43,8 @@ export interface Rules { days: number; unit: Unit; yardstick: string; basis: Bas
 export const coinDays = (tradingDays: number): number => Math.max(1, Math.round((tradingDays * 7) / 5));
 
 /** The exchange suffix of a symbol as Yahoo Finance spells it (".MC" for Madrid, ".TWO" for Taipei's OTC market), or null
- *  for a US listing. One letter after a dot is a US share class (BRK.B), except Yahoo's one-letter exchanges (.T Tokyo,
- *  .L London, .V TSX Venture, .F Frankfurt). */
+ *  for a US listing. A US share class typed with a dot (BRK.B) is Yahoo's BRK-B, with no suffix; Yahoo's one-letter
+ *  exchanges keep theirs (.T Tokyo, .L London, .V TSX Venture, .F Frankfurt). */
 export function exchangeOf(ticker: string): string | null {
   const m = /\.([A-Z]{2,3}|[TLVF])$/.exec(normalizeSymbol(ticker));
   return m ? `.${m[1]}` : null;
@@ -46,7 +52,7 @@ export function exchangeOf(ticker: string): string | null {
 
 /** The yardstick a call on `ticker` gets now, and why: the person's one choice when set, else by the exchange suffix
  *  (.T -> Nikkei), else the default (SPY as shipped) - for a US listing, a coin, or an exchange the settings do not list.
- *  A dotted US ticker such as BRK.B takes the default, since no suffix matches. */
+ *  A US share class such as BRK.B (Yahoo's BRK-B) takes the default, since no suffix matches. */
 export function yardstickFor(ticker: string, s: Pick<Scoring, 'benchmark' | 'benchmarks'>): { yardstick: string; basis: Basis } {
   if (s.benchmark.trim()) return { yardstick: normalizeSymbol(s.benchmark), basis: 'chosen' };
   const sym = normalizeSymbol(ticker);
@@ -58,12 +64,28 @@ export function yardstickFor(ticker: string, s: Pick<Scoring, 'benchmark' | 'ben
 /** The index a stock is judged against (`yardstickFor`, without the why). */
 export const resolveBenchmark = (ticker: string, s: Pick<Scoring, 'benchmark' | 'benchmarks'>): string => yardstickFor(ticker, s).yardstick;
 
+/** Funds that copy the same index, so any of them measured against another would show an alpha of about zero: the S&P
+ *  500 funds the dashboard names. */
+const SAME_INDEX: ReadonlyArray<readonly string[]> = [['SPY', 'VOO', 'IVV']];
+/** The funds that copy the same index as `yardstick` (VOO and IVV for SPY, SPY and IVV for VOO). */
+export const copiesOf = (yardstick: string): readonly string[] => (SAME_INDEX.find((g) => g.includes(yardstick)) ?? []).filter((x) => x !== yardstick);
+/** Whether a call on `ticker` would be measured against itself: the yardstick, or a fund that copies the same index. */
+export const isOwnYardstick = (ticker: string, yardstick: string): boolean => {
+  const sym = normalizeSymbol(ticker);
+  return sym === yardstick || copiesOf(yardstick).includes(sym);
+};
+
 /** The window and yardstick a call on `ticker` made now is scored by: the settings' trading days for a stock or fund, the
- *  same span of the calendar for a coin. Kept in the call's journal entry when it is recorded. */
+ *  same span of the calendar for a coin. Kept in the call's journal entry when it is recorded. A call on its yardstick, or
+ *  on a fund that copies the same index, is scored on its own return (`same`). */
 export function rulesFor(ticker: string, s: Scoring): Rules {
-  const coin = isCrypto(ticker);
-  return { days: coin ? coinDays(s.holdingPeriodDays) : s.holdingPeriodDays, unit: coin ? 'calendar' : 'trading', ...yardstickFor(ticker, s) };
+  const coin = isCrypto(ticker), y = yardstickFor(ticker, s);
+  return { days: coin ? coinDays(s.holdingPeriodDays) : s.holdingPeriodDays, unit: coin ? 'calendar' : 'trading', yardstick: y.yardstick, basis: isOwnYardstick(ticker, y.yardstick) ? 'same' : y.basis };
 }
+/** How a US stock or fund is scored now, for the rules in words (what `rulesFor` gives a US listing that is not SPY). */
+export const stockRules = (s: Scoring): Rules => ({ days: s.holdingPeriodDays, unit: 'trading', ...yardstickFor('', s) });
+/** Whether a call is scored on its own return rather than against its yardstick. */
+export const ownReturn = (r: Pick<Rules, 'basis'>): boolean => r.basis === 'same';
 
 /** The rules a call recorded before the journal kept them is scored by, as the desk scored such calls then: the days its
  *  entry gives ("5d", once scored) or else the settings', counted as price rows (a coin has one every day), and its
@@ -91,6 +113,9 @@ export function basisWords(ticker: string, r: Pick<Rules, 'yardstick' | 'basis'>
     case 'unlisted': return `its exchange${ex ? `, ${ex},` : ''} had no index in the desk's settings when the call was made, so it is scored against the one for US listings`;
     case 'market': return `the index the desk's settings give its exchange${ex ? `, ${ex}` : ''}`;
     case 'chosen': return "the one yardstick the desk's settings set for every call";
+    case 'same': return normalizeSymbol(ticker) === r.yardstick
+      ? `${r.yardstick} is the yardstick itself, so against it the alpha would always be zero`
+      : `${normalizeSymbol(ticker)} copies the same index as ${r.yardstick}, so against it the alpha would be about zero whatever happened`;
   }
 }
 /** The yardstick named, and why it is that one: "SPY, the fund that copies the S&P 500", "SPY, the fund that copies the
@@ -101,7 +126,13 @@ export function yardstickWords(ticker: string, r: Pick<Rules, 'yardstick' | 'bas
 }
 /** The whole check in one phrase: "a first-week check against SPY, the fund that copies the S&P 500, over the 5 trading
  *  days after the call". */
-export const checkWords = (ticker: string, r: Rules): string => `${checkName(r)} against ${yardstickWords(ticker, r)}, over the ${windowWords(r)} after the call`;
+export const checkWords = (ticker: string, r: Rules): string => `${checkName(r)} ${againstWords(ticker, r)}, over the ${windowWords(r)} after the call`;
+/** What a call is measured against, in words: "against SPY, the fund that copies the S&P 500", or for a call on its own
+ *  yardstick "on its own return (SPY is the yardstick itself, so against it the alpha would always be zero)". */
+export const againstWords = (ticker: string, r: Pick<Rules, 'yardstick' | 'basis'>): string =>
+  (ownReturn(r) ? `on its own return (${basisWords(ticker, r)})` : `against ${yardstickWords(ticker, r)}`);
+/** For a call scored on its own return: what a rating needs, in words. */
+export const OWN_RETURN_WORDS = 'A Buy or Overweight works when it rose over the window, an Underweight or Sell when it fell; a Hold is shown, not judged.';
 /** For a coin: how its yardstick's closes are taken. Empty for a stock. */
 export const COIN_YARDSTICK_WORDS = "A coin trades every day, so its window is calendar days; its yardstick trades only on New York's market days, so it is taken at its close on the coin's first and last day, or at its last close before that day when New York's market was closed (a weekend or a New York holiday).";
 /** What the score is not, said wherever it is shown or described. */
@@ -114,6 +145,9 @@ export interface Outcome {
   raw: number; alpha: number; benchmarkReturn: number; holdingDays: number; unit: Unit; entry: string; exit: string; benchmark: string;
   /** The yardstick's closes the return is worked out from: the last on or before the entry and the exit. */
   benchFrom: string; benchTo: string;
+  /** Scored on its own return (a call on its yardstick, or a fund that copies the same index): its alpha is its return,
+   *  and the yardstick's return is no part of it (`benchmarkReturn` 0, its dates the window's own). */
+  own?: true;
 }
 
 const rowOn = (bars: Bar[], date: string): Bar | undefined => [...bars].reverse().find((b) => b.date <= date);
@@ -126,16 +160,30 @@ function lastMarketDay(day: string): string {
 }
 
 /** The outcome of a call by its rules, or null when its window has not finished trading. Throws when prices could not be
- *  had, or a price the window needs is missing from the source. */
-export async function measure(ticker: string, tradeDate: string, r: Pick<Rules, 'days' | 'unit' | 'yardstick'>): Promise<Outcome | null> {
-  return r.unit === 'calendar' ? measureCalendar(ticker, tradeDate, r) : measureTrading(ticker, tradeDate, r);
+ *  had, a price the window needs is missing from the source, or the stock stopped trading before its window ended. */
+export async function measure(ticker: string, tradeDate: string, r: Pick<Rules, 'days' | 'unit' | 'yardstick'> & { basis?: Basis }): Promise<Outcome | null> {
+  const o = r.unit === 'calendar' ? await measureCalendar(ticker, tradeDate, r) : await measureTrading(ticker, tradeDate, r);
+  // Scored on its own return: against its yardstick (itself, or a copy of the same index) the alpha would be about zero.
+  return o && r.basis === 'same' ? { ...o, alpha: o.raw, benchmarkReturn: 0, benchFrom: o.entry, benchTo: o.exit, own: true } : o;
 }
+
+/** A stock with no session in this many days before today, short of its window, has stopped trading or is halted. */
+const STOPPED_DAYS = 10;
 
 /** A stock's window: its own sessions, the entry's close to the close `days` sessions later. */
 async function measureTrading(ticker: string, tradeDate: string, r: Pick<Rules, 'days' | 'yardstick'>): Promise<Outcome | null> {
   // days counts trading days: ask for the calendar span they occupy (about 7 for every 5) plus a week of holidays.
-  const end = addDays(tradeDate, Math.round((r.days * 7) / 5) + 7);
-  const stock = (await daily(ticker, tradeDate, end)).bars;
+  let end = addDays(tradeDate, Math.round((r.days * 7) / 5) + 7);
+  let stock = (await daily(ticker, tradeDate, end)).bars;
+  // That span has passed with too few sessions in it (a market shut for a long holiday, a halt): ask up to today.
+  if (stock.length <= r.days && end < today()) {
+    end = today();
+    stock = (await daily(ticker, tradeDate, end)).bars;
+    const last = stock.at(-1)?.date;
+    if (stock.length <= r.days && last && daysBetween(last, today()) > STOPPED_DAYS) {
+      throw new NoData(`Yahoo Finance gives no price for ${normalizeSymbol(ticker)} after ${last}, ${plural(stock.length - 1, 'session')} into its ${plural(r.days, 'trading day')} window: it may have stopped trading or been halted, so this call cannot be scored unless it trades again`);
+    }
+  }
   if (stock.length <= r.days) return null;
   const entry = stock[0]!.date, exit = stock[r.days]!.date;
   // The exit session must be over: today's bar may still move.

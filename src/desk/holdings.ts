@@ -6,7 +6,7 @@
 // Adapted from TradingAgents (tradingagents/portfolio.py), Apache License 2.0; rewritten in TypeScript.
 import fs from 'node:fs';
 import path from 'node:path';
-import { safeSymbol } from '../data/symbols.js';
+import { checkedTicker, deskSymbol, safeSymbol } from '../data/symbols.js';
 import { writeWhole } from './lock.js';
 
 export interface Position { ticker: string; quantity: number; averagePrice?: number }
@@ -43,9 +43,10 @@ export function saveHoldings(dir: string, input: { cash?: number; currency?: str
 
 const finite = (v: number | null | undefined): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
 
-/** Keeps what the dashboard read from Robinhood. The top-level positions and cash are the tradable account's (the one
- *  the desk may trade); every account is kept apart under accounts. A holding whose symbol the desk cannot use is left out
- *  and counted. Returns how many were left out. */
+/** Keeps what the dashboard read from Robinhood, each symbol already named as the desk names it (care.ts deskSymbol) and
+ *  kept as it is: a stock's own ticker is never read as a chart-site name. The top-level positions and cash are the
+ *  tradable account's (the one the desk may trade); every account is kept apart under accounts. A holding whose symbol the
+ *  desk cannot use is left out and counted. Returns how many were left out. */
 export function saveAccountHoldings(dir: string, accounts: HeldAccount[], today: string): { saved: Holdings; leftOut: number } {
   let leftOut = 0;
   const clean = accounts.slice(0, 10).map((a) => ({
@@ -54,7 +55,7 @@ export function saveAccountHoldings(dir: string, accounts: HeldAccount[], today:
     ...(a.currency ? { currency: a.currency } : {}),
     positions: a.positions.flatMap((p) => {
       try {
-        const ticker = safeSymbol(p.ticker), quantity = finite(p.quantity), averagePrice = finite(p.averagePrice);
+        const ticker = checkedTicker(p.ticker), quantity = finite(p.quantity), averagePrice = finite(p.averagePrice);
         if (!quantity) { leftOut++; return []; }
         return [{ ticker, quantity, ...(averagePrice && averagePrice > 0 ? { averagePrice } : {}) }];
       } catch { leftOut++; return []; }
@@ -81,11 +82,13 @@ export function forgetHoldings(dir: string): boolean {
 
 const n = (v: number) => v.toLocaleString('en-US', { maximumSignificantDigits: 4 });
 const m = (v: number) => v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+/** The position in the stock being analysed: a share class saved in either spelling (BRK.B, BRK-B) is the same stock. */
+const holdingOf = (positions: Position[], ticker: string): Position | undefined => positions.find((p) => deskSymbol(p.ticker, 'stock') === deskSymbol(ticker, 'stock'));
 
 /** The holdings block for the agents, led by the stock being analysed. */
 function renderAccounts(h: Holdings, ticker: string): string {
   const lines = (h.accounts ?? []).map((a) => {
-    const held = a.positions.find((p) => p.ticker === ticker), others = a.positions.filter((p) => p !== held), cur = a.currency ? ` ${a.currency}` : '';
+    const held = holdingOf(a.positions, ticker), others = a.positions.filter((p) => p !== held), cur = a.currency ? ` ${a.currency}` : '';
     const parts = [held ? `position in ${ticker}: ${n(held.quantity)} units${held.averagePrice ? `, average price ${m(held.averagePrice)}` : ''}` : `no position in ${ticker}`];
     if (a.cash !== undefined) parts.push(`cash ${m(a.cash)}${cur}`);
     if (a.buyingPower !== undefined) parts.push(`buying power ${m(a.buyingPower)}${cur}`);
@@ -104,7 +107,7 @@ export const BACKTEST_HOLDINGS = 'Portfolio context: not used in a backtest. A b
 export function renderHoldings(h: Holdings | null, ticker: string): string {
   if (h?.accounts?.length) return renderAccounts(h, ticker);
   if (!h) return NO_HOLDINGS;
-  const held = h.positions.find((p) => p.ticker === ticker);
+  const held = holdingOf(h.positions, ticker);
   const lines = [held ? `- Current position in ${ticker}: ${n(held.quantity)} units${held.averagePrice ? `, average price ${m(held.averagePrice)}` : ''}` : `- No current position in ${ticker}`];
   if (h.cash !== undefined) lines.push(`- Cash available: ${m(h.cash)}${h.currency ? ` ${h.currency}` : ''}`);
   const others = h.positions.filter((p) => p !== held);
