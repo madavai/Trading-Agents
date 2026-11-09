@@ -38297,6 +38297,7 @@ var SERIES = {
   germany_10y: ["IRLTLT01DEM156N", "Germany 10-year government bond yield (percent)"],
   eur_usd: ["DEXUSEU", "US dollars per euro"]
 };
+var isCsv = (text4) => /^\s*(observation_date|DATE)\s*,/i.test(text4);
 function parseCsv(csv) {
   return csv.trim().split(/\r?\n/).slice(1).map((line2) => line2.split(",")).filter((c) => c.length >= 2 && c[1] !== "." && c[1] !== "").map(([d, v]) => ({ date: d.trim(), value: Number(v) })).filter((o) => /^\d{4}-\d{2}-\d{2}$/.test(o.date) && Number.isFinite(o.value));
 }
@@ -38325,13 +38326,13 @@ async function economicSeries(indicator, analysis2, lookBackDays = 365) {
   const url2 = past ? `https://alfred.stlouisfed.org/graph/alfredgraph.csv?id=${id}&vintage_date=${day3}&cosd=${from}&coed=${day3}` : `https://fred.stlouisfed.org/graph/fredgraph.csv?id=${id}&cosd=${from}&coed=${day3}`;
   let read2;
   try {
-    read2 = await getTextAt(url2);
+    read2 = await getTextAt(url2, { usable: isCsv });
   } catch (e) {
     if (past && e instanceof NoData) throw new NoData(`FRED's archive of past releases (ALFRED) does not hold ${id} as it stood on ${day3} (${e.message}); today's revised figures are not given for a past day, since they would carry what was published or revised later into it`);
     throw e;
   }
   const { text: csv, at } = read2;
-  if (!/^\s*(observation_date|DATE)\s*,/i.test(csv)) throw new Unavailable(`${past ? "FRED's archive (ALFRED)" : "FRED"} answered with something other than its data download (it may be down for maintenance)`);
+  if (!isCsv(csv)) throw new Unavailable(`${past ? "FRED's archive (ALFRED)" : "FRED"} answered with something other than its data download (it may be down for maintenance)`);
   const all = parseCsv(csv).filter((o) => o.date <= day3), freq = frequency(all);
   const obs = all.filter((o) => o.date >= addDays(day3, -window2));
   if (!obs.length) throw new NoData(`FRED has no ${id} values published by ${day3} in this window`);
