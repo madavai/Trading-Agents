@@ -659,7 +659,7 @@ p { text-wrap: pretty; }
       <article class="src edge c-src">
         <div class="src-h"><span class="icbox"><svg class="ic"><use href="#i-chart"/></svg></span><div><p class="src-name">Yahoo Finance</p><p class="src-kind">Prices and news</p></div></div>
         <p>Daily prices for charts and indicators, and company and world news. It gives its company and fund data only to web browsers, and the desk keeps its own name, so that data is mostly unavailable.</p>
-        <p class="note"><svg class="ic sm"><use href="#i-clock"/></svg><span>Prices can be up to 15 minutes late. It has no official free service: the desk reads the public pages its website uses, for personal use.</span></p>
+        <p class="note"><svg class="ic sm"><use href="#i-clock"/></svg><span>Prices are real-time for US stocks and funds on Nasdaq, the New York Stock Exchange, NYSE Arca, NYSE American and Cboe US, and for coins; any other market's may be late. It has no official free service: the desk reads the public pages its website uses, for personal use.</span></p>
       </article>
       <article class="src edge c-src">
         <div class="src-h"><span class="icbox"><svg class="ic"><use href="#i-chat"/></svg></span><div><p class="src-name">StockTwits</p><p class="src-kind">Traders' posts</p></div></div>
@@ -674,7 +674,7 @@ p { text-wrap: pretty; }
       <article class="src edge c-src">
         <div class="src-h"><span class="icbox"><svg class="ic"><use href="#i-bank"/></svg></span><div><p class="src-name">FRED</p><p class="src-kind">The St. Louis Fed's economic data</p></div></div>
         <p>Interest rates, bond yields, inflation, jobs and growth, for the US and the euro area.</p>
-        <p class="note"><svg class="ic sm"><use href="#i-clock"/></svg><span>For a past date, only figures that were already published by then.</span></p>
+        <p class="note"><svg class="ic sm"><use href="#i-clock"/></svg><span>For a past date, only figures that were already published by then, at today's revised values.</span></p>
       </article>
       <article class="src edge c-src">
         <div class="src-h"><span class="icbox"><svg class="ic"><use href="#i-spark"/></svg></span><div><p class="src-name">Polymarket</p><p class="src-kind">Prediction-market odds</p></div></div>
@@ -699,7 +699,7 @@ p { text-wrap: pretty; }
           <tr><th scope="col">Source</th><th scope="col">Market<small>analyst</small></th><th scope="col">Sentiment<small>analyst</small></th><th scope="col">News<small>analyst</small></th><th scope="col">Fundamentals<small>analyst</small></th><th scope="col">Trader<small>agent</small></th><th scope="col">Dashboard<small>yours</small></th></tr>
         </thead>
         <tbody>
-          <tr><th scope="row">Yahoo Finance</th><td><span class="cell c-src">prices, indicators</span></td><td><span class="cell c-src">headlines</span></td><td><span class="cell c-src">company and world news</span></td><td><span class="cell c-src">a fund outside the US, today only, when given</span></td><td><span class="cell c-src">checked price table</span></td><td><span class="cell c-src">markets, charts, the morning's look</span></td></tr>
+          <tr><th scope="row">Yahoo Finance</th><td><span class="cell c-src">prices, indicators</span></td><td><span class="cell c-src">headlines</span></td><td><span class="cell c-src">company and world news</span></td><td><span class="cell c-src">a company or fund outside the US, today only, when given</span></td><td><span class="cell c-src">checked price table</span></td><td><span class="cell c-src">markets, charts, the morning's look</span></td></tr>
           <tr><th scope="row">StockTwits</th><td><span class="none" aria-label="no"></span></td><td><span class="cell c-src">traders' posts</span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td></tr>
           <tr><th scope="row">Reddit</th><td><span class="none" aria-label="no"></span></td><td><span class="cell c-src">forum posts</span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td></tr>
           <tr><th scope="row">FRED</th><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="cell c-src">economic figures</span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td><td><span class="none" aria-label="no"></span></td></tr>
@@ -739,7 +739,7 @@ p { text-wrap: pretty; }
           </article>
           <article class="agent edge c-desk">
             <div class="agent-h"><span class="icbox"><svg class="ic"><use href="#i-chat"/></svg></span><div><p class="agent-name">Sentiment analyst</p><p class="agent-id">sentiment-analyst</p></div></div>
-            <p class="agent-role">Measures the mood around the stock this week: what the headlines say and how traders feel.</p>
+            <p class="agent-role">Measures the mood around the stock lately, as far back as each source reaches (often only hours): what the headlines say and how traders feel.</p>
             <dl><dt>Reads</dt><dd>News headlines, StockTwits, Reddit</dd><dt>Writes</dt><dd>The sentiment report</dd></dl>
           </article>
           <article class="agent edge c-desk">
@@ -956,7 +956,7 @@ p { text-wrap: pretty; }
       </div>
     </div>
 
-    <div class="at-box aside"><svg class="ic"><use href="#i-clock"/></svg><span><b>The routines run this same line for you.</b> The morning routine scores past calls (on a day New York's market is closed, a weekend or one of its holidays, that is all it does), on a Monday (the Tuesday, when Monday is a market holiday) puts up to three of your holdings whose view is a week old on the waiting list to be re-rated, reads what is worth a look today (and, with your morning switch on, puts its top three on the waiting list), then analyses what is waiting and your starred stocks (at most five), and lists the new calls to decide on. The evening wrap-up scores what is ready and reports the day's calls and orders. Neither places an order.</span></div>
+    <div class="at-box aside"><svg class="ic"><use href="#i-clock"/></svg><span><b>The routines run this same line for you.</b> The morning routine scores past calls (on a day New York's market is closed, a weekend or one of its holidays, that is all it does), on a Monday (the Tuesday, when Monday is a market holiday) puts up to three of your holdings whose view is a week old on the waiting list to be re-rated, reads what is worth a look today (and, with your morning switch on, puts its top three on the waiting list), then analyses what is waiting and your starred stocks (at most five), and lists the new calls to decide on. The evening wrap-up scores what is ready, names any holding whose last close is below its stop (the dashboard warns of one only while its page is open), and reports the day's calls and orders. Neither places an order.</span></div>
   </section>
 
   <!-- 5 -->
@@ -1021,7 +1021,7 @@ p { text-wrap: pretty; }
       <div class="joined leaves">
         <div class="leave edge c-src"><p class="leave-h"><svg class="ic sm"><use href="#i-globe"/></svg>To the free sources</p><p>Only what the desk asks for, such as a stock's prices or news, and what you type in the dashboard's search box.</p></div>
         <div class="leave edge c-src"><p class="leave-h"><svg class="ic sm"><use href="#i-ledger"/></svg>To the SEC</p><p>The same, plus your email, which it asks of every program that reads its filings.</p></div>
-        <div class="leave edge c-desk"><p class="leave-h"><svg class="ic sm"><use href="#i-spark"/></svg>To Claude</p><p>The agents think with Claude, so what they read and write passes through it while they work.</p></div>
+        <div class="leave edge c-desk"><p class="leave-h"><svg class="ic sm"><use href="#i-spark"/></svg>To the model</p><p>The agents think with the model that runs them (Madav's own, or Claude with Claude Code), so what they read and write passes through it while they work.</p></div>
         <div class="leave edge c-rh"><p class="leave-h"><svg class="ic sm"><use href="#i-bank"/></svg>To Robinhood</p><p>The dashboard's reads, its dry-run checks, and the orders you confirm; and the desk check's read-only sign-in test, on your yes.</p></div>
       </div>
     </div>
@@ -1197,18 +1197,18 @@ p { text-wrap: pretty; }
       <div class="feat edge c-you"><span class="icbox"><svg class="ic"><use href="#i-star"/></svg></span><b>Watchlist and analyses</b><p>Grouped by tier, each folding away. The robot asks the desk to analyse a stock or a fund, as deep as you choose; each shows waiting, the step it is on, its rating or why it failed.</p></div>
       <div class="feat edge c-src"><span class="icbox"><svg class="ic"><use href="#i-sun"/></svg></span><b>This morning</b><p>The market weather in three plain lines (trend, mood, rates), and up to five worth a look today, each with its reason. A switch, off as shipped, sends the top three to analysis.</p></div>
       <div class="feat edge c-desk"><span class="icbox"><svg class="ic"><use href="#i-target"/></svg></span><b>Calls and your paper record</b><p>Each call in two lines, and in full with every agent's part; each followed on paper at its ticket's size against the S&amp;P 500, and how it scored.</p></div>
-      <div class="feat edge c-rh"><span class="icbox"><svg class="ic"><use href="#i-bank"/></svg></span><b>Your account and what you hold</b><p>Value, cash, buying power and gain; beside each holding, the desk's view ("Overweight, 3 days ago"). In the Agentic account, its stop is watched and a Sell is marked.</p></div>
+      <div class="feat edge c-rh"><span class="icbox"><svg class="ic"><use href="#i-bank"/></svg></span><b>Your account and what you hold</b><p>Value, cash, buying power and gain; beside each holding, the desk's view ("Overweight, 3 days ago"). In the Agentic account, its stop is watched while the page is open, and a Sell is marked.</p></div>
       <div class="feat edge c-you"><span class="icbox"><svg class="ic"><use href="#i-send"/></svg></span><b>Order tickets</b><p>Decide… from a call, Sell… on a holding the desk says to sell, or Trade… for your own: checked against your caps, reviewed by Robinhood, placed only on your Confirm. Nothing is ever sold by itself.</p></div>
     </div>
     <div class="joined facts">
       <span><svg class="ic sm"><use href="#i-lock"/></svg>On this computer only; a fresh key each start, given only to the browser it opens</span>
-      <span><svg class="ic sm"><use href="#i-clock"/></svg>Market prices up to 15 minutes late</span>
+      <span><svg class="ic sm"><use href="#i-clock"/></svg>Nasdaq, NYSE, Cboe and coin prices real-time · others may be late</span>
       <span><svg class="ic sm"><use href="#i-sun"/></svg>Light and dark · opens where you left it</span>
     </div>
     <div class="at-box month" id="first-month">
       <div class="month-head">
         <span class="icbox c-you"><svg class="ic"><use href="#i-clip"/></svg></span>
-        <div><b>Your first month</b><p>What Get started walks a newcomer through on the dashboard, one step at a time. Each step ticks itself off from the desk's own records, wherever it is done: on the page, or by asking the desk in a chat. It suggests the whole market and a sector or two, never a company: the names are yours.</p></div>
+        <div><b>Your first month</b><p>What Get started walks a newcomer through on the dashboard, one step at a time. Each step ticks itself off from the desk's own records, wherever it is done (on the page, or by asking the desk in a chat), except reading your first calls, which ticks when you open one on the page. It suggests the whole market and a sector or two, never a company: the names are yours.</p></div>
       </div>
       <ol class="joined month-steps">
         <li><span class="when">Day one</span><b>1 · Your email for the SEC</b><p>Once, in the field on the dashboard or in a chat. Kept on this computer, sent to the SEC alone, and never shown back in full.</p></li>

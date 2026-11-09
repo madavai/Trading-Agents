@@ -1,7 +1,8 @@
 // The order ticket: what one of the desk's calls asks of the Agentic account, sized by the person's settings and checked
 // against their caps, before anything is sent to Robinhood. Pure arithmetic on real figures (the account's value, buying
 // power and holdings as Robinhood gave them, Robinhood's live price): when a figure is missing the ticket says so and
-// proposes nothing, it never guesses. Limit orders of whole shares only: Robinhood takes fractions on market orders alone.
+// proposes nothing, it never guesses. The desk's tickets send limit orders of whole shares only (order.ts), its own
+// choice: Robinhood takes some fractional limit orders too, with limits of its own, which the desk does not use.
 // Crypto is sized here for the paper book alone (the dashboard never sends it to Robinhood, whose agent doorway trades
 // stocks and funds only): in fractions to six decimal places, as crypto is bought, and within the crypto limit.
 import type { Action, Caps, Trading } from '../settings.js';
@@ -75,7 +76,7 @@ export function propose(c: TicketContext, t: Trading, caps: Caps): Proposal {
     if (early(c, caps)) return none(`${c.symbol} was bought here on ${c.boughtOn}, ${c.heldDays} trading day(s) ago: your shortest hold is ${caps.minHoldDays}, so the desk proposes no sell yet.`);
     const all = action === 'sell everything held', quantity = coin ? (all ? c.held : downToStep(c.held / 2)) : Math.floor(all ? c.held : c.held / 2);
     if (coin && quantity <= 0) return none(`${units(c.held, true)} of ${c.symbol} are held; half of that is less than the smallest step of 0.000001.`);
-    if (quantity < (coin ? 0 : 1)) return none(`The Agentic account holds ${c.held} share(s); half of that is less than one whole share, and a limit order sells whole shares only.`);
+    if (quantity < (coin ? 0 : 1)) return none(`The Agentic account holds ${c.held} share(s); half of that is less than one whole share, and the desk's tickets sell whole shares only.`);
     why.push(`${all ? 'Everything held' : 'Half of what is held'}: ${quantity} of ${units(c.held, coin)}${coin ? '' : ', whole shares only'}.`);
     return { action, order: { symbol: c.symbol, side: 'sell', quantity, limitPrice, timeInForce: t.orderDefaults.timeInForce }, why };
   }
@@ -98,7 +99,7 @@ export function propose(c: TicketContext, t: Trading, caps: Caps): Proposal {
     return { action, order: { symbol: c.symbol, side: 'buy', quantity, limitPrice, timeInForce: t.orderDefaults.timeInForce }, why };
   }
   const quantity = Math.floor(amount / limitPrice);
-  if (quantity < 1) return none(`${money(amount)} buys less than one share at ${money(limitPrice)}, and a limit order buys whole shares only.`);
+  if (quantity < 1) return none(`${money(amount)} buys less than one share at ${money(limitPrice)}, and the desk's tickets buy whole shares only.`);
   why.push(`${money(amount)} ÷ ${money(limitPrice)}, rounded down: ${quantity} share(s).`);
   return { action, order: { symbol: c.symbol, side: 'buy', quantity, limitPrice, timeInForce: t.orderDefaults.timeInForce }, why };
 }
@@ -111,7 +112,7 @@ export function proposeOwn(c: TicketContext, side: Side, t: Trading): Proposal {
   const none = (reason: string): Proposal => ({ action, order: null, why: [reason] });
   if (c.price === null || c.price <= 0) return none(`Robinhood gave no live price for ${c.symbol}, so no order can be priced.`);
   if (side === 'sell' && c.held <= 0) return none(`The Agentic account holds no ${c.symbol} to sell.`);
-  if (side === 'sell' && c.held < 1) return none(`The Agentic account holds ${c.held} of a share of ${c.symbol}; a limit order sells whole shares only.`);
+  if (side === 'sell' && c.held < 1) return none(`The Agentic account holds ${c.held} of a share of ${c.symbol}; the desk's tickets sell whole shares only.`);
   const limitPrice = cents(c.price);
   const why = [`Your own order: one whole share to start, at Robinhood's live price of ${money(limitPrice)}. Change the shares and the limit price below.`];
   if (side === 'sell') why.push(`The Agentic account holds ${c.held} share(s) of ${c.symbol}.`);

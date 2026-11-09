@@ -62,7 +62,7 @@ export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetc
 
   server.registerTool('desk_check', {
     title: 'Desk check',
-    description: 'Check that this computer is ready for the Trading Agents desk: Node, the desk data folder, whether a Robinhood sign-in is saved, whether the desk\'s agent files in this folder are as the project ships them, whether this conversation\'s steps for the team are the ones in this folder (only from the version those steps give: team_version is required; the trading-desk team passes the one in step 1 of its own "Check this computer" steps, anyone else "none", and then it says they were not compared), and whether each free data source answers (naming the one it does not ask). If its answer starts with TEAM VERSION NEEDED, do what that line says. Pass on its line about this conversation\'s steps and its line about the agent files as written, never one for the other. It sends no order and reads no secret; the contact email is shown masked. All it writes is a test file in desk-data, removed at once.',
+    description: 'Check that this computer is ready for the Trading Agents desk: Node, the desk data folder, whether a Robinhood sign-in is saved, whether the desk\'s agent files in this folder are as the project ships them, whether this conversation\'s steps for the team are the ones in this folder (only from the version those steps give: team_version is required; the trading-desk team passes the one in step 1 of its own "Check this computer" steps, anyone else "none", and then it says they were not compared), and whether each free data source answers (naming the one it does not ask). If its answer starts with TEAM VERSION NEEDED, do what that line says. Pass on its line about this conversation\'s steps and its line about the agent files as written, never one for the other, and open the report as its HOW TO SUM UP line says. It sends no order and reads no secret; the contact email is shown masked. All it writes is a test file in desk-data, removed at once.',
     // Required (8 Nov 2026: in Madav the team twice left out the version its own step 1 names, so a conversation begun
     // before an update could not be told). Left out, nothing is checked and the caller is told what to pass.
     inputSchema: { team_version: z.string({ error: (issue) => (issue.input === undefined ? 'Nothing was checked: team_version is required. The trading-desk team: call desk_check again with the version in step 1 of your own "Check this computer" steps, copied exactly. Anyone else: call it again with "none". Never read a version from a file and never make one up. The value is missing' : undefined) }).max(40).describe('Required. The trading-desk team: the version in step 1 of its own "Check this computer" steps, copied exactly from the instructions this conversation began with. Anyone else (a chat that is not the trading-desk team): "none", and the check says this conversation\'s steps were not compared. Never read it from a file and never make one up') },
@@ -77,15 +77,19 @@ export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetc
   }, async () => {
     // Tools started before an update hold the team's source as it was then: a reset from them would write the old team back.
     if (fresh.updated()) return text("Not reset: the desk in this folder was updated after the desk's tools in this conversation started, so they could write the team back as it was before the update. Nothing was written. Do not call reset_team again here: tell the person in one plain line to start a new conversation in Madav and check this computer there; a reset is needed only if that check still finds a difference.");
-    let wrote: string[];
+    let wrote: string[], writing = false;
     try {
       const shipped = await shippedAgentFiles(source), last = lastReset(root), drift = driftOf(root, shipped);
       // Soon after a reset, with nothing differing on disk, another one cannot add anything: it is refused, and nothing is
       // written (a write would tell Madav once more to pause the desk's routines).
       if (last && Date.now() - last.getTime() < RESET_AGAIN_MS && !drift.changed.length && !drift.missing.length) return text(resetAgainWords(last));
+      writing = true;
       wrote = resetAgentFiles(root, shipped);
     } catch (e) {
-      return text(`The team could not be reset: ${(e as Error).message}. Nothing was changed.`);
+      // Before the first write nothing has changed; a write that fails part-way leaves the files before it already put back.
+      return text(`The team could not be reset: ${(e as Error).message}. ${writing
+        ? 'It stopped part-way, so some of the team\'s files may already be back as the project ships them and others not. Tell the person in one plain line, and that the desk check in a new conversation shows which still differ.'
+        : 'Nothing was changed.'}`);
     }
     try { noteReset(root); } catch { /* the reset is done; only a repeat soon after will not be caught */ }
     const madav = 'Madav goes back to the project\'s version of the team too, in place of changes made in its Agent Studio; the model, permissions and effort chosen there stay as they are. If Madav runs the desk\'s routines, it pauses them until they are switched on again in Madav.';
@@ -182,7 +186,7 @@ export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetc
 
   server.registerTool('get_social_posts', {
     title: 'StockTwits and Reddit posts',
-    description: 'What people posted about the instrument over the week before the analysis date: StockTwits messages with their authors\' Bullish or Bearish tags and counts, and Reddit posts from the investing communities (crypto ones for a crypto pair). Each source that fails is named as unavailable, never as quiet.',
+    description: 'What people posted about the instrument in the week before the analysis date, as far back as each source reaches: StockTwits messages with their authors\' Bullish or Bearish tags and counts (it serves only its latest messages, often just the last hours), and Reddit posts from the investing communities (crypto ones for a crypto pair; up to 100 from its past week). The answer says the span each really covers. Each source that fails is named as unavailable, never as quiet.',
     inputSchema: { symbol, analysis_date: analysis },
     annotations: READ,
   }, async (a) => answer('posts about ' + a.symbol, () => socialPosts(a.symbol, a.analysis_date, { lookBackDays: a0.newsLookbackDays, stocktwitsLimit: a0.stocktwitsLimit, subreddits: a0.subreddits, cryptoSubreddits: a0.cryptoSubreddits })));
@@ -228,7 +232,7 @@ export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetc
 
   server.registerTool('get_fund_profile', {
     title: 'Fund profile',
-    description: 'For a fund (an ETF or a mutual fund, as get_instrument says), its fundamentals in place of company accounts, from the latest portfolio report it had filed with the SEC by the analysis date (form N-PORT; a past date reads what was public then): its size, what it holds (largest holdings by issuer, stocks against bonds and cash, issuers, countries, for bonds their years to repayment and interest), and its own monthly returns, with the day its holdings are from. Its yearly cost has no official free source and is said as unavailable. A fund outside the US falls back to Yahoo Finance, today only.',
+    description: 'For a fund (an ETF or a mutual fund, as get_instrument says), its fundamentals in place of company accounts, from the latest portfolio report it had filed with the SEC by the analysis date (form N-PORT; a past date reads what was public then): its size, what it holds (largest holdings by issuer, stocks against bonds and cash, issuers, countries, for bonds their years to repayment and interest), and its own monthly returns, with the day its holdings are from. Its yearly cost is not read (the fund\'s prospectus states it) and is said as unavailable. A fund outside the US falls back to Yahoo Finance, today only.',
     inputSchema: { symbol, analysis_date: analysis },
     annotations: READ,
   }, async (a) => answer('fund profile of ' + a.symbol, () => fundProfile(a.symbol, a.analysis_date)));

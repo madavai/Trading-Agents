@@ -36734,6 +36734,8 @@ import path4 from "node:path";
 var ANALYSTS = ["market", "sentiment", "news", "fundamentals"];
 var ACTIONS = ["buy a full position", "buy half a position", "no order", "sell half of what is held", "sell everything held"];
 var DEFAULT_CAPS = { perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 3, perSectorPercent: 30, cryptoPercent: 5, weeklyLossPercent: 5, minHoldDays: 5 };
+var CAP_RANGES = { perOrderUsd: [1, 1e5], perStockPercent: [1, 100], ordersPerDay: [1, 50], perSectorPercent: [1, 100], cryptoPercent: [0, 100], weeklyLossPercent: [1, 50], minHoldDays: [0, 60] };
+var CAP_RANGE_WORDS = ((r) => `caps are $${r.perOrderUsd[0]} to $${r.perOrderUsd[1].toLocaleString("en-US")} an order, ${r.perStockPercent[0]}% to ${r.perStockPercent[1]}% of the account in one stock, ${r.ordersPerDay[0]} to ${r.ordersPerDay[1]} orders a day, ${r.perSectorPercent[0]}% to ${r.perSectorPercent[1]}% in one sector, ${r.cryptoPercent[0]}% to ${r.cryptoPercent[1]}% in crypto, a weekly fall of ${r.weeklyLossPercent[0]}% to ${r.weeklyLossPercent[1]}% before trading switches itself off, and a shortest hold of ${r.minHoldDays[0]} to ${r.minHoldDays[1]} trading days; orders a day and the shortest hold are whole numbers`)(CAP_RANGES);
 var DEFAULTS = {
   analysis: {
     outputLanguage: "English",
@@ -36981,7 +36983,7 @@ function agentsLine(drift) {
 }
 var UPDATED_WHY = "the desk in this folder was updated after the desk's tools in this conversation started";
 var NOT_COMPARED = { ok: false, text: `The desk's agent files in this folder were not compared with the project's version: ${UPDATED_WHY}. Start a new conversation in Madav and check this computer there; reset nothing from this one` };
-var NO_VERSION = "no version was given";
+var NO_VERSION = "no version was given. Only the trading-desk team's own steps carry a version, so a check from any other chat, or from a terminal, compares nothing here";
 var NONE2 = "none";
 function teamLine(given, folder2, updated = false, known) {
   const v = given?.trim() ?? "";
@@ -36997,9 +36999,20 @@ function teamLine(given, folder2, updated = false, known) {
 }
 var ASK_AGAIN = `TEAM VERSION NEEDED: this answer did not compare this conversation's steps for the team with the ones in this folder. If you are the trading-desk team and have not yet called desk_check again in this check, call it once more now, with team_version copied exactly from step 1 of your own "Check this computer" steps (in the instructions this conversation began with), and pass on that answer instead of this one. Otherwise (you are not the trading-desk team, your steps give no version, or you already called again) pass this answer on as it is, and never say this conversation's steps match.`;
 var TWO_LINES = "Pass on the line about this conversation's steps for the team and the line about the desk's agent files in this folder as they are written. Only the first can say whether this conversation's steps are the folder's, and only with a version shown; the second is about the files alone. Never take one for the other.";
-function render(lines, sources) {
+function sumUp(lines, sources) {
+  const not = lines.filter((l) => !l.ok && !l.unchecked).length, down = sources.filter((s) => !s.ok).length;
+  const unchecked = lines.some((l) => l.unchecked);
+  const only = 'That opening is the whole summing up: add no other, at the start or at the end (never "everything is ready", "all checked", "nothing needs fixing" or the like)';
+  if (not || down) {
+    const what = [not ? "each line marked NO" : "", down ? "each data source that could not be reached" : ""].filter(Boolean).join(", and ");
+    return `HOW TO SUM UP: open your answer with what is not ready (${what}) and what to do about each${unchecked ? ", then say that this conversation's steps for the team were not compared" : ""}. ${only}.`;
+  }
+  if (unchecked) return `HOW TO SUM UP: open your answer with "Ready, except one thing this check did not compare: whether this conversation's steps for the team are the ones in this folder", then pass on that line as it is written. ${only}, since the line marked -- was not checked.`;
+  return "HOW TO SUM UP: everything this check looked at is ready. You may say so, and name what it does not check (its last line).";
+}
+function render(lines, sources, how) {
   const mark = (ok, unchecked) => unchecked ? "-- " : ok ? "OK " : "NO ";
-  const out = [`Trading Agents desk check (version ${VERSION})`, "", "This computer:"];
+  const out = [`Trading Agents desk check (version ${VERSION})`, ...how ? [how] : [], "", "This computer:"];
   for (const l of lines) out.push(`- ${mark(l.ok, l.unchecked)} ${l.text}`);
   out.push(TWO_LINES);
   out.push("", "Free data sources:");
@@ -37034,7 +37047,7 @@ async function deskCheck(root = process.cwd(), fetchImpl2 = fetch, source = root
   lines.unshift(team);
   return `${team.askAgain && asker.viaTool ? `${ASK_AGAIN}
 
-` : ""}${render(lines, sources)}`;
+` : ""}${render(lines, sources, asker.viaTool ? sumUp(lines, sources) : void 0)}`;
 }
 
 // src/data/http.ts
@@ -37586,6 +37599,13 @@ function latestState(s, upTo, now = Date.now()) {
   }
   if (!session2 && last.date === today()) return said(final, ["- **The latest row is today's session. If the market is still open it is partial: its close, high, low and volume are the latest so far, and every indicator on it will change by the close. Do not treat a level as broken or held on this row alone.**"]);
   return said(final, []);
+}
+async function lastClose(raw, upTo, now = Date.now()) {
+  const s = await daily(raw, addDays(upTo, -14), upTo), rows = s.traded?.length === s.bars.length ? s.traded : s.bars;
+  if (!rows.length) throw new NoData(`Yahoo Finance has no prices for ${normalizeSymbol(raw)} in the two weeks to ${upTo}`);
+  const last = latestState(s, upTo, now).open ? rows.at(-2) : rows.at(-1);
+  if (!last) throw new NoData(`Yahoo Finance has no finished session for ${normalizeSymbol(raw)} in the two weeks to ${upTo}`);
+  return { date: last.date, close: last.close };
 }
 var MAX_ROWS = 260;
 async function priceHistory(raw, analysis2, start, end) {
@@ -38904,7 +38924,7 @@ function renderReport(sym2, day3, r, topN = 10) {
     };
     lines.push(`Its own total return by month, as it reported it: ${r.returns.map((v, i) => `${month(2 - i)} ${signed2(v)}`).join(", ")}`);
   } else lines.push("Its own monthly returns: not in this report");
-  lines.push("Yearly cost (expense ratio): unavailable (no official free source gives it in a form the desk can read; the fund's prospectus states it)");
+  lines.push("Yearly cost (expense ratio): unavailable (the desk does not read it; the fund's prospectus states it)");
   const top = shares(r.holdings, (h) => h.name).slice(0, topN);
   if (top.length) {
     const together = top.reduce((a, [, p]) => a + p, 0);
@@ -39860,7 +39880,7 @@ ${e.reflection}`] : []
     const short2 = (e) => `${head2(e)}${e.reflection && LESSON_NOTE[e.lesson] ? ` (lesson ${LESSON_NOTE[e.lesson](e)})` : ""}
 ${e.reflection || e.decision.slice(0, 300) + (e.decision.length > 300 ? "..." : "")}`;
     const parts = [];
-    if (same.length) parts.push(`Past analyses of ${ticker} (most recent first):`, ...same.map(full));
+    if (same.length) parts.push(`Past analyses of ${ticker} (latest recorded first):`, ...same.map(full));
     if (other.length) parts.push("Recent cross-ticker lessons:", ...other.map(short2));
     return parts.join("\n\n");
   }
@@ -40025,6 +40045,11 @@ ${body.join("\n\n")}
 }
 function deleteRun(dir, ticker, date5) {
   fs10.rmSync(folder(dir, ticker, date5), { recursive: true, force: true });
+}
+function sectionsOf(dir, ticker, date5) {
+  const out = {};
+  for (const e of load(dir, ticker, date5).log) (out[e.section] ??= []).push(e.text);
+  return out;
 }
 
 // src/desk/queue.ts
@@ -40946,6 +40971,43 @@ function viewOf(calls, symbol4, today2) {
   return { rating: latest.rating, date: latest.date, days, ago: agoWords(days) };
 }
 var isStale = (v) => !v || v.days >= RERATE_DAYS;
+function stopOf(text4) {
+  const m2 = /\*\*Stop[ -]?Loss:?\*\*:?[ \t]*([^\n]*)/i.exec(text4);
+  if (!m2) return null;
+  const words3 = m2[1].replace(/\*\*/g, "").replace(/`/g, "").trim().slice(0, 200);
+  const n2 = /^(?:US)?\$?\s*(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?/.exec(words3);
+  if (!n2) return { level: null, words: words3 };
+  const rest = words3.slice(n2[0].length).trim();
+  if (/^(?:[%×*+/=−]|[-–]\s*\d|x\s*\d|x\s|times\b|atr\b)/i.test(rest)) return { level: null, words: words3 };
+  const level = Number(`${n2[1].replace(/,/g, "")}${n2[2] ?? ""}`);
+  return Number.isFinite(level) && level > 0 && level < 1e7 ? { level, words: words3 } : { level: null, words: words3 };
+}
+function stopIn(dir, ticker, date5) {
+  try {
+    const t = sectionsOf(dir, ticker, date5).trader?.at(-1);
+    return t ? stopOf(t) : null;
+  } catch {
+    return null;
+  }
+}
+async function stopsAtClose(dir, today2, closeOf) {
+  const held = readHoldings(dir);
+  if (!held) return { state: "unknown" };
+  if (held.source === "robinhood" && !held.accounts?.some((a) => a.tradable)) return { state: "no-agentic" };
+  const symbols = [...new Set(held.positions.map((p) => p.ticker))].filter((s) => !/[\^=]/.test(s));
+  if (!symbols.length) return { state: "nothing-held" };
+  const calls = new Journal(path18.join(dir, "journal.md")).load(), stops = [];
+  for (const symbol4 of symbols) {
+    const view = viewOf(calls, symbol4, today2), level = view ? stopIn(dir, symbol4, view.date)?.level ?? null : null;
+    if (!view || level === null) continue;
+    try {
+      stops.push({ symbol: symbol4, level, called: view.date, close: await closeOf(symbol4) });
+    } catch (e) {
+      stops.push({ symbol: symbol4, level, called: view.date, close: null, why: e.message });
+    }
+  }
+  return { state: "checked", held: symbols.length, stops };
+}
 var rerateFile = (dir) => path18.join(dir, "rerate.json");
 function readRerate(dir) {
   try {
@@ -41098,7 +41160,7 @@ function morningBrief(dir, today2, max, look) {
   lines.push("", "No one may be watching: do not wait for an answer. If a step needs the person (for example no contact email is saved), skip what depends on it and say so at the end.");
   return lines.join("\n");
 }
-function eveningBrief(dir, today2, now) {
+function eveningBrief(dir, today2, now, stops) {
   const calls = new Journal(path19.join(dir, "journal.md")).load();
   const todays = calls.filter((e) => e.date === today2), pending = calls.filter((e) => e.pending).length;
   const orders = ordersOn(dir, now);
@@ -41114,9 +41176,30 @@ function eveningBrief(dir, today2, now) {
     }
     lines.push("   What happened since (filled, approved, cancelled) is on the dashboard and in the Robinhood app: the team does not read Robinhood. Say so; do not guess.");
   }
-  lines.push("", `4. Calls still waiting to be scored: ${pending}.`);
+  lines.push("", ...stopLines(stops));
+  lines.push("", `5. Calls still waiting to be scored: ${pending}.`);
   lines.push("", "Tell the person in a short plain list, using only these facts and what the tools return. Not investment advice.");
   return lines.join("\n");
+}
+var priceText = (n2) => n2.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: n2 < 1 ? 6 : 2 });
+function stopLines(s) {
+  const head2 = "4. Stops at the last close (the dashboard warns of a stop only while its page is open, so the wrap-up checks them here)";
+  if (!s) return [`${head2}: not checked this evening. Say so.`];
+  if (s.state === "failed") return [`${head2}: they could not be checked (${s.why}). Say so: whether a holding closed below its stop is not known.`];
+  if (s.state === "unknown") return [`${head2}: the holdings the desk sizes trades to are not known (the dashboard has not read Robinhood, and the person gave none), so no stop was checked. Say so.`];
+  if (s.state === "no-agentic") return [`${head2}: the Agentic account is not among the accounts shown on the dashboard, so no stop was checked. Say so.`];
+  if (s.state === "nothing-held") return [`${head2}: nothing is held, so there is no stop to check.`];
+  if (!s.stops.length) return [`${head2}: ${s.held === 1 ? "the one holding has no stop" : `none of the ${s.held} holdings has a stop`} at a price level in the desk's latest call on it, so there is none to check.`];
+  const out = [`${head2}:`];
+  for (const x of s.stops) {
+    const stop = `the stop of ${priceText(x.level)} the desk's trader proposed in the call of ${withWeekday(x.called)}`;
+    if (!x.close) out.push(`   - ${x.symbol}: its last close could not be read (${x.why ?? "unavailable"}), so whether it is below ${stop} is not known. Never say it is above.`);
+    else if (x.close.close < x.level) out.push(`   - BELOW ITS STOP: ${x.symbol} closed at ${priceText(x.close.close)} on ${withWeekday(x.close.date)}, below ${stop}.`);
+    else out.push(`   - ${x.symbol} closed at ${priceText(x.close.close)} on ${withWeekday(x.close.date)}, at or above ${stop}.`);
+  }
+  const below = s.stops.filter((x) => x.close && x.close.close < x.level).map((x) => x.symbol);
+  out.push(below.length ? `   Name ${below.length === 1 ? "it" : "each one below its stop"} first in your report, with its close and its stop (${below.join(", ")}). Nothing is sold by itself: selling is the person's own decision, on the dashboard or in the Robinhood app.` : "   None closed below its stop: say so in one line.");
+  return out;
 }
 
 // src/terminal/prefs.ts
@@ -41252,7 +41335,7 @@ async function act(run) {
     return text2(await run());
   } catch (e) {
     if (e instanceof NeedsEmail) return text2(`NEEDS_EMAIL: ${e.message}`);
-    if (e instanceof Unavailable || e instanceof NoData) return text2(failureText(e, "this desk record"));
+    if (e instanceof Unavailable || e instanceof NoData) return text2(failureText(e, "a source this desk tool reads"));
     return text2(`INPUT_ERROR: ${e.message}. Correct it and call again.`);
   }
 }
@@ -41441,7 +41524,7 @@ Rating: ${rating}`;
       ...todo.slice(0, 30).map((c, i) => `${i + 1}. ${c.symbol} ${c.date}`),
       ...todo.length > 30 ? [`... and ${todo.length - 30} more`] : [],
       "",
-      "Limits to tell the person: for a past date, prices, indicators, economic figures and SEC accounts are as known on that date, but news, posts, odds, the company profile and insider trades exist only for recent days, so those reads are thin or unavailable and say so. Results are indicative, not repeatable."
+      "Limits to tell the person: for a past date the desk reads only what was out by then, but not all of it as it stood then. A US company's accounts, profile and insider trades, and a US fund's holdings, are its SEC filings as made public by that date; economic figures are those released by then, at today's revised values; prices and indicators are adjusted for every split and dividend since, so before a split they read as a fraction of the price traded then; news, posts and odds exist only for recent days, so those reads are thin or unavailable and say so. Results are indicative, not repeatable."
     ].join("\n");
   }));
   server.registerTool("end_backtest", {
@@ -41476,12 +41559,20 @@ ${renderSummary(summarize(entries))}`;
   }));
   server.registerTool("routine_brief", {
     title: "Today's routine",
-    description: `What the morning routine should do today (on a day New York's market is closed, a weekend or one of its holidays, only score past calls; otherwise score past calls; on a Monday, or the Tuesday after a Monday holiday, re-rate the holdings whose view is a week old; "Worth a look today", the same list the dashboard shows, worked out from prices if it was not this hour; then the stocks to analyse in order, within the person's limit) or what the evening wrap-up has to report (today's calls, the orders the dashboard sent and Robinhood's answer, what is still to be scored). It changes nothing but the waiting list: on a Monday (the Tuesday after a Monday holiday), up to three holdings with no view or one a week old or more go on it at shallow depth, once that week; and with the person's switch "Analyse the top three each market morning" on, the top three of the list go on it at shallow depth, once a market day. Call it first when asked to run the morning routine or the evening wrap-up.`,
+    description: `What the morning routine should do today (on a day New York's market is closed, a weekend or one of its holidays, only score past calls; otherwise score past calls; on a Monday, or the Tuesday after a Monday holiday, re-rate the holdings whose view is a week old; "Worth a look today", the same list the dashboard shows, worked out from prices if it was not this hour; then the stocks to analyse in order, within the person's limit) or what the evening wrap-up has to report (today's calls, the orders the dashboard sent and Robinhood's answer, any holding whose last close is below the stop the desk's trader proposed, since the dashboard warns of a stop only while its page is open, and what is still to be scored). It changes nothing but the waiting list: on a Monday (the Tuesday after a Monday holiday), up to three holdings with no view or one a week old or more go on it at shallow depth, once that week; and with the person's switch "Analyse the top three each market morning" on, the top three of the list go on it at shallow depth, once a market day. Call it first when asked to run the morning routine or the evening wrap-up.`,
     inputSchema: { kind: external_exports.enum(["morning", "evening"]).describe("morning: before the open; evening: after the close") },
     annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: true }
   }, async (a) => act(async () => {
     const day3 = today();
-    if (a.kind === "evening") return eveningBrief(dir, day3, /* @__PURE__ */ new Date());
+    if (a.kind === "evening") {
+      let stops;
+      try {
+        stops = await stopsAtClose(dir, day3, (sym2) => lastClose(sym2, day3));
+      } catch (e) {
+        stops = { state: "failed", why: e.message };
+      }
+      return eveningBrief(dir, day3, /* @__PURE__ */ new Date(), stops);
+    }
     const on = readPrefs(dir).morning === true, open3 = isMarketDay(day3);
     let look;
     if (open3) {
@@ -41687,7 +41778,7 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root, home) {
   noteWhenUpdated(server, fresh);
   server.registerTool("desk_check", {
     title: "Desk check",
-    description: `Check that this computer is ready for the Trading Agents desk: Node, the desk data folder, whether a Robinhood sign-in is saved, whether the desk's agent files in this folder are as the project ships them, whether this conversation's steps for the team are the ones in this folder (only from the version those steps give: team_version is required; the trading-desk team passes the one in step 1 of its own "Check this computer" steps, anyone else "none", and then it says they were not compared), and whether each free data source answers (naming the one it does not ask). If its answer starts with TEAM VERSION NEEDED, do what that line says. Pass on its line about this conversation's steps and its line about the agent files as written, never one for the other. It sends no order and reads no secret; the contact email is shown masked. All it writes is a test file in desk-data, removed at once.`,
+    description: `Check that this computer is ready for the Trading Agents desk: Node, the desk data folder, whether a Robinhood sign-in is saved, whether the desk's agent files in this folder are as the project ships them, whether this conversation's steps for the team are the ones in this folder (only from the version those steps give: team_version is required; the trading-desk team passes the one in step 1 of its own "Check this computer" steps, anyone else "none", and then it says they were not compared), and whether each free data source answers (naming the one it does not ask). If its answer starts with TEAM VERSION NEEDED, do what that line says. Pass on its line about this conversation's steps and its line about the agent files as written, never one for the other, and open the report as its HOW TO SUM UP line says. It sends no order and reads no secret; the contact email is shown masked. All it writes is a test file in desk-data, removed at once.`,
     // Required (8 Nov 2026: in Madav the team twice left out the version its own step 1 names, so a conversation begun
     // before an update could not be told). Left out, nothing is checked and the caller is told what to pass.
     inputSchema: { team_version: external_exports.string({ error: (issue2) => issue2.input === void 0 ? 'Nothing was checked: team_version is required. The trading-desk team: call desk_check again with the version in step 1 of your own "Check this computer" steps, copied exactly. Anyone else: call it again with "none". Never read a version from a file and never make one up. The value is missing' : void 0 }).max(40).describe(`Required. The trading-desk team: the version in step 1 of its own "Check this computer" steps, copied exactly from the instructions this conversation began with. Anyone else (a chat that is not the trading-desk team): "none", and the check says this conversation's steps were not compared. Never read it from a file and never make one up`) },
@@ -41700,13 +41791,14 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root, home) {
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false }
   }, async () => {
     if (fresh.updated()) return text3("Not reset: the desk in this folder was updated after the desk's tools in this conversation started, so they could write the team back as it was before the update. Nothing was written. Do not call reset_team again here: tell the person in one plain line to start a new conversation in Madav and check this computer there; a reset is needed only if that check still finds a difference.");
-    let wrote;
+    let wrote, writing = false;
     try {
       const shipped = await shippedAgentFiles(source), last = lastReset(root), drift = driftOf(root, shipped);
       if (last && Date.now() - last.getTime() < RESET_AGAIN_MS && !drift.changed.length && !drift.missing.length) return text3(resetAgainWords(last));
+      writing = true;
       wrote = resetAgentFiles(root, shipped);
     } catch (e) {
-      return text3(`The team could not be reset: ${e.message}. Nothing was changed.`);
+      return text3(`The team could not be reset: ${e.message}. ${writing ? "It stopped part-way, so some of the team's files may already be back as the project ships them and others not. Tell the person in one plain line, and that the desk check in a new conversation shows which still differ." : "Nothing was changed."}`);
     }
     try {
       noteReset(root);
@@ -41795,7 +41887,7 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root, home) {
   }, async (a) => answer("world news", () => worldNews(a.analysis_date, a.look_back_days ?? a0.newsLookbackDays, a0.worldNewsLimit, a0.worldNewsSearches)));
   server.registerTool("get_social_posts", {
     title: "StockTwits and Reddit posts",
-    description: "What people posted about the instrument over the week before the analysis date: StockTwits messages with their authors' Bullish or Bearish tags and counts, and Reddit posts from the investing communities (crypto ones for a crypto pair). Each source that fails is named as unavailable, never as quiet.",
+    description: "What people posted about the instrument in the week before the analysis date, as far back as each source reaches: StockTwits messages with their authors' Bullish or Bearish tags and counts (it serves only its latest messages, often just the last hours), and Reddit posts from the investing communities (crypto ones for a crypto pair; up to 100 from its past week). The answer says the span each really covers. Each source that fails is named as unavailable, never as quiet.",
     inputSchema: { symbol: symbol3, analysis_date: analysis },
     annotations: READ
   }, async (a) => answer("posts about " + a.symbol, () => socialPosts(a.symbol, a.analysis_date, { lookBackDays: a0.newsLookbackDays, stocktwitsLimit: a0.stocktwitsLimit, subreddits: a0.subreddits, cryptoSubreddits: a0.cryptoSubreddits })));
@@ -41836,7 +41928,7 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root, home) {
   }, async (a) => answer("insider transactions of " + a.symbol, () => insiderTransactions(a.symbol, a.analysis_date)));
   server.registerTool("get_fund_profile", {
     title: "Fund profile",
-    description: "For a fund (an ETF or a mutual fund, as get_instrument says), its fundamentals in place of company accounts, from the latest portfolio report it had filed with the SEC by the analysis date (form N-PORT; a past date reads what was public then): its size, what it holds (largest holdings by issuer, stocks against bonds and cash, issuers, countries, for bonds their years to repayment and interest), and its own monthly returns, with the day its holdings are from. Its yearly cost has no official free source and is said as unavailable. A fund outside the US falls back to Yahoo Finance, today only.",
+    description: "For a fund (an ETF or a mutual fund, as get_instrument says), its fundamentals in place of company accounts, from the latest portfolio report it had filed with the SEC by the analysis date (form N-PORT; a past date reads what was public then): its size, what it holds (largest holdings by issuer, stocks against bonds and cash, issuers, countries, for bonds their years to repayment and interest), and its own monthly returns, with the day its holdings are from. Its yearly cost is not read (the fund's prospectus states it) and is said as unavailable. A fund outside the US falls back to Yahoo Finance, today only.",
     inputSchema: { symbol: symbol3, analysis_date: analysis },
     annotations: READ
   }, async (a) => answer("fund profile of " + a.symbol, () => fundProfile(a.symbol, a.analysis_date)));

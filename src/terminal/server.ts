@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { today } from '../data/dates.js';
 import { configure } from '../data/http.js';
 import { clearCache, daily } from '../data/yahoo.js';
-import { addDays } from '../data/dates.js';
+import { addDays, marketDay } from '../data/dates.js';
 import { readContactEmail, saveContactEmail } from '../contact.js';
 import { followed, paperBook, readPaperStart, recordOf, RECORD_WEEKS, RECORD_WORDS, savePaperStart, type Closes, type Dividends, type PaperBook } from '../desk/paper.js';
 import { isCrypto, safeSymbol } from '../data/symbols.js';
@@ -23,16 +23,15 @@ import { dashboardKeyFile, deskDataDir, robinhoodFile } from '../paths.js';
 import { writePrivate } from '../private.js';
 import { AnswerLost, Link, plainFailure, type Snapshot } from '../robinhood/link.js';
 import { saveAccountHoldings } from '../desk/holdings.js';
-import { careOf, deskSymbol, stopIn, toWatch, watched, type HoldingCare } from '../desk/care.js';
+import { careOf, deskSymbol, stopIn, toWatch, watched, type HoldingCare, type WatchPrice } from '../desk/care.js';
 import { lastBuy, logOrder, placedToday, unanswered, type SentOrder } from '../desk/orders.js';
-import { marketDay } from '../data/dates.js';
 import { Sectors } from '../desk/sectors.js';
 export { placedToday };
 import { check, passes, propose, proposeOwn, type Check, type Order, type Proposal, type TicketContext } from '../desk/ticket.js';
 import type { Review } from '../robinhood/review.js';
 import type { Placed } from '../robinhood/order.js';
 import { Journal } from '../desk/journal.js';
-import { capsFrom, readSettings, type Caps } from '../settings.js';
+import { CAP_RANGE_WORDS, capsFrom, readSettings, type Caps } from '../settings.js';
 import { VERSION } from '../version.js';
 import { callOf, listenerOf, marketView, queueOf, stateOf, versionOf } from './state.js';
 import { clearQuotes, history, isRange, MARKETS, quote } from './quotes.js';
@@ -262,8 +261,8 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
     if (!snap) return { at: null, holdings: [] };
     const held = careOf({ views: snap.views, calls: callsOf(), queue: readQueue(dir, now), today: day, trading: readSettings(root).trading, caps: robinhood.trading().caps,
       stop: (ticker, date) => stopIn(dir, ticker, date), bought: (symbol) => lastBuy(dir, symbol, now), ticketable });
-    const prices = new Map<string, { value: number; asOf: string }>();
-    for (const q of await Promise.all(toWatch(held).map(quote))) if (!('error' in q)) prices.set(q.symbol, { value: q.price, asOf: q.asOf });
+    const prices = new Map<string, WatchPrice>();
+    for (const q of await Promise.all(toWatch(held).map(quote))) if (!('error' in q)) prices.set(q.symbol, { value: q.price, asOf: q.asOf, open: q.open, market: q.market });
     return { at: snap.at, holdings: watched(held, prices) };
   };
 
@@ -536,7 +535,7 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
     if (p === '/api/trading' && method === 'POST') {
       if (b.caps !== undefined) {
         const caps = capsFrom(b.caps);
-        if (!caps) throw new Refused(400, 'caps are $1 to $100,000 an order, 1% to 100% of the account in one stock, and 1 to 50 orders a day');
+        if (!caps) throw new Refused(400, CAP_RANGE_WORDS);
         return json(res, 200, robinhood.setCaps(caps));
       }
       if (b.on === false) return json(res, 200, robinhood.setTrading(false));

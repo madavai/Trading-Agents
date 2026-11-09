@@ -19342,10 +19342,10 @@ function waitForCode(port, expectedState, timeoutMs = 5 * 6e4) {
         return;
       }
       if (!got || !want || state !== want) {
-        answer(res, 400, "This sign-in link does not match. Start again from Madav.");
+        answer(res, 400, "This sign-in link does not match. Start again from where you began it: the dashboard's Connect, or the desk check.");
         return;
       }
-      answer(res, 200, "Signed in to Robinhood. You can close this tab and go back to Madav.");
+      answer(res, 200, "Signed in to Robinhood. You can close this tab and go back to where you started it.");
       finish();
       resolve(got);
     });
@@ -19637,6 +19637,7 @@ var ANALYSTS = ["market", "sentiment", "news", "fundamentals"];
 var DEFAULT_CAPS = { perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 3, perSectorPercent: 30, cryptoPercent: 5, weeklyLossPercent: 5, minHoldDays: 5 };
 var CAP_RANGES = { perOrderUsd: [1, 1e5], perStockPercent: [1, 100], ordersPerDay: [1, 50], perSectorPercent: [1, 100], cryptoPercent: [0, 100], weeklyLossPercent: [1, 50], minHoldDays: [0, 60] };
 var WHOLE_CAPS = /* @__PURE__ */ new Set(["ordersPerDay", "minHoldDays"]);
+var CAP_RANGE_WORDS = ((r) => `caps are $${r.perOrderUsd[0]} to $${r.perOrderUsd[1].toLocaleString("en-US")} an order, ${r.perStockPercent[0]}% to ${r.perStockPercent[1]}% of the account in one stock, ${r.ordersPerDay[0]} to ${r.ordersPerDay[1]} orders a day, ${r.perSectorPercent[0]}% to ${r.perSectorPercent[1]}% in one sector, ${r.cryptoPercent[0]}% to ${r.cryptoPercent[1]}% in crypto, a weekly fall of ${r.weeklyLossPercent[0]}% to ${r.weeklyLossPercent[1]}% before trading switches itself off, and a shortest hold of ${r.minHoldDays[0]} to ${r.minHoldDays[1]} trading days; orders a day and the shortest hold are whole numbers`)(CAP_RANGES);
 var DEFAULTS = {
   analysis: {
     outputLanguage: "English",
@@ -19950,7 +19951,8 @@ var Link = class {
       state: "connected",
       checkedAt: this.now(),
       tools: { read: k.read.length, order: k.order.length, other: k.other.length },
-      message: `Robinhood offers ${total} ${total === 1 ? "tool" : "tools"}: ${k.read.length} that only read, ${k.order.length} that order or move money (this page never uses them) and ${k.other.length} others.`
+      // Of the order tools, the page calls two (review.ts, order.ts), and only on the person's own press; no agent gets any.
+      message: `Robinhood offers ${total} ${total === 1 ? "tool" : "tools"}: ${k.read.length} that only read, ${k.order.length} that order or move money (of these, this page uses only Robinhood's dry run, when you press Review, and the order itself, on your Confirm; no agent ever gets one) and ${k.other.length} others.`
     };
   }
   bad(e) {

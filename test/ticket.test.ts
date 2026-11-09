@@ -93,7 +93,8 @@ test('the person\'s own ticket starts at one whole share at the live price, sell
   assert.match(buy.why[0]!, /^Your own order: one whole share to start, at Robinhood's live price of \$182\.40\./);
   assert.equal(own({ price: null }, 'buy').order, null, 'no live price, no order');
   assert.match(own({}, 'sell').why[0]!, /holds no NVDA to sell/);
-  assert.equal(own({ held: 0.4 }, 'sell').order, null, 'a limit order sells whole shares only');
+  assert.equal(own({ held: 0.4 }, 'sell').order, null, 'the desk\'s tickets sell whole shares only');
+  assert.match(own({ held: 0.4 }, 'sell').why.join(' '), /the desk's tickets sell whole shares only/, 'said as the desk\'s own choice, not as a rule of limit orders (audit 1 A5.3)');
   const sell = own({ held: 3 }, 'sell');
   assert.deepEqual([sell.action, sell.order?.side, sell.order?.quantity], ['your own sell', 'sell', 1]);
   // the same checks as a call's ticket: a person's own order is no way around the caps

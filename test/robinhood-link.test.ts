@@ -75,7 +75,9 @@ test('the link tells the dashboard where Robinhood stands: none, waiting, connec
   assert.equal(connected.state, 'connected');
   assert.deepEqual(connected.tools, { read: 3, order: 3, other: 2 });
   assert.equal(connected.checkedAt, '2026-10-12T15:00:00.000Z');
-  assert.match(connected.message, /Robinhood offers 8 tools: 3 that only read, 3 that order or move money \(this page never uses them\) and 2 others/);
+  // audit 1 A4.19: the page does use two of the order tools (the dry run and the order on Confirm), so it says which
+  assert.match(connected.message, /Robinhood offers 8 tools: 3 that only read, 3 that order or move money \(of these, this page uses only Robinhood's dry run, when you press Review, and the order itself, on your Confirm; no agent ever gets one\) and 2 others/);
+  assert.doesNotMatch(connected.message, /never uses them/);
   assert.equal(opened.length, 1);
   assert.deepEqual(fake.calls, []);
 

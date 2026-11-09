@@ -1,6 +1,6 @@
 ---
 name: routine
-description: Run the desk's morning routine (score past calls, then analyse what is waiting and the starred watchlist stocks, on Mondays also re-rating the holdings with an old view, and list the new calls to decide on) or its evening wrap-up (score what is ready and report the day's calls and orders). Use when the person, or a routine scheduled in Madav, asks for the morning routine or the evening wrap-up. It never places an order.
+description: Run the desk's morning routine (score past calls, then analyse what is waiting and the starred watchlist stocks, on Mondays also re-rating the holdings with an old view, and list the new calls to decide on) or its evening wrap-up (score what is ready, name any holding whose last close is below the stop the desk's trader proposed, and report the day's calls and orders). Use when the person, or a routine scheduled in Madav, asks for the morning routine or the evening wrap-up. It never places an order.
 argument-hint: morning|evening
 ---
 
@@ -21,7 +21,7 @@ Asked for as "the morning routine", "morning", or at the start of a market day.
 Asked for as "the evening wrap-up", "evening", or after the close.
 1. Call `routine_brief` with kind `evening` and follow it.
 2. Score what is ready, by the /settle playbook.
-3. Tell the person in a short plain list: the desk's calls today, each in one sentence; the orders the dashboard sent today and what Robinhood answered; which may still be waiting for their approval on their phone (the team cannot see what happened since: say they can check the dashboard or the Robinhood app); and how many calls are still waiting to be scored. Use only the brief's facts and what the tools return. This is not investment advice.
+3. Tell the person in a short plain list, first any holding the brief names as below its stop (its close, its stop and the call it came from, as the brief gives them; if the brief says the stops could not be checked, say that instead, and never that none is below), then: the desk's calls today, each in one sentence; the orders the dashboard sent today and what Robinhood answered; which may still be waiting for their approval on their phone (the team cannot see what happened since: say they can check the dashboard or the Robinhood app); and how many calls are still waiting to be scored. Use only the brief's facts and what the tools return. A holding below its stop is only reported: nothing is sold by itself, and selling is the person's own decision, on the dashboard or in the Robinhood app. This is not investment advice.
 
 ## Never
 - Never call a broker connection, open Robinhood's site, or call a tool that trades or moves money.

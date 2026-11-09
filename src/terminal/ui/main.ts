@@ -4,7 +4,8 @@
 // (Decide…) or the person's own (Trade…) - and is placed only on their Confirm, with trading switched on by them.
 import { api, ApiError, claimKey, hasKey, KEY_LOST, type CallDetail, type DeskState, type Depth, type History, type LinkInfo, type Market, type Match, type Prefs, type Caps, type PaperView, type PaperTrade, type QueueView, type QuoteResult, type Account, type AccountView, type Holding, type Order, type Recent, type Snapshot, type TicketOpen, type Check, type Review, type Placed, type Trading, type Tier, type TierItem, type TierView, type Worth, type Screen, type Weather, type WeatherLine, type HoldingCare } from './api.js';
 import { heroChart, paperChart, sparkline } from './chart.js';
-import { averageOf, barOn, chipDay, dayText, esc, labelled, money, moveDayOf, notHorizon, NOTES, num, opening, pct, plain, points, priceDayWords, ratingMeaning, ratingTone, resultOf, scoredOver, SECTION_NAMES, shortDay, tone, weekDay, when } from './fmt.js';
+import { averageOf, barOn, chipDay, dayText, esc, labelled, money, moveDayOf, notHorizon, NOTES, num, opening, pct, plain, points, priceDayWords, qty, ratingMeaning, ratingTone, resultOf, scoredOver, SECTION_NAMES, shortDay, tone, weekDay, when } from './fmt.js';
+import { DELAY_SENTENCE, DELAY_SHORT, LATE } from '../../data/delay.js';
 import { GLOSSARY, glossaryGroups, isTerm, means, type TermKey } from './glossary.js';
 import { markdown } from './md.js';
 import { sameFigures, typedNumber, type Asked } from './typed.js';
@@ -204,7 +205,7 @@ function renderGuide(): void {
   const a = g.analyse, ask = toAsk(), l = d!.analyses.listener;
   const analyse = guideStep(3, a.done, `Ask the desk to analyse them, ${term('depth', 'shallow')}, and switch on running automatically`,
     `<div class="at-row">${factChip(a.asked > 0, `${a.asked} asked for`)}${factChip(!!a.automatic, a.automatic ? `runs by itself: ${a.automatic}` : 'not running by itself yet')}</div>
-    <p class="at-quiet ta-gwhy">Shallow is the quickest and costs least: each analysis uses your Claude plan, like a chat. Running automatically means each one you ask for starts by itself, one at a time; they are listed under Analyses you asked for.</p>
+    <p class="at-quiet ta-gwhy">Shallow is the quickest and costs least: each analysis is a full team run on the models of whatever runs it (Madav's own, or your Claude plan with Claude Code). Running automatically means each one you ask for starts by itself, one at a time; they are listed under Analyses you asked for.</p>
     <div class="at-row">${ask.length ? `<button class="at-btn at-press primary" data-act="guide-ask"${GUIDE.asking ? ' disabled' : ''}><svg class="g"><use href="#i-bot"/></svg><span>${GUIDE.asking ? 'Asking…' : `Ask for your ${ask.length === 1 ? 'pick' : `${ask.length} picks`}, shallow`}</span></button>` : ''}${l ? '' : '<button class="at-btn at-press" data-act="listen-on"><span>Run automatically with Claude Code</span></button>'}</div>
     ${l ? '' : '<p class="at-quiet">Or switch on "Run automatically" in Madav, if you use it.</p>'}`);
 
@@ -221,7 +222,7 @@ function renderGuide(): void {
 
   const all = g.done === g.of;
   $('#guideSub').textContent = all ? 'All five done. The desk keeps reading and proposing; every decision stays yours.'
-    : 'A safe first month, one step at a time. Each step ticks itself off when it is done, wherever you do it: here, or by asking the desk in a chat.';
+    : 'A safe first month, one step at a time. Each step ticks itself off when it is done, here or by asking the desk in a chat, except reading your first calls: that one ticks when you open a call here.';
   $('#guideDo').innerHTML = `<span class="at-chip${all ? ' ok' : ''}">${g.done} of ${g.of} done</span><button class="at-btn at-press" data-act="gloss-open"><svg class="g"><use href="#i-book"/></svg><span>What does this mean?</span></button><button class="at-btn at-press" data-act="guide-away" title="Put it away: the side list opens it again">Put away</button>`;
   $('#guideCard').innerHTML = `<ol class="ta-guide">${email}${picks}${analyse}${read}${paper}</ol>
     <p class="at-honest">The desk reads and proposes; it never places an order by itself, and nothing here is investment advice.</p>`;
@@ -257,7 +258,7 @@ async function askPicks(): Promise<void> {
 // ---------- what does this mean? every trading word, in one plain line ----------
 function openGlossary(): void {
   $('#glossDialog').innerHTML = `<div class="ta-pophead"><h2 id="glossTitle">What does this mean?</h2><button class="icon-btn" data-act="gloss-close" aria-label="Close"><svg class="g"><use href="#i-x"/></svg></button></div>
-    <p class="at-lede">Every trading word on the dashboard, in one plain line. On the page, point at a dotted word or a rating to see its line there.</p>
+    <p class="at-lede">The dashboard's main trading words, each in one plain line. On the page, point at a dotted word or a rating to see its line there; a word not listed here is explained where it is used.</p>
     ${glossaryGroups().map((g) => `<p class="at-kicker ta-stage">${esc(g.group)}</p><dl class="at-facts ruled at-box ta-gloss">${g.terms.map((t) => `<div><dt>${esc(t.term)}</dt><dd>${esc(t.means)}</dd></div>`).join('')}</dl>`).join('')}
     <p class="at-honest">Nothing here is investment advice.</p>`;
   $<HTMLDialogElement>('#glossDialog').showModal();
@@ -266,6 +267,8 @@ function openGlossary(): void {
 /** The trading words written into the page itself (data-term) take their meaning from the glossary, once at the start. */
 function explainStaticWords(): void {
   for (const el of document.querySelectorAll<HTMLElement>('[data-term]')) { const k = el.dataset.term ?? ''; if (isTerm(k)) el.title = means(k); }
+  // How late a price may be, written once (data/delay.ts): the page's own copy of the words is the same, for before this runs.
+  for (const el of document.querySelectorAll<HTMLElement>('[data-delay]')) { el.textContent = el.dataset.delay === 'short' ? DELAY_SHORT : DELAY_SENTENCE; if (el.dataset.delay === 'short') el.title = DELAY_SENTENCE; }
 }
 
 function renderFavs(): void {
@@ -388,8 +391,10 @@ const sideWord = (s: string | null) => (s === 'buy' ? 'Buy' : s === 'sell' ? 'Se
 // while the page is open, and stays marked for as long as it lasts. Nothing here sells: a mark opens a ticket on a press.
 const CARE = { holdings: [] as HoldingCare[], noticed: new Set<string>() };
 const careFor = (account: string, symbol: string): HoldingCare | undefined => CARE.holdings.find((c) => c.account === account && c.symbol === symbol);
+/** Why a holding is marked below its stop: the price, when it is from and, while its market trades, how late it may be (a
+ *  close is final, so nothing is said of lateness beside one). */
 const belowWords = (c: HoldingCare): string => c.price && c.stop?.level != null
-  ? `${c.desk} is at ${money(c.price.value)} on Yahoo Finance (${when(c.price.asOf)}, up to 15 minutes late), below the stop of ${money(c.stop.level)} the desk's trader proposed on ${dayText(c.stop.date)}. Nothing is sold by itself: selling is your decision.`
+  ? `${c.desk} ${c.price.open === false ? `closed at ${money(c.price.value)} on Yahoo Finance (${when(c.price.asOf)})` : `is at ${money(c.price.value)} on Yahoo Finance (${when(c.price.asOf)}, ${LATE[c.price.market ?? 'other']})`}, below the stop of ${money(c.stop.level)} the desk's trader proposed on ${dayText(c.stop.date)}. Nothing is sold by itself: selling is your decision.`
   : '';
 const sellWords = (c: HoldingCare): string => {
   if (!c.sell || !c.view) return '';
@@ -423,7 +428,7 @@ function renderCare(): void {
   const items = CARE.holdings.filter((c) => c.agentic && (c.below || c.sell));
   $('#sec-care').classList.toggle('hide', !items.length);
   if (!items.length) return;
-  $('#careSub').textContent = 'In the Agentic account, as Robinhood was last read · nothing is ever sold by itself: every sale is your own Confirm on a ticket';
+  $('#careSub').textContent = 'In the Agentic account, as Robinhood was last read · stops are watched only while this page is open · nothing is ever sold by itself: every sale is your own Confirm on a ticket';
   const rows = items.map((c) => {
     const chips = `${c.below ? '<span class="at-chip danger">below its stop</span>' : ''}${c.sell ? ' <span class="at-chip danger">the desk says sell</span>' : ''}`;
     const words = [c.below ? belowWords(c) : '', c.sell ? sellWords(c) : ''].filter(Boolean).map((w) => `<span>${esc(w)}</span>`).join(' ');
@@ -460,9 +465,9 @@ function viewCard(v: AccountView, at: string): string {
     ${kpi({ tone: 'merged', icon: 'i-pie', name: 'Holdings', value: String(v.holdings.length), line: `${stocks} ${stocks === 1 ? 'stock' : 'stocks'}${coins ? ` · ${coins} crypto` : ''}` })}</div>`;
   const total = p?.total ?? null;
   const share = (h: Holding) => (h.value === null || !total ? null : (h.value / total) * 100);
-  const rows = v.holdings.map((h: Holding) => { const s = share(h); return `<tr><td><b>${esc(h.symbol)}</b>${h.kind === 'crypto' ? ' <small class="at-quiet">crypto</small>' : ''}</td><td class="num">${num(h.quantity, h.quantity % 1 ? 4 : 0)}</td><td class="num">${money(h.averageCost, cur)}</td><td class="num">${money(h.price, cur)}</td><td class="num">${money(h.value, cur)}</td><td><span class="ta-share">${s === null ? '—' : `<progress class="at-bar" max="100" value="${s.toFixed(1)}" aria-label="${s.toFixed(1)}% of the account"></progress><small>${s.toFixed(1)}%</small>`}</span></td><td class="num">${h.gainPct === null ? '—' : `<span class="at-chip ${tone(h.gainPct)}">${pct(h.gainPct)}</span>`}</td><td class="wrap">${careCell(careFor(a.key, h.symbol))}</td></tr>`; }).join('');
+  const rows = v.holdings.map((h: Holding) => { const s = share(h); return `<tr><td><b>${esc(h.symbol)}</b>${h.kind === 'crypto' ? ' <small class="at-quiet">crypto</small>' : ''}</td><td class="num">${qty(h.quantity)}</td><td class="num">${money(h.averageCost, cur)}</td><td class="num">${money(h.price, cur)}</td><td class="num">${money(h.value, cur)}</td><td><span class="ta-share">${s === null ? '—' : `<progress class="at-bar" max="100" value="${s.toFixed(1)}" aria-label="${s.toFixed(1)}% of the account"></progress><small>${s.toFixed(1)}%</small>`}</span></td><td class="num">${h.gainPct === null ? '—' : `<span class="at-chip ${tone(h.gainPct)}">${pct(h.gainPct)}</span>`}</td><td class="wrap">${careCell(careFor(a.key, h.symbol))}</td></tr>`; }).join('');
   const care = a.agentic
-    ? "<p class=\"at-quiet\">The desk's view is its latest call on each holding. A stop is the desk's trader's, watched against Yahoo Finance's price (up to 15 minutes late). Nothing is ever sold by itself: Sell… opens a ticket that Robinhood checks and you confirm.</p>"
+    ? `<p class="at-quiet">The desk's view is its latest call on each holding. ${esc(NOTES.stopWatch)} Nothing is ever sold by itself: Sell… opens a ticket that Robinhood checks and you confirm.</p>`
     : "<p class=\"at-quiet\">The desk's view is shown for your information: it proposes orders for the Agentic account alone.</p>";
   const table = v.holdings.length
     ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>Holding</th><th class="num">Quantity</th><th class="num">Average cost</th><th class="num">Price now</th><th class="num">Value</th><th>Share of the account</th><th class="num">Since bought</th><th class="wrap">The desk's view</th></tr></thead><tbody>${rows}</tbody></table></div>${care}`
@@ -475,7 +480,7 @@ function viewCard(v: AccountView, at: string): string {
     const o = v.orders;
     const orders = o === null ? '<p class="at-quiet">The orders could not be read.</p>'
       : o.count === 0 ? '<p class="at-quiet">No orders in this account yet.</p>'
-      : `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>When</th><th>Order</th><th class="num">Quantity</th><th class="num">Price</th><th>State</th></tr></thead><tbody>${o.orders.map((x: Order) => `<tr><td>${esc(x.at ? dayText(x.at) : '—')}</td><td>${esc(`${sideWord(x.side)} ${x.symbol ?? ''}`.trim())}${x.type ? ` <small class="at-quiet">${esc(x.type)}</small>` : ''}</td><td class="num">${num(x.quantity, 0)}</td><td class="num">${money(x.price, cur)}</td><td>${esc(x.state ?? '—')}</td></tr>`).join('')}</tbody></table></div>${o.count > o.orders.length ? `<p class="at-quiet">The latest ${o.orders.length} of ${o.count}.</p>` : ''}`;
+      : `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>When</th><th>Order</th><th class="num">Quantity</th><th class="num">Price</th><th>State</th></tr></thead><tbody>${o.orders.map((x: Order) => `<tr><td>${esc(x.at ? dayText(x.at) : '—')}</td><td>${esc(`${sideWord(x.side)} ${x.symbol ?? ''}`.trim())}${x.type ? ` <small class="at-quiet">${esc(x.type)}</small>` : ''}</td><td class="num">${qty(x.quantity)}</td><td class="num">${money(x.price, cur)}</td><td>${esc(x.state ?? '—')}</td></tr>`).join('')}</tbody></table></div>${o.count > o.orders.length ? `<p class="at-quiet">The latest ${o.orders.length} of ${o.count}.</p>` : ''}`;
     agentic = `<div class="at-card-head"><h3>Orders in this account</h3></div>${orders}<p class="at-honest">${esc(phone)} Keep it on until you trust the desk.</p>`;
   }
   const problems = v.problems.length ? `<p class="at-honest bad">Not read: ${esc(v.problems.join('; '))}. Those figures are left as dashes.</p>` : '';
@@ -567,10 +572,12 @@ function capsBlock(): string {
       <label class="at-field"><span class="at-field-l">Switch off after a fall in a week of, %</span><input class="at-input at-box" id="capWeek" type="text" inputmode="decimal" value="${c.weeklyLossPercent}"></label>
       <label class="at-field"><span class="at-field-l">Shortest hold, trading days</span><input class="at-input at-box" id="capHold" type="number" min="0" max="60" step="1" inputmode="numeric" value="${c.minHoldDays}"></label></div>
     <div class="at-row">${rhButton('caps-save', 'Save the caps', { primary: true })}${rhButton('caps-cancel', 'Cancel')}</div>`;
-  const chip = (k: TermKey, words: string) => `<span class="at-chip" title="${esc(means(k))}">${esc(words)}</span>`;
+  const chip = (k: TermKey, words: string, more = '') => `<span class="at-chip" title="${esc(`${means(k)}${more}`)}">${esc(words)}</span>`;
+  // Each chip points at its own meaning: the most in one stock is a cap, not the size of a position (both 10% as shipped).
+  // A whole-market fund counts in no sector (desk/sectors.ts MARKET_FUNDS), QQQ included, so the sector chip says so.
   return `<div class="at-card-head"><h3>Your ${term('cap', 'caps')}</h3></div>
-    <div class="at-row">${chip('cap', `${money(c.perOrderUsd)} an order at most`)}${chip('position', `${c.perStockPercent}% of the account in one stock`)}${chip('cap', `${c.ordersPerDay} ${c.ordersPerDay === 1 ? 'order' : 'orders'} a day`)}</div>
-    <div class="at-row">${chip('sector', `one sector at most ${c.perSectorPercent}%`)}${chip('crypto', `crypto at most ${c.cryptoPercent}%`)}${chip('weeklyLoss', `switches itself off after a ${c.weeklyLossPercent}% fall in a week`)}${chip('shortestHold', `a stock bought here is held at least ${c.minHoldDays} trading ${c.minHoldDays === 1 ? 'day' : 'days'}`)}</div>
+    <div class="at-row">${chip('cap', `${money(c.perOrderUsd)} an order at most`)}${chip('cap', `${c.perStockPercent}% of the account in one stock`)}${chip('cap', `${c.ordersPerDay} ${c.ordersPerDay === 1 ? 'order' : 'orders'} a day`)}</div>
+    <div class="at-row">${chip('sector', `one sector at most ${c.perSectorPercent}%`, ' For this limit a whole-market fund, such as SPY or the Nasdaq 100 fund QQQ, counts in no sector, though QQQ is mostly technology.')}${chip('crypto', `crypto at most ${c.cryptoPercent}%`)}${chip('weeklyLoss', `switches itself off after a ${c.weeklyLossPercent}% fall in a week`)}${chip('shortestHold', `a stock bought here is held at least ${c.minHoldDays} trading ${c.minHoldDays === 1 ? 'day' : 'days'}`)}</div>
     <div class="at-row">${rhButton('caps-edit', 'Change the caps…')}</div>`;
 }
 
@@ -917,7 +924,7 @@ function renderStock(): void {
     const rows = A.snapshot.views.flatMap((v) => v.holdings.filter((h) => h.symbol === sym).map((h) => {
       const cur = v.portfolio?.currency ?? 'USD';
       const c = careFor(v.account.key, h.symbol), marks = c ? careMarks(c) : '';
-      return `<div><dt>${esc(v.account.label)} · ${v.account.agentic ? 'Agentic' : 'view only'}</dt><dd>${num(h.quantity, h.quantity % 1 ? 4 : 0)} at ${money(h.averageCost, cur)} average · now ${money(h.value, cur)}${h.gainPct === null ? '' : ` <span class="at-chip ${tone(h.gainPct)}">${pct(h.gainPct)}</span>`}${marks ? ` ${marks}` : ''}</dd></div>`;
+      return `<div><dt>${esc(v.account.label)} · ${v.account.agentic ? 'Agentic' : 'view only'}</dt><dd>${qty(h.quantity)} at ${money(h.averageCost, cur)} average · now ${money(h.value, cur)}${h.gainPct === null ? '' : ` <span class="at-chip ${tone(h.gainPct)}">${pct(h.gainPct)}</span>`}${marks ? ` ${marks}` : ''}</dd></div>`;
     }));
     held = rows.length ? `<dl class="at-facts ruled at-box">${rows.join('')}</dl><p class="at-quiet">Valued at Robinhood's live price, read at ${esc(when(A.snapshot.at))}.</p>` : `<p class="at-quiet">Not held in the accounts you show.</p>`;
   }
@@ -939,7 +946,7 @@ function renderStock(): void {
   const orders = !A.snapshot ? '<p class="at-quiet">Read your accounts to see your orders on it.</p>'
     : !ag ? '<p class="at-quiet">Show your Agentic account to see its orders.</p>'
     : ag.orders === null ? '<p class="at-quiet">The orders could not be read.</p>'
-    : mine.length ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>When</th><th>Order</th><th class="num">Quantity</th><th class="num">Price</th><th>State</th></tr></thead><tbody>${mine.map((x) => `<tr><td>${esc(x.at ? dayText(x.at) : '—')}</td><td>${esc(sideWord(x.side))}${x.type ? ` <small class="at-quiet">${esc(x.type)}</small>` : ''}</td><td class="num">${num(x.quantity, 0)}</td><td class="num">${money(x.price)}</td><td>${esc(x.state ?? '—')}</td></tr>`).join('')}</tbody></table></div>`
+    : mine.length ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>When</th><th>Order</th><th class="num">Quantity</th><th class="num">Price</th><th>State</th></tr></thead><tbody>${mine.map((x) => `<tr><td>${esc(x.at ? dayText(x.at) : '—')}</td><td>${esc(sideWord(x.side))}${x.type ? ` <small class="at-quiet">${esc(x.type)}</small>` : ''}</td><td class="num">${qty(x.quantity)}</td><td class="num">${money(x.price)}</td><td>${esc(x.state ?? '—')}</td></tr>`).join('')}</tbody></table></div>`
     : `<p class="at-quiet">No orders on ${esc(sym)} in the Agentic account.</p>`;
   const trade = isStock(sym) ? `<div class="at-row">${(['buy', 'sell'] as const).map((s) => `<button class="at-btn at-press" data-act="trade" data-side="${s}" data-symbol="${esc(sym)}"><svg class="g"><use href="#${s === 'buy' ? 'i-up' : 'i-down'}"/></svg><span>${s === 'buy' ? 'Buy' : 'Sell'} ${esc(sym)}…</span></button>`).join('')}</div>` : '';
   $('#stockBody').innerHTML = `<div class="ta-col">
@@ -1064,7 +1071,7 @@ function renderLook(): void {
   const s = MORNING.screen, el = $('#lookCard');
   const head = `<div class="at-card-head"><h3>Worth a look today</h3>${s ? `<span class="at-chip" title="How many funds and stocks were looked at">${s.picks.length} of ${s.looked}</span>` : ''}</div>`;
   const sw = `<button class="at-toggle" data-act="morning-switch" role="switch" aria-checked="${MORNING.on}"><span class="at-switch${MORNING.on ? ' on' : ''}"></span><span>Analyse the top ${MORNING.top} each market morning</span></button>
-    <p class="at-quiet">${MORNING.on ? `On${MORNING.from ? `, from ${esc(dayText(MORNING.from))}` : ''}: each market morning (before noon in New York), the top ${MORNING.top} not already called go on the waiting list at shallow depth, once. Each analysis uses your Claude plan, like a chat.` : `Off as shipped. When on, it starts the next market morning: then the top ${MORNING.top} go on the waiting list at shallow depth once each market morning, and run when something is listening. Switching it on puts nothing on the list at once.`}</p>`;
+    <p class="at-quiet">${MORNING.on ? `On${MORNING.from ? `, from ${esc(dayText(MORNING.from))}` : ''}: each market morning (before noon in New York), the top ${MORNING.top} not already called that day go on the waiting list at shallow depth, once. Each analysis is a full team run on the models of whatever runs it (Madav's own, or your Claude plan with Claude Code).` : `Off as shipped. When on, it starts the next market morning: then the top ${MORNING.top} go on the waiting list at shallow depth once each market morning, and run when something is listening. Switching it on puts nothing on the list at once.`}</p>`;
   if (!s) { el.innerHTML = `${head}<p class="at-quiet">${esc(MORNING.screenFailed || "Looking over the whole market, the sectors and your names: the first look of the day takes a minute.")}</p>${sw}`; return; }
   const list = s.picks.length ? `<div class="ta-looks">${s.picks.map(lookRow).join('')}</div>`
     : `<p class="at-lede">Nothing stood out among the ${s.looked} looked at: no move of 3% or more, no volume twice its usual, no 52-week high or low, no cross of an average${!s.news?.read ? '' : s.news.unread.length ? ', and no news today about your other companies or coins' : ', and no news today about your companies or coins'}.</p>`;
@@ -1154,6 +1161,8 @@ function renderPaper(): void {
   else if (b.missing.length) lede = `The paper record cannot be worked out just now: the closing prices of ${listWords(b.missing)} could not be read from Yahoo Finance, and every order on paper is sized from the whole paper account, so no total is shown rather than one that leaves ${b.missing.length === 1 ? 'it' : 'them'} out. It tries again in a moment.`;
   else if (b.series.length < 2 || b.returnPct === null || b.value === null) lede = `Following the desk on paper since ${dayText(b.since ?? d.paper.since)}: nothing has filled yet. A call fills at the first closing price after its day.`;
   else lede = `Following the desk on paper since ${dayText(b.since ?? d.paper.since)}: ${pct(b.returnPct * 100)} (${money(b.value)} from ${money(b.startUsd)}), ${fundWords(b.benchmark)} ${b.benchmarkPct === null ? 'unavailable' : pct(b.benchmarkPct * 100)} over the same days.`;
+  // An earlier record left on screen after a later try failed says so: it may be out of date.
+  if (b && PAPER.failed) lede += ' The latest try to work it out again failed, so this may be out of date. It tries again in a moment.';
   const paidIn = b && b.dividendsUsd !== null && b.dividendsUsd > 0 ? ` Dividends paid into paper cash so far: ${esc(money(b.dividendsUsd))}.` : '';
   const held = b?.positions.length && b.cash !== null ? `<p class="at-quiet">${term('position', 'Positions')} on paper now: ${b.positions.map((p) => `${esc(p.ticker)} ${p.quantity}`).join(', ')}, and ${esc(money(b.cash))} in cash.${paidIn}</p>` : paidIn ? `<p class="at-quiet">${paidIn.trim()}</p>` : '';
   $('#paperCard').innerHTML = `<div class="at-card-head"><h3>Your ${term('paper', 'paper')} record</h3><span class="at-chip">${esc(weeksWords(d.paper))} of record</span></div>
@@ -1373,7 +1382,7 @@ function ask(sym: string): void {
 function renderAsk(): void {
   const l = S.desk?.analyses.listener;
   const coin = isCrypto(ASK.symbol), it = tierItem(ASK.symbol);
-  const reads = coin ? 'the price, the news and the mood (a coin has no accounts to read)' : 'the price, the news, the mood and the accounts (for a fund: what it holds and what it costs to own)';
+  const reads = coin ? 'the price, the news and the mood (a coin has no accounts to read)' : 'the price, the news, the mood and the accounts (for a fund: what it holds, and its yearly cost where the desk reads it, which for a US fund it does not)';
   $('#askDialog').innerHTML = `<h2 id="askTitle">Analyse ${esc(it?.name ? `${it.name} (${ASK.symbol})` : ASK.symbol)}</h2>
     <p class="at-lede">The desk's thirteen agents read ${reads}, check the facts, argue both sides, and record a call you can read and decide on. It never places an order${coin ? `: ${it?.paper === false ? 'among crypto, the desk follows only Bitcoin and Ether on paper' : 'a coin is followed on paper only'}` : ''}.</p>
     <div class="at-seg" role="radiogroup" aria-label="How deep">${DEPTH_ORDER.map((d) => `<button class="at-seg-b${d === ASK.depth ? ' on' : ''}" role="radio" aria-checked="${d === ASK.depth}" data-act="ask-depth" data-depth="${d}">${DEPTH_WORDS[d][0]}</button>`).join('')}</div>

@@ -7737,7 +7737,7 @@ function propose(c, t2, caps) {
     if (early(c, caps)) return none(`${c.symbol} was bought here on ${c.boughtOn}, ${c.heldDays} trading day(s) ago: your shortest hold is ${caps.minHoldDays}, so the desk proposes no sell yet.`);
     const all = action === "sell everything held", quantity2 = coin ? all ? c.held : downToStep(c.held / 2) : Math.floor(all ? c.held : c.held / 2);
     if (coin && quantity2 <= 0) return none(`${units(c.held, true)} of ${c.symbol} are held; half of that is less than the smallest step of 0.000001.`);
-    if (quantity2 < (coin ? 0 : 1)) return none(`The Agentic account holds ${c.held} share(s); half of that is less than one whole share, and a limit order sells whole shares only.`);
+    if (quantity2 < (coin ? 0 : 1)) return none(`The Agentic account holds ${c.held} share(s); half of that is less than one whole share, and the desk's tickets sell whole shares only.`);
     why.push(`${all ? "Everything held" : "Half of what is held"}: ${quantity2} of ${units(c.held, coin)}${coin ? "" : ", whole shares only"}.`);
     return { action, order: { symbol: c.symbol, side: "sell", quantity: quantity2, limitPrice, timeInForce: t2.orderDefaults.timeInForce }, why };
   }
@@ -7768,7 +7768,7 @@ function propose(c, t2, caps) {
     return { action, order: { symbol: c.symbol, side: "buy", quantity: quantity2, limitPrice, timeInForce: t2.orderDefaults.timeInForce }, why };
   }
   const quantity = Math.floor(amount / limitPrice);
-  if (quantity < 1) return none(`${money(amount)} buys less than one share at ${money(limitPrice)}, and a limit order buys whole shares only.`);
+  if (quantity < 1) return none(`${money(amount)} buys less than one share at ${money(limitPrice)}, and the desk's tickets buy whole shares only.`);
   why.push(`${money(amount)} \xF7 ${money(limitPrice)}, rounded down: ${quantity} share(s).`);
   return { action, order: { symbol: c.symbol, side: "buy", quantity, limitPrice, timeInForce: t2.orderDefaults.timeInForce }, why };
 }
@@ -7777,7 +7777,7 @@ function proposeOwn(c, side, t2) {
   const none = (reason) => ({ action, order: null, why: [reason] });
   if (c.price === null || c.price <= 0) return none(`Robinhood gave no live price for ${c.symbol}, so no order can be priced.`);
   if (side === "sell" && c.held <= 0) return none(`The Agentic account holds no ${c.symbol} to sell.`);
-  if (side === "sell" && c.held < 1) return none(`The Agentic account holds ${c.held} of a share of ${c.symbol}; a limit order sells whole shares only.`);
+  if (side === "sell" && c.held < 1) return none(`The Agentic account holds ${c.held} of a share of ${c.symbol}; the desk's tickets sell whole shares only.`);
   const limitPrice = cents(c.price);
   const why = [`Your own order: one whole share to start, at Robinhood's live price of ${money(limitPrice)}. Change the shares and the limit price below.`];
   if (side === "sell") why.push(`The Agentic account holds ${c.held} share(s) of ${c.symbol}.`);
@@ -8375,6 +8375,7 @@ var ACTIONS = ["buy a full position", "buy half a position", "no order", "sell h
 var DEFAULT_CAPS = { perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 3, perSectorPercent: 30, cryptoPercent: 5, weeklyLossPercent: 5, minHoldDays: 5 };
 var CAP_RANGES = { perOrderUsd: [1, 1e5], perStockPercent: [1, 100], ordersPerDay: [1, 50], perSectorPercent: [1, 100], cryptoPercent: [0, 100], weeklyLossPercent: [1, 50], minHoldDays: [0, 60] };
 var WHOLE_CAPS = /* @__PURE__ */ new Set(["ordersPerDay", "minHoldDays"]);
+var CAP_RANGE_WORDS = ((r) => `caps are $${r.perOrderUsd[0]} to $${r.perOrderUsd[1].toLocaleString("en-US")} an order, ${r.perStockPercent[0]}% to ${r.perStockPercent[1]}% of the account in one stock, ${r.ordersPerDay[0]} to ${r.ordersPerDay[1]} orders a day, ${r.perSectorPercent[0]}% to ${r.perSectorPercent[1]}% in one sector, ${r.cryptoPercent[0]}% to ${r.cryptoPercent[1]}% in crypto, a weekly fall of ${r.weeklyLossPercent[0]}% to ${r.weeklyLossPercent[1]}% before trading switches itself off, and a shortest hold of ${r.minHoldDays[0]} to ${r.minHoldDays[1]} trading days; orders a day and the shortest hold are whole numbers`)(CAP_RANGES);
 var DEFAULTS = {
   analysis: {
     outputLanguage: "English",
@@ -20395,10 +20396,10 @@ function waitForCode(port, expectedState, timeoutMs = 5 * 6e4) {
         return;
       }
       if (!got || !want || state !== want) {
-        answer(res, 400, "This sign-in link does not match. Start again from Madav.");
+        answer(res, 400, "This sign-in link does not match. Start again from where you began it: the dashboard's Connect, or the desk check.");
         return;
       }
-      answer(res, 200, "Signed in to Robinhood. You can close this tab and go back to Madav.");
+      answer(res, 200, "Signed in to Robinhood. You can close this tab and go back to where you started it.");
       finish();
       resolve(got);
     });
@@ -20737,7 +20738,8 @@ var Link = class {
       state: "connected",
       checkedAt: this.now(),
       tools: { read: k.read.length, order: k.order.length, other: k.other.length },
-      message: `Robinhood offers ${total} ${total === 1 ? "tool" : "tools"}: ${k.read.length} that only read, ${k.order.length} that order or move money (this page never uses them) and ${k.other.length} others.`
+      // Of the order tools, the page calls two (review.ts, order.ts), and only on the person's own press; no agent gets any.
+      message: `Robinhood offers ${total} ${total === 1 ? "tool" : "tools"}: ${k.read.length} that only read, ${k.order.length} that order or move money (of these, this page uses only Robinhood's dry run, when you press Review, and the order itself, on your Confirm; no agent ever gets one) and ${k.other.length} others.`
     };
   }
   bad(e) {
@@ -21174,7 +21176,7 @@ ${e.reflection}`] : []
     const short = (e) => `${head(e)}${e.reflection && LESSON_NOTE[e.lesson] ? ` (lesson ${LESSON_NOTE[e.lesson](e)})` : ""}
 ${e.reflection || e.decision.slice(0, 300) + (e.decision.length > 300 ? "..." : "")}`;
     const parts = [];
-    if (same.length) parts.push(`Past analyses of ${ticker} (most recent first):`, ...same.map(full));
+    if (same.length) parts.push(`Past analyses of ${ticker} (latest recorded first):`, ...same.map(full));
     if (other.length) parts.push("Recent cross-ticker lessons:", ...other.map(short));
     return parts.join("\n\n");
   }
@@ -21885,15 +21887,15 @@ import path14 from "node:path";
 // src/terminal/tiers.ts
 var TIERS = ["market", "sectors", "names", "crypto"];
 var TIER_WORDS = {
-  market: { name: "The whole market", meaning: "Funds that each hold hundreds or thousands of companies, or bonds: the broadest and steadiest place to start." },
+  market: { name: "The whole market", meaning: "Funds that each follow a broad index, from 30 companies (the Dow Jones) or 100 (the Nasdaq 100) to thousands, or bonds: broader than one sector or one company." },
   sectors: { name: "Sectors", meaning: "The eleven parts of the economy, such as technology or energy, one fund each: side by side, they show which parts are rising." },
   names: { name: "Single names", meaning: "One company each, or a narrower fund: each can swing far more than the whole market." },
-  crypto: { name: "Crypto", meaning: "Coins such as Bitcoin, which swing far more than shares: the desk follows them on paper only, never with an order." }
+  crypto: { name: "Crypto", meaning: "Coins such as Bitcoin, which swing far more than shares: the desk follows Bitcoin and Ether on paper only, never with an order, and no other coin." }
 };
 var SHIPPED_MARKET = ["SPY", "QQQ", "VT", "BND"];
 var MAX_MARKET = 8;
 var START_NAMES = 12;
-var sp500 = { name: "S&P 500 fund", meaning: "copies the S&P 500 index: the 500 largest US companies" };
+var sp500 = { name: "S&P 500 fund", meaning: "copies the S&P 500 index: about 500 large US companies, chosen by S&P" };
 var us = { name: "The whole US market", meaning: "nearly every US company, large and small" };
 var bonds = { name: "US bonds", meaning: "loans to the US government and to companies: steadier than shares, and they pay interest" };
 var PLAIN = {
@@ -21905,12 +21907,12 @@ var PLAIN = {
   SCHB: us,
   BND: bonds,
   AGG: bonds,
-  QQQ: { name: "Nasdaq 100 fund", meaning: "copies the Nasdaq 100 index: the 100 largest companies on the Nasdaq exchange, mostly technology" },
+  QQQ: { name: "Nasdaq 100 fund", meaning: "copies the Nasdaq 100 index: the 100 largest companies on the Nasdaq exchange, leaving out banks and other financial firms, mostly technology" },
   DIA: { name: "Dow Jones fund", meaning: "copies the Dow Jones index: 30 large, long-established US companies" },
   IWM: { name: "Russell 2000 fund", meaning: "copies the Russell 2000 index: 2,000 smaller US companies" },
   VT: { name: "The whole world", meaning: "thousands of companies in dozens of countries" },
   VXUS: { name: "The world outside the US", meaning: "thousands of companies outside the United States" },
-  VEA: { name: "Developed markets", meaning: "large companies in Europe, Japan, Canada and Australia" },
+  VEA: { name: "Developed markets", meaning: "companies large and small in developed countries outside the US, such as in Europe, Japan, Canada and Australia" },
   EFA: { name: "Developed markets", meaning: "large companies in Europe, Japan and Australia" },
   VWO: { name: "Emerging markets", meaning: "companies in growing economies such as China, India and Brazil" },
   XLK: { name: "Technology", meaning: "makers of chips, software and computers" },
@@ -22210,6 +22212,14 @@ function callOf(root2, ticker, date4) {
   return { decision: e.decision, sections: sectionsOf(dir, ticker, date4), hasReport: hasReport(dir, ticker, date4) };
 }
 
+// src/data/delay.ts
+var US_EXCHANGES = ["NMS", "NGM", "NCM", "NYQ", "PCX", "ASE", "BTS"];
+function priceMarket(listing) {
+  if (listing.instrumentType === "CRYPTOCURRENCY") return "coin";
+  if ((listing.instrumentType === "EQUITY" || listing.instrumentType === "ETF") && US_EXCHANGES.includes(listing.exchangeName ?? "")) return "us";
+  return "other";
+}
+
 // src/terminal/quotes.ts
 var finite2 = (v) => typeof v === "number" && Number.isFinite(v);
 function parseQuote(json, symbol, nowSec = Date.now() / 1e3) {
@@ -22233,7 +22243,8 @@ function parseQuote(json, symbol, nowSec = Date.now() / 1e3) {
     changePct: previousClose === null ? null : (price / previousClose - 1) * 100,
     open: open4,
     asOf: new Date(t2 * 1e3).toISOString(),
-    points: points.length ? points : [price]
+    points: points.length ? points : [price],
+    market: priceMarket(m)
   };
 }
 var memo2 = /* @__PURE__ */ new Map();
@@ -22564,7 +22575,8 @@ function outcomeWords(title) {
   if (/no change/i.test(title)) return { words: "no change", way: "none" };
   const m = /(\d+)\s*(\+?)\s*bps?\s*(decrease|cut|increase|hike|rise)/i.exec(title);
   if (!m) return { words: title.toLowerCase(), way: "none" };
-  const cut = /decrease|cut/i.test(m[3]), size = `${Number((Number(m[1]) / 100).toFixed(2))}%`;
+  const points = Number((Number(m[1]) / 100).toFixed(2));
+  const cut = /decrease|cut/i.test(m[3]), size = `${points} percentage point${points === 1 ? "" : "s"}`;
   return { words: `${cut ? "a cut" : "a rise"} of ${size}${m[2] ? " or more" : ""}`, way: cut ? "cut" : "rise" };
 }
 function ratesOf(events, now = /* @__PURE__ */ new Date()) {
@@ -22816,7 +22828,7 @@ async function startTerminal(opts) {
       ticketable
     });
     const prices = /* @__PURE__ */ new Map();
-    for (const q of await Promise.all(toWatch(held).map(quote))) if (!("error" in q)) prices.set(q.symbol, { value: q.price, asOf: q.asOf });
+    for (const q of await Promise.all(toWatch(held).map(quote))) if (!("error" in q)) prices.set(q.symbol, { value: q.price, asOf: q.asOf, open: q.open, market: q.market });
     return { at: snap.at, holdings: watched(held, prices) };
   };
   const queued = (job) => {
@@ -23128,7 +23140,7 @@ async function startTerminal(opts) {
     if (p === "/api/trading" && method === "POST") {
       if (b.caps !== void 0) {
         const caps = capsFrom(b.caps);
-        if (!caps) throw new Refused2(400, "caps are $1 to $100,000 an order, 1% to 100% of the account in one stock, and 1 to 50 orders a day");
+        if (!caps) throw new Refused2(400, CAP_RANGE_WORDS);
         return json(res, 200, robinhood.setCaps(caps));
       }
       if (b.on === false) return json(res, 200, robinhood.setTrading(false));

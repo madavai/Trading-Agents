@@ -8,6 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { daysBetween } from '../data/dates.js';
+import type { PriceMarket } from '../data/delay.js';
 import { firstMarketDayOfWeek } from '../data/holidays.js';
 import { normalizeSymbol } from '../data/symbols.js';
 import type { Caps, Trading } from '../settings.js';
@@ -68,6 +69,10 @@ export function stopIn(dir: string, ticker: string, date: string): Stop | null {
   try { const t = sectionsOf(dir, ticker, date).trader?.at(-1); return t ? stopOf(t) : null; } catch { return null; }
 }
 
+/** A price a stop is watched against: Yahoo Finance's, when it is from, whether its market is open (a closed one's price is
+ *  its close), and the market it is from, for how late a live one may be. */
+export interface WatchPrice { value: number; asOf: string; open?: boolean; market?: PriceMarket }
+
 /** What the dashboard shows beside one holding. */
 export interface HoldingCare {
   /** The account's key (never its number), and whether it is the Agentic account. */
@@ -78,9 +83,11 @@ export interface HoldingCare {
   /** On the waiting list: waiting to be re-rated, or being analysed now. */
   rerating: 'waiting' | 'running' | null;
   /** The Agentic account only: the stop the trader proposed in the latest call, the price it is watched against (Yahoo
-   *  Finance's, up to 15 minutes late), and whether the price is below it. */
+   *  Finance's, with whether its market is open and which market it is, for how late it may be: data/delay.ts), and
+   *  whether the price is below it. Watched only while the dashboard page is open; the evening wrap-up's brief names a
+   *  holding whose last close is below its stop (`stopsAtClose`). */
   stop: (Stop & { date: string }) | null;
-  price: { value: number; asOf: string } | null;
+  price: WatchPrice | null;
   below: boolean;
   /** The Agentic account only, for a Sell or Underweight call: what the person's settings make of it, whether a ticket can
    *  be opened (a coin's cannot), and when the stock was bought here under the shortest hold. */
@@ -119,11 +126,44 @@ export const toWatch = (care: readonly HoldingCare[]): string[] => [...new Set(c
 
 /** The stop watch: each watched holding with its price, and below its stop when the price is under the trader's level. A
  *  price that could not be had leaves the holding unwatched for now, never marked. */
-export function watched(care: readonly HoldingCare[], prices: ReadonlyMap<string, { value: number; asOf: string }>): HoldingCare[] {
+export function watched(care: readonly HoldingCare[], prices: ReadonlyMap<string, WatchPrice>): HoldingCare[] {
   return care.map((c) => {
     const level = c.agentic ? c.stop?.level ?? null : null, p = level === null ? undefined : prices.get(c.desk);
     return p && level !== null ? { ...c, price: p, below: p.value < level } : c;
   });
+}
+
+// ---------- the stops at the last close, for the evening wrap-up ----------
+// The dashboard watches a stop only while its page is open in a browser. So the evening wrap-up's brief checks each stop
+// against the holding's last close and names any below it: Madav's evening routine (when the person switched the routines
+// on) then reports it. It only reports: nothing is ever sold by itself.
+
+/** A session's final close, as the desk's tools read it: its day and the price traded at. */
+export interface Close { date: string; close: number }
+
+/** One holding's stop against its last close: `close` null when the close could not be read (`why`). */
+export interface StopAtClose { symbol: string; level: number; called: string; close: Close | null; why?: string }
+
+/** The stops at the last close of the holdings the desk sizes trades to (the Agentic account as the dashboard last read
+ *  it, or what the person said they hold), or why none could be checked. Only a holding with a call whose trader gave a
+ *  stop at a price level is checked; a close that could not be read is said to be unavailable, never taken as above. */
+export type StopsAtClose =
+  | { state: 'unknown' } | { state: 'no-agentic' } | { state: 'nothing-held' }
+  | { state: 'checked'; held: number; stops: StopAtClose[] };
+
+export async function stopsAtClose(dir: string, today: string, closeOf: (symbol: string) => Promise<Close>): Promise<StopsAtClose> {
+  const held = readHoldings(dir);
+  if (!held) return { state: 'unknown' };
+  if (held.source === 'robinhood' && !held.accounts?.some((a) => a.tradable)) return { state: 'no-agentic' };
+  const symbols = [...new Set(held.positions.map((p) => p.ticker))].filter((s) => !/[\^=]/.test(s));
+  if (!symbols.length) return { state: 'nothing-held' };
+  const calls = new Journal(path.join(dir, 'journal.md')).load(), stops: StopAtClose[] = [];
+  for (const symbol of symbols) {
+    const view = viewOf(calls, symbol, today), level = view ? stopIn(dir, symbol, view.date)?.level ?? null : null;
+    if (!view || level === null) continue;
+    try { stops.push({ symbol, level, called: view.date, close: await closeOf(symbol) }); } catch (e) { stops.push({ symbol, level, called: view.date, close: null, why: (e as Error).message }); }
+  }
+  return { state: 'checked', held: symbols.length, stops };
 }
 
 // ---------- Monday's re-rating ----------
