@@ -246,7 +246,8 @@ export class Link {
   private good(reader: Reader): Last {
     const k = reader.byKind(), total = reader.tools.length;
     return { state: 'connected', checkedAt: this.now(), tools: { read: k.read.length, order: k.order.length, other: k.other.length },
-      message: `Robinhood offers ${total} ${total === 1 ? 'tool' : 'tools'}: ${k.read.length} that only read, ${k.order.length} that order or move money (this page never uses them) and ${k.other.length} others.` };
+      // Of the order tools, the page calls two (review.ts, order.ts), and only on the person's own press; no agent gets any.
+      message: `Robinhood offers ${total} ${total === 1 ? 'tool' : 'tools'}: ${k.read.length} that only read, ${k.order.length} that order or move money (of these, this page uses only Robinhood's dry run, when you press Review, and the order itself, on your Confirm; no agent ever gets one) and ${k.other.length} others.` };
   }
 
   private bad(e: unknown): Last {

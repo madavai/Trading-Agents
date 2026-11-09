@@ -11,7 +11,7 @@ import { ordersOn } from './orders.js';
 import { readWatchlist } from '../terminal/store.js';
 import { finishItem, readQueue } from './queue.js';
 import { TOP_QUEUED, type Pick, type Screen } from './screen.js';
-import { dueForRerate, isRerateDay, readRerate, RERATE_DAYS, RERATE_MAX, type Rerate } from './care.js';
+import { dueForRerate, isRerateDay, readRerate, RERATE_DAYS, RERATE_MAX, type Rerate, type StopsAtClose } from './care.js';
 
 /** "Worth a look today" as the morning reads it: the screen (null when it could not be worked out, with why), and whether
  *  the person's switch "Analyse the top three each market morning" is on. */
@@ -213,7 +213,7 @@ function openStill(today: string, now: Date): string[] {
   return at >= '16:00' ? [] : [`New York's market has not closed yet today: it is ${at} there. The day's calls and orders below are those so far; say so at the end.`];
 }
 
-export function eveningBrief(dir: string, today: string, now: Date): string {
+export function eveningBrief(dir: string, today: string, now: Date, stops?: StopsAtClose | { state: 'failed'; why: string }): string {
   const calls = new Journal(path.join(dir, 'journal.md')).load();
   const todays = calls.filter((e) => e.date === today), pending = calls.filter((e) => e.pending).length;
   const orders = ordersOn(dir, now);
@@ -229,7 +229,36 @@ export function eveningBrief(dir: string, today: string, now: Date): string {
     }
     lines.push('   What happened since (filled, approved, cancelled) is on the dashboard and in the Robinhood app: the team does not read Robinhood. Say so; do not guess.');
   }
-  lines.push('', `4. Calls still waiting to be scored: ${pending}.`);
+  lines.push('', ...stopLines(stops));
+  lines.push('', `5. Calls still waiting to be scored: ${pending}.`);
   lines.push('', 'Tell the person in a short plain list, using only these facts and what the tools return. Not investment advice.');
   return lines.join('\n');
+}
+
+/** A price in the brief: two decimals, more for one under a dollar (a coin such as DOGE). */
+const priceText = (n: number): string => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: n < 1 ? 6 : 2 });
+
+/** The stops at the last close, in the evening brief. The dashboard warns of a stop only while its page is open in a
+ *  browser, so the wrap-up names here any holding whose last close is below the stop the desk's trader proposed. It only
+ *  reports: nothing is ever sold by itself. A close that could not be read is said to be unknown, never taken as above. */
+export function stopLines(s: StopsAtClose | { state: 'failed'; why: string } | undefined): string[] {
+  const head = '4. Stops at the last close (the dashboard warns of a stop only while its page is open, so the wrap-up checks them here)';
+  if (!s) return [`${head}: not checked this evening. Say so.`];
+  if (s.state === 'failed') return [`${head}: they could not be checked (${s.why}). Say so: whether a holding closed below its stop is not known.`];
+  if (s.state === 'unknown') return [`${head}: the holdings the desk sizes trades to are not known (the dashboard has not read Robinhood, and the person gave none), so no stop was checked. Say so.`];
+  if (s.state === 'no-agentic') return [`${head}: the Agentic account is not among the accounts shown on the dashboard, so no stop was checked. Say so.`];
+  if (s.state === 'nothing-held') return [`${head}: nothing is held, so there is no stop to check.`];
+  if (!s.stops.length) return [`${head}: ${s.held === 1 ? 'the one holding has no stop' : `none of the ${s.held} holdings has a stop`} at a price level in the desk's latest call on it, so there is none to check.`];
+  const out = [`${head}:`];
+  for (const x of s.stops) {
+    const stop = `the stop of ${priceText(x.level)} the desk's trader proposed in the call of ${withWeekday(x.called)}`;
+    if (!x.close) out.push(`   - ${x.symbol}: its last close could not be read (${x.why ?? 'unavailable'}), so whether it is below ${stop} is not known. Never say it is above.`);
+    else if (x.close.close < x.level) out.push(`   - BELOW ITS STOP: ${x.symbol} closed at ${priceText(x.close.close)} on ${withWeekday(x.close.date)}, below ${stop}.`);
+    else out.push(`   - ${x.symbol} closed at ${priceText(x.close.close)} on ${withWeekday(x.close.date)}, at or above ${stop}.`);
+  }
+  const below = s.stops.filter((x) => x.close && x.close.close < x.level).map((x) => x.symbol);
+  out.push(below.length
+    ? `   Name ${below.length === 1 ? 'it' : 'each one below its stop'} first in your report, with its close and its stop (${below.join(', ')}). Nothing is sold by itself: selling is the person's own decision, on the dashboard or in the Robinhood app.`
+    : '   None closed below its stop: say so in one line.');
+  return out;
 }

@@ -35,7 +35,7 @@ built, which decisions stand, every document, and what is pending.
   portfolio report (form N-PORT) the fund had filed by the analysis day, found by its series (`fundOf`, from the SEC's
   fund list, then the SEC's list of that series' reports) or, for an ETF set up as a trust such as SPY, by its own
   filings; its size, lines added up by issuer, assets, issuers, countries, bonds' years and interest, its own monthly
-  returns, and the day its holdings are from. Amendments are not read. The yearly cost has no official free source and
+  returns, and the day its holdings are from. Amendments are not read. The yearly cost is not read (the prospectus states it) and
   is said as unavailable; a fund the SEC does not list falls back to Yahoo, today only.
 - `src/check/` - the desk check: this computer, and the free data sources. `probes.ts` asks each host the desk reads
   (SEC EDGAR and the SEC's company data among them); `NOT_PROBED` names the one it does not ask, and the check says so.

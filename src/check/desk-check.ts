@@ -70,8 +70,9 @@ export const UPDATED_WHY = "the desk in this folder was updated after the desk's
  *  whether the files match the project's version now; a reset from them could write the old team back. */
 export const NOT_COMPARED: Line = { ok: false, text: `The desk's agent files in this folder were not compared with the project's version: ${UPDATED_WHY}. Start a new conversation in Madav and check this computer there; reset nothing from this one` };
 
-/** Why this conversation's steps were not compared when it passed no version: true in Madav and in a plain chat alike. */
-export const NO_VERSION = 'no version was given';
+/** Why this conversation's steps were not compared when it passed no version: true in Madav and in a plain chat alike, and
+ *  plain about who can compare them (8 Nov 2026: in a plain chat the line read as a fault to fix). */
+export const NO_VERSION = 'no version was given. Only the trading-desk team\'s own steps carry a version, so a check from any other chat, or from a terminal, compares nothing here';
 
 /** What a caller that is not the trading-desk team passes as team_version (the desk check's tool needs one, so leaving the
  *  version out is never a quiet slip): read like no version at all. */
@@ -109,9 +110,26 @@ export const ASK_AGAIN = 'TEAM VERSION NEEDED: this answer did not compare this 
  *  passed no version read the agent-files line as saying its own steps were the folder's). */
 export const TWO_LINES = "Pass on the line about this conversation's steps for the team and the line about the desk's agent files in this folder as they are written. Only the first is about this conversation's steps, and only with a version shown; the second is about the files alone. Never take one for the other.";
 
-export function render(lines: Line[], sources: ProbeResult[]): string {
+/** The first words of the report, worked out from every line, for an agent that passes the check on (8 Nov 2026: a plain
+ *  chat in Madav opened "Everything is ready" over a check that compared none of its steps, against its own step 5). Said
+ *  once, above the lines, so it is read before the report is written; it is the whole summing up, so none is added at the
+ *  end either (in a test, one report opened as told and still closed "Nothing needs fixing"). A check read in a terminal
+ *  goes without it. */
+export function sumUp(lines: Line[], sources: ProbeResult[]): string {
+  const not = lines.filter((l) => !l.ok && !l.unchecked).length, down = sources.filter((s) => !s.ok).length;
+  const unchecked = lines.some((l) => l.unchecked);
+  const only = 'That opening is the whole summing up: add no other, at the start or at the end (never "everything is ready", "all checked", "nothing needs fixing" or the like)';
+  if (not || down) {
+    const what = [not ? 'each line marked NO' : '', down ? 'each data source that could not be reached' : ''].filter(Boolean).join(', and ');
+    return `HOW TO SUM UP: open your answer with what is not ready (${what}) and what to do about each${unchecked ? ', then say that this conversation\'s steps for the team were not compared' : ''}. ${only}.`;
+  }
+  if (unchecked) return `HOW TO SUM UP: open your answer with "Ready, except one thing this check did not compare: whether this conversation's steps for the team are the ones in this folder", then pass on that line as it is written. ${only}, since the line marked -- was not checked.`;
+  return 'HOW TO SUM UP: everything this check looked at is ready. You may say so, and name what it does not check (its last line).';
+}
+
+export function render(lines: Line[], sources: ProbeResult[], how?: string): string {
   const mark = (ok: boolean, unchecked?: true) => (unchecked ? '-- ' : ok ? 'OK ' : 'NO ');
-  const out = [`Trading Agents desk check (version ${VERSION})`, '', 'This computer:'];
+  const out = [`Trading Agents desk check (version ${VERSION})`, ...(how ? [how] : []), '', 'This computer:'];
   for (const l of lines) out.push(`- ${mark(l.ok, l.unchecked)} ${l.text}`);
   out.push(TWO_LINES);
   out.push('', 'Free data sources:');
@@ -148,5 +166,5 @@ export async function deskCheck(root: string = process.cwd(), fetchImpl: typeof 
   }
   const team = teamLine(asker.teamVersion, folder, asker.updated, knownTeamVersions(source));
   lines.unshift(team);   // the first thing to read: an old conversation's other answers may not hold
-  return `${team.askAgain && asker.viaTool ? `${ASK_AGAIN}\n\n` : ''}${render(lines, sources)}`;
+  return `${team.askAgain && asker.viaTool ? `${ASK_AGAIN}\n\n` : ''}${render(lines, sources, asker.viaTool ? sumUp(lines, sources) : undefined)}`;
 }

@@ -12,10 +12,10 @@ export type Tier = 'market' | 'sectors' | 'names' | 'crypto';
 export const TIERS: readonly Tier[] = ['market', 'sectors', 'names', 'crypto'];
 
 export const TIER_WORDS: Readonly<Record<Tier, { name: string; meaning: string }>> = {
-  market: { name: 'The whole market', meaning: 'Funds that each hold hundreds or thousands of companies, or bonds: the broadest and steadiest place to start.' },
+  market: { name: 'The whole market', meaning: 'Funds that each follow a broad index, from 30 companies (the Dow Jones) or 100 (the Nasdaq 100) to thousands, or bonds: broader than one sector or one company.' },
   sectors: { name: 'Sectors', meaning: 'The eleven parts of the economy, such as technology or energy, one fund each: side by side, they show which parts are rising.' },
   names: { name: 'Single names', meaning: 'One company each, or a narrower fund: each can swing far more than the whole market.' },
-  crypto: { name: 'Crypto', meaning: 'Coins such as Bitcoin, which swing far more than shares: the desk follows them on paper only, never with an order.' },
+  crypto: { name: 'Crypto', meaning: 'Coins such as Bitcoin, which swing far more than shares: the desk follows Bitcoin and Ether on paper only, never with an order, and no other coin.' },
 };
 
 /** The whole-market tier as shipped: the S&P 500, the Nasdaq 100, the whole world and US bonds. */
@@ -26,17 +26,17 @@ export const START_NAMES = 12;
 
 // A fund that copies an index is named as a fund ("S&P 500 fund"), so it is never taken for the index itself, which the
 // Markets cards show under the index's own name at about ten times the fund's price.
-const sp500 = { name: 'S&P 500 fund', meaning: 'copies the S&P 500 index: the 500 largest US companies' }, us = { name: 'The whole US market', meaning: 'nearly every US company, large and small' };
+const sp500 = { name: 'S&P 500 fund', meaning: 'copies the S&P 500 index: about 500 large US companies, chosen by S&P' }, us = { name: 'The whole US market', meaning: 'nearly every US company, large and small' };
 const bonds = { name: 'US bonds', meaning: 'loans to the US government and to companies: steadier than shares, and they pay interest' };
 /** The broad funds, the sector funds and the coins paper follows, by name in plain words, with what each holds. */
 export const PLAIN: Readonly<Record<string, { name: string; meaning: string }>> = {
   SPY: sp500, VOO: sp500, IVV: sp500, VTI: us, ITOT: us, SCHB: us, BND: bonds, AGG: bonds,
-  QQQ: { name: 'Nasdaq 100 fund', meaning: 'copies the Nasdaq 100 index: the 100 largest companies on the Nasdaq exchange, mostly technology' },
+  QQQ: { name: 'Nasdaq 100 fund', meaning: 'copies the Nasdaq 100 index: the 100 largest companies on the Nasdaq exchange, leaving out banks and other financial firms, mostly technology' },
   DIA: { name: 'Dow Jones fund', meaning: 'copies the Dow Jones index: 30 large, long-established US companies' },
   IWM: { name: 'Russell 2000 fund', meaning: 'copies the Russell 2000 index: 2,000 smaller US companies' },
   VT: { name: 'The whole world', meaning: 'thousands of companies in dozens of countries' },
   VXUS: { name: 'The world outside the US', meaning: 'thousands of companies outside the United States' },
-  VEA: { name: 'Developed markets', meaning: 'large companies in Europe, Japan, Canada and Australia' },
+  VEA: { name: 'Developed markets', meaning: 'companies large and small in developed countries outside the US, such as in Europe, Japan, Canada and Australia' },
   EFA: { name: 'Developed markets', meaning: 'large companies in Europe, Japan and Australia' },
   VWO: { name: 'Emerging markets', meaning: 'companies in growing economies such as China, India and Brazil' },
   XLK: { name: 'Technology', meaning: 'makers of chips, software and computers' },

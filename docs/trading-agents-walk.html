@@ -327,7 +327,7 @@ b, strong { font-weight: var(--weight-semibold); }
   { "id": "A", "name": "Getting started in Agent Studio",
     "sub": "The project is cloned, the team is where Madav reads it, and the desk check is green.",
     "about": "Trading Agents is a desk of thirteen AI agents that analyse a company the way a trading firm would and propose a rating, from Buy to Sell. In Madav it arrives as a ready team called trading-desk. You talk to it in Agent Studio: open the trading-desk team, choose Put to work, and type what you want in plain words. Every test with a prompt box works this way: press the box to copy the words, paste them to the team, and send.",
-    "before": "Madav, signed in to Claude, and Node 22 or later (the desk check tells you if it is missing). In Madav, clone https://github.com/madavai/Trading-Agents. There is nothing else to install and no keys to get. If Madav asks whether to use this folder's tools, say yes.",
+    "before": "Madav (it runs the team on the models it is set to use), and Node 22 or later (the desk check tells you if it is missing). In Madav, clone https://github.com/madavai/Trading-Agents. There is nothing else to install and no keys to get. If Madav asks whether to use this folder's tools, say yes.",
     "tests": [
     { "id": "A1", "title": "The thirteen agents are listed", "tags": [], "changed": "2026-11-07",
       "about": "Each agent has one job, like a desk at a trading firm: four analysts gather facts, a fact checker corrects their reports, a bull and a bear argue, a research manager weighs them, a trader drafts a plan, three risk voices challenge it and a portfolio manager decides.",
@@ -359,10 +359,11 @@ b, strong { font-weight: var(--weight-semibold); }
         "A line saying your private folder is locked to your own account and the system (nothing more: it never says that no other account can open it), and \"The desk's agent files in this folder (its thirteen agents, the team's file and its line-up) are as the project ships them\". The team never reads that line as being about this conversation's steps.",
         "Under \"Free data sources\", all eight answer: Yahoo Finance prices and news, StockTwits, Reddit, FRED economic data, Polymarket, SEC EDGAR and SEC company data. Then \"Every source checked here is reachable.\" and \"Not checked here: Yahoo Finance's company data, …\", the one source the check does not ask, with why.",
         "SPY's checked price table comes back. The team does not test Robinhood here: it points you to Connect on the dashboard's Your account (section D).",
+        "The team opens its answer as the check's \"HOW TO SUM UP\" line (just under the title) says. With every line OK it may say that everything the check looked at is ready. With a line marked NO or not checked (--), it opens with that, and nowhere says \"everything is ready\" or \"nothing needs fixing\".",
         "If this happens: the team says first that this conversation began before the desk was updated (the check starts \"DESK UPDATED\", or says \"This conversation's steps for the team (version …) are not the ones in this folder now\"). Start a new conversation with the trading-desk team and check again there. Reset nothing from the old conversation: it would offer no reset, and the desk refuses one from it.",
         "If this happens (a Fail: paste the team's words in the note): the first line says instead \"This conversation's steps for the team were not compared with the ones in this folder\", followed by \"no version was given\" or \"… is not a version the team's steps have ever had\". The team must say exactly that, as something not checked, and never that this conversation's steps match or that nothing needs fixing."] },
     { "id": "A4", "title": "Your email goes to the SEC alone", "tags": [], "changed": "2026-11-08",
-      "about": "The SEC (the US body that keeps companies' official accounts) asks every program that reads its filings for a contact email, and the desk is one, so it needs yours once, before its first analysis. It is kept on your computer and sent to the SEC only.",
+      "about": "The SEC (the US market regulator, which keeps the official filings companies send it) asks every program that reads its filings for a contact email, and the desk is one, so it needs yours once, before its first analysis. It is kept on your computer and sent to the SEC only.",
       "where": "The same answer as A3",
       "do": [
         "Read the line about your email. If the desk asks for it (the first time), answer with your own email address."],
@@ -398,7 +399,7 @@ b, strong { font-weight: var(--weight-semibold); }
   { "id": "B", "name": "The analysis team",
     "sub": "Thirteen agents analyse NVIDIA, a fund or a coin from free public data, official sources first, and record a rated call.",
     "about": "An analysis is the desk's main job. You name a company and how deep to go; four analysts read prices, mood, news and the company's accounts, a fact checker corrects what they got wrong, a bull and a bear argue, and a portfolio manager gives a rating from Buy to Sell. The result is a \"call\", kept in the desk's journal on your computer. It only proposes: nothing is ever bought or sold by an analysis.",
-    "before": "Section A done, and your email given (A4). Depth: shallow is one round of debate (the least model time: about 40 minutes in the desk's first real runs), medium three (nearly 3 hours), deep five. Each analysis uses your Claude plan, like a chat.",
+    "before": "Section A done, and your email given (A4). Depth: shallow is one round of debate (the least model time: about 40 minutes in the desk's first real runs), medium three (nearly 3 hours), deep five. Each analysis is a full team run on the models of whatever runs it: Madav's own, or your Claude plan with Claude Code.",
     "tests": [
     { "id": "B1", "title": "A shallow analysis of NVIDIA runs end to end", "tags": [], "changed": "2026-11-08",
       "about": "This is the whole desk at work on one company. Watching it once shows you every role in turn.",
@@ -465,7 +466,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "Ask the team about a company it has not analysed today, for example Microsoft: [[Analyse MSFT medium]]"],
       "see": [
         "Three rounds of the bull and bear debate and of the risk debate. It takes longer and uses more model time."] },
-    { "id": "B8", "title": "A fund is read for what it holds", "tags": [], "changed": "2026-11-08",
+    { "id": "B8", "title": "A fund is read for what it holds", "tags": [], "changed": "2026-11-09",
       "about": "A fund such as SPY (the S&P 500 in one ticker) has no company accounts. For a fund the desk reads what it holds instead, from the report every US fund files with the SEC each quarter (form N-PORT), a few months after the day it speaks for.",
       "where": "Madav › Agent Studio › trading-desk › Put to work, then the call's Fundamentals report",
       "do": [
@@ -473,10 +474,10 @@ b, strong { font-weight: var(--weight-semibold); }
         "On the dashboard, open the SPY call's \"Fundamentals report\". Then do the same for a sector fund, XLK, and a bond fund, BND."],
       "see": [
         "\"Fund profile for SPY, from its portfolio report to the SEC (form N-PORT, filed …): what it held on …\", with how many days before the analysis that was.",
-        "Its size (\"Net assets\"), what it is held in (stocks, bonds, cash), its countries, its own monthly returns, and its top ten holdings added up by issuer (Alphabet's two kinds of shares as one).",
+        "Its size (\"Net assets\"), what it is held in (stocks, bonds, cash), its countries, its own monthly returns, and its top ten holdings added up by issuer (Alphabet's two listed kinds of shares as one).",
         "In the countries line, holdings the report gives no country for (cash, futures) are named apart, as \"no country given for …\", and never counted as \"outside the US\".",
         "For BND, the US Treasury's many bonds as one line with their count, and the bonds' average years to repayment and yearly interest.",
-        "The yearly cost (the expense ratio) is \"unavailable\": no official free source gives it. Never a made-up figure.",
+        "The yearly cost (the expense ratio) is \"unavailable\": the desk does not read it, and the report says the fund's prospectus states it. Never a made-up figure.",
         "If the SEC could not be reached, or sent back an empty or broken list of the fund's reports, the report says the fund profile was \"unavailable\" and names the SEC. It never says SPY is \"not a fund\" or \"a company or a trust\" because of that."] },
     { "id": "B9", "title": "NVIDIA's valuation and insider trades, from the SEC", "tags": [], "changed": "2026-11-08",
       "about": "Insider trades are shares bought or sold by a company's own directors and officers, reported to the SEC on Form 4. When every filing was read, they are a fact, so \"none\" is an answer, not a gap. When some filings could not be read, the desk says how many and that the counts are not the whole picture. When an insider corrects a filing, the correction (a Form 4/A) takes the old filing's place, so no trade is counted twice. The desk reads the SEC's list of a company's filings again after an hour, and says when it read it, so a filing made since is never hidden behind an old read.",
@@ -514,7 +515,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "For a company that pays none, such as Tesla, the report says none went ex-dividend in those twelve months \"as the price source records them\", and what the company's filings say to that (none either, or no figure to check it against): never a made-up figure.",
         "If the price source records none but the filings show a dividend, the report gives the dividend as \"unavailable\", says the price source's record of dividends may be missing, and works out no yield from the filed figure. It never says such a company paid none."] },
     { "id": "B11", "title": "A company with two kinds of shares", "tags": [], "changed": "2026-10-22",
-      "about": "Some companies, such as Meta and Alphabet, have two classes of shares and publish no single share count where the desk first looks. The desk then uses the average share count from the company's own accounts, and says so, so its market value is still worked out.",
+      "about": "Some companies have more than one class of shares, such as Meta (two) and Alphabet (three), and publish no single share count where the desk first looks. The desk then uses the average share count from the company's own accounts, and says so, so its market value is still worked out.",
       "where": "Madav › Agent Studio › trading-desk › Put to work, then Dashboard › META's call › Fundamentals report",
       "do": [
         "Ask the team about Meta, if it has not been analysed today: [[Analyse META shallow]]",
@@ -543,7 +544,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "If a report calls a few hours' sample \"this week's\" news or mood, that is a fault: note the sentence.",
         "If StockTwits or Reddit sent back an error or an empty answer, the Sentiment report calls that source \"unavailable\", never a quiet crowd or a calm mood. If no source gave anything to read, its first line is \"Overall Sentiment: Unavailable (Score: none)\", never \"Neutral\"."] },
     { "id": "B13", "title": "The day's prices are called what they are", "tags": [], "changed": "2026-11-08",
-      "about": "During trading hours a stock's latest price is still moving. The free price source can be up to 15 minutes late, so the desk takes a day's figures as final only when it read them 15 minutes or more after the close, and it keeps a read of the prices for five minutes at most, so a long analysis never works from an old one. For a while after a day ends the source may not have filled that day in yet, and now and then it lists a day with no prices at all. The desk says which, and when it read the prices, so the reports never call a moving price \"the close\", never doubt a final one, and never say a day that traded had no trading.",
+      "about": "During trading hours a stock's latest price is still moving. A day's figures are not final the moment the market closes, so the desk takes them as final only when it read them 15 minutes or more after the close, and it keeps a read of the prices for five minutes at most, so a long analysis never works from an old one. For a while after a day ends the source may not have filled that day in yet, and now and then it lists a day with no prices at all. The desk says which, and when it read the prices, so the reports never call a moving price \"the close\", never doubt a final one, and never say a day that traded had no trading.",
       "where": "Dashboard › any call made after this update › Market report",
       "do": [
         "Run an analysis of NVIDIA during US trading hours (9:30 to 16:00 New York time) and open its Market report.",
@@ -630,7 +631,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "Its tip says \"Switch to the light face\" or \"Switch to the dark face\". The first visit follows your computer's own setting.",
         "Both faces are easy to read, including the account cards, the charts and the ticket."] },
     { "id": "C3", "title": "Markets", "tags": [], "changed": "2026-11-08",
-      "about": "A glance at the big markets, from Yahoo Finance (up to 15 minutes late). Each move belongs to the latest trading day, so on a weekend or before the open it names that day rather than passing for today's. A yield is already a percent, so its move is in points.",
+      "about": "A glance at the big markets, from Yahoo Finance. Each move belongs to the latest trading day, so on a weekend or before the open it names that day rather than passing for today's. A yield is already a percent, so its move is in points.",
       "where": "Dashboard › Markets",
       "do": [
         "Look at the market tiles, on a weekday while the market trades and again on a weekend. Point at a move.",
@@ -689,7 +690,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "With round 1's Bitcoin call in your journal, a call recorded before the desk kept each call's window with it is named: \"Scored otherwise: BTC-USD (16 Oct 2026): against SPY, the fund that copies the S&P 500 (the desk's settings name no yardstick for coins, so a coin is scored against the one for US listings), over the 5 calendar days after the call, as it was recorded before the desk kept each call's window with it, so it is scored as such calls were then.\" Its score does not change.",
         "Then: \"A call is scored when a scoring runs after its window (/settle, an analysis or a routine), not by itself. Both returns count dividends: they are worked out from prices adjusted for them. Green means the calls went the way their rating said in their first check, red that they went against it: a Buy or Overweight works when its stock beats its yardstick, an Underweight or Sell when its stock trails it. A Hold claims no direction, so it stays plain.\"",
         "With few scored calls: \"With so few scored calls these figures are noise, not a record.\" With none: \"Nothing has been scored yet. A call is scored once its window has passed and a scoring runs (/settle, an analysis or a routine), not by itself.\""] },
-    { "id": "C8", "title": "NVIDIA's own page", "tags": [], "changed": "2026-11-08",
+    { "id": "C8", "title": "NVIDIA's own page", "tags": [], "changed": "2026-11-09",
       "about": "Every company has a page that gathers everything about it: what you hold of it, your orders on it, and every call the desk made on it.",
       "where": "Dashboard › chart NVDA › side list › Stock page",
       "do": [
@@ -699,8 +700,8 @@ b, strong { font-weight: var(--weight-semibold); }
         "\"Everything on NVDA\": \"What you hold\" in each account (with \"Buy NVDA…\" and \"Sell NVDA…\"), \"Your orders on it\", and \"The desk's calls on it\" with each result.",
         "Under the calls: \"Each result is a first-week check against SPY over the 5 trading days after the call, not the call's own time horizon.\"",
         "\"Ask the desk to analyse\", \"Trade…\" and \"Decide…\".",
-        "Each price says where it comes from: Yahoo Finance, up to 15 minutes late, or Robinhood's live price.",
-        "The line under the title says which day its price is: \"$188.08 (+1.20% today) on Yahoo Finance, up to 15 min late\" while the market trades, \"$188.08, today's close (+1.20% today), from Yahoo Finance\" after it, and on a weekend \"$188.08, the close of Fri 6 Nov (+2.78% that day), from Yahoo Finance\"."] },
+        "Each price says where it comes from: Yahoo Finance or Robinhood's live price. A Yahoo price while the market trades says how late it may be: \"real-time\" for a US stock or fund on Nasdaq, the New York Stock Exchange, NYSE Arca, NYSE American or Cboe US, and for a coin; \"may be late\" for any other. A close says nothing about lateness.",
+        "The line under the title says which day its price is: \"$188.08 (+1.20% today) on Yahoo Finance, real-time\" while the market trades, \"$188.08, today's close (+1.20% today), from Yahoo Finance\" after it, and on a weekend \"$188.08, the close of Fri 6 Nov (+2.78% that day), from Yahoo Finance\"."] },
     { "id": "C9", "title": "Search by name", "tags": [], "changed": "2026-10-21",
       "about": "You don't need to know a ticker: type a company's name and pick it from Yahoo Finance's matches.",
       "where": "Dashboard › the search box at the top",
@@ -779,14 +780,15 @@ b, strong { font-weight: var(--weight-semibold); }
     "about": "Robinhood lets AI agents trade only in a separate account it calls Agentic, which you fund yourself. You connect Robinhood on the dashboard yourself, on Robinhood's own sign-in page; agents never touch the connection. This section is about reading your accounts; nothing here can place an order.",
     "before": "A Robinhood account, with its Agentic account opened in the Robinhood app if you want the desk to propose trades. The dashboard open (C1).",
     "tests": [
-    { "id": "D1", "title": "Connect Robinhood", "tags": [], "changed": "2026-10-21",
+    { "id": "D1", "title": "Connect Robinhood", "tags": [], "changed": "2026-11-09",
       "about": "The sign-in is saved in a private folder on your computer, locked to your own account, which agents are refused.",
       "where": "Dashboard › side list › Your account",
       "do": [
         "Press \"Connect Robinhood\" and sign in on Robinhood's own page (or \"Check the connection\" if you connected before)."],
       "see": [
         "\"Connected\": \"The sign-in works and Robinhood answered.\"",
-        "\"Robinhood offers N tools: X that only read, Y that order or move money (this page never uses them) and Z others.\""] },
+        "\"Robinhood offers N tools: X that only read, Y that order or move money (of these, this page uses only Robinhood's dry run, when you press Review, and the order itself, on your Confirm; no agent ever gets one) and Z others.\"",
+        "It never says that this page never uses them."] },
     { "id": "D2", "title": "You choose the accounts", "tags": [], "changed": "2026-10-21",
       "about": "Only the accounts you tick are shown, and only those reach the agents.",
       "where": "Dashboard › Your account › Choose accounts",
@@ -982,7 +984,7 @@ b, strong { font-weight: var(--weight-semibold); }
   ] },
   { "id": "G", "name": "Routines",
     "sub": "The morning routine and the evening wrap-up, by hand or from Madav's Routines, where the project ships them switched off.",
-    "about": "Routines are the desk's daily habits. The morning routine scores old calls, looks at what moved, analyses what you asked for and your starred companies, and lists the new calls to decide on; the evening wrap-up reports the day. Madav can run them on a schedule. They never place an order.",
+    "about": "Routines are the desk's daily habits. The morning routine scores old calls, looks at what moved, analyses what you asked for and your starred companies, and lists the new calls to decide on; the evening wrap-up reports the day, first any holding that closed below its stop. Madav can run them on a schedule. They never place an order.",
     "before": "A few calls recorded (section B) and NVDA starred on your watchlist (C4).",
     "tests": [
     { "id": "G1", "title": "The morning routine", "tags": [], "changed": "2026-11-09",
@@ -1001,11 +1003,13 @@ b, strong { font-weight: var(--weight-semibold); }
         "If your computer's day is not New York's when it runs (8:00 on a Monday in Dubai is Sunday evening in New York), the brief says so first, \"The desk's day is New York's: …\", and works for New York's day.",
         "It ends with a one-line count, such as \"3 analysed, 1 skipped, 2 scored\". It never places an order."] },
     { "id": "G2", "title": "The evening wrap-up", "tags": [], "changed": "2026-11-09",
-      "about": "A short report of the day: what the desk called and what was sent to Robinhood.",
+      "about": "A short report of the day: any holding whose last close is below the stop the desk's trader proposed (the dashboard warns of a stop only while its page is open), what the desk called, and what was sent to Robinhood.",
       "where": "Madav › Agent Studio › trading-desk › Put to work",
       "do": [
         "Ask the team: [[Run the evening wrap-up]]"],
       "see": [
+        "First, each holding of the Agentic account that closed below its stop, with its close, its stop and the call it came from; or that none did. A close that could not be read is said as not known, never as above the stop.",
+        "It only reports: nothing is sold by itself, and selling stays your own decision, on the dashboard or in the Robinhood app.",
         "Today's calls, any orders the dashboard sent and what Robinhood answered then, and how many calls wait to be scored.",
         "It says what happened since is on the dashboard and in the Robinhood app: the team does not read Robinhood.",
         "Run before New York's market has closed (its time is your computer's clock), it says so: \"New York's market has not closed yet today: it is <time> there\", and that the day's calls and orders are those so far."] },
@@ -1139,7 +1143,7 @@ b, strong { font-weight: var(--weight-semibold); }
       "do": [
         "Type, one at a time: [[/desk-check]] [[/analyse NVDA shallow]] [[/terminal]] [[/routine morning]]"],
       "see": [
-        "The same results as asking the team in Agent Studio, except one line: first under \"This computer\", /desk-check in a chat says \"This conversation's steps for the team were not compared with the ones in this folder: no version was given\" (only the team in Agent Studio gives that version), and the chat passes that on as it is, as something not checked: never as a match, and never summed up as \"nothing needs fixing\".",
+        "The same results as asking the team in Agent Studio, except one line: first under \"This computer\", /desk-check in a chat says \"This conversation's steps for the team were not compared with the ones in this folder: no version was given. Only the trading-desk team's own steps carry a version, so a check from any other chat, or from a terminal, compares nothing here\". With everything else OK, the chat opens its answer with \"Ready, except one thing this check did not compare: whether this conversation's steps for the team are the ones in this folder\", as the check's own \"HOW TO SUM UP\" line tells it, and passes that line on as it is: never as a match, and nowhere \"everything is ready\" or \"nothing needs fixing\".",
         "/desk-check in a chat also offers, on your yes, to test the Robinhood sign-in read-only, saying first what it reads: the tools Robinhood's connection offers and how many holdings answer, never their values. Then \"Connected to Robinhood. Its connection offers N tools.\" It waits up to five minutes for your sign-in, never cut off sooner.",
         "If the test does not work: it says nothing was ordered, that the desk's analyses work without Robinhood, and that you can run the test again or press Connect on the dashboard's Your account. Never \"plan B\"."] },
     { "id": "I2", "title": "/analyse with no company runs the waiting list", "tags": ["Optional"], "changed": "2026-11-09",
@@ -1157,6 +1161,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "Type [[/backtest NVDA 2026-06-01 2026-06-15]]"],
       "see": [
         "The team runs over those past dates in a journal of its own, then reports by rating how often the direction was right and the mean alpha.",
+        "Before it runs, the team says the limits of past dates: a US company's or fund's SEC filings as made public by then, economic figures released by then at today's revised values, prices adjusted for every split and dividend since, and news, posts and odds thin or unavailable. It never says a company's profile and insider trades exist only for recent days.",
         "The dashboard's calls and scorecard are unchanged. While it runs, an analysis of today you ask for, on the dashboard or in a chat, and the routines' scoring stay with your own calls, never in the back-test; nothing but the back-test itself ends it.",
         "Your holdings are left out: what you hold now was not known on the days tested. In the back-test's own reports (in the desk-data folder, under backtest), each trader's proposal begins with a \"Holdings:\" line that says so."] }
   ] },
@@ -1195,7 +1200,7 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "The watchlist is grouped as The whole market, Sectors, Single names and Crypto.",
         "The tier folds away and stays folded after the reload; pressing its name opens it again."] },
-    { "id": "J4", "title": "Market weather", "tags": [], "changed": "2026-11-08",
+    { "id": "J4", "title": "Market weather", "tags": [], "changed": "2026-11-09",
       "about": "Three plain lines on the ground the market stands on, each from figures (never a forecast): the trend of the S&P 500, the mood from the VIX (the market's own measure of expected swings), and what the crowd expects from the Federal Reserve's next interest-rate decision.",
       "where": "Dashboard › This morning › Market weather",
       "do": [
@@ -1204,6 +1209,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "Marked \"never a forecast\", three lines: the trend (Rising, Mixed or Falling: the S&P 500 against its 50- and 200-day averages), the mood (Calm, Normal or Wild: the VIX) and rates (A cut, A rise or No change: Polymarket's odds on the Federal Reserve's next decision).",
         "During New York's trading hours the trend and the mood give the figure so far, never \"closed at\": \"The S&P 500 is at <figure> at <time> New York time on <day>, still trading (not a close)\". In the minutes after the close, before its figures are final, \"was at <figure> when read at <time> …, before that session's close was final (not a close)\". Then \"closed at <figure> on <day>\".",
         "A line that cannot be read says \"Unavailable\", never a guess. If Polymarket sends back an error, the rates line says \"Unavailable: Polymarket answered without its search results.\", never that there is no open market. An outcome with no price is never shown as 0%.",
+        "A move in rates is in percentage points, for example \"a cut of 0.25 percentage points\", never \"0.25%\".",
         "\"From Yahoo Finance and Polymarket at <time>. Nothing here is investment advice.\""] },
     { "id": "J5", "title": "Worth a look today", "tags": [], "changed": "2026-11-08",
       "about": "A cheap morning screen before the costly team run: up to five names that moved in a way worth reading about, each with its reason.",
@@ -1216,7 +1222,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "At its foot: \"From Yahoo Finance's daily prices at <time>; the moves are from the session of <day>\", and while that session's close is not final yet (during New York's trading hours, and a few minutes after) also \", read before its close was final: so far, not a close\".",
         "If some names' news could not be read: \"News could not be read just now for <names>: whether they are in the news today is not known.\" \"Nothing stood out\" then never says \"no news\" for them."] },
     { "id": "J6", "title": "The morning switch", "tags": ["Optional"], "changed": "2026-11-09",
-      "about": "Switched on, the top three of the morning screen are analysed by themselves each market morning, at shallow depth, starting the next market morning. Off as shipped, since each analysis uses your Claude plan.",
+      "about": "Switched on, the top three of the morning screen are analysed by themselves each market morning, at shallow depth, starting the next market morning. Off as shipped, since each analysis is a full team run on the models of whatever runs it (Madav's own, or your Claude plan with Claude Code).",
       "where": "Dashboard › This morning › under Worth a look today",
       "do": [
         "Read the switch \"Analyse the top 3 each market morning\", switch it on, then off again."],
@@ -1431,7 +1437,7 @@ b, strong { font-weight: var(--weight-semibold); }
   ] },
   { "id": "N", "name": "Care for what you hold",
     "sub": "The desk's view beside each holding, its stop watched, and sells you confirm. Nothing is ever sold by itself.",
-    "about": "Once you hold something in the Agentic account, the desk keeps an eye on it: its latest view beside each holding and how old it is, a fresh look each Monday when a view is a week old, a warning when the price falls below the stop the trader proposed, and a Sell… button when the desk rates it Sell or Underweight. Every sale is still your own Confirm.",
+    "about": "Once you hold something in the Agentic account, the desk keeps an eye on it: its latest view beside each holding and how old it is, a fresh look each Monday when a view is a week old, a warning while the dashboard is open when the price falls below the stop the trader proposed (with it closed, the evening wrap-up names it), and a Sell… button when the desk rates it Sell or Underweight. Every sale is still your own Confirm.",
     "before": "Robinhood connected with holdings in the Agentic account, and calls on what you hold (for example NVDA after F3).",
     "tests": [
     { "id": "N1", "title": "The desk's view of each holding", "tags": [], "changed": "2026-10-21",
@@ -1449,13 +1455,14 @@ b, strong { font-weight: var(--weight-semibold); }
         "Open NVDA's Stock page."],
       "see": [
         "\"What you hold\" shows the same view and marks."] },
-    { "id": "N3", "title": "The stop watch", "tags": ["Later"], "changed": "2026-10-21",
-      "about": "A stop is the price under which the trader would sell to limit a loss. The dashboard watches it and tells you when the price falls below; it never sells by itself.",
+    { "id": "N3", "title": "The stop watch", "tags": ["Later"], "changed": "2026-11-09",
+      "about": "A stop is the price under which the trader would sell to limit a loss. The dashboard watches it while its page is open and tells you when the price falls below; with the page closed, the evening wrap-up (G2) names a holding whose last close is below its stop. It never sells by itself.",
       "where": "Dashboard › Your account › the Agentic account's holdings",
       "do": [
         "On a holding whose call has a stop, read its mark. When the price falls below it, read the notice."],
       "see": [
-        "A small \"stop $…\" beside the holding.",
+        "A small \"stop $…\" beside the holding, and under \"Your account\" the line \"stops are watched only while this page is open\".",
+        "Pointing at \"below its stop\" says where the price is from and when: \"NVDA is at $… on Yahoo Finance (<time>, <how late>)\" while the market trades, \"NVDA closed at $… on Yahoo Finance (<day>)\" after it.",
         "Below it: once, a red notice \"NVDA is below its stop of $…: $… on Yahoo Finance. Nothing is sold by itself.\", the mark \"below its stop\", and the holding under \"What you hold needs a look\".",
         "No order is placed."] },
     { "id": "N4", "title": "The desk says sell", "tags": ["Later"], "changed": "2026-10-21",
@@ -1490,14 +1497,14 @@ b, strong { font-weight: var(--weight-semibold); }
     "about": "Get started is the dashboard's own guide for a first month: give your email, pick what you know, ask for analyses, read the first calls, then follow them on paper for four weeks before thinking about money. Each step ticks itself off from what the desk really recorded, whether you did it on the page or in a chat. \"What does this mean?\" explains every trading word on the page.",
     "before": "The dashboard open (C1). Get started opens by itself only while the desk has no calls; otherwise open it from the side list.",
     "tests": [
-    { "id": "O1", "title": "Get started opens on a first visit", "tags": ["Optional"], "changed": "2026-10-21",
+    { "id": "O1", "title": "Get started opens on a first visit", "tags": ["Optional"], "changed": "2026-11-09",
       "about": "A newcomer lands on the guide, not on a wall of markets and ratings.",
       "where": "Dashboard, on a desk with no calls yet",
       "do": [
         "On a fresh clone of the project (no calls yet), open the dashboard.",
         "Let the first call arrive, then reload the page."],
       "see": [
-        "\"Get started\" opens at the top: \"A safe first month, one step at a time. Each step ticks itself off when it is done, wherever you do it: here, or by asking the desk in a chat.\"",
+        "\"Get started\" opens at the top: \"A safe first month, one step at a time. Each step ticks itself off when it is done, here or by asking the desk in a chat, except reading your first calls: that one ticks when you open a call here.\"",
         "Five numbered steps, \"N of 5 done\", \"What does this mean?\" and \"Put away\".",
         "It stays open after the first call arrives. A desk that already has calls does not open it by itself."] },
     { "id": "O2", "title": "Put away, and open it again", "tags": [], "changed": "2026-10-21",

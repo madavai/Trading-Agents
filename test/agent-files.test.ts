@@ -7,7 +7,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { deskServer } from '../src/tools/server.js';
 import { driftOf, knownTeamVersions, lastReset, noteReset, RESET_AGAIN_MS, resetAgainWords, resetAgentFiles, shippedAgentFiles, teamVersionOf, VERSIONS_FILE } from '../src/desk/agent-files.js';
-import { agentDrift, agentsLine, ASK_AGAIN, deskCheck, NO_VERSION, teamLine, TWO_LINES, UPDATED_WHY } from '../src/check/desk-check.js';
+import { agentDrift, agentsLine, ASK_AGAIN, deskCheck, NO_VERSION, sumUp, teamLine, TWO_LINES, UPDATED_WHY } from '../src/check/desk-check.js';
 import { UPDATED_NOTE } from '../src/desk/freshness.js';
 import { awayHome } from './away.js';
 
@@ -155,7 +155,7 @@ test('tools started before the desk was updated say so in every answer, never re
   assert.doesNotMatch(await call('read_queue'), /DESK UPDATED/, 'nothing is said while the folder holds the code these tools started with');
   const before = await call('desk_check', { team_version: 'none' });
   assert.doesNotMatch(before, /DESK UPDATED|not compared with the project's version|updated after/);
-  assert.match(before, /- --  This conversation's steps for the team were not compared with the ones in this folder: no version was given\n/);
+  assert.ok(before.includes(`- --  This conversation's steps for the team were not compared with the ones in this folder: ${NO_VERSION}\n`));
 
   fs.appendFileSync(path.join(root, 'dist', 'desk-tools.mjs'), '// and after it\n');   // an update, as a pull writes it
   for (const name of ['read_queue', 'list_settlements', 'end_backtest']) {
@@ -245,8 +245,9 @@ test('the desk check says whether this conversation\'s steps for the team are th
   assert.match(ASK_AGAIN, /^TEAM VERSION NEEDED: this answer did not compare this conversation's steps for the team with the ones in this folder\. If you are the trading-desk team and have not yet called desk_check again in this check, call it once more now, with team_version copied exactly from step 1 of your own "Check this computer" steps \(in the instructions this conversation began with\), and pass on that answer instead of this one\. Otherwise \(you are not the trading-desk team, your steps give no version, or you already called again\) pass this answer on as it is, and never say this conversation's steps match\.$/);
   assert.doesNotMatch(ASK_AGAIN, /[0-9a-f]{8}/, 'it names no version: the team copies its own');
 
-  assert.equal(NO_VERSION, 'no version was given');
-  assert.deepEqual(teamLine(undefined, now), { ok: false, unchecked: true, askAgain: true, text: "This conversation's steps for the team were not compared with the ones in this folder: no version was given" });
+  // 8 Nov 2026: in a plain chat the line read as a fault; it says who can compare the steps, and that elsewhere none are
+  assert.equal(NO_VERSION, "no version was given. Only the trading-desk team's own steps carry a version, so a check from any other chat, or from a terminal, compares nothing here");
+  assert.deepEqual(teamLine(undefined, now), { ok: false, unchecked: true, askAgain: true, text: `This conversation's steps for the team were not compared with the ones in this folder: ${NO_VERSION}` });
   assert.equal(teamLine('0badc0de', undefined).ok, false);
   assert.match(teamLine('0badc0de', undefined).text, /^This conversation's steps for the team \(version 0badc0de\) could not be compared: the team's file in this folder carries no version$/);
   assert.deepEqual(teamLine(now, now, true), { ok: false, unchecked: true, text: `This conversation's steps for the team were not compared with the ones in this folder: ${UPDATED_WHY}` }, 'tools started before an update compare nothing, a version given or not, and ask nothing again');
@@ -274,7 +275,31 @@ test('team_version is required: left out, the desk check checks nothing and says
   // the same check from a terminal (node dist/desk-tools.mjs --check) is read by a person: not compared, never asked again
   const terminal = await deskCheck(root, reachable, repo, {}, awayHome());
   assert.ok(terminal.startsWith('Trading Agents desk check'));
-  assert.match(terminal, /\nThis computer:\n- --  This conversation's steps for the team were not compared with the ones in this folder: no version was given\n/);
+  assert.ok(terminal.includes(`\nThis computer:\n- --  This conversation's steps for the team were not compared with the ones in this folder: ${NO_VERSION}\n`));
+  assert.doesNotMatch(terminal, /HOW TO SUM UP/, 'a person reads it there: no words for an agent');
+});
+
+test('through the tool, the check says how to sum it up, from every line: never "everything is ready" over a line it did not check (8 Nov 2026: a plain chat opened "Everything is ready")', async () => {
+  const ok = (text: string) => ({ ok: true, text }), no = (text: string) => ({ ok: false, text });
+  const unchecked = teamLine('none', 'abcdef12'), up = { name: 'SEC EDGAR', ok: true, detail: 'answered' }, down = { name: 'FRED', ok: false, detail: 'timed out' };
+
+  const plain = sumUp([unchecked, ok('Node 22')], [up]);
+  // the opening is the whole summing up (in a test of the first wording, one report opened as told and still closed
+  // "Nothing needs fixing on this computer")
+  const only = 'That opening is the whole summing up: add no other, at the start or at the end (never "everything is ready", "all checked", "nothing needs fixing" or the like)';
+  assert.equal(plain, `HOW TO SUM UP: open your answer with "Ready, except one thing this check did not compare: whether this conversation's steps for the team are the ones in this folder", then pass on that line as it is written. ${only}, since the line marked -- was not checked.`);
+  const both = sumUp([unchecked, no('No contact email is saved')], [up, down]);
+  assert.equal(both, `HOW TO SUM UP: open your answer with what is not ready (each line marked NO, and each data source that could not be reached) and what to do about each, then say that this conversation's steps for the team were not compared. ${only}.`);
+  assert.equal(sumUp([teamLine('abcdef12', 'abcdef12'), ok('Node 22')], [down]), `HOW TO SUM UP: open your answer with what is not ready (each data source that could not be reached) and what to do about each. ${only}.`);
+  assert.equal(sumUp([teamLine('abcdef12', 'abcdef12'), ok('Node 22')], [up]), 'HOW TO SUM UP: everything this check looked at is ready. You may say so, and name what it does not check (its last line).', 'only a check with every line OK may be called ready');
+
+  // in the answer: under the title, above "This computer:", so the version line stays the first under it
+  const root = clone();
+  const { client, call } = await serve(root, repo);
+  const none = await call('desk_check', { team_version: 'none' });
+  assert.match(none, /\nTrading Agents desk check \(version [^)]+\)\nHOW TO SUM UP: [^\n]+\n\nThis computer:\n- -- {2}This conversation's steps for the team were not compared/);
+  assert.doesNotMatch(none.split('\nHOW TO SUM UP: ')[1]!.split('\n')[0]!, /everything this check looked at is ready/, 'a check that compared nothing is never summed up as all ready');
+  await client.close();
 });
 
 test('the list of every version the team\'s steps have had keeps them all, the folder\'s too, and the desk check reads it', async () => {
@@ -305,4 +330,20 @@ test('a folder without the project\'s source says the agents could not be compar
   assert.match(r.content[0]!.text, /^The team could not be reset: .*Nothing was changed\.$/s);
   assert.equal(fs.existsSync(path.join(empty, AG)), false);
   await client.close();
+});
+
+test('a reset that fails part-way never says nothing was changed: the files before it are already back (audit 1 G4)', { skip: process.getuid?.() === 0 && 'a read-only file does not stop the root user' }, async () => {
+  const root = clone(), shipped = await shippedAgentFiles(repo), [first, ...rest] = [...shipped.keys()], last = rest.at(-1)!;
+  fs.writeFileSync(path.join(root, first!), 'changed in Agent Studio');
+  fs.chmodSync(path.join(root, last), 0o444);   // the last file cannot be written
+  const { client, call } = await serve(root, repo);
+  try {
+    const r = await call('reset_team', { confirmed: true });
+    assert.match(r, /^The team could not be reset: .*It stopped part-way, so some of the team's files may already be back as the project ships them and others not\./s);
+    assert.doesNotMatch(r, /Nothing was changed/);
+    assert.equal(fs.readFileSync(path.join(root, first!), 'utf8').replace(/\r\n/g, '\n'), shipped.get(first!), 'the file before the failure was put back');
+  } finally {
+    fs.chmodSync(path.join(root, last), 0o644);
+    await client.close();
+  }
 });
