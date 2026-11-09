@@ -15,11 +15,10 @@ import { socialPosts } from '../src/data/social.js';
 import { predictionMarkets } from '../src/data/odds.js';
 import { companyNews } from '../src/data/news.js';
 import { economicSeries } from '../src/data/macro.js';
-import { moodOf, ratesOf, trendOf, weatherNow, type PolyEvent } from '../src/desk/weather.js';
+import { ratesOf, weatherNow, type PolyEvent } from '../src/desk/weather.js';
 import { clearQuotes, parseQuote, quote } from '../src/terminal/quotes.js';
 import { clearCache } from '../src/data/yahoo.js';
 import { deskServer } from '../src/tools/server.js';
-import { chartJson, series } from './chart.js';
 
 const json = (v: unknown, status = 200) => new Response(typeof v === 'string' ? v : JSON.stringify(v), { status });
 /** No answer in time: the request fails at once (a network error would be tried again after a wait). */
@@ -268,26 +267,6 @@ test('a dashboard price that comes with no time is no data, never stamped with t
   assert.throws(() => parseQuote(noTime, '^GSPC'), (e: Error) => e instanceof NoData && /gave a price for \^GSPC with no time, so when it is from is not known/.test(e.message));
   configure({ fetch: route([[/finance\/chart/, () => json(noTime)]]) });
   assert.deepEqual(await quote('^GSPC'), { symbol: '^GSPC', error: 'no-data', message: 'Yahoo Finance gave a price for ^GSPC with no time, so when it is from is not known' });
-});
-
-test('the market weather says "is at … (still trading)" while the session trades, and "closed at" once it has closed', async () => {
-  const open = Date.parse('2026-11-06T14:30:00Z') / 1000, close = Date.parse('2026-11-06T21:00:00Z') / 1000;
-  const session = { currentTradingPeriod: { regular: { start: open, end: close } } };
-  configure({ fetch: route([
-    [/chart\/%5EGSPC/, () => json(chartJson('^GSPC', series('2026-11-06', 260, 6000), session))],
-    [/chart\/%5EVIX/, () => json(chartJson('^VIX', series('2026-11-06', 10, 17), session))],
-    [/polymarket/, () => json({ pagination: { hasMore: false, totalResults: 0 } })],
-  ]) });
-  const during = await weatherNow('2026-11-06', new Date('2026-11-06T18:00:00Z'));
-  assert.match(during.lines[0]!.words, /^The S&P 500 is at [\d,]+ \(6 Nov 2026, still trading\), (above|below) its 50-day average/);
-  assert.match(during.lines[1]!.words, /^The VIX is at [\d.]+ \(6 Nov 2026, still trading\)\.$/);
-  clearCache();
-  const after = await weatherNow('2026-11-06', new Date('2026-11-06T22:00:00Z'));
-  assert.match(after.lines[0]!.words, /^The S&P 500 closed at [\d,]+ on 6 Nov 2026, /);
-  assert.match(after.lines[1]!.words, /^The VIX closed at [\d.]+ on 6 Nov 2026\.$/);
-  const bars = series('2026-11-06', 260, 6000).map((r) => ({ date: r.date, open: r.o, high: r.h, low: r.l, close: r.c, volume: r.v }));
-  assert.match(trendOf(bars, true).words, /still trading/);
-  assert.match(moodOf(bars, false).words, /closed at/);
 });
 
 test('FRED: a series asked by its id changes in its own units only (no percent of a percent), and nothing changes by a percent from zero', async () => {

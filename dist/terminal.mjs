@@ -20665,11 +20665,11 @@ function parse3(block) {
 var lessonPart = (p) => [keep(p.lesson), ...[["LESSON CHECK", p.check], ["EARLIER CORRECTIONS", p.earlier], ["FIRST LESSON", p.first]].filter(([, words4]) => words4?.trim()).map(([head, words4]) => `${head}:
 ${keep(words4)}`)].join("\n\n");
 function withLesson(block, mark, lessonPart2) {
-  const b = block.trim(), nl = b.indexOf("\n"), at2 = b.search(/^REFLECTION:\r?$/m);
+  const b = block.trim(), nl = b.indexOf("\n"), at = b.search(/^REFLECTION:\r?$/m);
   const tag = b.slice(1, nl).replace(/\]\s*$/, "").split("|").map((s) => s.trim()).filter((x) => !x.startsWith("lesson:"));
-  return `[${[...tag, mark].join(" | ")}]${at2 < 0 ? `${b.slice(nl)}
+  return `[${[...tag, mark].join(" | ")}]${at < 0 ? `${b.slice(nl)}
 
-` : b.slice(nl, at2)}REFLECTION:
+` : b.slice(nl, at)}REFLECTION:
 ${lessonPart2}`;
 }
 var LESSON_NOTE = {
@@ -20948,7 +20948,7 @@ function change(dir, now, edit) {
 }
 var readQueue = (dir, now = /* @__PURE__ */ new Date()) => load(dir, now);
 var waitingIn = (list3) => list3.filter((i) => i.state === "waiting");
-function enqueue(dir, raw, at2, depth, now = /* @__PURE__ */ new Date()) {
+function enqueue(dir, raw, at, depth, now = /* @__PURE__ */ new Date()) {
   const symbol = safeSymbol(raw);
   return change(dir, now, (list3) => {
     const was = list3.find((i) => i.symbol === symbol);
@@ -20959,7 +20959,7 @@ function enqueue(dir, raw, at2, depth, now = /* @__PURE__ */ new Date()) {
     }
     const rest = list3.filter((i) => i !== was);
     if (rest.filter(open2).length >= MAX_OPEN) throw new QueueRefusal("FULL", `${MAX_OPEN} analyses are already waiting: let them run first`);
-    const next = [...rest, { symbol, requestedAt: at2, state: "waiting", ...depth ? { depth } : {} }];
+    const next = [...rest, { symbol, requestedAt: at, state: "waiting", ...depth ? { depth } : {} }];
     return { list: next, result: next };
   });
 }
@@ -21189,8 +21189,8 @@ function sectorOfSic(raw) {
 }
 async function fundTickers() {
   const t2 = await cached2("https://www.sec.gov/files/company_tickers_mf.json", 3e4);
-  const at2 = t2.fields?.indexOf("symbol") ?? 3;
-  return new Set((t2.data ?? []).map((r) => String(r[at2] ?? "").toUpperCase()).filter(Boolean));
+  const at = t2.fields?.indexOf("symbol") ?? 3;
+  return new Set((t2.data ?? []).map((r) => String(r[at] ?? "").toUpperCase()).filter(Boolean));
 }
 
 // src/data/company.ts
@@ -21545,8 +21545,8 @@ var saveMarket = (dir, list3) => (isShipped(list3) ? savePrefs(dir, {}, ["market
 // src/terminal/guide.ts
 var NAMES_TO_PICK = 3;
 function maskEmail(email2) {
-  const at2 = email2.lastIndexOf("@");
-  return at2 > 0 ? `${email2[0]}\u2026${email2.slice(at2)}` : "";
+  const at = email2.lastIndexOf("@");
+  return at > 0 ? `${email2[0]}\u2026${email2.slice(at)}` : "";
 }
 function guideOf(f) {
   const picked = /* @__PURE__ */ new Set([...f.watchlist.map((w) => w.symbol), ...f.queue.map((q) => q.symbol), ...f.calls.map((c) => c.ticker)]);
@@ -22113,24 +22113,19 @@ var dayWords = (iso2) => {
   return `${Number(d)} ${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][Number(m) - 1]} ${y}`;
 };
 var unavailable = (key, name, why) => ({ key, name, state: null, tone: "", words: `Unavailable: ${why}.`, meaning: MEANING[key] });
-var stillTrading = (s, now) => {
-  const last = s.bars.at(-1), session = s.meta.session;
-  return !!last && !!session && session.date === last.date && now.getTime() >= session.start && now.getTime() < session.end;
-};
-var at = (price, date4, trading) => trading ? `is at ${price} (${dayWords(date4)}, still trading)` : `closed at ${price} on ${dayWords(date4)}`;
-function trendOf(bars, trading = false) {
+function trendOf(bars) {
   const closes = bars.map((b) => b.close), n = closes.length;
   const ma50 = sma(closes, 50)[n - 1], ma200 = sma(closes, 200)[n - 1], last = closes[n - 1];
   if (last === void 0 || ma50 == null || ma200 == null) return unavailable("trend", "Trend", "too few days of S&P 500 prices for its 200-day average");
   const above = (ma) => last > ma ? "above" : "below";
   const [state, tone] = last > ma50 && last > ma200 ? ["Rising", "ok"] : last < ma50 && last < ma200 ? ["Falling", "bad"] : ["Mixed", "warn"];
-  return { key: "trend", name: "Trend", state, tone, words: `The S&P 500 ${at(whole2(last), bars[n - 1].date, trading)}, ${above(ma50)} its 50-day average (${whole2(ma50)}) and ${above(ma200)} its 200-day average (${whole2(ma200)}).`, meaning: MEANING.trend };
+  return { key: "trend", name: "Trend", state, tone, words: `The S&P 500 closed at ${whole2(last)} on ${dayWords(bars[n - 1].date)}, ${above(ma50)} its 50-day average (${whole2(ma50)}) and ${above(ma200)} its 200-day average (${whole2(ma200)}).`, meaning: MEANING.trend };
 }
-function moodOf(bars, trading = false) {
+function moodOf(bars) {
   const last = bars[bars.length - 1];
   if (!last) return unavailable("mood", "Mood", "no VIX figure came from Yahoo Finance");
   const v = last.close, [state, tone] = v < 15 ? ["Calm", "ok"] : v <= 25 ? ["Normal", ""] : ["Wild", "bad"];
-  return { key: "mood", name: "Mood", state, tone, words: `The VIX ${at(v.toFixed(1), last.date, trading)}.`, meaning: MEANING.mood };
+  return { key: "mood", name: "Mood", state, tone, words: `The VIX closed at ${v.toFixed(1)} on ${dayWords(last.date)}.`, meaning: MEANING.mood };
 }
 function outcomeWords(title) {
   if (/no change/i.test(title)) return { words: "no change", way: "none" };
@@ -22150,8 +22145,8 @@ function ratesOf(events, now = /* @__PURE__ */ new Date()) {
 }
 async function weatherNow(day2, now = /* @__PURE__ */ new Date()) {
   const [trend, mood, rates] = await Promise.all([
-    daily("^GSPC", addDays(day2, -400), day2).then((s) => trendOf(s.bars, stillTrading(s, now)), () => unavailable("trend", "Trend", "Yahoo Finance did not answer for the S&P 500")),
-    daily("^VIX", addDays(day2, -14), day2).then((s) => moodOf(s.bars, stillTrading(s, now)), () => unavailable("mood", "Mood", "Yahoo Finance did not answer for the VIX")),
+    daily("^GSPC", addDays(day2, -400), day2).then((s) => trendOf(s.bars), () => unavailable("trend", "Trend", "Yahoo Finance did not answer for the S&P 500")),
+    daily("^VIX", addDays(day2, -14), day2).then((s) => moodOf(s.bars), () => unavailable("mood", "Mood", "Yahoo Finance did not answer for the VIX")),
     getJson("https://gamma-api.polymarket.com/public-search?q=fed%20decision&limit_per_type=20").then(
       (j) => {
         try {
