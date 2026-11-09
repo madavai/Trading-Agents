@@ -7,11 +7,12 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { configure } from '../src/data/http.js';
 import { Journal } from '../src/desk/journal.js';
-import { enqueue, finishItem, readListener, readQueue, ringDoorbell, startItem, STALE_MS, writeListener } from '../src/desk/queue.js';
+import { enqueue, finishItem, QUIET_MS, QUIET_REASON, readListener, readQueue, ringDoorbell, startItem, writeListener } from '../src/desk/queue.js';
+import { saveSection, startRun, writeReport } from '../src/desk/runs.js';
 import { deskServer } from '../src/tools/server.js';
 import { startTerminal, type Assets } from '../src/terminal/server.js';
 import { findClaude, RUN_ARGS, RUN_WORDS, runClaude, stopReason } from '../src/watch/claude.js';
-import { AlreadyListening, watch } from '../src/watch/watcher.js';
+import { AlreadyListening, STOCK_MAX_MS, stopWhy, watch } from '../src/watch/watcher.js';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const until = async (done: () => boolean, ms = 10_000) => { const end = Date.now() + ms; while (!done()) { if (Date.now() > end) assert.fail('timed out waiting'); await sleep(10); } };
@@ -36,13 +37,15 @@ test('the run is fixed in code: the trading-desk team, the waiting list, refusin
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'ta-claude-')), script = path.join(cwd, 'fake.js');
   fs.writeFileSync(script, "console.log(JSON.stringify({ args: process.argv.slice(2), cwd: process.cwd() })); process.exit(Number(process.argv.includes('--fail')))");
   let out = '';
-  assert.deepEqual(await runClaude({ command: process.execPath, args: [script] }, cwd, (t) => { out += t; }), { code: 0, timedOut: false });
+  assert.deepEqual(await runClaude({ command: process.execPath, args: [script] }, cwd, (t) => { out += t; }), { code: 0 });
   const seen = JSON.parse(out) as { args: string[]; cwd: string };
   assert.deepEqual(seen.args, [...RUN_ARGS]);
   assert.equal(fs.realpathSync(seen.cwd), fs.realpathSync(cwd), 'run in the project folder');
-  assert.equal((await runClaude({ command: process.execPath, args: [script] }, cwd, () => {}, 10_000, ['--fail'])).code, 1);
+  assert.equal((await runClaude({ command: process.execPath, args: [script] }, cwd, () => {}, { stopIf: () => null, everyMs: 20 }, ['--fail'])).code, 1, 'a check that finds nothing wrong stops nothing');
   fs.writeFileSync(script, 'setTimeout(() => {}, 60_000)');
-  assert.deepEqual(await runClaude({ command: process.execPath, args: [script] }, cwd, () => {}, 200), { code: null, timedOut: true }, 'a run that hangs is stopped');
+  let asked = 0;
+  const stuck = () => (++asked >= 3 ? 'nothing was saved for two hours' : null);
+  assert.deepEqual(await runClaude({ command: process.execPath, args: [script] }, cwd, () => {}, { stopIf: stuck, everyMs: 30 }), { code: null, stopped: 'nothing was saved for two hours' }, 'a run that hangs is stopped, with why');
   assert.equal((await runClaude({ command: path.join(cwd, 'no-such-program'), args: [] }, cwd, (t) => { out = t; })).code, null);
   assert.match(out, /Claude Code could not be started/);
 });
@@ -129,10 +132,148 @@ test('a run that stops half way leaves no stock "running": the listener marks it
   w2.stop(); await w2.done;
 
   enqueue(dir, 'AAPL', '2026-10-12T10:00:00Z');
-  startItem(dir, 'AAPL', '2026-10-12', new Date('2026-10-12T10:00:00Z'));
-  assert.equal(readQueue(dir, new Date(Date.parse('2026-10-12T10:00:00Z') + STALE_MS - 1000)).find((i) => i.symbol === 'AAPL')?.state, 'running');
-  const late = readQueue(dir, new Date(Date.parse('2026-10-12T10:00:00Z') + STALE_MS + 1000)).find((i) => i.symbol === 'AAPL');
-  assert.deepEqual([late?.state, /did not finish/.test(late?.reason ?? '')], ['failed', true]);
+  startItem(dir, 'AAPL', '2026-10-12', new Date('2026-10-12T10:00:00Z'));   // a run that died without a word, and saved nothing
+  assert.equal(readQueue(dir, new Date(Date.parse('2026-10-12T10:00:00Z') + QUIET_MS - 1000)).find((i) => i.symbol === 'AAPL')?.state, 'running');
+  const late = readQueue(dir, new Date(Date.parse('2026-10-12T10:00:00Z') + QUIET_MS + 1000)).find((i) => i.symbol === 'AAPL');
+  assert.deepEqual([late?.state, late?.reason, late?.quiet, late?.endedAt], ['failed', QUIET_REASON, true, new Date(Date.parse('2026-10-12T10:00:00Z') + QUIET_MS).toISOString()], 'the same everywhere: failed once nothing was saved for two hours, dated when that was so');
+  assert.match(QUIET_REASON, /^nothing was saved for this analysis for two hours, so its run has most likely stopped: press Retry\. If it was still going, it shows done once its call is recorded$/);
+});
+
+// Round 1's medium NVDA run (6 Nov 2026, in Madav): started 23:48:12 UTC, its analysts and first debate turns saved by
+// 00:23, its call recorded 02:35, 2 h 47 min in all. The old rule read it as failed from 01:48 on.
+const R1 = '2026-11-06', at = (hhmm: string) => new Date(`${hhmm < '12:00' ? '2026-11-07' : R1}T${hhmm}:00Z`);
+/** Saves a step of the made-up run at the time it was written. */
+const step = (dir: string, section: Parameters<typeof saveSection>[3], hhmm: string) => {
+  saveSection(dir, 'NVDA', R1, section, `${section} for NVDA.`);
+  const file = path.join(dir, 'runs', `NVDA_${R1}`, 'run.json');
+  fs.utimesSync(file, at(hhmm), at(hhmm));
+};
+const medium: Array<[Parameters<typeof saveSection>[3], string]> = [
+  ['market', '00:05'], ['sentiment', '00:07'], ['news', '00:09'], ['fundamentals', '00:12'], ['fact_check', '00:18'], ['bull', '00:21'], ['bear', '00:23'],
+  ['bull', '00:36'], ['bear', '00:48'], ['bull', '01:01'], ['bear', '01:13'], ['research_plan', '01:24'], ['trader', '01:33'],
+  ['aggressive', '01:41'], ['conservative', '01:48'], ['neutral', '01:55'], ['aggressive', '02:01'], ['conservative', '02:07'], ['neutral', '02:12'],
+  ['aggressive', '02:17'], ['conservative', '02:22'], ['neutral', '02:27'], ['decision', '02:30']];
+
+test('a long analysis that keeps saving its steps is never marked failed: a made-up run of 2 h 47 min stays running, then finishes', async () => {
+  const { root, dir } = desk();
+  process.env.TRADING_AGENTS_TODAY = R1;
+  configure({ fetch: async () => new Response('no route', { status: 404 }), secEmail: '' });
+  enqueue(dir, 'NVDA', '2026-11-06T23:47:00Z', 'medium');
+  startItem(dir, 'NVDA', R1, new Date('2026-11-06T23:48:12Z'));
+  startRun(dir, 'NVDA', R1, { steps: [] }); fs.utimesSync(path.join(dir, 'runs', `NVDA_${R1}`, 'run.json'), at('23:48'), at('23:48'));
+  const start = '2026-11-06T23:48:12.000Z', began = Date.parse(start);
+  let pastTwoHours = 0;
+  for (const [section, hhmm] of medium) {
+    step(dir, section, hhmm);
+    for (const now of [new Date(at(hhmm).getTime() + 60_000), new Date(at(hhmm).getTime() + 5 * 60_000)]) {
+      const nvda = readQueue(dir, now)[0]!;
+      assert.equal(nvda.state, 'running', `still being analysed at ${now.toISOString()} (${section} saved ${hhmm})`);
+      assert.equal(stopWhy(dir, start, now), null, `the desk's listener lets it go on at ${now.toISOString()}`);
+      if (now.getTime() - began > 2 * 60 * 60_000) pastTwoHours++;
+    }
+  }
+  assert.equal(pastTwoHours, 18, 'nine of its steps were saved more than two hours after it started, when the old rule read it as failed');
+  // its call is recorded at 02:35, and its own run finishes it, through the desk's tools, as the team does
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  await deskServer(root, async () => new Response('no route', { status: 404 })).connect(a);
+  const client = new Client({ name: 'pretend team', version: '0' });
+  await client.connect(b);
+  try {
+    new Journal(path.join(dir, 'journal.md')).storeDecision('NVDA', R1, '**Rating**: Overweight\n\n**Executive Summary**: NVDA.');
+    writeReport(dir, 'NVDA', R1, []);
+    const said = ((await client.callTool({ name: 'finish_queue_item', arguments: { symbol: 'NVDA' } })) as { content: Array<{ text: string }> }).content[0]!.text;
+    assert.equal(said, 'Marked done: NVDA, Overweight. The dashboard shows it.');
+    const nvda = readQueue(dir)[0]!;
+    assert.deepEqual([nvda.state, nvda.rating, nvda.quiet], ['done', 'Overweight', undefined]);
+  } finally { await client.close(); }
+});
+
+test('a stock read as failed because nothing was saved for two hours is put right by its own run: done once its call is recorded, or failed in the run\'s words', async () => {
+  const { root, dir } = desk();
+  process.env.TRADING_AGENTS_TODAY = R1;
+  configure({ fetch: async () => new Response('no route', { status: 404 }), secEmail: '' });
+  enqueue(dir, 'NVDA', '2026-11-06T23:47:00Z', 'medium'); enqueue(dir, 'AMD', '2026-11-06T23:47:30Z');
+  startItem(dir, 'NVDA', R1, new Date('2026-11-06T23:48:12Z'));
+  step(dir, 'market', '00:05'); step(dir, 'bear', '00:23');
+  // one step took longer than two hours (none ever has): from 02:23 the stock reads as failed, and a change to the list keeps it so
+  assert.equal(readQueue(dir, at('02:22'))[0]!.state, 'running');
+  enqueue(dir, 'TSLA', '2026-11-07T02:30:00Z', undefined, at('02:30'));
+  const saved = JSON.parse(fs.readFileSync(path.join(dir, 'queue.json'), 'utf8')) as Array<Record<string, unknown>>;
+  assert.deepEqual([saved[0]!.state, saved[0]!.reason, saved[0]!.quiet], ['failed', QUIET_REASON, true], 'kept as the desk\'s own guess');
+  finishItem(dir, 'AMD', { rating: 'Hold' });
+  assert.throws(() => finishItem(dir, 'AMD', { reason: 'late words' }), /AMD is already done/, 'any other finished stock stays finished');
+  // the run was still going after all: its call is recorded at 02:35 and it finishes the stock
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  await deskServer(root, async () => new Response('no route', { status: 404 })).connect(a);
+  const client = new Client({ name: 'pretend team', version: '0' });
+  await client.connect(b);
+  try {
+    new Journal(path.join(dir, 'journal.md')).storeDecision('NVDA', R1, '**Rating**: Overweight\n\n**Executive Summary**: NVDA.');
+    const said = ((await client.callTool({ name: 'finish_queue_item', arguments: { symbol: 'NVDA' } })) as { content: Array<{ text: string }> }).content[0]!.text;
+    assert.equal(said, 'Marked done: NVDA, Overweight. The dashboard shows it. It had read as failed, because nothing was saved for it for two hours; this run\'s word replaces that.');
+    const nvda = readQueue(dir)[0]!;
+    assert.deepEqual([nvda.state, nvda.rating, nvda.reason, nvda.quiet], ['done', 'Overweight', undefined, undefined]);
+    assert.throws(() => finishItem(dir, 'NVDA', { reason: 'late words' }), /NVDA is already done/, 'and from then on it stays done');
+  } finally { await client.close(); }
+  // or its run says why it failed, in its own words, in place of the desk's guess
+  const other = desk().dir;
+  enqueue(other, 'META', '2026-11-06T20:00:00Z'); startItem(other, 'META', R1, new Date('2026-11-06T20:00:00Z'));
+  enqueue(other, 'XLK', '2026-11-06T23:00:00Z', undefined, new Date('2026-11-06T23:00:00Z'));   // persists META as failed, quietly
+  assert.equal(finishItem(other, 'META', { reason: "the model's 5-hour usage limit was reached" }).reason, "the model's 5-hour usage limit was reached");
+  assert.equal(readQueue(other)[0]!.quiet, undefined);
+});
+
+test("the desk's own listener stops a run only when nothing was saved for two hours, or one stock ran six hours, and says why beside the stock", async (t) => {
+  const { dir } = desk();
+  const start = '2026-11-06T23:48:00.000Z', t0 = Date.parse(start), min = 60_000;
+  assert.equal(stopWhy(dir, start, new Date(t0 + QUIET_MS - min)), null, 'a run that has not yet started a stock is given the same two hours');
+  assert.match(stopWhy(dir, start, new Date(t0 + QUIET_MS + min))!, /^nothing was saved for two hours, so the desk's listener stopped the run: press Retry$/);
+  enqueue(dir, 'NVDA', '2026-11-06T23:47:00Z', 'deep');
+  startItem(dir, 'NVDA', R1, new Date('2026-11-06T23:48:12Z'));
+  // a deep run that keeps saving every 20 minutes goes on past the old three hours...
+  for (let m = 20; m <= 5 * 60 + 40; m += 20) {
+    saveSection(dir, 'NVDA', R1, 'bull', `turn at ${m}`);
+    const when = new Date(t0 + m * min);
+    fs.utimesSync(path.join(dir, 'runs', `NVDA_${R1}`, 'run.json'), when, when);
+    assert.equal(stopWhy(dir, start, new Date(when.getTime() + 10 * min)), null, `${m} minutes in, still saving`);
+  }
+  // ...but not past six hours on one stock, in case the team is going round in a loop that keeps saving
+  const looped = new Date(Date.parse('2026-11-06T23:48:12Z') + STOCK_MAX_MS + min);
+  fs.utimesSync(path.join(dir, 'runs', `NVDA_${R1}`, 'run.json'), looped, looped);
+  assert.equal(stopWhy(dir, start, looped), "NVDA had been analysed for six hours, the most the desk's listener allows one stock, so it stopped the run: press Retry");
+
+  // the listener puts its own words beside the stock, also when the waiting list already read it as failed by the quiet rule
+  const quiet = desk().dir;
+  enqueue(quiet, 'NVDA', '2026-11-06T23:47:00Z');
+  let shift = Date.parse('2026-11-06T23:48:00Z') - Date.now();   // a clock that ticks, set to round 1's evening
+  const clock = () => new Date(Date.now() + shift);
+  const why = "nothing was saved for two hours, so the desk's listener stopped the run: press Retry";
+  const w = watch({ dir: quiet, listener: 'Claude Code', pid: 501, ...quick, now: clock, run: async () => {
+    startItem(quiet, 'NVDA', R1, clock());
+    shift += QUIET_MS + 2 * min;   // the run hangs, saving nothing
+    assert.equal(readQueue(quiet, clock())[0]!.reason, QUIET_REASON, 'the waiting list already reads it as failed, in general words');
+    return why;
+  } });
+  t.after(() => w.stop());
+  await until(() => !!readListener(quiet, clock())?.lastRun);
+  const nvda = readQueue(quiet, clock())[0]!;
+  assert.deepEqual([nvda.state, nvda.reason, nvda.quiet], ['failed', why, undefined]);
+  assert.equal(readListener(quiet, clock())!.lastRun!.result, `0 analysed, 1 failed; ${why}`);
+  w.stop(); await w.done;
+});
+
+test('the listener counts as analysed only the stocks it analysed: one already called today is said apart', async (t) => {
+  const { dir } = desk();
+  enqueue(dir, 'NVDA', '2026-10-12T10:00:00Z'); enqueue(dir, 'AAPL', '2026-10-12T10:00:01Z');
+  const w = watch({ dir, listener: 'Claude Code', pid: 601, ...quick, run: async () => {
+    finishItem(dir, 'NVDA', { rating: 'Buy', already: true });   // start_queue_item's ALREADY: called earlier today
+    startItem(dir, 'AAPL', '2026-10-12'); finishItem(dir, 'AAPL', { rating: 'Hold' });
+  } });
+  t.after(() => w.stop());
+  await until(() => !!readListener(dir)?.lastRun);
+  assert.equal(readListener(dir)!.lastRun!.result, '1 analysed, 1 already called today, 0 failed');
+  assert.deepEqual(readQueue(dir).map((i) => [i.symbol, i.state, i.already]), [['NVDA', 'done', true], ['AAPL', 'done', undefined]]);
+  w.stop(); await w.done;
 });
 
 test("any listener's note that its run has ended fails the stock that run left running at once, in the listener's words", () => {
@@ -201,4 +342,29 @@ test('end to end with a pretend runner: presses on the dashboard, the doorbell, 
     assert.equal(lines.at(-1), "Nothing is waiting. On the dashboard's list: 7 done, 0 failed.");
     assert.match(readListener(dir)?.lastRun?.result ?? '', /^2 analysed, 0 failed$/);
   } finally { w.stop(); await w.done; await client.close(); await term.close(); }
+});
+
+test('the waiting list says the real reason when nothing is waiting: empty, or only finished analyses kept for the person to see', async () => {
+  const { root, dir } = desk();
+  process.env.TRADING_AGENTS_TODAY = '2026-10-12';
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  await deskServer(root, async () => new Response('no route', { status: 404 })).connect(a);
+  const client = new Client({ name: 'pretend team', version: '0' });
+  await client.connect(b);
+  const read = async () => ((await client.callTool({ name: 'read_queue', arguments: {} })) as { content: Array<{ text: string }> }).content[0]!.text;
+  try {
+    const about = (await client.listTools()).tools.find((t) => t.name === 'read_queue')!.description!;
+    assert.match(about, /the stocks the person asked the desk to analyse on the dashboard, and those Monday's re-rating and the morning switch put on it/, 'not only what the person asked for one by one');
+    assert.equal(await read(), 'Nothing is waiting: the list is empty.');
+    enqueue(dir, 'NVDA', '2026-10-12T10:00:00Z'); enqueue(dir, 'AAPL', '2026-10-12T10:00:01Z'); enqueue(dir, 'TSLA', '2026-10-12T10:00:02Z');
+    finishItem(dir, 'NVDA', { rating: 'Buy' }); finishItem(dir, 'AAPL', { reason: 'no email saved for the SEC yet' });
+    startItem(dir, 'TSLA', '2026-10-12');
+    const busy = await read();
+    assert.match(busy, /^Being analysed now: TSLA \(started \d\d:\d\d UTC\)\./);
+    assert.match(busy, /\nNothing else is waiting\. The list also keeps finished analyses for the person to see, 1 done and 1 failed \(the person presses Retry on the dashboard to ask again\): none of them needs a run\.$/);
+    finishItem(dir, 'TSLA', { rating: 'Sell' });
+    const after = await read();
+    assert.equal(after, 'Nothing is waiting. The list also keeps finished analyses for the person to see, 2 done and 1 failed (the person presses Retry on the dashboard to ask again): none of them needs a run.');
+    assert.doesNotMatch(after, /has not asked/, 'never "the person has not asked for any analysis" with their analyses on the list');
+  } finally { await client.close(); }
 });

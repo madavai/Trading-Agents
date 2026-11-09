@@ -335,9 +335,18 @@ Something has to run them. The page says who is listening:
 - **By hand**: ask the desk to "analyse what is waiting" in a chat, or type `/analyse` with no stock.
 
 A run of the waiting list never asks you anything: what it cannot do (for example, no email saved for the SEC yet) is
-marked failed with the reason, for you to fix and Retry. When the run itself stops early, the stock it was on says why
-at once, in plain words: for example "Claude Code's weekly usage limit was reached; it resets 6am (America/Chicago).
-Press Retry after that." On the same day, Retry carries on from the step it stopped at.
+marked failed with the reason, for you to fix and Retry. An analysis takes a while: in the desk's first real runs (in
+Madav, on its default model), about 40 minutes at shallow depth and nearly 3 hours at medium; deep runs more rounds.
+However long it takes, a stock is never marked failed while its analysis is still saving its steps.
+
+When the run itself stops early, the stock it was on says why in plain words. With the desk's own Claude Code
+listener it says so at once: for example "Claude Code's weekly usage limit was reached; it resets 6am
+(America/Chicago). Press Retry after that." With Madav it can say so at once only when Madav's note gives the time its
+run ended, which it does not yet: until then the stock shows "being analysed" until nothing has been saved for it for
+two hours, then failed, saying exactly that. If a stock marked failed that way was in fact still going, it shows done
+once its call is recorded. The desk's own listener stops a run that has saved nothing for two hours, or that has
+analysed one stock for six hours (in case the team is going round in a loop), and says so beside the stock. On the
+same day, Retry carries on from the step it stopped at.
 
 The desk counts days by New York's calendar, the market's own, wherever your computer is: an analysis run on an
 American evening is dated that day, not the next.

@@ -125,8 +125,9 @@ export function watched(care: readonly HoldingCare[], prices: ReadonlyMap<string
 }
 
 // ---------- Monday's re-rating ----------
-/** What Monday's routine put on the waiting list, so it does so once a Monday and the brief can say why each is there. */
-export interface Rerate { day: string; symbols: Array<{ symbol: string; called: string | null; rating: string | null }> }
+/** What Monday's routine put on the waiting list, so it does so once a Monday and the brief can say why each is there;
+ *  `full` when the waiting list refused one, so the brief can say that, and only then, was the reason. */
+export interface Rerate { day: string; symbols: Array<{ symbol: string; called: string | null; rating: string | null }>; full?: true }
 
 const rerateFile = (dir: string) => path.join(dir, 'rerate.json');
 
@@ -135,7 +136,7 @@ export function readRerate(dir: string): Rerate | null {
     const v = JSON.parse(fs.readFileSync(rerateFile(dir), 'utf8')) as Rerate;
     if (typeof v.day !== 'string' || !Array.isArray(v.symbols)) return null;
     const dayOrNull = (x: unknown) => x === null || typeof x === 'string';
-    return { day: v.day, symbols: v.symbols.filter((s) => typeof s?.symbol === 'string' && dayOrNull(s.called) && dayOrNull(s.rating)) };
+    return { day: v.day, symbols: v.symbols.filter((s) => typeof s?.symbol === 'string' && dayOrNull(s.called) && dayOrNull(s.rating)), ...(v.full === true ? { full: true as const } : {}) };
   } catch { return null; }
 }
 
@@ -167,11 +168,12 @@ export function rerateWeekly(dir: string, today: string, now: Date = new Date())
     const kept = readRerate(dir);
     if (kept?.day === today) return kept.symbols;
     const queued: Rerate['symbols'] = [];
+    let full = false;
     for (const due of dueForRerate(dir, today, now)) {
       if (queued.length >= RERATE_MAX) break;
-      try { enqueue(dir, due.symbol, now.toISOString(), 'shallow', now); queued.push(due); } catch (e) { if (!(e instanceof QueueRefusal)) throw e; break; }   // a full list takes no more
+      try { enqueue(dir, due.symbol, now.toISOString(), 'shallow', now); queued.push(due); } catch (e) { if (!(e instanceof QueueRefusal)) throw e; full = true; break; }   // a full list takes no more
     }
-    writeWhole(rerateFile(dir), JSON.stringify({ day: today, symbols: queued }, null, 2) + '\n');
+    writeWhole(rerateFile(dir), JSON.stringify({ day: today, symbols: queued, ...(full ? { full: true } : {}) }, null, 2) + '\n');
     return queued;
   });
 }

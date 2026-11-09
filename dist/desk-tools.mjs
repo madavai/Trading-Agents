@@ -39599,6 +39599,16 @@ function progress(dir, ticker, date5) {
   return out;
 }
 var savedPlan = (dir, ticker, date5) => load(dir, ticker, date5).plan;
+function lastSaved(dir, ticker, date5) {
+  let latest = null;
+  for (const file5 of [runFile(dir, ticker, date5), path11.join(folder(dir, ticker, date5), "complete_report.md")]) {
+    try {
+      latest = Math.max(latest ?? 0, fs10.statSync(file5).mtimeMs);
+    } catch {
+    }
+  }
+  return latest;
+}
 function readSections(dir, ticker, date5, names, fallback) {
   const run = load(dir, ticker, date5), log = run.log;
   let ctx;
@@ -39646,8 +39656,8 @@ var DEPTHS = { shallow: 1, medium: 3, deep: 5 };
 var isDepth = (v) => typeof v === "string" && Object.hasOwn(DEPTHS, v);
 var MAX_OPEN = 20;
 var MAX_FINISHED = 20;
-var STALE_MS2 = 2 * 60 * 6e4;
-var STALE_REASON = "the run did not finish (it stopped, or took over two hours): press Retry";
+var QUIET_MS = 2 * 60 * 6e4;
+var QUIET_REASON = "nothing was saved for this analysis for two hours, so its run has most likely stopped: press Retry. If it was still going, it shows done once its call is recorded";
 var QueueRefusal = class extends Error {
   constructor(code, message) {
     super(message);
@@ -39684,16 +39694,24 @@ function itemOf(v) {
   if (startedAt) out.startedAt = startedAt;
   if (endedAt) out.endedAt = endedAt;
   if (state === "done" && rating) out.rating = rating;
+  if (state === "done" && r.already === true) out.already = true;
   if (state === "failed") out.reason = reason2 ?? "no reason was given";
+  if (state === "failed" && r.quiet === true) out.quiet = true;
   return out;
 }
-function settled(item, now, note) {
+function lastSignOf(dir, item) {
+  const started = Date.parse(item.startedAt ?? item.requestedAt);
+  const saved = item.date ? lastSaved(dir, item.symbol, item.date) : null;
+  return Math.max(started, saved ?? 0);
+}
+function settled(dir, item, now, note) {
   if (item.state !== "running") return item;
   const last = note?.lastRun, started = Date.parse(item.startedAt ?? item.requestedAt);
   if (last?.started && Date.parse(last.started) <= started && started <= Date.parse(last.at)) {
     return { ...item, state: "failed", reason: words(`${note.listener}'s run ended before this stock was finished: ${last.result}`, 300), endedAt: last.at };
   }
-  return now.getTime() - started > STALE_MS2 ? { ...item, state: "failed", reason: STALE_REASON, endedAt: now.toISOString() } : item;
+  const sign = lastSignOf(dir, item);
+  return now.getTime() - sign > QUIET_MS ? { ...item, state: "failed", reason: QUIET_REASON, quiet: true, endedAt: new Date(sign + QUIET_MS).toISOString() } : item;
 }
 function load2(dir, now) {
   let raw = [];
@@ -39706,7 +39724,7 @@ function load2(dir, now) {
     const item = itemOf(v);
     if (!item || seen.has(item.symbol)) continue;
     seen.add(item.symbol);
-    out.push(settled(item, now, note));
+    out.push(settled(dir, item, now, note));
   }
   return out;
 }
@@ -39755,6 +39773,8 @@ function startItem(dir, raw, date5, now = /* @__PURE__ */ new Date()) {
     delete started.endedAt;
     delete started.rating;
     delete started.reason;
+    delete started.quiet;
+    delete started.already;
     return { list: list2.map((i) => i === item ? started : i), result: started };
   });
 }
@@ -39763,10 +39783,12 @@ function finishItem(dir, raw, outcome, now = /* @__PURE__ */ new Date()) {
   return change2(dir, now, (list2) => {
     const item = list2.find((i) => i.symbol === symbol4);
     if (!item) throw new QueueRefusal("NOT_ON_LIST", `${symbol4} is not on the waiting list`);
-    if (!open2(item)) throw new QueueRefusal("FINISHED", `${symbol4} is already ${item.state}`);
-    const finished = "rating" in outcome ? { ...item, state: "done", rating: words(outcome.rating, 30) ?? "recorded", endedAt: now.toISOString() } : { ...item, state: "failed", reason: words(outcome.reason, 300) ?? "no reason was given", endedAt: now.toISOString() };
+    if (!open2(item) && !item.quiet) throw new QueueRefusal("FINISHED", `${symbol4} is already ${item.state}`);
+    const finished = "rating" in outcome ? { ...item, state: "done", rating: words(outcome.rating, 30) ?? "recorded", endedAt: now.toISOString(), ...outcome.already ? { already: true } : {} } : { ...item, state: "failed", reason: words(outcome.reason, 300) ?? "no reason was given", endedAt: now.toISOString() };
     if (finished.state === "done") delete finished.reason;
     else delete finished.rating;
+    delete finished.quiet;
+    if (!("rating" in outcome && outcome.already)) delete finished.already;
     return { list: list2.map((i) => i === item ? finished : i), result: finished };
   });
 }
@@ -40534,7 +40556,7 @@ function readRerate(dir) {
     const v = JSON.parse(fs16.readFileSync(rerateFile(dir), "utf8"));
     if (typeof v.day !== "string" || !Array.isArray(v.symbols)) return null;
     const dayOrNull = (x) => x === null || typeof x === "string";
-    return { day: v.day, symbols: v.symbols.filter((s) => typeof s?.symbol === "string" && dayOrNull(s.called) && dayOrNull(s.rating)) };
+    return { day: v.day, symbols: v.symbols.filter((s) => typeof s?.symbol === "string" && dayOrNull(s.called) && dayOrNull(s.rating)), ...v.full === true ? { full: true } : {} };
   } catch {
     return null;
   }
@@ -40554,6 +40576,7 @@ function rerateWeekly(dir, today2, now = /* @__PURE__ */ new Date()) {
     const kept = readRerate(dir);
     if (kept?.day === today2) return kept.symbols;
     const queued = [];
+    let full = false;
     for (const due of dueForRerate(dir, today2, now)) {
       if (queued.length >= RERATE_MAX) break;
       try {
@@ -40561,10 +40584,11 @@ function rerateWeekly(dir, today2, now = /* @__PURE__ */ new Date()) {
         queued.push(due);
       } catch (e) {
         if (!(e instanceof QueueRefusal)) throw e;
+        full = true;
         break;
       }
     }
-    writeWhole(rerateFile(dir), JSON.stringify({ day: today2, symbols: queued }, null, 2) + "\n");
+    writeWhole(rerateFile(dir), JSON.stringify({ day: today2, symbols: queued, ...full ? { full: true } : {} }, null, 2) + "\n");
     return queued;
   });
 }
@@ -40623,10 +40647,11 @@ function rerateLines(dir, today2) {
   if (!held.positions.length) return ["", `${head2}: nothing is held, so there is nothing to re-rate.`];
   const out = [""], names = due.map((s) => s.symbol).join(", "), are = due.length === 1 ? "is" : "are";
   if (done.length) out.push(`${head2}: ${done.map((s) => `${s.symbol} (${lastView(s)})`).join(", ")} ${done.length === 1 ? "was" : "were"} put on the waiting list at shallow depth, for a view under ${RERATE_DAYS} days old (at most ${RERATE_MAX} a Monday). ${done.length === 1 ? "It is" : "They are"} analysed in step 2 with the rest of the list.`);
-  else if (due.length && ran) out.push(`${head2}: ${names} ${are} due, but the waiting list is full, so nothing went on it. Say so at the end.`);
+  else if (due.length && ran && r.full) out.push(`${head2}: ${names} ${are} due, but the waiting list was full, so nothing went on it. Say so at the end.`);
+  else if (due.length && ran) out.push(`${head2}: ${names} ${are} due now, but the re-rating ran earlier this Monday, when ${due.length === 1 ? "it was" : "they were"} not due, and it runs once a Monday: left for next Monday. Say so at the end.`);
   else if (due.length) out.push(`${head2}: ${names} ${are} due, but the re-rating could not put ${due.length === 1 ? "it" : "them"} on the waiting list today. Say so at the end.`);
   else out.push(`${head2}: each has a view under ${RERATE_DAYS} days old, or is already on the waiting list. Nothing to re-rate.`);
-  if (done.length && due.length) out.push(`   Due as well, left for next Monday: ${due.map((s) => s.symbol).join(", ")}.`);
+  if (done.length && due.length) out.push(`   Due as well, left for next Monday${r?.full ? " (the waiting list was full)" : ""}: ${due.map((s) => s.symbol).join(", ")}.`);
   return out;
 }
 function morningBrief(dir, today2, max, look) {
@@ -40644,9 +40669,12 @@ function morningBrief(dir, today2, max, look) {
     m2.analyse.forEach((a, i) => lines.push(`   ${i + 1}. ${a.symbol} (${a.why})`));
     if (m2.analyse.some((a) => a.queued)) lines.push("   A stock asked for on the dashboard is run as the /analyse playbook's waiting list says: start_queue_item first (it gives the depth), finish_queue_item once its call is recorded or with why it failed. A starred stock uses the settings' depth.");
   }
-  if (m2.later.length) lines.push(`   Left for another morning, over the limit of ${max}: ${m2.later.join(", ")}.`);
+  const waitingNow = new Set(readQueue(dir).filter((q) => q.state === "waiting").map((q) => q.symbol));
+  const laterWaiting = m2.later.filter((s) => waitingNow.has(s)), laterStarred = m2.later.filter((s) => !waitingNow.has(s));
+  if (laterWaiting.length) lines.push(`   Over the limit of ${max}, still waiting on the dashboard: ${laterWaiting.join(", ")}. Not left for another morning: end_queue_run asks for another run, which starts at once when something listens on this computer.`);
+  if (laterStarred.length) lines.push(`   Left for another morning, over the limit of ${max}: ${laterStarred.join(", ")}.`);
   if (m2.calledToday.length) lines.push(`   Already called today, so not analysed again: ${m2.calledToday.join(", ")}.`);
-  if (m2.analyse.some((a) => a.queued) || m2.later.length) lines.push("   Last, call end_queue_run once: stocks still waiting on the dashboard get another run.");
+  if (m2.analyse.some((a) => a.queued) || laterWaiting.length) lines.push("   Last, call end_queue_run once: it asks for another run when stocks are still waiting on the dashboard.");
   lines.push("", `3. ${holdingsLine(dir)}`);
   lines.push("", `4. Finish with a short plain list: each new call (stock, rating, one sentence of its executive summary; for a re-rated holding, its new rating beside its last one), anything skipped and why, and any data that was unavailable. Then: decide on the dashboard ("Decide\u2026" on a call); only the person's own Confirm there places an order. A Sell or Underweight on a holding of the Agentic account shows there as "the desk says sell", with a Sell button that opens a ticket: nothing is ever sold by itself. Not investment advice.`);
   lines.push("", "No one may be watching: do not wait for an answer. If a step needs the person (for example no contact email is saved), skip what depends on it and say so at the end.");
@@ -41071,14 +41099,17 @@ ${renderSummary(summarize(entries))}`;
   });
   server.registerTool("read_queue", {
     title: "The waiting list",
-    description: "The stocks the person asked the desk to analyse from the dashboard: those waiting, in the order to run them, each with the depth asked, any being analysed now, and how many one run may analyse. /analyse with no ticker runs them. Read-only.",
+    description: "The waiting list: the stocks the person asked the desk to analyse on the dashboard, and those Monday's re-rating and the morning switch put on it. It gives those waiting, in the order to run them, each with the depth asked, any being analysed now, and how many one run may analyse. /analyse with no ticker runs them. Read-only.",
     annotations: { readOnlyHint: true, openWorldHint: false }
   }, async () => act(() => {
     const list2 = readQueue(dir), waiting = waitingIn(list2), running = list2.find((i) => i.state === "running");
     const lines = [];
     if (running) lines.push(`Being analysed now: ${running.symbol} (started ${running.startedAt?.slice(11, 16) ?? "?"} UTC). One stock runs at a time: if this run did not start it, stop and say so.`);
-    if (!waiting.length) lines.push("Nothing is waiting: the person has not asked for any analysis from the dashboard.");
-    else {
+    if (!waiting.length) {
+      const doneN = list2.filter((i) => i.state === "done").length, failedN = list2.filter((i) => i.state === "failed").length;
+      const kept = [doneN ? `${doneN} done` : "", failedN ? `${failedN} failed (the person presses Retry on the dashboard to ask again)` : ""].filter(Boolean).join(" and ");
+      lines.push(!list2.length ? "Nothing is waiting: the list is empty." : `Nothing ${running ? "else " : ""}is waiting.${kept ? ` The list also keeps finished analyses for the person to see, ${kept}: none of them needs a run.` : ""}`);
+    } else {
       lines.push(`${waiting.length} waiting, in the order to run them; one run analyses at most ${perRun()}:`);
       waiting.forEach((i, n2) => lines.push(`${n2 + 1}. ${i.symbol}, depth ${depthWords(i.depth)}, asked ${i.requestedAt.slice(0, 16).replace("T", " ")} UTC`));
       lines.push("For each, in order: start_queue_item, the analysis, then finish_queue_item. At the end, end_queue_run.");
@@ -41094,7 +41125,7 @@ ${renderSummary(summarize(entries))}`;
     if (ws().sweep) return `BUSY: a backtest sweep (${ws().sweep}) is running; the waiting list runs only on the live desk. Stop and say so.`;
     const sym2 = safeSymbol(a.symbol), d = today(), done = called(sym2, d);
     if (done) {
-      finishItem(dir, sym2, { rating: done.rating });
+      finishItem(dir, sym2, { rating: done.rating, already: true });
       return `ALREADY: ${sym2} was already called today (${done.rating}); it is marked done. Take the next.`;
     }
     const item = startItem(dir, sym2, d);
@@ -41107,14 +41138,15 @@ ${renderSummary(summarize(entries))}`;
     annotations: write
   }, async (a) => queueAct(() => {
     const sym2 = safeSymbol(a.symbol);
+    const item = readQueue(dir).find((i) => i.symbol === sym2), late2 = item?.quiet ? ` It had read as failed, because nothing was saved for it for two hours; this run's word replaces that.` : "";
     if (a.failed_because) {
       finishItem(dir, sym2, { reason: a.failed_because });
-      return `Marked failed: ${sym2}. The person sees why on the dashboard and can press Retry.`;
+      return `Marked failed: ${sym2}. The person sees why on the dashboard and can press Retry.${late2}`;
     }
-    const item = readQueue(dir).find((i) => i.symbol === sym2), call = called(sym2, item?.date ?? today());
+    const call = called(sym2, item?.date ?? today());
     if (!call) throw new Error(`no call for ${sym2} on ${item?.date ?? today()} is recorded yet: call record_decision first, or pass failed_because`);
     finishItem(dir, sym2, { rating: call.rating });
-    return `Marked done: ${sym2}, ${call.rating}. The dashboard shows it.`;
+    return `Marked done: ${sym2}, ${call.rating}. The dashboard shows it.${late2}`;
   }));
   server.registerTool("end_queue_run", {
     title: "End a run of the waiting list",
