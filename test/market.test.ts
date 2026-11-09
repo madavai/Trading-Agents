@@ -222,3 +222,25 @@ test('a window holding only a session the source lists with blank prices names i
   configure({ fetch: chartFetch(() => series('2026-10-09', 300)) });
   assert.equal(await priceHistory('NVDA', '2026-10-12', '2026-10-10', '2026-10-11'), 'No trading rows for NVDA from 2026-10-10 to 2026-10-11.', 'a weekend has none');
 });
+
+// Audit 3 prices-12: a day was taken as final 15 minutes after the close in every market, though Yahoo's own list has
+// markets up to 30 minutes late, and on 9 Nov 2026 its chart service had London, Frankfurt and Zurich 15 minutes late: read
+// then, the row could still miss the closing auction. A US stock or fund on a checked exchange, and a coin, come real-time.
+test('a day is taken as final 15 minutes after a US close, and 45 minutes after the close of a market whose delay the desk has not checked', () => {
+  const market = (meta: Record<string, unknown>) => parseChart(chartJson('X', series('2026-10-12', 3), meta), 'X').meta.market;
+  assert.deepEqual([
+    market({ instrumentType: 'EQUITY', exchangeName: 'NMS' }), market({ instrumentType: 'ETF', exchangeName: 'PCX' }), market({ instrumentType: 'CRYPTOCURRENCY', exchangeName: 'CCC' }),
+    market({ instrumentType: 'EQUITY', exchangeName: 'LSE' }), market({ instrumentType: 'FUTURE', exchangeName: 'CMX' }), market({ instrumentType: 'INDEX', exchangeName: 'CXI' }),
+  ], ['us', 'us', 'coin', 'other', 'other', 'other']);
+  const end = Date.parse('2026-10-12T15:30:00Z');   // 16:30 in London
+  const row = (m: 'us' | 'other', readAfterMin: number) => latestState({
+    meta: { symbol: 'X', timezone: 'Europe/London', market: m, session: { date: '2026-10-12', start: end - 8.5 * 3_600_000, end } },
+    bars: [{ date: '2026-10-12', open: 1, high: 1, low: 1, close: 1, volume: 1 }], fetchedAt: end + readAfterMin * 60_000,
+  }, '2026-10-12', end + 2 * 3_600_000);
+  assert.equal(row('us', 20).label, 'Close', 'a US close read 20 minutes after is final');
+  const early = row('other', 20);
+  assert.deepEqual([early.open, early.label], [true, 'Latest price (read at 16:50 Europe/London time, not the close)']);
+  assert.match(early.lines[0]!, /just after its session ended \(it ended at 16:30 Europe\/London time, and its figures are taken as final 45 minutes after\)/);
+  assert.equal(row('other', 44).open, true);
+  assert.deepEqual([row('other', 45).open, row('other', 45).lines], [false, ['- The latest row, 2026-10-12, is a finished session: its figures are final.']]);
+});

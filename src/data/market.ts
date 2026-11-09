@@ -38,13 +38,20 @@ export async function instrument(raw: string, analysis: string): Promise<string>
 }
 
 /** A time of day in the exchange's own zone, as a person reads it. */
-export const clock =(ms: number, zone = 'UTC'): string => {
+export const clock = (ms: number, zone = 'UTC'): string => {
   try { return `${new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: zone })} ${zone} time`; } catch { return `${new Date(ms).toISOString().slice(11, 16)} UTC`; }
 };
 
 /** How long after a session ends its figures are taken as final at the source: a margin of 15 minutes, so a row read sooner
- *  than that after the close is not called final. (How late Yahoo's live prices may be is said in data/delay.ts.) */
+ *  than that after the close is not called final. That is for prices that come real-time: a US stock or fund on an exchange
+ *  the desk checked, and a coin (data/delay.ts). Any other market's prices may be late by a time the desk has not checked:
+ *  Yahoo's own list of its delays goes up to 30 minutes (Shanghai, Shenzhen, Switzerland, New York's metal and energy
+ *  futures), and on 9 Nov 2026 its chart service had London, Frankfurt and Zurich 15 minutes late. So such a market's
+ *  figures are taken as final only 30 minutes later than a US close's: 45 minutes after its close. */
 export const SETTLE_MS = 15 * 60_000;
+export const SETTLE_OTHER_MS = 45 * 60_000;
+/** The margin for a series, by the market its prices are from (when the answer says). */
+export const settleMs = (meta: Pick<Series['meta'], 'market'>): number => (meta.market === 'other' ? SETTLE_OTHER_MS : SETTLE_MS);
 
 /** What the latest row is. `open`: its close is not a final close; `label`: what the checked price table calls it;
  *  `inline`: the words before it in a sentence; `lines`: what the tools say about it, and about any session the rows lack. */
@@ -71,9 +78,10 @@ export function latestState(s: Series, upTo: string, now = Date.now()): LatestSt
   if (unfilled) return said(final, [`- **The source lists a session on ${unfilled}, but its prices are not filled in yet (this happens for a while after a session ends). Every figure here is as of ${last.date}. Do not call ${last.date} the latest session, and do not say ${unfilled} had no trading: say its prices were not available yet.**`]);
   if (session && session.date === last.date) {
     if (now < session.end) return said({ open: true, label: 'Latest price (still trading)', inline: 'still trading: latest price' }, [`- **The latest row, ${last.date}, is a session still trading (it closes at ${clock(session.end, zone)}). Its "close" is the latest price so far, not a close; its high, low, volume and every indicator on it will change. Call it the latest price, never the close, and do not treat a level as broken or held on this row alone.**`]);
-    if (read < session.end + SETTLE_MS) {
+    const settle = settleMs(s.meta);
+    if (read < session.end + settle) {
       const at = clock(read, zone);
-      return said({ open: true, label: `Latest price (read at ${at}, not the close)`, inline: `latest price as read at ${at}` }, [`- **The latest row, ${last.date}, was read at ${at}, ${read < session.end ? 'while its session was still trading' : 'just after its session ended'} (it ended at ${clock(session.end, zone)}, and its figures are taken as final ${SETTLE_MS / 60_000} minutes after). Its "close" is the latest price as read then, not the close; its high, low, volume and every indicator on it may still change. Call it the latest price as read at ${at}, never the close, and do not treat a level as broken or held on this row alone.**`]);
+      return said({ open: true, label: `Latest price (read at ${at}, not the close)`, inline: `latest price as read at ${at}` }, [`- **The latest row, ${last.date}, was read at ${at}, ${read < session.end ? 'while its session was still trading' : 'just after its session ended'} (it ended at ${clock(session.end, zone)}, and its figures are taken as final ${settle / 60_000} minutes after). Its "close" is the latest price as read then, not the close; its high, low, volume and every indicator on it may still change. Call it the latest price as read at ${at}, never the close, and do not treat a level as broken or held on this row alone.**`]);
     }
     return said(final, [`- The latest row, ${last.date}, is a finished session: its figures are final.`]);
   }

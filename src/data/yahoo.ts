@@ -6,6 +6,7 @@
 // when it was read (`fetchedAt`), and is kept in memory no longer than on disk, so a run that goes on past the close
 // reads the close, not the price of the afternoon.
 import { addDays, daysBetween } from './dates.js';
+import { priceMarket, type PriceMarket } from './delay.js';
 import { getJsonAt, keepFor, NoData } from './http.js';
 import { normalizeSymbol } from './symbols.js';
 
@@ -15,6 +16,9 @@ export interface Meta {
   symbol: string; currency?: string; exchange?: string; type?: string; name?: string; price?: number; timezone?: string;
   /** The current or latest regular session the service knows of: its day in the exchange's calendar, its opening and close (ms). */
   session?: { date: string; start: number; end: number };
+  /** The market the prices are from, for how late they may be (data/delay.ts): a US stock or fund on a checked exchange, a
+   *  coin, or any other. */
+  market?: PriceMarket;
 }
 /** A dividend: its ex-dividend day in the exchange's calendar, and the amount per share as the chart service gives it
  *  (in the quote currency, adjusted for later splits, so it is on the same footing as today's price). */
@@ -88,7 +92,7 @@ export function parseChart(json: ChartJson, symbol: string): Series {
     if (amount !== null && amount > 0 && typeof d.date === 'number' && Number.isFinite(d.date)) paid.set(dayOf(d.date), amount);
   }
   return {
-    meta: { symbol: m.symbol ?? symbol, currency: m.currency, exchange: m.fullExchangeName ?? m.exchangeName, type: m.instrumentType, name: m.longName ?? m.shortName, price: m.regularMarketPrice, timezone: m.exchangeTimezoneName, session },
+    meta: { symbol: m.symbol ?? symbol, currency: m.currency, exchange: m.fullExchangeName ?? m.exchangeName, type: m.instrumentType, name: m.longName ?? m.shortName, price: m.regularMarketPrice, timezone: m.exchangeTimezoneName, session, market: priceMarket(m) },
     bars: unique, unfilled, missing, dividends: [...paid].map(([date, amount]) => ({ date, amount })).sort((a, b) => a.date.localeCompare(b.date)),
     traded: kept.map((x) => x.traded), unadjusted: kept.filter((x) => !x.adjusted).map((x) => x.bar.date),
   };
