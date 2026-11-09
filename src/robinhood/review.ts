@@ -13,8 +13,10 @@ const REVIEW = 'review_equity_order';
 /** Robinhood's review in plain parts. Its shape is read as Robinhood's tool description names it (an answer with alerts
  *  under order_checks and a customer_approval_required flag); anything else it says is shown as it said it. */
 export interface Review {
-  /** Robinhood answered without reporting an error. */
+  /** Robinhood answered without reporting an error, with its list of order checks (an empty list: no alerts). */
   answered: boolean;
+  /** Robinhood answered without an error but without its list of order checks: the order counts as not checked. */
+  unclear: boolean;
   /** Robinhood's own alerts on the order (buying power, a halt, a pattern-day-trade rule, ...), in its words. */
   alerts: string[];
   /** Whether Robinhood will ask the person to approve the order on their phone, when it says. */
@@ -35,8 +37,15 @@ const words = (v: unknown): string[] => {
 };
 
 export function parseReview(answer: { data: unknown; text: string; failed: boolean }): Review {
-  if (answer.failed) return { answered: false, alerts: [], approvalRequired: null, facts: [], error: masked(answer.text) };
+  if (answer.failed) return { answered: false, unclear: false, alerts: [], approvalRequired: null, facts: [], error: masked(answer.text) };
   const d = obj(obj(answer.data).data);
+  // Only an answer with Robinhood's list of order checks is a check; anything else (words alone, another shape) checked
+  // nothing that the desk can tell, so it is shown as Robinhood said it and the order cannot be placed.
+  if (d.order_checks === undefined || d.order_checks === null) {
+    const said = answer.data === null ? answer.text.trim() : words(obj(answer.data).data).join(' ');   // its data part only: its guide is advice to chat agents
+    return { answered: false, unclear: true, alerts: [], approvalRequired: null, facts: [],
+      error: `Robinhood answered without its list of order checks, so this order counts as not checked and cannot be placed.${said ? ` It said: ${masked(said).slice(0, 300)}` : ''}` };
+  }
   const alerts = [...new Set([...words(d.order_checks), ...words(d.alerts), ...words(d.warnings)])].slice(0, 12).map((x) => x.slice(0, 300));
   const facts: Array<[string, string]> = [];
   const walk = (o: Record<string, unknown>, prefix: string, depth: number) => {
@@ -48,7 +57,7 @@ export function parseReview(answer: { data: unknown; text: string; failed: boole
     }
   };
   walk(d, '', 0);
-  return { answered: true, alerts, approvalRequired: typeof d.customer_approval_required === 'boolean' ? d.customer_approval_required : null, facts, error: null };
+  return { answered: true, unclear: false, alerts, approvalRequired: typeof d.customer_approval_required === 'boolean' ? d.customer_approval_required : null, facts, error: null };
 }
 
 export class Reviewer {

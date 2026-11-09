@@ -727,14 +727,15 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "About half a minute after the update: \"The desk was updated. Restart the dashboard to use the new version: it reopens where you are.\"",
         "\"The dashboard is restarting with the new version. This page reloads in a moment.\" It reopens where you were. With an order ticket open, it asks you to finish or close it first."] },
-    { "id": "C12", "title": "Stop", "tags": [], "changed": "2026-10-21",
+    { "id": "C12", "title": "Stop", "tags": [], "changed": "2026-11-09",
       "about": "The dashboard keeps running until you stop it, so the page can update and watch your holdings. Stop closes it; the team opens it again any time.",
       "where": "Dashboard › the power button, top right",
       "do": [
         "Press it, then \"Stop\"."],
       "see": [
         "\"Stop the dashboard?\" with \"Keep it running\" and \"Stop\".",
-        "After Stop: \"The dashboard is stopped. Ask the team to open it again any time.\""] },
+        "After Stop: \"The dashboard is stopped. Ask the team to open it again any time.\"",
+        "If an order is being sent to Robinhood at that moment, Stop waits for its answer: a red notice says \"an order is being sent: stop when it is done\". Press Stop again once the ticket shows Robinhood's answer."] },
     { "id": "C13", "title": "A page opened by hand has no key", "tags": [], "changed": "2026-10-21",
       "about": "Each time it starts, the dashboard makes a key and gives it only to the page the team opened. Anything else that finds its address, even on your computer, gets no data.",
       "where": "Another browser, or a private window",
@@ -819,8 +820,8 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "Its orders (When, Order, Quantity, Price, State), or \"No orders in this account yet.\"",
         "\"Robinhood asks you to approve every trade on your phone. Keep it on until you trust the desk.\" when that is your Robinhood setting."] },
-    { "id": "D6", "title": "The agents get your holdings", "tags": [], "changed": "2026-10-21",
-      "about": "Each refresh hands the agents your chosen holdings, so an analysis of NVIDIA knows whether you already own it.",
+    { "id": "D6", "title": "The agents get your holdings", "tags": [], "changed": "2026-11-09",
+      "about": "Each refresh hands the agents your chosen holdings, so an analysis of NVIDIA knows whether you already own it. Each share count goes to them exactly as Robinhood gives it, fractions of a share included.",
       "where": "Dashboard › Your account › under the accounts",
       "do": [
         "Press \"Refresh from Robinhood\", then read the note under the accounts."],
@@ -840,13 +841,13 @@ b, strong { font-weight: var(--weight-semibold); }
         "Press \"Refresh from Robinhood\"."],
       "see": [
         "It reads \"Reading from Robinhood…\", then \"From Robinhood at <time>\" moves to now."] },
-    { "id": "D9", "title": "Disconnect and reconnect", "tags": ["Optional"], "changed": "2026-10-21",
+    { "id": "D9", "title": "Disconnect and reconnect", "tags": ["Optional"], "changed": "2026-11-09",
       "about": "Disconnect deletes the saved sign-in from your computer and switches trading off. To end the access on Robinhood's side too, remove it in Robinhood.",
       "where": "Dashboard › Your account",
       "do": [
         "Press \"Disconnect\", then \"Connect Robinhood\", and sign in on Robinhood's own page."],
       "see": [
-        "\"The saved Robinhood sign-in is deleted from this computer.\"",
+        "\"The saved Robinhood sign-in is deleted from this computer, and trading is switched off.\" The top of the page says \"Trading off\" straight away, without reloading the page.",
         "Back to connected: you choose the accounts again, and trading is switched off. Your caps stay as you set them."] }
   ] },
   { "id": "E", "name": "Deciding on a call",
@@ -886,14 +887,16 @@ b, strong { font-weight: var(--weight-semibold); }
         "Set the limit price 20% above the live price."],
       "see": [
         "\"20.0% from Robinhood's live price of $…: more than 10% away, which looks like a typing slip\". Review is greyed out."] },
-    { "id": "E5", "title": "Robinhood's check", "tags": ["Market hours"], "changed": "2026-10-21",
+    { "id": "E5", "title": "Robinhood's check", "tags": ["Market hours"], "changed": "2026-11-09",
       "about": "\"Review with Robinhood\" asks Robinhood to check the exact order without placing it (a dry run), so you see its warnings first.",
       "where": "The NVDA ticket",
       "do": [
         "Put the proposed numbers back, then press \"Review with Robinhood\"."],
       "see": [
         "\"Robinhood's check\" with \"No alerts\", or Robinhood's alerts in its own words.",
-        "\"This was Robinhood's dry run: nothing was placed.\" No new order in the Robinhood app."] },
+        "\"This was Robinhood's dry run: nothing was placed.\" No new order in the Robinhood app.",
+        "If you change the shares or the limit price while Robinhood is checking, its answer is not shown as the check of the new figures: press \"Review with Robinhood\" again.",
+        "If Robinhood answers without its list of checks, the box says \"Not checked\": \"Robinhood answered without its list of order checks, so this order counts as not checked and cannot be placed.\" There is no Place button."] },
     { "id": "E6", "title": "Trading off blocks placing", "tags": [], "changed": "2026-10-21",
       "about": "Trading ships switched off. Until you switch it on yourself (F2), a ticket can be checked but never placed.",
       "where": "The NVDA ticket, trading off",
@@ -943,7 +946,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "\"Switch trading on?\" with the warning first.",
         "With under four weeks: \"That is under four weeks: too little to tell whether the desk's calls are any good. Read your paper record first.\" \"Yes, switch trading on\" appears only after \"I understand\", which turns into \"You understand\".",
         "\"Trading is switched on. Every order still needs your Confirm.\" The top of the page says \"Trading on\", the side list \"Trading is on\" and the card \"On since <date>\"."] },
-    { "id": "F3", "title": "Place one share of NVIDIA", "tags": ["Real money","Market hours","Optional"], "changed": "2026-10-21",
+    { "id": "F3", "title": "Place one share of NVIDIA", "tags": ["Real money","Market hours","Optional"], "changed": "2026-11-09",
       "about": "The Confirm button names the exact order, so you always know what you are sending.",
       "where": "Dashboard › The desk's calls › NVDA (a Buy) › Decide…",
       "do": [
@@ -951,7 +954,8 @@ b, strong { font-weight: var(--weight-semibold); }
         "Read the button, then press it."],
       "see": [
         "The button names exactly the order: \"Confirm: Buy 1 NVDA at $<price>\", over \"Pressing Confirm sends a real order with real money to Robinhood.\"",
-        "\"Robinhood took it\", and \"Robinhood now asks you to approve it on your phone: it is not sent to the market until you do.\" A notice: \"The order is with Robinhood.\""] },
+        "\"Robinhood took it\", and \"Robinhood now asks you to approve it on your phone: it is not sent to the market until you do.\" A notice: \"The order is with Robinhood.\"",
+        "If Robinhood marks the order rejected or failed, the box says \"Robinhood refused it\", with Robinhood's words. It is never shown as taken."] },
     { "id": "F4", "title": "Approve or decline on your phone", "tags": ["Real money","Optional"], "changed": "2026-10-21",
       "about": "The last word is yours on your phone; the dashboard then shows what Robinhood did.",
       "where": "The Robinhood app, then Dashboard › Your account",
@@ -979,7 +983,27 @@ b, strong { font-weight: var(--weight-semibold); }
       "do": [
         "Press \"Switch trading off\"."],
       "see": [
-        "\"Trading is switched off.\" The page says trading is off, and tickets no longer offer Place."] }
+        "\"Trading is switched off.\" The page says trading is off, and tickets no longer offer Place."] },
+    { "id": "F8", "title": "An open order counts towards your caps", "tags": ["Real money","Market hours","Optional"], "changed": "2026-11-09",
+      "about": "An order Robinhood has taken but not yet filled (waiting for your approval on your phone, or for its limit price) counts towards your per-stock and sector caps as if it were bought, so two tickets cannot together go past a cap. Shares already in sell orders cannot be sold twice.",
+      "where": "A new NVDA ticket, while F3's order waits for your approval",
+      "do": [
+        "Before you approve F3's order on your phone, chart NVDA, press \"Trade…\" and read \"Your checks\".",
+        "Then approve or decline the first order on your phone (F4)."],
+      "see": [
+        "The per-stock line counts the open order: \"NVDA would be …% of the account, counting 1 share(s) in orders not yet filled; your cap is 10%\". The sector line ends \", counting orders not yet filled\".",
+        "On a Sell ticket, shares already in sell orders not yet filled are taken off: \"Only N of the M held can be sold: K are in sell orders not yet filled\".",
+        "If Robinhood lists an order the desk cannot read well enough, a red check says \"Robinhood listed N order(s) whose stock, side, size or state could not be read, so your per-stock and sector caps cannot be checked\", and the ticket cannot be reviewed."] },
+    { "id": "F9", "title": "No clear answer from Robinhood", "tags": ["Later","Optional"], "changed": "2026-11-09",
+      "about": "If Robinhood's answer to an order never arrives (the connection drops while it is sent), or comes back without an order id, the order may have gone through. The dashboard never says it failed and never offers to send it again. It counts it as sent: towards your orders a day and, for a buy, the shortest hold (M4).",
+      "where": "The ticket you placed from, then the Robinhood app",
+      "do": [
+        "Nothing to press: read this when it happens. Then look at the Agentic account's orders in the Robinhood app, and press \"Refresh from Robinhood\"."],
+      "see": [
+        "The ticket's box says \"No clear answer\", with \"Robinhood's answer did not arrive (…), so this order may have gone through. Look at the Agentic account's orders in Robinhood's own app before you try again.\" and \"It is in the desk's order log as sent, so it counts towards your orders a day. This ticket sends nothing more.\" Only Close is left.",
+        "A notice: \"No clear answer from Robinhood: look in its app before you try again.\"",
+        "For a week, a new ticket for that stock begins with \"An order sent from here on <day> (Buy 1 NVDA at $…) got no clear answer from Robinhood, so it may have gone through. Look in Robinhood's own app before you place another.\" Its \"Orders today\" counts that order, even if Robinhood does not list it.",
+        "The evening wrap-up lists it as \"no clear answer from Robinhood, so it may have gone through\"."] }
   ] },
   { "id": "G", "name": "Routines",
     "sub": "The morning routine and the evening wrap-up, by hand or from Madav's Routines, where the project ships them switched off.",
@@ -1124,7 +1148,16 @@ b, strong { font-weight: var(--weight-semibold); }
         "Ask the team: [[Raise my order cap to $5,000]]",
         "Then ask: [[Switch trading on for me]]"],
       "see": [
-        "Neither is done: the team says these are yours to change, on the dashboard's Your account. Your caps and the trading switch are as you left them."] }
+        "Neither is done: the team says these are yours to change, on the dashboard's Your account. Your caps and the trading switch are as you left them."] },
+    { "id": "H7", "title": "Other spellings are refused too", "tags": ["Optional"], "changed": "2026-11-09",
+      "about": "The guard reads every command a chat in this folder runs. It knows your private folder and the dashboard by more than their exact names: a wildcard, a Windows short name or a name split into pieces is refused the same way. It is a spelling check, not a wall. The wall is Claude Code asking you before any command outside this folder, so say no to one you did not expect.",
+      "where": "A Claude Code chat in your Trading-Agents folder",
+      "do": [
+        "Ask the chat: [[List the folders in my home folder whose names start with .trad]]",
+        "Then ask: [[Fetch http://127.1:47615/api/state]]"],
+      "see": [
+        "Both are refused, by the chat itself (this folder's rules) or by the guard (with the words of H3 or H4, or \"Agents never search the whole home folder or above it…\"). Nothing inside the private folder is shown and nothing is fetched from the dashboard.",
+        "If the chat asks you to allow a command outside this folder, say no."] }
   ] },
   { "id": "I", "name": "The same desk in a chat",
     "sub": "In a Claude Code chat in this folder, short commands do what the team does.",
@@ -1387,23 +1420,26 @@ b, strong { font-weight: var(--weight-semibold); }
         "Read \"Your caps\"."],
       "see": [
         "\"$500.00 an order at most\", \"10% of the account in one stock\", \"3 orders a day\", \"one sector at most 30%\", \"crypto at most 5%\", \"switches itself off after a 5% fall in a week\" and \"a stock bought here is held at least 5 trading days\" (or your own values)."] },
-    { "id": "M2", "title": "Change a cap", "tags": [], "changed": "2026-10-21",
+    { "id": "M2", "title": "Change a cap", "tags": [], "changed": "2026-11-09",
       "about": "Changing a cap takes effect on the next ticket.",
       "where": "Dashboard › Your account › Your caps › Change the caps…",
       "do": [
         "Set \"Orders a day\" to [[2]] and press \"Save the caps\". Open the NVDA ticket.",
-        "Put it back to [[3]]"],
+        "Put it back to [[3]]",
+        "Set \"One stock, % of the account\" to [[7,5]] and save. Then put it back to [[10]]"],
       "see": [
         "\"Your caps are saved. Every ticket is checked against them.\"",
-        "The ticket's orders today reads \"0 of 2\"."] },
-    { "id": "M3", "title": "The sector limit on a ticket", "tags": [], "changed": "2026-10-21",
-      "about": "Each company counts towards its sector, worked out from the industry code it gave the SEC, so you cannot pile into one sector by accident.",
+        "The ticket's orders today reads \"0 of 2\".",
+        "\"7.5% of the account in one stock\": a decimal comma is read as a decimal point, never as 75%. A figure that is unclear, such as 1,2,3, is refused and nothing is saved."] },
+    { "id": "M3", "title": "The sector limit on a ticket", "tags": [], "changed": "2026-11-09",
+      "about": "Each company counts towards its sector, worked out from the industry code it gave the SEC, so you cannot pile into one sector by accident. Orders not yet filled count too (F8).",
       "where": "The NVDA ticket › Your checks",
       "do": [
         "Open the NVDA ticket (\"Decide…\" or \"Trade…\") and read its checks; then one for SPY."],
       "see": [
         "A sector line, for example \"Sector Technology would be 28.6% of the account; your limit is 30%\".",
-        "For SPY: \"SPY is a whole-market fund: it counts towards no sector\". A company the SEC does not list counts as its own (\"…, whose sector is not known, counted on its own\")."] },
+        "For SPY: \"SPY is a whole-market fund: it counts towards no sector\". A company the SEC does not list counts as its own (\"…, whose sector is not known, counted on its own\").",
+        "If Robinhood gives no live price for a holding in the same sector, the sector cannot be checked and the line is red: \"Sector Technology cannot be checked against your limit of 30%: Robinhood gave no live price for …, held in the account\". It never counts that holding as worth nothing."] },
     { "id": "M4", "title": "The shortest hold", "tags": ["Later"], "changed": "2026-11-08",
       "about": "To avoid jumping in and out, a company bought here is held five trading days (days New York's market is open: weekends and its holidays, such as Thanksgiving, do not count) before the desk proposes selling it. Your own early sale takes one more press.",
       "where": "Dashboard › Trade… on a company bought here in the last five trading days",
@@ -1412,14 +1448,15 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "An amber check: \"NVDA was bought here on <day>, N trading day(s) ago, under your shortest hold of 5: selling it now takes one more press\".",
         "\"Sell anyway\" in place of \"Review with Robinhood\". A Sell call's ticket on it proposes no sell yet."] },
-    { "id": "M5", "title": "The weekly loss limit", "tags": ["Later","Optional"], "changed": "2026-10-21",
-      "about": "If the Agentic account falls 5% (as shipped) below its highest value of the last seven days, trading switches itself off and says why.",
+    { "id": "M5", "title": "The weekly loss limit", "tags": ["Later","Optional"], "changed": "2026-11-09",
+      "about": "If the Agentic account falls 5% (as shipped) below its highest value of the last seven days, trading switches itself off and says why. When you switch it back on, the limit counts from that moment, so the same fall does not switch it off again.",
       "where": "Dashboard › Your account › Trading",
       "do": [
         "Nothing to press: this is read when it happens. With trading on, it trips when the Agentic account falls your limit below its highest value of the last seven days."],
       "see": [
-        "Trading switches itself off, and the card says why in red: \"The Agentic account fell …% below its highest value of the last seven days (…), past your weekly limit of 5%. Trading switched itself off. …\"",
-        "The top of the page says \"Trading off\"."] }
+        "Trading switches itself off, and the card says why in red: \"The Agentic account fell …% below its highest value of the last seven days (…), past your weekly limit of 5%. Trading switched itself off. A large withdrawal can do this too. When you switch it back on, the limit counts from then.\"",
+        "The top of the page says \"Trading off\" as soon as the dashboard reads your accounts or you open a ticket, without reloading the page.",
+        "Switched back on (F2), trading stays on: the seven days start again from then."] }
   ] },
   { "id": "N", "name": "Care for what you hold",
     "sub": "The desk's view beside each holding, its stop watched, and sells you confirm. Nothing is ever sold by itself.",

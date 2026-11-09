@@ -49,7 +49,7 @@ test('a sector comes from the fund tables or the company\'s own profile; anythin
   assert.equal((await s.of('FAIL')).name, 'Energy', 'and is asked again next time');
   await s.of('AAPL'); assert.equal(asked, 4, 'a sector found is remembered');
   const c = s.context('AAPL', [{ symbol: 'XLK', quantity: 10, price: 200 }, { symbol: 'AAPL', quantity: 2, price: 250 }, { symbol: 'SPY', quantity: 1, price: 600 }, { symbol: 'NEW', quantity: 5, price: 10 }]);
-  assert.deepEqual(c, { name: 'Technology', label: 'Technology', heldUsd: 2_500 }, 'a sector fund counts towards its sector; a whole-market fund and a stock not looked up do not');
+  assert.deepEqual(c, { name: 'Technology', label: 'Technology', heldUsd: 2_500, openUsd: 0, unpriced: [] }, 'a sector fund counts towards its sector; a whole-market fund and a stock not looked up do not');
   assert.equal(s.context('SPY', [{ symbol: 'SPY', quantity: 1, price: 600 }]).heldUsd, 0);
 });
 
