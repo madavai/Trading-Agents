@@ -16,9 +16,9 @@
 // again after that with nothing saved since answers STOP, and a listing that would show the same lessons again with
 // nothing saved since says STOP instead. The notes lapse an hour after the re-check's last step.
 import { Journal, UNCHECKED, flagOf, type Entry } from './journal.js';
-import { measure, resolveBenchmark, type Outcome, type Scoring } from './scoring.js';
+import { checkName, measure, windowWords, type Outcome, type Scoring } from './scoring.js';
 import { windowRows } from './window.js';
-import { lessonRefusal } from './settle.js';
+import { lessonRefusal, rulesOf } from './settle.js';
 import { REFUSALS_TO_LEAVE, countRefusal, keyOf, leftIn, noteStep, readNotes, writeNotes } from './loop-notes.js';
 import { listed, utcTime } from './agent-files.js';
 import { today } from '../data/dates.js';
@@ -73,10 +73,12 @@ function flagWords(e: Entry): string[] {
 async function windowOf(e: Entry, scoring: Scoring): Promise<{ o: Outcome; rows: string }> {
   const days = Number(/^(\d+)d$/.exec(e.holding ?? '')?.[1]);
   if (!days || !e.resolved) throw new NoWindow('the journal does not record its holding window');
+  // The rules it was scored by, with the days its score says it was scored over.
+  const r = { ...rulesOf(e, scoring), days };
   let o: Outcome | null;
-  try { o = await measure(e.ticker, e.date, resolveBenchmark(e.ticker, scoring), days); }
+  try { o = await measure(e.ticker, e.date, r); }
   catch (err) { throw new NoWindow(`the prices of ${e.ticker}'s window could not be had (${(err as Error).message})`); }
-  if (!o) throw new NoWindow(`the prices no longer cover ${e.ticker}'s ${days}-trading-day window after ${e.date}`);
+  if (!o) throw new NoWindow(`the prices no longer cover ${e.ticker}'s window of ${windowWords(r)} after ${e.date}`);
   if (o.exit !== e.resolved) throw new NoWindow(`the prices now give a window ending ${o.exit}, but the call was scored to ${e.resolved}`);
   try { return { o, rows: await windowRows(e.ticker, o) }; }
   catch (err) { throw new NoWindow(`the day-by-day rows of ${e.ticker}'s window could not be had (${(err as Error).message})`); }
@@ -96,7 +98,7 @@ function noWindow(journal: Journal, e: Entry, why: string, on: string): 'flagged
 const RULES = [
   'For each call TO REWRITE: check every statement of its lesson against its window\'s rows, then save a new lesson with correct_lesson (symbol, trade_date, lesson, what_was_wrong). Write only from the rows, the decision and the score shown here: say nothing about the desk\'s other calls or its journal, which are not shown here.',
   `The lesson: 2 to 4 sentences of plain prose (the desk counts them and refuses more than 4), no bullets, headings or markdown; (1) what the alpha over the window shows about the directional call, citing the figure as listed, and saying plainly if the window is too short to judge the thesis; (2) which part of the thesis the window supports or undercuts; (3) one concrete lesson for the next similar analysis.`,
-  'Read the rows as they are labelled: the row marked "entry" is the close the call is scored from, not a session of the window, so the call\'s first session is session 1. Say how the index moved with the figure the score line gives, never a word for it such as "flat". When the decision says an event comes after a session\'s close (a report after the bell), the first session that can show it is the next one.',
+  'Read the rows as they are labelled: the row marked "entry" is the close the call is scored from, not a session of the window, so the call\'s first session is session 1. Say how the yardstick moved with the figure the score line gives, never a word for it such as "flat". When the decision says an event comes after a session\'s close (a report after the bell), the first session that can show it is the next one.',
   'Before writing about any level, stop, target or trigger the decision named, find it in the rows: say it was reached, held or broken, or that a trigger fired or not, only when a row shows it, naming that row\'s date and figure. A trigger the decision tied to more than one condition fired only when every condition did: a condition the rows cannot show leaves it "not known from the prices". What the rows cannot show (news, earnings, a filing, a figure they do not hold) is "not known from the prices", never a guess.',
   `what_was_wrong sorts each statement of the lesson as it stands under three labels, in this order: "${CHECK_LABELS[0]}" each statement the rows contradict, quoted, with the row that shows otherwise (its date and figure); "${CHECK_LABELS[1]}" each statement the rows cannot show, quoted; "${CHECK_LABELS[2]}" the rest. Write "none" under a label with nothing in it. A statement is contradicted only when a row shows otherwise. The desk keeps the first lesson word for word beside the new one, and any corrected lesson it replaces, marked as corrected. The call, its rating and its score stay as they are.`,
   'For a lesson the person said is wrong, what they said is shown beside it. Check it against the rows like every other statement, and write only what a row shows: never take their words, or a review\'s, as given.',
@@ -125,7 +127,7 @@ export async function lessonsToRecheck(journal: Journal, scoring: Scoring, ticke
       const w = await windowOf(e, scoring);
       shown.push([
         `${tagOf(e)} TO REWRITE: ${whyOf(e)}.`,
-        `ITS SCORE, WHICH STAYS AS IT IS: ${e.ticker} ${e.raw} from ${w.o.entry} to ${w.o.exit} (${w.o.holdingDays} trading days); its index, ${w.o.benchmark}, ${signedPct(w.o.benchmarkReturn)} over the same days; alpha ${e.alpha}.`,
+        `ITS SCORE, WHICH STAYS AS IT IS: ${e.ticker} ${e.raw} from ${w.o.entry} to ${w.o.exit} (${windowWords({ days: w.o.holdingDays, unit: w.o.unit })}); its yardstick, ${w.o.benchmark}, ${signedPct(w.o.benchmarkReturn)} over the same days; alpha ${e.alpha}. It is ${checkName({ days: w.o.holdingDays, unit: w.o.unit })}, not the call's own time horizon.`,
         `DECISION:\n${e.decision}`,
         `LESSON AS IT STANDS:\n${e.reflection}`,
         ...flagWords(e),

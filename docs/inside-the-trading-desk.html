@@ -644,7 +644,7 @@ p { text-wrap: pretty; }
       </div>
       <div class="joined bands">
         <p class="band guard c-guard"><svg class="ic"><use href="#i-shield"/></svg><span><b>The guard</b> stands between every agent and your money. No agent has a broker tool or an order tool, and none may open Robinhood's site, your sign-in or the dashboard's address, whatever it is told. Orders come only from your Confirm.</span></p>
-        <p class="band c-desk"><svg class="ic"><use href="#i-loop"/></svg><span><b>Two things flow back.</b> The dashboard shares your holdings with the desk, so the trader and the portfolio manager fit their advice to what you own. And every call is scored five trading days later, so the desk learns from its own record.</span></p>
+        <p class="band c-desk"><svg class="ic"><use href="#i-loop"/></svg><span><b>Two things flow back.</b> The dashboard shares your holdings with the desk, so the trader and the portfolio manager fit their advice to what you own. And every call is scored in a first-week check against SPY once a scoring runs (5 trading days, or 7 calendar days for a coin), so the desk learns from its own record. It is a short first check, not the call's own time horizon.</span></p>
       </div>
     </figure>
   </section>
@@ -869,7 +869,7 @@ p { text-wrap: pretty; }
           </div></li>
           <li class="step c-desk"><span class="badge">2</span><div class="step-body">
             <div class="step-h"><p class="step-title">Past calls are scored first</p><span class="at-chip c-desk"><i></i>The lead</span></div>
-            <p>Any call whose five trading days are up is scored against its market's index, and gets a short lesson.</p>
+            <p>Any call whose first week is up (5 trading days, or 7 calendar days for a coin) is scored against its yardstick, SPY as shipped, and gets a short lesson. It is a first-week check, not the call's own time horizon.</p>
             <p class="why"><b>Why it matters.</b> Today's analysis starts from the desk's own track record.</p>
           </div></li>
           <li class="step c-desk"><span class="badge">3</span><div class="step-body">
@@ -945,11 +945,11 @@ p { text-wrap: pretty; }
       </div>
 
       <div class="phase">
-        <div class="phase-h s1"><h3>The desk learns</h3><span>Step 13. Five trading days later.</span></div>
+        <div class="phase-h s1"><h3>The desk learns</h3><span>Step 13. After its first week, when a scoring runs.</span></div>
         <ol class="steps" start="13">
           <li class="step c-desk"><span class="badge">13</span><div class="step-body">
             <div class="step-h"><p class="step-title">Scored and learned</p><span class="at-chip c-desk"><i></i>The lead</span></div>
-            <p>The call's return is compared with its market's index, such as SPY for a US stock, and a lesson is written. The scorecard on the dashboard updates.</p>
+            <p>The call's return over its first week is compared with its yardstick's over the same days (SPY, the S&amp;P 500 fund, as shipped), and a lesson is written. It is a first-week check, not the call's own time horizon. The scorecard on the dashboard updates.</p>
             <span class="loop"><svg class="ic sm"><use href="#i-loop"/></svg>The lesson goes into step 2 of the next analysis.</span>
           </div></li>
         </ol>
@@ -971,7 +971,7 @@ p { text-wrap: pretty; }
         <article class="drawer edge c-store">
           <div class="drawer-h"><span class="icbox lg"><svg class="ic lg"><use href="#i-folder"/></svg></span><div><p class="drawer-name">The desk's records</p><p class="drawer-where">In the project's <code>desk-data</code> folder. Never uploaded to GitHub.</p></div></div>
           <ul>
-            <li><b>Journal</b><span>Every call and its rating; once scored, its return against the index and its lesson.</span></li>
+            <li><b>Journal</b><span>Every call and its rating, with the window and yardstick it is scored by; once scored, its return against the yardstick and its lesson.</span></li>
             <li><b>Reports</b><span>A folder per analysis: a page per agent and the complete report.</span></li>
             <li><b>Watchlist</b><span>Your stocks, and which ones you starred.</span></li>
             <li><b>Analyses you asked for</b><span>Each stock you asked for on the dashboard, at the depth you chose: waiting, being analysed, done with its rating, or failed with why.</span></li>
@@ -988,7 +988,7 @@ p { text-wrap: pretty; }
           <div class="drawer-h"><span class="icbox lg"><svg class="ic lg"><use href="#i-sliders"/></svg></span><div><p class="drawer-name">Your rules</p><p class="drawer-where">The project's <code>desk-settings.json</code>. Edit it freely.</p></div></div>
           <ul>
             <li><b>Analysis</b><span>Which analysts, how many debate turns, the report's language.</span></li>
-            <li><b>Scoring</b><span>Five trading days, against the index of the stock's market.</span></li>
+            <li><b>Scoring</b><span>A first-week check against SPY: the 5 trading days after a call on a US stock or fund, the 7 calendar days after a call on a coin.</span></li>
             <li><b>Position size</b><span>A full position is 10% of the account. Your caps are not here: they are in your private folder, beside the trading switch.</span></li>
             <li><b>Routines</b><span>At most five analyses a morning.</span></li>
             <li><b>Safety net</b><span>A value out of range falls back to the shipped one, never to a larger one.</span></li>

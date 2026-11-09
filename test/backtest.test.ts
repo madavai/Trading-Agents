@@ -32,7 +32,7 @@ test('cells are a stock at a time, with a stock or date given twice counted once
   assert.throws(() => cells(['../x'], ['2026-06-01']), /not a ticker/);
 });
 
-const e = (rating: string, alpha: string | null, pending = false, holding = '5d'): Entry => ({ date: '2026-06-01', ticker: 'X', rating, pending, raw: pending ? null : '+1.0%', alpha: pending ? null : alpha, holding: pending ? null : holding, resolved: null, decision: '', reflection: '', lesson: pending ? 'none' : 'prices', lessonOn: null, lessonCheck: '', earlier: '', firstLesson: '' });
+const e = (rating: string, alpha: string | null, pending = false, holding = '5d'): Entry => ({ date: '2026-06-01', ticker: 'X', rating, pending, raw: pending ? null : '+1.0%', alpha: pending ? null : alpha, holding: pending ? null : holding, resolved: null, decision: '', reflection: '', lesson: pending ? 'none' : 'prices', lessonOn: null, lessonCheck: '', earlier: '', firstLesson: '', rules: null });
 
 test('calls are scored by rating: direction hit rate for Buy and Sell, none for Hold, and unreadable ratings left out', () => {
   const s = summarize([e('Buy', '+7.0%'), e('Buy', '-2.0%'), e('Overweight', '+1.0%'), e('Sell', '-4.0%'), e('Sell', '+3.0%'), e('Hold', '+0.5%'), e('Hold', '-0.5%'), e('Needs review', '+9.0%'), e('Buy', null, true), e('Sell', 'n/a')]);
@@ -68,10 +68,12 @@ test('a call worked when its stock went the way its rating said against the inde
 
 test('the summary says what it is and is not', () => {
   const t = renderSummary(summarize([e('Buy', '+7.0%'), e('Needs review', null), e('Sell', null, true)]));
-  assert.match(t, /^Resolved cells: 1 · pending: 1 · unscored: 1\n- Buy: n=1, called the direction 100%, mean alpha \+7\.00% vs the benchmark/);
+  assert.match(t, /^Resolved cells: 1 · pending: 1 · unscored: 1\n- Buy: n=1, called the direction 100%, mean alpha \+7\.00% vs the yardstick/);
   assert.match(t, /Pending cells are not scored above/);
   assert.match(t, /Unscored cells had no readable rating/);
-  assert.match(t, /measured over 5 trading days/);
+  assert.match(t, /Alpha is measured over the first 5 trading days after each analysis date, against each call's yardstick: a short first check, not the calls' own time horizons\./);
+  const kept = { ...e('Buy', '+7.0%'), rules: { days: 5, unit: 'trading' as const, yardstick: 'SPY', basis: 'us' as const } };
+  assert.match(renderSummary(summarize([kept])), /against each call's yardstick \(SPY\): a short first check/, 'the yardsticks the calls kept are named');
   assert.match(t, /fewer than about 30 calls per rating is noise/);
   assert.match(renderSummary(summarize([])), /Resolved cells: 0 · pending: 0/);
 });

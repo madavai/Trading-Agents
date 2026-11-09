@@ -69,7 +69,7 @@ test('re-checking shows each old lesson with its score, its decision, the lesson
   assert.match(t, /^1 lesson\(s\) to re-check: 1 to rewrite below\.\n\nFor each call TO REWRITE: check every statement of its lesson against its window's rows, then save a new lesson with correct_lesson/);
   assert.match(t, /only when a row shows it, naming that row's date and figure\. A trigger the decision tied to more than one condition fired only when every condition did: a condition the rows cannot show leaves it "not known from the prices"\. What the rows cannot show \(news, earnings, a filing, a figure they do not hold\) is "not known from the prices", never a guess\./);
   assert.match(t, /\[2026-09-01 \| NVDA \| Buy \| \+10\.0% \| \+7\.0% \| 5d \| resolved:2026-09-08\] TO REWRITE: it was written before the desk showed the lesson writer the window's prices\./);
-  assert.match(t, /ITS SCORE, WHICH STAYS AS IT IS: NVDA \+10\.0% from 2026-09-01 to 2026-09-08 \(5 trading days\); its index, SPY, \+3\.0% over the same days; alpha \+7\.0%\./);
+  assert.match(t, /ITS SCORE, WHICH STAYS AS IT IS: NVDA \+10\.0% from 2026-09-01 to 2026-09-08 \(5 trading days\); its yardstick, SPY, \+3\.0% over the same days; alpha \+7\.0%\. It is a first-week check, not the call's own time horizon\./);
   const at =[`DECISION:\n${DECISION}`, `LESSON AS IT STANDS:\n${OLD}`, "WHAT HAPPENED IN THE WINDOW: NVDA's finished sessions from 2026-09-01 (entry) to 2026-09-08 (exit)"].map((s) => t.indexOf(s));
   assert.ok(at.every((i, n) => i > 0 && (n === 0 || i > at[n - 1]!)), 'the decision, then the lesson as it stands, then what happened');
   assert.match(t, /\n4 \| 2026-09-07 \| 104\.00 \| 104\.00 \| 104\.00 \| 104\.00 \| \+0\.97% \|/);   // the row that shows the add trigger fired
@@ -95,7 +95,7 @@ test('a corrected lesson replaces only the lesson: the call, its rating, its sco
   // later analyses read the new lesson, marked as corrected, and never the first
   const same = j.pastContext('NVDA'), other = j.pastContext('AMD');
   assert.match(same, /REFLECTION \(corrected on 2026-11-07: rewritten from the holding window's real prices, replacing an earlier lesson\):\nAlpha of \+7\.0%/);
-  assert.match(other, /^Recent cross-ticker lessons:\n\n\[2026-09-01 \| NVDA \| Buy \| \+10\.0%\] \(lesson corrected on 2026-11-07: rewritten from the holding window's real prices, replacing an earlier lesson\)\nAlpha of \+7\.0%/);
+  assert.match(other, /^Recent cross-ticker lessons:\n\n\[2026-09-01 \| NVDA \| Buy \| return \+10\.0% \| alpha \+7\.0% \| over 5d\] \(lesson corrected on 2026-11-07: rewritten from the holding window's real prices, replacing an earlier lesson\)\nAlpha of \+7\.0%/);
   for (const ctx of [same, other]) assert.ok(!ctx.includes(OLD) && !ctx.includes('LESSON CHECK') && !ctx.includes(WRONG), 'the first lesson is not read again');
 
   // a lesson is corrected once, and then nothing waits until the person says it is wrong
@@ -304,9 +304,9 @@ test('analyses are told how each lesson was written: an old one is flagged as no
     j.recordOutcome(t, '2026-08-20', 0.01, 0, 5, `lesson ${t}`, '2026-08-27', from);
   }
   const ctx = j.pastContext('NVDA');
-  assert.match(ctx, /\[2026-08-20 \| AAA \| Buy \| \+1\.0%\]\nlesson AAA/);
-  assert.match(ctx, /\[2026-08-20 \| BBB \| Buy \| \+1\.0%\] \(lesson written before the desk showed the lesson writer the holding window's prices, and not re-checked since: what it says happened on a given day may be wrong\)\nlesson BBB/);
-  assert.match(ctx, /\[2026-08-20 \| CCC \| Buy \| \+1\.0%\] \(lesson written when the holding window's prices could not be had, and not re-checked since\)\nlesson CCC/);
+  assert.match(ctx, /\[2026-08-20 \| AAA \| Buy \| return \+1\.0% \| alpha 0\.0% \| over 5d\]\nlesson AAA/);
+  assert.match(ctx, /\[2026-08-20 \| BBB \| Buy \| return \+1\.0% \| alpha 0\.0% \| over 5d\] \(lesson written before the desk showed the lesson writer the holding window's prices, and not re-checked since: what it says happened on a given day may be wrong\)\nlesson BBB/);
+  assert.match(ctx, /\[2026-08-20 \| CCC \| Buy \| return \+1\.0% \| alpha 0\.0% \| over 5d\] \(lesson written when the holding window's prices could not be had, and not re-checked since\)\nlesson CCC/);
   assert.match(j.pastContext('BBB'), /REFLECTION \(written before the desk showed the lesson writer the holding window's prices, and not re-checked since: what it says happened on a given day may be wrong\):\nlesson BBB/);
   assert.match(j.pastContext('AAA'), /\n\nREFLECTION:\nlesson AAA/);
 });
@@ -501,7 +501,7 @@ test('the real case of 8 Nov 2026: the desk counts 5 sentences in exactly the tw
   assert.match(t, /^2 lesson\(s\) on META to re-check: 2 to rewrite below\./);
   const m21 = t.slice(t.indexOf('[2026-10-21 | META'));
   assert.match(m21, /^\[2026-10-21 \| META \| Overweight \| -12\.2% \| -12\.1% \| 5d \| resolved:2026-10-28\] TO REWRITE: the person said on 2026-11-09 that it is wrong/);
-  assert.match(m21, /ITS SCORE, WHICH STAYS AS IT IS: META -12\.2% from 2026-10-21 to 2026-10-28 \(5 trading days\); its index, SPY, -0\.1% over the same days; alpha -12\.1%\./);
+  assert.match(m21, /ITS SCORE, WHICH STAYS AS IT IS: META -12\.2% from 2026-10-21 to 2026-10-28 \(5 trading days\); its yardstick, SPY, -0\.1% over the same days; alpha -12\.1%\. It is a first-week check, not the call's own time horizon\./);
   assert.match(m21, /\nentry \| 2026-10-21 \| 697\.60 \| 713\.22 \| 689\.68 \| 697\.52 \| left out \| 29,203,900 \|/);
   assert.match(m21, /\n1 \| 2026-10-22 \| 676\.35 \| 681\.07 \| 639\.69 \| 648\.85 \| -6\.98% \| 40,571,000 \|/);
   assert.match(m21, /\nIN SESSIONS 1 TO 5 \(the entry row left out\): highest close 648\.85 on 2026-10-22; lowest close 612\.49 on 2026-10-28; highest high 681\.07 on 2026-10-22; lowest low 609\.00 on 2026-10-28\./);

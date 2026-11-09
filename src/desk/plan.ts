@@ -1,6 +1,7 @@
 // The plan for one analysis, drawn up before any agent speaks: the stock and what kind of instrument it is, which analysts
-// run (a crypto asset or index has no company accounts), how many debate rounds, the language, the index the call will be
-// judged against, what the person holds, the lessons from past calls - and, for a run that stopped half way, the next step.
+// run (a crypto asset or index has no company accounts), how many debate rounds, the language, the window and yardstick
+// the call will be scored by (kept in its journal entry when it is recorded), what the person holds, the lessons from past
+// calls - and, for a run that stopped half way, the next step.
 // Every number and rule here is code; the agents only follow the plan.
 import { analysisDate, isHistorical } from '../data/dates.js';
 import { cryptoBase, safeSymbol } from '../data/symbols.js';
@@ -12,7 +13,7 @@ import { journalIn, workspaceOf, type Workspace } from './workspace.js';
 import { BACKTEST_HOLDINGS, readHoldings, renderHoldings } from './holdings.js';
 import { deleteRun, progress, saveContext, savedPlan, startRun, type RunContext, type Section } from './runs.js';
 import { DEPTHS, readQueue } from './queue.js';
-import { resolveBenchmark } from './scoring.js';
+import { checkName, rulesFor, windowWords, yardstickWords, type Rules } from './scoring.js';
 
 export class NeedsEmail extends Error { override name = 'NeedsEmail'; }
 
@@ -21,6 +22,8 @@ export interface Plan {
   symbol: string; analysisDate: string; kind: 'stock' | 'crypto' | 'other';
   analysts: Analyst[]; debateRounds: number; riskRounds: number; language: string; managerModel: string;
   benchmark: string; holdingDays: number; steps: Step[]; notes: string[];
+  /** The window and yardstick the call is scored by; a plan saved before the desk kept them has none. */
+  window?: Rules;
 }
 
 export interface PlanRequest { symbol: string; analysisDate: string; analysts?: string[]; debateRounds?: number; riskRounds?: number; language?: string; restart?: boolean }
@@ -51,7 +54,8 @@ export function stepsFor(analysts: Analyst[], debateRounds: number, riskRounds: 
 /** What the decision agents work from besides the reports, drawn up as the plan gives it: the person's holdings (in a
  *  backtest, none: what they hold now was not known on the days it tests) and the lessons from past calls. */
 export function runContext(root: string, ws: Workspace, symbol: string, day: string): RunContext {
-  const lessons = journalOf(root, ws).pastContext(symbol, isHistorical(day) ? { asOf: day } : {});
+  const scoring = readSettings(root).scoring;
+  const lessons = journalOf(root, ws).pastContext(symbol, isHistorical(day) ? { asOf: day, scoring } : { scoring });
   return {
     holdings: ws.sweep ? BACKTEST_HOLDINGS : renderHoldings(readHoldings(deskDataDir(root)), symbol),
     lessons: lessons ? `Lessons from past calls:\n${lessons}` : 'Lessons from past calls: none yet (no earlier call has been settled).',
@@ -99,8 +103,9 @@ export function buildPlan(root: string, req: PlanRequest, ws: Workspace = worksp
     language = req.language !== undefined ? languageName(req.language) : s.analysis.outputLanguage;
   }
 
-  const benchmark = resolveBenchmark(symbol, s.scoring);
-  const plan: Plan = { symbol, analysisDate: day, kind, analysts, debateRounds, riskRounds, language, managerModel: s.analysis.managerModel, benchmark, holdingDays: s.scoring.holdingPeriodDays, steps: [], notes };
+  // A run resumed keeps the window and yardstick it was planned with, like its steps.
+  const window = resumed && saved?.window ? saved.window : rulesFor(symbol, s.scoring);
+  const plan: Plan = { symbol, analysisDate: day, kind, analysts, debateRounds, riskRounds, language, managerModel: s.analysis.managerModel, benchmark: window.yardstick, holdingDays: window.days, window, steps: [], notes };
   let steps = stepsFor(analysts, debateRounds, riskRounds);
   // A run whose debate began before the desk had its fact checker goes on without one: its reports are already argued from.
   if (resumed && !done.fact_check && (done.bull ?? 0) > 0) {
@@ -115,6 +120,11 @@ export function buildPlan(root: string, req: PlanRequest, ws: Workspace = worksp
   return { plan, ...ctx, resumed };
 }
 
+/** What the call will be scored over and against, for the plan and the report's head: its first check, not its horizon. */
+export const scoredWords = (p: Pick<Plan, 'symbol' | 'window' | 'holdingDays' | 'benchmark'>): string => p.window
+  ? `${checkName(p.window)} against ${yardstickWords(p.symbol, p.window)}, over the ${windowWords(p.window)} after the call, once a scoring runs after them. It is not the call's own time horizon.`
+  : `after ${p.holdingDays} trading days against ${p.benchmark}`;
+
 export function renderPlan({ plan: p, holdings, lessons, resumed }: ReturnType<typeof buildPlan>): string {
   const next = p.steps.find((x) => !x.done);
   const step = (x: Step) => `${x.section}${x.turn > 1 || p.steps.filter((y) => y.section === x.section).length > 1 ? ` (turn ${x.turn})` : ''}`;
@@ -125,7 +135,7 @@ export function renderPlan({ plan: p, holdings, lessons, resumed }: ReturnType<t
     `Debate rounds: ${p.debateRounds} (bull and bear each speak ${p.debateRounds} time(s)); risk rounds: ${p.riskRounds} (each of the three risk voices speaks ${p.riskRounds} time(s))`,
     `Report language: ${p.language}${p.language.toLowerCase() === 'english' ? '' : ' (the labelled lines **Rating**, **Action**, **Recommendation** keep their English words)'}`,
     `Manager model: ${p.managerModel || 'the same as everyone else'}`,
-    `Judged after ${p.holdingDays} trading days against ${p.benchmark}`,
+    `Scored: ${scoredWords(p)}`,
     ...(p.notes.length ? ['', ...p.notes.map((n) => `Note: ${n}`)] : []),
     '', `Steps${resumed ? ' (resuming)' : ''}: ${p.steps.map((x) => `${x.done ? '[done] ' : ''}${step(x)}`).join(' -> ')}`,
     next ? `Next step: ${step(next)}` : 'Every step is done: write the report and record the decision.',

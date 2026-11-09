@@ -29,8 +29,9 @@ test('"What does this mean?" holds about thirty words, each in one plain line, t
 
 test('alpha says how to read it for each rating: above zero is good only for a Buy or Overweight', () => {
   // Round 1 (7 Nov 2026): the line said "above zero, it beat the market", the opposite of the truth for an Underweight or Sell.
-  assert.match(GLOSSARY.alpha.means, /beat \(\+\) or trailed \(−\) its market's index/);
-  assert.match(GLOSSARY.alpha.means, /Above zero is good for a Buy or Overweight; below zero is good for an Underweight or Sell\./);
+  // 8 Nov 2026: and that it is a first-week check against a named yardstick, not the call's own horizon.
+  assert.match(GLOSSARY.alpha.means, /beat \(\+\) or trailed \(−\) its yardstick \(SPY as shipped\) over a call's first week \(5 trading days; a coin, 7 days\), not its time horizon\./);
+  assert.match(GLOSSARY.alpha.means, /Above zero is good for a Buy or Overweight; below zero for an Underweight or Sell\./);
   assert.doesNotMatch(GLOSSARY.alpha.means, /beat the market|better \(\+\)|a call did/);
 });
 

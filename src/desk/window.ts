@@ -20,7 +20,7 @@ import type { Outcome } from './scoring.js';
 
 const f2 = (v: number | null | undefined) => (v === null || v === undefined || !Number.isFinite(v) ? 'N/A' : v.toFixed(2));
 
-/** The window's sessions from entry to exit: the stock's prices, change, volume and main indicators, and the index's close. */
+/** The window's sessions from entry to exit: the stock's prices, change, volume and main indicators, and the yardstick's close. */
 export async function windowRows(ticker: string, o: Outcome): Promise<string> {
   const s = await history(ticker, o.exit), bars = s.bars;   // a long history, so the indicators on the window's rows are settled
   const rsi = compute('rsi', bars), macdh = compute('macdh', bars), ema10 = compute('close_10_ema', bars), sma50 = compute('close_50_sma', bars);
@@ -46,7 +46,7 @@ export async function windowRows(ticker: string, o: Outcome): Promise<string> {
   const printed = after.map((r) => r.t).filter((t): t is Bar => !!t);
   if (differ && printed.length) glance.push(`AS TRADED, IN SESSIONS 1 TO ${after.length}: highest close ${f2(most(printed, (t) => t.close, true).close)} on ${most(printed, (t) => t.close, true).date}; lowest close ${f2(most(printed, (t) => t.close, false).close)} on ${most(printed, (t) => t.close, false).date}; highest high ${f2(most(printed, (t) => t.high, true).high)} on ${most(printed, (t) => t.high, true).date}; lowest low ${f2(most(printed, (t) => t.low, false).low)} on ${most(printed, (t) => t.low, false).date}.`);
   return [
-    `WHAT HAPPENED IN THE WINDOW: ${ticker}'s finished sessions from ${o.entry} (entry) to ${o.exit} (exit), prices ${adjustedWords({ bars: inWindow, unadjusted: s.unadjusted ?? [] })} (the call is scored on these, so its return counts any dividend), and ${o.benchmark}'s close beside each. Anything the lesson says about what happened in the window must be found in these rows.`,
+    `WHAT HAPPENED IN THE WINDOW: ${ticker}'s finished sessions from ${o.entry} (entry) to ${o.exit} (exit), prices ${adjustedWords({ bars: inWindow, unadjusted: s.unadjusted ?? [] })} (the call is scored on these, so its return counts any dividend), and ${o.benchmark}'s close beside each${o.unit === 'calendar' ? ` (a coin trades every day, ${o.benchmark} only on New York's market days: beside a weekend or a New York holiday, its close is its last one before that day)` : ''}. Anything the lesson says about what happened in the window must be found in these rows.`,
     `The row marked "entry" is not a session of the window: the call is scored from its close, so its open, high, low and volume came before the window began, and its change, against the session before it, is left out. The window's sessions are numbered from 1${after[0] ? ` (${after[0].date})` : ''}; each one's change is against the session before it.`,
     differ
       ? 'A dividend has gone ex since some of these days, so their adjusted prices sit below what the market printed then. The last three columns are the high, low and close as traded: check every price level the decision named (an entry, a stop, a target) against those, never against the adjusted prices.'

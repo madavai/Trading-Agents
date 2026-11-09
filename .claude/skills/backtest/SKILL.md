@@ -1,6 +1,6 @@
 ---
 name: backtest
-description: Test how well the desk decides - run the analysis team over several stocks and past dates, then score each call against its market index and report by rating. Use when the person runs /backtest or asks how good the desk's calls would have been. Slow and costly: every date is a full team run.
+description: Test how well the desk decides - run the analysis team over several stocks and past dates, then score each call in a first-week check against its yardstick (SPY as shipped), not over its own time horizon, and report by rating. Use when the person runs /backtest or asks how good the desk's calls would have been. Slow and costly: every date is a full team run.
 argument-hint: TICKER[,TICKER...] START END [every=7] [shallow|medium|deep] [analysts=market,news]
 ---
 
@@ -30,7 +30,7 @@ For each cell still to run, one at a time, in the order listed: run the /analyse
 ## 4. Score
 1. Run the /settle procedure for the sweep's pending calls: `list_settlements`, then `record_outcome` with a lesson for each READY call. Those still NOT YET stay pending.
 2. Call `backtest_summary`, then `end_backtest`.
-3. Report the figures exactly as the summary gives them: how many calls were scored, pending and unscored, and by rating the count, how often the direction was called right (Hold claims none) and the mean alpha. Add, in your own words, that this is a handful of calls from one run of the model: a hit rate over fewer than about 30 calls per rating is noise, text feeds are not archived, and past results do not promise future ones. Nothing here is investment advice.
+3. Report the figures exactly as the summary gives them: how many calls were scored, pending and unscored, and by rating the count, how often the direction was called right (Hold claims none) and the mean alpha. Add, in your own words, that this is a handful of calls from one run of the model: a hit rate over fewer than about 30 calls per rating is noise, each alpha is a first-week check, as the summary says, not the calls' own time horizons, text feeds are not archived, and past results do not promise future ones. Nothing here is investment advice.
 
 ## Never
 - Never call a broker connection, open Robinhood's site, or use a tool that trades or moves money.

@@ -17917,8 +17917,8 @@ var error43 = () => {
       case "not_multiple_of":
         return `N\xFAmero inv\xE1lido: deve ser m\xFAltiplo de ${issue2.divisor}`;
       case "unrecognized_keys": {
-        const plural3 = issue2.keys.length > 1 ? "s" : "";
-        return `Chave${plural3} inv\xE1lida${plural3}: ${joinValues(issue2.keys, ", ")}`;
+        const plural4 = issue2.keys.length > 1 ? "s" : "";
+        return `Chave${plural4} inv\xE1lida${plural4}: ${joinValues(issue2.keys, ", ")}`;
       }
       case "invalid_key":
         return `Entrada inv\xE1lida n${translateOriginWithArticle(issue2.origin, "definite")}`;
@@ -18062,8 +18062,8 @@ var error44 = () => {
       case "not_multiple_of":
         return `N\xFAmero inv\xE1lido: deve ser m\xFAltiplo de ${issue2.divisor}`;
       case "unrecognized_keys": {
-        const plural3 = issue2.keys.length > 1 ? "s" : "";
-        return `Chave${plural3} inv\xE1lida${plural3}: ${joinValues(issue2.keys, ", ")}`;
+        const plural4 = issue2.keys.length > 1 ? "s" : "";
+        return `Chave${plural4} inv\xE1lida${plural4}: ${joinValues(issue2.keys, ", ")}`;
       }
       case "invalid_key":
         return `Entrada inv\xE1lida n${translateOriginWithArticle(issue2.origin, "definite")}`;
@@ -39425,6 +39425,90 @@ function renderHoldings(h, ticker) {
 ${lines.join("\n")}`;
 }
 
+// src/desk/scoring.ts
+var coinDays = (tradingDays) => Math.max(1, Math.round(tradingDays * 7 / 5));
+function exchangeOf(ticker) {
+  const m2 = /\.([A-Z]{2,3}|[TLVF])$/.exec(normalizeSymbol(ticker));
+  return m2 ? `.${m2[1]}` : null;
+}
+function yardstickFor(ticker, s) {
+  if (s.benchmark.trim()) return { yardstick: normalizeSymbol(s.benchmark), basis: "chosen" };
+  const sym2 = normalizeSymbol(ticker);
+  const suffix = Object.keys(s.benchmarks).filter(Boolean).sort((a, b) => b.length - a.length).find((x) => sym2.endsWith(x.toUpperCase()));
+  if (suffix) return { yardstick: normalizeSymbol(s.benchmarks[suffix]), basis: "market" };
+  return { yardstick: normalizeSymbol(s.benchmarks[""] ?? "SPY"), basis: isCrypto(sym2) ? "coin" : exchangeOf(sym2) ? "unlisted" : "us" };
+}
+function rulesFor(ticker, s) {
+  const coin = isCrypto(ticker);
+  return { days: coin ? coinDays(s.holdingPeriodDays) : s.holdingPeriodDays, unit: coin ? "calendar" : "trading", ...yardstickFor(ticker, s) };
+}
+function legacyRules(ticker, s, holding) {
+  const kept = Number(/^(\d+)d$/.exec(holding ?? "")?.[1]);
+  return { days: kept > 0 ? kept : s.holdingPeriodDays, unit: isCrypto(ticker) ? "calendar" : "trading", ...yardstickFor(ticker, s) };
+}
+var plural3 = (n2, one3) => `${n2} ${one3}${n2 === 1 ? "" : "s"}`;
+var windowWords = (r) => plural3(r.days, `${r.unit} day`);
+var checkName = (r) => (r.unit === "trading" ? r.days === 5 : r.days === 7) ? "a first-week check" : `a check over its first ${windowWords(r)}`;
+var yardstickName = (y) => y === "SPY" ? "SPY, the fund that copies the S&P 500" : y;
+function basisWords(ticker, r) {
+  const ex = exchangeOf(ticker);
+  switch (r.basis) {
+    case "us":
+      return r.yardstick === "SPY" ? "" : "the desk's yardstick for US listings";
+    case "coin":
+      return "the desk's settings name no yardstick for coins, so a coin is scored against the one for US listings";
+    case "unlisted":
+      return `its exchange${ex ? `, ${ex},` : ""} had no index in the desk's settings when the call was made, so it is scored against the one for US listings`;
+    case "market":
+      return `the index the desk's settings give its exchange${ex ? `, ${ex}` : ""}`;
+    case "chosen":
+      return "the one yardstick the desk's settings set for every call";
+  }
+}
+function yardstickWords(ticker, r) {
+  const why = basisWords(ticker, r);
+  return `${yardstickName(r.yardstick)}${why ? ` (${why})` : ""}`;
+}
+var checkWords = (ticker, r) => `${checkName(r)} against ${yardstickWords(ticker, r)}, over the ${windowWords(r)} after the call`;
+var COIN_YARDSTICK_WORDS = "A coin trades every day, so its window is calendar days; its yardstick trades only on New York's market days, so it is taken at its close on the coin's first and last day, or at its last close before that day when New York's market was closed (a weekend or a New York holiday).";
+var WHEN_SCORED = "A call is scored when a scoring runs after its window (/settle, an analysis or a routine), not by itself.";
+var rowOn = (bars, date5) => [...bars].reverse().find((b) => b.date <= date5);
+function lastMarketDay(day3) {
+  let d = day3;
+  while (!isMarketDay(d)) d = addDays(d, -1);
+  return d;
+}
+async function measure(ticker, tradeDate, r) {
+  return r.unit === "calendar" ? measureCalendar(ticker, tradeDate, r) : measureTrading(ticker, tradeDate, r);
+}
+async function measureTrading(ticker, tradeDate, r) {
+  const end = addDays(tradeDate, Math.round(r.days * 7 / 5) + 7);
+  const stock = (await daily(ticker, tradeDate, end)).bars;
+  if (stock.length <= r.days) return null;
+  const entry = stock[0].date, exit = stock[r.days].date;
+  if (exit >= today()) return null;
+  const bench = (await daily(r.yardstick, addDays(tradeDate, -7), end)).bars;
+  if (!bench.length || bench[0].date > entry || bench[bench.length - 1].date < exit) return null;
+  const from = rowOn(bench, entry), to = rowOn(bench, exit);
+  const raw = stock[r.days].close / stock[0].close - 1, benchmarkReturn = to.close / from.close - 1;
+  return { raw, alpha: raw - benchmarkReturn, benchmarkReturn, holdingDays: r.days, unit: "trading", entry, exit, benchmark: r.yardstick, benchFrom: from.date, benchTo: to.date };
+}
+async function measureCalendar(ticker, tradeDate, r) {
+  const stock = (await daily(ticker, tradeDate, addDays(tradeDate, r.days + 7))).bars;
+  if (!stock.length) return null;
+  const entry = stock[0].date, exit = addDays(entry, r.days);
+  if (exit >= today()) return null;
+  const last = stock.find((b) => b.date === exit);
+  if (!last) throw new Error(`Yahoo Finance gives no ${normalizeSymbol(ticker)} close for ${exit}, the last day of its ${plural3(r.days, "calendar day")} window${stock.at(-1).date < exit ? " yet" : ""}`);
+  const later = addDays(exit, 7), bench = (await daily(r.yardstick, addDays(entry, -7), later < today() ? later : today())).bars;
+  const from = rowOn(bench, entry), to = rowOn(bench, exit);
+  if (!from || !to) return null;
+  const due = lastMarketDay(exit);
+  if (to.date < due && !bench.some((b) => b.date > exit)) throw new Error(`Yahoo Finance gives no ${r.yardstick} close for ${due} yet, the last New York market day of the window`);
+  const raw = last.close / stock[0].close - 1, benchmarkReturn = to.close / from.close - 1;
+  return { raw, alpha: raw - benchmarkReturn, benchmarkReturn, holdingDays: r.days, unit: "calendar", entry, exit, benchmark: r.yardstick, benchFrom: from.date, benchTo: to.date };
+}
+
 // src/desk/rating.ts
 var RATINGS = ["Buy", "Overweight", "Hold", "Underweight", "Sell"];
 var REVIEW = "Needs review";
@@ -39491,19 +39575,23 @@ function summarize(entries) {
     byRating[rating] = { count: alphas.length, direction: dir, hitRate: dir ? alphas.filter((a) => worked(rating, a)).length / alphas.length : null, meanAlpha: alphas.reduce((s, a) => s + a, 0) / alphas.length };
   }
   const unscored = entries.filter((e) => e.rating === REVIEW).length;
-  const windows = [...new Set(resolved2.map((x) => x.e.holding).filter((h) => !!h && h.endsWith("d")).map((h) => `${h.slice(0, -1)} trading days`))].sort();
-  return { resolved: resolved2.length, pending: entries.length - resolved2.length - unscored, unscored, byRating, holding: windows.join(", ") || "the configured window" };
+  const windows = [...new Set(resolved2.map(({ e }) => {
+    const days = Number(/^(\d+)d$/.exec(e.holding ?? "")?.[1]);
+    return days > 0 ? windowWords({ days, unit: e.rules?.unit ?? (isCrypto(e.ticker) ? "calendar" : "trading") }) : "";
+  }).filter(Boolean))].sort();
+  const yardsticks = [...new Set(resolved2.map(({ e }) => e.rules?.yardstick ?? "").filter(Boolean))].sort();
+  return { resolved: resolved2.length, pending: entries.length - resolved2.length - unscored, unscored, byRating, holding: windows.join(", ") || "the configured window", yardsticks: yardsticks.join(", ") };
 }
 var pctText = (v) => signedPct(v, 2);
 function renderSummary(s) {
   const lines = [`Resolved cells: ${s.resolved} \xB7 pending: ${s.pending}${s.unscored ? ` \xB7 unscored: ${s.unscored}` : ""}`];
   for (const [rating, sc] of Object.entries(s.byRating)) {
-    lines.push(`- ${rating}: n=${sc.count}, ${sc.hitRate !== null ? `called the direction ${Math.round(sc.hitRate * 100)}%` : "no direction claimed"}, mean alpha ${pctText(sc.meanAlpha)} vs the benchmark`);
+    lines.push(`- ${rating}: n=${sc.count}, ${sc.hitRate !== null ? `called the direction ${Math.round(sc.hitRate * 100)}%` : "no direction claimed"}, mean alpha ${pctText(sc.meanAlpha)} vs the yardstick`);
   }
   lines.push("");
   if (s.pending) lines.push("Pending cells are not scored above; settle them when their window has traded.");
   if (s.unscored) lines.push("Unscored cells had no readable rating (Needs review): they count neither for nor against the desk.");
-  lines.push(`Alpha is measured over ${s.holding} after each analysis date. One model sampling per cell, and text feeds are not archived, so these figures are indicative rather than repeatable. A handful of cells proves nothing: a hit rate over fewer than about 30 calls per rating is noise.`);
+  lines.push(`Alpha is measured over the first ${s.holding} after each analysis date, against each call's yardstick${s.yardsticks ? ` (${s.yardsticks})` : ""}: a short first check, not the calls' own time horizons. One model sampling per cell, and text feeds are not archived, so these figures are indicative rather than repeatable. A handful of cells proves nothing: a hit rate over fewer than about 30 calls per rating is noise.`);
   return lines.join("\n");
 }
 
@@ -39530,6 +39618,20 @@ function lessonOf(fields, pending) {
 }
 var DATE = /^\d{4}-\d{2}-\d{2}$/;
 var TICKER = /^[A-Za-z0-9.\-=^]{1,20}$/;
+var BASES = ["us", "coin", "unlisted", "market", "chosen"];
+var WINDOW = /^window:(\d{1,3}) (trading|calendar) days?$/;
+var YARDSTICK = /^yardstick:([A-Za-z0-9.\-=^]{1,20}) \(([a-z]+)\)$/;
+var rulesFields = (r) => [`window:${windowWords(r)}`, `yardstick:${r.yardstick} (${r.basis})`];
+function rulesIn(fields) {
+  const w = fields.map((x) => WINDOW.exec(x)).find(Boolean), y = fields.map((x) => YARDSTICK.exec(x)).find(Boolean);
+  if (!w || !y || !BASES.includes(y[2]) || !(Number(w[1]) > 0)) return null;
+  return { days: Number(w[1]), unit: w[2], yardstick: y[1], basis: y[2] };
+}
+function checkRules(r) {
+  if (!Number.isInteger(r.days) || r.days < 1 || r.days > 366) throw new Error(`a window of ${r.days} days is not one the journal can keep`);
+  if (!TICKER.test(r.yardstick)) throw new Error(`the yardstick "${r.yardstick}" in desk-settings.json is not a ticker the journal can keep`);
+  if (!BASES.includes(r.basis)) throw new Error(`"${r.basis}" is not why a yardstick is chosen`);
+}
 function checkTag(ticker, date5) {
   if (!TICKER.test(ticker)) throw new Error(`"${ticker}" is not a ticker the journal can keep`);
   if (!DATE.test(date5)) throw new Error(`"${date5}" is not a date in YYYY-MM-DD form`);
@@ -39548,7 +39650,7 @@ function parse3(block) {
   const firstLesson = /(?:^|\n)FIRST LESSON:\n([\s\S]*)$/.exec(body)?.[1]?.trim() ?? "";
   const resolved2 = f.slice(6).find((x) => x.startsWith("resolved:"))?.slice("resolved:".length).trim() ?? null;
   const pending = f[3] === "pending", score = (s) => s === void 0 ? null : unsignZero(s);
-  return { date: f[0], ticker: f[1], rating: f[2], pending, raw: pending ? null : score(f[3]), alpha: score(f[4]), holding: f[5] ?? null, resolved: resolved2, decision, reflection, ...lessonOf(f.slice(6), pending), lessonCheck, earlier, firstLesson };
+  return { date: f[0], ticker: f[1], rating: f[2], pending, raw: pending ? null : score(f[3]), alpha: pending ? null : score(f[4]), holding: pending ? null : f[5] ?? null, resolved: resolved2, decision, reflection, ...lessonOf(f.slice(6), pending), lessonCheck, earlier, firstLesson, rules: rulesIn(f.slice(4)) };
 }
 var lessonPart = (p) => [keep(p.lesson), ...[["LESSON CHECK", p.check], ["EARLIER CORRECTIONS", p.earlier], ["FIRST LESSON", p.first]].filter(([, words3]) => words3?.trim()).map(([head2, words3]) => `${head2}:
 ${keep(words3)}`)].join("\n\n");
@@ -39601,15 +39703,18 @@ var Journal = class {
   pending() {
     return this.load().filter((e) => e.pending);
   }
-  /** Adds a pending entry. One entry per stock and day, settled or not: a re-run must not count the same call twice. */
-  storeDecision(ticker, date5, decision, rating) {
+  /** Adds a pending entry, with the window and yardstick it will be scored by when they are given (every call the desk
+   *  records now). One entry per stock and day, settled or not: a re-run must not count the same call twice. */
+  storeDecision(ticker, date5, decision, rating, rules) {
     checkTag(ticker, date5);
+    if (rules) checkRules(rules);
     fs9.mkdirSync(path9.dirname(this.file), { recursive: true });
     return withLock(this.file, () => {
       if (this.load().some((e) => e.date === date5 && e.ticker === ticker)) return "exists";
       const r = rating && RATINGS.includes(rating) ? rating : parseRating(decision);
       const old = this.read();
-      this.write(`${old}${old && !old.endsWith(SEPARATOR) ? SEPARATOR : ""}[${date5} | ${ticker} | ${r} | pending]
+      const kept = rules ? rulesFields(rules).map((x) => ` | ${x}`).join("") : "";
+      this.write(`${old}${old && !old.endsWith(SEPARATOR) ? SEPARATOR : ""}[${date5} | ${ticker} | ${r} | pending${kept}]
 
 DECISION:
 ${keep(decision)}${SEPARATOR}`);
@@ -39617,7 +39722,8 @@ ${keep(decision)}${SEPARATOR}`);
     });
   }
   /** Settles a pending entry with its measured outcome and the lesson. False when it was no longer pending. `from` says
-   *  whether the window's day-by-day prices were at hand for the lesson; left out, the lesson is unmarked (the old way). */
+   *  whether the window's day-by-day prices were at hand for the lesson; left out, the lesson is unmarked (the old way).
+   *  The window and yardstick the entry kept stay in its tag. */
   recordOutcome(ticker, date5, raw, alpha, holdingDays, reflection, resolution, from) {
     return withLock(this.file, () => {
       let done = false;
@@ -39625,7 +39731,8 @@ ${keep(decision)}${SEPARATOR}`);
         const e = parse3(block);
         if (done || !e || !e.pending || e.date !== date5 || e.ticker !== ticker) return block;
         done = true;
-        return `[${date5} | ${ticker} | ${e.rating} | ${signedPct(raw)} | ${signedPct(alpha)} | ${holdingDays}d | resolved:${resolution}${from ? ` | lesson:${from}` : ""}]
+        const kept = e.rules ? rulesFields(e.rules).map((x) => ` | ${x}`).join("") : "";
+        return `[${date5} | ${ticker} | ${e.rating} | ${signedPct(raw)} | ${signedPct(alpha)} | ${holdingDays}d | resolved:${resolution}${kept}${from ? ` | lesson:${from}` : ""}]
 
 DECISION:
 ${e.decision}
@@ -39724,7 +39831,9 @@ Its check before then: ${e.lessonCheck}` : ""}`, earlier: e.earlier, first: e.fi
   /** The lessons for an analysis: the latest settled calls on this stock in full, and the latest on others as lessons only.
    *  With `asOf`, only calls whose outcome was already known on that day - a past-dated run must not learn from its future.
    *  Each lesson says how it was written (see LESSON_NOTE); one marked unreliable or flagged by the person is withheld, and
-   *  is not counted among the other stocks' lessons, since it brings none. */
+   *  is not counted among the other stocks' lessons, since it brings none. Each call's header names what it was scored
+   *  over and against (its own rules, or for a call recorded before the desk kept them, the rules it was made under, from
+   *  `scoring`): a short first check, not the call's own time horizon. */
   pastContext(ticker, o = {}) {
     const { sameLimit = 5, otherLimit = 3 } = o;
     let settled2 = this.load().filter((e) => !e.pending);
@@ -39736,14 +39845,19 @@ Its check before then: ${e.lessonCheck}` : ""}`, earlier: e.earlier, first: e.fi
       if (same.length >= sameLimit && other.length >= otherLimit) break;
     }
     if (!same.length && !other.length) return "";
+    const over = (e) => {
+      const r = e.rules ?? (o.scoring ? legacyRules(e.ticker, o.scoring, e.holding) : null);
+      return r ? `${checkName(r)}: against ${r.yardstick} over the ${windowWords(r)} after the call, not the call's own time horizon` : `over ${e.holding ?? "n/a"}`;
+    };
+    const head2 = (e) => `[${e.date} | ${e.ticker} | ${e.rating} | return ${e.raw ?? "n/a"} | alpha ${e.alpha ?? "n/a"} | ${over(e)}]`;
     const full = (e) => [
-      `[${e.date} | ${e.ticker} | ${e.rating} | ${e.raw ?? "n/a"} | ${e.alpha ?? "n/a"} | ${e.holding ?? "n/a"}]`,
+      head2(e),
       `DECISION:
 ${e.decision}`,
       ...e.lesson === "unreliable" || e.lesson === "flagged" ? [`REFLECTION: ${LESSON_NOTE[e.lesson](e)}`] : e.reflection ? [`REFLECTION${LESSON_NOTE[e.lesson] ? ` (${LESSON_NOTE[e.lesson](e)})` : ""}:
 ${e.reflection}`] : []
     ].join("\n\n");
-    const short2 = (e) => `[${e.date} | ${e.ticker} | ${e.rating} | ${e.raw ?? "n/a"}]${e.reflection && LESSON_NOTE[e.lesson] ? ` (lesson ${LESSON_NOTE[e.lesson](e)})` : ""}
+    const short2 = (e) => `${head2(e)}${e.reflection && LESSON_NOTE[e.lesson] ? ` (lesson ${LESSON_NOTE[e.lesson](e)})` : ""}
 ${e.reflection || e.decision.slice(0, 300) + (e.decision.length > 300 ? "..." : "")}`;
     const parts = [];
     if (same.length) parts.push(`Past analyses of ${ticker} (most recent first):`, ...same.map(full));
@@ -40085,27 +40199,6 @@ function readListener(dir, now = /* @__PURE__ */ new Date()) {
   }
 }
 
-// src/desk/scoring.ts
-function resolveBenchmark(ticker, s) {
-  if (s.benchmark.trim()) return normalizeSymbol(s.benchmark);
-  const sym2 = normalizeSymbol(ticker);
-  const suffix = Object.keys(s.benchmarks).filter(Boolean).sort((a, b) => b.length - a.length).find((x) => sym2.endsWith(x.toUpperCase()));
-  return suffix ? s.benchmarks[suffix] : s.benchmarks[""] ?? "SPY";
-}
-var closeOn = (bars, date5) => [...bars].reverse().find((b) => b.date <= date5).close;
-async function measure(ticker, tradeDate, benchmark, holdingDays) {
-  const end = addDays(tradeDate, Math.round(holdingDays * 7 / 5) + 7);
-  const stock = (await daily(ticker, tradeDate, end)).bars;
-  if (stock.length <= holdingDays) return null;
-  const entry = stock[0].date, exit = stock[holdingDays].date;
-  if (exit >= today()) return null;
-  const bench = (await daily(benchmark, addDays(tradeDate, -7), end)).bars;
-  if (!bench.length || bench[0].date > entry || bench[bench.length - 1].date < exit) return null;
-  const raw = stock[holdingDays].close / stock[0].close - 1;
-  const benchmarkReturn = closeOn(bench, exit) / closeOn(bench, entry) - 1;
-  return { raw, alpha: raw - benchmarkReturn, benchmarkReturn, holdingDays, entry, exit, benchmark };
-}
-
 // src/desk/plan.ts
 var NeedsEmail = class extends Error {
   name = "NeedsEmail";
@@ -40126,7 +40219,8 @@ function stepsFor(analysts, debateRounds, riskRounds) {
   return steps;
 }
 function runContext(root, ws, symbol4, day3) {
-  const lessons = journalOf(root, ws).pastContext(symbol4, isHistorical(day3) ? { asOf: day3 } : {});
+  const scoring = readSettings(root).scoring;
+  const lessons = journalOf(root, ws).pastContext(symbol4, isHistorical(day3) ? { asOf: day3, scoring } : { scoring });
   return {
     holdings: ws.sweep ? BACKTEST_HOLDINGS : renderHoldings(readHoldings(deskDataDir(root)), symbol4),
     lessons: lessons ? `Lessons from past calls:
@@ -40170,8 +40264,8 @@ function buildPlan(root, req, ws = workspaceOf(root)) {
     if (req.language !== void 0 && languageName(req.language, "") === "") throw new Error(`"${req.language}" is not a language name`);
     language = req.language !== void 0 ? languageName(req.language) : s.analysis.outputLanguage;
   }
-  const benchmark = resolveBenchmark(symbol4, s.scoring);
-  const plan = { symbol: symbol4, analysisDate: day3, kind, analysts, debateRounds, riskRounds, language, managerModel: s.analysis.managerModel, benchmark, holdingDays: s.scoring.holdingPeriodDays, steps: [], notes };
+  const window2 = resumed && saved?.window ? saved.window : rulesFor(symbol4, s.scoring);
+  const plan = { symbol: symbol4, analysisDate: day3, kind, analysts, debateRounds, riskRounds, language, managerModel: s.analysis.managerModel, benchmark: window2.yardstick, holdingDays: window2.days, window: window2, steps: [], notes };
   let steps = stepsFor(analysts, debateRounds, riskRounds);
   if (resumed && !done.fact_check && (done.bull ?? 0) > 0) {
     steps = steps.filter((st) => st.section !== "fact_check");
@@ -40183,6 +40277,7 @@ function buildPlan(root, req, ws = workspaceOf(root)) {
   saveContext(dir, symbol4, day3, ctx);
   return { plan, ...ctx, resumed };
 }
+var scoredWords = (p) => p.window ? `${checkName(p.window)} against ${yardstickWords(p.symbol, p.window)}, over the ${windowWords(p.window)} after the call, once a scoring runs after them. It is not the call's own time horizon.` : `after ${p.holdingDays} trading days against ${p.benchmark}`;
 function renderPlan({ plan: p, holdings, lessons, resumed }) {
   const next = p.steps.find((x) => !x.done);
   const step = (x) => `${x.section}${x.turn > 1 || p.steps.filter((y) => y.section === x.section).length > 1 ? ` (turn ${x.turn})` : ""}`;
@@ -40193,7 +40288,7 @@ function renderPlan({ plan: p, holdings, lessons, resumed }) {
     `Debate rounds: ${p.debateRounds} (bull and bear each speak ${p.debateRounds} time(s)); risk rounds: ${p.riskRounds} (each of the three risk voices speaks ${p.riskRounds} time(s))`,
     `Report language: ${p.language}${p.language.toLowerCase() === "english" ? "" : " (the labelled lines **Rating**, **Action**, **Recommendation** keep their English words)"}`,
     `Manager model: ${p.managerModel || "the same as everyone else"}`,
-    `Judged after ${p.holdingDays} trading days against ${p.benchmark}`,
+    `Scored: ${scoredWords(p)}`,
     ...p.notes.length ? ["", ...p.notes.map((n2) => `Note: ${n2}`)] : [],
     "",
     `Steps${resumed ? " (resuming)" : ""}: ${p.steps.map((x) => `${x.done ? "[done] " : ""}${step(x)}`).join(" -> ")}`,
@@ -40237,7 +40332,7 @@ async function windowRows(ticker, o) {
   const printed = after.map((r) => r.t).filter((t) => !!t);
   if (differ && printed.length) glance.push(`AS TRADED, IN SESSIONS 1 TO ${after.length}: highest close ${f23(most(printed, (t) => t.close, true).close)} on ${most(printed, (t) => t.close, true).date}; lowest close ${f23(most(printed, (t) => t.close, false).close)} on ${most(printed, (t) => t.close, false).date}; highest high ${f23(most(printed, (t) => t.high, true).high)} on ${most(printed, (t) => t.high, true).date}; lowest low ${f23(most(printed, (t) => t.low, false).low)} on ${most(printed, (t) => t.low, false).date}.`);
   return [
-    `WHAT HAPPENED IN THE WINDOW: ${ticker}'s finished sessions from ${o.entry} (entry) to ${o.exit} (exit), prices ${adjustedWords({ bars: inWindow2, unadjusted: s.unadjusted ?? [] })} (the call is scored on these, so its return counts any dividend), and ${o.benchmark}'s close beside each. Anything the lesson says about what happened in the window must be found in these rows.`,
+    `WHAT HAPPENED IN THE WINDOW: ${ticker}'s finished sessions from ${o.entry} (entry) to ${o.exit} (exit), prices ${adjustedWords({ bars: inWindow2, unadjusted: s.unadjusted ?? [] })} (the call is scored on these, so its return counts any dividend), and ${o.benchmark}'s close beside each${o.unit === "calendar" ? ` (a coin trades every day, ${o.benchmark} only on New York's market days: beside a weekend or a New York holiday, its close is its last one before that day)` : ""}. Anything the lesson says about what happened in the window must be found in these rows.`,
     `The row marked "entry" is not a session of the window: the call is scored from its close, so its open, high, low and volume came before the window began, and its change, against the session before it, is left out. The window's sessions are numbered from 1${after[0] ? ` (${after[0].date})` : ""}; each one's change is against the session before it.`,
     differ ? "A dividend has gone ex since some of these days, so their adjusted prices sit below what the market printed then. The last three columns are the high, low and close as traded: check every price level the decision named (an entry, a stop, a target) against those, never against the adjusted prices." : "These prices are also the prices as traded (no dividend has lowered them), so a price level the decision named can be checked against them.",
     `Session | Date | Open | High | Low | Close | Change | Volume | RSI | MACD histogram | 10 EMA | 50 SMA | ${o.benchmark} close${differ ? " | High as traded | Low as traded | Close as traded" : ""}`,
@@ -40298,7 +40393,9 @@ function leftIn(notes, ticker, date5) {
 }
 
 // src/desk/settle.ts
-var line = (o, e) => `${e.ticker} ${signedPct(o.raw)} from ${o.entry} to ${o.exit} (${o.holdingDays} trading days); ${o.benchmark} ${signedPct(o.benchmarkReturn)}; alpha ${signedPct(o.alpha)}`;
+var line = (o, e) => `${e.ticker} ${signedPct(o.raw)} from ${o.entry} to ${o.exit} (${windowWords({ days: o.holdingDays, unit: o.unit })}); ${o.benchmark} ${signedPct(o.benchmarkReturn)}${o.unit === "calendar" ? ` (its close of ${o.benchFrom} to its close of ${o.benchTo})` : ""}; alpha ${signedPct(o.alpha)}`;
+var rulesOf = (e, scoring) => e.rules ?? legacyRules(e.ticker, scoring, e.holding);
+var scoreIs = (o, r) => `THIS SCORE IS ${checkName(r).toUpperCase()}: the ${windowWords(r)} after the call against ${o.benchmark}, not the call's own time horizon (its decision states that). Say in the lesson how much a window this short can show about the thesis.${r.unit === "calendar" ? ` ${COIN_YARDSTICK_WORDS}` : ""}`;
 var MAX_REFLECTION = 1200;
 var MAX_SENTENCES = 4;
 var SCORING = "settle-check";
@@ -40355,13 +40452,14 @@ async function dueSettlements(journal, scoring, ticker, now = Date.now()) {
       continue;
     }
     try {
-      const o = await measure(e.ticker, e.date, resolveBenchmark(e.ticker, scoring), scoring.holdingPeriodDays);
+      const r = rulesOf(e, scoring), o = await measure(e.ticker, e.date, r);
       if (!o) {
-        out.push(`${head2} NOT YET: the ${scoring.holdingPeriodDays}-trading-day window after ${e.date} has not finished. Leave it pending.`);
+        out.push(`${head2} NOT YET: its window, the ${windowWords(r)} after ${e.date} (against ${r.yardstick}), has not finished. Leave it pending.`);
         continue;
       }
       ready++;
       out.push(`${head2} READY: ${line(o, e)}
+${scoreIs(o, r)}
 DECISION:
 ${e.decision}
 
@@ -40395,8 +40493,8 @@ async function settleOnce(journal, scoring, ticker, date5, reflection) {
   if (refused) throw new Error(refused);
   const e = journal.pending().find((x) => x.ticker === ticker && x.date === date5);
   if (!e) throw new Error(`there is no pending call on ${ticker} for ${date5}`);
-  const o = await measure(ticker, date5, resolveBenchmark(ticker, scoring), scoring.holdingPeriodDays);
-  if (!o) return `NOT_YET: the ${scoring.holdingPeriodDays}-trading-day window after ${date5} has not finished, so ${ticker} stays pending.`;
+  const r = rulesOf(e, scoring), o = await measure(ticker, date5, r);
+  if (!o) return `NOT_YET: its window, the ${windowWords(r)} after ${date5}, has not finished, so ${ticker} stays pending.`;
   const from = await windowRows(ticker, o).then(() => "prices", () => "no-prices");
   return journal.recordOutcome(ticker, date5, o.raw, o.alpha, o.holdingDays, text4, o.exit, from) ? `Settled: ${line(o, e)}. The lesson is kept and will be read by later analyses from ${o.exit} on.` : `${ticker} on ${date5} was settled by another run already.`;
 }
@@ -40435,13 +40533,14 @@ ${before}`] : []
 async function windowOf(e, scoring) {
   const days = Number(/^(\d+)d$/.exec(e.holding ?? "")?.[1]);
   if (!days || !e.resolved) throw new NoWindow("the journal does not record its holding window");
+  const r = { ...rulesOf(e, scoring), days };
   let o;
   try {
-    o = await measure(e.ticker, e.date, resolveBenchmark(e.ticker, scoring), days);
+    o = await measure(e.ticker, e.date, r);
   } catch (err) {
     throw new NoWindow(`the prices of ${e.ticker}'s window could not be had (${err.message})`);
   }
-  if (!o) throw new NoWindow(`the prices no longer cover ${e.ticker}'s ${days}-trading-day window after ${e.date}`);
+  if (!o) throw new NoWindow(`the prices no longer cover ${e.ticker}'s window of ${windowWords(r)} after ${e.date}`);
   if (o.exit !== e.resolved) throw new NoWindow(`the prices now give a window ending ${o.exit}, but the call was scored to ${e.resolved}`);
   try {
     return { o, rows: await windowRows(e.ticker, o) };
@@ -40458,7 +40557,7 @@ function noWindow(journal, e, why, on) {
 var RULES = [
   "For each call TO REWRITE: check every statement of its lesson against its window's rows, then save a new lesson with correct_lesson (symbol, trade_date, lesson, what_was_wrong). Write only from the rows, the decision and the score shown here: say nothing about the desk's other calls or its journal, which are not shown here.",
   `The lesson: 2 to 4 sentences of plain prose (the desk counts them and refuses more than 4), no bullets, headings or markdown; (1) what the alpha over the window shows about the directional call, citing the figure as listed, and saying plainly if the window is too short to judge the thesis; (2) which part of the thesis the window supports or undercuts; (3) one concrete lesson for the next similar analysis.`,
-  `Read the rows as they are labelled: the row marked "entry" is the close the call is scored from, not a session of the window, so the call's first session is session 1. Say how the index moved with the figure the score line gives, never a word for it such as "flat". When the decision says an event comes after a session's close (a report after the bell), the first session that can show it is the next one.`,
+  `Read the rows as they are labelled: the row marked "entry" is the close the call is scored from, not a session of the window, so the call's first session is session 1. Say how the yardstick moved with the figure the score line gives, never a word for it such as "flat". When the decision says an event comes after a session's close (a report after the bell), the first session that can show it is the next one.`,
   `Before writing about any level, stop, target or trigger the decision named, find it in the rows: say it was reached, held or broken, or that a trigger fired or not, only when a row shows it, naming that row's date and figure. A trigger the decision tied to more than one condition fired only when every condition did: a condition the rows cannot show leaves it "not known from the prices". What the rows cannot show (news, earnings, a filing, a figure they do not hold) is "not known from the prices", never a guess.`,
   `what_was_wrong sorts each statement of the lesson as it stands under three labels, in this order: "${CHECK_LABELS[0]}" each statement the rows contradict, quoted, with the row that shows otherwise (its date and figure); "${CHECK_LABELS[1]}" each statement the rows cannot show, quoted; "${CHECK_LABELS[2]}" the rest. Write "none" under a label with nothing in it. A statement is contradicted only when a row shows otherwise. The desk keeps the first lesson word for word beside the new one, and any corrected lesson it replaces, marked as corrected. The call, its rating and its score stay as they are.`,
   "For a lesson the person said is wrong, what they said is shown beside it. Check it against the rows like every other statement, and write only what a row shows: never take their words, or a review's, as given."
@@ -40488,7 +40587,7 @@ ${laterWords(ticker)}`;
       const w = await windowOf(e, scoring);
       shown2.push([
         `${tagOf(e)} TO REWRITE: ${whyOf(e)}.`,
-        `ITS SCORE, WHICH STAYS AS IT IS: ${e.ticker} ${e.raw} from ${w.o.entry} to ${w.o.exit} (${w.o.holdingDays} trading days); its index, ${w.o.benchmark}, ${signedPct(w.o.benchmarkReturn)} over the same days; alpha ${e.alpha}.`,
+        `ITS SCORE, WHICH STAYS AS IT IS: ${e.ticker} ${e.raw} from ${w.o.entry} to ${w.o.exit} (${windowWords({ days: w.o.holdingDays, unit: w.o.unit })}); its yardstick, ${w.o.benchmark}, ${signedPct(w.o.benchmarkReturn)} over the same days; alpha ${e.alpha}. It is ${checkName({ days: w.o.holdingDays, unit: w.o.unit })}, not the call's own time horizon.`,
         `DECISION:
 ${e.decision}`,
         `LESSON AS IT STANDS:
@@ -41174,7 +41273,7 @@ function registerDeskTools(server, root) {
   };
   server.registerTool("plan_analysis", {
     title: "Plan an analysis",
-    description: "Draw up the plan for analysing a stock on a date, before any agent speaks: the instrument, the analysts that run, the debate rounds, the report language, the index the call will be judged against, what the person holds, the lessons from past calls, and - for a run that stopped half way - the next step. Refused with NEEDS_EMAIL until the person has given their email. Call it first, and follow it.",
+    description: "Draw up the plan for analysing a stock on a date, before any agent speaks: the instrument, the analysts that run, the debate rounds, the report language, the window and yardstick the call will be scored by (a short first check, not its time horizon), what the person holds, the lessons from past calls, and - for a run that stopped half way - the next step. Refused with NEEDS_EMAIL until the person has given their email. Call it first, and follow it.",
     inputSchema: {
       symbol: symbol2,
       analysis_date: day2,
@@ -41239,14 +41338,14 @@ function registerDeskTools(server, root) {
     if (!progress(ws().dir, sym2, d)["decision"]) throw new Error(`the portfolio manager's decision is not saved yet for ${sym2} on ${d}`);
     const rating = parseRating(readSections(ws().dir, sym2, d, ["decision"]));
     const header = [`Rating: ${rating}`, `Generated: ${(/* @__PURE__ */ new Date()).toISOString().slice(0, 16).replace("T", " ")} UTC`];
-    if (plan?.analysts) header.push(`Analysts: ${plan.analysts.join(", ")}; research debate rounds ${plan.debateRounds}, risk debate rounds ${plan.riskRounds}; language ${plan.language}`, `Judged after ${plan.holdingDays} trading days against ${plan.benchmark}`);
+    if (plan?.analysts) header.push(`Analysts: ${plan.analysts.join(", ")}; research debate rounds ${plan.debateRounds}, risk debate rounds ${plan.riskRounds}; language ${plan.language}`, `Scored: ${scoredWords(plan)}`);
     const file5 = writeReport(ws().dir, sym2, d, header);
     return `Report written: ${file5}
 Rating: ${rating}`;
   }));
   server.registerTool("record_decision", {
     title: "Record the decision",
-    description: "Put the portfolio manager's saved decision in the journal as a pending call, to be scored later against its market index. The text is the one saved in the run, so the journal always matches the report. One call per stock and day: a repeat is ignored. Pass the rating the decision states; without one it is read from the text, and a decision with no readable rating is recorded as Needs review.",
+    description: "Put the portfolio manager's saved decision in the journal as a pending call, with the window and yardstick it will be scored by (the plan's), so a later change to the settings never re-scores it. It is scored once a scoring runs after that window (/settle, an analysis or a routine): a short first check, not the call's own time horizon. The text is the one saved in the run, so the journal always matches the report. One call per stock and day: a repeat is ignored. Pass the rating the decision states; without one it is read from the text, and a decision with no readable rating is recorded as Needs review.",
     inputSchema: { symbol: symbol2, analysis_date: day2, rating: external_exports.enum(RATINGS).optional() },
     annotations: write
   }, async (a) => act(() => {
@@ -41254,13 +41353,14 @@ Rating: ${rating}`;
     const decision = readSections(ws().dir, sym2, d, ["decision"]);
     if (!progress(ws().dir, sym2, d)["decision"]) throw new Error(`the portfolio manager's decision is not saved yet for ${sym2} on ${d}`);
     const body = decision.replace(/^## [^\n]*\n/, "");
-    const r = journalOf(root, ws()).storeDecision(sym2, d, body, a.rating ?? void 0);
+    const rules = savedPlan(ws().dir, sym2, d)?.window ?? rulesFor(sym2, readSettings(root).scoring);
+    const r = journalOf(root, ws()).storeDecision(sym2, d, body, a.rating ?? void 0, rules);
     const rating = a.rating ?? parseRating(body);
-    return r === "stored" ? `Recorded: ${sym2} on ${d}, ${rating}, pending. It is scored after ${readSettings(root).scoring.holdingPeriodDays} trading days.` : `${sym2} on ${d} is already in the journal; nothing changed.`;
+    return r === "stored" ? `Recorded: ${sym2} on ${d}, ${rating}, pending. It will be scored as ${checkWords(sym2, rules)}, kept with the call so a later change to the settings does not change it. It is not the call's own time horizon. ${WHEN_SCORED} Until then it stays pending: for the ${windowWords(rules)} after the call, and after them until a scoring runs.` : `${sym2} on ${d} is already in the journal; nothing changed.`;
   }));
   server.registerTool("list_settlements", {
     title: "Pending calls",
-    description: "List the calls in the journal that are not settled yet. For each whose holding window has finished trading, it shows the measured outcome (return, the index's return, alpha), the decision, and what happened in the window day by day (the stock's prices, volume and main indicators beside the index's close), so you can write the lesson from what happened; the others are marked NOT YET. A call record_outcome failed to settle twice in this scoring is LEFT: named, not shown, and left pending. The figures come from price rows only.",
+    description: "List the calls in the journal that are not settled yet. For each whose scoring window has passed (the window kept with the call: a short first check, not the call's own time horizon), it shows the measured outcome (return, its yardstick's return, alpha), the decision, and what happened in the window day by day (the stock's prices, volume and main indicators beside the yardstick's close), so you can write the lesson from what happened; the others are marked NOT YET. A call record_outcome failed to settle twice in this scoring is LEFT: named, not shown, and left pending. The figures come from price rows only.",
     inputSchema: { symbol: symbol2.optional() },
     annotations: { readOnlyHint: true, openWorldHint: true }
   }, async (a) => act(() => dueSettlements(journalOf(root, ws()), readSettings(root).scoring, a.symbol ? safeSymbol(a.symbol) : void 0)));
@@ -41274,7 +41374,7 @@ Rating: ${rating}`;
   }, async (a) => act(() => settleOne(journalOf(root, ws()), readSettings(root).scoring, safeSymbol(a.symbol), a.trade_date, a.lesson)));
   server.registerTool("recheck_lessons", {
     title: "Lessons to re-check",
-    description: "Find the settled calls whose lesson was not written from the holding window's prices (written before the desk showed them, when they could not be had, or marked unreliable before), or that the person said is wrong (flag_lesson). Up to three at a time are shown to rewrite: the call's score and its index's return over the same days, which stay as they are, the decision, the lesson as it stands, what the person said is wrong (for a flagged one), and the window's entry and finished sessions day by day; call again once those are saved for the next ones. A call whose window's prices cannot be had is marked unreliable by the desk itself, so later analyses stop reading its lesson. A lesson correct_lesson refused twice in this re-check is LEFT, named but not shown; the same lessons asked for again with nothing saved since answer STOP. With nothing left to rewrite, its last words say what a later re-check does. Never changes a call, its rating or its score.",
+    description: "Find the settled calls whose lesson was not written from the holding window's prices (written before the desk showed them, when they could not be had, or marked unreliable before), or that the person said is wrong (flag_lesson). Up to three at a time are shown to rewrite: the call's score and its yardstick's return over the same days, which stay as they are, the decision, the lesson as it stands, what the person said is wrong (for a flagged one), and the window's entry and finished sessions day by day; call again once those are saved for the next ones. A call whose window's prices cannot be had is marked unreliable by the desk itself, so later analyses stop reading its lesson. A lesson correct_lesson refused twice in this re-check is LEFT, named but not shown; the same lessons asked for again with nothing saved since answer STOP. With nothing left to rewrite, its last words say what a later re-check does. Never changes a call, its rating or its score.",
     inputSchema: { symbol: symbol2.optional() },
     annotations: { readOnlyHint: false, openWorldHint: true }
   }, async (a) => act(() => lessonsToRecheck(journalOf(root, ws()), readSettings(root).scoring, a.symbol ? safeSymbol(a.symbol) : void 0)));
@@ -41304,7 +41404,7 @@ Rating: ${rating}`;
   }, async (a) => act(() => flagLesson(journalOf(root, ws()), safeSymbol(a.symbol), a.trade_date, a.what_is_wrong)));
   server.registerTool("start_backtest", {
     title: "Start a backtest sweep",
-    description: "Lay out a backtest: the team is run over every stock on every date from start to end (every few days) and the calls are scored later against the market index. From now until end_backtest every desk tool records into this sweep's own journal and runs, so the live journal and its lessons are untouched. Repeat the call with the same sweep_id to resume: cells already recorded are skipped. Every cell is a full team run, so tell the person the number of cells before running any.",
+    description: "Lay out a backtest: the team is run over every stock on every date from start to end (every few days) and the calls are scored later, each over its short first window against its yardstick, as a live call is. From now until end_backtest every desk tool records into this sweep's own journal and runs, so the live journal and its lessons are untouched. Repeat the call with the same sweep_id to resume: cells already recorded are skipped. Every cell is a full team run, so tell the person the number of cells before running any.",
     inputSchema: {
       symbols: external_exports.array(symbol2).min(1).max(10),
       start_date: day2,
@@ -41345,7 +41445,7 @@ Rating: ${rating}`;
   }));
   server.registerTool("backtest_summary", {
     title: "Backtest results",
-    description: "Score a sweep's settled calls by rating: how many, how often the direction was called right (not for Hold, which claims none), and the mean alpha against each stock's market index. Calls whose window has not traded are pending; calls with no readable rating are unscored. Report the figures as they are and say that a few calls prove nothing.",
+    description: "Score a sweep's settled calls by rating: how many, how often the direction was called right (not for Hold, which claims none), and the mean alpha against each call's yardstick over its first window (the summary names them), not over the calls' own time horizons. Calls whose window has not traded are pending; calls with no readable rating are unscored. Report the figures as they are and say that a few calls prove nothing.",
     inputSchema: { sweep_id: external_exports.string().max(40).optional().describe("The sweep to score; the running one when left out") },
     annotations: { readOnlyHint: true, openWorldHint: false }
   }, async (a) => act(() => {
