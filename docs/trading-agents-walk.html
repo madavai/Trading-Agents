@@ -543,7 +543,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "If a report calls a few hours' sample \"this week's\" news or mood, that is a fault: note the sentence.",
         "If StockTwits or Reddit sent back an error or an empty answer, the Sentiment report calls that source \"unavailable\", never a quiet crowd or a calm mood. If no source gave anything to read, its first line is \"Overall Sentiment: Unavailable (Score: none)\", never \"Neutral\"."] },
     { "id": "B13", "title": "The day's prices are called what they are", "tags": [], "changed": "2026-11-08",
-      "about": "During trading hours a stock's latest price is still moving. The free price source can be up to 15 minutes late, so the desk takes a day's figures as final only when it read them 15 minutes or more after the close, and it keeps a read of the prices for five minutes at most, so a long analysis never works from an old one. For a while after a day ends the source may not have filled that day in yet, and now and then it lists a day with no prices at all. The desk says which, and when it read the prices, so the reports never call a moving price \"the close\", never doubt a final one, and never say a day that traded had no trading.",
+      "about": "During trading hours a stock's latest price is still moving. A day's figures are not final the moment the market closes, so the desk takes them as final only when it read them 15 minutes or more after the close, and it keeps a read of the prices for five minutes at most, so a long analysis never works from an old one. For a while after a day ends the source may not have filled that day in yet, and now and then it lists a day with no prices at all. The desk says which, and when it read the prices, so the reports never call a moving price \"the close\", never doubt a final one, and never say a day that traded had no trading.",
       "where": "Dashboard › any call made after this update › Market report",
       "do": [
         "Run an analysis of NVIDIA during US trading hours (9:30 to 16:00 New York time) and open its Market report.",
@@ -630,7 +630,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "Its tip says \"Switch to the light face\" or \"Switch to the dark face\". The first visit follows your computer's own setting.",
         "Both faces are easy to read, including the account cards, the charts and the ticket."] },
     { "id": "C3", "title": "Markets", "tags": [], "changed": "2026-11-08",
-      "about": "A glance at the big markets, from Yahoo Finance (up to 15 minutes late). Each move belongs to the latest trading day, so on a weekend or before the open it names that day rather than passing for today's. A yield is already a percent, so its move is in points.",
+      "about": "A glance at the big markets, from Yahoo Finance. Each move belongs to the latest trading day, so on a weekend or before the open it names that day rather than passing for today's. A yield is already a percent, so its move is in points.",
       "where": "Dashboard › Markets",
       "do": [
         "Look at the market tiles, on a weekday while the market trades and again on a weekend. Point at a move.",
@@ -689,7 +689,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "With round 1's Bitcoin call in your journal, a call recorded before the desk kept each call's window with it is named: \"Scored otherwise: BTC-USD (16 Oct 2026): against SPY, the fund that copies the S&P 500 (the desk's settings name no yardstick for coins, so a coin is scored against the one for US listings), over the 5 calendar days after the call, as it was recorded before the desk kept each call's window with it, so it is scored as such calls were then.\" Its score does not change.",
         "Then: \"A call is scored when a scoring runs after its window (/settle, an analysis or a routine), not by itself. Both returns count dividends: they are worked out from prices adjusted for them. Green means the calls went the way their rating said in their first check, red that they went against it: a Buy or Overweight works when its stock beats its yardstick, an Underweight or Sell when its stock trails it. A Hold claims no direction, so it stays plain.\"",
         "With few scored calls: \"With so few scored calls these figures are noise, not a record.\" With none: \"Nothing has been scored yet. A call is scored once its window has passed and a scoring runs (/settle, an analysis or a routine), not by itself.\""] },
-    { "id": "C8", "title": "NVIDIA's own page", "tags": [], "changed": "2026-11-08",
+    { "id": "C8", "title": "NVIDIA's own page", "tags": [], "changed": "2026-11-09",
       "about": "Every company has a page that gathers everything about it: what you hold of it, your orders on it, and every call the desk made on it.",
       "where": "Dashboard › chart NVDA › side list › Stock page",
       "do": [
@@ -699,8 +699,8 @@ b, strong { font-weight: var(--weight-semibold); }
         "\"Everything on NVDA\": \"What you hold\" in each account (with \"Buy NVDA…\" and \"Sell NVDA…\"), \"Your orders on it\", and \"The desk's calls on it\" with each result.",
         "Under the calls: \"Each result is a first-week check against SPY over the 5 trading days after the call, not the call's own time horizon.\"",
         "\"Ask the desk to analyse\", \"Trade…\" and \"Decide…\".",
-        "Each price says where it comes from: Yahoo Finance, up to 15 minutes late, or Robinhood's live price.",
-        "The line under the title says which day its price is: \"$188.08 (+1.20% today) on Yahoo Finance, up to 15 min late\" while the market trades, \"$188.08, today's close (+1.20% today), from Yahoo Finance\" after it, and on a weekend \"$188.08, the close of Fri 6 Nov (+2.78% that day), from Yahoo Finance\"."] },
+        "Each price says where it comes from: Yahoo Finance or Robinhood's live price. A Yahoo price while the market trades says how late it may be: \"real-time\" for a US stock or fund on Nasdaq, the New York Stock Exchange, NYSE Arca, NYSE American or Cboe US, and for a coin; \"may be late\" for any other. A close says nothing about lateness.",
+        "The line under the title says which day its price is: \"$188.08 (+1.20% today) on Yahoo Finance, real-time\" while the market trades, \"$188.08, today's close (+1.20% today), from Yahoo Finance\" after it, and on a weekend \"$188.08, the close of Fri 6 Nov (+2.78% that day), from Yahoo Finance\"."] },
     { "id": "C9", "title": "Search by name", "tags": [], "changed": "2026-10-21",
       "about": "You don't need to know a ticker: type a company's name and pick it from Yahoo Finance's matches.",
       "where": "Dashboard › the search box at the top",

@@ -5,7 +5,7 @@ description: Open the Trading Agents dashboard - the page where the person sees 
 
 # Terminal
 
-The dashboard is a page on this computer only. It shows prices from Yahoo Finance (up to 15 minutes late), the desk's own records and the Robinhood accounts the person chose to show. It places an order only when the person has switched trading on and presses Confirm on a ticket Robinhood has checked; nothing an agent does can place one.
+The dashboard is a page on this computer only. It shows prices from Yahoo Finance (real-time for US stocks and funds on Nasdaq, the New York Stock Exchange, NYSE Arca, NYSE American and Cboe US, and for coins; any other market's may be late), the desk's own records and the Robinhood accounts the person chose to show. It places an order only when the person has switched trading on and presses Confirm on a ticket Robinhood has checked; nothing an agent does can place one.
 
 1. Call the desk tool `open_dashboard`. It starts the dashboard on this computer (or finds the one already running for this folder) and opens the page in the person's browser, on a link that gives that page its key. That one call is the whole job: do not start the dashboard with a shell command, a background task or another agent, and do not reach for anything else first.
 2. Pass on what the tool answered, in one line: the dashboard has opened in their browser, and it works on this computer only. The page the tool opened is the one to use; the address alone, typed into another browser, opens a page without its key. If the tool answered that the dashboard did not answer, give its words: the person can run `node dist/terminal.mjs` in a terminal window of their own, in this folder, and tell you what it prints.

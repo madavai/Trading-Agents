@@ -90,8 +90,9 @@ figures), Polymarket (odds) and SEC EDGAR (company filings). World news is the n
 market's own symbols (the S&P 500, the 10-year Treasury yield, oil, gold, the euro; `worldNewsSearches` in
 `desk-settings.json`): its search finds none under topic words. Yahoo Finance has no official free service: the desk reads
 the same public pages its website uses, for personal use, and Yahoo can block or change them without notice. Any source
-that does not answer is reported as unavailable, never as "nothing happened". Market prices may be up to 15 minutes
-late.
+that does not answer is reported as unavailable, never as "nothing happened". Prices are real-time for US stocks and
+funds on Nasdaq, the New York Stock Exchange, NYSE Arca, NYSE American and Cboe US, and for coins (Yahoo's own list
+of its delays, and the desk's check of its feed on 9 November 2026); any other market's price may be late.
 
 **Why your email:** the SEC asks every program that reads its filings for a contact email (the desk is one), so the desk
 needs yours before its first analysis. Give it to the desk in a chat, or in the field in Get started on the dashboard.

@@ -13,17 +13,19 @@ test('a price\'s market comes from Yahoo\'s own description of it: a coin, a US 
   assert.equal(priceMarket({ instrumentType: 'EQUITY', exchangeName: 'NYQ' }), 'us', 'Coca-Cola, on the New York Stock Exchange');
   assert.equal(priceMarket({ instrumentType: 'ETF', exchangeName: 'PCX' }), 'us', 'SPY, on NYSE Arca');
   assert.equal(priceMarket({ instrumentType: 'ETF', exchangeName: 'NGM' }), 'us');
+  assert.equal(priceMarket({ instrumentType: 'EQUITY', exchangeName: 'ASE' }), 'us', 'NYSE American');
+  assert.equal(priceMarket({ instrumentType: 'ETF', exchangeName: 'BTS' }), 'us', 'FBTC, on Cboe US');
   assert.equal(priceMarket({ instrumentType: 'CRYPTOCURRENCY', exchangeName: 'CCC' }), 'coin');
   for (const other of [
     { instrumentType: 'EQUITY', exchangeName: 'JPX' },     // Tokyo: 20 minutes on Yahoo's list, 15 on the feed
     { instrumentType: 'EQUITY', exchangeName: 'LSE' },     // London: 20 minutes
     { instrumentType: 'EQUITY', exchangeName: 'PNK' },     // the OTC markets: 15 minutes
-    { instrumentType: 'EQUITY', exchangeName: 'ASE' },     // NYSE American: not checked
+    { instrumentType: 'EQUITY', exchangeName: 'OQB' },     // OTC as well: not checked
     { instrumentType: 'INDEX', exchangeName: 'SNP' },      // an index is neither a stock, a fund nor a coin
     { instrumentType: 'INDEX', exchangeName: 'CXI' },      // the VIX: Cboe's indices are 15 minutes
     { instrumentType: 'EQUITY' }, {},                      // nothing said: nothing claimed
   ]) assert.equal(priceMarket(other), 'other', JSON.stringify(other));
-  assert.deepEqual([...US_EXCHANGES], ['NMS', 'NGM', 'NCM', 'NYQ', 'PCX']);
+  assert.deepEqual([...US_EXCHANGES], ['NMS', 'NGM', 'NCM', 'NYQ', 'PCX', 'ASE', 'BTS']);
 });
 
 test('how late is said only as far as it is known: never a minute figure for a market not checked, and the feed check is recorded', () => {
