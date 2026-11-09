@@ -111,8 +111,10 @@ test('a sweep records into its own journal and runs, never the live ones, and ca
   assert.ok(!fs.existsSync(path.join(live, 'journal.md')), 'the live journal was touched');
   assert.ok(!fs.existsSync(path.join(live, 'runs')), 'the live runs were touched');
 
-  assert.match(await call('list_settlements'), /1 pending call\(s\), 1 ready[\s\S]*SPY \+2\.5%; alpha \+7\.5%/);
-  assert.match(await call('record_outcome', { symbol: 'NVDA', trade_date: '2026-08-31', lesson: 'Alpha +7.5%, thesis held.' }), /^Settled: NVDA \+10\.0%/);
+  // the sweep's calls are scored by naming the sweep: left out, the scoring reads the person's live journal
+  assert.match(await call('list_settlements'), /No pending calls/);
+  assert.match(await call('list_settlements', { sweep_id: 'june' }), /1 pending call\(s\), 1 ready[\s\S]*SPY \+2\.5%; alpha \+7\.5%/);
+  assert.match(await call('record_outcome', { symbol: 'NVDA', trade_date: '2026-08-31', lesson: 'Alpha +7.5%, thesis held.', sweep_id: 'june' }), /^Settled: NVDA \+10\.0%/);
   const summary = await call('backtest_summary');
   assert.match(summary, /^Backtest sweep june: 1 call\(s\) recorded of 2 planned\n\nResolved cells: 1 · pending: 0\n- Buy: n=1, called the direction 100%, mean alpha \+7\.50%/);
 

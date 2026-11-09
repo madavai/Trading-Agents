@@ -72,10 +72,22 @@ export function buildPlan(root: string, req: PlanRequest, ws: Workspace = worksp
   // A run that stopped half way is resumed as it was planned, so changed settings cannot shift its steps under it.
   const done = progress(dir, symbol, day), saved = savedPlan(dir, symbol, day) as Partial<Plan> | undefined;
   const resumed = Object.keys(done).length > 0 && !!saved?.analysts;
-  let analysts: Analyst[], debateRounds: number, riskRounds: number, language: string;
+  let analysts: Analyst[], debateRounds: number, riskRounds: number, language: string, reRounded = false;
+  // A stock asked for on the dashboard runs at the depth the person chose there (a request from before depths: the
+  // settings'), whatever rounds the lead asks for: the time and the model allowance it spends are the person's.
+  const asked = ws.sweep ? undefined : readQueue(dir).find((i) => i.symbol === symbol && i.state === 'running' && i.date === day);
+  const askedRounds = (): [number, number] => (asked?.depth ? [DEPTHS[asked.depth], DEPTHS[asked.depth]] : [s.analysis.debateRounds, s.analysis.riskRounds]);
+  const askedWords = () => (asked?.depth ? `${asked.depth} depth` : "the settings' depth");
   if (resumed) {
     ({ analysts, debateRounds, riskRounds, language } = saved as Plan);
     notes.push(`Resuming the run started earlier for ${symbol} on ${day}, with its original plan (${analysts.join(', ')}; ${debateRounds} debate and ${riskRounds} risk round(s); ${language}). To start over, plan again with restart.`);
+    // Its steps stay as planned, but its rounds are the depth the person asked for now: a stopped deep run asked for again
+    // at Shallow resumes at Shallow, spending what the person chose.
+    const [d, r] = asked ? askedRounds() : [debateRounds, riskRounds];
+    if (d !== debateRounds || r !== riskRounds) {
+      notes.push(`${symbol} was asked for again on the dashboard at ${askedWords()}, so the run resumes with ${d} debate and ${r} risk round(s), not the ${debateRounds} and ${riskRounds} it started with.`);
+      debateRounds = d; riskRounds = r; reRounded = true;
+    }
   } else {
     if (req.analysts) {
       const unknown = req.analysts.filter((a) => !(ANALYSTS as readonly string[]).includes(a));
@@ -91,12 +103,9 @@ export function buildPlan(root: string, req: PlanRequest, ws: Workspace = worksp
     for (const [name, v] of [['debate rounds', req.debateRounds], ['risk rounds', req.riskRounds]] as const) if (v !== undefined && !(Number.isInteger(v) && v >= 1 && v <= 5)) throw new Error(`${name} must be a whole number from 1 to 5`);
     debateRounds = req.debateRounds ?? s.analysis.debateRounds;
     riskRounds = req.riskRounds ?? s.analysis.riskRounds;
-    // A stock asked for on the dashboard runs at the depth the person chose there (a request from before depths: the
-    // settings'), whatever rounds the lead asks for: the time and the model allowance it spends are the person's.
-    const asked = ws.sweep ? undefined : readQueue(dir).find((i) => i.symbol === symbol && i.state === 'running' && i.date === day);
     if (asked) {
-      const [d, r] = asked.depth ? [DEPTHS[asked.depth], DEPTHS[asked.depth]] : [s.analysis.debateRounds, s.analysis.riskRounds];
-      if ((req.debateRounds ?? d) !== d || (req.riskRounds ?? r) !== r) notes.push(`${symbol} was asked for on the dashboard at ${asked.depth ? `${asked.depth} depth` : "the settings' depth"}, so it runs ${d} debate and ${r} risk round(s), not the ${debateRounds} and ${riskRounds} asked for here.`);
+      const [d, r] = askedRounds();
+      if ((req.debateRounds ?? d) !== d || (req.riskRounds ?? r) !== r) notes.push(`${symbol} was asked for on the dashboard at ${askedWords()}, so it runs ${d} debate and ${r} risk round(s), not the ${debateRounds} and ${riskRounds} asked for here.`);
       debateRounds = d; riskRounds = r;
     }
     if (req.language !== undefined && languageName(req.language, '') === '') throw new Error(`"${req.language}" is not a language name`);
@@ -113,7 +122,7 @@ export function buildPlan(root: string, req: PlanRequest, ws: Workspace = worksp
     notes.push('Its debate began before the desk had a fact checker, so its reports go on unchecked.');
   }
   plan.steps = steps.map((st) => ({ ...st, done: (done[st.section] ?? 0) >= st.turn }));
-  if (!resumed) startRun(dir, symbol, day, plan);
+  if (!resumed || reRounded) startRun(dir, symbol, day, plan);   // a resumed run keeps its plan, but for the rounds asked now
   // Saved with the run each time it is planned, so the agents read them from the desk, never from the lead's copy.
   const ctx = runContext(root, ws, symbol, day);
   saveContext(dir, symbol, day, ctx);

@@ -1,6 +1,7 @@
 // The desk's own records as tools the agents call: the plan for an analysis, the run's working record, the journal of calls
 // and their outcomes, and what the person holds. None of these touches an order; each answers in plain words, and a
 // refused request says INPUT_ERROR with what to correct.
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -16,7 +17,7 @@ import { cells, iterGrid, renderSummary, summarize } from '../desk/backtest.js';
 import { buildPlan, journalOf, NeedsEmail, renderPlan, runContext, scoredWords, type Plan } from '../desk/plan.js';
 import { checkWords, rulesFor, windowWords, WHEN_SCORED, type Rules } from '../desk/scoring.js';
 import { SWEEP_ID, workspaceOf } from '../desk/workspace.js';
-import { DEPTHS, finishItem, QueueRefusal, readQueue, ringDoorbell, startItem, waitingIn, type Depth } from '../desk/queue.js';
+import { byAnother, DEPTHS, finishItem, QueueRefusal, readQueue, ringDoorbell, RUNNER_ID, startItem, waitingIn, type Depth, type Runner } from '../desk/queue.js';
 import { Journal } from '../desk/journal.js';
 import { writeWhole } from '../desk/lock.js';
 import { parseRating, RATINGS } from '../desk/rating.js';
@@ -49,20 +50,40 @@ async function act(run: () => string | Promise<string>) {
 export function registerDeskTools(server: McpServer, root: string): void {
   const dir = deskDataDir(root);
   const write = { readOnlyHint: false, openWorldHint: false } as const;
-  // While a backtest sweep is running, the run record and the journal are the sweep's own; the live ones are not touched.
-  // Which sweep is running is kept on disk, not in this process, so every copy of the tool server routes the same way. It
-  // lapses after two idle hours, so a sweep that was abandoned cannot capture later live analyses.
+  // While a backtest sweep is running, each of its cells (its stocks on its dates) is recorded in the sweep's own run
+  // records and journal; everything else stays on the live desk, so the person's own analyses, routines and scoring go on
+  // beside a backtest and never land in it. Which sweep is running, and its cells, are kept on disk, not in this process,
+  // so every copy of the tool server (a member with its own connection) routes a cell the same way. Only a cell's own
+  // work keeps the sweep alive: it lapses after two idle hours, so an abandoned one routes nothing for long.
   const activeFile = path.join(dir, 'backtest', 'active.json'), IDLE_MS = 2 * 3_600_000;
-  const getSweep = (): string | null => {
-    try { const a = JSON.parse(fs.readFileSync(activeFile, 'utf8')) as { sweep?: unknown; at?: unknown }; if (typeof a.sweep === 'string' && SWEEP_ID.test(a.sweep) && typeof a.at === 'number' && Date.now() - a.at < IDLE_MS) return a.sweep; } catch { /* none running */ }
-    return null;
+  const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+  const activeSweep = (): { id: string; cells: Set<string> } | null => {
+    try {
+      const a = JSON.parse(fs.readFileSync(activeFile, 'utf8')) as { sweep?: unknown; at?: unknown };
+      if (typeof a.sweep !== 'string' || !SWEEP_ID.test(a.sweep) || typeof a.at !== 'number' || Date.now() - a.at >= IDLE_MS) return null;
+      let cells = new Set<string>();
+      try {
+        const g = JSON.parse(fs.readFileSync(path.join(workspaceOf(root, a.sweep).dir, 'sweep.json'), 'utf8')) as { symbols?: unknown; dates?: unknown };
+        cells = new Set(strings(g.symbols).flatMap((s) => strings(g.dates).map((d) => `${s}|${d}`)));
+      } catch { /* a sweep with no grid on disk has no cells: nothing is routed to it */ }
+      return { id: a.sweep, cells };
+    } catch { return null; }
   };
+  const getSweep = (): string | null => activeSweep()?.id ?? null;
   const setSweep = (id: string | null): void => {
     if (id === null) { fs.rmSync(activeFile, { force: true }); return; }
     fs.mkdirSync(path.dirname(activeFile), { recursive: true });
     writeWhole(activeFile, JSON.stringify({ sweep: id, at: Date.now() }));
   };
-  const ws = () => { const id = getSweep(); if (id) setSweep(id); return workspaceOf(root, id); };
+  /** The running sweep whose cell this stock and day are, if any (read only: nothing is kept alive by asking). */
+  const sweepOfCell = (sym: string, day: string): string | null => { const s = activeSweep(); return s?.cells.has(`${safeSymbol(sym)}|${day}`) ? s.id : null; };
+  /** Where a run of this stock and day is recorded: the running sweep's own records when it is one of its cells (which
+   *  keeps the sweep alive), else the live desk's. */
+  const wsFor = (sym: string, day: string) => { const id = sweepOfCell(sym, day); if (id) setSweep(id); return workspaceOf(root, id); };
+  const live = () => workspaceOf(root);
+  /** The journal a scoring reads: a sweep's when its id is given (only /backtest gives it), else the live one. */
+  const scored = (sweep?: string) => (sweep ? workspaceOf(root, sweep) : live());
+  const sweepArg = z.string().max(40).optional().describe("Only inside a backtest: the sweep_id whose calls to score (the /backtest playbook gives it). Left out: the live journal's calls, the person's own");
 
   server.registerTool('plan_analysis', {
     title: 'Plan an analysis',
@@ -76,7 +97,10 @@ export function registerDeskTools(server: McpServer, root: string): void {
       restart: z.boolean().optional().describe('Throw away an earlier unfinished run of this stock and day and start over'),
     },
     annotations: write,
-  }, async (a) => act(() => (getSweep() ? `[Backtest sweep ${getSweep()}: this run is recorded in the sweep's own journal, not the live one.]\n` : '') + renderPlan(buildPlan(root, { symbol: a.symbol, analysisDate: a.analysis_date, analysts: a.analysts, debateRounds: a.debate_rounds, riskRounds: a.risk_rounds, language: a.language, restart: a.restart }, ws()))));
+  }, async (a) => act(() => {
+    const w = wsFor(a.symbol, analysisDate(a.analysis_date));
+    return (w.sweep ? `[Backtest sweep ${w.sweep}: this run is recorded in the sweep's own journal, not the live one.]\n` : '') + renderPlan(buildPlan(root, { symbol: a.symbol, analysisDate: a.analysis_date, analysts: a.analysts, debateRounds: a.debate_rounds, riskRounds: a.risk_rounds, language: a.language, restart: a.restart }, w));
+  }));
 
   server.registerTool('save_run_section', {
     title: 'Save a run section',
@@ -84,7 +108,7 @@ export function registerDeskTools(server: McpServer, root: string): void {
     inputSchema: { symbol, analysis_date: day, section: z.enum(SECTIONS), text: z.string().min(1).max(60_000) },
     annotations: write,
   }, async (a) => act(() => {
-    const d = analysisDate(a.analysis_date), turns = saveSection(ws().dir, a.symbol, d, a.section, a.text);
+    const d = analysisDate(a.analysis_date), turns = saveSection(wsFor(a.symbol, d).dir, a.symbol, d, a.section, a.text);
     return `Saved ${a.section} for ${safeSymbol(a.symbol)} on ${d} (${turns > 1 ? `turn ${turns}` : 'one text'}).`;
   }));
 
@@ -103,7 +127,7 @@ export function registerDeskTools(server: McpServer, root: string): void {
     },
     annotations: write,
   }, async (a) => act(() => {
-    const d = analysisDate(a.analysis_date), lines = correctSection(ws().dir, a.symbol, d, a.section, a.corrections, a.flag_after);
+    const d = analysisDate(a.analysis_date), lines = correctSection(wsFor(a.symbol, d).dir, a.symbol, d, a.section, a.corrections, a.flag_after);
     return [`The ${a.section} report for ${safeSymbol(a.symbol)} on ${d}:`, ...lines].join('\n');
   }));
 
@@ -113,9 +137,9 @@ export function registerDeskTools(server: McpServer, root: string): void {
     inputSchema: { symbol, analysis_date: day, sections: z.array(z.enum([...SECTIONS, ...DEBATES, ...CONTEXT])).optional() },
     annotations: { readOnlyHint: true, openWorldHint: false },
   }, async (a) => act(() => {
-    const d = analysisDate(a.analysis_date);
-    if (a.sections?.length) { const w = ws(); return readSections(w.dir, a.symbol, d, a.sections, () => runContext(root, w, safeSymbol(a.symbol), d)); }
-    const p = progress(ws().dir, a.symbol, d);
+    const d = analysisDate(a.analysis_date), w = wsFor(a.symbol, d);
+    if (a.sections?.length) return readSections(w.dir, a.symbol, d, a.sections, () => runContext(root, w, safeSymbol(a.symbol), d));
+    const p = progress(w.dir, a.symbol, d);
     return Object.keys(p).length ? `Written so far for ${safeSymbol(a.symbol)} on ${d}: ${Object.entries(p).map(([k, n]) => `${k} (${n})`).join(', ')}` : `Nothing written yet for ${safeSymbol(a.symbol)} on ${d}.`;
   }));
 
@@ -125,12 +149,12 @@ export function registerDeskTools(server: McpServer, root: string): void {
     inputSchema: { symbol, analysis_date: day },
     annotations: write,
   }, async (a) => act(() => {
-    const d = analysisDate(a.analysis_date), sym = safeSymbol(a.symbol), plan = savedPlan(ws().dir, sym, d) as Plan | undefined;
-    if (!progress(ws().dir, sym, d)['decision']) throw new Error(`the portfolio manager's decision is not saved yet for ${sym} on ${d}`);
-    const rating = parseRating(readSections(ws().dir, sym, d, ['decision']));
+    const d = analysisDate(a.analysis_date), sym = safeSymbol(a.symbol), w = wsFor(sym, d), plan = savedPlan(w.dir, sym, d) as Plan | undefined;
+    if (!progress(w.dir, sym, d)['decision']) throw new Error(`the portfolio manager's decision is not saved yet for ${sym} on ${d}`);
+    const rating = parseRating(readSections(w.dir, sym, d, ['decision']));
     const header = [`Rating: ${rating}`, `Generated: ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC`];
     if (plan?.analysts) header.push(`Analysts: ${plan.analysts.join(', ')}; research debate rounds ${plan.debateRounds}, risk debate rounds ${plan.riskRounds}; language ${plan.language}`, `Scored: ${scoredWords(plan)}`);
-    const file = writeReport(ws().dir, sym, d, header);
+    const file = writeReport(w.dir, sym, d, header);
     return `Report written: ${file}\nRating: ${rating}`;
   }));
 
@@ -140,13 +164,13 @@ export function registerDeskTools(server: McpServer, root: string): void {
     inputSchema: { symbol, analysis_date: day, rating: z.enum(RATINGS).optional() },
     annotations: write,
   }, async (a) => act(() => {
-    const d = analysisDate(a.analysis_date), sym = safeSymbol(a.symbol);
-    const decision = readSections(ws().dir, sym, d, ['decision']);
-    if (!progress(ws().dir, sym, d)['decision']) throw new Error(`the portfolio manager's decision is not saved yet for ${sym} on ${d}`);
+    const d = analysisDate(a.analysis_date), sym = safeSymbol(a.symbol), w = wsFor(sym, d);
+    const decision = readSections(w.dir, sym, d, ['decision']);
+    if (!progress(w.dir, sym, d)['decision']) throw new Error(`the portfolio manager's decision is not saved yet for ${sym} on ${d}`);
     const body = decision.replace(/^## [^\n]*\n/, '');
     // The window and yardstick the plan gave this run; a run planned before the desk kept them gets the settings' now.
-    const rules: Rules = (savedPlan(ws().dir, sym, d) as Plan | undefined)?.window ?? rulesFor(sym, readSettings(root).scoring);
-    const r = journalOf(root, ws()).storeDecision(sym, d, body, a.rating ?? undefined, rules);
+    const rules: Rules = (savedPlan(w.dir, sym, d) as Plan | undefined)?.window ?? rulesFor(sym, readSettings(root).scoring);
+    const r = journalOf(root, w).storeDecision(sym, d, body, a.rating ?? undefined, rules);
     const rating = a.rating ?? parseRating(body);
     return r === 'stored' ? `Recorded: ${sym} on ${d}, ${rating}, pending. It will be scored as ${checkWords(sym, rules)}, kept with the call so a later change to the settings does not change it. It is not the call's own time horizon. ${WHEN_SCORED} Until then it stays pending: for the ${windowWords(rules)} after the call, and after them until a scoring runs.` : `${sym} on ${d} is already in the journal; nothing changed.`;
   }));
@@ -154,25 +178,25 @@ export function registerDeskTools(server: McpServer, root: string): void {
   server.registerTool('list_settlements', {
     title: 'Pending calls',
     description: 'List the calls in the journal that are not settled yet. For each whose scoring window has passed (the window kept with the call: a short first check, not the call\'s own time horizon), it shows the measured outcome (return, its yardstick\'s return, alpha), the decision, and what happened in the window day by day (the stock\'s prices, volume and main indicators beside the yardstick\'s close), so you can write the lesson from what happened; the others are marked NOT YET. A call record_outcome failed to settle twice in this scoring is LEFT: named, not shown, and left pending. The figures come from price rows only.',
-    inputSchema: { symbol: symbol.optional() },
+    inputSchema: { symbol: symbol.optional(), sweep_id: sweepArg },
     annotations: { readOnlyHint: true, openWorldHint: true },
-  }, async (a) => act(() => dueSettlements(journalOf(root, ws()), readSettings(root).scoring, a.symbol ? safeSymbol(a.symbol) : undefined)));
+  }, async (a) => act(() => dueSettlements(journalOf(root, scored(a.sweep_id)), readSettings(root).scoring, a.symbol ? safeSymbol(a.symbol) : undefined)));
 
   server.registerTool('record_outcome', {
     title: 'Settle a call',
     description: 'Settle one pending call whose window has finished: the desk measures the outcome again itself and keeps it with your lesson. Give only the lesson - 2 to 4 plain sentences (the desk counts them and refuses more than 4) naming what the alpha shows, what part of the thesis it supports or undercuts, and one thing to do next time. The row marked "entry" is the close the call is scored from, not a session of the window. Say what happened in the window only as its rows from list_settlements show it, naming the day; never pass or invent a number. Failing a second time for the same call in this scoring, it answers LEFT: leave that call pending and go on. The same call sent again after that with no call settled since answers STOP: leave it too.',
     // The desk checks the length itself (under 1200 characters), so a refusal is counted and said in plain words: one
     // refused by these input rules never reaches it, and could be sent round again and again.
-    inputSchema: { symbol, trade_date: day, lesson: z.string().max(8000).describe('The lesson: 2 to 4 plain sentences, under 1200 characters') },
+    inputSchema: { symbol, trade_date: day, lesson: z.string().max(8000).describe('The lesson: 2 to 4 plain sentences, under 1200 characters'), sweep_id: sweepArg },
     annotations: { readOnlyHint: false, openWorldHint: true },
-  }, async (a) => act(() => settleOne(journalOf(root, ws()), readSettings(root).scoring, safeSymbol(a.symbol), a.trade_date, a.lesson)));
+  }, async (a) => act(() => settleOne(journalOf(root, scored(a.sweep_id)), readSettings(root).scoring, safeSymbol(a.symbol), a.trade_date, a.lesson)));
 
   server.registerTool('recheck_lessons', {
     title: 'Lessons to re-check',
     description: 'Find the settled calls whose lesson was not written from the holding window\'s prices (written before the desk showed them, when they could not be had, or marked unreliable before), or that the person said is wrong (flag_lesson). Up to three at a time are shown to rewrite: the call\'s score and its yardstick\'s return over the same days, which stay as they are, the decision, the lesson as it stands, what the person said is wrong (for a flagged one), and the window\'s entry and finished sessions day by day; call again once those are saved for the next ones. A call whose window\'s prices cannot be had is marked unreliable by the desk itself, so later analyses stop reading its lesson. A lesson correct_lesson refused twice in this re-check is LEFT, named but not shown; the same lessons asked for again with nothing saved since answer STOP. With nothing left to rewrite, its last words say what a later re-check does. Never changes a call, its rating or its score.',
     inputSchema: { symbol: symbol.optional() },
     annotations: { readOnlyHint: false, openWorldHint: true },
-  }, async (a) => act(() => lessonsToRecheck(journalOf(root, ws()), readSettings(root).scoring, a.symbol ? safeSymbol(a.symbol) : undefined)));
+  }, async (a) => act(() => lessonsToRecheck(journalOf(root, live()), readSettings(root).scoring, a.symbol ? safeSymbol(a.symbol) : undefined)));
 
   server.registerTool('correct_lesson', {
     title: 'Correct a lesson',
@@ -185,7 +209,7 @@ export function registerDeskTools(server: McpServer, root: string): void {
       what_was_wrong: z.string().max(8000).describe('Contradicted: ... Not known from the prices: ... Right: ...; under 900 characters'),
     },
     annotations: { readOnlyHint: false, openWorldHint: true },
-  }, async (a) => act(() => correctLesson(journalOf(root, ws()), readSettings(root).scoring, safeSymbol(a.symbol), a.trade_date, a.lesson, a.what_was_wrong)));
+  }, async (a) => act(() => correctLesson(journalOf(root, live()), readSettings(root).scoring, safeSymbol(a.symbol), a.trade_date, a.lesson, a.what_was_wrong)));
 
   server.registerTool('flag_lesson', {
     title: 'Flag a lesson as wrong',
@@ -196,11 +220,11 @@ export function registerDeskTools(server: McpServer, root: string): void {
       confirmed: z.literal(true).describe('true: the person said in words, in this conversation, that this lesson is wrong, and confirmed flagging it'),
     },
     annotations: { readOnlyHint: false, openWorldHint: false },
-  }, async (a) => act(() => flagLesson(journalOf(root, ws()), safeSymbol(a.symbol), a.trade_date, a.what_is_wrong)));
+  }, async (a) => act(() => flagLesson(journalOf(root, live()), safeSymbol(a.symbol), a.trade_date, a.what_is_wrong)));
 
   server.registerTool('start_backtest', {
     title: 'Start a backtest sweep',
-    description: 'Lay out a backtest: the team is run over every stock on every date from start to end (every few days) and the calls are scored later, each over its short first window against its yardstick, as a live call is. From now until end_backtest every desk tool records into this sweep\'s own journal and runs, so the live journal and its lessons are untouched. Repeat the call with the same sweep_id to resume: cells already recorded are skipped. Every cell is a full team run, so tell the person the number of cells before running any.',
+    description: 'Lay out a backtest: the team is run over every stock on every date from start to end (every few days) and the calls are scored later, each over its short first window against its yardstick, as a live call is. From now until end_backtest each of its cells (its stocks on its dates) is recorded in this sweep\'s own journal and runs, whichever conversation or member works on it; everything else stays on the live desk, so the live journal, its scoring and its lessons are untouched and the person\'s other analyses go on beside it. Score its calls with list_settlements and record_outcome given its sweep_id. Repeat the call with the same sweep_id to resume: cells already recorded are skipped. Every cell is a full team run, so tell the person the number of cells before running any.',
     inputSchema: {
       symbols: z.array(symbol).min(1).max(10), start_date: day, end_date: day,
       every_days: z.number().int().min(1).max(60).optional().describe('Days between analysis dates; 7 when left out'),
@@ -219,7 +243,7 @@ export function registerDeskTools(server: McpServer, root: string): void {
     const symbols = new Set(grid.map((c) => c.symbol)).size;
     return [
       `Backtest sweep ${id}: ${grid.length} cell(s) (${symbols} stock(s) on ${dates.length} date(s), every ${every} day(s), ${dates[0]} to ${dates[dates.length - 1]}); ${grid.length - todo.length} already recorded, ${todo.length} to run.`,
-      'From now until end_backtest every desk tool records into this sweep\'s own journal and runs. The live journal and its lessons are untouched.',
+      `From now until end_backtest each of these cells is recorded in this sweep's own journal and runs; everything else stays on the live desk, whose journal and lessons are untouched. Score this sweep's calls with list_settlements and record_outcome given sweep_id ${id}.`,
       '', `Cells to run, in order (${todo.length ? 'each is a full team run' : 'none left'}):`,
       ...todo.slice(0, 30).map((c, i) => `${i + 1}. ${c.symbol} ${c.date}`), ...(todo.length > 30 ? [`... and ${todo.length - 30} more`] : []),
       '', 'Limits to tell the person: for a past date, prices, indicators, economic figures and SEC accounts are as known on that date, but news, posts, odds, the company profile and insider trades exist only for recent days, so those reads are thin or unavailable and say so. Results are indicative, not repeatable.',
@@ -228,7 +252,7 @@ export function registerDeskTools(server: McpServer, root: string): void {
 
   server.registerTool('end_backtest', {
     title: 'End the backtest sweep',
-    description: 'Go back to the live desk: from now on the desk tools record into the live journal and runs again. The sweep and its results stay on disk.',
+    description: 'End the backtest sweep this conversation started, once it has run and been scored (or the person said to stop it): from now on its cells are recorded on the live desk again. The sweep and its results stay on disk. Never end a sweep this conversation did not start.',
     annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false },
   }, async () => act(() => { const was = getSweep(); setSweep(null); return was ? `Backtest sweep ${was} ended. The desk is back on the live journal.` : 'No backtest was running; the desk is on the live journal.'; }));
 
@@ -267,7 +291,7 @@ export function registerDeskTools(server: McpServer, root: string): void {
         look = { screen: readScreen(dir) ?? worked, on };
       } catch (e) { look = { screen: null, failed: (e as Error).message, on }; }
     }
-    return morningBrief(dir, day, readSettings(root).routines.maxAnalyses, look);
+    return morningBrief(dir, day, readSettings(root).routines.maxAnalyses, look, { now: new Date() });
   }));
 
   server.registerTool('open_dashboard', {
@@ -280,6 +304,11 @@ export function registerDeskTools(server: McpServer, root: string): void {
   // put there. A run takes them one at a time, in order, up to the
   // routines' limit: start_queue_item marks one running (one at a time, whoever started the run), finish_queue_item marks
   // it done with the rating recorded or failed with why, and end_queue_run asks for another run when stocks still wait.
+  // Which run asks: this copy of the desk's tools, one per conversation. The desk's own listener gives its run an id (each
+  // copy its run starts shares it); any other conversation's copy makes its own. With its process, it is noted on each
+  // stock this run starts, so a second run never takes it and only its own run's end finishes it.
+  const given = process.env.TRADING_AGENTS_RUN;
+  const me: Runner = { runner: given && RUNNER_ID.test(given) ? given : `tools-${randomUUID().slice(0, 8)}`, pid: process.pid };
   const perRun = () => readSettings(root).routines.maxAnalyses;
   const depthWords = (d: Depth | undefined) => (d ? `${d} (debate_rounds ${DEPTHS[d]} and risk_rounds ${DEPTHS[d]})` : "the settings' depth (leave the rounds out)");
   const called = (sym: string, d: string) => new Journal(path.join(dir, 'journal.md')).load().find((e) => e.ticker === sym && e.date === d);
@@ -291,13 +320,17 @@ export function registerDeskTools(server: McpServer, root: string): void {
     annotations: { readOnlyHint: true, openWorldHint: false },
   }, async () => act(() => {
     const list = readQueue(dir), waiting = waitingIn(list), running = list.find((i) => i.state === 'running');
-    const lines: string[] = [];
-    if (running) lines.push(`Being analysed now: ${running.symbol} (started ${running.startedAt?.slice(11, 16) ?? '?'} UTC). One stock runs at a time: if this run did not start it, stop and say so.`);
+    const lines: string[] = [], since = `started ${running?.startedAt?.slice(11, 16) ?? '?'} UTC`, another = !!running && byAnother(running, me);
+    // Another run's stock: this run stops, and asks for no other run, which would only find the same and stop (a loop).
+    if (running && another) lines.push(`Being analysed now by another run: ${running.symbol} (${since}). One stock runs at a time: stop this run and say so. Do not call end_queue_run: the run analysing ${running.symbol} asks for the next run itself when it finishes.`);
+    if (running && !another) lines.push(`Being analysed now by this run: ${running.symbol} (${since}). Finish it with finish_queue_item (done once its call is recorded, or failed with why) before starting another.`);
     if (!waiting.length) {
       const doneN = list.filter((i) => i.state === 'done').length, failedN = list.filter((i) => i.state === 'failed').length;
       const kept = [doneN ? `${doneN} done` : '', failedN ? `${failedN} failed (the person presses Retry on the dashboard to ask again)` : ''].filter(Boolean).join(' and ');
       lines.push(!list.length ? 'Nothing is waiting: the list is empty.'
         : `Nothing ${running ? 'else ' : ''}is waiting.${kept ? ` The list also keeps finished analyses for the person to see, ${kept}: none of them needs a run.` : ''}`);
+    } else if (another) {
+      lines.push(`Waiting behind it, left to that run: ${waiting.map((i) => i.symbol).join(', ')}.`);
     } else {
       lines.push(`${waiting.length} waiting, in the order to run them; one run analyses at most ${perRun()}:`);
       waiting.forEach((i, n) => lines.push(`${n + 1}. ${i.symbol}, depth ${depthWords(i.depth)}, asked ${i.requestedAt.slice(0, 16).replace('T', ' ')} UTC`));
@@ -308,14 +341,19 @@ export function registerDeskTools(server: McpServer, root: string): void {
 
   server.registerTool('start_queue_item', {
     title: 'Start a waiting analysis',
-    description: 'Mark a stock from the waiting list as being analysed now, before its analysis starts, so the dashboard shows it running. It answers the date and the debate rounds to plan with. BUSY means another stock is being analysed: stop the run. ALREADY means it was called today: it is marked done, take the next.',
+    description: 'Mark a stock from the waiting list as being analysed now, before its analysis starts, so the dashboard shows it running. It answers the date and the debate rounds to plan with. BUSY means another run is analysing a stock: stop this run, without end_queue_run. ALREADY means it was called today: it is marked done, take the next. NOT STARTED means it cannot run now (it says why, and it is marked failed with that reason): take the next.',
     inputSchema: { symbol },
     annotations: write,
   }, async (a) => queueAct(() => {
-    if (ws().sweep) return `BUSY: a backtest sweep (${ws().sweep}) is running; the waiting list runs only on the live desk. Stop and say so.`;
     const sym = safeSymbol(a.symbol), d = today(), done = called(sym, d);
-    if (done) { finishItem(dir, sym, { rating: done.rating, already: true }); return `ALREADY: ${sym} was already called today (${done.rating}); it is marked done. Take the next.`; }
-    const item = startItem(dir, sym, d);
+    if (done) { finishItem(dir, sym, { rating: done.rating, already: true }, new Date(), me); return `ALREADY: ${sym} was already called today (${done.rating}); it is marked done. Take the next.`; }
+    // A backtest whose cells include this stock today would record the analysis in its own journal, not the person's.
+    const sweep = sweepOfCell(sym, d);
+    if (sweep && readQueue(dir).find((i) => i.symbol === sym)?.state === 'waiting') {
+      finishItem(dir, sym, { reason: `A backtest that includes ${sym} on ${d} is running, so an analysis now would be recorded in the backtest, not in the desk's journal: press Retry once it has ended.` }, new Date(), me);
+      return `NOT STARTED: ${sym} on ${d} is a cell of the backtest sweep ${sweep}, which is running, so its analysis would be recorded in the sweep, not the live journal. It is marked failed with why; the person presses Retry once the backtest has ended. Take the next.`;
+    }
+    const item = startItem(dir, sym, d, new Date(), me);
     return `START: ${sym} is marked as being analysed. Plan it with analysis date ${d}, depth ${depthWords(item.depth)}. When its call is recorded, call finish_queue_item; if it cannot be finished, call finish_queue_item with failed_because.`;
   }));
 
@@ -327,22 +365,27 @@ export function registerDeskTools(server: McpServer, root: string): void {
   }, async (a) => queueAct(() => {
     const sym = safeSymbol(a.symbol);
     const item = readQueue(dir).find((i) => i.symbol === sym), late = item?.quiet ? ` It had read as failed, because nothing was saved for it for two hours; this run's word replaces that.` : '';
-    if (a.failed_because) { finishItem(dir, sym, { reason: a.failed_because }); return `Marked failed: ${sym}. The person sees why on the dashboard and can press Retry.${late}`; }
+    if (item?.state === 'running' && item.runner && byAnother(item, me)) return `BUSY: ${sym} is being analysed by another run: only that run finishes it. Stop this run and say so, without end_queue_run.`;
+    if (a.failed_because) { finishItem(dir, sym, { reason: a.failed_because }, new Date(), me); return `Marked failed: ${sym}. The person sees why on the dashboard and can press Retry.${late}`; }
     const call = called(sym, item?.date ?? today());
     if (!call) throw new Error(`no call for ${sym} on ${item?.date ?? today()} is recorded yet: call record_decision first, or pass failed_because`);
-    finishItem(dir, sym, { rating: call.rating });
+    finishItem(dir, sym, { rating: call.rating }, new Date(), me);
     return `Marked done: ${sym}, ${call.rating}. The dashboard shows it.${late}`;
   }));
 
   server.registerTool('end_queue_run', {
     title: 'End a run of the waiting list',
-    description: 'Call once when a run of the waiting list stops. If stocks are still waiting (the run reached its limit, or stopped early), it asks whoever listens on this computer for another run. Answers one line to end the run with.',
+    description: 'Call once when a run of the waiting list stops. A stock this run started and left unfinished is marked failed. If stocks are still waiting (the run reached its limit, or stopped early), it asks whoever listens on this computer for another run, unless another run is analysing a stock: that run asks when it finishes. Answers one line to end the run with.',
     annotations: write,
   }, async () => act(() => {
-    const list = readQueue(dir), waiting = waitingIn(list).length;
+    const now = new Date(), left = readQueue(dir, now).find((i) => i.state === 'running' && !byAnother(i, me));
+    if (left) finishItem(dir, left.symbol, { reason: 'The run analysing it ended before it was finished, without saying why: press Retry to ask again.' }, now, me);
+    const list = readQueue(dir), waiting = waitingIn(list).length, other = list.find((i) => i.state === 'running');
     const doneN = list.filter((i) => i.state === 'done').length, failedN = list.filter((i) => i.state === 'failed').length;
+    const tally = `On the dashboard's list: ${doneN} done, ${failedN} failed.`, mine = left ? `Marked failed: ${left.symbol}, which this run left unfinished without saying why. ` : '';
+    if (other) return `${mine}${other.symbol} is being analysed by another run, which asks for the next run itself when it finishes: no run was asked for here. ${waiting ? `${waiting} still waiting.` : 'Nothing else is waiting.'} ${tally}`;
     if (waiting) ringDoorbell(dir, 'more');
-    return `${waiting ? `${waiting} still waiting: another run was asked for.` : 'Nothing is waiting.'} On the dashboard's list: ${doneN} done, ${failedN} failed.`;
+    return `${mine}${waiting ? `${waiting} still waiting: another run was asked for.` : 'Nothing is waiting.'} ${tally}`;
   }));
 
   server.registerTool('set_holdings', {

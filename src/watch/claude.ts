@@ -63,12 +63,16 @@ export function stopReason(output: string): string | null {
  *  while the run is working (the watcher's `stopWhy`). */
 export interface RunLimits { stopIf?: () => string | null; everyMs?: number }
 
-/** One run of the team in `root`. Its words go to `log`; it is stopped when `limits.stopIf` gives a reason, which comes
- *  back as `stopped`. */
-export function runClaude(cmd: Command, root: string, log: (text: string) => void, limits: RunLimits = {}, args: readonly string[] = RUN_ARGS): Promise<{ code: number | null; stopped?: string }> {
+/** Where the desk's tools find the id of the run they belong to: the listener sets it for its run's Claude Code, whose
+ *  tools inherit it. */
+export const RUN_ENV = 'TRADING_AGENTS_RUN';
+
+/** One run of the team in `root`, with `env` added to its environment (the run's id). Its words go to `log`; it is
+ *  stopped when `limits.stopIf` gives a reason, which comes back as `stopped`. */
+export function runClaude(cmd: Command, root: string, log: (text: string) => void, limits: RunLimits = {}, args: readonly string[] = RUN_ARGS, env: Record<string, string> = {}): Promise<{ code: number | null; stopped?: string }> {
   return new Promise((resolve) => {
     let stopped: string | undefined;
-    const child = spawn(cmd.command, [...cmd.args, ...args], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+    const child = spawn(cmd.command, [...cmd.args, ...args], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, env: { ...process.env, ...env } });
     const timer = limits.stopIf ? setInterval(() => {
       let why: string | null = null;
       try { why = limits.stopIf!(); } catch { /* a check that fails stops nothing */ }

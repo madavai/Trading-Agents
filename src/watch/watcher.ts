@@ -1,16 +1,22 @@
 // The desk's own listener for the doorbell (desk/queue.ts), the same contract Madav's routine keeps: while it listens it
 // keeps a note saying so, with a heartbeat; when the doorbell rings it waits a moment (several presses make one run),
 // runs the team once, one run at a time, with at most one more owed; and it stops when its note is taken away (the person
-// switched it off), after the run in hand. It starts no run when nothing is waiting, so a ring costs nothing then.
-import { finishItem, lastSignOf, QUIET_MS, readDoorbell, readListener, readQueue, removeListener, waitingIn, writeListener, type ListenerNote, type QueueItem } from '../desk/queue.js';
+// switched it off), after the run in hand. It starts no run when nothing is waiting, so a ring costs nothing then, and none
+// while another run (a routine, a chat) is analysing a stock: that run would only stop at once, so it waits for the list
+// to be free and runs then. Each run gets an id, which the desk's tools note on each stock it starts.
+import crypto from 'node:crypto';
+import { alive, finishItem, lastSignOf, QUIET_MS, readDoorbell, readListener, readQueue, removeListener, runEnded, waitingIn, writeListener, type ListenerNote, type QueueItem } from '../desk/queue.js';
 
 /** The longest the desk's own listener lets one stock be analysed before it stops the run, in case the team is going round
  *  in a loop that keeps saving: more than twice the longest analysis seen in the desk's first real runs (2 h 47 min). */
 export const STOCK_MAX_MS = 6 * 60 * 60_000;
 
 const startedIn = (i: QueueItem, start: string) => (i.startedAt ?? '') >= start;
-/** A stock this run started that its run has not finished: still running, or read as failed only by the quiet rule. */
+/** A stock started since the run began that no run has finished: still running, or read as failed only by the quiet rule. */
 const leftOpen = (i: QueueItem, start: string) => startedIn(i, start) && (i.state === 'running' || i.quiet === true);
+/** A stock this run started (the desk's tools noted its id), or one whose run has ended: never another run's that is still
+ *  going (a routine started beside this run). */
+const ownOrEnded = (i: QueueItem, id: string) => i.runner === id || runEnded(i);
 
 /** Why the desk's own listener stops the run in hand, in plain words for the stock it was on, or null while the run is
  *  working. It stops a run only when nothing has been saved for `QUIET_MS` (the waiting list's own rule: the run is
@@ -33,12 +39,14 @@ export interface WatcherOptions {
   dir: string;
   /** Who is listening, as the person reads it on the dashboard. */
   listener: string;
-  /** Runs the team once, from `start` (ISO, for `stopWhy`). Resolves with nothing, or with a few plain words on why it
-   *  stopped early, which the person reads beside the stock it left unfinished. */
-  run: (start: string) => Promise<string | void>;
+  /** Runs the team once, from `start` (ISO, for `stopWhy`), as run `id` (given to the desk's tools the run starts, which
+   *  note it on each stock). Resolves with nothing, or with a few plain words on why it stopped early, which the person
+   *  reads beside the stock it left unfinished. */
+  run: (start: string, id: string) => Promise<string | void>;
   pid?: number;
-  /** Wait this long after the last ring before a run (20 seconds); look this often (2 seconds); beat this often (a minute). */
-  settleMs?: number; pollMs?: number; beatMs?: number;
+  /** Wait this long after the last ring before a run (20 seconds); look this often (2 seconds); beat this often (a minute);
+   *  after a run, wait at most this long for its tools to close (10 seconds), to tell its stocks from another run's. */
+  settleMs?: number; pollMs?: number; beatMs?: number; graceMs?: number;
   now?: () => Date;
   /** True once the listener's own code changed on disk (an update): it then stops between runs, to be started afresh. */
   retire?: () => boolean;
@@ -73,16 +81,20 @@ export function watch(o: WatcherOptions): Watcher {
   const runOnce = async (): Promise<void> => {
     if (!waitingIn(readQueue(o.dir)).length) return;   // nothing to do: no run, no cost
     running = true;
-    const start = now().toISOString();
+    const start = now().toISOString(), id = `listener-${crypto.randomUUID().slice(0, 8)}`;
     let trouble = '';
-    try { trouble = (await o.run(start)) ?? ''; } catch (e) { trouble = (e as Error).message; }
+    try { trouble = (await o.run(start, id)) ?? ''; } catch (e) { trouble = (e as Error).message; }
+    // Its tools close a moment after the run: wait for them, so a stock whose run is still going is told apart.
+    const unclear = () => readQueue(o.dir).some((i) => leftOpen(i, start) && i.runner !== id && i.pid !== undefined && alive(i.pid));
+    for (const until = Date.now() + (o.graceMs ?? 10_000); unclear() && Date.now() < until;) await new Promise((r) => setTimeout(r, 100));
     // A stock this run started and left unfinished did not finish: say so now, and why, rather than leave it to the
-    // waiting list's quiet rule (which may already read it as failed, in general words this run can put right).
+    // waiting list's quiet rule (which may already read it as failed, in general words this run can put right). A stock
+    // another run started meanwhile, and is still analysing, is left to it.
     const why = trouble || 'the run stopped before this stock was finished: press Retry';
-    for (const i of readQueue(o.dir)) if (leftOpen(i, start)) finishItem(o.dir, i.symbol, { reason: why });
-    const ended = readQueue(o.dir).filter((i) => (i.endedAt ?? '') >= start);
+    for (const i of readQueue(o.dir)) if (leftOpen(i, start) && ownOrEnded(i, id)) finishItem(o.dir, i.symbol, { reason: why });
+    const ended = readQueue(o.dir).filter((i) => (i.endedAt ?? '') >= start && ownOrEnded(i, id));
     const done = ended.filter((i) => i.state === 'done'), a = done.filter((i) => i.already).length, f = ended.filter((i) => i.state === 'failed').length;
-    note.lastRun = { started: start, at: now().toISOString(), result: `${done.length - a} analysed${a ? `, ${a} already called today` : ''}, ${f} failed${trouble ? `; ${trouble}` : ''}` };
+    note.lastRun = { started: start, at: now().toISOString(), result: `${done.length - a} analysed${a ? `, ${a} already called today` : ''}, ${f} failed${trouble ? `; ${trouble}` : ''}`, runner: id };
     running = false;
     beat();
     if (owed) { owed = false; pending = true; }
@@ -94,7 +106,11 @@ export function watch(o: WatcherOptions): Watcher {
     if (stopping) { if (!running) { clearInterval(timer); removeListener(o.dir, pid); finished(stopping); } return; }
     const b = readDoorbell(o.dir)?.at ?? '';
     if (b !== bell) { bell = b; ringAt = now().getTime(); if (running) owed = true; else pending = true; }
-    if (!running && pending && now().getTime() - ringAt >= settle) { pending = false; void runOnce(); }
+    if (!running && pending && now().getTime() - ringAt >= settle) {
+      // Another run is analysing a stock: a run now would only stop. Wait for the list to be free, then run.
+      const list = readQueue(o.dir);
+      if (!list.some((i) => i.state === 'running') || !waitingIn(list).length) { pending = false; void runOnce(); }
+    }
     if (now().getTime() - lastBeat >= beatEvery) beat();
   };
   const timer = setInterval(tick, o.pollMs ?? 2_000);
