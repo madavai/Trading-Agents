@@ -36994,13 +36994,13 @@ function teamLine(given, folder2, updated = false, known) {
   if (!v || v.toLowerCase() === NONE2) return not(NO_VERSION);
   if (!/^[0-9a-f]{8}$/.test(v)) return not("what was given is not a version");
   if (!folder2) return { ok: false, text: `This conversation's steps for the team (version ${v}) could not be compared: the team's file in this folder carries no version` };
-  if (v === folder2) return { ok: true, text: `This conversation's steps for the team are the ones in this folder (version ${folder2})` };
+  if (v === folder2) return { ok: true, text: `This conversation began with the team's steps of version ${folder2}, the version in this folder. A change made to the team in Madav's Agent Studio cannot be told from here: it keeps that version. If the team was changed there, ask the desk to reset the team to go back to the project's steps` };
   if (known && !known.includes(v)) return not(`${v} is not a version the team's steps have ever had`);
   const why = known ? "this conversation began before the desk was updated" : `this conversation began before the desk was updated, or ${v} was not copied from the team's steps (the list of the steps' earlier versions could not be read)`;
   return { ok: false, text: `This conversation's steps for the team (version ${v}) are not the ones in this folder now (version ${folder2}): ${why}. Start a new conversation in Madav, where the new steps load, and check this computer there; reset nothing from this one` };
 }
 var ASK_AGAIN = `TEAM VERSION NEEDED: this answer did not compare this conversation's steps for the team with the ones in this folder. If you are the trading-desk team and have not yet called desk_check again in this check, call it once more now, with team_version copied exactly from step 1 of your own "Check this computer" steps (in the instructions this conversation began with), and pass on that answer instead of this one. Otherwise (you are not the trading-desk team, your steps give no version, or you already called again) pass this answer on as it is, and never say this conversation's steps match.`;
-var TWO_LINES = "Pass on the line about this conversation's steps for the team and the line about the desk's agent files in this folder as they are written. Only the first can say whether this conversation's steps are the folder's, and only with a version shown; the second is about the files alone. Never take one for the other.";
+var TWO_LINES = "Pass on the line about this conversation's steps for the team and the line about the desk's agent files in this folder as they are written. Only the first is about this conversation's steps, and only with a version shown; the second is about the files alone. Never take one for the other.";
 function sumUp(lines, sources) {
   const not = lines.filter((l) => !l.ok && !l.unchecked).length, down = sources.filter((s) => !s.ok).length;
   const unchecked = lines.some((l) => l.unchecked);
@@ -39606,6 +39606,7 @@ async function financialStatement(raw, kind, freq, analysis2) {
 }
 
 // src/tools/desk.ts
+import { randomUUID } from "node:crypto";
 import fs18 from "node:fs";
 import path21 from "node:path";
 
@@ -40399,6 +40400,16 @@ import fs11 from "node:fs";
 import path12 from "node:path";
 var DEPTHS = { shallow: 1, medium: 3, deep: 5 };
 var isDepth = (v) => typeof v === "string" && Object.hasOwn(DEPTHS, v);
+var RUNNER_ID = /^[A-Za-z0-9_.:-]{1,64}$/;
+function alive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return e.code === "EPERM";
+  }
+}
+var runEnded = (i) => !i.pid || !alive(i.pid);
 var MAX_OPEN = 20;
 var MAX_FINISHED = 20;
 var QUIET_MS = 2 * 60 * 6e4;
@@ -40442,6 +40453,8 @@ function itemOf(v) {
   if (state === "done" && r.already === true) out.already = true;
   if (state === "failed") out.reason = reason2 ?? "no reason was given";
   if (state === "failed" && r.quiet === true) out.quiet = true;
+  if (state !== "waiting" && typeof r.runner === "string" && RUNNER_ID.test(r.runner)) out.runner = r.runner;
+  if (state !== "waiting" && Number.isInteger(r.pid) && r.pid > 0) out.pid = r.pid;
   return out;
 }
 function lastSignOf(dir, item) {
@@ -40449,10 +40462,25 @@ function lastSignOf(dir, item) {
   const saved = item.date ? lastSaved(dir, item.symbol, item.date) : null;
   return Math.max(started, saved ?? 0);
 }
-function settled(dir, item, now, note) {
+var fromJournal = /* @__PURE__ */ new WeakSet();
+var callsIn = (dir) => {
+  let kept = null;
+  return () => kept ??= new Map(new Journal(path12.join(dir, "journal.md")).load().map((e) => [`${e.ticker}|${e.date}`, e.rating]));
+};
+function settled(dir, item, now, note, calls) {
+  if (item.state !== "running" && item.state !== "failed") return item;
+  const rating = item.date ? calls().get(`${item.symbol}|${item.date}`) : void 0;
+  if (rating) {
+    const done = { ...item, state: "done", rating, endedAt: item.endedAt ?? new Date(Math.min(now.getTime(), lastSignOf(dir, item))).toISOString() };
+    delete done.reason;
+    delete done.quiet;
+    fromJournal.add(done);
+    return done;
+  }
   if (item.state !== "running") return item;
   const last = note?.lastRun, started = Date.parse(item.startedAt ?? item.requestedAt);
-  if (last?.started && Date.parse(last.started) <= started && started <= Date.parse(last.at)) {
+  const itsRun = !!last && (!!last.runner && item.runner === last.runner || runEnded(item));
+  if (last?.started && Date.parse(last.started) <= started && started <= Date.parse(last.at) && itsRun) {
     return { ...item, state: "failed", reason: words(`${note.listener}'s run ended before this stock was finished: ${last.result}`, 300), endedAt: last.at };
   }
   const sign = lastSignOf(dir, item);
@@ -40464,12 +40492,12 @@ function load2(dir, now) {
     raw = JSON.parse(fs11.readFileSync(queueFile(dir), "utf8"));
   } catch {
   }
-  const seen = /* @__PURE__ */ new Set(), out = [], note = readListener(dir, now);
+  const seen = /* @__PURE__ */ new Set(), out = [], note = readListener(dir, now), calls = callsIn(dir);
   for (const v of Array.isArray(raw) ? raw : []) {
     const item = itemOf(v);
     if (!item || seen.has(item.symbol)) continue;
     seen.add(item.symbol);
-    out.push(settled(dir, item, now, note));
+    out.push(settled(dir, item, now, note, calls));
   }
   return out;
 }
@@ -40505,31 +40533,44 @@ function enqueue(dir, raw, at, depth, now = /* @__PURE__ */ new Date()) {
     return { list: next, result: next };
   });
 }
-function startItem(dir, raw, date5, now = /* @__PURE__ */ new Date()) {
+var byAnother = (i, by) => !by || i.runner !== by.runner;
+var signed3 = (by) => by ? { runner: by.runner, ...by.pid ? { pid: by.pid } : {} } : {};
+function startItem(dir, raw, date5, now = /* @__PURE__ */ new Date(), by) {
   const symbol4 = safeSymbol(raw);
   return change2(dir, now, (list2) => {
     const item = list2.find((i) => i.symbol === symbol4);
     if (!item) throw new QueueRefusal("NOT_ON_LIST", `${symbol4} is not on the waiting list`);
     const busy = list2.find((i) => i.state === "running" && i.symbol !== symbol4);
-    if (busy) throw new QueueRefusal("BUSY", `${busy.symbol} is being analysed now: one stock runs at a time`);
-    if (item.state === "running") return { list: list2, result: item };
+    if (busy) {
+      throw new QueueRefusal("BUSY", !by ? `${busy.symbol} is being analysed now: one stock runs at a time` : byAnother(busy, by) ? `${busy.symbol} is being analysed now by another run: one stock runs at a time` : `${busy.symbol}, which this run started, is not finished yet: call finish_queue_item for it (done once its call is recorded, or failed with why) before starting another`);
+    }
+    if (item.state === "running") {
+      if (by && item.runner && item.runner !== by.runner) throw new QueueRefusal("BUSY", `${symbol4} is being analysed now by another run: one stock runs at a time`);
+      return { list: list2, result: item };
+    }
     if (item.state !== "waiting") throw new QueueRefusal("NOT_WAITING", `${symbol4} is not waiting (it is ${item.state}): the person presses Retry to ask again`);
-    const started = { ...item, state: "running", date: date5, startedAt: now.toISOString() };
+    const started = { ...item, state: "running", date: date5, startedAt: now.toISOString(), ...signed3(by) };
     delete started.endedAt;
     delete started.rating;
     delete started.reason;
     delete started.quiet;
     delete started.already;
+    if (!by) {
+      delete started.runner;
+      delete started.pid;
+    }
     return { list: list2.map((i) => i === item ? started : i), result: started };
   });
 }
-function finishItem(dir, raw, outcome, now = /* @__PURE__ */ new Date()) {
+function finishItem(dir, raw, outcome, now = /* @__PURE__ */ new Date(), by) {
   const symbol4 = safeSymbol(raw);
   return change2(dir, now, (list2) => {
     const item = list2.find((i) => i.symbol === symbol4);
     if (!item) throw new QueueRefusal("NOT_ON_LIST", `${symbol4} is not on the waiting list`);
-    if (!open2(item) && !item.quiet) throw new QueueRefusal("FINISHED", `${symbol4} is already ${item.state}`);
-    const finished = "rating" in outcome ? { ...item, state: "done", rating: words(outcome.rating, 30) ?? "recorded", endedAt: now.toISOString(), ...outcome.already ? { already: true } : {} } : { ...item, state: "failed", reason: words(outcome.reason, 300) ?? "no reason was given", endedAt: now.toISOString() };
+    if (fromJournal.has(item) && !("rating" in outcome)) throw new QueueRefusal("FINISHED", `${symbol4} is already done: its call (${item.rating}) is in the journal`);
+    if (!open2(item) && !item.quiet && !fromJournal.has(item)) throw new QueueRefusal("FINISHED", `${symbol4} is already ${item.state}`);
+    const who = item.state === "waiting" ? signed3(by) : {};
+    const finished = "rating" in outcome ? { ...item, ...who, state: "done", rating: words(outcome.rating, 30) ?? "recorded", endedAt: now.toISOString(), ...outcome.already ? { already: true } : {} } : { ...item, ...who, state: "failed", reason: words(outcome.reason, 300) ?? "no reason was given", endedAt: now.toISOString() };
     if (finished.state === "done") delete finished.reason;
     else delete finished.rating;
     delete finished.quiet;
@@ -40557,8 +40598,8 @@ function readListener(dir, now = /* @__PURE__ */ new Date()) {
       const result = words([how, words(last.result, 200)].filter(Boolean).join(": "), 200) ?? "finished";
       if (began) note.lastRun = ended && Date.parse(began) <= Date.parse(ended) ? { started: began, at: ended, result } : { at: began, result, startOnly: true };
     } else {
-      const lastAt = iso(last?.at), result = words(last?.result, 200), started = iso(last?.started);
-      if (lastAt && result) note.lastRun = { ...started && Date.parse(started) <= Date.parse(lastAt) ? { started } : {}, at: lastAt, result };
+      const lastAt = iso(last?.at), result = words(last?.result, 200), started = iso(last?.started), runner = typeof last?.runner === "string" && RUNNER_ID.test(last.runner) ? last.runner : void 0;
+      if (lastAt && result) note.lastRun = { ...started && Date.parse(started) <= Date.parse(lastAt) ? { started } : {}, at: lastAt, result, ...runner ? { runner } : {} };
     }
     return note;
   } catch {
@@ -40602,10 +40643,20 @@ function buildPlan(root, req, ws = workspaceOf(root)) {
   if (req.restart) deleteRun(dir, symbol4, day3);
   const done = progress(dir, symbol4, day3), saved = savedPlan(dir, symbol4, day3);
   const resumed = Object.keys(done).length > 0 && !!saved?.analysts;
-  let analysts, debateRounds, riskRounds, language;
+  let analysts, debateRounds, riskRounds, language, reRounded = false;
+  const asked = ws.sweep ? void 0 : readQueue(dir).find((i) => i.symbol === symbol4 && i.state === "running" && i.date === day3);
+  const askedRounds = () => asked?.depth ? [DEPTHS[asked.depth], DEPTHS[asked.depth]] : [s.analysis.debateRounds, s.analysis.riskRounds];
+  const askedWords = () => asked?.depth ? `${asked.depth} depth` : "the settings' depth";
   if (resumed) {
     ({ analysts, debateRounds, riskRounds, language } = saved);
     notes.push(`Resuming the run started earlier for ${symbol4} on ${day3}, with its original plan (${analysts.join(", ")}; ${debateRounds} debate and ${riskRounds} risk round(s); ${language}). To start over, plan again with restart.`);
+    const [d, r] = asked ? askedRounds() : [debateRounds, riskRounds];
+    if (d !== debateRounds || r !== riskRounds) {
+      notes.push(`${symbol4} was asked for again on the dashboard at ${askedWords()}, so the run resumes with ${d} debate and ${r} risk round(s), not the ${debateRounds} and ${riskRounds} it started with.`);
+      debateRounds = d;
+      riskRounds = r;
+      reRounded = true;
+    }
   } else {
     if (req.analysts) {
       const unknown2 = req.analysts.filter((a) => !ANALYSTS.includes(a));
@@ -40621,10 +40672,9 @@ function buildPlan(root, req, ws = workspaceOf(root)) {
     for (const [name, v] of [["debate rounds", req.debateRounds], ["risk rounds", req.riskRounds]]) if (v !== void 0 && !(Number.isInteger(v) && v >= 1 && v <= 5)) throw new Error(`${name} must be a whole number from 1 to 5`);
     debateRounds = req.debateRounds ?? s.analysis.debateRounds;
     riskRounds = req.riskRounds ?? s.analysis.riskRounds;
-    const asked = ws.sweep ? void 0 : readQueue(dir).find((i) => i.symbol === symbol4 && i.state === "running" && i.date === day3);
     if (asked) {
-      const [d, r] = asked.depth ? [DEPTHS[asked.depth], DEPTHS[asked.depth]] : [s.analysis.debateRounds, s.analysis.riskRounds];
-      if ((req.debateRounds ?? d) !== d || (req.riskRounds ?? r) !== r) notes.push(`${symbol4} was asked for on the dashboard at ${asked.depth ? `${asked.depth} depth` : "the settings' depth"}, so it runs ${d} debate and ${r} risk round(s), not the ${debateRounds} and ${riskRounds} asked for here.`);
+      const [d, r] = askedRounds();
+      if ((req.debateRounds ?? d) !== d || (req.riskRounds ?? r) !== r) notes.push(`${symbol4} was asked for on the dashboard at ${askedWords()}, so it runs ${d} debate and ${r} risk round(s), not the ${debateRounds} and ${riskRounds} asked for here.`);
       debateRounds = d;
       riskRounds = r;
     }
@@ -40639,7 +40689,7 @@ function buildPlan(root, req, ws = workspaceOf(root)) {
     notes.push("Its debate began before the desk had a fact checker, so its reports go on unchecked.");
   }
   plan.steps = steps.map((st) => ({ ...st, done: (done[st.section] ?? 0) >= st.turn }));
-  if (!resumed) startRun(dir, symbol4, day3, plan);
+  if (!resumed || reRounded) startRun(dir, symbol4, day3, plan);
   const ctx = runContext(root, ws, symbol4, day3);
   saveContext(dir, symbol4, day3, ctx);
   return { plan, ...ctx, resumed };
@@ -41312,6 +41362,7 @@ function queueTop(dir, screen, day3, ring, now = /* @__PURE__ */ new Date(), fro
       break;
     }
   }
+  if (!queued.length && screen.unavailable.length) return [];
   keep2(dir, { ...screen, queued: { day: day3, symbols: queued } });
   if (queued.length && ring) ringDoorbell(dir, "press", now);
   return queued;
@@ -41439,8 +41490,10 @@ var reratedToday = (dir, today2) => {
 };
 var lastView = (s) => s.called ? `its latest view: ${s.rating ?? "a call"} on ${s.called}` : s.tried ? `the desk has no view of it yet: the re-rating of ${s.tried} left no call on it, so it may not be one the desk can analyse` : "the desk has no view of it yet";
 function morningList(dir, today2, max, screen = null) {
-  const called = new Set(new Journal(path19.join(dir, "journal.md")).load().filter((e) => e.date === today2).map((e) => e.ticker));
-  const queue2 = readQueue(dir), running = queue2.find((q) => q.state === "running")?.symbol ?? null;
+  const entries = new Journal(path19.join(dir, "journal.md")).load(), latest = /* @__PURE__ */ new Map();
+  for (const e of entries) if ((latest.get(e.ticker) ?? "") < e.date) latest.set(e.ticker, e.date);
+  const called = new Set(entries.filter((e) => e.date === today2).map((e) => e.ticker));
+  const queue2 = readQueue(dir), running = queue2.find((q) => q.state === "running")?.symbol ?? null, leftToRun = [];
   const wanted = [], seen = new Set(running ? [running] : []);
   const add = (symbol4, why2, queued) => {
     if (!seen.has(symbol4) && !called.has(symbol4)) {
@@ -41454,9 +41507,40 @@ function morningList(dir, today2, max, screen = null) {
     if (r) return `a holding re-rated this ${weekday2(today2) === "Monday" ? "Monday" : "week"} (${lastView(r)}), ${q.depth ?? "shallow"} depth`;
     return bySwitch.has(q.symbol) ? `worth a look today, put on the list by the morning switch, ${q.depth ?? "shallow"} depth` : `asked for on the dashboard, ${q.depth ?? "the settings'"} depth`;
   };
-  for (const q of queue2) if (q.state === "waiting") add(q.symbol, why(q), true);
-  for (const w of readWatchlist(dir)) if (w.favourite && !w.symbol.startsWith("^")) add(w.symbol, "a starred watchlist stock", false);
-  return { analyse: wanted.slice(0, max), later: wanted.slice(max).map((w) => w.symbol), calledToday: [...called], running };
+  for (const q of queue2) {
+    if (q.state !== "waiting") continue;
+    if (running && !called.has(q.symbol)) {
+      leftToRun.push(q.symbol);
+      seen.add(q.symbol);
+    } else add(q.symbol, why(q), true);
+  }
+  const starred = readWatchlist(dir).filter((w) => w.favourite && !w.symbol.startsWith("^")).map((w, i) => ({ symbol: w.symbol, i, last: latest.get(w.symbol) ?? "" }));
+  starred.sort((a, b) => a.last.localeCompare(b.last) || a.i - b.i);
+  for (const w of starred) add(w.symbol, "a starred watchlist stock", false);
+  return { analyse: wanted.slice(0, max), later: wanted.slice(max).map((w) => w.symbol), calledToday: [...called], running, leftToRun };
+}
+function whereNow(symbols, m2, max) {
+  const step2 = new Set(m2.analyse.map((a) => a.symbol)), called = new Set(m2.calledToday), left = new Set(m2.leftToRun), later = new Set(m2.later);
+  const groups = [
+    { words: () => "analysed in step 2", names: symbols.filter((s) => step2.has(s)) },
+    { words: () => "being analysed now by another run", names: symbols.filter((s) => s === m2.running) },
+    { words: () => "already called today, so not analysed again", names: symbols.filter((s) => !step2.has(s) && s !== m2.running && called.has(s)) },
+    { words: () => `left on the dashboard to the run analysing ${m2.running} (one stock runs at a time)`, names: symbols.filter((s) => !called.has(s) && left.has(s)) },
+    { words: (n2) => `over today's limit of ${max}, so ${n2 === 1 ? "it waits" : "they wait"} on the dashboard`, names: symbols.filter((s) => !called.has(s) && later.has(s)) }
+  ];
+  const told = new Set(groups.flatMap((g) => g.names));
+  groups.push({ words: () => "no longer waiting on the dashboard", names: symbols.filter((s) => !told.has(s)) });
+  return groups.filter((g) => g.names.length).map((g) => `${g.words(g.names.length)}: ${g.names.join(", ")}`);
+}
+var allInStep2 = (symbols, m2) => symbols.every((s) => m2.analyse.some((a) => a.symbol === s));
+var sentence = (fragments) => fragments.length ? ` ${fragments.join("; ").replace(/^./, (c) => c.toUpperCase())}.` : "";
+var dayIn2 = (now, zone) => new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+var timeIn = (now, zone) => new Intl.DateTimeFormat("en-GB", { timeZone: zone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(now);
+function clockLines(today2, clock2) {
+  if (!clock2 || marketDay(clock2.now) !== today2) return [];
+  const local = dayIn2(clock2.now, clock2.zone);
+  if (local === today2) return [];
+  return [`The desk's day is New York's: there it is ${weekday2(today2)} ${today2}, ${timeIn(clock2.now, "America/New_York")}, while on this computer it is ${local > today2 ? "already" : "still"} ${weekday2(local)} ${local}. This brief is for New York's ${weekday2(today2)}. Say so at the end: the routine runs by this computer's clock, so its time may need moving for New York's day.`];
 }
 var holdingsLine = (dir) => {
   const h = readHoldings(dir);
@@ -41468,7 +41552,7 @@ function quietNews(news) {
   if (!news || !news.read) return "";
   return news.unread.length ? ", no news today about the other companies and coins the person watches" : ", no news today about the companies and coins the person watches";
 }
-function lookLines(look, today2) {
+function lookLines(look, today2, m2, max) {
   if (!look) return [];
   if (!look.screen) return ["", `   Worth a look today: unavailable (${look.failed ?? "it could not be worked out"}). Say so at the end.`];
   const s = look.screen, of = (p) => sessionWords(p.session, p.live), sessions = new Set(s.picks.map(of));
@@ -41479,11 +41563,11 @@ function lookLines(look, today2) {
   if (s.unavailable.length) out.push(`   Could not be read: ${s.unavailable.join(", ")}.`);
   if (s.news?.unread.length) out.push(`   News could not be read just now for ${s.news.unread.join(", ")}: whether ${s.news.unread.length === 1 ? "it is" : "they are"} in the news today is not known. Never say "no news" for ${s.news.unread.length === 1 ? "it" : "them"}.`);
   const queued = s.queued?.day === today2 ? s.queued.symbols : [];
-  out.push(look.on ? `   The person's switch "Analyse the top ${TOP_QUEUED} each market morning" is on${queued.length ? `: ${queued.join(", ")} ${queued.length === 1 ? "was" : "were"} put on the waiting list at shallow depth, and ${queued.length === 1 ? "is" : "are"} analysed in step 2` : ": nothing more went on the waiting list today"}.` : `   The person's switch "Analyse the top ${TOP_QUEUED} each market morning" is off: this list is for the person to read, not for you to analyse.`);
+  out.push(look.on ? `   The person's switch "Analyse the top ${TOP_QUEUED} each market morning" is on${queued.length ? `: ${queued.join(", ")} ${queued.length === 1 ? "was" : "were"} put on the waiting list at shallow depth${allInStep2(queued, m2) ? `, and ${queued.length === 1 ? "is" : "are"} analysed in step 2` : `; ${whereNow(queued, m2, max).join("; ")}`}` : ": nothing more went on the waiting list today"}.` : `   The person's switch "Analyse the top ${TOP_QUEUED} each market morning" is off: this list is for the person to read, not for you to analyse.`);
   out.push("   In step 4, give this list in a line or two, with its reasons.");
   return out;
 }
-function rerateLines(dir, today2) {
+function rerateLines(dir, today2, m2, max) {
   const held = readHoldings(dir), r = readRerate(dir), ran = r?.day === today2, done = ran ? r.symbols : [], due = dueForRerate(dir, today2);
   const day3 = weekday2(today2), monday = day3 === "Monday" ? "" : ` (on ${day3}: Monday was a New York market holiday)`;
   const head2 = `   Monday's re-rating${monday}, of the holdings the desk sizes trades to`;
@@ -41491,7 +41575,7 @@ function rerateLines(dir, today2) {
   if (held.source === "robinhood" && !held.accounts?.some((a) => a.tradable)) return ["", `${head2}: the Agentic account is not among the accounts shown on the dashboard, so nothing was re-rated. Say so at the end.`];
   if (!held.positions.length) return ["", `${head2}: nothing is held, so there is nothing to re-rate.`];
   const out = [""], names = due.map((s) => s.symbol).join(", "), are = due.length === 1 ? "is" : "are";
-  if (done.length) out.push(`${head2}: ${done.map((s) => `${s.symbol} (${lastView(s)})`).join(", ")} ${done.length === 1 ? "was" : "were"} put on the waiting list at shallow depth, for a view under ${RERATE_DAYS} days old (at most ${RERATE_MAX} a week). ${done.length === 1 ? "It is" : "They are"} analysed in step 2 with the rest of the list.`);
+  if (done.length) out.push(`${head2}: ${done.map((s) => `${s.symbol} (${lastView(s)})`).join(", ")} ${done.length === 1 ? "was" : "were"} put on the waiting list at shallow depth, for a view under ${RERATE_DAYS} days old (at most ${RERATE_MAX} a week).${allInStep2(done.map((s) => s.symbol), m2) ? ` ${done.length === 1 ? "It is" : "They are"} analysed in step 2 with the rest of the list.` : sentence(whereNow(done.map((s) => s.symbol), m2, max))}`);
   else if (due.length && ran && r.full) out.push(`${head2}: ${names} ${are} due, but the waiting list was full, so nothing went on it. Say so at the end.`);
   else if (due.length && ran) out.push(`${head2}: ${names} ${are} due now, but the re-rating ran earlier today, when ${due.length === 1 ? "it was" : "they were"} not due, and it runs once a week: left for next week's re-rating. Say so at the end.`);
   else if (due.length) out.push(`${head2}: ${names} ${are} due, but the re-rating could not put ${due.length === 1 ? "it" : "them"} on the waiting list today. Say so at the end.`);
@@ -41499,9 +41583,9 @@ function rerateLines(dir, today2) {
   if (done.length && due.length) out.push(`   Due as well, left for next week's re-rating${r?.full ? " (the waiting list was full)" : ""}: ${due.map((s) => s.symbol).join(", ")}.`);
   return out;
 }
-function closedBrief(dir, today2, why) {
+function closedBrief(dir, today2, why, clock2) {
   const waiting = readQueue(dir).filter((q) => q.state === "waiting").map((q) => q.symbol), next = nextMarketDay(today2);
-  const lines = [`MORNING ROUTINE for ${weekday2(today2)} ${today2}.`, `New York's market is closed today (${why}): score past calls (step 1), then stop. Analyse nothing in this routine today; the next market day is ${weekday2(next)} ${next}.`];
+  const lines = [`MORNING ROUTINE for ${weekday2(today2)} ${today2}.`, ...clockLines(today2, clock2), `New York's market is closed today (${why}): score past calls (step 1), then stop. Analyse nothing in this routine today; the next market day is ${weekday2(next)} ${next}.`];
   lines.push("", `1. Score past calls first: list_settlements, then record_outcome with a lesson for each READY call (the /settle playbook). ${LEFT_CALLS}`);
   lines.push("", "2. Analyse nothing today: the market is closed.");
   if (waiting.length) lines.push(`   Left on the dashboard's waiting list: ${waiting.join(", ")}. Do not start them from this routine.`);
@@ -41510,17 +41594,31 @@ function closedBrief(dir, today2, why) {
   return lines.join("\n");
 }
 var unknownHolidays = (today2) => holidaysKnown(today2) ? [] : ["", `   New York's market holidays for ${today2.slice(0, 4)} are not in the desk's list, so a weekday is taken as a market day. If the market is closed today, say so. Say at the end that the list needs that year added.`];
-function morningBrief(dir, today2, max, look) {
+function doneAlready(dir, today2) {
+  const calls = new Map(new Journal(path19.join(dir, "journal.md")).load().filter((e) => e.date === today2).map((e) => [e.ticker, e.rating]));
+  const marked = /* @__PURE__ */ new Set();
+  for (const q of readQueue(dir)) {
+    const rating = calls.get(q.symbol);
+    if (q.state !== "waiting" || !rating) continue;
+    try {
+      finishItem(dir, q.symbol, { rating, already: true });
+      marked.add(q.symbol);
+    } catch {
+    }
+  }
+  return marked;
+}
+function morningBrief(dir, today2, max, look, clock2) {
   const closed = marketClosed(today2);
-  if (closed) return closedBrief(dir, today2, closed);
-  const day3 = weekday2(today2);
+  if (closed) return closedBrief(dir, today2, closed, clock2);
+  const day3 = weekday2(today2), marked = doneAlready(dir, today2);
   const m2 = morningList(dir, today2, max, look?.screen ?? null);
-  const lines = [`MORNING ROUTINE for ${day3} ${today2}.`];
+  const lines = [`MORNING ROUTINE for ${day3} ${today2}.`, ...clockLines(today2, clock2)];
   lines.push(...unknownHolidays(today2));
   lines.push("", `1. Score past calls first: list_settlements, then record_outcome with a lesson for each READY call (the /settle playbook). ${LEFT_CALLS}`);
-  if (isRerateDay(today2)) lines.push(...rerateLines(dir, today2));
-  lines.push(...lookLines(look, today2));
-  if (m2.running) lines.push("", `   ${m2.running} is being analysed now by another run: leave it alone.`);
+  if (isRerateDay(today2)) lines.push(...rerateLines(dir, today2, m2, max));
+  lines.push(...lookLines(look, today2, m2, max));
+  if (m2.running) lines.push("", `   ${m2.running} is being analysed now by another run: leave it alone.${m2.leftToRun.length ? ` Waiting on the dashboard, left to that run (one stock runs at a time): ${m2.leftToRun.join(", ")}. Do not start them from this routine.` : ""}`);
   if (!m2.analyse.length) lines.push("", "2. Nothing to analyse: no stock is waiting on the dashboard and no starred watchlist stock is without a call today. Say so.");
   else {
     lines.push("", `2. Analyse, one after another, in this order (${m2.analyse.length} of at most ${max} a morning), each by the /analyse playbook with today's date:`);
@@ -41530,19 +41628,24 @@ function morningBrief(dir, today2, max, look) {
   const waitingNow = new Set(readQueue(dir).filter((q) => q.state === "waiting").map((q) => q.symbol));
   const laterWaiting = m2.later.filter((s) => waitingNow.has(s)), laterStarred = m2.later.filter((s) => !waitingNow.has(s));
   if (laterWaiting.length) lines.push(`   Over the limit of ${max}, still waiting on the dashboard: ${laterWaiting.join(", ")}. Not left for another morning: end_queue_run asks for another run, which starts at once when something listens on this computer.`);
-  if (laterStarred.length) lines.push(`   Left for another morning, over the limit of ${max}: ${laterStarred.join(", ")}.`);
-  if (m2.calledToday.length) lines.push(`   Already called today, so not analysed again: ${m2.calledToday.join(", ")}.`);
+  if (laterStarred.length) lines.push(`   Left for another morning, over the limit of ${max}: ${laterStarred.join(", ")}. Starred stocks take turns: the ones whose latest call is oldest go first.`);
+  if (m2.calledToday.length) lines.push(`   Already called today, so not analysed again: ${m2.calledToday.map((s) => marked.has(s) ? `${s} (it was waiting on the dashboard: marked done there, with that call's rating)` : s).join(", ")}.`);
   if (m2.analyse.some((a) => a.queued) || laterWaiting.length) lines.push("   Last, call end_queue_run once: it asks for another run when stocks are still waiting on the dashboard.");
   lines.push("", `3. ${holdingsLine(dir)}`);
   lines.push("", `4. Finish with a short plain list: each new call (stock, rating, one sentence of its executive summary; for a re-rated holding, its new rating beside its last one), anything skipped and why, and any data that was unavailable. Then: decide on the dashboard ("Decide\u2026" on a call); only the person's own Confirm there places an order. A Sell or Underweight on a holding of the Agentic account shows there as "the desk says sell", with a Sell button that opens a ticket: nothing is ever sold by itself. Not investment advice.`);
   lines.push("", "No one may be watching: do not wait for an answer. If a step needs the person (for example no contact email is saved), skip what depends on it and say so at the end.");
   return lines.join("\n");
 }
+function openStill(today2, now) {
+  if (marketDay(now) !== today2 || marketClosed(today2)) return [];
+  const at = timeIn(now, "America/New_York");
+  return at >= "16:00" ? [] : [`New York's market has not closed yet today: it is ${at} there. The day's calls and orders below are those so far; say so at the end.`];
+}
 function eveningBrief(dir, today2, now, stops) {
   const calls = new Journal(path19.join(dir, "journal.md")).load();
   const todays = calls.filter((e) => e.date === today2), pending = calls.filter((e) => e.pending).length;
   const orders = ordersOn(dir, now);
-  const lines = [`EVENING WRAP-UP for ${weekday2(today2)} ${today2}.`, "", `1. Score what is ready: list_settlements, then record_outcome with a lesson for each READY call (the /settle playbook). ${LEFT_CALLS}`, ""];
+  const lines = [`EVENING WRAP-UP for ${weekday2(today2)} ${today2}.`, ...openStill(today2, now), "", `1. Score what is ready: list_settlements, then record_outcome with a lesson for each READY call (the /settle playbook). ${LEFT_CALLS}`, ""];
   lines.push(todays.length ? `2. The desk's calls today (${todays.length}): ${todays.map((e) => `${e.ticker} ${e.rating}`).join(", ")}. Read each one's executive summary with read_run (section decision) for one sentence each.` : "2. The desk made no call today.");
   lines.push("");
   if (!orders.length) lines.push("3. The dashboard sent no order today.");
@@ -41721,14 +41824,23 @@ function registerDeskTools(server, root) {
   const dir = deskDataDir(root);
   const write = { readOnlyHint: false, openWorldHint: false };
   const activeFile = path21.join(dir, "backtest", "active.json"), IDLE_MS = 2 * 36e5;
-  const getSweep = () => {
+  const strings = (v) => Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
+  const activeSweep = () => {
     try {
       const a = JSON.parse(fs18.readFileSync(activeFile, "utf8"));
-      if (typeof a.sweep === "string" && SWEEP_ID.test(a.sweep) && typeof a.at === "number" && Date.now() - a.at < IDLE_MS) return a.sweep;
+      if (typeof a.sweep !== "string" || !SWEEP_ID.test(a.sweep) || typeof a.at !== "number" || Date.now() - a.at >= IDLE_MS) return null;
+      let cells2 = /* @__PURE__ */ new Set();
+      try {
+        const g = JSON.parse(fs18.readFileSync(path21.join(workspaceOf(root, a.sweep).dir, "sweep.json"), "utf8"));
+        cells2 = new Set(strings(g.symbols).flatMap((s) => strings(g.dates).map((d) => `${s}|${d}`)));
+      } catch {
+      }
+      return { id: a.sweep, cells: cells2 };
     } catch {
+      return null;
     }
-    return null;
   };
+  const getSweep = () => activeSweep()?.id ?? null;
   const setSweep = (id) => {
     if (id === null) {
       fs18.rmSync(activeFile, { force: true });
@@ -41737,11 +41849,18 @@ function registerDeskTools(server, root) {
     fs18.mkdirSync(path21.dirname(activeFile), { recursive: true });
     writeWhole(activeFile, JSON.stringify({ sweep: id, at: Date.now() }));
   };
-  const ws = () => {
-    const id = getSweep();
+  const sweepOfCell = (sym2, day3) => {
+    const s = activeSweep();
+    return s?.cells.has(`${safeSymbol(sym2)}|${day3}`) ? s.id : null;
+  };
+  const wsFor = (sym2, day3) => {
+    const id = sweepOfCell(sym2, day3);
     if (id) setSweep(id);
     return workspaceOf(root, id);
   };
+  const live = () => workspaceOf(root);
+  const scored = (sweep) => sweep ? workspaceOf(root, sweep) : live();
+  const sweepArg = external_exports.string().max(40).optional().describe("Only inside a backtest: the sweep_id whose calls to score (the /backtest playbook gives it). Left out: the live journal's calls, the person's own");
   server.registerTool("plan_analysis", {
     title: "Plan an analysis",
     description: "Draw up the plan for analysing a stock on a date, before any agent speaks: the instrument, the analysts that run, the debate rounds, the report language, the window and yardstick the call will be scored by (a short first check, not its time horizon), what the person holds, the lessons from past calls, and - for a run that stopped half way - the next step. Refused with NEEDS_EMAIL until the person has given their email. Call it first, and follow it.",
@@ -41755,15 +41874,18 @@ function registerDeskTools(server, root) {
       restart: external_exports.boolean().optional().describe("Throw away an earlier unfinished run of this stock and day and start over")
     },
     annotations: write
-  }, async (a) => act(() => (getSweep() ? `[Backtest sweep ${getSweep()}: this run is recorded in the sweep's own journal, not the live one.]
-` : "") + renderPlan(buildPlan(root, { symbol: a.symbol, analysisDate: a.analysis_date, analysts: a.analysts, debateRounds: a.debate_rounds, riskRounds: a.risk_rounds, language: a.language, restart: a.restart }, ws()))));
+  }, async (a) => act(() => {
+    const w = wsFor(a.symbol, analysisDate(a.analysis_date));
+    return (w.sweep ? `[Backtest sweep ${w.sweep}: this run is recorded in the sweep's own journal, not the live one.]
+` : "") + renderPlan(buildPlan(root, { symbol: a.symbol, analysisDate: a.analysis_date, analysts: a.analysts, debateRounds: a.debate_rounds, riskRounds: a.risk_rounds, language: a.language, restart: a.restart }, w));
+  }));
   server.registerTool("save_run_section", {
     title: "Save a run section",
     description: `Save what you wrote for your step of an analysis, so the next agent reads it from the desk and a stopped run can resume. section is one of ${SECTIONS.join(", ")}. A debate turn (bull, bear, aggressive, conservative, neutral) is added; any other section replaces the earlier text.`,
     inputSchema: { symbol: symbol2, analysis_date: day2, section: external_exports.enum(SECTIONS), text: external_exports.string().min(1).max(6e4) },
     annotations: write
   }, async (a) => act(() => {
-    const d = analysisDate(a.analysis_date), turns = saveSection(ws().dir, a.symbol, d, a.section, a.text);
+    const d = analysisDate(a.analysis_date), turns = saveSection(wsFor(a.symbol, d).dir, a.symbol, d, a.section, a.text);
     return `Saved ${a.section} for ${safeSymbol(a.symbol)} on ${d} (${turns > 1 ? `turn ${turns}` : "one text"}).`;
   }));
   server.registerTool("correct_report", {
@@ -41782,7 +41904,7 @@ function registerDeskTools(server, root) {
     },
     annotations: write
   }, async (a) => act(() => {
-    const d = analysisDate(a.analysis_date), lines = correctSection(ws().dir, a.symbol, d, a.section, a.corrections, a.flag_after);
+    const d = analysisDate(a.analysis_date), lines = correctSection(wsFor(a.symbol, d).dir, a.symbol, d, a.section, a.corrections, a.flag_after);
     return [`The ${a.section} report for ${safeSymbol(a.symbol)} on ${d}:`, ...lines].join("\n");
   }));
   server.registerTool("read_run", {
@@ -41791,12 +41913,9 @@ function registerDeskTools(server, root) {
     inputSchema: { symbol: symbol2, analysis_date: day2, sections: external_exports.array(external_exports.enum([...SECTIONS, ...DEBATES2, ...CONTEXT])).optional() },
     annotations: { readOnlyHint: true, openWorldHint: false }
   }, async (a) => act(() => {
-    const d = analysisDate(a.analysis_date);
-    if (a.sections?.length) {
-      const w = ws();
-      return readSections(w.dir, a.symbol, d, a.sections, () => runContext(root, w, safeSymbol(a.symbol), d));
-    }
-    const p = progress(ws().dir, a.symbol, d);
+    const d = analysisDate(a.analysis_date), w = wsFor(a.symbol, d);
+    if (a.sections?.length) return readSections(w.dir, a.symbol, d, a.sections, () => runContext(root, w, safeSymbol(a.symbol), d));
+    const p = progress(w.dir, a.symbol, d);
     return Object.keys(p).length ? `Written so far for ${safeSymbol(a.symbol)} on ${d}: ${Object.entries(p).map(([k, n2]) => `${k} (${n2})`).join(", ")}` : `Nothing written yet for ${safeSymbol(a.symbol)} on ${d}.`;
   }));
   server.registerTool("write_report", {
@@ -41805,12 +41924,12 @@ function registerDeskTools(server, root) {
     inputSchema: { symbol: symbol2, analysis_date: day2 },
     annotations: write
   }, async (a) => act(() => {
-    const d = analysisDate(a.analysis_date), sym2 = safeSymbol(a.symbol), plan = savedPlan(ws().dir, sym2, d);
-    if (!progress(ws().dir, sym2, d)["decision"]) throw new Error(`the portfolio manager's decision is not saved yet for ${sym2} on ${d}`);
-    const rating = parseRating(readSections(ws().dir, sym2, d, ["decision"]));
+    const d = analysisDate(a.analysis_date), sym2 = safeSymbol(a.symbol), w = wsFor(sym2, d), plan = savedPlan(w.dir, sym2, d);
+    if (!progress(w.dir, sym2, d)["decision"]) throw new Error(`the portfolio manager's decision is not saved yet for ${sym2} on ${d}`);
+    const rating = parseRating(readSections(w.dir, sym2, d, ["decision"]));
     const header = [`Rating: ${rating}`, `Generated: ${(/* @__PURE__ */ new Date()).toISOString().slice(0, 16).replace("T", " ")} UTC`];
     if (plan?.analysts) header.push(`Analysts: ${plan.analysts.join(", ")}; research debate rounds ${plan.debateRounds}, risk debate rounds ${plan.riskRounds}; language ${plan.language}`, `Scored: ${scoredWords(plan)}`);
-    const file5 = writeReport(ws().dir, sym2, d, header);
+    const file5 = writeReport(w.dir, sym2, d, header);
     return `Report written: ${file5}
 Rating: ${rating}`;
   }));
@@ -41820,35 +41939,35 @@ Rating: ${rating}`;
     inputSchema: { symbol: symbol2, analysis_date: day2, rating: external_exports.enum(RATINGS).optional() },
     annotations: write
   }, async (a) => act(() => {
-    const d = analysisDate(a.analysis_date), sym2 = safeSymbol(a.symbol);
-    const decision = readSections(ws().dir, sym2, d, ["decision"]);
-    if (!progress(ws().dir, sym2, d)["decision"]) throw new Error(`the portfolio manager's decision is not saved yet for ${sym2} on ${d}`);
+    const d = analysisDate(a.analysis_date), sym2 = safeSymbol(a.symbol), w = wsFor(sym2, d);
+    const decision = readSections(w.dir, sym2, d, ["decision"]);
+    if (!progress(w.dir, sym2, d)["decision"]) throw new Error(`the portfolio manager's decision is not saved yet for ${sym2} on ${d}`);
     const body = decision.replace(/^## [^\n]*\n/, "");
-    const rules = savedPlan(ws().dir, sym2, d)?.window ?? rulesFor(sym2, readSettings(root).scoring);
-    const r = journalOf(root, ws()).storeDecision(sym2, d, body, a.rating ?? void 0, rules, /* @__PURE__ */ new Date());
+    const rules = savedPlan(w.dir, sym2, d)?.window ?? rulesFor(sym2, readSettings(root).scoring);
+    const r = journalOf(root, w).storeDecision(sym2, d, body, a.rating ?? void 0, rules, /* @__PURE__ */ new Date());
     const rating = parseRating(body);
     return r === "stored" ? `Recorded: ${sym2} on ${d}, ${rating}, pending. It will be scored as ${checkWords(sym2, rules)}, kept with the call so a later change to the settings does not change it. It is not the call's own time horizon. ${WHEN_SCORED} Until then it stays pending: for the ${windowWords(rules)} after the call, and after them until a scoring runs.` : `${sym2} on ${d} is already in the journal; nothing changed.`;
   }));
   server.registerTool("list_settlements", {
     title: "Pending calls",
     description: "List the calls in the journal that are not settled yet. For each whose scoring window has passed (the window kept with the call: a short first check, not the call's own time horizon), it shows the measured outcome (return, its yardstick's return, alpha), the decision, and what happened in the window day by day (the stock's prices, volume and main indicators beside the yardstick's close), so you can write the lesson from what happened; the others are marked NOT YET. A call record_outcome failed to settle twice in this scoring is LEFT: named, not shown, and left pending. The figures come from price rows only.",
-    inputSchema: { symbol: symbol2.optional() },
+    inputSchema: { symbol: symbol2.optional(), sweep_id: sweepArg },
     annotations: { readOnlyHint: true, openWorldHint: true }
-  }, async (a) => act(() => dueSettlements(journalOf(root, ws()), readSettings(root).scoring, a.symbol ? safeSymbol(a.symbol) : void 0)));
+  }, async (a) => act(() => dueSettlements(journalOf(root, scored(a.sweep_id)), readSettings(root).scoring, a.symbol ? safeSymbol(a.symbol) : void 0)));
   server.registerTool("record_outcome", {
     title: "Settle a call",
     description: 'Settle one pending call whose window has finished: the desk measures the outcome again itself and keeps it with your lesson. Give only the lesson - 2 to 4 plain sentences (the desk counts them and refuses more than 4) naming what the alpha shows, what part of the thesis it supports or undercuts, and one thing to do next time. The row marked "entry" is the close the call is scored from, not a session of the window. Say what happened in the window only as its rows from list_settlements show it, naming the day; never pass or invent a number. Failing a second time for the same call in this scoring, it answers LEFT: leave that call pending and go on. The same call sent again after that with no call settled since answers STOP: leave it too.',
     // The desk checks the length itself (under 1200 characters), so a refusal is counted and said in plain words: one
     // refused by these input rules never reaches it, and could be sent round again and again.
-    inputSchema: { symbol: symbol2, trade_date: day2, lesson: external_exports.string().max(8e3).describe("The lesson: 2 to 4 plain sentences, under 1200 characters") },
+    inputSchema: { symbol: symbol2, trade_date: day2, lesson: external_exports.string().max(8e3).describe("The lesson: 2 to 4 plain sentences, under 1200 characters"), sweep_id: sweepArg },
     annotations: { readOnlyHint: false, openWorldHint: true }
-  }, async (a) => act(() => settleOne(journalOf(root, ws()), readSettings(root).scoring, safeSymbol(a.symbol), a.trade_date, a.lesson)));
+  }, async (a) => act(() => settleOne(journalOf(root, scored(a.sweep_id)), readSettings(root).scoring, safeSymbol(a.symbol), a.trade_date, a.lesson)));
   server.registerTool("recheck_lessons", {
     title: "Lessons to re-check",
     description: "Find the settled calls whose lesson was not written from the holding window's prices (written before the desk showed them, when they could not be had, or marked unreliable before), or that the person said is wrong (flag_lesson). Up to three at a time are shown to rewrite: the call's score and its yardstick's return over the same days, which stay as they are, the decision, the lesson as it stands, what the person said is wrong (for a flagged one), and the window's entry and finished sessions day by day; call again once those are saved for the next ones. A call whose window's prices cannot be had is marked unreliable by the desk itself, so later analyses stop reading its lesson. A lesson correct_lesson refused twice in this re-check is LEFT, named but not shown; the same lessons asked for again with nothing saved since answer STOP. With nothing left to rewrite, its last words say what a later re-check does. Never changes a call, its rating or its score.",
     inputSchema: { symbol: symbol2.optional() },
     annotations: { readOnlyHint: false, openWorldHint: true }
-  }, async (a) => act(() => lessonsToRecheck(journalOf(root, ws()), readSettings(root).scoring, a.symbol ? safeSymbol(a.symbol) : void 0)));
+  }, async (a) => act(() => lessonsToRecheck(journalOf(root, live()), readSettings(root).scoring, a.symbol ? safeSymbol(a.symbol) : void 0)));
   server.registerTool("correct_lesson", {
     title: "Correct a lesson",
     description: `Replace the lesson of a call recheck_lessons listed TO REWRITE with one rewritten from its window's rows alone: 2 to 4 plain sentences, as for record_outcome (the desk counts them and refuses more than 4). what_was_wrong sorts each statement of the lesson as it stands under three labels, in this order: "Contradicted:" (each quoted, with the row's date and figure that shows otherwise), "Not known from the prices:" (each quoted) and "Right:" (the rest), with "none" under a label with nothing in it. The desk fetches the rows again first: if they cannot be had, nothing is saved and the lesson is marked unreliable (one the person flagged stays flagged). It keeps the first lesson word for word beside the new one, and any corrected lesson it replaces with its check, marked as corrected, and never touches the call, its rating or its score. A lesson written from the prices or corrected already is refused unless the person flagged it. Refused a second time for the same lesson in this re-check, it answers LEFT: leave that lesson and go on. The same lesson sent again after that with no lesson saved since answers STOP: leave it too. Never pass or invent a number the rows do not show.`,
@@ -41861,7 +41980,7 @@ Rating: ${rating}`;
       what_was_wrong: external_exports.string().max(8e3).describe("Contradicted: ... Not known from the prices: ... Right: ...; under 900 characters")
     },
     annotations: { readOnlyHint: false, openWorldHint: true }
-  }, async (a) => act(() => correctLesson(journalOf(root, ws()), readSettings(root).scoring, safeSymbol(a.symbol), a.trade_date, a.lesson, a.what_was_wrong)));
+  }, async (a) => act(() => correctLesson(journalOf(root, live()), readSettings(root).scoring, safeSymbol(a.symbol), a.trade_date, a.lesson, a.what_was_wrong)));
   server.registerTool("flag_lesson", {
     title: "Flag a lesson as wrong",
     description: "Only on the person's own word in this conversation, after they confirmed it: they named the stock, the call's date and what is wrong with its lesson (their words, or a review's finding they pass on). Never because a check of yours, or of any member, found something: tell the person that instead, and let them decide. Marks that settled call's lesson as wrong by the person: later analyses stop reading it at once, and recheck_lessons lists it again to rewrite from its window's prices, with what the person said. Nothing is removed: its words, its check, its earlier corrections and its first lesson stay in the journal; the call, its rating and its score never change. Call it once for each lesson: one flagged already answers ALREADY FLAGGED and nothing is written.",
@@ -41872,10 +41991,10 @@ Rating: ${rating}`;
       confirmed: external_exports.literal(true).describe("true: the person said in words, in this conversation, that this lesson is wrong, and confirmed flagging it")
     },
     annotations: { readOnlyHint: false, openWorldHint: false }
-  }, async (a) => act(() => flagLesson(journalOf(root, ws()), safeSymbol(a.symbol), a.trade_date, a.what_is_wrong)));
+  }, async (a) => act(() => flagLesson(journalOf(root, live()), safeSymbol(a.symbol), a.trade_date, a.what_is_wrong)));
   server.registerTool("start_backtest", {
     title: "Start a backtest sweep",
-    description: "Lay out a backtest: the team is run over every stock on every date from start to end (every few days) and the calls are scored later, each over its short first window against its yardstick, as a live call is. From now until end_backtest every desk tool records into this sweep's own journal and runs, so the live journal and its lessons are untouched. Repeat the call with the same sweep_id to resume: cells already recorded are skipped. Every cell is a full team run, so tell the person the number of cells before running any.",
+    description: "Lay out a backtest: the team is run over every stock on every date from start to end (every few days) and the calls are scored later, each over its short first window against its yardstick, as a live call is. From now until end_backtest each of its cells (its stocks on its dates) is recorded in this sweep's own journal and runs, whichever conversation or member works on it; everything else stays on the live desk, so the live journal, its scoring and its lessons are untouched and the person's other analyses go on beside it. Score its calls with list_settlements and record_outcome given its sweep_id. Repeat the call with the same sweep_id to resume: cells already recorded are skipped. Every cell is a full team run, so tell the person the number of cells before running any.",
     inputSchema: {
       symbols: external_exports.array(symbol2).min(1).max(10),
       start_date: day2,
@@ -41896,7 +42015,7 @@ Rating: ${rating}`;
     const symbols = new Set(grid.map((c) => c.symbol)).size;
     return [
       `Backtest sweep ${id}: ${grid.length} cell(s) (${symbols} stock(s) on ${dates.length} date(s), every ${every} day(s), ${dates[0]} to ${dates[dates.length - 1]}); ${grid.length - todo.length} already recorded, ${todo.length} to run.`,
-      "From now until end_backtest every desk tool records into this sweep's own journal and runs. The live journal and its lessons are untouched.",
+      `From now until end_backtest each of these cells is recorded in this sweep's own journal and runs; everything else stays on the live desk, whose journal and lessons are untouched. Score this sweep's calls with list_settlements and record_outcome given sweep_id ${id}.`,
       "",
       `Cells to run, in order (${todo.length ? "each is a full team run" : "none left"}):`,
       ...todo.slice(0, 30).map((c, i) => `${i + 1}. ${c.symbol} ${c.date}`),
@@ -41907,12 +42026,15 @@ Rating: ${rating}`;
   }));
   server.registerTool("end_backtest", {
     title: "End the backtest sweep",
-    description: "Go back to the live desk: from now on the desk tools record into the live journal and runs again. The sweep and its results stay on disk.",
+    description: "End the backtest sweep this conversation started, named by the sweep_id start_backtest gave it, once it has run and been scored (or the person said to stop it): from now on its cells are recorded on the live desk again. The sweep and its results stay on disk. Never end a sweep this conversation did not start.",
+    inputSchema: { sweep_id: external_exports.string().max(40).describe("The sweep to end: the sweep_id start_backtest gave this conversation") },
     annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false }
-  }, async () => act(() => {
+  }, async (a) => act(() => {
     const was = getSweep();
+    if (!was) return "No backtest was running; the desk is on the live journal.";
+    if (was !== a.sweep_id) return `NOT ENDED: the backtest running is not ${a.sweep_id}. Only the conversation that started it ends it, with the sweep_id start_backtest gave it; it also ends by itself after two hours with no work on its cells. Nothing was changed.`;
     setSweep(null);
-    return was ? `Backtest sweep ${was} ended. The desk is back on the live journal.` : "No backtest was running; the desk is on the live journal.";
+    return `Backtest sweep ${was} ended. The desk is back on the live journal.`;
   }));
   server.registerTool("backtest_summary", {
     title: "Backtest results",
@@ -41967,13 +42089,15 @@ ${renderSummary(summarize(entries))}`;
         look = { screen: null, failed: e.message, on };
       }
     }
-    return morningBrief(dir, day3, readSettings(root).routines.maxAnalyses, look);
+    return morningBrief(dir, day3, readSettings(root).routines.maxAnalyses, look, { now: /* @__PURE__ */ new Date() });
   }));
   server.registerTool("open_dashboard", {
     title: "Open the dashboard",
     description: "Start the Trading Agents dashboard on this computer and open it in the person's browser, or open the one already running. Use when the person asks to see the dashboard, their accounts, the markets or the desk's calls. It only starts the page; everything on it, Robinhood and any order included, is the person's own to press.",
     annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false }
   }, async () => act(() => openDashboard(root)));
+  const given = process.env.TRADING_AGENTS_RUN;
+  const me = { runner: given && RUNNER_ID.test(given) ? given : `tools-${randomUUID().slice(0, 8)}`, pid: process.pid };
   const perRun = () => readSettings(root).routines.maxAnalyses;
   const depthWords = (d) => d ? `${d} (debate_rounds ${DEPTHS[d]} and risk_rounds ${DEPTHS[d]})` : "the settings' depth (leave the rounds out)";
   const called = (sym2, d) => new Journal(path21.join(dir, "journal.md")).load().find((e) => e.ticker === sym2 && e.date === d);
@@ -41991,12 +42115,15 @@ ${renderSummary(summarize(entries))}`;
     annotations: { readOnlyHint: true, openWorldHint: false }
   }, async () => act(() => {
     const list2 = readQueue(dir), waiting = waitingIn(list2), running = list2.find((i) => i.state === "running");
-    const lines = [];
-    if (running) lines.push(`Being analysed now: ${running.symbol} (started ${running.startedAt?.slice(11, 16) ?? "?"} UTC). One stock runs at a time: if this run did not start it, stop and say so.`);
+    const lines = [], since = `started ${running?.startedAt?.slice(11, 16) ?? "?"} UTC`, another = !!running && byAnother(running, me);
+    if (running && another) lines.push(`Being analysed now by another run: ${running.symbol} (${since}). One stock runs at a time: stop this run and say so. Do not call end_queue_run: the run analysing ${running.symbol} asks for the next run itself when it finishes.`);
+    if (running && !another) lines.push(`Being analysed now by this run: ${running.symbol} (${since}). Finish it with finish_queue_item (done once its call is recorded, or failed with why) before starting another.`);
     if (!waiting.length) {
       const doneN = list2.filter((i) => i.state === "done").length, failedN = list2.filter((i) => i.state === "failed").length;
       const kept = [doneN ? `${doneN} done` : "", failedN ? `${failedN} failed (the person presses Retry on the dashboard to ask again)` : ""].filter(Boolean).join(" and ");
       lines.push(!list2.length ? "Nothing is waiting: the list is empty." : `Nothing ${running ? "else " : ""}is waiting.${kept ? ` The list also keeps finished analyses for the person to see, ${kept}: none of them needs a run.` : ""}`);
+    } else if (another) {
+      lines.push(`Waiting behind it, left to that run: ${waiting.map((i) => i.symbol).join(", ")}.`);
     } else {
       lines.push(`${waiting.length} waiting, in the order to run them; one run analyses at most ${perRun()}:`);
       waiting.forEach((i, n2) => lines.push(`${n2 + 1}. ${i.symbol}, depth ${depthWords(i.depth)}, asked ${i.requestedAt.slice(0, 16).replace("T", " ")} UTC`));
@@ -42006,17 +42133,21 @@ ${renderSummary(summarize(entries))}`;
   }));
   server.registerTool("start_queue_item", {
     title: "Start a waiting analysis",
-    description: "Mark a stock from the waiting list as being analysed now, before its analysis starts, so the dashboard shows it running. It answers the date and the debate rounds to plan with. BUSY means another stock is being analysed: stop the run. ALREADY means it was called today: it is marked done, take the next.",
+    description: "Mark a stock from the waiting list as being analysed now, before its analysis starts, so the dashboard shows it running. It answers the date and the debate rounds to plan with. BUSY means another run is analysing a stock: stop this run, without end_queue_run. ALREADY means it was called today: it is marked done, take the next. NOT STARTED means it cannot run now (it says why, and it is marked failed with that reason): take the next.",
     inputSchema: { symbol: symbol2 },
     annotations: write
   }, async (a) => queueAct(() => {
-    if (ws().sweep) return `BUSY: a backtest sweep (${ws().sweep}) is running; the waiting list runs only on the live desk. Stop and say so.`;
     const sym2 = safeSymbol(a.symbol), d = today(), done = called(sym2, d);
     if (done) {
-      finishItem(dir, sym2, { rating: done.rating, already: true });
+      finishItem(dir, sym2, { rating: done.rating, already: true }, /* @__PURE__ */ new Date(), me);
       return `ALREADY: ${sym2} was already called today (${done.rating}); it is marked done. Take the next.`;
     }
-    const item = startItem(dir, sym2, d);
+    const sweep = sweepOfCell(sym2, d);
+    if (sweep && readQueue(dir).find((i) => i.symbol === sym2)?.state === "waiting") {
+      finishItem(dir, sym2, { reason: `A backtest that includes ${sym2} on ${d} is running, so an analysis now would be recorded in the backtest, not in the desk's journal: press Retry once it has ended.` }, /* @__PURE__ */ new Date(), me);
+      return `NOT STARTED: ${sym2} on ${d} is a cell of the backtest sweep ${sweep}, which is running, so its analysis would be recorded in the sweep, not the live journal. It is marked failed with why; the person presses Retry once the backtest has ended. Take the next.`;
+    }
+    const item = startItem(dir, sym2, d, /* @__PURE__ */ new Date(), me);
     return `START: ${sym2} is marked as being analysed. Plan it with analysis date ${d}, depth ${depthWords(item.depth)}. When its call is recorded, call finish_queue_item; if it cannot be finished, call finish_queue_item with failed_because.`;
   }));
   server.registerTool("finish_queue_item", {
@@ -42027,24 +42158,29 @@ ${renderSummary(summarize(entries))}`;
   }, async (a) => queueAct(() => {
     const sym2 = safeSymbol(a.symbol);
     const item = readQueue(dir).find((i) => i.symbol === sym2), late2 = item?.quiet ? ` It had read as failed, because nothing was saved for it for two hours; this run's word replaces that.` : "";
+    if (item?.state === "running" && item.runner && byAnother(item, me)) return `BUSY: ${sym2} is being analysed by another run: only that run finishes it. Stop this run and say so, without end_queue_run.`;
     if (a.failed_because) {
-      finishItem(dir, sym2, { reason: a.failed_because });
+      finishItem(dir, sym2, { reason: a.failed_because }, /* @__PURE__ */ new Date(), me);
       return `Marked failed: ${sym2}. The person sees why on the dashboard and can press Retry.${late2}`;
     }
     const call = called(sym2, item?.date ?? today());
     if (!call) throw new Error(`no call for ${sym2} on ${item?.date ?? today()} is recorded yet: call record_decision first, or pass failed_because`);
-    finishItem(dir, sym2, { rating: call.rating });
+    finishItem(dir, sym2, { rating: call.rating }, /* @__PURE__ */ new Date(), me);
     return `Marked done: ${sym2}, ${call.rating}. The dashboard shows it.${late2}`;
   }));
   server.registerTool("end_queue_run", {
     title: "End a run of the waiting list",
-    description: "Call once when a run of the waiting list stops. If stocks are still waiting (the run reached its limit, or stopped early), it asks whoever listens on this computer for another run. Answers one line to end the run with.",
+    description: "Call once when a run of the waiting list stops. A stock this run started and left unfinished is marked failed. If stocks are still waiting (the run reached its limit, or stopped early), it asks whoever listens on this computer for another run, unless another run is analysing a stock: that run asks when it finishes. Answers one line to end the run with.",
     annotations: write
   }, async () => act(() => {
-    const list2 = readQueue(dir), waiting = waitingIn(list2).length;
+    const now = /* @__PURE__ */ new Date(), left = readQueue(dir, now).find((i) => i.state === "running" && !byAnother(i, me));
+    if (left) finishItem(dir, left.symbol, { reason: "The run analysing it ended before it was finished, without saying why: press Retry to ask again." }, now, me);
+    const list2 = readQueue(dir), waiting = waitingIn(list2).length, other = list2.find((i) => i.state === "running");
     const doneN = list2.filter((i) => i.state === "done").length, failedN = list2.filter((i) => i.state === "failed").length;
+    const tally = `On the dashboard's list: ${doneN} done, ${failedN} failed.`, mine = left ? `Marked failed: ${left.symbol}, which this run left unfinished without saying why. ` : "";
+    if (other) return `${mine}${other.symbol} is being analysed by another run, which asks for the next run itself when it finishes: no run was asked for here. ${waiting ? `${waiting} still waiting.` : "Nothing else is waiting."} ${tally}`;
     if (waiting) ringDoorbell(dir, "more");
-    return `${waiting ? `${waiting} still waiting: another run was asked for.` : "Nothing is waiting."} On the dashboard's list: ${doneN} done, ${failedN} failed.`;
+    return `${mine}${waiting ? `${waiting} still waiting: another run was asked for.` : "Nothing is waiting."} ${tally}`;
   }));
   server.registerTool("set_holdings", {
     title: "Save what the person holds",
@@ -42156,7 +42292,7 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root, home) {
   noteWhenUpdated(server, fresh);
   server.registerTool("desk_check", {
     title: "Desk check",
-    description: `Check that this computer is ready for the Trading Agents desk: Node, the desk data folder, whether a Robinhood sign-in is saved, whether the desk's agent files in this folder are as the project ships them, whether this conversation's steps for the team are the ones in this folder (only from the version those steps give: team_version is required; the trading-desk team passes the one in step 1 of its own "Check this computer" steps, anyone else "none", and then it says they were not compared), and whether each free data source answers (naming the one it does not ask). If its answer starts with TEAM VERSION NEEDED, do what that line says. Pass on its line about this conversation's steps and its line about the agent files as written, never one for the other, and open the report as its HOW TO SUM UP line says. It sends no order and reads no secret; the contact email is shown masked. All it writes is a test file in desk-data, removed at once.`,
+    description: `Check that this computer is ready for the Trading Agents desk: Node, the desk data folder, whether a Robinhood sign-in is saved, whether the desk's agent files in this folder are as the project ships them, whether this conversation began with the team's steps of the version in this folder (a change made to the team in Agent Studio keeps that version, so it cannot be told; only from the version those steps give: team_version is required; the trading-desk team passes the one in step 1 of its own "Check this computer" steps, anyone else "none", and then it says they were not compared), and whether each free data source answers (naming the one it does not ask). If its answer starts with TEAM VERSION NEEDED, do what that line says. Pass on its line about this conversation's steps and its line about the agent files as written, never one for the other, and open the report as its HOW TO SUM UP line says. It sends no order and reads no secret; the contact email is shown masked. All it writes is a test file in desk-data, removed at once.`,
     // Required (8 Nov 2026: in Madav the team twice left out the version its own step 1 names, so a conversation begun
     // before an update could not be told). Left out, nothing is checked and the caller is told what to pass.
     inputSchema: { team_version: external_exports.string({ error: (issue2) => issue2.input === void 0 ? 'Nothing was checked: team_version is required. The trading-desk team: call desk_check again with the version in step 1 of your own "Check this computer" steps, copied exactly. Anyone else: call it again with "none". Never read a version from a file and never make one up. The value is missing' : void 0 }).max(40).describe(`Required. The trading-desk team: the version in step 1 of its own "Check this computer" steps, copied exactly from the instructions this conversation began with. Anyone else (a chat that is not the trading-desk team): "none", and the check says this conversation's steps were not compared. Never read it from a file and never make one up`) },

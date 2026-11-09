@@ -54,7 +54,8 @@ export function guideOf(f: GuideFacts): Guide {
   const tiers = [...picked].filter((s) => !s.startsWith('^')).map((s) => tierOf(s, f.market));
   const names = tiers.filter((t) => t === 'names').length, market = tiers.includes('market'), sector = tiers.includes('sectors');
   const asked = new Set([...f.queue.map((q) => q.symbol), ...f.calls.map((c) => c.ticker)]).size;
-  const automatic = f.listener ?? (f.autorun ? 'Claude Code' : '');
+  // Only what listens now (its fresh note): the switch left on is not a run by itself while nothing listens.
+  const automatic = f.listener ?? '';
   const latest = [...f.calls].sort((a, b) => b.date.localeCompare(a.date))[0] ?? null;
   const steps = {
     email: { done: !!f.email, saved: f.email ? maskEmail(f.email) : '' },

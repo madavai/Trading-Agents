@@ -47,7 +47,8 @@ test('step three ticks once something was asked for and analyses run by themselv
   assert.deepEqual([guideOf({ ...none, queue: [{ symbol: 'NVDA' }] }).analyse.asked, guideOf({ ...none, queue: [{ symbol: 'NVDA' }] }).analyse.done], [1, false], 'asked, but nothing listens');
   assert.equal(guideOf({ ...none, listener: 'Madav' }).analyse.done, false, 'listening, but nothing asked');
   assert.deepEqual([guideOf({ ...none, queue: [{ symbol: 'NVDA' }], listener: 'Madav' }).analyse.done, guideOf({ ...none, queue: [{ symbol: 'NVDA' }], listener: 'Madav' }).analyse.automatic], [true, 'Madav']);
-  assert.equal(guideOf({ ...none, calls: [{ ticker: 'NVDA', date: '2026-10-01', rating: 'Buy' }], autorun: true }).analyse.done, true, 'the Claude Code switch on, between heartbeats');
+  assert.equal(guideOf({ ...none, calls: [{ ticker: 'NVDA', date: '2026-10-01', rating: 'Buy' }], autorun: true }).analyse.done, false, 'the Claude Code switch on, but nothing listens now: nothing runs by itself');
+  assert.equal(guideOf({ ...none, calls: [{ ticker: 'NVDA', date: '2026-10-01', rating: 'Buy' }], autorun: true, listener: 'Claude Code' }).analyse.automatic, 'Claude Code', 'the switch on, and it listens');
   assert.equal(guideOf({ ...none, queue: [{ symbol: 'NVDA' }], calls: [{ ticker: 'NVDA', date: '2026-10-01', rating: 'Buy' }] }).analyse.asked, 1, 'one stock once');
 });
 

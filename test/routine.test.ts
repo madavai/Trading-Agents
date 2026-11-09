@@ -26,18 +26,18 @@ test('the morning analyses what was asked for on the dashboard first, then the s
   enqueue(dir, 'NVDA', '2026-10-16T12:00:00Z', 'deep'); enqueue(dir, 'AAPL', '2026-10-16T12:01:00Z');
   call(dir, 'MSFT', '2026-10-19'); call(dir, 'TSLA', '2026-10-16');   // MSFT already called today; TSLA's call is old
   const m = morningList(dir, '2026-10-19', 3);
-  assert.deepEqual(m.analyse, [{ symbol: 'NVDA', why: 'asked for on the dashboard, deep depth', queued: true }, { symbol: 'AAPL', why: "asked for on the dashboard, the settings' depth", queued: true }, { symbol: 'TSLA', why: 'a starred watchlist stock', queued: false }]);
-  assert.deepEqual(m.later, ['AMD'], 'over the limit, left for another morning; an index is never analysed');
+  assert.deepEqual(m.analyse, [{ symbol: 'NVDA', why: 'asked for on the dashboard, deep depth', queued: true }, { symbol: 'AAPL', why: "asked for on the dashboard, the settings' depth", queued: true }, { symbol: 'AMD', why: 'a starred watchlist stock', queued: false }]);
+  assert.deepEqual(m.later, ['TSLA'], 'over the limit, left for another morning (starred stocks take turns: AMD has no call yet, TSLA has one); an index is never analysed');
   assert.deepEqual(m.calledToday, ['MSFT']);
   const brief = morningBrief(dir, '2026-10-19', 3);
   assert.match(brief, /^MORNING ROUTINE for Monday 2026-10-19\./);
   assert.match(brief, /1\. Score past calls first/);
   // no one may be watching: a call the desk cannot settle is left, never sent round again
   assert.match(brief, /\(the \/settle playbook\)\. A call record_outcome answers LEFT or STOP for stays pending: do not send it again now, go on, and name it at the end with the reason it gave\./);
-  assert.match(brief, /3 of at most 3 a morning[\s\S]*1\. NVDA \(asked for on the dashboard, deep depth\)[\s\S]*3\. TSLA/);
+  assert.match(brief, /3 of at most 3 a morning[\s\S]*1\. NVDA \(asked for on the dashboard, deep depth\)[\s\S]*3\. AMD/);
   assert.match(brief, /start_queue_item first \(it gives the depth\)/);
   assert.match(brief, /call end_queue_run once/);
-  assert.match(brief, /Left for another morning, over the limit of 3: AMD/);
+  assert.match(brief, /Left for another morning, over the limit of 3: TSLA\. Starred stocks take turns/);
   assert.match(brief, /Already called today, so not analysed again: MSFT/);
   assert.match(brief, /Holdings: none saved\. The analyses say so/);
   assert.match(brief, /only the person's own Confirm there places an order/);
@@ -46,7 +46,8 @@ test('the morning analyses what was asked for on the dashboard first, then the s
   startItem(dir, 'NVDA', '2026-10-19');
   const busy = morningList(dir, '2026-10-19', 3);
   assert.equal(busy.running, 'NVDA');
-  assert.deepEqual(busy.analyse.map((a) => a.symbol), ['AAPL', 'TSLA', 'AMD']);
+  assert.deepEqual(busy.leftToRun, ['AAPL'], 'the rest of the waiting list is left to the run analysing NVDA');
+  assert.deepEqual(busy.analyse.map((a) => a.symbol), ['AMD', 'TSLA'], 'and the morning analyses the starred stocks, never AAPL beside that run');
   assert.match(morningBrief(dir, '2026-10-19', 3), /NVDA is being analysed now by another run: leave it alone/);
 });
 

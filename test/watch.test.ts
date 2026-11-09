@@ -209,8 +209,11 @@ test('a stock read as failed because nothing was saved for two hours is put righ
   await client.connect(b);
   try {
     new Journal(path.join(dir, 'journal.md')).storeDecision('NVDA', R1, '**Rating**: Overweight\n\n**Executive Summary**: NVDA.');
+    // once its call is recorded the list already reads it done, with that call's rating (audit 3, server-7), and its run's
+    // word makes that its own
+    assert.deepEqual([readQueue(dir)[0]!.state, readQueue(dir)[0]!.rating], ['done', 'Overweight']);
     const said = ((await client.callTool({ name: 'finish_queue_item', arguments: { symbol: 'NVDA' } })) as { content: Array<{ text: string }> }).content[0]!.text;
-    assert.equal(said, 'Marked done: NVDA, Overweight. The dashboard shows it. It had read as failed, because nothing was saved for it for two hours; this run\'s word replaces that.');
+    assert.equal(said, 'Marked done: NVDA, Overweight. The dashboard shows it.');
     const nvda = readQueue(dir)[0]!;
     assert.deepEqual([nvda.state, nvda.rating, nvda.reason, nvda.quiet], ['done', 'Overweight', undefined, undefined]);
     assert.throws(() => finishItem(dir, 'NVDA', { reason: 'late words' }), /NVDA is already done/, 'and from then on it stays done');
@@ -313,21 +316,27 @@ test('end to end with a pretend runner: presses on the dashboard, the doorbell, 
   const post = async (p: string, body: unknown) => (await fetch(`${term.url}${p.slice(1)}`, { method: 'POST', headers: { 'x-desk-token': term.token, 'content-type': 'application/json' }, body: JSON.stringify(body) })).json() as Promise<any>;
   const state = async () => (await fetch(`${term.url}api/state`, { headers: { 'x-desk-token': term.token } })).json() as Promise<any>;
   // The pretend team: what the playbook's waiting list asks, through the desk's own tools, with a recorded call per stock.
-  const [a, b] = InMemoryTransport.createLinkedPair();
-  await deskServer(root, async () => new Response('no route', { status: 404 })).connect(a);
-  const client = new Client({ name: 'pretend team', version: '0' });
-  await client.connect(b);
-  const tool = async (name: string, args: Record<string, unknown> = {}) => ((await client.callTool({ name, arguments: args })) as { content: Array<{ text: string }> }).content[0]!.text;
+  // Each run starts its own copy of the tools with the run's id, as Claude Code started by the listener does.
   const lines: string[] = [];
-  const team = async () => {
-    const list = await tool('read_queue'), max = Number(/at most (\d+)/.exec(list)?.[1]);
-    for (const sym of readQueue(dir).filter((i) => i.state === 'waiting').map((i) => i.symbol).slice(0, max)) {
-      const started = await tool('start_queue_item', { symbol: sym });
-      assert.match(started, /^START/);
-      new Journal(path.join(dir, 'journal.md')).storeDecision(sym, '2026-10-12', `**Rating**: ${sym === 'TSLA' ? 'Sell' : 'Buy'}\n\n**Executive Summary**: ${sym}.`);
-      lines.push(await tool('finish_queue_item', { symbol: sym }));
-    }
-    lines.push(await tool('end_queue_run'));
+  const team = async (_start: string, id: string) => {
+    process.env.TRADING_AGENTS_RUN = id;
+    const [a, b] = InMemoryTransport.createLinkedPair();
+    await deskServer(root, async () => new Response('no route', { status: 404 })).connect(a);
+    delete process.env.TRADING_AGENTS_RUN;
+    const client = new Client({ name: 'pretend team', version: '0' });
+    await client.connect(b);
+    const tool = async (name: string, args: Record<string, unknown> = {}) => ((await client.callTool({ name, arguments: args })) as { content: Array<{ text: string }> }).content[0]!.text;
+    try {
+      const list = await tool('read_queue'), max = Number(/at most (\d+)/.exec(list)?.[1]);
+      for (const sym of readQueue(dir).filter((i) => i.state === 'waiting').map((i) => i.symbol).slice(0, max)) {
+        const started = await tool('start_queue_item', { symbol: sym });
+        assert.match(started, /^START/);
+        assert.equal(readQueue(dir).find((i) => i.symbol === sym)?.runner, id, "the stock is noted as this run's");
+        new Journal(path.join(dir, 'journal.md')).storeDecision(sym, '2026-10-12', `**Rating**: ${sym === 'TSLA' ? 'Sell' : 'Buy'}\n\n**Executive Summary**: ${sym}.`);
+        lines.push(await tool('finish_queue_item', { symbol: sym }));
+      }
+      lines.push(await tool('end_queue_run'));
+    } finally { await client.close(); }
   };
   const w = watch({ dir, listener: 'Claude Code', pid: 401, ...quick, settleMs: 2_000, run: team });   // seven presses, one run
   try {
@@ -341,7 +350,7 @@ test('end to end with a pretend runner: presses on the dashboard, the doorbell, 
     assert.equal(lines[5], "2 still waiting: another run was asked for. On the dashboard's list: 5 done, 0 failed.", `five a run; the rest rang for another: ${JSON.stringify(lines)}`);
     assert.equal(lines.at(-1), "Nothing is waiting. On the dashboard's list: 7 done, 0 failed.");
     assert.match(readListener(dir)?.lastRun?.result ?? '', /^2 analysed, 0 failed$/);
-  } finally { w.stop(); await w.done; await client.close(); await term.close(); }
+  } finally { w.stop(); await w.done; await term.close(); }
 });
 
 test('the waiting list says the real reason when nothing is waiting: empty, or only finished analyses kept for the person to see', async () => {
@@ -360,7 +369,7 @@ test('the waiting list says the real reason when nothing is waiting: empty, or o
     finishItem(dir, 'NVDA', { rating: 'Buy' }); finishItem(dir, 'AAPL', { reason: 'no email saved for the SEC yet' });
     startItem(dir, 'TSLA', '2026-10-12');
     const busy = await read();
-    assert.match(busy, /^Being analysed now: TSLA \(started \d\d:\d\d UTC\)\./);
+    assert.match(busy, /^Being analysed now by another run: TSLA \(started \d\d:\d\d UTC\)\./);
     assert.match(busy, /\nNothing else is waiting\. The list also keeps finished analyses for the person to see, 1 done and 1 failed \(the person presses Retry on the dashboard to ask again\): none of them needs a run\.$/);
     finishItem(dir, 'TSLA', { rating: 'Sell' });
     const after = await read();

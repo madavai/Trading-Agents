@@ -40,9 +40,9 @@ import { findSymbols, QUERY } from './search.js';
 import { marketOf, readPrefs, saveMarket, savePrefs } from './prefs.js';
 import { marketSymbol, MAX_MARKET, screenUniverse, ticketable } from './tiers.js';
 import { addWatch, readWatchlist, removeWatch, setFavourite } from './store.js';
-import { nextMarketDay, queueTop, readScreen, SCREEN_MS, screenToday, TOP_QUEUED, type Screen } from '../desk/screen.js';
+import { nextMarketDay, queueTop, readScreen, SCREEN_MS, screenToday, switchDue, TOP_QUEUED, type Screen } from '../desk/screen.js';
 import { weatherNow, type Weather } from '../desk/weather.js';
-import { dequeue, depthOfRounds, enqueue, isDepth, QueueRefusal, readQueue, removeListener, ringDoorbell, waitingIn } from '../desk/queue.js';
+import { dequeue, enqueue, isDepth, QueueRefusal, readQueue, removeListener, ringDoorbell, waitingIn } from '../desk/queue.js';
 import { findClaude } from '../watch/claude.js';
 import { maskEmail } from './guide.js';
 
@@ -128,6 +128,10 @@ export interface TerminalOptions {
   listen?: { start: () => void; claude?: () => boolean };
   /** Where a stock's sector is looked up (Yahoo Finance's profiles, unless the tests say otherwise). */
   sectors?: Sectors;
+  /** How often the dashboard looks after the person's switches while it runs, with or without a page open (a minute). */
+  keepMs?: number;
+  /** The time now (the clock, unless the tests say otherwise). */
+  now?: () => Date;
 }
 
 /** The listener the switch starts calls itself this, in its note. */
@@ -248,11 +252,12 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
   // the person's morning switch on, the top three of the screen go on the waiting list once a market day, and the
   // doorbell rings for whoever listens.
   let screening: Promise<Screen> | null = null;
+  const clock = opts.now ?? (() => new Date());
   const screenNow = async (day: string) => {
     const { symbols, news } = screenUniverse(readWatchlist(dir), marketOf(dir));
-    screening ??= screenToday(dir, symbols, news, day).finally(() => { screening = null; });
+    screening ??= screenToday(dir, symbols, news, day, clock()).finally(() => { screening = null; });
     const worked = await screening, prefs = readPrefs(dir), on = prefs.morning === true;
-    const queued = on ? queueTop(dir, worked, day, true, new Date(), prefs.morningFrom) : [];
+    const queued = on ? queueTop(dir, worked, day, true, clock(), prefs.morningFrom) : [];
     return { screen: readScreen(dir) ?? worked, morning: { on, top: TOP_QUEUED, from: on ? prefs.morningFrom : undefined }, queued };
   };
   let weatherMemo: { at: number; day: string; value: Promise<Weather> } | null = null;
@@ -364,11 +369,12 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
     if (p === '/api/favourite' && method === 'POST') return json(res, 200, { watchlist: setFavourite(dir, name, b.favourite === true) });
     // The waiting list. Asking (Analyse, Retry) and Run now ring the doorbell for whoever listens; taking a stock off does not.
     if (p === '/api/queue' && method === 'POST') {
-      const symbol = safeSymbol(name), d = b.depth === undefined ? depthOfRounds(readSettings(root).analysis.debateRounds) : b.depth;
-      if (!isDepth(d)) throw new Refused(400, 'the depth is shallow, medium or deep');
+      // No depth chosen: the settings' own debate and risk rounds, exactly (never rounded to a depth).
+      const symbol = safeSymbol(name), d: unknown = b.depth;
+      if (d !== undefined && !isDepth(d)) throw new Refused(400, 'the depth is shallow, medium or deep');
       const call = new Journal(path.join(dir, 'journal.md')).load().find((e) => e.ticker === symbol && e.date === day);
       if (call) throw new Refused(409, `${symbol} was already analysed today (${call.rating}): its call is in the journal. Ask again tomorrow`);
-      queued(() => enqueue(dir, symbol, new Date().toISOString(), d));
+      queued(() => enqueue(dir, symbol, new Date().toISOString(), isDepth(d) ? d : undefined));
       ringDoorbell(dir, 'press');
       return json(res, 200, { queue: queueOf(dir) });
     }
@@ -408,7 +414,8 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
     // waiting list at once: it starts the next market morning, and then acts once each market morning.
     if (p === '/api/screen/morning' && method === 'POST') {
       if (typeof b.on !== 'boolean') throw new Refused(400, 'say on or off');
-      const from = b.on ? nextMarketDay(day) : undefined;
+      // Already on: an "on" from another tab or an old page keeps the day it starts, so it never skips a morning.
+      const was = readPrefs(dir), from = b.on ? (was.morning === true && was.morningFrom ? was.morningFrom : nextMarketDay(day)) : undefined;
       savePrefs(dir, b.on ? { morning: true, morningFrom: from } : { morning: false }, b.on ? [] : ['morningFrom']);
       return json(res, 200, { morning: { on: b.on, top: TOP_QUEUED, from }, queued: [] });
     }
@@ -600,9 +607,29 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
   keep((keys) => { keys[deskId] = { port, key: token }; });
 
   // "Run automatically with Claude Code" was left on: start the listener again, unless someone already listens.
-  if (opts.listen && readPrefs(dir).autorun && !listenerOf(dir) && (opts.listen.claude ?? (() => !!findClaude()))()) {
+  const claudeHere = opts.listen?.claude ?? (() => !!findClaude());
+  if (opts.listen && readPrefs(dir).autorun && !listenerOf(dir) && claudeHere()) {
     try { opts.listen.start(); } catch { /* the page then says nothing is listening */ }
   }
+
+  // While it runs, the dashboard keeps the person's two switches itself, with or without a page open. "Run automatically
+  // with Claude Code" left on: when nothing has listened for five looks in a row (the listener stopped, or Madav, which
+  // it made way for, stopped listening), it starts the listener again, at most once in five looks. "Analyse the top
+  // three each market morning" on: on a market morning, until the top three went on the list that day, it works out the
+  // screen (at most once an hour, as for a page) and puts them on, ringing for whoever listens.
+  let quietLooks = 0;
+  const keeper = setInterval(() => {
+    try {
+      if (opts.listen && readPrefs(dir).autorun && !listenerOf(dir)) {
+        if (++quietLooks >= 5 && claudeHere()) { quietLooks = 0; opts.listen.start(); }
+      } else quietLooks = 0;
+    } catch { /* tried again at the next look */ }
+    try {
+      const prefs = readPrefs(dir), now = clock(), day = today(now);
+      if (prefs.morning === true && switchDue(dir, day, now, prefs.morningFrom)) void screenNow(day).catch(() => { /* the next look tries again */ });
+    } catch { /* tried again at the next look */ }
+  }, opts.keepMs ?? 60_000);
+  keeper.unref();
 
   // Yahoo's prices are held in memory for a short while; clear them now and then so a dashboard left open stays current.
   const sweep = setInterval(() => { clearCache(); clearQuotes(); }, 60_000);
@@ -622,6 +649,6 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
   updates?.unref();
   return {
     url: `http://127.0.0.1:${port}/`, port, token, deskId, claim,
-    close: () => new Promise((resolve) => { keep((keys) => { delete keys[deskId]; }); clearInterval(sweep); if (updates) clearInterval(updates); server.close(() => resolve()); server.closeAllConnections?.(); }),
+    close: () => new Promise((resolve) => { keep((keys) => { delete keys[deskId]; }); clearInterval(sweep); clearInterval(keeper); if (updates) clearInterval(updates); server.close(() => resolve()); server.closeAllConnections?.(); }),
   };
 }
