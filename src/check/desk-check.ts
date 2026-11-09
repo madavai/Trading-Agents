@@ -11,7 +11,8 @@ import { readSettings } from '../settings.js';
 import { maskEmail, readContactEmail, WHY_EMAIL } from '../contact.js';
 import { driftOf, listed, plainName, shippedAgentFiles, teamVersionOf, type Drift } from '../desk/agent-files.js';
 
-export interface Line { ok: boolean; text: string }
+/** One line of the check. `unchecked`: the check did not look at this, and says so (marked "--", neither OK nor NO). */
+export interface Line { ok: boolean; text: string; unchecked?: true }
 
 export function nodeLine(version = process.versions.node): Line {
   const major = Number(version.split('.')[0]);
@@ -53,32 +54,50 @@ export function contactLine(email: string): Line {
     : { ok: false, text: `Contact email for the SEC: not given yet. The desk needs it before the first analysis: ${WHY_EMAIL}. Ask the person for their own email and save it with set_contact_email` };
 }
 
-/** Whether the desk's agents and the team are as the project ships them; a string when they could not be compared. */
+/** Whether the desk's agent files in this folder are as the project ships them; a string when they could not be compared.
+ *  It is about the files on disk only, never about the steps a conversation holds (that is `teamLine`), so it names them. */
 export function agentsLine(drift: Drift | string): Line {
-  if (typeof drift === 'string') return { ok: false, text: `The desk's agents could not be compared with the project's version: ${drift}` };
+  if (typeof drift === 'string') return { ok: false, text: `The desk's agent files in this folder could not be compared with the project's version: ${drift}` };
   const off = [...drift.changed, ...drift.missing].map(plainName);
-  if (!off.length) return { ok: true, text: "The desk's agents and the trading-desk team are as the project ships them" };
-  return { ok: false, text: `${off.length === 1 ? 'One of the desk\'s agent files differs' : `${off.length} of the desk's agent files differ`} from the project's version (${listed(off)}). An edit, or an older version of Madav, can do this. Ask the desk to reset the team to put them back` };
+  if (!off.length) return { ok: true, text: "The desk's agent files in this folder (its thirteen agents, the team's file and its line-up) are as the project ships them" };
+  return { ok: false, text: `${off.length === 1 ? 'One of the desk\'s agent files in this folder differs' : `${off.length} of the desk's agent files in this folder differ`} from the project's version (${listed(off)}). An edit, or an older version of Madav, can do this. Ask the desk to reset the team to put them back` };
 }
+
+/** Why tools started before the desk in the folder was updated compare nothing: they hold the team's source as it was then. */
+export const UPDATED_WHY = "the desk in this folder was updated after the desk's tools in this conversation started";
 
 /** Tools started before the desk in the folder was updated hold the team's source as it was then, so they cannot say
  *  whether the files match the project's version now; a reset from them could write the old team back. */
-export const NOT_COMPARED: Line = { ok: false, text: "The desk's agents were not compared with the project's version: the desk in this folder was updated after the desk's tools in this conversation started. Start a new conversation in Madav and check this computer there; reset nothing from this one" };
+export const NOT_COMPARED: Line = { ok: false, text: `The desk's agent files in this folder were not compared with the project's version: ${UPDATED_WHY}. Start a new conversation in Madav and check this computer there; reset nothing from this one` };
 
-/** Whether this conversation's copy of the team's steps (the version it passed, from its own copy of the team's file) is
- *  the folder's; null when it passed none or not a version, which says nothing either way. */
-export function teamLine(given: string | undefined, folder: string | undefined): Line | null {
-  if (!given || !/^[0-9a-f]{8}$/.test(given.trim())) return null;
-  if (!folder) return { ok: false, text: `This conversation's steps for the team (version ${given.trim()}) could not be compared: the team's file in this folder carries no version` };
-  return given.trim() === folder
+/** Why this conversation's steps were not compared when it passed no version: true in Madav and in a plain chat alike. */
+export const NO_VERSION = 'no version was given';
+
+/** Whether this conversation's copy of the team's steps (the version it passed, from its own copy of the team's file, the
+ *  one it began with) is the folder's. Always a line, the first under "This computer": nothing else in the check is about
+ *  this conversation's steps, so without a version it says plainly that they were not compared. `updated`: these tools
+ *  started before the folder was updated, so they hold the old source and cannot tell the folder's version. */
+export function teamLine(given: string | undefined, folder: string | undefined, updated = false): Line {
+  const v = given?.trim() ?? '';
+  const not = (why: string): Line => ({ ok: false, unchecked: true, text: `This conversation's steps for the team were not compared with the ones in this folder: ${why}` });
+  if (updated) return not(UPDATED_WHY);
+  if (!v) return not(NO_VERSION);
+  if (!/^[0-9a-f]{8}$/.test(v)) return not('what was given is not a version');
+  if (!folder) return { ok: false, text: `This conversation's steps for the team (version ${v}) could not be compared: the team's file in this folder carries no version` };
+  return v === folder
     ? { ok: true, text: `This conversation's steps for the team are the ones in this folder (version ${folder})` }
-    : { ok: false, text: `This conversation's steps for the team (version ${given.trim()}) are not the ones in this folder now (version ${folder}): this conversation began before the desk was updated. Start a new conversation in Madav, where the new steps load, and check this computer there; reset nothing from this one` };
+    : { ok: false, text: `This conversation's steps for the team (version ${v}) are not the ones in this folder now (version ${folder}): this conversation began before the desk was updated. Start a new conversation in Madav, where the new steps load, and check this computer there; reset nothing from this one` };
 }
 
+/** Under the lines: how to pass on the two that sound alike, whichever steps the reader followed (8 Nov 2026: a team that
+ *  passed no version read the agent-files line as saying its own steps were the folder's). */
+export const TWO_LINES = "Pass on the line about this conversation's steps for the team and the line about the desk's agent files in this folder as they are written. Only the first can say whether this conversation's steps are the folder's, and only with a version shown; the second is about the files alone. Never take one for the other.";
+
 export function render(lines: Line[], sources: ProbeResult[]): string {
-  const mark = (ok: boolean) => (ok ? 'OK ' : 'NO ');
+  const mark = (ok: boolean, unchecked?: true) => (unchecked ? '-- ' : ok ? 'OK ' : 'NO ');
   const out = [`Trading Agents desk check (version ${VERSION})`, '', 'This computer:'];
-  for (const l of lines) out.push(`- ${mark(l.ok)} ${l.text}`);
+  for (const l of lines) out.push(`- ${mark(l.ok, l.unchecked)} ${l.text}`);
+  out.push(TWO_LINES);
   out.push('', 'Free data sources:');
   for (const s of sources) out.push(`- ${mark(s.ok)} ${s.name}: ${s.detail}`);
   const down = sources.filter((s) => !s.ok).length;
@@ -104,13 +123,12 @@ export async function deskCheck(root: string = process.cwd(), fetchImpl: typeof 
   const settings = readSettings(root), email = readContactEmail(root);
   const sources = await probeAll(settings.sources.contact, email, fetchImpl);
   const lines = [nodeLine(), dataLine(root), contactLine(email), robinhoodLine(home.signIn), privateFolderLine(home.folder)];
+  let folder: string | undefined;
   if (asker.updated) lines.push(NOT_COMPARED);
   else {
     lines.push(agentsLine(await agentDrift(root, source)));
-    let folder: string | undefined;
     try { folder = teamVersionOf(await shippedAgentFiles(source)); } catch { /* the agents line says they could not be compared */ }
-    const team = teamLine(asker.teamVersion, folder);
-    if (team) lines.unshift(team);   // the first thing to read: an old conversation's other answers may not hold
   }
+  lines.unshift(teamLine(asker.teamVersion, folder, asker.updated));   // the first thing to read: an old conversation's other answers may not hold
   return render(lines, sources);
 }

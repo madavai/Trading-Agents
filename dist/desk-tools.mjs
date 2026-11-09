@@ -36965,21 +36965,29 @@ function contactLine(email3) {
   return email3 ? { ok: true, text: `Contact email for the SEC: ${maskEmail(email3)} (shown masked; sent to sec.gov alone, kept in desk-data)` } : { ok: false, text: `Contact email for the SEC: not given yet. The desk needs it before the first analysis: ${WHY_EMAIL}. Ask the person for their own email and save it with set_contact_email` };
 }
 function agentsLine(drift) {
-  if (typeof drift === "string") return { ok: false, text: `The desk's agents could not be compared with the project's version: ${drift}` };
+  if (typeof drift === "string") return { ok: false, text: `The desk's agent files in this folder could not be compared with the project's version: ${drift}` };
   const off = [...drift.changed, ...drift.missing].map(plainName);
-  if (!off.length) return { ok: true, text: "The desk's agents and the trading-desk team are as the project ships them" };
-  return { ok: false, text: `${off.length === 1 ? "One of the desk's agent files differs" : `${off.length} of the desk's agent files differ`} from the project's version (${listed(off)}). An edit, or an older version of Madav, can do this. Ask the desk to reset the team to put them back` };
+  if (!off.length) return { ok: true, text: "The desk's agent files in this folder (its thirteen agents, the team's file and its line-up) are as the project ships them" };
+  return { ok: false, text: `${off.length === 1 ? "One of the desk's agent files in this folder differs" : `${off.length} of the desk's agent files in this folder differ`} from the project's version (${listed(off)}). An edit, or an older version of Madav, can do this. Ask the desk to reset the team to put them back` };
 }
-var NOT_COMPARED = { ok: false, text: "The desk's agents were not compared with the project's version: the desk in this folder was updated after the desk's tools in this conversation started. Start a new conversation in Madav and check this computer there; reset nothing from this one" };
-function teamLine(given, folder2) {
-  if (!given || !/^[0-9a-f]{8}$/.test(given.trim())) return null;
-  if (!folder2) return { ok: false, text: `This conversation's steps for the team (version ${given.trim()}) could not be compared: the team's file in this folder carries no version` };
-  return given.trim() === folder2 ? { ok: true, text: `This conversation's steps for the team are the ones in this folder (version ${folder2})` } : { ok: false, text: `This conversation's steps for the team (version ${given.trim()}) are not the ones in this folder now (version ${folder2}): this conversation began before the desk was updated. Start a new conversation in Madav, where the new steps load, and check this computer there; reset nothing from this one` };
+var UPDATED_WHY = "the desk in this folder was updated after the desk's tools in this conversation started";
+var NOT_COMPARED = { ok: false, text: `The desk's agent files in this folder were not compared with the project's version: ${UPDATED_WHY}. Start a new conversation in Madav and check this computer there; reset nothing from this one` };
+var NO_VERSION = "no version was given";
+function teamLine(given, folder2, updated = false) {
+  const v = given?.trim() ?? "";
+  const not = (why) => ({ ok: false, unchecked: true, text: `This conversation's steps for the team were not compared with the ones in this folder: ${why}` });
+  if (updated) return not(UPDATED_WHY);
+  if (!v) return not(NO_VERSION);
+  if (!/^[0-9a-f]{8}$/.test(v)) return not("what was given is not a version");
+  if (!folder2) return { ok: false, text: `This conversation's steps for the team (version ${v}) could not be compared: the team's file in this folder carries no version` };
+  return v === folder2 ? { ok: true, text: `This conversation's steps for the team are the ones in this folder (version ${folder2})` } : { ok: false, text: `This conversation's steps for the team (version ${v}) are not the ones in this folder now (version ${folder2}): this conversation began before the desk was updated. Start a new conversation in Madav, where the new steps load, and check this computer there; reset nothing from this one` };
 }
+var TWO_LINES = "Pass on the line about this conversation's steps for the team and the line about the desk's agent files in this folder as they are written. Only the first can say whether this conversation's steps are the folder's, and only with a version shown; the second is about the files alone. Never take one for the other.";
 function render(lines, sources) {
-  const mark = (ok) => ok ? "OK " : "NO ";
+  const mark = (ok, unchecked) => unchecked ? "-- " : ok ? "OK " : "NO ";
   const out = [`Trading Agents desk check (version ${VERSION})`, "", "This computer:"];
-  for (const l of lines) out.push(`- ${mark(l.ok)} ${l.text}`);
+  for (const l of lines) out.push(`- ${mark(l.ok, l.unchecked)} ${l.text}`);
+  out.push(TWO_LINES);
   out.push("", "Free data sources:");
   for (const s of sources) out.push(`- ${mark(s.ok)} ${s.name}: ${s.detail}`);
   const down = sources.filter((s) => !s.ok).length;
@@ -36999,17 +37007,16 @@ async function deskCheck(root = process.cwd(), fetchImpl2 = fetch, source = root
   const settings = readSettings(root), email3 = readContactEmail(root);
   const sources = await probeAll(settings.sources.contact, email3, fetchImpl2);
   const lines = [nodeLine(), dataLine(root), contactLine(email3), robinhoodLine(home.signIn), privateFolderLine(home.folder)];
+  let folder2;
   if (asker.updated) lines.push(NOT_COMPARED);
   else {
     lines.push(agentsLine(await agentDrift(root, source)));
-    let folder2;
     try {
       folder2 = teamVersionOf(await shippedAgentFiles(source));
     } catch {
     }
-    const team = teamLine(asker.teamVersion, folder2);
-    if (team) lines.unshift(team);
   }
+  lines.unshift(teamLine(asker.teamVersion, folder2, asker.updated));
   return render(lines, sources);
 }
 
@@ -41553,8 +41560,8 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root, home) {
   noteWhenUpdated(server, fresh);
   server.registerTool("desk_check", {
     title: "Desk check",
-    description: "Check that this computer is ready for the Trading Agents desk: Node, the desk data folder, whether a Robinhood sign-in is saved, whether the desk's agents and team are as the project ships them, whether this conversation's steps for the team are the ones in this folder, and whether each free data source answers (naming the one it does not ask). It sends no order and reads no secret; the contact email is shown masked. All it writes is a test file in desk-data, removed at once.",
-    inputSchema: { team_version: external_exports.string().max(40).optional().describe(`The version of the team's steps, exactly as the team's own "Check this computer" step gives it; left out when the steps give none`) },
+    description: "Check that this computer is ready for the Trading Agents desk: Node, the desk data folder, whether a Robinhood sign-in is saved, whether the desk's agent files in this folder are as the project ships them, whether this conversation's steps for the team are the ones in this folder (only from the version those steps give; without one it says they were not compared), and whether each free data source answers (naming the one it does not ask). Pass on its line about this conversation's steps and its line about the agent files as written, never one for the other. It sends no order and reads no secret; the contact email is shown masked. All it writes is a test file in desk-data, removed at once.",
+    inputSchema: { team_version: external_exports.string().max(40).optional().describe(`The version of the team's steps, exactly as the trading-desk team's own "Check this computer" step gives it, in the instructions this conversation began with. Never read it from a file and never make one up: left out, the check says this conversation's steps were not compared`) },
     annotations: READ
   }, async (a) => text3(await deskCheck(root, fetchImpl2, source, { updated: fresh.updated(), teamVersion: a.team_version }, home)));
   server.registerTool("reset_team", {

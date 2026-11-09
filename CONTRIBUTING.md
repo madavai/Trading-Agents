@@ -70,7 +70,13 @@ built, which decisions stand, every document, and what is pending.
   hour) with nothing differing on disk, it writes nothing and answers ALREADY RESET. The team's file carries the version
   of its own steps (`team_version "…"`: the first eight hex digits of the SHA-256 of its text with `VERSION_MARK` in
   their place, `scripts/team-src.mjs`); the team passes it to `desk_check`, which says whether it is the folder's
-  (`teamLine`), since a conversation keeps its copy of the steps from when it began.
+  (`teamLine`), since a conversation keeps its copy of the steps from when it began. Without one (none given, not a
+  version, or tools started before an update) the first line says plainly that this conversation's steps were not
+  compared, marked `--` (neither OK nor NO; `NO_VERSION` in a plain chat). The agent-files line names the files in this
+  folder, and `TWO_LINES` under them says to pass both on as written, never one for the other. The desk-check skill
+  carries no version of its own: it tells the team to pass the one in its own steps, since steps read from the folder
+  during a conversation would always match. The team's own section and the skill share the same reporting step (a test
+  keeps them so).
 - `src/desk/freshness.ts` - whether the desk in the folder was updated after this tool server started: a fingerprint
   of the desk's own code (`CODE_FILES`: the built tool server, the team's source, and every skill) taken at start and
   compared on each answer, read again only when a file's size or time changes. Once it differs, every answer opens with

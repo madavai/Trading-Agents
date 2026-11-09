@@ -4,7 +4,8 @@
 // So the tool server notes, when it starts, a fingerprint of the desk's own code in its folder: the built tool server, the
 // source the team's files are written from, and the skills their steps come from. When that code changes later, every
 // answer says so first (`UPDATED_NOTE`). It cannot see a conversation whose tools are started afresh for each step: the
-// team's version line, passed to the desk check, covers that (`teamLine` in the desk check).
+// team's version line, passed to the desk check, covers that (`teamLine` in the desk check, which says plainly when no
+// version came and so nothing was compared).
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
