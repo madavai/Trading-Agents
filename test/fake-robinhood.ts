@@ -40,11 +40,13 @@ export const MAIN_TOTAL = '9112.50', AGENTIC_CASH = '2500.00';
 const answer = (data: unknown) => text({ data, guide: 'Present the accounts in a table and always confirm with the user.' });
 
 /** Two live accounts (the default one, and the one agents may trade) and a closed one; the default holds NVDA and AAPL. */
-export function accountTools(calls: string[], o: { approvalsOn?: boolean; orders?: unknown[]; reviewAlerts?: string[]; reviewed?: Array<Record<string, unknown>>; agenticBuyingPower?: string; placed?: Array<Record<string, unknown>>; agenticPositions?: unknown[] } = {}): McpServer {
+/** quotesPerCall: Robinhood answers at most this many quotes an ask. placeWait: an order is answered only once it settles.
+ *  placeAnswer: what Robinhood answers to an order, in place of a queued order. reviewAnswer: the same for its order check. */
+export function accountTools(calls: string[], o: { approvalsOn?: boolean; orders?: unknown[]; reviewAlerts?: string[]; reviewed?: Array<Record<string, unknown>>; agenticBuyingPower?: string; placed?: Array<Record<string, unknown>>; agenticPositions?: unknown[]; quotesPerCall?: number; placeWait?: Promise<unknown>; placeAnswer?: unknown; reviewAnswer?: unknown } = {}): McpServer {
   const s = new McpServer({ name: 'fake-robinhood-accounts', version: '0' });
   const acct = { account_number: z.string() }, rhs = { rhs_account_number: z.string() };
   const reg = (name: string, readOnlyHint: boolean, run: (a: Record<string, unknown>) => unknown, inputSchema?: Record<string, z.ZodType>) => {
-    const cb = async (a: unknown) => { calls.push(name); return answer(run((a ?? {}) as Record<string, unknown>)); };
+    const cb = async (a: unknown) => { calls.push(name); return answer(await run((a ?? {}) as Record<string, unknown>)); };
     if (inputSchema) s.registerTool(name, { description: name, inputSchema, annotations: { readOnlyHint } }, cb); else s.registerTool(name, { description: name, annotations: { readOnlyHint } }, async () => cb({}));
   };
   reg('get_accounts', true, () => ({ accounts: [
@@ -57,14 +59,14 @@ export function accountTools(calls: string[], o: { approvalsOn?: boolean; orders
     : { total_value: AGENTIC_CASH, equity_value: '0', crypto_value: '0', options_value: '0', cash: AGENTIC_CASH, currency: 'USD', buying_power: { buying_power: o.agenticBuyingPower ?? 'not a number' } }), acct);
   reg('get_equity_positions', true, (a) => ({ positions: a.account_number === MAIN ? [{ symbol: 'NVDA', quantity: '20.0000', average_buy_price: '141.20' }, { symbol: 'AAPL', quantity: '10.0000', average_buy_price: '198.50' }, { symbol: 'ZERO', quantity: '0.0000' }] : o.agenticPositions ?? [] }), acct);
   reg('get_crypto_positions', true, () => ({ results: [] }), rhs);
-  reg('get_equity_quotes', true, (a) => ({ results: (a.symbols as string[]).filter((x) => x !== 'AAPL').map((symbol) => ({ quote: { symbol, last_trade_price: symbol === 'NVDA' ? '182.40' : '1.00' } })) }), { symbols: z.array(z.string()) });
+  reg('get_equity_quotes', true, (a) => ({ results: (a.symbols as string[]).slice(0, o.quotesPerCall ?? Infinity).filter((x) => x !== 'AAPL').map((symbol) => ({ quote: { symbol, last_trade_price: symbol === 'NVDA' ? '182.40' : '1.00' } })) }), { symbols: z.array(z.string()) });
   reg('get_equity_orders', true, () => ({ orders: o.orders ?? [] }), acct);
   reg('get_trade_approval_setting', true, (a) => ({ setting: { account_number: a.account_number, human_must_approve_trades: o.approvalsOn ?? true } }), acct);
   reg('get_trade_approvals', true, () => ({ approvals: [] }), acct);
   // Robinhood labels its order check as not read-only, though it places nothing: it is reached only through the Reviewer.
-  reg('review_equity_order', false, (a) => { o.reviewed?.push(a); return { order_checks: (o.reviewAlerts ?? []).map((message) => ({ message })), customer_approval_required: o.approvalsOn ?? true, estimated_cost: String(Number(a.quantity) * Number(a.limit_price)), quote: { last_trade_price: '182.40' } }; },
+  reg('review_equity_order', false, (a) => { o.reviewed?.push(a); if (o.reviewAnswer !== undefined) return o.reviewAnswer; return { order_checks: (o.reviewAlerts ?? []).map((message) => ({ message })), customer_approval_required: o.approvalsOn ?? true, estimated_cost: String(Number(a.quantity) * Number(a.limit_price)), quote: { last_trade_price: '182.40' } }; },
     { ...acct, symbol: z.string(), side: z.string(), type: z.string(), quantity: z.string(), limit_price: z.string(), time_in_force: z.string(), market_hours: z.string() });
-  reg('place_equity_order', false, (a) => { o.placed?.push(a); return { order_id: '6f1c2b9e-0000-4000-8000-00000000abcd', state: 'queued', customer_approval_required: o.approvalsOn ?? true, message: 'Waiting for the customer to approve in the Robinhood app.' }; },
+  reg('place_equity_order', false, async (a) => { o.placed?.push(a); if (o.placeWait) await o.placeWait; if (o.placeAnswer !== undefined) return o.placeAnswer; return { order_id: '6f1c2b9e-0000-4000-8000-00000000abcd', state: 'queued', customer_approval_required: o.approvalsOn ?? true, message: 'Waiting for the customer to approve in the Robinhood app.' }; },
     { ...acct, symbol: z.string(), side: z.string(), type: z.string(), quantity: z.string(), limit_price: z.string(), time_in_force: z.string(), market_hours: z.string(), ref_id: z.string() });
   return s;
 }
@@ -79,6 +81,9 @@ export interface Fake {
   hits: { mcp: number; turnedAway: number };
   /** While true, every pass is refused, as if Robinhood had ended the person's access. */
   refuseAll: boolean;
+  /** While true, an order reaches Robinhood but its answer never comes back: the connection drops. `lost` keeps each. */
+  lose: boolean;
+  lost: unknown[];
   close: () => Promise<void>;
 }
 
@@ -94,7 +99,7 @@ export async function fakeRobinhood(tools: (calls: string[]) => McpServer = fake
     child.stdout!.on('data', (b: Buffer) => { if (String(b).includes('listening')) { child.removeAllListeners('exit'); resolve(); } });
   });
 
-  const fake: Fake = { url: `${door}/mcp`, calls, hits, refuseAll: false, close: async () => {} };
+  const fake: Fake = { url: `${door}/mcp`, calls, hits, refuseAll: false, lose: false, lost: [], close: async () => {} };
   const passIsGood = async (pass: string): Promise<boolean> => {
     if (fake.refuseAll) return false;
     const r = await fetch(`${signIn}/introspect`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token: pass }) });
@@ -111,6 +116,8 @@ export async function fakeRobinhood(tools: (calls: string[]) => McpServer = fake
     if (!pass || !(await passIsGood(pass))) { hits.turnedAway++; return send(401, { error: 'unauthorized' }, { 'www-authenticate': `Bearer resource_metadata="${door}/.well-known/oauth-protected-resource"` }); }
     if (req.method !== 'POST') return send(405, { error: 'POST only' });
     let body = ''; for await (const c of req) body += c;
+    const msg = JSON.parse(body) as { method?: string; params?: { name?: string; arguments?: unknown } };
+    if (fake.lose && msg.method === 'tools/call' && msg.params?.name === 'place_equity_order') { calls.push('place_equity_order'); fake.lost.push(msg.params.arguments); req.socket.destroy(); return; }
     const mcp = tools(calls), transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     res.on('close', () => { void transport.close(); void mcp.close(); });
     await mcp.connect(transport);

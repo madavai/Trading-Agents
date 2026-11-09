@@ -8,6 +8,7 @@ import { averageOf, barOn, chipDay, dayText, esc, labelled, money, moveDayOf, no
 import { DELAY_SENTENCE, DELAY_SHORT, LATE } from '../../data/delay.js';
 import { GLOSSARY, glossaryGroups, isTerm, means, type TermKey } from './glossary.js';
 import { markdown } from './md.js';
+import { sameFigures, typedNumber, type Asked } from './typed.js';
 import { isCrypto } from '../../data/symbols.js';
 import type { Quote } from '../quotes.js';
 
@@ -50,12 +51,21 @@ const say = (e: unknown): string => (e instanceof ApiError ? e.message : 'The da
 // remembered in the desk's own folder, so the dashboard opens as they left it in any browser and after a restart. A copy
 // in this browser paints the face at once. Nothing about an order is ever remembered.
 const P: Prefs = {};
+// Only the choices that changed are sent, and the desk merges them into what it keeps: a second, older tab sending all it
+// remembers would undo what this one changed since ("Put away" coming back).
+const unsent: Prefs = {};
 let saving: ReturnType<typeof setTimeout> | null = null;
 function remember(change: Prefs): void {
-  Object.assign(P, change);
+  Object.assign(P, change); Object.assign(unsent, change);
   try { localStorage.setItem('ta.prefs', JSON.stringify(P)); } catch { /* the page works without it */ }
   if (saving) clearTimeout(saving);
-  saving = setTimeout(() => { saving = null; void api.savePrefs(P).catch(() => { /* kept in this browser; the next change tries again */ }); }, 400);
+  saving = setTimeout(() => {
+    saving = null;
+    const send = { ...unsent };
+    for (const k of Object.keys(send) as Array<keyof Prefs>) delete unsent[k];
+    // kept in this browser; what did not reach the desk goes with the next change, unless that one changed it again
+    void api.savePrefs(send).catch(() => { for (const [k, v] of Object.entries(send)) if (!(k in unsent)) Object.assign(unsent, { [k]: v }); });
+  }, 400);
 }
 /** This browser's copy, and before it the single choices older dashboards kept here. */
 function browserPrefs(): Prefs {
@@ -270,10 +280,12 @@ function explainStaticWords(): void {
   for (const el of document.querySelectorAll<HTMLElement>('[data-delay]')) { el.textContent = el.dataset.delay === 'short' ? DELAY_SHORT : DELAY_SENTENCE; if (el.dataset.delay === 'short') el.title = DELAY_SENTENCE; }
 }
 
+/** A starred stock's move in the side list, in the watchlist's own words: points for a yield, and its day when not today. */
+const sideMove = (q: Quote): string => { const day = moveDayOf(q.asOf); return q.changePct === null ? '—' : `${moveText(q)}${day ? ` · ${chipDay(day)}` : ''}`; };
 function renderFavs(): void {
   const favs = (S.desk?.watchlist ?? []).filter((w) => w.favourite);
   $('#favs').innerHTML = favs.length
-    ? favs.map((w) => { const q = quoteOf(w.symbol); return `<button class="at-li ${w.symbol === S.symbol ? 'on' : ''}" data-act="select" data-symbol="${esc(w.symbol)}"><span class="at-li-t">${esc(w.symbol)}</span><small>${q ? pct(q.changePct) : ''}</small></button>`; }).join('')
+    ? favs.map((w) => { const q = quoteOf(w.symbol); return `<button class="at-li ${w.symbol === S.symbol ? 'on' : ''}" data-act="select" data-symbol="${esc(w.symbol)}"><span class="at-li-t">${esc(w.symbol)}</span><small>${q ? sideMove(q) : ''}</small></button>`; }).join('')
     : '<p class="at-quiet">Star a stock in the watchlist to keep it here.</p>';
 }
 
@@ -521,7 +533,7 @@ async function readAccounts(): Promise<void> {
   if (A.reading) return;
   A.reading = true; renderViews();
   try { const r = await api.readAccounts(); A.snapshot = r.snapshot; A.chosen = r.chosen; A.shared = r.holdingsShared; } catch (e) { toast(say(e), 'bad'); }
-  finally { A.reading = false; renderViews(); renderCall(); renderStock(); void loadCare(); }
+  finally { A.reading = false; renderViews(); renderCall(); renderStock(); void loadCare(); void loadTrading(); }   // the read may have tripped the weekly loss limit
 }
 
 async function openPicker(): Promise<void> {
@@ -582,7 +594,7 @@ function capsBlock(): string {
 
 /** What the person typed for the caps: numbers, as the desk will check them. */
 const capsTyped = (): Caps => {
-  const n = (id: string) => Number($<HTMLInputElement>(id).value.replace(/[$,%\s]/g, ''));
+  const n = (id: string) => typedNumber($<HTMLInputElement>(id).value);   // "2,5" is 2.5, never 25
   return { perOrderUsd: n('#capOrder'), perStockPercent: n('#capStock'), ordersPerDay: n('#capDay'), perSectorPercent: n('#capSector'), cryptoPercent: n('#capCrypto'), weeklyLossPercent: n('#capWeek'), minHoldDays: n('#capHold') };
 };
 
@@ -591,12 +603,15 @@ function switchBlock(): string {
     <p class="at-lede">You can place an order from a ticket, from one of the desk's calls (Decide…) or your own (Trade…), in the Agentic account only, within your caps, after Robinhood's check and your Confirm.</p>
     <div class="at-row">${rhButton('tr-off', 'Switch trading off')}</div>`;
   if (!TR.asking) return `<div class="at-card-head"><h3>Trading</h3><span class="at-chip">Off</span></div>
-    ${TR.state?.offBecause ? `<p class="at-honest bad">${esc(TR.state.offBecause.words)}</p>` : ''}<p class="at-lede">With trading off, a ticket can be checked by Robinhood but never placed.</p>${recordLine()}<div class="at-row">${rhButton('tr-ask', 'Switch trading on…')}</div>`;
+    ${TR.state?.offBecause ? `<p class="at-honest bad">${esc(daysInWords(TR.state.offBecause.words))}</p>` : ''}<p class="at-lede">With trading off, a ticket can be checked by Robinhood but never placed.</p>${recordLine()}<div class="at-row">${rhButton('tr-ask', 'Switch trading on…')}</div>`;
   return `<div class="at-card-head"><h3>Switch trading on?</h3></div>
     <p class="at-lede">From then on, a ticket you open, from one of the desk's calls or your own, can place a real order with real money in your Agentic account. Every order still needs Robinhood's check with no alerts, your caps, and your own Confirm naming the exact order. Keep Robinhood's approval on your phone switched on until you trust the desk. This is not investment advice.</p>
     ${recordLine()}${young() ? `<p class="at-honest bad">That is under ${esc(S.desk?.paper.minWords ?? '')}: too little to tell whether the desk's calls are any good. Read your paper record first.</p><div class="at-row">${TR.understood ? '<span class="at-chip ok">You understand</span>' : rhButton('tr-understood', 'I understand')}</div>` : ''}
     <div class="at-row">${young() && !TR.understood ? '' : rhButton('tr-on', 'Yes, switch trading on', { primary: true })}${rhButton('tr-cancel', 'Cancel')}</div>`;
 }
+
+/** The desk's own sentences name days as 2026-11-09; the page writes them as it writes every other day, "9 Nov 2026". */
+const daysInWords = (said: string): string => said.replace(/\b\d{4}-\d{2}-\d{2}\b/g, dayText);
 
 async function loadTrading(): Promise<void> {
   try { TR.state = await api.trading(); } catch { return; }
@@ -611,17 +626,18 @@ function renderTicketDyn(): void {
   const t = T.open;
   if (!t) return;
   const asks = T.checks.filter((c) => c.ask), ok = T.checks.length > 0 && T.checks.every((c) => c.ok) && (!asks.length || T.early);
-  const checks = t.proposal.order ? `<div class="at-card-head"><h3>Your checks</h3></div><div class="at-row">${T.checks.map((c) => `<span class="at-chip ${c.ask ? 'warn' : c.ok ? 'ok' : 'danger'}">${esc(c.words)}</span>`).join('')}</div>` : '';
+  const checks = t.proposal.order ? `<div class="at-card-head"><h3>Your checks</h3></div><div class="at-row ta-checks">${T.checks.map((c) => `<span class="at-chip ${c.ask ? 'warn' : c.ok ? 'ok' : 'danger'}">${esc(c.words)}</span>`).join('')}</div>` : '';
   const r = T.review;
-  const review = r ? `<div class="at-card at-box"><div class="at-card-head"><h3>${term('dryRun')}</h3>${!r.answered ? '<span class="at-chip danger">Robinhood reported an error</span>' : r.alerts.length ? `<span class="at-chip danger">${r.alerts.length} alert(s)</span>` : '<span class="at-chip ok">No alerts</span>'}</div>
+  const review = r ? `<div class="at-card at-box"><div class="at-card-head"><h3>${term('dryRun')}</h3>${!r.answered ? `<span class="at-chip danger">${r.unclear ? 'Not checked' : 'Robinhood reported an error'}</span>` : r.alerts.length ? `<span class="at-chip danger">${r.alerts.length} alert(s)</span>` : '<span class="at-chip ok">No alerts</span>'}</div>
       ${r.error ? `<p class="at-honest bad">${esc(r.error)}</p>` : ''}${r.alerts.map((a) => `<p class="at-honest bad">${esc(a)}</p>`).join('')}
       ${r.approvalRequired === null ? '' : `<p class="at-lede">${r.approvalRequired ? 'Robinhood would ask you to approve this order on your phone before it is sent.' : 'Robinhood would not ask for your approval on your phone: an order would be sent at once.'}</p>`}
       ${r.facts.length ? `<dl class="at-facts ruled at-box">${r.facts.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>` : ''}
       <p class="at-quiet">This was Robinhood's dry run: nothing was placed.</p></div>` : '';
   const clean = !!r && r.answered && r.alerts.length === 0;
   const p = T.placed;
-  const placed = p ? `<div class="at-card at-box"><div class="at-card-head"><h3>Sent to Robinhood</h3>${p.answered ? '<span class="at-chip ok">Robinhood took it</span>' : '<span class="at-chip danger">Robinhood refused it</span>'}</div>
+  const placed = p ? `<div class="at-card at-box"><div class="at-card-head"><h3>Sent to Robinhood</h3>${p.answered ? '<span class="at-chip ok">Robinhood took it</span>' : p.unknown ? '<span class="at-chip warn">No clear answer</span>' : '<span class="at-chip danger">Robinhood refused it</span>'}</div>
       ${p.error ? `<p class="at-honest bad">${esc(p.error)}</p>` : ''}
+      ${p.unknown ? '<p class="at-lede">It is in the desk\'s order log as sent, so it counts towards your orders a day. This ticket sends nothing more.</p>' : ''}
       ${p.answered ? `<p class="at-lede">${p.approvalRequired === true ? 'Robinhood now asks you to approve it on your phone: it is not sent to the market until you do.' : p.approvalRequired === false ? 'Robinhood sent it to the market.' : 'Check the order in Robinhood.'}${p.state ? ` State: ${esc(p.state)}.` : ''}</p>` : ''}
       ${p.facts.length ? `<dl class="at-facts ruled at-box">${p.facts.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>` : ''}</div>` : '';
   let buttons = '';
@@ -641,7 +657,7 @@ async function placeTicket(): Promise<void> {
   const t = T.open;
   if (!t || T.busy || T.placed) return;
   T.busy = true; renderTicketDyn();
-  try { T.placed = (await api.placeTicket(t.id, T.confirm, T.early)).placed; toast(T.placed.answered ? 'The order is with Robinhood.' : 'Robinhood refused the order.', T.placed.answered ? 'ok' : 'bad'); void readAccounts(); void loadTrading(); }
+  try { T.placed = (await api.placeTicket(t.id, T.confirm, T.early)).placed; toast(T.placed.answered ? 'The order is with Robinhood.' : T.placed.unknown ? "No clear answer from Robinhood: look in its app before you try again." : 'Robinhood refused the order.', T.placed.answered ? 'ok' : 'bad'); void readAccounts(); void loadTrading(); }
   catch (e) { T.confirming = false; toast(say(e), 'bad'); }
   finally { T.busy = false; renderTicketDyn(); }
 }
@@ -656,7 +672,7 @@ function renderTicket(): void {
     <p class="at-lede">Your own order, not one of the desk's calls: in the Agentic account only, within your caps, after Robinhood's check and your Confirm.</p>`
     : `<div class="ta-pophead"><h2>${esc(o ? `${o.side === 'buy' ? 'Buy' : 'Sell'} ${c.symbol}` : `No order for ${c.symbol}`)}</h2>${ratingChip(c.rating)}${close}</div>
     <p class="at-lede">The desk rated ${esc(c.symbol)} ${esc(c.rating)} on ${esc(dayText(c.callDate))}: ${esc(t.proposal.action)}. In the Agentic account only.</p>`;
-  $('#tkHead').innerHTML = `${head}
+  $('#tkHead').innerHTML = `${head}${t.lost ? `<p class="at-honest bad">${esc(daysInWords(t.lost))}</p>` : ''}
     <dl class="at-facts ruled at-box"><div><dt>Account value</dt><dd>${money(c.accountValue)}</dd></div><div><dt>Buying power</dt><dd>${money(c.buyingPower)}</dd></div><div><dt>Held now</dt><dd>${esc(String(c.held))} share(s)</dd></div><div><dt>Live price</dt><dd>${money(c.price)}</dd></div><div><dt>Orders today</dt><dd>${c.ordersToday} of ${t.caps.ordersPerDay}</dd></div></dl>
     ${t.proposal.why.map((w) => `<p class="at-quiet">${esc(w)}</p>`).join('')}`;
   $('#tkFields').innerHTML = o ? `<div class="at-row">
@@ -676,13 +692,14 @@ async function openTicket(symbol: string, date: string, side?: 'buy' | 'sell'): 
     T.open = t; T.checks = t.checks; T.quantity = t.proposal.order?.quantity ?? 0; T.limit = t.proposal.order?.limitPrice ?? 0;
     renderTicket();
   } catch (e) { dlg.close(); toast(say(e), 'bad'); }
+  void loadTrading();   // reading the account for the ticket may have tripped the weekly loss limit
 }
 
 function ticketEdited(): void {
   const t = T.open;
   if (!t?.proposal.order) return;
   T.quantity = Number($<HTMLInputElement>('#tkQty').value);
-  T.limit = Number($<HTMLInputElement>('#tkLimit').value.replace(/[$,\s]/g, ''));
+  T.limit = typedNumber($<HTMLInputElement>('#tkLimit').value);
   T.review = null; T.checks = []; T.confirming = false; renderTicketDyn();
   clearTimeout(T.timer);
   T.timer = window.setTimeout(() => void run(async () => { if (T.open?.id !== t.id) return; T.checks = (await api.checkTicket(t.id, T.quantity, T.limit)).checks; renderTicketDyn(); }), 350);
@@ -691,8 +708,14 @@ function ticketEdited(): void {
 async function reviewTicket(): Promise<void> {
   const t = T.open;
   if (!t || T.busy) return;
+  const asked: Asked = { id: t.id, quantity: T.quantity, limit: T.limit };
   T.busy = true; renderTicketDyn();
-  try { const r = await api.reviewTicket(t.id, T.quantity, T.limit, T.early); T.checks = r.checks; T.review = r.review; T.confirm = r.confirm; T.confirming = false; TR.state = { ...TR.state, ...r.trading }; renderTrading(); }
+  try {
+    const r = await api.reviewTicket(t.id, T.quantity, T.limit, T.early);
+    TR.state = { ...TR.state, ...r.trading }; renderTrading();
+    if (!sameFigures(asked, { id: T.open?.id, quantity: T.quantity, limit: T.limit })) return;   // changed while Robinhood checked: not the check of the new figures
+    T.checks = r.checks; T.review = r.review; T.confirm = r.confirm; T.confirming = false;
+  }
   catch (e) { toast(say(e), 'bad'); }
   finally { T.busy = false; renderTicketDyn(); }
 }
@@ -764,7 +787,7 @@ function renderHero(): void {
     $('#heroNote').textContent = '';
     return;
   }
-  const info = heroChart(svg, tip, h, { kind: S.kind, layers: S.layers });
+  const info = heroChart(svg, tip, h, { kind: S.kind, layers: S.layers, unit: marketOf(sym)?.unit });
   $('#heroNote').textContent = info === null ? 'Not enough prices to draw this range.' : info.hasAverages ? '' : 'Too few days of history for the averages.';
 }
 
@@ -931,11 +954,19 @@ function renderStock(): void {
   // your own orders on it, as Robinhood listed them for the Agentic account when the dashboard last read it
   const ag = A.snapshot?.views.find((v) => v.account.agentic);
   const mine = (ag?.orders?.orders ?? []).filter((o) => (o.symbol ?? '').toUpperCase() === sym);
+  // Said as the page knows it: the stock and fund orders Robinhood listed at the last read, of which the dashboard reads
+  // the first 20 in Robinhood's order (robinhood/account.ts parseOrders), with nothing saying that order is by time. A
+  // coin's orders are not among them.
+  const count = ag?.orders?.count ?? 0, shown = ag?.orders?.orders.length ?? 0, rest = count - shown, at = A.snapshot ? when(A.snapshot.at) : '';
+  const restWords = rest === 1 ? 'the other one is not read here' : `the other ${rest} are not read here`;
   const orders = !A.snapshot ? '<p class="at-quiet">Read your accounts to see your orders on it.</p>'
     : !ag ? '<p class="at-quiet">Show your Agentic account to see its orders.</p>'
     : ag.orders === null ? '<p class="at-quiet">The orders could not be read.</p>'
-    : mine.length ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>When</th><th>Order</th><th class="num">Quantity</th><th class="num">Price</th><th>State</th></tr></thead><tbody>${mine.map((x) => `<tr><td>${esc(x.at ? dayText(x.at) : '—')}</td><td>${esc(sideWord(x.side))}${x.type ? ` <small class="at-quiet">${esc(x.type)}</small>` : ''}</td><td class="num">${qty(x.quantity)}</td><td class="num">${money(x.price)}</td><td>${esc(x.state ?? '—')}</td></tr>`).join('')}</tbody></table></div>`
-    : `<p class="at-quiet">No orders on ${esc(sym)} in the Agentic account.</p>`;
+    : isCrypto(sym) ? "<p class=\"at-quiet\">The dashboard reads the Agentic account's stock and fund orders only, so a coin's orders are not shown here.</p>"
+    : mine.length ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>When</th><th>Order</th><th class="num">Quantity</th><th class="num">Price</th><th>State</th></tr></thead><tbody>${mine.map((x) => `<tr><td>${esc(x.at ? dayText(x.at) : '—')}</td><td>${esc(sideWord(x.side))}${x.type ? ` <small class="at-quiet">${esc(x.type)}</small>` : ''}</td><td class="num">${qty(x.quantity)}</td><td class="num">${money(x.price)}</td><td>${esc(x.state ?? '—')}</td></tr>`).join('')}</tbody></table></div>${rest > 0 ? `<p class="at-quiet">Read from ${shown} of the ${count} orders Robinhood listed at ${esc(at)}: ${restWords}.</p>` : ''}`
+    : !count ? `<p class="at-quiet">Robinhood listed no orders for the Agentic account at ${esc(at)}.</p>`
+    : rest > 0 ? `<p class="at-quiet">No orders on ${esc(sym)} among the ${shown} the dashboard reads of the ${count} orders Robinhood listed for the Agentic account at ${esc(at)}: ${restWords}, so ${rest === 1 ? 'it' : 'one of them'} may be.</p>`
+    : `<p class="at-quiet">No orders on ${esc(sym)} among the ${count === 1 ? 'one order' : `${count} orders`} Robinhood listed for the Agentic account at ${esc(at)}.</p>`;
   const trade = isStock(sym) ? `<div class="at-row">${(['buy', 'sell'] as const).map((s) => `<button class="at-btn at-press" data-act="trade" data-side="${s}" data-symbol="${esc(sym)}"><svg class="g"><use href="#${s === 'buy' ? 'i-up' : 'i-down'}"/></svg><span>${s === 'buy' ? 'Buy' : 'Sell'} ${esc(sym)}…</span></button>`).join('')}</div>` : '';
   $('#stockBody').innerHTML = `<div class="ta-col">
       <div class="at-card at-box"><div class="at-card-head"><h3>What you hold</h3></div>${held}${trade}</div>
@@ -1031,7 +1062,8 @@ function renderStart(): void {
 
 // ---------- this morning: the market weather, and what is worth a look today ----------
 // Both are worked out by the desk from figures, at most once an hour; the page asks when it opens and every hour after.
-const MORNING = { weather: null as Weather | null, weatherFailed: '', screen: null as Screen | null, screenFailed: '', on: false, top: 3, from: '' };
+/** `known`: whether the morning switch is on has been read (with the remembered choices, or the screen's answer). */
+const MORNING = { weather: null as Weather | null, weatherFailed: '', screen: null as Screen | null, screenFailed: '', on: false, known: false, top: 3, from: '' };
 const LINE_TONE: Record<WeatherLine['tone'], string> = { ok: 'ok', warn: 'warn', bad: 'danger', '': '' };
 
 function renderWeather(): void {
@@ -1058,7 +1090,8 @@ function lookRow(p: Worth): string {
 function renderLook(): void {
   const s = MORNING.screen, el = $('#lookCard');
   const head = `<div class="at-card-head"><h3>Worth a look today</h3>${s ? `<span class="at-chip" title="How many funds and stocks were looked at">${s.picks.length} of ${s.looked}</span>` : ''}</div>`;
-  const sw = `<button class="at-toggle" data-act="morning-switch" role="switch" aria-checked="${MORNING.on}"><span class="at-switch${MORNING.on ? ' on' : ''}"></span><span>Analyse the top ${MORNING.top} each market morning</span></button>
+  // No switch is drawn until the page knows whether it is on: one drawn "off" meanwhile would be pressed to turn it on.
+  const sw = !MORNING.known ? `<p class="at-quiet">${MORNING.screenFailed ? 'Whether' : 'Reading whether'} "Analyse the top ${MORNING.top} each market morning" is on${MORNING.screenFailed ? ' could not be read just now' : ''}.</p>` : `<button class="at-toggle" data-act="morning-switch" role="switch" aria-checked="${MORNING.on}"><span class="at-switch${MORNING.on ? ' on' : ''}"></span><span>Analyse the top ${MORNING.top} each market morning</span></button>
     <p class="at-quiet">${MORNING.on ? `On${MORNING.from ? `, from ${esc(dayText(MORNING.from))}` : ''}: each market morning (before noon in New York), the top ${MORNING.top} not already called that day go on the waiting list at shallow depth, once. Each analysis is a full team run on the models of whatever runs it (Madav's own, or your Claude plan with Claude Code).` : `Off as shipped. When on, it starts the next market morning: then the top ${MORNING.top} go on the waiting list at shallow depth once each market morning, and run when something is listening. Switching it on puts nothing on the list at once.`}</p>`;
   if (!s) { el.innerHTML = `${head}<p class="at-quiet">${esc(MORNING.screenFailed || "Looking over the whole market, the sectors and your names: the first look of the day takes a minute.")}</p>${sw}`; return; }
   const list = s.picks.length ? `<div class="ta-looks">${s.picks.map(lookRow).join('')}</div>`
@@ -1076,7 +1109,7 @@ async function loadMorning(): Promise<void> {
   await Promise.all([
     api.weather().then((r) => { MORNING.weather = r.weather; MORNING.weatherFailed = ''; }, (e) => { MORNING.weatherFailed = say(e); }),
     api.screen().then(async (r) => {
-      MORNING.screen = r.screen; MORNING.on = r.morning.on; MORNING.top = r.morning.top; MORNING.from = r.morning.from ?? ''; MORNING.screenFailed = '';
+      MORNING.screen = r.screen; MORNING.on = r.morning.on; MORNING.known = true; MORNING.top = r.morning.top; MORNING.from = r.morning.from ?? ''; MORNING.screenFailed = '';
       if (r.queued.length) { toast(`${listWords(r.queued)} ${r.queued.length === 1 ? 'is' : 'are'} waiting to be analysed: your morning switch put ${r.queued.length === 1 ? 'it' : 'them'} on the list.`); await refreshState(); }
     }, (e) => { MORNING.screenFailed = say(e); }),
   ]);
@@ -1343,7 +1376,8 @@ async function refreshQuotes(): Promise<void> {
 }
 
 async function refreshMarkets(): Promise<void> {
-  try { S.markets = (await api.markets()).markets; renderMarkets(); renderHero(); } catch { /* the next round asks again */ }
+  // a yield's unit comes with the markets: the moves already written (side list, watchlist) are written again with it
+  try { S.markets = (await api.markets()).markets; renderMarkets(); renderHero(); renderFavs(); renderWatch(); } catch { /* the next round asks again */ }
 }
 
 // ---------- doing things ----------
@@ -1388,12 +1422,19 @@ async function askNow(): Promise<void> {
   });
 }
 
+/** A press on the shade around an open dialog closes it. A press inside its box (its padding, the gaps between its parts,
+ *  its scroll bar or its resize corner) has the dialog itself as its target too, and keeps it open. */
+const onShade = (e: MouseEvent, dlg: Element): boolean => {
+  if (e.target !== dlg) return false;
+  const r = dlg.getBoundingClientRect();
+  return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+};
 document.addEventListener('click', (e) => {
   const dlg = $<HTMLDialogElement>('#callDialog');
-  if (e.target === dlg) { dlg.close(); return; }
-  if (e.target === $('#ticketDialog')) { $<HTMLDialogElement>('#ticketDialog').close(); T.open = null; return; }
-  if (e.target === $('#stopDialog')) { $<HTMLDialogElement>('#stopDialog').close(); return; }
-  if (e.target === $('#glossDialog')) { $<HTMLDialogElement>('#glossDialog').close(); return; }
+  if (onShade(e, dlg)) { dlg.close(); return; }
+  if (onShade(e, $('#ticketDialog'))) { $<HTMLDialogElement>('#ticketDialog').close(); T.open = null; return; }
+  if (onShade(e, $('#stopDialog'))) { $<HTMLDialogElement>('#stopDialog').close(); return; }
+  if (onShade(e, $('#glossDialog'))) { $<HTMLDialogElement>('#glossDialog').close(); return; }
   const el = (e.target as Element).closest<HTMLElement>('[data-act]');
   if (!el) return;
   const sym = el.dataset.symbol ?? '';
@@ -1435,7 +1476,7 @@ document.addEventListener('click', (e) => {
       if (f.has(t)) f.delete(t); else f.add(t);
       remember({ folded: TIER_KEYS.filter((k) => f.has(k)) }); renderWatch(); break;
     }
-    case 'morning-switch': void run(async () => {
+    case 'morning-switch': if (!MORNING.known) break; void run(async () => {
       const r = await api.setMorning(!MORNING.on);
       MORNING.on = r.morning.on; MORNING.top = r.morning.top; MORNING.from = r.morning.from ?? ''; renderLook();
       toast(!r.morning.on ? 'Switched off: nothing goes on the waiting list by itself.'
@@ -1480,7 +1521,7 @@ document.addEventListener('click', (e) => {
     case 'rh-connect': void run(async () => { S.rh = await api.connectRobinhood(); renderAccount(); toast("Robinhood's sign-in page is opening in your browser."); void refreshRobinhood();
 void loadTrading(); }); break;
     case 'rh-check': void run(async () => { S.rh = await api.checkRobinhood(); renderAccount(); void loadSnapshot(); toast(S.rh.state === 'connected' ? 'Robinhood answered: the connection works.' : S.rh.message, S.rh.state === 'connected' ? 'ok' : 'bad'); }); break;
-    case 'rh-forget': void run(async () => { S.rh = await api.disconnectRobinhood(); A.snapshot = null; A.chosen = []; A.picking = false; CARE.holdings = []; renderAccount(); renderViews(); renderCare(); toast('The saved Robinhood sign-in is deleted from this computer.'); }); break;
+    case 'rh-forget': void run(async () => { S.rh = await api.disconnectRobinhood(); A.snapshot = null; A.chosen = []; A.picking = false; CARE.holdings = []; renderAccount(); renderViews(); renderCare(); void loadTrading(); toast('The saved Robinhood sign-in is deleted from this computer, and trading is switched off.'); }); break;
     case 'acc-pick': void openPicker(); break;
     case 'acc-toggle': { const k = el.dataset.key ?? ''; if (A.pick.has(k)) A.pick.delete(k); else A.pick.add(k); renderViews(); break; }
     case 'acc-cancel': A.picking = false; renderViews(); break;
@@ -1505,7 +1546,11 @@ document.addEventListener('keydown', (e) => {
 // market and the kind, with the desk's latest rating and a mark when it is already watched. An empty box shows the
 // stocks they looked at last. Arrow keys move, Enter picks (the first match when none is marked), Esc closes.
 type FindRow = { symbol: string; name: string; exchange?: string; kind?: string };
-const F = { mode: 'closed' as 'closed' | 'recent' | 'loading' | 'matches' | 'failed', query: '', matches: [] as Match[], active: -1, seq: 0, timer: null as ReturnType<typeof setTimeout> | null };
+/** `found`: the words the matches are for; `active`: the row marked, kept while the list is closed until the words change. */
+const F = { mode: 'closed' as 'closed' | 'recent' | 'loading' | 'matches' | 'failed', query: '', matches: [] as Match[], found: '', active: -1, seq: 0, timer: null as ReturnType<typeof setTimeout> | null };
+/** The match marked first: the ticker typed, when it was typed as a ticker is written (in capitals: "FORD"); else Yahoo's
+ *  own first, so a company typed by its name ("Ford") marks Ford Motor (F), not the company whose ticker is FORD. */
+const markedOf = (matches: readonly Match[], q: string): number => (!matches.length ? -1 : Math.max(0, q === q.toUpperCase() ? matches.findIndex((m) => m.symbol === q) : -1));
 const FIND_QUERY = /^[\p{L}\p{N} .&'\-^=,]{1,40}$/u;
 const findInput = $<HTMLInputElement>('#addInput');
 
@@ -1546,12 +1591,11 @@ async function findNow(q: string): Promise<Match | null> {
   try {
     const { matches } = await api.search(q);
     if (seq !== F.seq) return null;
-    F.matches = matches; F.mode = 'matches';
-    const exact = matches.findIndex((m) => m.symbol === q.toUpperCase());
-    F.active = matches.length ? Math.max(0, exact) : -1;
+    F.matches = matches; F.found = q; F.mode = 'matches';
+    F.active = markedOf(matches, q);
   } catch {
     if (seq !== F.seq) return null;
-    F.matches = []; F.mode = 'failed'; F.active = -1;
+    F.matches = []; F.found = ''; F.mode = 'failed'; F.active = -1;
   }
   renderFind();
   return F.matches[F.active] ?? null;
@@ -1559,8 +1603,8 @@ async function findNow(q: string): Promise<Match | null> {
 
 function closeFind(clear = false): void {
   if (F.timer) { clearTimeout(F.timer); F.timer = null; }
-  F.seq++; F.mode = 'closed'; F.active = -1;
-  if (clear) { findInput.value = ''; F.matches = []; F.query = ''; }
+  F.seq++; F.mode = 'closed';
+  if (clear) { findInput.value = ''; F.matches = []; F.found = ''; F.query = ''; F.active = -1; }
   renderFind();
 }
 
@@ -1576,7 +1620,7 @@ findInput.addEventListener('input', () => {
   const q = findInput.value.trim();
   if (F.timer) { clearTimeout(F.timer); F.timer = null; }
   F.active = -1;
-  if (!q) { F.seq++; F.query = ''; F.matches = []; F.mode = P.recent?.length ? 'recent' : 'closed'; renderFind(); return; }
+  if (!q) { F.seq++; F.query = ''; F.matches = []; F.found = ''; F.mode = P.recent?.length ? 'recent' : 'closed'; renderFind(); return; }
   if (!FIND_QUERY.test(q)) { closeFind(); return; }
   F.query = q; F.mode = 'loading'; renderFind();
   F.timer = setTimeout(() => { F.timer = null; void findNow(q); }, 250);   // Yahoo is asked once the typing pauses
@@ -1586,7 +1630,7 @@ findInput.addEventListener('blur', () => closeFind());
 findInput.addEventListener('keydown', (e) => {
   const rows = findRows();
   if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-    if (F.mode === 'closed' && !findInput.value.trim() && P.recent?.length) { F.mode = 'recent'; renderFind(); }
+    if (F.mode === 'closed' && !findInput.value.trim() && P.recent?.length) { F.mode = 'recent'; F.active = -1; renderFind(); }
     const n = findRows().length;
     if (!n) return;
     e.preventDefault();
@@ -1598,14 +1642,21 @@ findInput.addEventListener('keydown', (e) => {
 // A press on the list must not take the focus from the box first, or the list would close before the press lands.
 $('#findPanel').addEventListener('mousedown', (e) => e.preventDefault());
 
+// Pressing "Add to watchlist" must not take the focus from the box either: the list, and the row marked in it, stay.
+$('#addForm button[type="submit"]').addEventListener('mousedown', (e) => e.preventDefault());
+
+// Add, like Enter, takes the match the list marks, never the typed words: "Apple" adds AAPL, which Yahoo prices, not
+// "APPLE". Its matches for these very words stand though the list closed (Tab to the button, Esc); pressed before they
+// came, it waits for them. The typed words go as a ticker only when Yahoo's search matched nothing or did not answer.
 $('#addForm').addEventListener('submit', (e) => {
   e.preventDefault();
   void (async () => {
     const q = findInput.value.trim();
     if (!q) return;
-    if (F.mode === 'loading' && FIND_QUERY.test(q)) {   // Enter before the matches came: wait for them, then take the best
+    if (FIND_QUERY.test(q)) {
       if (F.timer) { clearTimeout(F.timer); F.timer = null; }
-      const best = await findNow(q);
+      const listed = F.found === q ? F.matches : null;
+      const best = listed ? listed[F.active >= 0 && F.active < listed.length ? F.active : markedOf(listed, q)] ?? null : await findNow(q);
       if (best) { pick(best); return; }
     }
     closeFind(true);
@@ -1622,8 +1673,10 @@ if (here.theme !== 'light' && here.theme !== 'dark') setTheme(matchMedia('(prefe
 async function loadPrefs(): Promise<void> {
   try {
     const kept = await api.prefs();
+    // The morning switch as the desk keeps it, so it is drawn as it is before the first look of the day comes (a minute)
+    if (!MORNING.known) { MORNING.on = kept.morning === true; MORNING.from = MORNING.on ? kept.morningFrom ?? '' : ''; MORNING.known = true; }
     if (Object.keys(kept).length) adopt(kept);
-    else if (Object.values(here).some((v) => v !== undefined)) remember({});
+    else if (Object.values(here).some((v) => v !== undefined)) remember({ ...P });
     try { localStorage.setItem('ta.prefs', JSON.stringify(P)); } catch { /* the page works without it */ }
   } catch { /* this browser's copy stands */ }
   if (P.view === 'account') showView('account', false);

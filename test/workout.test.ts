@@ -6,7 +6,7 @@ import { configure } from '../src/data/http.js';
 import { evaluate, shown, workOut } from '../src/data/workout.js';
 import { clearCache } from '../src/data/yahoo.js';
 import { deskServer } from '../src/tools/server.js';
-import { chartFetch, series } from './chart.js';
+import { chartFetch, chartJson, series } from './chart.js';
 
 beforeEach(() => { process.env.TRADING_AGENTS_TODAY = '2026-11-06'; clearCache(); });
 
@@ -28,7 +28,8 @@ test('a sum is read by the desk\'s own parser: the usual order, brackets, a perc
 test('what it cannot work out is said plainly, and nothing in a sum is run as code', () => {
   const no = (e: string, why: RegExp) => assert.throws(() => evaluate(e), why, e);
   no('1,234 + 5', /a comma outside a function's brackets: write numbers without thousands commas/);
-  no('change(1,234, 1,300)', /change takes 2 numbers, not 4/);
+  no('change(1,234, 1,300)', /"1,234" reads as a number written with a thousands comma/);
+  no('change(1, 2, 3)', /change takes 2 numbers, not 3/);
   no('5 / (3 - 3)', /divides by zero/);
   no('(1 + 2', /a bracket is not closed/);
   no('process.exit(1)', /"process" is not something it knows/);
@@ -81,4 +82,50 @@ test('the server offers the calculator to the agents', async () => {
   const r = await client.callTool({ name: 'work_out', arguments: { analysis_date: '2026-11-06', sums: [{ expression: 'change(100, 103)' }], dates: [{ date: '2026-11-07' }] } }) as { content: Array<{ text: string }> };
   assert.match(r.content[0]!.text, /- change\(100, 103\) = 3\n[\s\S]*- 2026-11-07 is a Saturday\./);
   await client.close();
+});
+
+// Audit 3 prices-2 (9 Nov 2026): the desk's own tables print volumes with thousands commas ("149,033,300") and work_out
+// prints its results with them, so an agent copying a figure wrote one into avg, sum, min, max or round, where every
+// comma started a new number: avg(45,123,456, 38,000,123) came out as 130.8333, with a sum beside it that looked checked.
+test('a number written with a thousands comma inside a helper\'s brackets is refused, never read as several numbers', () => {
+  for (const e of ['avg(45,123,456, 38,000,123)', 'sum(45,123,456, 50,000,000)', 'max(1,234.50, 999.10)', 'min(1,234.50, 1,300.00)', 'avg(186.64, 1,250.00)', 'round(1,234.567)', 'sum(149,033,300)', 'change(1,234, 1,300)']) {
+    assert.throws(() => evaluate(e), /"[\d.]+,\d{3}[\d.,]*" reads as a number written with a thousands comma: write numbers without them \(1234567, not 1,234,567\), and put a space after each comma between numbers \(avg\(100, 200\)\)/, e);
+  }
+  assert.equal(evaluate('avg(45123456, 38000123)'), 41561789.5);
+  assert.equal(evaluate('sum(1, 2,3)'), 6, 'a comma before one or two digits is a list');
+  assert.equal(evaluate('max(1, 1000)'), 1000, 'a comma with a space after it is a list');
+});
+
+// Audit 3 prices-11: round() multiplied by a power of ten, so a half stored a hair low in binary was rounded down.
+test('round() rounds a half away from zero, as a person rounding by hand does', () => {
+  assert.equal(evaluate('round(1.255, 2)'), 1.26);
+  assert.equal(evaluate('round(1.005, 2)'), 1.01);
+  assert.equal(evaluate('round(-2.5)'), -3);
+  assert.equal(evaluate('round(2.5)'), 3);
+  assert.equal(evaluate('round(-1.255, 2)'), -1.26);
+  assert.equal(evaluate('round(2.345, 2)'), 2.35);
+  assert.equal(evaluate('round(1234.5678, 2)'), 1234.57);
+  assert.equal(evaluate('round(1250, -2)'), 1300);
+  assert.equal(evaluate('round(0.000123456, 6)'), 0.000123);
+  assert.equal(evaluate('round(1e-7, 2)'), 0);
+  assert.equal(shown(evaluate('round(-0.4)')), '0');
+  assert.throws(() => evaluate('round(1.5, 0.5)'), /round\(a, d\) needs d as a whole number of decimals/);
+});
+
+// Audit 3 prices-9: a morning run before the open asked about today and was told the stock "did not trade" that day,
+// while the checked price table at the same moment said the session had not opened yet.
+test('before the open, today\'s session is said not to have opened yet, never "did not trade"', async () => {
+  process.env.TRADING_AGENTS_TODAY = '2026-11-09';
+  const real = Date.now;
+  Date.now = () => Date.parse('2026-11-09T13:00:00Z');   // 08:00 in New York, before the 09:30 open
+  try {
+    const regular = { start: Date.parse('2026-11-09T14:30:00Z') / 1000, end: Date.parse('2026-11-09T21:00:00Z') / 1000 };
+    configure({ fetch: async () => new Response(JSON.stringify(chartJson('NVDA', series('2026-11-06', 300), { currentTradingPeriod: { regular } }))) });
+    const t = await workOut('2026-11-09', [], [{ date: '2026-11-09', symbol: 'NVDA' }, { from: '2026-11-05', to: '2026-11-09', symbol: 'NVDA' }, { from: '2026-11-09', to: '2026-11-09', symbol: 'NVDA' }]);
+    assert.doesNotMatch(t, /did not trade|was not a session/);
+    const lines = t.split('\n').slice(2);
+    assert.equal(lines[0], '- 2026-11-09 is a Monday. NVDA\'s session that day has not opened yet (it opens at 09:30 America/New_York time); its latest session before it: 2026-11-06 (Fri).');
+    assert.match(lines[1]!, /NVDA traded on 1 session after 2026-11-05 up to and including 2026-11-09 \(the first 2026-11-06 \(Fri\), the last 2026-11-06 \(Fri\)\); 2026-11-05 itself was a session, so both included it is 2\. 2026-11-09's session has not opened yet \(it opens at 09:30 America\/New_York time\): it is not counted\.$/);
+    assert.match(lines[2]!, /NVDA traded on 0 sessions after 2026-11-09 up to and including 2026-11-09; 2026-11-09 itself has not opened yet \(it opens at 09:30 America\/New_York time\)\.$/);
+  } finally { Date.now = real; }
 });

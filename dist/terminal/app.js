@@ -215,6 +215,8 @@
   };
   var MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   var dayText = (iso) => {
+    const t = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(iso) ? new Date(iso) : null;
+    if (t && !Number.isNaN(t.getTime())) return `${t.getDate()} ${MON[t.getMonth()]} ${t.getFullYear()}`;
     const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
     return m ? `${Number(m[3])} ${MON[Number(m[2]) - 1]} ${m[1]}` : iso;
   };
@@ -296,6 +298,31 @@
     return hit;
   }
 
+  // src/terminal/ui/bars.ts
+  var MON2 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  var monthYear = (iso) => `${MON2[Number(iso.slice(5, 7)) - 1]} ${iso.slice(0, 4)}`;
+  function barsOf(h) {
+    const day = (b) => ({ date: b.date, label: shortDay(b.date), o: b.open, h: b.high, l: b.low, c: b.close, v: b.volume });
+    if (h.range !== "5Y") return { bars: h.bars.map(day), ma50: h.ma50, ma200: h.ma200 };
+    const bars = [], ma50 = [], ma200 = [];
+    for (let i = 0; i < h.bars.length; i += 5) {
+      const g = h.bars.slice(i, i + 5), end = g[g.length - 1];
+      bars.push({ date: end.date, from: g[0].date, label: monthYear(end.date), o: g[0].open, h: Math.max(...g.map((b) => b.high)), l: Math.min(...g.map((b) => b.low)), c: end.close, v: g.some((b) => b.volume === null) ? null : g.reduce((a, b) => a + b.volume, 0) });
+      ma50.push(h.ma50[i + g.length - 1] ?? null);
+      ma200.push(h.ma200[i + g.length - 1] ?? null);
+    }
+    return { bars, ma50, ma200 };
+  }
+  var spanText = (from, to) => from.slice(0, 4) === to.slice(0, 4) ? `${shortDay(from)} to ${dayText(to)}` : `${dayText(from)} to ${dayText(to)}`;
+  var volumeWords = (v) => v === null || !Number.isFinite(v) || v <= 0 ? "not given" : new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(v);
+  function tipOf(bars, i, unit) {
+    const b = bars[i], before = i > 0 ? bars[i - 1] : null;
+    const change = before === null ? null : unit === "%" ? b.c - before.c : (b.c / before.c - 1) * 100;
+    const move = change === null ? "" : ` <span class="at-chip ${tone(change)}" title="From the close of ${esc(dayText(before.date))}">${unit === "%" ? points(change) : pct(change)}</span>`;
+    const fact = (k, v) => `<div><dt>${k}</dt><dd>${v}</dd></div>`;
+    return `<div class="at-tile-name">${esc(b.from && b.from !== b.date ? spanText(b.from, b.date) : dayText(b.date))}</div><dl class="at-facts">${fact("Open", num(b.o))}${fact("High", num(b.h))}${fact("Low", num(b.l))}${fact("Close", `${num(b.c)}${move}`)}${fact("Volume", volumeWords(b.v))}</dl>`;
+  }
+
   // src/terminal/ui/chart.ts
   function smooth(pts) {
     const n = pts.length;
@@ -365,19 +392,6 @@
     s += `<text x="0" y="${H - 6}" class="ch-axis">${esc(shortDay(series[0].date))}</text><text x="${pw}" y="${H - 6}" text-anchor="end" class="ch-axis">${esc(shortDay(series.at(-1).date))}</text></svg>`;
     el.innerHTML = s;
   }
-  var monthYear = (iso) => (/* @__PURE__ */ new Date(`${iso}T00:00:00Z`)).toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
-  function barsOf(h) {
-    const day = (b) => ({ date: b.date, label: shortDay(b.date), o: b.open, h: b.high, l: b.low, c: b.close, v: b.volume });
-    if (h.range !== "5Y") return { bars: h.bars.map(day), ma50: h.ma50, ma200: h.ma200 };
-    const bars = [], ma50 = [], ma200 = [];
-    for (let i = 0; i < h.bars.length; i += 5) {
-      const g = h.bars.slice(i, i + 5), end = g[g.length - 1];
-      bars.push({ date: end.date, label: monthYear(end.date), o: g[0].open, h: Math.max(...g.map((b) => b.high)), l: Math.min(...g.map((b) => b.low)), c: end.close, v: g.some((b) => b.volume === null) ? null : g.reduce((a, b) => a + b.volume, 0) });
-      ma50.push(h.ma50[i + g.length - 1] ?? null);
-      ma200.push(h.ma200[i + g.length - 1] ?? null);
-    }
-    return { bars, ma50, ma200 };
-  }
   function heroChart(el, tip, h, o) {
     const { bars, ma50, ma200 } = barsOf(h), n = bars.length;
     if (n < 2) {
@@ -440,8 +454,7 @@
       xhl.setAttribute("x2", String(x(i)));
       xhd.setAttribute("cx", String(x(i)));
       xhd.setAttribute("cy", String(y(b.c)));
-      const move = (b.c / b.o - 1) * 100;
-      tip.innerHTML = `<div class="at-tile-name">${dayText(b.date)}</div><dl class="at-facts"><div><dt>Open</dt><dd>${num(b.o)}</dd></div><div><dt>High</dt><dd>${num(b.h)}</dd></div><div><dt>Low</dt><dd>${num(b.l)}</dd></div><div><dt>Close</dt><dd>${num(b.c)} <span class="at-chip ${tone(move)}">${pct(move)}</span></dd></div><div><dt>Volume</dt><dd>${b.v === null ? "not given" : `${(b.v / 1e6).toFixed(1)}M`}</dd></div></dl>`;
+      tip.innerHTML = tipOf(bars, i, o.unit);
       tip.classList.add("on");
       const tw = tip.offsetWidth;
       let left = x(i) + 16;
@@ -461,7 +474,7 @@
   var cells = (line) => line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
   var isRule = (line) => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(line);
   function markdown(source) {
-    const lines = source.replace(/\r\n?/g, "\n").split("\n"), out = [];
+    const lines = source.replace(/\r\n?/g, "\n").replace(/\u{2028}/gu, " ").replace(/\u{2029}/gu, "\n\n").split("\n"), out = [];
     let i = 0;
     while (i < lines.length) {
       const line = lines[i];
@@ -498,15 +511,27 @@
           items.push(`<li>${inline(m[3])}</li>`);
           i++;
         }
-        out.push(ordered ? `<ol>${items.join("")}</ol>` : `<ul>${items.join("")}</ul>`);
-        continue;
+        if (items.length) {
+          out.push(ordered ? `<ol>${items.join("")}</ol>` : `<ul>${items.join("")}</ul>`);
+          continue;
+        }
       }
-      const para = [];
+      const para = [lines[i++]];
       while (i < lines.length && lines[i].trim() && !/^(#{1,6}\s|\s*(?:[-*+•]|\d+[.)])\s)/.test(lines[i]) && !(lines[i].includes("|") && i + 1 < lines.length && isRule(lines[i + 1]))) para.push(lines[i++]);
       out.push(`<p>${inline(para.join(" "))}</p>`);
     }
     return out.join("");
   }
+
+  // src/terminal/ui/typed.ts
+  function typedNumber(typed) {
+    const s = typed.replace(/[$%\s]/g, "");
+    if (/^[1-9]\d{0,2}(,\d{3})+(\.\d+)?$/.test(s)) return Number(s.replace(/,/g, ""));
+    if (/^\d+,\d{1,2}$/.test(s)) return Number(s.replace(",", "."));
+    if (/^\d+(\.\d+)?$/.test(s)) return Number(s);
+    return NaN;
+  }
+  var sameFigures = (asked, now) => asked.id === now.id && asked.quantity === now.quantity && asked.limit === now.limit;
 
   // src/data/symbols.ts
   var CRYPTO_BASES = /* @__PURE__ */ new Set(["BTC", "ETH", "SOL", "XRP", "ADA", "DOGE", "LTC", "BCH", "DOT", "AVAX", "LINK"]);
@@ -554,9 +579,11 @@
   var marketOf = (sym) => S.markets.find((m) => m.symbol === sym);
   var say = (e) => e instanceof ApiError ? e.message : "The dashboard could not reach the desk.";
   var P = {};
+  var unsent = {};
   var saving = null;
   function remember(change) {
     Object.assign(P, change);
+    Object.assign(unsent, change);
     try {
       localStorage.setItem("ta.prefs", JSON.stringify(P));
     } catch {
@@ -564,7 +591,10 @@
     if (saving) clearTimeout(saving);
     saving = setTimeout(() => {
       saving = null;
-      void api.savePrefs(P).catch(() => {
+      const send = { ...unsent };
+      for (const k of Object.keys(send)) delete unsent[k];
+      void api.savePrefs(send).catch(() => {
+        for (const [k, v] of Object.entries(send)) if (!(k in unsent)) Object.assign(unsent, { [k]: v });
       });
     }, 400);
   }
@@ -798,11 +828,15 @@
       if (el.dataset.delay === "short") el.title = DELAY_SENTENCE;
     }
   }
+  var sideMove = (q2) => {
+    const day = moveDayOf(q2.asOf);
+    return q2.changePct === null ? "\u2014" : `${moveText(q2)}${day ? ` \xB7 ${chipDay(day)}` : ""}`;
+  };
   function renderFavs() {
     const favs = (S.desk?.watchlist ?? []).filter((w) => w.favourite);
     $("#favs").innerHTML = favs.length ? favs.map((w) => {
       const q2 = quoteOf(w.symbol);
-      return `<button class="at-li ${w.symbol === S.symbol ? "on" : ""}" data-act="select" data-symbol="${esc(w.symbol)}"><span class="at-li-t">${esc(w.symbol)}</span><small>${q2 ? pct(q2.changePct) : ""}</small></button>`;
+      return `<button class="at-li ${w.symbol === S.symbol ? "on" : ""}" data-act="select" data-symbol="${esc(w.symbol)}"><span class="at-li-t">${esc(w.symbol)}</span><small>${q2 ? sideMove(q2) : ""}</small></button>`;
     }).join("") : '<p class="at-quiet">Star a stock in the watchlist to keep it here.</p>';
   }
   var RH_WORDS = {
@@ -1065,6 +1099,7 @@
       renderCall();
       renderStock();
       void loadCare();
+      void loadTrading();
     }
   }
   async function openPicker() {
@@ -1119,7 +1154,7 @@
     <div class="at-row">${rhButton("caps-edit", "Change the caps\u2026")}</div>`;
   }
   var capsTyped = () => {
-    const n = (id) => Number($(id).value.replace(/[$,%\s]/g, ""));
+    const n = (id) => typedNumber($(id).value);
     return { perOrderUsd: n("#capOrder"), perStockPercent: n("#capStock"), ordersPerDay: n("#capDay"), perSectorPercent: n("#capSector"), cryptoPercent: n("#capCrypto"), weeklyLossPercent: n("#capWeek"), minHoldDays: n("#capHold") };
   };
   function switchBlock() {
@@ -1127,12 +1162,13 @@
     <p class="at-lede">You can place an order from a ticket, from one of the desk's calls (Decide\u2026) or your own (Trade\u2026), in the Agentic account only, within your caps, after Robinhood's check and your Confirm.</p>
     <div class="at-row">${rhButton("tr-off", "Switch trading off")}</div>`;
     if (!TR.asking) return `<div class="at-card-head"><h3>Trading</h3><span class="at-chip">Off</span></div>
-    ${TR.state?.offBecause ? `<p class="at-honest bad">${esc(TR.state.offBecause.words)}</p>` : ""}<p class="at-lede">With trading off, a ticket can be checked by Robinhood but never placed.</p>${recordLine()}<div class="at-row">${rhButton("tr-ask", "Switch trading on\u2026")}</div>`;
+    ${TR.state?.offBecause ? `<p class="at-honest bad">${esc(daysInWords(TR.state.offBecause.words))}</p>` : ""}<p class="at-lede">With trading off, a ticket can be checked by Robinhood but never placed.</p>${recordLine()}<div class="at-row">${rhButton("tr-ask", "Switch trading on\u2026")}</div>`;
     return `<div class="at-card-head"><h3>Switch trading on?</h3></div>
     <p class="at-lede">From then on, a ticket you open, from one of the desk's calls or your own, can place a real order with real money in your Agentic account. Every order still needs Robinhood's check with no alerts, your caps, and your own Confirm naming the exact order. Keep Robinhood's approval on your phone switched on until you trust the desk. This is not investment advice.</p>
     ${recordLine()}${young() ? `<p class="at-honest bad">That is under ${esc(S.desk?.paper.minWords ?? "")}: too little to tell whether the desk's calls are any good. Read your paper record first.</p><div class="at-row">${TR.understood ? '<span class="at-chip ok">You understand</span>' : rhButton("tr-understood", "I understand")}</div>` : ""}
     <div class="at-row">${young() && !TR.understood ? "" : rhButton("tr-on", "Yes, switch trading on", { primary: true })}${rhButton("tr-cancel", "Cancel")}</div>`;
   }
+  var daysInWords = (said) => said.replace(/\b\d{4}-\d{2}-\d{2}\b/g, dayText);
   async function loadTrading() {
     try {
       TR.state = await api.trading();
@@ -1148,17 +1184,18 @@
     const t = T.open;
     if (!t) return;
     const asks = T.checks.filter((c) => c.ask), ok = T.checks.length > 0 && T.checks.every((c) => c.ok) && (!asks.length || T.early);
-    const checks = t.proposal.order ? `<div class="at-card-head"><h3>Your checks</h3></div><div class="at-row">${T.checks.map((c) => `<span class="at-chip ${c.ask ? "warn" : c.ok ? "ok" : "danger"}">${esc(c.words)}</span>`).join("")}</div>` : "";
+    const checks = t.proposal.order ? `<div class="at-card-head"><h3>Your checks</h3></div><div class="at-row ta-checks">${T.checks.map((c) => `<span class="at-chip ${c.ask ? "warn" : c.ok ? "ok" : "danger"}">${esc(c.words)}</span>`).join("")}</div>` : "";
     const r = T.review;
-    const review = r ? `<div class="at-card at-box"><div class="at-card-head"><h3>${term("dryRun")}</h3>${!r.answered ? '<span class="at-chip danger">Robinhood reported an error</span>' : r.alerts.length ? `<span class="at-chip danger">${r.alerts.length} alert(s)</span>` : '<span class="at-chip ok">No alerts</span>'}</div>
+    const review = r ? `<div class="at-card at-box"><div class="at-card-head"><h3>${term("dryRun")}</h3>${!r.answered ? `<span class="at-chip danger">${r.unclear ? "Not checked" : "Robinhood reported an error"}</span>` : r.alerts.length ? `<span class="at-chip danger">${r.alerts.length} alert(s)</span>` : '<span class="at-chip ok">No alerts</span>'}</div>
       ${r.error ? `<p class="at-honest bad">${esc(r.error)}</p>` : ""}${r.alerts.map((a) => `<p class="at-honest bad">${esc(a)}</p>`).join("")}
       ${r.approvalRequired === null ? "" : `<p class="at-lede">${r.approvalRequired ? "Robinhood would ask you to approve this order on your phone before it is sent." : "Robinhood would not ask for your approval on your phone: an order would be sent at once."}</p>`}
       ${r.facts.length ? `<dl class="at-facts ruled at-box">${r.facts.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>` : ""}
       <p class="at-quiet">This was Robinhood's dry run: nothing was placed.</p></div>` : "";
     const clean = !!r && r.answered && r.alerts.length === 0;
     const p = T.placed;
-    const placed = p ? `<div class="at-card at-box"><div class="at-card-head"><h3>Sent to Robinhood</h3>${p.answered ? '<span class="at-chip ok">Robinhood took it</span>' : '<span class="at-chip danger">Robinhood refused it</span>'}</div>
+    const placed = p ? `<div class="at-card at-box"><div class="at-card-head"><h3>Sent to Robinhood</h3>${p.answered ? '<span class="at-chip ok">Robinhood took it</span>' : p.unknown ? '<span class="at-chip warn">No clear answer</span>' : '<span class="at-chip danger">Robinhood refused it</span>'}</div>
       ${p.error ? `<p class="at-honest bad">${esc(p.error)}</p>` : ""}
+      ${p.unknown ? `<p class="at-lede">It is in the desk's order log as sent, so it counts towards your orders a day. This ticket sends nothing more.</p>` : ""}
       ${p.answered ? `<p class="at-lede">${p.approvalRequired === true ? "Robinhood now asks you to approve it on your phone: it is not sent to the market until you do." : p.approvalRequired === false ? "Robinhood sent it to the market." : "Check the order in Robinhood."}${p.state ? ` State: ${esc(p.state)}.` : ""}</p>` : ""}
       ${p.facts.length ? `<dl class="at-facts ruled at-box">${p.facts.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>` : ""}</div>` : "";
     let buttons = "";
@@ -1179,7 +1216,7 @@
     renderTicketDyn();
     try {
       T.placed = (await api.placeTicket(t.id, T.confirm, T.early)).placed;
-      toast(T.placed.answered ? "The order is with Robinhood." : "Robinhood refused the order.", T.placed.answered ? "ok" : "bad");
+      toast(T.placed.answered ? "The order is with Robinhood." : T.placed.unknown ? "No clear answer from Robinhood: look in its app before you try again." : "Robinhood refused the order.", T.placed.answered ? "ok" : "bad");
       void readAccounts();
       void loadTrading();
     } catch (e) {
@@ -1198,7 +1235,7 @@
     const head = t.own ? `<div class="ta-pophead"><h2>${esc(`${side === "buy" ? "Buy" : "Sell"} ${c.symbol}`)}</h2><div class="at-seg" role="tablist" aria-label="Buy or sell">${["buy", "sell"].map((s) => `<button class="at-seg-b${s === side ? " on" : ""}" data-act="tk-side" data-side="${s}" data-symbol="${esc(c.symbol)}">${s === "buy" ? "Buy" : "Sell"}</button>`).join("")}</div>${close}</div>
     <p class="at-lede">Your own order, not one of the desk's calls: in the Agentic account only, within your caps, after Robinhood's check and your Confirm.</p>` : `<div class="ta-pophead"><h2>${esc(o ? `${o.side === "buy" ? "Buy" : "Sell"} ${c.symbol}` : `No order for ${c.symbol}`)}</h2>${ratingChip(c.rating)}${close}</div>
     <p class="at-lede">The desk rated ${esc(c.symbol)} ${esc(c.rating)} on ${esc(dayText(c.callDate))}: ${esc(t.proposal.action)}. In the Agentic account only.</p>`;
-    $("#tkHead").innerHTML = `${head}
+    $("#tkHead").innerHTML = `${head}${t.lost ? `<p class="at-honest bad">${esc(daysInWords(t.lost))}</p>` : ""}
     <dl class="at-facts ruled at-box"><div><dt>Account value</dt><dd>${money(c.accountValue)}</dd></div><div><dt>Buying power</dt><dd>${money(c.buyingPower)}</dd></div><div><dt>Held now</dt><dd>${esc(String(c.held))} share(s)</dd></div><div><dt>Live price</dt><dd>${money(c.price)}</dd></div><div><dt>Orders today</dt><dd>${c.ordersToday} of ${t.caps.ordersPerDay}</dd></div></dl>
     ${t.proposal.why.map((w) => `<p class="at-quiet">${esc(w)}</p>`).join("")}`;
     $("#tkFields").innerHTML = o ? `<div class="at-row">
@@ -1230,12 +1267,13 @@
       dlg.close();
       toast(say(e), "bad");
     }
+    void loadTrading();
   }
   function ticketEdited() {
     const t = T.open;
     if (!t?.proposal.order) return;
     T.quantity = Number($("#tkQty").value);
-    T.limit = Number($("#tkLimit").value.replace(/[$,\s]/g, ""));
+    T.limit = typedNumber($("#tkLimit").value);
     T.review = null;
     T.checks = [];
     T.confirming = false;
@@ -1250,16 +1288,18 @@
   async function reviewTicket() {
     const t = T.open;
     if (!t || T.busy) return;
+    const asked = { id: t.id, quantity: T.quantity, limit: T.limit };
     T.busy = true;
     renderTicketDyn();
     try {
       const r = await api.reviewTicket(t.id, T.quantity, T.limit, T.early);
+      TR.state = { ...TR.state, ...r.trading };
+      renderTrading();
+      if (!sameFigures(asked, { id: T.open?.id, quantity: T.quantity, limit: T.limit })) return;
       T.checks = r.checks;
       T.review = r.review;
       T.confirm = r.confirm;
       T.confirming = false;
-      TR.state = { ...TR.state, ...r.trading };
-      renderTrading();
     } catch (e) {
       toast(say(e), "bad");
     } finally {
@@ -1345,7 +1385,7 @@
       $("#heroNote").textContent = "";
       return;
     }
-    const info = heroChart(svg, tip, h, { kind: S.kind, layers: S.layers });
+    const info = heroChart(svg, tip, h, { kind: S.kind, layers: S.layers, unit: marketOf(sym)?.unit });
     $("#heroNote").textContent = info === null ? "Not enough prices to draw this range." : info.hasAverages ? "" : "Too few days of history for the averages.";
   }
   var compact = (n) => n === null || !Number.isFinite(n) || n <= 0 ? "\u2014" : new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(n);
@@ -1493,7 +1533,9 @@
     const latest = calls[0];
     const ag = A.snapshot?.views.find((v) => v.account.agentic);
     const mine = (ag?.orders?.orders ?? []).filter((o) => (o.symbol ?? "").toUpperCase() === sym);
-    const orders = !A.snapshot ? '<p class="at-quiet">Read your accounts to see your orders on it.</p>' : !ag ? '<p class="at-quiet">Show your Agentic account to see its orders.</p>' : ag.orders === null ? '<p class="at-quiet">The orders could not be read.</p>' : mine.length ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>When</th><th>Order</th><th class="num">Quantity</th><th class="num">Price</th><th>State</th></tr></thead><tbody>${mine.map((x) => `<tr><td>${esc(x.at ? dayText(x.at) : "\u2014")}</td><td>${esc(sideWord(x.side))}${x.type ? ` <small class="at-quiet">${esc(x.type)}</small>` : ""}</td><td class="num">${qty(x.quantity)}</td><td class="num">${money(x.price)}</td><td>${esc(x.state ?? "\u2014")}</td></tr>`).join("")}</tbody></table></div>` : `<p class="at-quiet">No orders on ${esc(sym)} in the Agentic account.</p>`;
+    const count = ag?.orders?.count ?? 0, shown = ag?.orders?.orders.length ?? 0, rest = count - shown, at = A.snapshot ? when(A.snapshot.at) : "";
+    const restWords = rest === 1 ? "the other one is not read here" : `the other ${rest} are not read here`;
+    const orders = !A.snapshot ? '<p class="at-quiet">Read your accounts to see your orders on it.</p>' : !ag ? '<p class="at-quiet">Show your Agentic account to see its orders.</p>' : ag.orders === null ? '<p class="at-quiet">The orders could not be read.</p>' : isCrypto(sym) ? `<p class="at-quiet">The dashboard reads the Agentic account's stock and fund orders only, so a coin's orders are not shown here.</p>` : mine.length ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>When</th><th>Order</th><th class="num">Quantity</th><th class="num">Price</th><th>State</th></tr></thead><tbody>${mine.map((x) => `<tr><td>${esc(x.at ? dayText(x.at) : "\u2014")}</td><td>${esc(sideWord(x.side))}${x.type ? ` <small class="at-quiet">${esc(x.type)}</small>` : ""}</td><td class="num">${qty(x.quantity)}</td><td class="num">${money(x.price)}</td><td>${esc(x.state ?? "\u2014")}</td></tr>`).join("")}</tbody></table></div>${rest > 0 ? `<p class="at-quiet">Read from ${shown} of the ${count} orders Robinhood listed at ${esc(at)}: ${restWords}.</p>` : ""}` : !count ? `<p class="at-quiet">Robinhood listed no orders for the Agentic account at ${esc(at)}.</p>` : rest > 0 ? `<p class="at-quiet">No orders on ${esc(sym)} among the ${shown} the dashboard reads of the ${count} orders Robinhood listed for the Agentic account at ${esc(at)}: ${restWords}, so ${rest === 1 ? "it" : "one of them"} may be.</p>` : `<p class="at-quiet">No orders on ${esc(sym)} among the ${count === 1 ? "one order" : `${count} orders`} Robinhood listed for the Agentic account at ${esc(at)}.</p>`;
     const trade = isStock(sym) ? `<div class="at-row">${["buy", "sell"].map((s) => `<button class="at-btn at-press" data-act="trade" data-side="${s}" data-symbol="${esc(sym)}"><svg class="g"><use href="#${s === "buy" ? "i-up" : "i-down"}"/></svg><span>${s === "buy" ? "Buy" : "Sell"} ${esc(sym)}\u2026</span></button>`).join("")}</div>` : "";
     $("#stockBody").innerHTML = `<div class="ta-col">
       <div class="at-card at-box"><div class="at-card-head"><h3>What you hold</h3></div>${held}${trade}</div>
@@ -1580,7 +1622,7 @@
       }
     }
   }
-  var MORNING = { weather: null, weatherFailed: "", screen: null, screenFailed: "", on: false, top: 3, from: "" };
+  var MORNING = { weather: null, weatherFailed: "", screen: null, screenFailed: "", on: false, known: false, top: 3, from: "" };
   var LINE_TONE = { ok: "ok", warn: "warn", bad: "danger", "": "" };
   function renderWeather() {
     const w = MORNING.weather, el = $("#weatherCard");
@@ -1605,7 +1647,7 @@
   function renderLook() {
     const s = MORNING.screen, el = $("#lookCard");
     const head = `<div class="at-card-head"><h3>Worth a look today</h3>${s ? `<span class="at-chip" title="How many funds and stocks were looked at">${s.picks.length} of ${s.looked}</span>` : ""}</div>`;
-    const sw = `<button class="at-toggle" data-act="morning-switch" role="switch" aria-checked="${MORNING.on}"><span class="at-switch${MORNING.on ? " on" : ""}"></span><span>Analyse the top ${MORNING.top} each market morning</span></button>
+    const sw = !MORNING.known ? `<p class="at-quiet">${MORNING.screenFailed ? "Whether" : "Reading whether"} "Analyse the top ${MORNING.top} each market morning" is on${MORNING.screenFailed ? " could not be read just now" : ""}.</p>` : `<button class="at-toggle" data-act="morning-switch" role="switch" aria-checked="${MORNING.on}"><span class="at-switch${MORNING.on ? " on" : ""}"></span><span>Analyse the top ${MORNING.top} each market morning</span></button>
     <p class="at-quiet">${MORNING.on ? `On${MORNING.from ? `, from ${esc(dayText(MORNING.from))}` : ""}: each market morning (before noon in New York), the top ${MORNING.top} not already called that day go on the waiting list at shallow depth, once. Each analysis is a full team run on the models of whatever runs it (Madav's own, or your Claude plan with Claude Code).` : `Off as shipped. When on, it starts the next market morning: then the top ${MORNING.top} go on the waiting list at shallow depth once each market morning, and run when something is listening. Switching it on puts nothing on the list at once.`}</p>`;
     if (!s) {
       el.innerHTML = `${head}<p class="at-quiet">${esc(MORNING.screenFailed || "Looking over the whole market, the sectors and your names: the first look of the day takes a minute.")}</p>${sw}`;
@@ -1632,6 +1674,7 @@
       api.screen().then(async (r) => {
         MORNING.screen = r.screen;
         MORNING.on = r.morning.on;
+        MORNING.known = true;
         MORNING.top = r.morning.top;
         MORNING.from = r.morning.from ?? "";
         MORNING.screenFailed = "";
@@ -1932,6 +1975,8 @@
       S.markets = (await api.markets()).markets;
       renderMarkets();
       renderHero();
+      renderFavs();
+      renderWatch();
     } catch {
     }
   }
@@ -1974,22 +2019,27 @@
       toast(l ? `${sym} is asked for: it runs by itself, and its call appears here.` : `${sym} is waiting. Nothing is listening yet: see Analyses you asked for.`);
     });
   }
+  var onShade = (e, dlg) => {
+    if (e.target !== dlg) return false;
+    const r = dlg.getBoundingClientRect();
+    return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+  };
   document.addEventListener("click", (e) => {
     const dlg = $("#callDialog");
-    if (e.target === dlg) {
+    if (onShade(e, dlg)) {
       dlg.close();
       return;
     }
-    if (e.target === $("#ticketDialog")) {
+    if (onShade(e, $("#ticketDialog"))) {
       $("#ticketDialog").close();
       T.open = null;
       return;
     }
-    if (e.target === $("#stopDialog")) {
+    if (onShade(e, $("#stopDialog"))) {
       $("#stopDialog").close();
       return;
     }
-    if (e.target === $("#glossDialog")) {
+    if (onShade(e, $("#glossDialog"))) {
       $("#glossDialog").close();
       return;
     }
@@ -2123,6 +2173,7 @@
         break;
       }
       case "morning-switch":
+        if (!MORNING.known) break;
         void run(async () => {
           const r = await api.setMorning(!MORNING.on);
           MORNING.on = r.morning.on;
@@ -2338,7 +2389,8 @@
           renderAccount();
           renderViews();
           renderCare();
-          toast("The saved Robinhood sign-in is deleted from this computer.");
+          void loadTrading();
+          toast("The saved Robinhood sign-in is deleted from this computer, and trading is switched off.");
         });
         break;
       case "acc-pick":
@@ -2396,7 +2448,8 @@
       renderStart();
     }
   });
-  var F = { mode: "closed", query: "", matches: [], active: -1, seq: 0, timer: null };
+  var F = { mode: "closed", query: "", matches: [], found: "", active: -1, seq: 0, timer: null };
+  var markedOf = (matches, q2) => !matches.length ? -1 : Math.max(0, q2 === q2.toUpperCase() ? matches.findIndex((m) => m.symbol === q2) : -1);
   var FIND_QUERY = /^[\p{L}\p{N} .&'\-^=,]{1,40}$/u;
   var findInput = $("#addInput");
   var findRows = () => F.mode === "recent" ? P.recent ?? [] : F.mode === "matches" || F.mode === "loading" ? F.matches : [];
@@ -2430,12 +2483,13 @@
       const { matches } = await api.search(q2);
       if (seq !== F.seq) return null;
       F.matches = matches;
+      F.found = q2;
       F.mode = "matches";
-      const exact = matches.findIndex((m) => m.symbol === q2.toUpperCase());
-      F.active = matches.length ? Math.max(0, exact) : -1;
+      F.active = markedOf(matches, q2);
     } catch {
       if (seq !== F.seq) return null;
       F.matches = [];
+      F.found = "";
       F.mode = "failed";
       F.active = -1;
     }
@@ -2449,11 +2503,12 @@
     }
     F.seq++;
     F.mode = "closed";
-    F.active = -1;
     if (clear) {
       findInput.value = "";
       F.matches = [];
+      F.found = "";
       F.query = "";
+      F.active = -1;
     }
     renderFind();
   }
@@ -2477,6 +2532,7 @@
       F.seq++;
       F.query = "";
       F.matches = [];
+      F.found = "";
       F.mode = P.recent?.length ? "recent" : "closed";
       renderFind();
       return;
@@ -2506,6 +2562,7 @@
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       if (F.mode === "closed" && !findInput.value.trim() && P.recent?.length) {
         F.mode = "recent";
+        F.active = -1;
         renderFind();
       }
       const n = findRows().length;
@@ -2522,17 +2579,19 @@
     }
   });
   $("#findPanel").addEventListener("mousedown", (e) => e.preventDefault());
+  $('#addForm button[type="submit"]').addEventListener("mousedown", (e) => e.preventDefault());
   $("#addForm").addEventListener("submit", (e) => {
     e.preventDefault();
     void (async () => {
       const q2 = findInput.value.trim();
       if (!q2) return;
-      if (F.mode === "loading" && FIND_QUERY.test(q2)) {
+      if (FIND_QUERY.test(q2)) {
         if (F.timer) {
           clearTimeout(F.timer);
           F.timer = null;
         }
-        const best = await findNow(q2);
+        const listed = F.found === q2 ? F.matches : null;
+        const best = listed ? listed[F.active >= 0 && F.active < listed.length ? F.active : markedOf(listed, q2)] ?? null : await findNow(q2);
         if (best) {
           pick(best);
           return;
@@ -2548,8 +2607,13 @@
   async function loadPrefs() {
     try {
       const kept = await api.prefs();
+      if (!MORNING.known) {
+        MORNING.on = kept.morning === true;
+        MORNING.from = MORNING.on ? kept.morningFrom ?? "" : "";
+        MORNING.known = true;
+      }
       if (Object.keys(kept).length) adopt(kept);
-      else if (Object.values(here).some((v) => v !== void 0)) remember({});
+      else if (Object.values(here).some((v) => v !== void 0)) remember({ ...P });
       try {
         localStorage.setItem("ta.prefs", JSON.stringify(P));
       } catch {

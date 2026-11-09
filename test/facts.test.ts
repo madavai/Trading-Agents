@@ -80,3 +80,36 @@ test('the server offers the price facts, held to the analysis date', async () =>
   await client.close();
   configure({ fetch: globalThis.fetch });
 });
+
+// Audit 3 prices-3 (9 Nov 2026): half an hour into a session, its volume so far is a fraction of a day's, and the facts
+// ranked it "the lightest volume of all 500 sessions on record" in every window, for the agents to quote.
+test('while the latest session is still trading, its volume so far is in no volume fact; once it is final, it is', () => {
+  const s = rows('2026-10-30', Array.from({ length: 300 }, (_, i) => 100 + (i % 7)), { 299: { volume: 110_000 } });
+  const live: Series = { ...s, meta: { ...s.meta, timezone: 'America/New_York', session: { date: '2026-10-30', start: Date.now() - 30 * 60_000, end: Date.now() + 6 * 3_600_000 } } };
+  const t = priceFactsText('ACME', '2026-10-30', live);
+  assert.doesNotMatch(t, /110,000/, 'not ranked, not set against the past');
+  assert.match(t, /\n- The latest row, 2026-10-30 \(Fri\), is not a finished session: its volume so far is not a whole day's, so it is left out of every volume fact here\.\n/);
+  assert.match(line(t, 'Lightest volume'), /^Lightest volume \| 1,000,280 on 2026-10-05 \(Mon\) \|/, 'the lightest of the 19 finished sessions');
+  assert.equal(line(t, '- Volume '), '');
+  const done = priceFactsText('ACME', '2026-10-30', s);
+  assert.match(line(done, 'Lightest volume'), /^Lightest volume \| 110,000 on 2026-10-30 \(Fri\)/, 'a finished session\'s volume is ranked');
+  assert.match(done, /- Volume 110,000 on 2026-10-30 \(Fri\): the lightest volume of all 300 sessions on record\./);
+  assert.doesNotMatch(done, /is not a finished session/);
+});
+
+// Audit 3 prices-7: a coin has a row every calendar day, so "the last 252 sessions (about a year)" was eight months.
+test('for a coin, which trades every day, the windows are counted in days: a month is 30, a year 365', () => {
+  const days = Array.from({ length: 700 }, (_, i) => new Date(Date.parse('2026-10-30T00:00:00Z') - (699 - i) * 86_400_000).toISOString().slice(0, 10));
+  const coin: Series = { meta: { symbol: 'BTC-USD', type: 'CRYPTOCURRENCY' }, bars: days.map((date, i) => ({ date, open: 100 + (i % 9), high: 101 + (i % 9), low: 99 + (i % 9), close: 100 + (i % 9), volume: 1_000_000 + i })) };
+  const t = priceFactsText('BTC-USD', '2026-10-30', coin);
+  for (const [n, words, from] of [[30, 'about a month', '2026-10-01 (Thu)'], [91, 'about three months', '2026-08-01 (Sat)'], [182, 'about six months', '2026-05-02 (Sat)'], [365, 'about a year', '2025-10-31 (Fri)']] as const) {
+    assert.match(t, new RegExp(`\nLast ${n} sessions \(${words}, from ${from.replace(/[()]/g, '\$&')}\) \| First \| Second \| Third\n`), `${n} days`);
+  }
+  assert.doesNotMatch(t, /Last 252 sessions|Last 20 sessions|Last 63 sessions|Last 126 sessions/);
+  assert.match(t, /A coin trades every day, so a session here is a calendar day; every date carries its weekday\./);
+  assert.match(t, /Fact \| Last 30 sessions \| Last 91 sessions \| Last 182 sessions \| Last 365 sessions \| Latest in the last year/);
+  assert.match(t, /Crossings in the last 365 sessions|No crossing in the last 365 sessions/);
+  const stock = priceFactsText('ACME', '2026-10-30', rows('2026-10-30', Array.from({ length: 300 }, (_, i) => 100 + (i % 9))));
+  assert.match(stock, /\nLast 252 sessions \(about a year, from /, 'a stock keeps its trading-day windows');
+  assert.doesNotMatch(stock, /A coin trades every day/);
+});

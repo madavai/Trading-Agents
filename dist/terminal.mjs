@@ -7493,7 +7493,7 @@ function pruneCache(dir) {
 var excerpt = (body) => body.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 140);
 async function getTextAt(url2, opts = {}) {
   const host = new URL(url2).host, cached3 = readCache(url2);
-  if (cached3 !== null) return cached3;
+  if (cached3 !== null && (!opts.usable || opts.usable(cached3.text))) return cached3;
   for (let attempt = 0; ; attempt++) {
     let res;
     await pace(host);
@@ -7522,7 +7522,7 @@ async function getTextAt(url2, opts = {}) {
       throw new Unavailable(`${host} refused (HTTP ${res.status})${said ? `, saying "${said}"` : ""}${res.status === 429 ? "; it is rate-limiting this computer, so try again in a few minutes" : ""}${sec ? emailNow().trim() ? " [a contact email was sent]" : " [no contact email was sent]" : ""}`);
     }
     const at = Date.now();
-    writeCache(url2, text2);
+    if (!opts.usable || opts.usable(text2)) writeCache(url2, text2);
     return { text: text2, at };
   }
 }
@@ -7530,12 +7530,19 @@ async function getJson(url2, opts = {}) {
   return (await getJsonAt(url2, opts)).value;
 }
 async function getJsonAt(url2, opts = {}) {
-  const { text: text2, at } = await getTextAt(url2, opts);
-  try {
-    return { value: JSON.parse(text2), at };
-  } catch {
-    throw new Unavailable(`${new URL(url2).host} answered with something that is not data`);
-  }
+  const read2 = {};
+  const usable = (text3) => {
+    try {
+      read2.value = JSON.parse(text3);
+      read2.text = text3;
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const { text: text2, at } = await getTextAt(url2, { ...opts, usable });
+  if (read2.text !== text2) throw new Unavailable(`${new URL(url2).host} answered with something that is not data`);
+  return { value: read2.value, at };
 }
 
 // src/terminal/server.ts
@@ -7554,6 +7561,14 @@ function today(now) {
 }
 var addDays = (date4, days) => new Date(Date.parse(`${date4}T00:00:00Z`) + days * DAY).toISOString().slice(0, 10);
 var daysBetween = (from, to) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY);
+
+// src/data/delay.ts
+var US_EXCHANGES = ["NMS", "NGM", "NCM", "NYQ", "PCX", "ASE", "BTS"];
+function priceMarket(listing) {
+  if (listing.instrumentType === "CRYPTOCURRENCY") return "coin";
+  if ((listing.instrumentType === "EQUITY" || listing.instrumentType === "ETF") && US_EXCHANGES.includes(listing.exchangeName ?? "")) return "us";
+  return "other";
+}
 
 // src/data/symbols.ts
 var FOREX = /* @__PURE__ */ new Set(["USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD", "CNY", "CNH", "HKD", "SGD", "SEK", "NOK", "DKK", "PLN", "MXN", "ZAR", "TRY", "INR", "KRW", "BRL", "RUB", "THB"]);
@@ -7632,11 +7647,21 @@ var HOSTS = ["https://query1.finance.yahoo.com", "https://query2.finance.yahoo.c
 var cache = /* @__PURE__ */ new Map();
 var epoch = (date4) => Math.floor(Date.parse(`${date4}T00:00:00Z`) / 1e3);
 var num = (v) => typeof v === "number" && Number.isFinite(v) ? v : null;
+function dayIn(zone, offset) {
+  const byOffset = (ts) => new Date((ts + offset) * 1e3).toISOString().slice(0, 10);
+  if (!zone) return byOffset;
+  try {
+    const f = new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" });
+    return (ts) => f.format(new Date(ts * 1e3));
+  } catch {
+    return byOffset;
+  }
+}
 function parseChart(json, symbol) {
   const r = json.chart?.result?.[0];
   if (!r) throw new NoData(`Yahoo Finance has no prices for ${symbol}${json.chart?.error?.description ? ` (${json.chart.error.description})` : ""}`);
   const m = r.meta ?? {}, q = r.indicators?.quote?.[0] ?? {}, adj = r.indicators?.adjclose?.[0]?.adjclose;
-  const offset = m.gmtoffset ?? 0, dayOf = (ts) => new Date((ts + offset) * 1e3).toISOString().slice(0, 10);
+  const dayOf = dayIn(m.exchangeTimezoneName, m.gmtoffset ?? 0);
   const rows = [], blank = [];
   (r.timestamp ?? []).forEach((ts, i) => {
     const open4 = num(q.open?.[i]), high = num(q.high?.[i]), low = num(q.low?.[i]), close = num(q.close?.[i]);
@@ -7659,7 +7684,7 @@ function parseChart(json, symbol) {
     if (amount !== null && amount > 0 && typeof d.date === "number" && Number.isFinite(d.date)) paid.set(dayOf(d.date), amount);
   }
   return {
-    meta: { symbol: m.symbol ?? symbol, currency: m.currency, exchange: m.fullExchangeName ?? m.exchangeName, type: m.instrumentType, name: m.longName ?? m.shortName, price: m.regularMarketPrice, timezone: m.exchangeTimezoneName, session },
+    meta: { symbol: m.symbol ?? symbol, currency: m.currency, exchange: m.fullExchangeName ?? m.exchangeName, type: m.instrumentType, name: m.longName ?? m.shortName, price: m.regularMarketPrice, timezone: m.exchangeTimezoneName, session, market: priceMarket(m) },
     bars: unique,
     unfilled,
     missing,
@@ -7686,9 +7711,11 @@ var KEEP_MS = keepFor(`${HOSTS[0]}/v8/finance/chart/`);
 async function daily(raw, from, to) {
   const symbol = normalizeSymbol(raw), key = `${symbol}|${from}|${to}`, hit = cache.get(key);
   if (!hit || Date.now() - hit.at >= KEEP_MS) {
-    const series = fetchDaily(symbol, from, to);
-    cache.set(key, { at: Date.now(), series });
-    series.catch(() => {
+    const series = fetchDaily(symbol, from, to), kept = { at: Date.now(), series };
+    cache.set(key, kept);
+    series.then((s2) => {
+      if (s2.fetchedAt !== void 0) kept.at = s2.fetchedAt;
+    }, () => {
       if (cache.get(key)?.series === series) cache.delete(key);
     });
   }
@@ -7803,23 +7830,28 @@ function check(o, c, t2, caps) {
     if (c.buyingPower === null) add(false, "Robinhood gave no buying power for the Agentic account");
     else add(cost <= c.buyingPower, cost <= c.buyingPower ? `Buying power ${money(c.buyingPower)} covers it` : `Buying power is ${money(c.buyingPower)}: not enough`);
     if (c.accountValue === null || c.accountValue <= 0) add(false, "Robinhood gave no total value for the Agentic account to check your per-stock cap");
+    else if (c.unreadOrders) add(false, `Robinhood listed ${c.unreadOrders} order(s) whose stock, side, size or state could not be read, so your per-stock and sector caps cannot be checked`);
     else {
-      const after = (c.held + o.quantity) * o.limitPrice / c.accountValue * 100;
-      add(after <= caps.perStockPercent, `${o.symbol} would be ${after.toFixed(1)}% of the account; your cap is ${caps.perStockPercent}%`);
+      const waiting = c.open?.buy ?? 0, after = (c.held + waiting + o.quantity) * o.limitPrice / c.accountValue * 100;
+      add(after <= caps.perStockPercent, `${o.symbol} would be ${after.toFixed(1)}% of the account${waiting ? `, counting ${waiting} share(s) in orders not yet filled` : ""}; your cap is ${caps.perStockPercent}%`);
       if (coin) {
         const inCrypto = ((c.cryptoHeldUsd ?? 0) + cost) / c.accountValue * 100;
         add(inCrypto <= caps.cryptoPercent + 1e-9, `Crypto would be ${inCrypto.toFixed(1)}% of the account; your limit is ${caps.cryptoPercent}%`);
       } else {
         const s = c.sector ?? { name: `own:${o.symbol}`, label: "not known, so counted as a sector of its own", heldUsd: c.held * o.limitPrice };
+        const named = s.label === "" ? "Its sector" : `Sector ${s.label}`;
         if (s.name === null) add(true, `${o.symbol} is a whole-market fund: it counts towards no sector`);
+        else if (s.unpriced?.length) add(false, `${named} cannot be checked against your limit of ${caps.perSectorPercent}%: Robinhood gave no live price for ${s.unpriced.join(", ")}, held in the account`);
         else {
           const inSector = (s.heldUsd + cost) / c.accountValue * 100;
-          add(inSector <= caps.perSectorPercent, `${s.label === "" ? "Its sector" : `Sector ${s.label}`} would be ${inSector.toFixed(1)}% of the account; your limit is ${caps.perSectorPercent}%`);
+          add(inSector <= caps.perSectorPercent, `${named} would be ${inSector.toFixed(1)}% of the account${s.openUsd ? ", counting orders not yet filled" : ""}; your limit is ${caps.perSectorPercent}%`);
         }
       }
     }
   } else {
-    add(o.quantity <= c.held, o.quantity <= c.held ? `Selling ${o.quantity} of the ${c.held} held` : `Only ${units(c.held, coin)} are held in the Agentic account`);
+    const promised = c.open?.sell ?? 0, free = c.held - promised;
+    if (promised) add(o.quantity <= free, o.quantity <= free ? `Selling ${o.quantity} of the ${c.held} held, ${promised} more already in sell orders not yet filled` : `Only ${Math.max(0, free)} of the ${c.held} held can be sold: ${promised} are in sell orders not yet filled`);
+    else add(o.quantity <= c.held, o.quantity <= c.held ? `Selling ${o.quantity} of the ${c.held} held` : `Only ${units(c.held, coin)} are held in the Agentic account`);
     if (early(c, caps)) out.push({ ok: true, ask: true, words: `${o.symbol} was bought here on ${c.boughtOn}, ${c.heldDays} trading day(s) ago, under your shortest hold of ${caps.minHoldDays}: selling it now takes one more press` });
   }
   add(c.ordersToday < caps.ordersPerDay, `${c.ordersToday} of your ${caps.ordersPerDay} orders a day used`);
@@ -7897,8 +7929,9 @@ function logOrder(dir, line) {
   fs4.appendFileSync(file2(dir), JSON.stringify(line) + "\n");
 }
 function readOrders(dir) {
+  let lines;
   try {
-    return fs4.readFileSync(file2(dir), "utf8").split("\n").flatMap((l) => {
+    lines = fs4.readFileSync(file2(dir), "utf8").split("\n").flatMap((l) => {
       try {
         const v = JSON.parse(l);
         return v && typeof v.at === "string" && typeof v.symbol === "string" && v.robinhood ? [v] : [];
@@ -7909,12 +7942,26 @@ function readOrders(dir) {
   } catch {
     return [];
   }
+  const out = [], at = /* @__PURE__ */ new Map();
+  for (const v of lines) {
+    const i = v.ticket ? at.get(v.ticket) : void 0;
+    if (i === void 0) {
+      if (v.ticket) at.set(v.ticket, out.length);
+      out.push(v);
+    } else out[i] = { ...v, at: out[i].at };
+  }
+  return out;
 }
+var mayHaveGone = (o) => o.robinhood.answered || o.robinhood.unknown === true;
 var ordersOn = (dir, now) => readOrders(dir).filter((o) => marketDay(new Date(o.at)) === marketDay(now));
 var placedToday = (dir, now) => ordersOn(dir, now).length;
+function unanswered(dir, symbol, now) {
+  const since = now.getTime() - 7 * 864e5;
+  return readOrders(dir).filter((o) => o.symbol === symbol && o.robinhood.unknown === true && Date.parse(o.at) >= since).at(-1) ?? null;
+}
 var tradingDaysBetween = (from, to) => marketDaysBetween(from, to);
 function lastBuy(dir, symbol, now) {
-  const buy = readOrders(dir).filter((o) => o.symbol === symbol && o.side === "buy" && o.robinhood.answered).at(-1);
+  const buy = readOrders(dir).filter((o) => o.symbol === symbol && o.side === "buy" && mayHaveGone(o)).at(-1);
   if (!buy) return null;
   const boughtOn = marketDay(new Date(buy.at));
   return { boughtOn, heldDays: tradingDaysBetween(boughtOn, marketDay(now)) };
@@ -8272,23 +8319,38 @@ function parseQuotes(answer) {
   }
   return out;
 }
+var orderOf = (v) => {
+  const o = obj(v);
+  return {
+    symbol: text(o.symbol)?.toUpperCase() ?? null,
+    side: text(o.side),
+    type: text(o.type),
+    state: text(o.state),
+    quantity: figure(o.quantity) ?? figure(o.cumulative_quantity),
+    price: figure(o.average_price) ?? figure(o.price) ?? figure(o.limit_price),
+    at: text(o.created_at) ?? text(o.updated_at)
+  };
+};
 function parseOrders(answer) {
   const rows = list(dataOf(answer).orders);
-  return {
-    count: rows.length,
-    orders: rows.slice(0, 20).map((v) => {
-      const o = obj(v);
-      return {
-        symbol: text(o.symbol)?.toUpperCase() ?? null,
-        side: text(o.side),
-        type: text(o.type),
-        state: text(o.state),
-        quantity: figure(o.quantity) ?? figure(o.cumulative_quantity),
-        price: figure(o.average_price) ?? figure(o.price) ?? figure(o.limit_price),
-        at: text(o.created_at) ?? text(o.updated_at)
-      };
-    })
-  };
+  return { count: rows.length, orders: rows.slice(0, 20).map(orderOf) };
+}
+var DONE = /^(filled|cancell?ed|rejected|failed|expired|voided)$/i;
+function openOrders(answer) {
+  const rows = list(dataOf(answer).orders), all = rows.map(orderOf);
+  const open4 = [];
+  let unread = 0;
+  rows.forEach((v, i) => {
+    const o = all[i], raw = obj(v);
+    if (o.state && DONE.test(o.state)) return;
+    const quantity = figure(raw.quantity), filled = figure(raw.cumulative_quantity) ?? 0;
+    if (!o.state || !o.symbol || o.side !== "buy" && o.side !== "sell" || quantity === null) {
+      unread++;
+      return;
+    }
+    open4.push({ symbol: o.symbol, side: o.side, quantity: Math.max(0, quantity - filled), price: figure(raw.price) ?? figure(raw.limit_price) });
+  });
+  return { all, open: open4.filter((o) => o.quantity > 0), unread };
 }
 function parseApprovals(setting, approvals) {
   const s = obj(dataOf(setting).setting);
@@ -20145,6 +20207,7 @@ var oneLine = (s, max) => {
   return t2.length > max ? `${t2.slice(0, max - 3)}...` : t2;
 };
 var masked = (s) => oneLine(s, 300).replace(/\b[a-z0-9]*\d{5,}[a-z0-9]*\b/gi, "#####");
+var LOOK_FIRST = "Look at the Agentic account's orders in Robinhood's own app before you try again.";
 
 // src/robinhood/reader.ts
 var Refused = class extends Error {
@@ -20196,8 +20259,19 @@ var words = (v) => {
   return own2 ? [own2.trim()] : Object.values(o).flatMap(words);
 };
 function parseReview(answer) {
-  if (answer.failed) return { answered: false, alerts: [], approvalRequired: null, facts: [], error: masked(answer.text) };
+  if (answer.failed) return { answered: false, unclear: false, alerts: [], approvalRequired: null, facts: [], error: masked(answer.text) };
   const d = obj2(obj2(answer.data).data);
+  if (d.order_checks === void 0 || d.order_checks === null) {
+    const said = answer.data === null ? answer.text.trim() : words(obj2(answer.data).data).join(" ");
+    return {
+      answered: false,
+      unclear: true,
+      alerts: [],
+      approvalRequired: null,
+      facts: [],
+      error: `Robinhood answered without its list of order checks, so this order counts as not checked and cannot be placed.${said ? ` It said: ${masked(said).slice(0, 300)}` : ""}`
+    };
+  }
   const alerts = [.../* @__PURE__ */ new Set([...words(d.order_checks), ...words(d.alerts), ...words(d.warnings)])].slice(0, 12).map((x) => x.slice(0, 300));
   const facts = [];
   const walk = (o, prefix, depth) => {
@@ -20209,7 +20283,7 @@ function parseReview(answer) {
     }
   };
   walk(d, "", 0);
-  return { answered: true, alerts, approvalRequired: typeof d.customer_approval_required === "boolean" ? d.customer_approval_required : null, facts, error: null };
+  return { answered: true, unclear: false, alerts, approvalRequired: typeof d.customer_approval_required === "boolean" ? d.customer_approval_required : null, facts, error: null };
 }
 var Reviewer = class {
   constructor(client, tools) {
@@ -20248,11 +20322,14 @@ var Reviewer = class {
 // src/robinhood/order.ts
 var PLACE = "place_equity_order";
 var obj3 = (v) => v && typeof v === "object" && !Array.isArray(v) ? v : {};
+var REFUSED = /^(rejected|failed|cancell?ed|expired|voided)$/i;
 function parsePlaced(answer) {
-  if (answer.failed) return { answered: false, approvalRequired: null, orderId: null, state: null, facts: [], error: masked(answer.text) };
+  if (answer.failed) return { answered: false, unknown: false, approvalRequired: null, orderId: null, state: null, facts: [], error: masked(answer.text) };
   const d = obj3(obj3(answer.data).data), order = obj3(d.order);
   const id = [d.order_id, d.id, order.id, d.approval_id].find((v) => typeof v === "string" && v.trim());
   const state = [d.state, order.state, d.status].find((v) => typeof v === "string" && v.trim());
+  const said = [d.reject_reason, order.reject_reason, d.message, d.detail, d.reason].find((v) => typeof v === "string" && v.trim())?.trim() ?? (answer.data === null && answer.text.trim() ? answer.text.trim() : void 0);
+  const words4 = said === void 0 ? void 0 : masked(said).slice(0, 300);
   const facts = [];
   const walk = (o, prefix, depth) => {
     for (const [k, v] of Object.entries(o)) {
@@ -20263,7 +20340,10 @@ function parsePlaced(answer) {
     }
   };
   walk(d, "", 0);
-  return { answered: true, approvalRequired: typeof d.customer_approval_required === "boolean" ? d.customer_approval_required : null, orderId: id ?? null, state: state ?? null, facts, error: null };
+  const base2 = { approvalRequired: typeof d.customer_approval_required === "boolean" ? d.customer_approval_required : null, orderId: id ?? null, state: state ?? null, facts };
+  if (state && REFUSED.test(state)) return { ...base2, answered: false, unknown: false, error: `Robinhood marked the order ${state}${words4 ? `: ${words4}` : "."}` };
+  if (!id) return { ...base2, answered: false, unknown: true, error: `Robinhood answered without an order id, so it is not clear it took this order: it may have gone through. ${LOOK_FIRST}${words4 ? ` It said: ${words4}` : ""}` };
+  return { ...base2, answered: true, unknown: false, error: null };
 }
 var Placer = class {
   constructor(client, tools) {
@@ -20272,11 +20352,15 @@ var Placer = class {
   }
   client;
   tools;
-  /** Places one limit order of whole shares on the Agentic account. Call only after the person's Confirm. */
-  async place(account, o, refId) {
+  /** Refuses, before anything is sent, an order this door would not send. */
+  ready(account, o, refId) {
     if (!account.agentic) throw new Refused("Only the Agentic account can trade, and this is not it.");
     if (!this.tools.some((t2) => t2.name === PLACE)) throw new Refused("Robinhood's connection no longer offers placing a stock order, so nothing was sent.");
     if (!Number.isInteger(o.quantity) || o.quantity < 1 || !(o.limitPrice > 0) || o.side !== "buy" && o.side !== "sell" || !/^[0-9a-f-]{36}$/.test(refId)) throw new Refused("That order is not complete, so it was not sent.");
+  }
+  /** Places one limit order of whole shares on the Agentic account. Call only after the person's Confirm. */
+  async place(account, o, refId) {
+    this.ready(account, o, refId);
     const r = await this.client.callTool({ name: PLACE, arguments: {
       account_number: account.accountNumber,
       symbol: o.symbol,
@@ -20414,6 +20498,13 @@ ${url2}`);
 
 // src/robinhood/link.ts
 var plainFailure = (e) => e instanceof NotSignedIn ? "Robinhood asks you to sign in again: press Connect." : `Robinhood did not answer as expected: ${masked(e instanceof Error ? e.message : String(e))}`;
+var AnswerLost = class extends Error {
+  constructor(why) {
+    super(`Robinhood's answer did not arrive (${why}), so this order may have gone through. ${LOOK_FIRST}`);
+    this.why = why;
+  }
+  why;
+};
 var Link = class {
   constructor(file4, opts = {}) {
     this.file = file4;
@@ -20494,7 +20585,8 @@ var Link = class {
     return this.ids.get(a.key);
   }
   /** The real figures a ticket for one stock is sized and checked on: the Agentic account's value, buying power and
-   *  holding of the stock, Robinhood's live price, and how many orders the account has had today (New York's day). */
+   *  holding of the stock, Robinhood's live price, how many orders the account has had today (New York's day), and its
+   *  orders still open, which count towards the caps as if they were filled. */
   async ticketContext(symbol, now = /* @__PURE__ */ new Date()) {
     return this.withReader((r) => this.contextWith(r, symbol, now));
   }
@@ -20513,10 +20605,25 @@ var Link = class {
       this.noteValue(p.total, now);
       const all = parsePositions(await data("get_equity_positions", { account_number: ids.accountNumber }));
       const held = all.find((x) => x.symbol === symbol)?.quantity ?? 0;
-      const quotes = parseQuotes(await data("get_equity_quotes", { symbols: [.../* @__PURE__ */ new Set([symbol, ...all.map((x) => x.symbol)])] }));
+      const orders = openOrders(await data("get_equity_orders", { account_number: ids.accountNumber }));
+      const ordersToday = orders.all.filter((o) => o.at && marketDay(new Date(o.at)) === marketDay(now)).length;
+      const wanted2 = [.../* @__PURE__ */ new Set([symbol, ...all.map((x) => x.symbol), ...orders.open.filter((o) => o.side === "buy" && o.price === null).map((o) => o.symbol)])];
+      const quotes = /* @__PURE__ */ new Map();
+      for (let i = 0; i < wanted2.length; i += QUOTES_PER_CALL) for (const [s, v] of parseQuotes(await data("get_equity_quotes", { symbols: wanted2.slice(i, i + QUOTES_PER_CALL) }))) quotes.set(s, v);
       const price = quotes.get(symbol) ?? null;
-      const ordersToday = parseOrders(await data("get_equity_orders", { account_number: ids.accountNumber })).orders.filter((o) => o.at && marketDay(new Date(o.at)) === marketDay(now)).length;
-      return { symbol, accountValue: p.total, buyingPower: p.buyingPower, held, price, ordersToday, positions: all.map((x) => ({ symbol: x.symbol, quantity: x.quantity, price: quotes.get(x.symbol) ?? null })) };
+      const mine = (side) => orders.open.filter((o) => o.symbol === symbol && o.side === side).reduce((n, o) => n + o.quantity, 0);
+      return {
+        symbol,
+        accountValue: p.total,
+        buyingPower: p.buyingPower,
+        held,
+        price,
+        ordersToday,
+        positions: all.map((x) => ({ symbol: x.symbol, quantity: x.quantity, price: quotes.get(x.symbol) ?? null })),
+        open: { buy: mine("buy"), sell: mine("sell") },
+        unreadOrders: orders.unread,
+        openBuys: orders.open.filter((o) => o.side === "buy").map((o) => ({ symbol: o.symbol, quantity: o.quantity, price: o.price ?? quotes.get(o.symbol) ?? null }))
+      };
     }
   }
   /** Whether the person has switched trading on, on the dashboard, and their caps. Kept together beside the sign-in, where
@@ -20540,6 +20647,7 @@ var Link = class {
   setTrading(on) {
     const was = this.trading();
     if (on && was.on) return was;
+    if (on && was.offBecause) fs9.rmSync(this.valuesFile, { force: true });
     return this.keepTrading(on, was.caps);
   }
   /** The person's caps, as the dashboard's server checked them (settings.ts capsFrom). The switch is left as it is. */
@@ -20551,7 +20659,7 @@ var Link = class {
   /** The Agentic account's value, day by day (New York's), kept beside the sign-in: the day's highest and latest reading,
    *  for the last fourteen days. When trading is on and the value falls the person's weekly limit below its highest of
    *  the last seven days, trading switches itself off and says why. A large withdrawal can trip it too; the person
-   *  switches it back on. */
+   *  switches it back on, and the limit then counts from that moment (setTrading). */
   get valuesFile() {
     return path8.join(path8.dirname(this.file), "values.json");
   }
@@ -20577,23 +20685,32 @@ var Link = class {
     const fall = (1 - total / top.high) * 100;
     if (!state.on || fall < state.caps.weeklyLossPercent) return state;
     const money2 = (n) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    return this.keepTrading(false, state.caps, { at: now.toISOString(), words: `The Agentic account fell ${fall.toFixed(1)}% below its highest value of the last seven days (${money2(top.high)} on ${top.day}, now ${money2(total)}), past your weekly limit of ${state.caps.weeklyLossPercent}%. Trading switched itself off. A large withdrawal can do this too; switch it back on when you are ready.` });
+    return this.keepTrading(false, state.caps, { at: now.toISOString(), words: `The Agentic account fell ${fall.toFixed(1)}% below its highest value of the last seven days (${money2(top.high)} on ${top.day}, now ${money2(total)}), past your weekly limit of ${state.caps.weeklyLossPercent}%. Trading switched itself off. A large withdrawal can do this too. When you switch it back on, the limit counts from then.` });
   }
   /** Places one order on the Agentic account, in one session: reads the account afresh, has `approve` check the order on
-   *  those figures, and only if every check passes sends it. The caller has already had the person Confirm it. */
-  async placeChecked(order, refId, approve) {
+   *  those figures, and only if every check passes sends it. The caller has already had the person Confirm it.
+   *  `sending` runs just before the order goes out (the desk logs it then, so a send whose answer never comes is still
+   *  known); a failure after that point is AnswerLost, never a plain failure: the order may have gone through. */
+  async placeChecked(order, refId, approve, sending = () => {
+  }) {
     if (!this.trading().on) throw new Error("trading is switched off: switch it on in Your account first");
     const session = await openSession(this.file, { ...this.opts, signIn: false });
     try {
       const context = await this.contextWith(session.reader, order.symbol, /* @__PURE__ */ new Date());
       const now = this.trading();
       if (!now.on) throw new Error(`trading switched itself off: ${now.offBecause?.words ?? "switch it on in Your account first"}`);
-      const failed = approve(context).filter((c) => !c.ok);
+      const failed = (await approve(context)).filter((c) => !c.ok);
       if (failed.length) throw new Error(`the order no longer passes on Robinhood's latest figures: ${failed.map((c) => c.words).join("; ")}`);
-      const placed = await session.placer.place({ accountNumber: this.agenticIds().accountNumber, agentic: true }, order, refId);
-      return { placed, context };
+      const account = { accountNumber: this.agenticIds().accountNumber, agentic: true };
+      session.placer.ready(account, order, refId);
+      sending();
+      try {
+        return { placed: await session.placer.place(account, order, refId), context };
+      } catch (e) {
+        throw e instanceof Refused ? e : new AnswerLost(oneLine(masked(e instanceof Error ? e.message : String(e)), 120));
+      }
     } finally {
-      await session.close();
+      await session.close().catch(() => void 0);
     }
   }
   /** Robinhood's own check of an order on the Agentic account. Nothing is placed. */
@@ -21630,6 +21747,8 @@ var clock = (ms, zone = "UTC") => {
   }
 };
 var SETTLE_MS = 15 * 6e4;
+var SETTLE_OTHER_MS = 45 * 6e4;
+var settleMs = (meta2) => meta2.market === "other" ? SETTLE_OTHER_MS : SETTLE_MS;
 function gapLines(s) {
   const days = s.missing ?? [];
   if (!days.length) return [];
@@ -21643,9 +21762,10 @@ function latestState(s, upTo, now = Date.now()) {
   if (unfilled) return said(final, [`- **The source lists a session on ${unfilled}, but its prices are not filled in yet (this happens for a while after a session ends). Every figure here is as of ${last.date}. Do not call ${last.date} the latest session, and do not say ${unfilled} had no trading: say its prices were not available yet.**`]);
   if (session && session.date === last.date) {
     if (now < session.end) return said({ open: true, label: "Latest price (still trading)", inline: "still trading: latest price" }, [`- **The latest row, ${last.date}, is a session still trading (it closes at ${clock(session.end, zone)}). Its "close" is the latest price so far, not a close; its high, low, volume and every indicator on it will change. Call it the latest price, never the close, and do not treat a level as broken or held on this row alone.**`]);
-    if (read2 < session.end + SETTLE_MS) {
+    const settle2 = settleMs(s.meta);
+    if (read2 < session.end + settle2) {
       const at = clock(read2, zone);
-      return said({ open: true, label: `Latest price (read at ${at}, not the close)`, inline: `latest price as read at ${at}` }, [`- **The latest row, ${last.date}, was read at ${at}, ${read2 < session.end ? "while its session was still trading" : "just after its session ended"} (it ended at ${clock(session.end, zone)}, and its figures are taken as final ${SETTLE_MS / 6e4} minutes after). Its "close" is the latest price as read then, not the close; its high, low, volume and every indicator on it may still change. Call it the latest price as read at ${at}, never the close, and do not treat a level as broken or held on this row alone.**`]);
+      return said({ open: true, label: `Latest price (read at ${at}, not the close)`, inline: `latest price as read at ${at}` }, [`- **The latest row, ${last.date}, was read at ${at}, ${read2 < session.end ? "while its session was still trading" : "just after its session ended"} (it ended at ${clock(session.end, zone)}, and its figures are taken as final ${settle2 / 6e4} minutes after). Its "close" is the latest price as read then, not the close; its high, low, volume and every indicator on it may still change. Call it the latest price as read at ${at}, never the close, and do not treat a level as broken or held on this row alone.**`]);
     }
     return said(final, [`- The latest row, ${last.date}, is a finished session: its figures are final.`]);
   }
@@ -21718,13 +21838,15 @@ var Sectors = class {
   async warm(symbols) {
     await Promise.all([...new Set(symbols)].map((s) => this.of(s)));
   }
-  /** The sector a buy of `symbol` falls in, and how much the account already holds in it, from what is held now. A
-   *  symbol not looked up yet counts on its own. */
+  /** The sector a buy of `symbol` falls in, and how much the account already holds in it, from what is held now and what
+   *  its open buys (`open`) wait to buy. A symbol not looked up yet counts on its own. A holding in the sector without a
+   *  price is named in `unpriced`, never counted as nothing. */
   context(symbol, positions) {
     const g = this.known.get(symbol) ?? ownGroup(symbol);
     const same = (s) => (this.known.get(s) ?? ownGroup(s)).name === g.name;
-    const heldUsd = g.name === null ? 0 : positions.filter((p) => same(p.symbol)).reduce((a, p) => a + p.quantity * (p.price ?? 0), 0);
-    return { ...g, heldUsd: Math.round(heldUsd * 100) / 100 };
+    const mine = g.name === null ? [] : positions.filter((p) => same(p.symbol));
+    const usd = (list3) => Math.round(list3.reduce((a, p) => a + p.quantity * (p.price ?? 0), 0) * 100) / 100;
+    return { ...g, heldUsd: usd(mine), openUsd: usd(mine.filter((p) => p.open)), unpriced: [...new Set(mine.filter((p) => p.price === null).map((p) => p.symbol))] };
   }
 };
 
@@ -22147,14 +22269,6 @@ function callOf(root2, ticker, date4) {
   return { decision: e.decision, sections: sectionsOf(dir, ticker, date4), hasReport: hasReport(dir, ticker, date4) };
 }
 
-// src/data/delay.ts
-var US_EXCHANGES = ["NMS", "NGM", "NCM", "NYQ", "PCX", "ASE", "BTS"];
-function priceMarket(listing) {
-  if (listing.instrumentType === "CRYPTOCURRENCY") return "coin";
-  if ((listing.instrumentType === "EQUITY" || listing.instrumentType === "ETF") && US_EXCHANGES.includes(listing.exchangeName ?? "")) return "us";
-  return "other";
-}
-
 // src/terminal/quotes.ts
 var finite2 = (v) => typeof v === "number" && Number.isFinite(v);
 function parseQuote(json, symbol, nowSec = Date.now() / 1e3) {
@@ -22384,7 +22498,7 @@ async function workScreen(symbols, news, day2, now = /* @__PURE__ */ new Date())
   const list3 = [...new Set(symbols)].filter((s) => !/[\^=]/.test(s));
   const read2 = await inTurn(list3, 4, async (symbol) => {
     try {
-      const s = await daily(symbol, addDays(day2, -400), day2), bars = s.bars;
+      const s = await daily(symbol, addDays(day2, -400), day2), bars = s.traded?.length === s.bars.length ? s.traded : s.bars;
       if (!bars.length || bars[bars.length - 1].date < addDays(day2, -7)) return { symbol, bars: null, news: null, asked: false, live: false };
       const asked2 = news.has(symbol);
       return { symbol, bars, news: asked2 ? await newsOn(symbol, day2) : null, asked: asked2, live: latestState(s, day2, now.getTime()).open };
@@ -22724,12 +22838,16 @@ async function startTerminal(opts) {
   };
   const sectors = opts.sectors ?? new Sectors();
   const limitedNow = (c) => {
-    const positions = c.positions ?? [], bought = lastBuy(dir, c.symbol, /* @__PURE__ */ new Date());
-    return { ...c, sector: sectors.context(c.symbol, positions), ...bought ? bought : {} };
+    const positions = [...c.positions ?? [], ...(c.openBuys ?? []).map((o) => ({ ...o, open: true }))], bought = lastBuy(dir, c.symbol, /* @__PURE__ */ new Date());
+    return { ...c, ordersToday: Math.max(c.ordersToday, placedToday(dir, /* @__PURE__ */ new Date())), sector: sectors.context(c.symbol, positions), ...bought ? bought : {} };
   };
   const limited = async (c) => {
-    await sectors.warm([c.symbol, ...(c.positions ?? []).map((p) => p.symbol)]);
+    await sectors.warm([c.symbol, ...(c.positions ?? []).map((p) => p.symbol), ...(c.openBuys ?? []).map((p) => p.symbol)]);
     return limitedNow(c);
+  };
+  const lostWords = (symbol) => {
+    const o = unanswered(dir, symbol, /* @__PURE__ */ new Date());
+    return o ? `An order sent from here on ${marketDay(new Date(o.at))} (${confirmWords(o)}) got no clear answer from Robinhood, so it may have gone through. Look in Robinhood's own app before you place another.` : null;
   };
   let screening = null;
   const clock2 = opts.now ?? (() => /* @__PURE__ */ new Date());
@@ -22773,12 +22891,15 @@ async function startTerminal(opts) {
       throw e;
     }
   };
+  const refusalOf = (e, nothingSent = false) => {
+    const m = e instanceof Error ? e.message : "", own2 = /not one of your Robinhood accounts|show your Agentic account|not the Agentic account|not complete, so it was not sent|no longer passes on Robinhood's latest figures|trading is switched off|trading switched itself off/.test(m);
+    return new Refused2(own2 ? 400 : 502, own2 ? m : `${plainFailure(e)}${nothingSent ? " Nothing was sent." : ""}`);
+  };
   const askRobinhood = async (job) => {
     try {
       return await job();
     } catch (e) {
-      const m = e instanceof Error ? e.message : "", own2 = /not one of your Robinhood accounts|show your Agentic account|not the Agentic account|not complete, so it was not sent|no longer passes on Robinhood's latest figures|trading is switched off|trading switched itself off/.test(m);
-      throw new Refused2(own2 ? 400 : 502, own2 ? m : plainFailure(e));
+      throw refusalOf(e);
     }
   };
   const handle = async (req, res) => {
@@ -22950,6 +23071,7 @@ async function startTerminal(opts) {
     }
     if (p === "/api/stop" && method === "POST") {
       if (!opts.stop) throw new Refused2(404, "not found");
+      if ([...tickets.values()].some((t2) => t2.placing)) throw new Refused2(409, "an order is being sent: stop when it is done");
       const stop = opts.stop;
       res.once("finish", () => {
         setTimeout(stop, 100);
@@ -22984,7 +23106,7 @@ async function startTerminal(opts) {
       const trading = readSettings(root2).trading, { caps } = robinhood.trading();
       const context = await limited({ ...await askRobinhood(() => robinhood.ticketContext(symbol)), rating: call.rating, callDate: call.date });
       const t2 = opened(false, context, propose(context, trading, caps), trading, caps);
-      return json(res, 200, { id: t2.id, own: false, context, proposal: t2.proposal, checks: t2.checks, caps });
+      return json(res, 200, { id: t2.id, own: false, context, proposal: t2.proposal, checks: t2.checks, caps, lost: lostWords(symbol) });
     }
     if (p === "/api/ticket/own" && method === "POST") {
       let symbol;
@@ -22999,7 +23121,7 @@ async function startTerminal(opts) {
       const trading = readSettings(root2).trading, { caps } = robinhood.trading();
       const context = await limited({ ...await askRobinhood(() => robinhood.ticketContext(symbol)), rating: "", callDate: "" });
       const t2 = opened(true, context, proposeOwn(context, side, trading), trading, caps);
-      return json(res, 200, { id: t2.id, own: true, context, proposal: t2.proposal, checks: t2.checks, caps });
+      return json(res, 200, { id: t2.id, own: true, context, proposal: t2.proposal, checks: t2.checks, caps, lost: lostWords(symbol) });
     }
     if (p === "/api/ticket/check" && method === "POST") {
       const t2 = ticketOf(b.id);
@@ -23029,18 +23151,39 @@ async function startTerminal(opts) {
       const t2 = ticketOf(b.id), tr = robinhood.trading();
       if (!tr.on) throw new Refused2(403, "trading is switched off: switch it on in Your account first");
       if (t2.placed || t2.placing) throw new Refused2(409, "this ticket has already sent its order");
+      if ([...tickets.values()].some((x) => x.placing)) throw new Refused2(409, "another order is being sent to Robinhood: try again when it has been answered");
       if (!t2.order || !t2.review || !t2.reviewedAt) throw new Refused2(400, "have Robinhood check this order first");
       if (Date.now() - t2.reviewedAt > REVIEW_MS) throw new Refused2(400, "Robinhood's check is more than five minutes old: review the order again");
-      if (!t2.review.answered || t2.review.alerts.length) throw new Refused2(400, "Robinhood raised alerts on this order, so it cannot be placed");
+      if (!t2.review.answered) throw new Refused2(400, "Robinhood's check of this order did not come back clean, so it cannot be placed");
+      if (t2.review.alerts.length) throw new Refused2(400, "Robinhood raised alerts on this order, so it cannot be placed");
       if (b.confirm !== confirmWords(t2.order)) throw new Refused2(400, "the confirmation does not name this order: nothing was sent");
       if (t2.checks.some((c) => c.ask) && b.early !== true) throw new Refused2(400, `${t2.order.symbol} was bought here under your shortest hold: press "Sell anyway" to go on`);
-      const order = t2.order, trading = readSettings(root2).trading, sentToday = placedToday(dir, /* @__PURE__ */ new Date());
+      const order = t2.order, trading = readSettings(root2).trading;
       tradable(order.symbol);
+      const line = (answer) => logOrder(dir, { at: (/* @__PURE__ */ new Date()).toISOString(), symbol: order.symbol, side: order.side, quantity: order.quantity, limitPrice: order.limitPrice, timeInForce: order.timeInForce, ...t2.own ? { own: true } : { call: { date: t2.context.callDate, rating: t2.context.rating } }, ticket: t2.id, robinhood: answer });
+      let sent = false;
       t2.placing = true;
       try {
-        const { placed } = await askRobinhood(() => robinhood.placeChecked(order, t2.refId, (fresh) => check(order, limitedNow({ ...fresh, rating: t2.context.rating, callDate: t2.context.callDate, ordersToday: Math.max(fresh.ordersToday, sentToday) }), trading, tr.caps)));
+        let placed;
+        try {
+          ({ placed } = await robinhood.placeChecked(
+            order,
+            t2.refId,
+            async (fresh) => check(order, await limited({ ...fresh, rating: t2.context.rating, callDate: t2.context.callDate }), trading, tr.caps),
+            () => {
+              line({ answered: false, unknown: true, approvalRequired: null, orderId: null, state: null, error: null });
+              sent = true;
+            }
+          ));
+        } catch (e) {
+          if (!(e instanceof AnswerLost)) {
+            if (sent) line({ answered: false, approvalRequired: null, orderId: null, state: null, error: `not sent: ${plainFailure(e)}` });
+            throw refusalOf(e, true);
+          }
+          placed = { answered: false, unknown: true, approvalRequired: null, orderId: null, state: null, facts: [], error: e.message };
+        }
         t2.placed = placed;
-        logOrder(dir, { at: (/* @__PURE__ */ new Date()).toISOString(), symbol: order.symbol, side: order.side, quantity: order.quantity, limitPrice: order.limitPrice, timeInForce: order.timeInForce, ...t2.own ? { own: true } : { call: { date: t2.context.callDate, rating: t2.context.rating } }, ticket: t2.id, robinhood: { answered: placed.answered, approvalRequired: placed.approvalRequired, orderId: placed.orderId, state: placed.state, error: placed.error } });
+        line({ answered: placed.answered, unknown: placed.unknown, approvalRequired: placed.approvalRequired, orderId: placed.orderId, state: placed.state, error: placed.error });
         return json(res, 200, { placed });
       } finally {
         t2.placing = false;
