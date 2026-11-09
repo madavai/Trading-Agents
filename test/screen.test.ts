@@ -227,3 +227,26 @@ test('the morning switch acts on market days only: never on Thanksgiving, and fr
   assert.deepEqual(queueTop(desk(), screenOf('2026-11-27', ['XLE']), '2026-11-27', true, new Date('2026-11-27T14:00:00Z'), '2026-11-27'), ['XLE'], 'and acts that Friday morning');
   assert.deepEqual(queueTop(desk(), screenOf('2027-01-18', ['XLE']), '2027-01-18', true, new Date('2027-01-18T15:00:00Z')), [], 'nor on Martin Luther King Jr. Day');
 });
+
+// Audit 3 server-5 (9 Nov 2026): the screen judged a new 52-week high or low on dividend-adjusted rows, where every older
+// row is lowered by each later dividend, so a fund that pays (BND, VT, XLU...) was called "a new 52-week high" while still
+// below its traded high, and a real new low was missed. The chart beside it shows the prices traded.
+test('"Worth a look today" judges a fund at the prices it traded, as its chart shows them: a dividend makes no new 52-week high or low', async () => {
+  const day = '2026-10-16', days = weekdays(day, 300), n = days.length;
+  // A fund paying 0.21 every 21 sessions: each row's dividend-adjusted close is lowered by the dividends paid after it.
+  const fund = (peakAt: number, peak: { c: number; h: number; l: number }, last: { c: number; h: number; l: number }) => days.map((date, i) => {
+    const r = i === n - 1 ? last : i === peakAt ? peak : { c: 72, h: 72.05, l: 71.95 };
+    return { date, o: r.c, h: r.h, l: r.l, c: r.c, v: 1_000_000, adj: r.c - 0.21 * Math.floor((n - 1 - i) / 21) };
+  });
+  const high = fund(n - 211, { c: 74, h: 74.05, l: 73.95 }, { c: 72.4, h: 73.45, l: 72.35 });   // traded high 74.05 ten months ago; today's high 73.45
+  const low = fund(n - 211, { c: 70.6, h: 70.65, l: 70.5 }, { c: 70.45, h: 71.0, l: 70.4 });    // traded low 70.50 ten months ago; today's low 70.40
+  for (const [symbol, rows, want, not] of [['BND', high, null, 'high'], ['XLU', low, 'low', 'high']] as const) {
+    configure({ fetch: async () => new Response(JSON.stringify(chartJson(symbol, rows))) });
+    const s = await workScreen([symbol], new Set(), day, new Date('2026-10-16T22:00:00Z'));
+    const fired = s.picks.flatMap((p) => p.signals.map((x) => x.kind));
+    assert.ok(!fired.includes(not), `${symbol}: no new 52-week ${not} (${fired.join(', ')})`);
+    if (want) assert.ok(fired.includes(want), `${symbol}: a real new 52-week ${want} is seen`);
+    else assert.ok(!fired.includes('high') && !fired.includes('low'), `${symbol}: below its traded high, above its traded low`);
+  }
+  configure({ fetch: globalThis.fetch });
+});

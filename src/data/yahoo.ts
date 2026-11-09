@@ -6,6 +6,7 @@
 // when it was read (`fetchedAt`), and is kept in memory no longer than on disk, so a run that goes on past the close
 // reads the close, not the price of the afternoon.
 import { addDays, daysBetween } from './dates.js';
+import { priceMarket, type PriceMarket } from './delay.js';
 import { getJsonAt, keepFor, NoData } from './http.js';
 import { normalizeSymbol } from './symbols.js';
 
@@ -15,6 +16,9 @@ export interface Meta {
   symbol: string; currency?: string; exchange?: string; type?: string; name?: string; price?: number; timezone?: string;
   /** The current or latest regular session the service knows of: its day in the exchange's calendar, its opening and close (ms). */
   session?: { date: string; start: number; end: number };
+  /** The market the prices are from, for how late they may be (data/delay.ts): a US stock or fund on a checked exchange, a
+   *  coin, or any other. */
+  market?: PriceMarket;
 }
 /** A dividend: its ex-dividend day in the exchange's calendar, and the amount per share as the chart service gives it
  *  (in the quote currency, adjusted for later splits, so it is on the same footing as today's price). */
@@ -51,12 +55,24 @@ const cache = new Map<string, { at: number; series: Promise<Series> }>();
 const epoch = (date: string) => Math.floor(Date.parse(`${date}T00:00:00Z`) / 1000);
 const num = (v: number | null | undefined) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
+/** A time's day in the exchange's own calendar. By its time zone's name when the answer gives one, so each row keeps its
+ *  own summer or winter time: the answer's offset is only the one in force when it was read, and a row stamped at the
+ *  exchange's midnight (futures at New York's, currencies at London's) would land a day early across a change. */
+function dayIn(zone: string | undefined, offset: number): (ts: number) => string {
+  const byOffset = (ts: number) => new Date((ts + offset) * 1000).toISOString().slice(0, 10);
+  if (!zone) return byOffset;
+  try {
+    const f = new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' });
+    return (ts) => f.format(new Date(ts * 1000));
+  } catch { return byOffset; }   // a zone this computer does not know
+}
+
 /** Turns the chart service's answer into rows. Exported for the tests. */
 export function parseChart(json: ChartJson, symbol: string): Series {
   const r = json.chart?.result?.[0];
   if (!r) throw new NoData(`Yahoo Finance has no prices for ${symbol}${json.chart?.error?.description ? ` (${json.chart.error.description})` : ''}`);
   const m = r.meta ?? {}, q = r.indicators?.quote?.[0] ?? {}, adj = r.indicators?.adjclose?.[0]?.adjclose;
-  const offset = m.gmtoffset ?? 0, dayOf = (ts: number) => new Date((ts + offset) * 1000).toISOString().slice(0, 10);
+  const dayOf = dayIn(m.exchangeTimezoneName, m.gmtoffset ?? 0);
   const rows: Array<{ bar: Bar; traded: Bar; adjusted: boolean }> = [], blank: string[] = [];
   (r.timestamp ?? []).forEach((ts, i) => {
     const open = num(q.open?.[i]), high = num(q.high?.[i]), low = num(q.low?.[i]), close = num(q.close?.[i]);
@@ -76,7 +92,7 @@ export function parseChart(json: ChartJson, symbol: string): Series {
     if (amount !== null && amount > 0 && typeof d.date === 'number' && Number.isFinite(d.date)) paid.set(dayOf(d.date), amount);
   }
   return {
-    meta: { symbol: m.symbol ?? symbol, currency: m.currency, exchange: m.fullExchangeName ?? m.exchangeName, type: m.instrumentType, name: m.longName ?? m.shortName, price: m.regularMarketPrice, timezone: m.exchangeTimezoneName, session },
+    meta: { symbol: m.symbol ?? symbol, currency: m.currency, exchange: m.fullExchangeName ?? m.exchangeName, type: m.instrumentType, name: m.longName ?? m.shortName, price: m.regularMarketPrice, timezone: m.exchangeTimezoneName, session, market: priceMarket(m) },
     bars: unique, unfilled, missing, dividends: [...paid].map(([date, amount]) => ({ date, amount })).sort((a, b) => a.date.localeCompare(b.date)),
     traded: kept.map((x) => x.traded), unadjusted: kept.filter((x) => !x.adjusted).map((x) => x.bar.date),
   };
@@ -99,9 +115,10 @@ const KEEP_MS = keepFor(`${HOSTS[0]}/v8/finance/chart/`);
 export async function daily(raw: string, from: string, to: string): Promise<Series> {
   const symbol = normalizeSymbol(raw), key = `${symbol}|${from}|${to}`, hit = cache.get(key);
   if (!hit || Date.now() - hit.at >= KEEP_MS) {
-    const series = fetchDaily(symbol, from, to);
-    cache.set(key, { at: Date.now(), series });
-    series.catch(() => { if (cache.get(key)?.series === series) cache.delete(key); });
+    const series = fetchDaily(symbol, from, to), kept = { at: Date.now(), series };
+    cache.set(key, kept);
+    // Its five minutes run from when the source was read: the answer may be the disk copy, already minutes old.
+    series.then((s) => { if (s.fetchedAt !== undefined) kept.at = s.fetchedAt; }, () => { if (cache.get(key)?.series === series) cache.delete(key); });
   }
   const s = await cache.get(key)!.series;
   const within = (b: Bar) => b.date >= from && b.date <= to;

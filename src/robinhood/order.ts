@@ -7,13 +7,16 @@ import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 import type { Order } from '../desk/ticket.js';
 import { Refused } from './reader.js';
-import { masked } from './rules.js';
+import { LOOK_FIRST, masked } from './rules.js';
 
 const PLACE = 'place_equity_order';
 
 export interface Placed {
-  /** Robinhood took the order (it may still wait for the person's approval on their phone). */
+  /** Robinhood took the order: it gave the order's id, and a state that is not a refusal (it may still wait for the
+   *  person's approval on their phone). */
   answered: boolean;
+  /** No clear answer: Robinhood's answer never arrived, or came without an order id. The order may have gone through. */
+  unknown: boolean;
   /** Whether Robinhood will ask the person to approve it on their phone, when it says. */
   approvalRequired: boolean | null;
   /** Robinhood's id for the order and its state, when it gives them. */
@@ -21,17 +24,23 @@ export interface Placed {
   state: string | null;
   /** The other things Robinhood said, as name and value, at most 24. */
   facts: Array<[string, string]>;
-  /** Robinhood's words when it refused. */
+  /** Robinhood's words when it refused, or when it is not clear that it took the order. */
   error: string | null;
 }
 
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {});
+/** A state in which Robinhood will not fill the order. */
+const REFUSED = /^(rejected|failed|cancell?ed|expired|voided)$/i;
 
 export function parsePlaced(answer: { data: unknown; text: string; failed: boolean }): Placed {
-  if (answer.failed) return { answered: false, approvalRequired: null, orderId: null, state: null, facts: [], error: masked(answer.text) };
+  if (answer.failed) return { answered: false, unknown: false, approvalRequired: null, orderId: null, state: null, facts: [], error: masked(answer.text) };
   const d = obj(obj(answer.data).data), order = obj(d.order);
   const id = [d.order_id, d.id, order.id, d.approval_id].find((v) => typeof v === 'string' && v.trim()) as string | undefined;
   const state = [d.state, order.state, d.status].find((v) => typeof v === 'string' && v.trim()) as string | undefined;
+  // Robinhood's own words: a message in its answer, else the whole answer when it was words and no JSON.
+  const said = ([d.reject_reason, order.reject_reason, d.message, d.detail, d.reason].find((v) => typeof v === 'string' && v.trim()) as string | undefined)?.trim()
+    ?? (answer.data === null && answer.text.trim() ? answer.text.trim() : undefined);
+  const words = said === undefined ? undefined : masked(said).slice(0, 300);
   const facts: Array<[string, string]> = [];
   const walk = (o: Record<string, unknown>, prefix: string, depth: number) => {
     for (const [k, v] of Object.entries(o)) {
@@ -42,17 +51,25 @@ export function parsePlaced(answer: { data: unknown; text: string; failed: boole
     }
   };
   walk(d, '', 0);
-  return { answered: true, approvalRequired: typeof d.customer_approval_required === 'boolean' ? d.customer_approval_required : null, orderId: id ?? null, state: state ?? null, facts, error: null };
+  const base = { approvalRequired: typeof d.customer_approval_required === 'boolean' ? d.customer_approval_required : null, orderId: id ?? null, state: state ?? null, facts };
+  if (state && REFUSED.test(state)) return { ...base, answered: false, unknown: false, error: `Robinhood marked the order ${state}${words ? `: ${words}` : '.'}` };
+  if (!id) return { ...base, answered: false, unknown: true, error: `Robinhood answered without an order id, so it is not clear it took this order: it may have gone through. ${LOOK_FIRST}${words ? ` It said: ${words}` : ''}` };
+  return { ...base, answered: true, unknown: false, error: null };
 }
 
 export class Placer {
   constructor(private readonly client: Pick<Client, 'callTool'>, private readonly tools: Tool[]) {}
 
-  /** Places one limit order of whole shares on the Agentic account. Call only after the person's Confirm. */
-  async place(account: { accountNumber: string; agentic: boolean }, o: Order, refId: string): Promise<Placed> {
+  /** Refuses, before anything is sent, an order this door would not send. */
+  ready(account: { accountNumber: string; agentic: boolean }, o: Order, refId: string): void {
     if (!account.agentic) throw new Refused('Only the Agentic account can trade, and this is not it.');
     if (!this.tools.some((t) => t.name === PLACE)) throw new Refused("Robinhood's connection no longer offers placing a stock order, so nothing was sent.");
     if (!Number.isInteger(o.quantity) || o.quantity < 1 || !(o.limitPrice > 0) || (o.side !== 'buy' && o.side !== 'sell') || !/^[0-9a-f-]{36}$/.test(refId)) throw new Refused('That order is not complete, so it was not sent.');
+  }
+
+  /** Places one limit order of whole shares on the Agentic account. Call only after the person's Confirm. */
+  async place(account: { accountNumber: string; agentic: boolean }, o: Order, refId: string): Promise<Placed> {
+    this.ready(account, o, refId);
     const r = await this.client.callTool({ name: PLACE, arguments: {
       account_number: account.accountNumber, symbol: o.symbol, side: o.side, type: 'limit', quantity: String(o.quantity),
       limit_price: o.limitPrice.toFixed(2), time_in_force: o.timeInForce, market_hours: 'regular_hours', ref_id: refId,
