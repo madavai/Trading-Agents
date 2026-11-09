@@ -50,8 +50,10 @@ export interface DeskState {
   /** `benchmark`: what a US stock's call is scored against (SPY as shipped: the fund that copies the S&P 500); `scoring`:
    *  how a call made now is scored, in a few words for the calls list. */
   desk: { emailSaved: boolean; tradingEnabled: boolean; holdingDays: number; benchmark: string; scoring: string };
-  /** The depth the page offers first (the settings'), how many one run analyses, and who listens for the doorbell. */
-  analyses: { depth: Depth; perRun: number; listener: ListenerView | null };
+  /** The depth the page offers first (the settings' debate rounds, as the nearest depth at or below them), the settings'
+   *  own debate and risk rounds (what an analysis asked for with no depth runs), how many one run analyses, and who
+   *  listens for the doorbell. */
+  analyses: { depth: Depth; rounds: { debate: number; risk: number }; perRun: number; listener: ListenerView | null };
   /** How much record the desk has on paper, the paper money it starts with, and the weeks under which switching trading
    *  on asks for one extra press, as a number and in words ("four weeks"). The paper book itself is /api/paper. */
   paper: PaperRecord & { startUsd: number; minWeeks: number; minWords: string };
@@ -194,7 +196,7 @@ export function stateOf(root: string, day: string): DeskState {
     version: versionOf(root), today: day, watchlist, queue, calls, startHere, watchTiers: watch, market, guide,
     record: { summary, text: renderSummary(summary), benchmarkNote: scoringNote(entries, s.scoring) },
     desk: { emailSaved: !!email, tradingEnabled: false, holdingDays: s.scoring.holdingPeriodDays, benchmark: resolveBenchmark('SPY', s.scoring), scoring: scoringShort(s.scoring) },
-    analyses: { depth: depthOfRounds(s.analysis.debateRounds), perRun: s.routines.maxAnalyses, listener },
+    analyses: { depth: depthOfRounds(s.analysis.debateRounds), rounds: { debate: s.analysis.debateRounds, risk: s.analysis.riskRounds }, perRun: s.routines.maxAnalyses, listener },
     paper: { ...record, startUsd: readPaperStart(dir), minWeeks: RECORD_WEEKS, minWords: RECORD_WORDS },
   };
 }

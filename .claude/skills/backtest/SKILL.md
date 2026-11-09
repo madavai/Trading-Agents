@@ -19,17 +19,17 @@ One analysis gives one decision, which cannot tell whether the desk decides well
 Call `start_backtest`.
 - **NEEDS_EMAIL**: ask the person for their own email as /analyse does, save it with `set_contact_email`, and call again.
 - **INPUT_ERROR**: tell the person what to correct and stop.
-- Otherwise, **tell the person before running anything**: the number of cells (a stock on a date), that each cell is a full team run (in the desk's first real runs, about 40 minutes at shallow depth and up to about 3 hours at medium) and a real amount of model use, and the limits it reports (for a past date the desk reads only what was out by then: a US company's or fund's SEC filings as made public by that date, economic figures released by then at today's revised values, prices adjusted for every split and dividend since; news, posts and odds exist only for recent days, so those reads are thin or unavailable and say so). If there are more than 3 cells, **ask whether to go ahead and wait for a yes**; on a no, call `end_backtest`.
+- Otherwise, **tell the person before running anything**: the number of cells (a stock on a date), that each cell is a full team run (in the desk's first real runs, about 40 minutes at shallow depth and up to about 3 hours at medium) and a real amount of model use, and the limits it reports (for a past date the desk reads only what was out by then: a US company's or fund's SEC filings as made public by that date, economic figures released by then at today's revised values, prices adjusted for every split and dividend since; news, posts and odds exist only for recent days, so those reads are thin or unavailable and say so). If there are more than 3 cells, **ask whether to go ahead and wait for a yes**; on a no, call `end_backtest` with this sweep's `sweep_id`.
 - To resume an interrupted sweep, call `start_backtest` again with the same `sweep_id` and the same stocks and dates: cells already recorded are skipped.
 
 ## 3. Run the cells
-For each cell still to run, one at a time, in the order listed: run the /analyse procedure for that stock and date, with the depth and analysts above. The desk records it all in the sweep's own journal; each cell ends with `record_decision`, and /analyse then replies with one line (ticker, date, rating). Print that line as the cell's progress.
+For each cell still to run, one at a time, in the order listed: run the /analyse procedure for that stock and date, with the depth and analysts above. The desk records each cell of the sweep in the sweep's own journal, whichever member records it, while everything else stays on the live desk; each cell ends with `record_decision`, and /analyse then replies with one line (ticker, date, rating). Print that line as the cell's progress.
 - A cell that fails twice is noted and skipped; do not end the sweep for one cell. Say which ones failed at the end.
 - Do not ask the person anything between cells.
 
 ## 4. Score
-1. Run the /settle procedure for the sweep's pending calls: `list_settlements`, then `record_outcome` with a lesson for each READY call. Those still NOT YET stay pending.
-2. Call `backtest_summary`, then `end_backtest`.
+1. Run the /settle procedure for the sweep's pending calls: `list_settlements`, then `record_outcome` with a lesson for each READY call, each given `sweep_id` (this sweep's, from `start_backtest`): without it they score the person's live calls instead. Those still NOT YET stay pending.
+2. Call `backtest_summary`, then `end_backtest` with this sweep's `sweep_id`.
 3. Report the figures exactly as the summary gives them: how many calls were scored, pending and unscored, and by rating the count, how often the direction was called right (Hold claims none) and the mean alpha. Add, in your own words, that this is a handful of calls from one run of the model: a hit rate over fewer than about 30 calls per rating is noise, each alpha is a first-week check, as the summary says, not the calls' own time horizons, text feeds are not archived, and past results do not promise future ones. Nothing here is investment advice.
 
 ## Never

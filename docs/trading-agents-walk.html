@@ -353,7 +353,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "Ask the team: [[Check this computer]]"],
       "see": [
         "\"Trading Agents desk check\", with the same version as the top of this walk.",
-        "First under \"This computer\": \"This conversation's steps for the team are the ones in this folder (version …)\", the version being eight letters and digits. The team gives you that version, copied from its own steps: the desk check always asks for it. It is the only line about this conversation's own steps.",
+        "First under \"This computer\": \"This conversation began with the team's steps of version …, the version in this folder. A change made to the team in Madav's Agent Studio cannot be told from here: it keeps that version. If the team was changed there, ask the desk to reset the team to go back to the project's steps\", the version being eight letters and digits. The team gives you that version, copied from its own steps: the desk check always asks for it. It is the only line about this conversation's own steps, and the team never sums it up as \"the steps match\".",
         "In the team's list of actions the desk check may show twice. That is fine: the first answer started \"TEAM VERSION NEEDED\" and asked the team for the version in its own steps, and what the team tells you comes from the second.",
         "Under \"This computer\", OK for Node, the desk data folder (writable), the contact email for the SEC (yours, masked: its first letter, then …@ and its domain, never the whole address) and Robinhood (\"a sign-in is saved\", or \"not connected yet (it is for your accounts on the dashboard, and for trading; analysis works without it)\").",
         "A line saying your private folder is locked to your own account and the system (nothing more: it never says that no other account can open it), and \"The desk's agent files in this folder (its thirteen agents, the team's file and its line-up) are as the project ships them\". The team never reads that line as being about this conversation's steps.",
@@ -371,7 +371,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "\"Contact email for the SEC: <its first letter>…@<its domain> (shown masked; sent to sec.gov alone, kept in desk-data)\", for example \"j…@mail.com\". Your whole address is never in the check. No other source is named as receiving it.",
         "When you give it: \"Saved. The SEC will see <your email> as the contact for this desk's requests; no other source sees it.\"",
         "An address written with a letter other than a to z (an accent, another alphabet) is refused at once, with the reason: for example \"josé@mail.com\" \"cannot be sent to the SEC: it has \"é\" …\". It is never saved to fail every request to the SEC later. An invisible mark copied along with an address is dropped."] },
-    { "id": "A5", "title": "Reset the team brings the project's team back", "tags": ["Optional"], "changed": "2026-11-08",
+    { "id": "A5", "title": "Reset the team brings the project's team back", "tags": ["Optional"], "changed": "2026-11-09",
       "about": "If the team stops behaving as described here, perhaps after a change in Agent Studio, \"reset the team\" puts the agents back exactly as the project ships them. Your own choices of model, permissions and effort stay. The team resets only when you ask for it in words, and once: the desk itself refuses a second reset soon after the first.",
       "where": "Madav › Agent Studio, then trading-desk › Put to work",
       "do": [
@@ -380,6 +380,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "Open Agent Studio again and look at the trader.",
         "Back in the same conversation, ask once more: [[Reset the team]] and say yes."],
       "see": [
+        "Before the reset, a desk check in this conversation would still say it began with the version in this folder, and that a change made in Agent Studio cannot be told from there: that is why the reset is yours to ask for.",
         "The answer starts \"Put back as the project ships them\" and says the others were written again too, that it takes effect from the next conversation or run, and that Madav goes back to the project's version of the team too.",
         "Your change is gone. The model, permissions and effort you chose in Agent Studio stay yours.",
         "If Madav runs the desk's routines, they are paused until you switch them on again (G5).",
@@ -1065,7 +1066,7 @@ b, strong { font-weight: var(--weight-semibold); }
     "about": "Routines are the desk's daily habits. The morning routine scores old calls, looks at what moved, analyses what you asked for and your starred companies, and lists the new calls to decide on; the evening wrap-up reports the day, first any holding that closed below its stop. Madav can run them on a schedule. They never place an order.",
     "before": "A few calls recorded (section B) and NVDA starred on your watchlist (C4).",
     "tests": [
-    { "id": "G1", "title": "The morning routine", "tags": [], "changed": "2026-11-08",
+    { "id": "G1", "title": "The morning routine", "tags": [], "changed": "2026-11-09",
       "about": "One prompt does a morning's work: at most five analyses, so it stays affordable.",
       "where": "Madav › Agent Studio › trading-desk › Put to work",
       "do": [
@@ -1075,6 +1076,10 @@ b, strong { font-weight: var(--weight-semibold); }
         "It scores past calls first, reads \"Worth a look today\" (naming the session its moves are from, and any names whose news could not be read, never as \"no news\"), analyses what is waiting and your starred companies such as NVDA (at most five), then lists the new calls to decide on and the list worth a look.",
         "On a Monday (the Tuesday, when Monday is a New York market holiday) it first puts up to three of your holdings whose view is a week old on the waiting list (N6).",
         "On a day New York's market is closed, a weekend or one of its holidays such as Thanksgiving (26 Nov 2026), it only scores past calls: \"New York's market is closed today (<why>)\", with the next market day. After \"Analyse nothing today\" it names no company to analyse; what is waiting stays on the dashboard's list.",
+        "Starred companies take turns: with more starred than a morning analyses, it names the rest \"Left for another morning\", and the next morning starts with the ones whose latest call is oldest, so every one gets its turn.",
+        "If an analysis from the dashboard's list is running when it starts (the listener's, say), it leaves that list to that run (\"left to that run (one stock runs at a time)\") and analyses your starred companies. A company asked for on the dashboard but already called today is marked done there, never analysed again.",
+        "It says \"analysed in step 2\" only of the companies step 2 lists: a re-rated holding or a switch pick over the morning's limit is said to wait on the dashboard, and one already called today is said so.",
+        "If your computer's day is not New York's when it runs (8:00 on a Monday in Dubai is Sunday evening in New York), the brief says so first, \"The desk's day is New York's: …\", and works for New York's day.",
         "It ends with a one-line count, such as \"3 analysed, 1 skipped, 2 scored\". It never places an order."] },
     { "id": "G2", "title": "The evening wrap-up", "tags": [], "changed": "2026-11-09",
       "about": "A short report of the day: any holding whose last close is below the stop the desk's trader proposed (the dashboard warns of a stop only while its page is open), what the desk called, and what was sent to Robinhood.",
@@ -1085,15 +1090,16 @@ b, strong { font-weight: var(--weight-semibold); }
         "First, each holding of the Agentic account that closed below its stop, with its close, its stop and the call it came from; or that none did. A close that could not be read is said as not known, never as above the stop.",
         "It only reports: nothing is sold by itself, and selling stays your own decision, on the dashboard or in the Robinhood app.",
         "Today's calls, any orders the dashboard sent and what Robinhood answered then, and how many calls wait to be scored.",
-        "It says what happened since is on the dashboard and in the Robinhood app: the team does not read Robinhood."] },
-    { "id": "G3", "title": "The routines come with the project, switched off", "tags": [], "changed": "2026-10-21",
+        "It says what happened since is on the dashboard and in the Robinhood app: the team does not read Robinhood.",
+        "Run before New York's market has closed (its time is your computer's clock), it says so: \"New York's market has not closed yet today: it is <time> there\", and that the day's calls and orders are those so far."] },
+    { "id": "G3", "title": "The routines come with the project, switched off", "tags": [], "changed": "2026-11-09",
       "about": "The project hands Madav three routines, each off until you switch it on: nothing runs on a schedule without your yes.",
       "where": "Madav › Routines",
       "do": [
         "Open Madav's Routines list.",
         "Switch \"Morning routine\" on and press Run now (or wait for 8:00 on a weekday)."],
       "see": [
-        "Three routines from the project: \"Run automatically when the dashboard asks\", \"Morning routine\" (8:00 on weekdays) and \"Evening wrap-up\" (17:00 on weekdays), each off until you switch it on.",
+        "Three routines from the project: \"Run automatically when the dashboard asks\", \"Morning routine\" (\"At 8:00 on weekdays, by this computer's clock\") and \"Evening wrap-up\" (\"At 17:00 on weekdays, by this computer's clock\"), each off until you switch it on. The desk's day is New York's: each routine's brief says so when your computer's day is another.",
         "The morning routine runs as trading-desk without asking you anything and ends with the list of new calls. You can change the times there; your version stays yours."] },
     { "id": "G4", "title": "Scoring past calls", "tags": ["Later"], "changed": "2026-11-09",
       "about": "Scoring is how the desk learns: each call whose first week is up gets its first-week check against SPY and a short lesson that later analyses read. It is a short first check, not the call's own time horizon, and it happens only when a scoring runs (this one, an analysis or a routine). The lesson is written from those days' actual prices, so it cannot make up what the stock did.",
@@ -1229,15 +1235,16 @@ b, strong { font-weight: var(--weight-semibold); }
         "Type, one at a time: [[/desk-check]] [[/analyse NVDA shallow]] [[/terminal]] [[/routine morning]]"],
       "see": [
         "The same results as asking the team in Agent Studio, except one line: first under \"This computer\", /desk-check in a chat says \"This conversation's steps for the team were not compared with the ones in this folder: no version was given. Only the trading-desk team's own steps carry a version, so a check from any other chat, or from a terminal, compares nothing here\". With everything else OK, the chat opens its answer with \"Ready, except one thing this check did not compare: whether this conversation's steps for the team are the ones in this folder\", as the check's own \"HOW TO SUM UP\" line tells it, and passes that line on as it is: never as a match, and nowhere \"everything is ready\" or \"nothing needs fixing\".",
-        "/desk-check in a chat also offers, on your yes, to test the Robinhood sign-in read-only, saying first what it reads: the tools Robinhood's connection offers and how many holdings answer, never their values. Then \"Connected to Robinhood. Its connection offers N tools.\"",
+        "/desk-check in a chat also offers, on your yes, to test the Robinhood sign-in read-only, saying first what it reads: the tools Robinhood's connection offers and how many holdings answer, never their values. Then \"Connected to Robinhood. Its connection offers N tools.\" It waits up to five minutes for your sign-in, never cut off sooner.",
         "If the test does not work: it says nothing was ordered, that the desk's analyses work without Robinhood, and that you can run the test again or press Connect on the dashboard's Your account. Never \"plan B\"."] },
-    { "id": "I2", "title": "/analyse with no company runs the waiting list", "tags": ["Optional"], "changed": "2026-10-21",
+    { "id": "I2", "title": "/analyse with no company runs the waiting list", "tags": ["Optional"], "changed": "2026-11-09",
       "about": "Without a company named, /analyse works through what you asked for on the dashboard.",
       "where": "The dashboard, then a Claude Code chat",
       "do": [
         "Ask for an analysis on the dashboard (the robot beside AAPL), then type [[/analyse]] in a chat."],
       "see": [
-        "It analyses what is waiting, one at a time, never asking you anything, and the dashboard shows where each one stands."] },
+        "It analyses what is waiting, one at a time, never asking you anything, and the dashboard shows where each one stands.",
+        "If another run is analysing a company from the list (a routine's, or the listener's), it stops at once and says so, \"Being analysed now by another run: …\", and asks for no other run: the run analysing that company carries on with the list when it finishes. It never takes or fails that run's company."] },
     { "id": "I3", "title": "A back-test", "tags": ["Optional"], "changed": "2026-11-09",
       "about": "A back-test runs the team over past dates to see how its calls would have done. It is slow and uses a lot of model time, and it is kept apart from your real calls.",
       "where": "A Claude Code chat in your Trading-Agents folder",
@@ -1246,7 +1253,7 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "The team runs over those past dates in a journal of its own, then reports by rating how often the direction was right and the mean alpha.",
         "Before it runs, the team says the limits of past dates: a US company's or fund's SEC filings as made public by then, economic figures released by then at today's revised values, prices adjusted for every split and dividend since, and news, posts and odds thin or unavailable. It never says a company's profile and insider trades exist only for recent days.",
-        "The dashboard's calls and scorecard are unchanged.",
+        "The dashboard's calls and scorecard are unchanged. While it runs, an analysis of today you ask for, on the dashboard or in a chat, and the routines' scoring stay with your own calls, never in the back-test. The routines and other analyses never end it: the back-test's own chat ends it when it is done, or it ends by itself after two hours with no work on its cells.",
         "Your holdings are left out: what you hold now was not known on the days tested. In the back-test's own reports (in the desk-data folder, under backtest), each trader's proposal begins with a \"Holdings:\" line that says so."] }
   ] },
   { "id": "J", "name": "Start here and This morning",
@@ -1311,13 +1318,17 @@ b, strong { font-weight: var(--weight-semibold); }
       "where": "Dashboard › This morning › under Worth a look today",
       "do": [
         "Read the switch \"Analyse the top 3 each market morning\", switch it on, then off again.",
-        "Switch it on, reload the page and read the switch at once, while \"Worth a look today\" is still looking (the first look of the day takes a minute). Switch it off again."],
+        "Switch it on, reload the page and read the switch at once, while \"Worth a look today\" is still looking (the first look of the day takes a minute). Switch it off again.",
+        "Open the dashboard in a second tab. Switch it on in the first, then press it on in the second too, which still shows it off."],
       "see": [
         "While the page reloads the switch reads as you left it (on), never off; until the page knows, it says \"Reading whether \"Analyse the top 3 each market morning\" is on.\" and there is no switch to press. If that cannot be read, it says so (\"Whether … could not be read just now.\").",
         "Off as shipped: \"When on, it starts the next market morning: then the top 3 go on the waiting list at shallow depth once each market morning, and run when something is listening. Switching it on puts nothing on the list at once.\"",
         "On: \"Switched on: nothing is queued now. From <day>, the top 3 go on the waiting list …\". Nothing joins Analyses you asked for until that morning; then the top three not already called today do, once, before noon New York time. <day> is the next market morning: switched on the day before Thanksgiving (25 Nov 2026), it is 27 Nov 2026.",
         "On a weekend or one of New York's market holidays nothing joins the waiting list: it is not a market morning.",
-        "Off: \"Switched off: nothing goes on the waiting list by itself.\""] }
+        "Off: \"Switched off: nothing goes on the waiting list by itself.\"",
+        "With it on, leave the dashboard running and close its page: on a market morning the top three still join the waiting list, since the dashboard looks itself while it runs.",
+        "If the morning's first look could not read the prices, nothing is used up: a later look before noon New York time puts the top three on the list.",
+        "The second tab gives the same <day> as the first: an \"on\" from another tab, or from a page left open since before, never moves the first morning on, so no morning is skipped."] }
   ] },
   { "id": "K", "name": "Analyses that run by themselves",
     "sub": "You ask on the dashboard; whatever listens (Madav, the desk's own Claude Code listener, or you in a chat) runs the team, one at a time.",
@@ -1345,7 +1356,8 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "Each row: Stock, Depth, Where it stands, Asked. Asked is your own day: one asked at 8:30 PM on Fri 6 Nov in Chicago says \"6 Nov 2026\", never the 7 Nov it already was in London.",
         "\"Waiting\", then \"Being analysed\" with the step it is on (for example \"analysts reading: 2 of 4 done\", \"debate round 1 of 1\", \"the portfolio manager is deciding\"), then its rating with \"done <time>\" and \"Read the call\". A time that is not today carries its day: \"done Fri 6 Nov, 03:10 PM\".",
-        "When one finishes, a notice says so wherever you are on the page. At most five a run; the rest wait for the next run, which is asked for by itself."] },
+        "When one finishes, a notice says so wherever you are on the page. At most five a run; the rest wait for the next run, which is asked for by itself.",
+        "With two runs at once (a routine and the listener, say), each company is analysed by one of them only, and one run never marks another's company failed."] },
     { "id": "K3", "title": "Madav is listening", "tags": [], "changed": "2026-11-07",
       "about": "Madav's routine watches the dashboard's doorbell and runs the team for you, as you set it up in Madav. When Madav's note gives no end time for its last run, the page says when that run started, never passing the start for the end.",
       "where": "Madav › Routines, then the dashboard",
@@ -1356,7 +1368,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "Under Analyses you asked for: \"Runs by itself: Madav is listening on this computer\", with its last run (for example \"last run 10:32 AM: 2 analysed, 0 failed\").",
         "A last run that was not today carries its day; one whose end Madav did not give says when it started: round 1's read \"last run started Sat 24 Oct, 12:54 AM: …\", not \"last run 12:54 AM\".",
         "It runs with nothing more from you. No \"Run automatically with Claude Code\" while Madav listens."] },
-    { "id": "K4", "title": "The desk's own Claude Code listener", "tags": [], "changed": "2026-10-21",
+    { "id": "K4", "title": "The desk's own Claude Code listener", "tags": [], "changed": "2026-11-09",
       "about": "Without Madav's routine, one press starts the desk's own listener, which runs the team with Claude Code on this computer whenever you ask. It keeps a log and stays on until you switch it off.",
       "where": "Dashboard › Analyses you asked for",
       "do": [
@@ -1366,9 +1378,10 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "\"Analyses you ask for now run by themselves, with Claude Code on this computer.\"",
         "\"Runs by itself: Claude Code is listening on this computer\". About 20 seconds after you ask, the run starts. Its log is `desk-data/watcher.log`.",
-        "It is still listening after the dashboard reopens.",
+        "It is still listening after the dashboard reopens. If it stops while the dashboard runs (Madav took over, then stopped listening, say), the dashboard starts it again by itself within about five minutes, while the switch is on.",
+        "While another run is analysing a company from the list (the morning routine's, say), it starts no run of its own; it starts one as soon as that run has finished.",
         "\"Analyses no longer run by themselves. A run in progress finishes first.\" Then \"Nothing is listening …\"."] },
-    { "id": "K5", "title": "Nothing listening, and Run now", "tags": [], "changed": "2026-11-08",
+    { "id": "K5", "title": "Nothing listening, and Run now", "tags": [], "changed": "2026-11-09",
       "about": "With nothing listening, your asks simply wait; a chat can run them, and with a listener \"Run now\" starts a run at once.",
       "where": "Dashboard, then trading-desk › Put to work",
       "do": [
@@ -1379,8 +1392,9 @@ b, strong { font-weight: var(--weight-semibold); }
         "\"Nothing is listening, so analyses wait here. Switch on \"Run automatically\" in Madav, or run them with Claude Code on this computer, or ask the desk to \"analyse what is waiting\" in a chat.\"",
         "The chat runs them one at a time, never asking you anything.",
         "Asked again with nothing waiting, the team says nothing is waiting, and that the finished analyses still on the list need no run. Never that you have not asked for any analysis.",
-        "With a listener and something waiting, \"Run now\" asks for a run: \"Asked for a run of what is waiting.\""] },
-    { "id": "K6", "title": "A stopped run says why, and Retry carries on", "tags": ["Later"], "changed": "2026-11-08",
+        "With a listener and something waiting, \"Run now\" asks for a run: \"Asked for a run of what is waiting.\"",
+        "Asked while another run is analysing a company from the list, the team stops and says so, and asks for no other run; that run carries on with the list when it finishes."] },
+    { "id": "K6", "title": "A stopped run says why, and Retry carries on", "tags": ["Later"], "changed": "2026-11-09",
       "about": "When a run stops early (a usage limit, a missing email), the company says why in plain words, and Retry carries on from the step it reached. With the desk's own Claude Code listener it says so at once. With Madav it can say so at once only when Madav's note gives the time its run ended, which it does not yet: until then the company shows \"Being analysed\" until nothing has been saved for it for two hours, and then says exactly that.",
       "where": "Dashboard › Analyses you asked for",
       "do": [
@@ -1391,7 +1405,8 @@ b, strong { font-weight: var(--weight-semibold); }
         "With Claude Code, at once: \"Failed\" with the reason in plain words, for example \"Claude Code's weekly usage limit was reached; it resets 6am (America/Chicago). Press Retry after that.\"",
         "With Madav: \"Being analysed\" with the last step it reached, then, two hours after that step, \"Failed\" with \"nothing was saved for this analysis for two hours, so its run has most likely stopped: press Retry. If it was still going, it shows done once its call is recorded\".",
         "What a run cannot do (for example no email saved for the SEC) marks it failed with the reason; it never asks you.",
-        "\"<company> is asked for again.\", and on the same day it carries on from the step it stopped at."] },
+        "\"<company> is asked for again.\", and on the same day it carries on from the step it stopped at.",
+        "A run that recorded its call before it stopped shows done with that call's rating, never \"Failed\"."] },
     { "id": "K7", "title": "The desk's day is New York's", "tags": ["Optional"], "changed": "2026-10-21",
       "about": "The desk counts days by the market's own calendar, New York's, wherever your computer is.",
       "where": "Dashboard › The desk's calls",
@@ -1399,7 +1414,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "Ask for an analysis late in the evening, after 8pm New York time, and look at the date of its call."],
       "see": [
         "The call is dated that day in New York, not the next day."] },
-    { "id": "K8", "title": "It runs at the depth you chose", "tags": [], "changed": "2026-10-22",
+    { "id": "K8", "title": "It runs at the depth you chose", "tags": [], "changed": "2026-11-09",
       "about": "The depth you choose on the dashboard decides how many rounds of debate run, whatever the team's lead plans: the time and the model allowance it spends are yours.",
       "where": "Dashboard › the robot beside a company, then its call › Read",
       "do": [
@@ -1407,8 +1422,9 @@ b, strong { font-weight: var(--weight-semibold); }
         "When it is done, open the call's reasoning."],
       "see": [
         "One turn each for the bull and the bear, and one for each of the three risk voices: the depth you chose, even if the team's lead planned more.",
-        "A Shallow run takes clearly less time than the Medium one in B7."] },
-    { "id": "K9", "title": "A long analysis is never marked failed while it works", "tags": ["Later"], "changed": "2026-11-08",
+        "A Shallow run takes clearly less time than the Medium one in B7.",
+        "If it could happen to you: a Deep run that stopped half way and is asked for again at Shallow carries on from where it stopped with Shallow's one round each, and its plan's note says \"… so the run resumes with 1 debate and 1 risk round(s), not the 5 and 5 it started with\"."] },
+    { "id": "K9", "title": "A long analysis is never marked failed while it works", "tags": ["Later"], "changed": "2026-11-09",
       "about": "An analysis can take hours: in the desk's first real runs about 40 minutes at shallow depth and 2 h 47 min at medium. A company stays \"Being analysed\" for as long as its analysis keeps saving its steps; it is marked failed only when nothing has been saved for it for two hours. If one marked failed that way was in fact still going, it shows done when its call is recorded. The desk's own Claude Code listener stops a run that has saved nothing for two hours, or that has analysed one company for six hours, in case the team is going round in a loop.",
       "where": "Dashboard › Analyses you asked for",
       "do": [
@@ -1416,7 +1432,7 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "\"Being analysed\" all the way, its step moving on (\"analysts reading: …\", \"debate round 2 of 3\", \"risk round 3 of 3\", \"the portfolio manager is deciding\"), also past two hours.",
         "Then its rating with \"done <time>\", and the notice \"NVDA: <rating>. Its call is in the desk's calls.\" Never \"Failed\" for a run that finished.",
-        "With Claude Code listening, the line under the list gives the last run's count, for example \"1 analysed, 0 failed\". A company already called today is counted apart: \"1 analysed, 1 already called today, 0 failed\"."] }
+        "With Claude Code listening, the line under the list gives the last run's count, for example \"1 analysed, 0 failed\". A company already called today is counted apart: \"1 analysed, 1 already called today, 0 failed\". It counts only the companies its own run took, never another run's."] }
   ] },
   { "id": "L", "name": "Your paper record",
     "sub": "Before you risk money: every call followed on paper against SPY, the S&P 500 fund, from the same start, and four weeks of it before trading.",
@@ -1624,7 +1640,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "Without an email: \"The desk has no contact email yet, which the SEC asks for before the first analysis: give it in Get started (in the side list), or to the desk in a chat.\"",
         "\"x\" is refused: it is not an email address. \"josé@mail.com\" is refused too: it \"cannot be sent to the SEC: it has \"é\", and the SEC can only be sent an address written with the letters a to z, digits and marks such as . _ - + …\". Your own: \"Saved: … The desk sends it to the SEC alone.\", showing only its first letter and its domain, never the whole address.",
         "Step 1 ticks itself off: \"Saved: … · sent to the SEC alone\", with \"Change…\". The desk check then names your email as the contact for the SEC (A4)."] },
-    { "id": "O4", "title": "The steps tick themselves off", "tags": [], "changed": "2026-10-21",
+    { "id": "O4", "title": "The steps tick themselves off", "tags": [], "changed": "2026-11-09",
       "about": "Each step is ticked from the desk's own records, so it ticks the same whether you used the page or a chat.",
       "where": "Dashboard › Get started › steps 2 to 5",
       "do": [
@@ -1633,7 +1649,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "When a call arrives, open it with \"Read the call on …\"."],
       "see": [
         "Step 2's chips turn green, \"3 of 3 names\", \"the whole market ✓\" and \"a sector ✓\", and it says \"done\".",
-        "Step 3: your picks wait at shallow depth (\"… are waiting to be analysed, at shallow depth.\"), then \"N asked for\" and \"runs by itself: Claude Code\" (or Madav).",
+        "Step 3: your picks wait at shallow depth (\"… are waiting to be analysed, at shallow depth.\"), then \"N asked for\" and \"runs by itself: Claude Code\" (or Madav). It ticks only while something listens: with the switch left on but nothing listening now, step 3 waits.",
         "Step 4 ticks once you open a call in full, with Buy, Hold, Sell and alpha explained beside it. Step 5 counts the weeks on paper, \"N of 4 weeks\", and ticks at four.",
         "A step done by asking the desk in a chat ticks off the same way."] },
     { "id": "O5", "title": "What does this mean?", "tags": [], "changed": "2026-10-21",

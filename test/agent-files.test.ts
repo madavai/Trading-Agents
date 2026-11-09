@@ -158,8 +158,8 @@ test('tools started before the desk was updated say so in every answer, never re
   assert.ok(before.includes(`- --  This conversation's steps for the team were not compared with the ones in this folder: ${NO_VERSION}\n`));
 
   fs.appendFileSync(path.join(root, 'dist', 'desk-tools.mjs'), '// and after it\n');   // an update, as a pull writes it
-  for (const name of ['read_queue', 'list_settlements', 'end_backtest']) {
-    const answer = await call(name);
+  for (const [name, args] of [['read_queue', {}], ['list_settlements', {}], ['end_backtest', { sweep_id: 'june' }]] as const) {
+    const answer = await call(name, args);
     assert.ok(answer.startsWith(`${UPDATED_NOTE}\n\n`), `${name}: ${answer.slice(0, 80)}`);
   }
   assert.match(UPDATED_NOTE, /^DESK UPDATED: the desk in this folder was updated after the desk's tools in this conversation started, so this conversation still has the old desk tools, and most likely the old steps\. Tell the person in one plain line to start a new conversation in Madav/);
@@ -205,11 +205,12 @@ test('the desk check says whether this conversation\'s steps for the team are th
   const { client, call } = await serve(root, repo);
   const filesLine = "- OK  The desk's agent files in this folder (its thirteen agents, the team's file and its line-up) are as the project ships them\n";
   const two = `\n${TWO_LINES}\n\nFree data sources:\n`;
-  assert.match(TWO_LINES, /^Pass on the line about this conversation's steps for the team and the line about the desk's agent files in this folder as they are written\. Only the first can say whether this conversation's steps are the folder's, and only with a version shown; the second is about the files alone\. Never take one for the other\.$/);
+  assert.match(TWO_LINES, /^Pass on the line about this conversation's steps for the team and the line about the desk's agent files in this folder as they are written\. Only the first is about this conversation's steps, and only with a version shown; the second is about the files alone\. Never take one for the other\.$/);
 
-  // the version this conversation's steps give, the folder's: it is shown and said to match
+  // the version this conversation's steps give, the folder's: it is shown as the version this conversation began with, and a
+  // change made in Agent Studio is said to be beyond what the check can tell (never "the steps are the folder's")
   const same = await call('desk_check', { team_version: now });
-  assert.match(same, new RegExp(`\\nThis computer:\\n- OK  This conversation's steps for the team are the ones in this folder \\(version ${now}\\)\\n`));
+  assert.match(same, new RegExp(`\\nThis computer:\\n- OK  This conversation began with the team's steps of version ${now}, the version in this folder\\. A change made to the team in Madav's Agent Studio cannot be told from here: it keeps that version\\. If the team was changed there, ask the desk to reset the team to go back to the project's steps\\n`));
   assert.ok(same.includes(filesLine) && same.includes(two), 'the files line, then how to pass on the two');
   const computer = (check: string) => check.split('\nFree data sources:\n')[0];   // the sources' timings vary
   assert.equal(computer(await call('desk_check', { team_version: ` ${now} ` })), computer(same), 'spaces around it do not matter');

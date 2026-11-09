@@ -115,16 +115,18 @@ test('a sweep records into its own journal and runs, never the live ones, and ca
   assert.ok(!fs.existsSync(path.join(live, 'journal.md')), 'the live journal was touched');
   assert.ok(!fs.existsSync(path.join(live, 'runs')), 'the live runs were touched');
 
-  assert.match(await call('list_settlements'), /1 pending call\(s\), 1 ready[\s\S]*SPY \+2\.5%; alpha \+7\.5%/);
-  assert.match(await call('record_outcome', { symbol: 'NVDA', trade_date: '2026-08-31', lesson: 'Alpha +7.5%, thesis held.' }), /^Settled: NVDA \+10\.0%/);
+  // the sweep's calls are scored by naming the sweep: left out, the scoring reads the person's live journal
+  assert.match(await call('list_settlements'), /No pending calls/);
+  assert.match(await call('list_settlements', { sweep_id: 'june' }), /1 pending call\(s\), 1 ready[\s\S]*SPY \+2\.5%; alpha \+7\.5%/);
+  assert.match(await call('record_outcome', { symbol: 'NVDA', trade_date: '2026-08-31', lesson: 'Alpha +7.5%, thesis held.', sweep_id: 'june' }), /^Settled: NVDA \+10\.0%/);
   const summary = await call('backtest_summary');
   assert.match(summary, /^Backtest sweep june: 1 call\(s\) recorded of 2 planned\n\nResolved cells: 1 · pending: 0\n- Buy: n=1, called the direction 100%, mean alpha \+7\.50%/);
 
-  assert.match(await call('end_backtest'), /Backtest sweep june ended\. The desk is back on the live journal\./);
+  assert.match(await call('end_backtest', { sweep_id: 'june' }), /Backtest sweep june ended\. The desk is back on the live journal\./);
   assert.match(await call('list_settlements'), /No pending calls: every call in the journal is settled\./);       // the live journal is empty
   assert.doesNotMatch(await call('plan_analysis', { symbol: 'NVDA', analysis_date: '2026-08-31', restart: true }), /Backtest sweep/);
   assert.match(await call('backtest_summary', { sweep_id: 'june' }), /1 call\(s\) recorded/);
-  assert.match(await call('end_backtest'), /No backtest was running/);
+  assert.match(await call('end_backtest', { sweep_id: 'june' }), /No backtest was running/);
 
   assert.match(await call('start_backtest', { ...args, sweep_id: 'june' }), /2 cell\(s\).*1 already recorded, 1 to run\.[\s\S]*1\. NVDA 2026-09-07/);     // resumed: the recorded cell is skipped
   await client.close();

@@ -8,7 +8,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { deskDataDir } from '../paths.js';
-import { findClaude, runClaude, stopReason } from './claude.js';
+import { findClaude, RUN_ARGS, RUN_ENV, runClaude, stopReason } from './claude.js';
 import { AlreadyListening, stopWhy, watch } from './watcher.js';
 
 const root = process.cwd(), dir = deskDataDir(root), logFile = path.join(dir, 'watcher.log');
@@ -37,10 +37,12 @@ let w;
 try {
   w = watch({
     dir, listener: 'Claude Code', retire: () => print() !== born,
-    run: async (start) => {
+    run: async (start, id) => {
       log(`\n=== ${new Date().toISOString()} a run of the waiting list starts ===\n`);
       let said = '';   // its last words, for why it stopped
-      const r = await runClaude(claude, root, (t) => { log(t); said = (said + t).slice(-8000); }, { stopIf: () => stopWhy(dir, start) });
+      // The run's id goes to the desk's tools it starts, which note it on each stock: this listener then fails only what
+      // its own run left unfinished, never a stock a routine or a chat is analysing beside it.
+      const r = await runClaude(claude, root, (t) => { log(t); said = (said + t).slice(-8000); }, { stopIf: () => stopWhy(dir, start) }, RUN_ARGS, { [RUN_ENV]: id });
       log(`\n=== ${new Date().toISOString()} the run ended${r.stopped ? ` (stopped: ${r.stopped})` : ''}, code ${r.code ?? 'none'} ===\n`);
       if (r.stopped) return r.stopped;
       if (r.code === 0) return undefined;

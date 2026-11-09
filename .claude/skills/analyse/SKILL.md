@@ -28,7 +28,7 @@ Call `plan_analysis` with the ticker, date, and any rounds, analysts or language
 
 Tell the person in two lines what will run: the analysts, the rounds, the language, and how long it can take: in the desk's first real runs, about 40 minutes at shallow depth and up to about 3 hours at medium; deep runs more rounds, so longer.
 
-If the plan starts with a line naming a backtest sweep, and you were not asked to run one by the /backtest skill, an earlier sweep was left running: call `end_backtest`, then plan again, so this analysis goes into the live journal.
+If the plan starts with a line naming a backtest sweep, and you were not asked to run one by the /backtest skill, this stock and date are a cell of a backtest running now, so the analysis would be recorded in that backtest, not in the person's journal. Stop and tell the person so (in a run of the waiting list, fail the stock with that reason); never end the backtest: only the conversation running it does.
 
 ## 4. Run the steps, in the plan's order, skipping the ones marked done
 Each agent is called with the Agent tool, `subagent_type` set to its name. Every request names the symbol (exactly as the plan gives it), the analysis date and the report language, and asks the agent to save its work. Agents save their work on the desk and reply with one line; do not paste their reports into the next request.
@@ -63,13 +63,13 @@ After each step, check it was saved: call `read_run` without sections and see th
 
 ## 6. The waiting list: the stocks asked for on the dashboard
 A run of the waiting list is often started with nobody watching: by a routine, or by the listener the dashboard rings when the person presses Analyse. So in it you never ask the person anything and never wait for an answer; what cannot be done is marked failed, with why, for the person to read on the dashboard.
-1. Settle past calls once (step 2), then call `read_queue`. It lists the stocks waiting, in order, each with the depth asked, and how many one run may analyse. If it says another stock is being analysed now, stop and say so: one stock runs at a time. If nothing is waiting, say so and stop.
+1. Settle past calls once (step 2), then call `read_queue`. It lists the stocks waiting, in order, each with the depth asked, and how many one run may analyse. If it says another run is analysing a stock, stop and say so, without `end_queue_run`: one stock runs at a time, and that run asks for the next run itself when it finishes. If it names a stock this run is analysing, finish that one first. If nothing is waiting, say so and stop.
 2. Take the waiting stocks one at a time, in that order, up to that number. For each:
-   - Call `start_queue_item`. START: plan with the date and the rounds it gives (step 3; no rounds when it says the settings decide). ALREADY: it was called today and is marked done; take the next. BUSY: stop the run and say why.
+   - Call `start_queue_item`. START: plan with the date and the rounds it gives (step 3; no rounds when it says the settings decide). ALREADY: it was called today and is marked done; take the next. NOT STARTED: it cannot run now and is marked failed with why; take the next. BUSY: another run is analysing a stock: stop the run and say why, without `end_queue_run`.
    - Run its steps (step 4) and finish it (step 5, without the summary: one line, the ticker and the rating).
    - Once its call is recorded, call `finish_queue_item` with the symbol alone: the dashboard shows it done, with its rating.
    - If it cannot be finished, call `finish_queue_item` with `failed_because`: one plain sentence the person reads, saying what went wrong and what to do, then go on with the next. If the plan answers NEEDS_EMAIL, do not ask: fail it with "the desk needs your email for the SEC: give it in a chat, then press Retry", and stop the run, since every stock would fail the same way. A step that fails twice: fail it with which step and why.
-3. Call `end_queue_run` once, at the end, however the run stopped. If stocks are still waiting, it asks for another run.
+3. Call `end_queue_run` once, at the end, however the run stopped, unless it stopped because another run is analysing a stock. A stock this run started and left unfinished is marked failed; if stocks are still waiting, it asks for another run.
 4. Reply with one line per stock (the ticker, and its rating or why it failed), then the line `end_queue_run` gave, then that nothing here is investment advice and the desk never trades: the person decides on the dashboard. End with one short line on its own, the count of this run, for example `2 analysed, 0 failed` (a routine shows the last line as the run's result).
 
 ## Never

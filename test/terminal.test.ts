@@ -157,7 +157,7 @@ test('a stock is added only if it has a price, can be starred and removed, and t
 
 test('an analysis asked for on the page waits at its depth, rings for whoever listens, and the desk\'s tools take it from waiting to running to done', async () => {
   const first = (await call(term, 'POST', '/api/queue', { body: { symbol: 'nvda' } })).json().queue;
-  assert.deepEqual(first.map((q: any) => [q.symbol, q.state, q.depth]), [['NVDA', 'waiting', 'shallow']], "the settings' depth when none is chosen");
+  assert.deepEqual(first.map((q: any) => [q.symbol, q.state, q.depth]), [['NVDA', 'waiting', undefined]], "no depth chosen: the settings' own rounds, never rounded to a depth");
   const bell = readDoorbell(dir());
   assert.deepEqual([bell?.why, bell?.waiting], ['press', 1], 'the press rings the doorbell');
   assert.deepEqual((await call(term, 'POST', '/api/queue', { body: { symbol: 'NVDA', depth: 'deep' } })).json().queue.map((q: any) => [q.symbol, q.depth]), [['NVDA', 'deep']], 'asked again while waiting: the new depth stands');
@@ -173,7 +173,7 @@ test('an analysis asked for on the page waits at its depth, rings for whoever li
   assert.deepEqual([running.state, running.date, running.progress], ['running', '2026-10-12', 'starting']);
   assert.equal((await call(term, 'DELETE', '/api/queue?symbol=NVDA')).status, 409, 'a stock being analysed stays on the list');
   await call(term, 'POST', '/api/queue', { body: { symbol: 'AAPL' } });
-  assert.match(await tool('start_queue_item', { symbol: 'AAPL' }), /^BUSY: NVDA is being analysed now: one stock runs at a time/);
+  assert.match(await tool('start_queue_item', { symbol: 'AAPL' }), /^BUSY: NVDA, which this run started, is not finished yet: call finish_queue_item for it/);
   assert.match(await tool('finish_queue_item', { symbol: 'NVDA' }), /^INPUT_ERROR: no call for NVDA on 2026-10-12 is recorded yet/);
   new Journal(path.join(dir(), 'journal.md')).storeDecision('NVDA', '2026-10-12', '**Rating**: Buy\n\n**Executive Summary**: Buy.');
   assert.match(await tool('finish_queue_item', { symbol: 'NVDA' }), /^Marked done: NVDA, Buy/);

@@ -81,9 +81,10 @@ export const NONE = 'none';
 /** The team's line, and whether the team should call once more with the version its own steps give (`askAgain`). */
 export type TeamLine = Line & { askAgain?: true };
 
-/** Whether this conversation's copy of the team's steps (the version it passed, from its own copy of the team's file, the
- *  one it began with) is the folder's. Always a line, the first under "This computer": nothing else in the check is about
- *  this conversation's steps, so without a version it says plainly that they were not compared. `updated`: these tools
+/** Whether this conversation began with the folder's version of the team's steps (the version it passed, from its own
+ *  copy of the team's file, the one it began with). A change made to the team in Agent Studio keeps that version, so it
+ *  cannot be told from here: a match is said as the version it began with, never as "the same steps". Always a line, the
+ *  first under "This computer": nothing else in the check is about this conversation's steps, so without a version it says plainly that they were not compared. `updated`: these tools
  *  started before the folder was updated, so they hold the old source and cannot tell the folder's version. `known`: every
  *  version the team's steps have had (scripts/team-versions.json), so only a real earlier one is said to show that this
  *  conversation began before the update; a version never had is not compared, and the team is asked again. */
@@ -94,7 +95,7 @@ export function teamLine(given: string | undefined, folder: string | undefined, 
   if (!v || v.toLowerCase() === NONE) return not(NO_VERSION);
   if (!/^[0-9a-f]{8}$/.test(v)) return not('what was given is not a version');
   if (!folder) return { ok: false, text: `This conversation's steps for the team (version ${v}) could not be compared: the team's file in this folder carries no version` };
-  if (v === folder) return { ok: true, text: `This conversation's steps for the team are the ones in this folder (version ${folder})` };
+  if (v === folder) return { ok: true, text: `This conversation began with the team's steps of version ${folder}, the version in this folder. A change made to the team in Madav's Agent Studio cannot be told from here: it keeps that version. If the team was changed there, ask the desk to reset the team to go back to the project's steps` };
   if (known && !known.includes(v)) return not(`${v} is not a version the team's steps have ever had`);
   const why = known ? 'this conversation began before the desk was updated' : `this conversation began before the desk was updated, or ${v} was not copied from the team's steps (the list of the steps' earlier versions could not be read)`;
   return { ok: false, text: `This conversation's steps for the team (version ${v}) are not the ones in this folder now (version ${folder}): ${why}. Start a new conversation in Madav, where the new steps load, and check this computer there; reset nothing from this one` };
@@ -107,7 +108,7 @@ export const ASK_AGAIN = 'TEAM VERSION NEEDED: this answer did not compare this 
 
 /** Under the lines: how to pass on the two that sound alike, whichever steps the reader followed (8 Nov 2026: a team that
  *  passed no version read the agent-files line as saying its own steps were the folder's). */
-export const TWO_LINES = "Pass on the line about this conversation's steps for the team and the line about the desk's agent files in this folder as they are written. Only the first can say whether this conversation's steps are the folder's, and only with a version shown; the second is about the files alone. Never take one for the other.";
+export const TWO_LINES = "Pass on the line about this conversation's steps for the team and the line about the desk's agent files in this folder as they are written. Only the first is about this conversation's steps, and only with a version shown; the second is about the files alone. Never take one for the other.";
 
 /** The first words of the report, worked out from every line, for an agent that passes the check on (8 Nov 2026: a plain
  *  chat in Madav opened "Everything is ready" over a check that compared none of its steps, against its own step 5). Said

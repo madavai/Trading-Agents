@@ -2,9 +2,9 @@
 import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);
 
 // src/watch/main.ts
-import crypto from "node:crypto";
-import fs5 from "node:fs";
-import path5 from "node:path";
+import crypto2 from "node:crypto";
+import fs6 from "node:fs";
+import path6 from "node:path";
 import { spawn as spawn2 } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
@@ -53,10 +53,11 @@ function stopReason(output) {
   }
   return null;
 }
-function runClaude(cmd, root2, log2, limits = {}, args = RUN_ARGS) {
+var RUN_ENV = "TRADING_AGENTS_RUN";
+function runClaude(cmd, root2, log2, limits = {}, args = RUN_ARGS, env = {}) {
   return new Promise((resolve) => {
     let stopped;
-    const child = spawn(cmd.command, [...cmd.args, ...args], { cwd: root2, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+    const child = spawn(cmd.command, [...cmd.args, ...args], { cwd: root2, stdio: ["ignore", "pipe", "pipe"], windowsHide: true, env: { ...process.env, ...env } });
     const timer = limits.stopIf ? setInterval(() => {
       let why = null;
       try {
@@ -83,9 +84,12 @@ function runClaude(cmd, root2, log2, limits = {}, args = RUN_ARGS) {
   });
 }
 
+// src/watch/watcher.ts
+import crypto from "node:crypto";
+
 // src/desk/queue.ts
-import fs4 from "node:fs";
-import path4 from "node:path";
+import fs5 from "node:fs";
+import path5 from "node:path";
 
 // src/data/symbols.ts
 var FOREX = /* @__PURE__ */ new Set(["USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD", "CNY", "CNH", "HKD", "SGD", "SEK", "NOK", "DKK", "PLN", "MXN", "ZAR", "TRY", "INR", "KRW", "BRL", "RUB", "THB"]);
@@ -162,11 +166,43 @@ function normalizeSymbol(raw) {
   if (sh) return `${sh[1]}.SS`;
   return yahooClass(s);
 }
+var isCrypto = (raw) => cryptoBase(raw) !== null;
 function safeSymbol(raw) {
   const s = normalizeSymbol(raw);
   if (!/^[A-Z0-9.\-=^]{1,20}$/.test(s)) throw new Error(`"${raw}" is not a ticker symbol this desk can look up`);
   return s;
 }
+
+// src/desk/journal.ts
+import fs3 from "node:fs";
+import path3 from "node:path";
+
+// src/desk/rating.ts
+var RATINGS = ["Buy", "Overweight", "Hold", "Underweight", "Sell"];
+var REVIEW = "Needs review";
+var SET = new Set(RATINGS.map((r) => r.toLowerCase()));
+var cap = (s) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+var LABEL = /(?<![a-z])rating\b[^:\-\u2010-\u2015]*[:\-\u2010-\u2015][\s*]*(\w+)/gi;
+var OWN = "(?:(?:final|our|overall|my|recommended|updated|revised|new|current)\\s+)*";
+var LINE = new RegExp(`^\\s*(?<item>(?:[-+*\\u2022]|\\d+[.)])\\s+)?[\\s*_#]*${OWN}rating[^\\w:\\-\\u2010-\\u2015]*[:\\-\\u2010-\\u2015][\\s*]*(?<value>\\w+)`, "i");
+var SCALE = /rating\s*(scale|options|legend)/i;
+function extractRating(text) {
+  if (!text) return null;
+  const lines = text.normalize("NFKC").split(/\r?\n/).filter((l) => l.trim() && !SCALE.test(l));
+  const first = lines.find((l) => !l.trimStart().startsWith("#") || LINE.test(l)) ?? "";
+  const m = LINE.exec(first);
+  const opening = m && SET.has(m.groups.value.toLowerCase()) ? m : null;
+  if (opening && !opening.groups.item) return cap(opening.groups.value);
+  const own = opening ? [cap(opening.groups.value)] : [], labels = [];
+  for (const line of lines) {
+    const lm = LINE.exec(line);
+    if (lm && !lm.groups.item && SET.has(lm.groups.value.toLowerCase())) own.push(cap(lm.groups.value));
+    for (const x of line.matchAll(LABEL)) if (SET.has(x[1].toLowerCase())) labels.push(cap(x[1]));
+  }
+  const found = own.length ? own : labels;
+  return found.length && new Set(found).size === 1 ? found[0] : null;
+}
+var parseRating = (text) => extractRating(text) ?? REVIEW;
 
 // src/desk/lock.ts
 import fs2 from "node:fs";
@@ -215,18 +251,377 @@ function writeWhole(file, text) {
   }
 }
 
+// src/numbers.ts
+function signed(v, digits) {
+  const text = Math.abs(v).toFixed(digits);
+  return Number(text) === 0 ? text : `${v > 0 ? "+" : "-"}${text}`;
+}
+var signedPct = (fraction, digits = 1) => `${signed(fraction * 100, digits)}%`;
+var unsignZero = (text) => text.replace(/^[+\-−](0(?:\.0+)?%)$/, "$1");
+
+// src/check/probes.ts
+var MAX_BYTES = 64 * 1024;
+
+// src/data/http.ts
+var MINUTE = 6e4;
+function keepFor(url) {
+  const u = new URL(url);
+  if (/(^|\.)sec\.gov$/.test(u.hostname)) return /^\/submissions\//.test(u.pathname) ? 60 * MINUTE : 24 * 60 * MINUTE;
+  return /fred/.test(u.hostname) ? 60 * MINUTE : 5 * MINUTE;
+}
+
+// src/data/holidays.ts
+var HOLIDAYS = {
+  2026: [
+    ["2026-01-01", "New Year's Day"],
+    ["2026-01-19", "Martin Luther King, Jr. Day"],
+    ["2026-02-16", "Washington's Birthday"],
+    ["2026-04-03", "Good Friday"],
+    ["2026-05-25", "Memorial Day"],
+    ["2026-06-19", "Juneteenth"],
+    ["2026-07-03", "Independence Day (observed)"],
+    ["2026-09-07", "Labor Day"],
+    ["2026-11-26", "Thanksgiving Day"],
+    ["2026-12-25", "Christmas Day"]
+  ],
+  2027: [
+    ["2027-01-01", "New Year's Day"],
+    ["2027-01-18", "Martin Luther King, Jr. Day"],
+    ["2027-02-15", "Washington's Birthday"],
+    ["2027-03-26", "Good Friday"],
+    ["2027-05-31", "Memorial Day"],
+    ["2027-06-18", "Juneteenth (observed)"],
+    ["2027-07-05", "Independence Day (observed)"],
+    ["2027-09-06", "Labor Day"],
+    ["2027-11-25", "Thanksgiving Day"],
+    ["2027-12-24", "Christmas Day (observed)"]
+  ],
+  // 1 Jan 2028 is a Saturday: the NYSE keeps no New Year's Day holiday that year.
+  2028: [
+    ["2028-01-17", "Martin Luther King, Jr. Day"],
+    ["2028-02-21", "Washington's Birthday"],
+    ["2028-04-14", "Good Friday"],
+    ["2028-05-29", "Memorial Day"],
+    ["2028-06-19", "Juneteenth"],
+    ["2028-07-04", "Independence Day"],
+    ["2028-09-04", "Labor Day"],
+    ["2028-11-23", "Thanksgiving Day"],
+    ["2028-12-25", "Christmas Day"]
+  ]
+};
+var NAMES = new Map(Object.values(HOLIDAYS).flat().map(([day2, name]) => [day2, name]));
+
+// src/data/yahoo.ts
+var HOSTS = ["https://query1.finance.yahoo.com", "https://query2.finance.yahoo.com"];
+var KEEP_MS = keepFor(`${HOSTS[0]}/v8/finance/chart/`);
+
+// src/desk/scoring.ts
+function exchangeOf(ticker) {
+  const m = /\.([A-Z]{2,3}|[TLVF])$/.exec(normalizeSymbol(ticker));
+  return m ? `.${m[1]}` : null;
+}
+function yardstickFor(ticker, s) {
+  if (s.benchmark.trim()) return { yardstick: normalizeSymbol(s.benchmark), basis: "chosen" };
+  const sym = normalizeSymbol(ticker);
+  const suffix = Object.keys(s.benchmarks).filter(Boolean).sort((a, b) => b.length - a.length).find((x) => sym.endsWith(x.toUpperCase()));
+  if (suffix) return { yardstick: normalizeSymbol(s.benchmarks[suffix]), basis: "market" };
+  return { yardstick: normalizeSymbol(s.benchmarks[""] ?? "SPY"), basis: isCrypto(sym) ? "coin" : exchangeOf(sym) ? "unlisted" : "us" };
+}
+var ownReturn = (r) => r.basis === "same";
+function legacyRules(ticker, s, holding) {
+  const kept = Number(/^(\d+)d$/.exec(holding ?? "")?.[1]);
+  return { days: kept > 0 ? kept : s.holdingPeriodDays, unit: isCrypto(ticker) ? "calendar" : "trading", ...yardstickFor(ticker, s) };
+}
+var plural = (n, one) => `${n} ${one}${n === 1 ? "" : "s"}`;
+var windowWords = (r) => plural(r.days, `${r.unit} day`);
+var checkName = (r) => (r.unit === "trading" ? r.days === 5 : r.days === 7) ? "a first-week check" : `a check over its first ${windowWords(r)}`;
+
+// src/desk/journal.ts
+var UNCHECKED = ["unmarked", "no-prices", "unreliable", "flagged"];
+var WITHHELD = ["unreliable", "flagged"];
+var SEPARATOR = "\n\n<!-- ENTRY_END -->\n\n";
+var MARK = /<!--\s*ENTRY_END\s*-->/i;
+var SPLIT = /\s*<!--\s*ENTRY_END\s*-->\s*/i;
+function keep(text) {
+  let s = text;
+  while (MARK.test(s)) s = s.replace(MARK, "");
+  return s.replace(/^([ \t]*)(DECISION|REFLECTION|LESSON CHECK|EARLIER CORRECTIONS|FIRST LESSON):/gim, "$1$2 -").trim();
+}
+var LESSON_STATES = /* @__PURE__ */ new Set(["prices", "no-prices", "corrected", "unreliable", "flagged"]);
+function lessonOf(fields, pending) {
+  if (pending) return { lesson: "none", lessonOn: null };
+  const [state, on] = (fields.find((x) => x.startsWith("lesson:"))?.slice("lesson:".length) ?? "").split(":");
+  return LESSON_STATES.has(state) ? { lesson: state, lessonOn: on && DATE.test(on) ? on : null } : { lesson: "unmarked", lessonOn: null };
+}
+var DATE = /^\d{4}-\d{2}-\d{2}$/;
+var TICKER = /^[A-Za-z0-9.\-=^]{1,20}$/;
+var BASES = ["us", "coin", "unlisted", "market", "chosen", "same"];
+var RECORDED = /^recorded:(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z)$/;
+var recordedIn = (fields) => fields.map((x) => RECORDED.exec(x)?.[1]).find(Boolean) ?? null;
+var WINDOW = /^window:(\d{1,3}) (trading|calendar) days?$/;
+var YARDSTICK = /^yardstick:([A-Za-z0-9.\-=^]{1,20}) \(([a-z]+)\)$/;
+var rulesFields = (r) => [`window:${windowWords(r)}`, `yardstick:${r.yardstick} (${r.basis})`];
+function rulesIn(fields) {
+  const w2 = fields.map((x) => WINDOW.exec(x)).find(Boolean), y = fields.map((x) => YARDSTICK.exec(x)).find(Boolean);
+  if (!w2 || !y || !BASES.includes(y[2]) || !(Number(w2[1]) > 0)) return null;
+  return { days: Number(w2[1]), unit: w2[2], yardstick: y[1], basis: y[2] };
+}
+function checkRules(r) {
+  if (!Number.isInteger(r.days) || r.days < 1 || r.days > 366) throw new Error(`a window of ${r.days} days is not one the journal can keep`);
+  if (!TICKER.test(r.yardstick)) throw new Error(`the yardstick "${r.yardstick}" in desk-settings.json is not a ticker the journal can keep`);
+  if (!BASES.includes(r.basis)) throw new Error(`"${r.basis}" is not why a yardstick is chosen`);
+}
+function checkTag(ticker, date) {
+  if (!TICKER.test(ticker)) throw new Error(`"${ticker}" is not a ticker the journal can keep`);
+  if (!DATE.test(date)) throw new Error(`"${date}" is not a date in YYYY-MM-DD form`);
+}
+function parse(block) {
+  const lines = block.trim().split(/\r?\n/);
+  const tag = lines[0]?.trim() ?? "";
+  if (!tag.startsWith("[") || !tag.endsWith("]")) return null;
+  const f = tag.slice(1, -1).split("|").map((s) => s.trim());
+  if (f.length < 4) return null;
+  const body = lines.slice(1).join("\n").trim();
+  const decision = /DECISION:\n([\s\S]*?)(?=\nREFLECTION:|$)/.exec(body)?.[1]?.trim() ?? "";
+  const reflection = /(?:^|\n)REFLECTION:\n([\s\S]*?)(?=\nLESSON CHECK:\n|\nEARLIER CORRECTIONS:\n|\nFIRST LESSON:\n|(?![\s\S]))/.exec(body)?.[1]?.trim() ?? "";
+  const lessonCheck = /(?:^|\n)LESSON CHECK:\n([\s\S]*?)(?=\nEARLIER CORRECTIONS:\n|\nFIRST LESSON:\n|(?![\s\S]))/.exec(body)?.[1]?.trim() ?? "";
+  const earlier = /(?:^|\n)EARLIER CORRECTIONS:\n([\s\S]*?)(?=\nFIRST LESSON:\n|(?![\s\S]))/.exec(body)?.[1]?.trim() ?? "";
+  const firstLesson = /(?:^|\n)FIRST LESSON:\n([\s\S]*)$/.exec(body)?.[1]?.trim() ?? "";
+  const resolved = f.slice(6).find((x) => x.startsWith("resolved:"))?.slice("resolved:".length).trim() ?? null;
+  const pending = f[3] === "pending", score = (s) => s === void 0 ? null : unsignZero(s);
+  return { date: f[0], ticker: f[1], rating: f[2], pending, raw: pending ? null : score(f[3]), alpha: pending ? null : score(f[4]), holding: pending ? null : f[5] ?? null, resolved, decision, reflection, ...lessonOf(f.slice(6), pending), lessonCheck, earlier, firstLesson, rules: rulesIn(f.slice(4)), recorded: recordedIn(f.slice(4)) };
+}
+var lessonPart = (p) => [keep(p.lesson), ...[["LESSON CHECK", p.check], ["EARLIER CORRECTIONS", p.earlier], ["FIRST LESSON", p.first]].filter(([, words2]) => words2?.trim()).map(([head, words2]) => `${head}:
+${keep(words2)}`)].join("\n\n");
+function withLesson(block, mark, lessonPart2) {
+  const b = block.trim(), nl = b.indexOf("\n"), at = b.search(/^REFLECTION:\r?$/m);
+  const tag = b.slice(1, nl).replace(/\]\s*$/, "").split("|").map((s) => s.trim()).filter((x) => !x.startsWith("lesson:"));
+  return `[${[...tag, mark].join(" | ")}]${at < 0 ? `${b.slice(nl)}
+
+` : b.slice(nl, at)}REFLECTION:
+${lessonPart2}`;
+}
+var LESSON_NOTE = {
+  unmarked: () => "written before the desk showed the lesson writer the holding window's prices, and not re-checked since: what it says happened on a given day may be wrong",
+  "no-prices": () => "written when the holding window's prices could not be had, and not re-checked since",
+  corrected: (e) => `corrected${e.lessonOn ? ` on ${e.lessonOn}` : ""}: rewritten from the holding window's real prices, replacing an earlier lesson`,
+  unreliable: (e) => `withheld. It was written without the holding window's prices, and they could not be had to check it${e.lessonOn ? ` on ${e.lessonOn}` : ""}.`,
+  flagged: (e) => `withheld. The person said${e.lessonOn ? ` on ${e.lessonOn}` : ""} that it is wrong, and it waits to be rewritten from the holding window's prices.`
+};
+var withheld = (e) => WITHHELD.includes(e.lesson);
+var Journal = class {
+  /** @param maxResolved keep at most this many settled entries (the oldest go first); pending ones are never dropped */
+  constructor(file, maxResolved = null) {
+    this.file = file;
+    this.maxResolved = maxResolved;
+  }
+  file;
+  maxResolved;
+  /** The file's own line ends, as last read: written back the same way. */
+  eol = "\n";
+  read() {
+    try {
+      const t = fs3.readFileSync(this.file, "utf8");
+      this.eol = t.includes("\r\n") ? "\r\n" : "\n";
+      return t.replace(/\r\n/g, "\n");
+    } catch {
+      return "";
+    }
+  }
+  write(text) {
+    fs3.mkdirSync(path3.dirname(this.file), { recursive: true });
+    writeWhole(this.file, this.eol === "\n" ? text : text.replace(/\n/g, this.eol));
+  }
+  blocks() {
+    return this.read().split(SPLIT).filter((b) => b.trim());
+  }
+  load() {
+    return this.blocks().map(parse).filter((e) => e !== null);
+  }
+  pending() {
+    return this.load().filter((e) => e.pending);
+  }
+  /** Adds a pending entry, with the window and yardstick it will be scored by when they are given (every call the desk
+   *  records now), and when it was recorded (`at`, which record_decision gives). The rating kept is the one the decision
+   *  states: a `rating` passed that differs from it is refused, and a decision that states none is Needs review. One
+   *  entry per stock and day, settled or not: a re-run must not count the same call twice. */
+  storeDecision(ticker, date, decision, rating, rules, at) {
+    checkTag(ticker, date);
+    if (rules) checkRules(rules);
+    const stated = parseRating(decision);
+    if (rating && RATINGS.includes(rating) && stated !== REVIEW && rating !== stated) throw new Error(`the decision states ${stated}, not ${rating}: the journal keeps the rating the decision's words give. Correct the decision, or pass ${stated}`);
+    fs3.mkdirSync(path3.dirname(this.file), { recursive: true });
+    return withLock(this.file, () => {
+      if (this.load().some((e) => e.date === date && e.ticker === ticker)) return "exists";
+      const old = this.read().replace(/\s+$/, "");
+      const kept = [...rules ? rulesFields(rules) : [], ...at ? [`recorded:${at.toISOString().slice(0, 16)}Z`] : []].map((x) => ` | ${x}`).join("");
+      const before = !old ? "" : /<!--\s*ENTRY_END\s*-->$/i.test(old) ? `${old}
+
+` : `${old}${SEPARATOR}`;
+      this.write(`${before}[${date} | ${ticker} | ${stated} | pending${kept}]
+
+DECISION:
+${keep(decision)}${SEPARATOR}`);
+      return "stored";
+    });
+  }
+  /** Settles a pending entry with its measured outcome and the lesson. False when it was no longer pending. `from` says
+   *  whether the window's day-by-day prices were at hand for the lesson; left out, the lesson is unmarked (the old way).
+   *  The window and yardstick the entry kept stay in its tag. */
+  recordOutcome(ticker, date, raw, alpha, holdingDays, reflection, resolution, from) {
+    return withLock(this.file, () => {
+      let done = false;
+      const out = this.blocks().map((block) => {
+        const e = parse(block);
+        if (done || !e || !e.pending || e.date !== date || e.ticker !== ticker) return block;
+        done = true;
+        const kept = [...e.rules ? rulesFields(e.rules) : [], ...e.recorded ? [`recorded:${e.recorded}`] : []].map((x) => ` | ${x}`).join("");
+        return `[${date} | ${ticker} | ${e.rating} | ${signedPct(raw)} | ${signedPct(alpha)} | ${holdingDays}d | resolved:${resolution}${kept}${from ? ` | lesson:${from}` : ""}]
+
+DECISION:
+${e.decision}
+
+REFLECTION:
+${keep(reflection)}`;
+      });
+      if (!done) return false;
+      this.write(this.rotate(out).join(SEPARATOR) + SEPARATOR);
+      return true;
+    });
+  }
+  /** Rewrites the lesson of one settled entry and nothing else; `change` gets the entry and returns its new tag mark and
+   *  lesson part, or null to leave it. False when there is no such settled entry or `change` left it. */
+  relesson(ticker, date, change2) {
+    return withLock(this.file, () => {
+      let done = false;
+      const out = this.blocks().map((block) => {
+        const e = parse(block);
+        if (done || !e || e.pending || e.date !== date || e.ticker !== ticker) return block;
+        const c = change2(e);
+        if (!c) return block;
+        done = true;
+        return withLesson(block, c.mark, c.part);
+      });
+      if (done) this.write(out.join(SEPARATOR) + SEPARATOR);
+      return done;
+    });
+  }
+  /** Replaces a settled call's lesson with one rewritten from its window's prices on `on`. The first lesson is kept word
+   *  for word under FIRST LESSON (one already kept stays: it is the first); a corrected lesson the person flagged, which
+   *  this replaces, is kept with its check under EARLIER CORRECTIONS, newest first; and `check` - what the check found -
+   *  goes under LESSON CHECK. The tag's call, rating and score and the decision are not touched. False when not settled,
+   *  or the lesson was written from the window's prices or corrected, and the person has not flagged it since. */
+  correctLesson(ticker, date, lesson, check, on) {
+    if (!DATE.test(on)) throw new Error(`"${on}" is not a date in YYYY-MM-DD form`);
+    return this.relesson(ticker, date, (e) => !UNCHECKED.includes(e.lesson) ? null : {
+      mark: `lesson:corrected:${on}`,
+      part: lessonPart({
+        lesson,
+        check,
+        // Only a lesson the desk already corrected has a first lesson kept beside it: that corrected lesson moves to the
+        // earlier corrections. Any other lesson being replaced is the first lesson itself.
+        earlier: e.firstLesson ? [`Lesson replaced on ${on}:
+${e.reflection}
+Its check: ${e.lessonCheck || "none was kept"}`, e.earlier].filter(Boolean).join("\n\n") : e.earlier,
+        first: e.firstLesson || e.reflection
+      })
+    });
+  }
+  /** Marks a settled call's lesson unreliable on `on`: it could not be checked against its window's prices, for the reason
+   *  `check` gives. Its words stay as they are; analyses stop reading them until a later check corrects them. False when
+   *  not settled, or the lesson was written from the window's prices or corrected already, or the person flagged it (it
+   *  is withheld already, and keeps what they said). */
+  markUnreliable(ticker, date, check, on) {
+    if (!DATE.test(on)) throw new Error(`"${on}" is not a date in YYYY-MM-DD form`);
+    return this.relesson(ticker, date, (e) => !UNCHECKED.includes(e.lesson) || e.lesson === "flagged" ? null : {
+      mark: `lesson:unreliable:${on}`,
+      part: lessonPart({ lesson: e.reflection, check, earlier: e.earlier, first: e.firstLesson })
+    });
+  }
+  /** Flags a settled call's lesson on `on`, on the person's word that it is wrong (`said`, kept on one line): analyses stop
+   *  reading it at once, and a re-check lists it again to be rewritten from the window's prices. Its words stay; the check
+   *  it had is kept under the person's words. The tag's call, rating and score and the decision are not touched.
+   *  'flagged' when done; 'already' when it was flagged already (nothing written); 'none' when there is no such settled call. */
+  flagLesson(ticker, date, said, on) {
+    if (!DATE.test(on)) throw new Error(`"${on}" is not a date in YYYY-MM-DD form`);
+    let already = false;
+    const done = this.relesson(ticker, date, (e) => {
+      if (e.lesson === "flagged") {
+        already = true;
+        return null;
+      }
+      const line = `${on}: the person said this lesson is wrong, so later analyses do not read it until a re-check rewrites it from the holding window's prices. What the person said is wrong: ${said.replace(/\s+/g, " ").trim()}`;
+      return { mark: `lesson:flagged:${on}`, part: lessonPart({ lesson: e.reflection, check: `${line}${e.lessonCheck ? `
+Its check before then: ${e.lessonCheck}` : ""}`, earlier: e.earlier, first: e.firstLesson }) };
+    });
+    return done ? "flagged" : already ? "already" : "none";
+  }
+  rotate(blocks) {
+    if (!this.maxResolved || this.maxResolved <= 0) return blocks;
+    const settled2 = blocks.filter((b) => {
+      const e = parse(b);
+      return e && !e.pending;
+    }).length;
+    let drop = settled2 - this.maxResolved;
+    return drop <= 0 ? blocks : blocks.filter((b) => {
+      const e = parse(b);
+      if (e && !e.pending && drop > 0) {
+        drop--;
+        return false;
+      }
+      return true;
+    });
+  }
+  /** The lessons for an analysis: the latest settled calls on this stock in full, and the latest on others as lessons only.
+   *  With `asOf`, only calls whose outcome was already known on that day - a past-dated run must not learn from its future.
+   *  Each lesson says how it was written (see LESSON_NOTE); one marked unreliable or flagged by the person is withheld, and
+   *  is not counted among the other stocks' lessons, since it brings none. Each call's header names what it was scored
+   *  over and against (its own rules, or for a call recorded before the desk kept them, the rules it was made under, from
+   *  `scoring`): a short first check, not the call's own time horizon. */
+  pastContext(ticker, o = {}) {
+    const { sameLimit = 5, otherLimit = 3 } = o;
+    let settled2 = this.load().filter((e) => !e.pending);
+    if (o.asOf) settled2 = settled2.filter((e) => e.resolved && e.resolved <= o.asOf);
+    const same = [], other = [];
+    for (const e of settled2.reverse()) {
+      if (e.ticker !== ticker && withheld(e)) continue;
+      if (e.ticker === ticker ? same.length < sameLimit : other.length < otherLimit) (e.ticker === ticker ? same : other).push(e);
+      if (same.length >= sameLimit && other.length >= otherLimit) break;
+    }
+    if (!same.length && !other.length) return "";
+    const over = (e) => {
+      const r = e.rules ?? (o.scoring ? legacyRules(e.ticker, o.scoring, e.holding) : null);
+      return r ? `${checkName(r)}: ${ownReturn(r) ? `on its own return (${r.yardstick} is its own yardstick or copies the same index), so its alpha is its return,` : `against ${r.yardstick}`} over the ${windowWords(r)} after the call, not the call's own time horizon` : `over ${e.holding ?? "n/a"}`;
+    };
+    const head = (e) => `[${e.date} | ${e.ticker} | ${e.rating} | return ${e.raw ?? "n/a"} | alpha ${e.alpha ?? "n/a"} | ${over(e)}]`;
+    const full = (e) => [
+      head(e),
+      `DECISION:
+${e.decision}`,
+      ...e.lesson === "unreliable" || e.lesson === "flagged" ? [`REFLECTION: ${LESSON_NOTE[e.lesson](e)}`] : e.reflection ? [`REFLECTION${LESSON_NOTE[e.lesson] ? ` (${LESSON_NOTE[e.lesson](e)})` : ""}:
+${e.reflection}`] : []
+    ].join("\n\n");
+    const short = (e) => `${head(e)}${e.reflection && LESSON_NOTE[e.lesson] ? ` (lesson ${LESSON_NOTE[e.lesson](e)})` : ""}
+${e.reflection || e.decision.slice(0, 300) + (e.decision.length > 300 ? "..." : "")}`;
+    const parts = [];
+    if (same.length) parts.push(`Past analyses of ${ticker} (latest recorded first):`, ...same.map(full));
+    if (other.length) parts.push("Recent cross-ticker lessons:", ...other.map(short));
+    return parts.join("\n\n");
+  }
+};
+
 // src/desk/runs.ts
-import fs3 from "node:fs";
-import path3 from "node:path";
+import fs4 from "node:fs";
+import path4 from "node:path";
 var DEBATES = { investment_debate: ["bull", "bear"], risk_debate: ["aggressive", "conservative", "neutral"] };
 var TURNS = new Set(Object.values(DEBATES).flat());
-var folder = (dir2, ticker, date) => path3.join(dir2, "runs", `${safeSymbol(ticker).replace(/\^/g, "IDX_").replace(/=/g, "_EQ_")}_${date}`);
-var runFile = (dir2, ticker, date) => path3.join(folder(dir2, ticker, date), "run.json");
+var folder = (dir2, ticker, date) => path4.join(dir2, "runs", `${safeSymbol(ticker).replace(/\^/g, "IDX_").replace(/=/g, "_EQ_")}_${date}`);
+var runFile = (dir2, ticker, date) => path4.join(folder(dir2, ticker, date), "run.json");
 function lastSaved(dir2, ticker, date) {
   let latest = null;
-  for (const file of [runFile(dir2, ticker, date), path3.join(folder(dir2, ticker, date), "complete_report.md")]) {
+  for (const file of [runFile(dir2, ticker, date), path4.join(folder(dir2, ticker, date), "complete_report.md")]) {
     try {
-      latest = Math.max(latest ?? 0, fs3.statSync(file).mtimeMs);
+      latest = Math.max(latest ?? 0, fs4.statSync(file).mtimeMs);
     } catch {
     }
   }
@@ -236,6 +631,16 @@ function lastSaved(dir2, ticker, date) {
 // src/desk/queue.ts
 var DEPTHS = { shallow: 1, medium: 3, deep: 5 };
 var isDepth = (v) => typeof v === "string" && Object.hasOwn(DEPTHS, v);
+var RUNNER_ID = /^[A-Za-z0-9_.:-]{1,64}$/;
+function alive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return e.code === "EPERM";
+  }
+}
+var runEnded = (i) => !i.pid || !alive(i.pid);
 var MAX_FINISHED = 20;
 var QUIET_MS = 2 * 60 * 6e4;
 var QUIET_REASON = "nothing was saved for this analysis for two hours, so its run has most likely stopped: press Retry. If it was still going, it shows done once its call is recorded";
@@ -246,9 +651,9 @@ var QueueRefusal = class extends Error {
   }
   code;
 };
-var queueFile = (dir2) => path4.join(dir2, "queue.json");
-var doorbellFile = (dir2) => path4.join(dir2, "doorbell.json");
-var listenerFile = (dir2) => path4.join(dir2, "listener.json");
+var queueFile = (dir2) => path5.join(dir2, "queue.json");
+var doorbellFile = (dir2) => path5.join(dir2, "doorbell.json");
+var listenerFile = (dir2) => path5.join(dir2, "listener.json");
 var iso = (v) => typeof v === "string" && v.length <= 40 && !Number.isNaN(Date.parse(v)) ? v : void 0;
 var day = (v) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : void 0;
 var words = (v, max) => {
@@ -278,6 +683,8 @@ function itemOf(v) {
   if (state === "done" && r.already === true) out.already = true;
   if (state === "failed") out.reason = reason ?? "no reason was given";
   if (state === "failed" && r.quiet === true) out.quiet = true;
+  if (state !== "waiting" && typeof r.runner === "string" && RUNNER_ID.test(r.runner)) out.runner = r.runner;
+  if (state !== "waiting" && Number.isInteger(r.pid) && r.pid > 0) out.pid = r.pid;
   return out;
 }
 function lastSignOf(dir2, item) {
@@ -285,10 +692,25 @@ function lastSignOf(dir2, item) {
   const saved = item.date ? lastSaved(dir2, item.symbol, item.date) : null;
   return Math.max(started, saved ?? 0);
 }
-function settled(dir2, item, now, note) {
+var fromJournal = /* @__PURE__ */ new WeakSet();
+var callsIn = (dir2) => {
+  let kept = null;
+  return () => kept ??= new Map(new Journal(path5.join(dir2, "journal.md")).load().map((e) => [`${e.ticker}|${e.date}`, e.rating]));
+};
+function settled(dir2, item, now, note, calls) {
+  if (item.state !== "running" && item.state !== "failed") return item;
+  const rating = item.date ? calls().get(`${item.symbol}|${item.date}`) : void 0;
+  if (rating) {
+    const done = { ...item, state: "done", rating, endedAt: item.endedAt ?? new Date(Math.min(now.getTime(), lastSignOf(dir2, item))).toISOString() };
+    delete done.reason;
+    delete done.quiet;
+    fromJournal.add(done);
+    return done;
+  }
   if (item.state !== "running") return item;
   const last = note?.lastRun, started = Date.parse(item.startedAt ?? item.requestedAt);
-  if (last?.started && Date.parse(last.started) <= started && started <= Date.parse(last.at)) {
+  const itsRun = !!last && (!!last.runner && item.runner === last.runner || runEnded(item));
+  if (last?.started && Date.parse(last.started) <= started && started <= Date.parse(last.at) && itsRun) {
     return { ...item, state: "failed", reason: words(`${note.listener}'s run ended before this stock was finished: ${last.result}`, 300), endedAt: last.at };
   }
   const sign = lastSignOf(dir2, item);
@@ -297,27 +719,27 @@ function settled(dir2, item, now, note) {
 function load(dir2, now) {
   let raw = [];
   try {
-    raw = JSON.parse(fs4.readFileSync(queueFile(dir2), "utf8"));
+    raw = JSON.parse(fs5.readFileSync(queueFile(dir2), "utf8"));
   } catch {
   }
-  const seen = /* @__PURE__ */ new Set(), out = [], note = readListener(dir2, now);
+  const seen = /* @__PURE__ */ new Set(), out = [], note = readListener(dir2, now), calls = callsIn(dir2);
   for (const v of Array.isArray(raw) ? raw : []) {
     const item = itemOf(v);
     if (!item || seen.has(item.symbol)) continue;
     seen.add(item.symbol);
-    out.push(settled(dir2, item, now, note));
+    out.push(settled(dir2, item, now, note, calls));
   }
   return out;
 }
 var open = (i) => i.state === "waiting" || i.state === "running";
 function trimmed(list) {
   const finished = list.filter((i) => !open(i)).sort((a, b) => (b.endedAt ?? "").localeCompare(a.endedAt ?? ""));
-  const keep = new Set(finished.slice(0, MAX_FINISHED));
-  return list.filter((i) => open(i) || keep.has(i));
+  const keep2 = new Set(finished.slice(0, MAX_FINISHED));
+  return list.filter((i) => open(i) || keep2.has(i));
 }
 function change(dir2, now, edit) {
   const file = queueFile(dir2);
-  fs4.mkdirSync(dir2, { recursive: true });
+  fs5.mkdirSync(dir2, { recursive: true });
   return withLock(file, () => {
     const { list, result } = edit(load(dir2, now));
     writeWhole(file, JSON.stringify(trimmed(list), null, 2) + "\n");
@@ -326,13 +748,16 @@ function change(dir2, now, edit) {
 }
 var readQueue = (dir2, now = /* @__PURE__ */ new Date()) => load(dir2, now);
 var waitingIn = (list) => list.filter((i) => i.state === "waiting");
-function finishItem(dir2, raw, outcome, now = /* @__PURE__ */ new Date()) {
+var signed2 = (by) => by ? { runner: by.runner, ...by.pid ? { pid: by.pid } : {} } : {};
+function finishItem(dir2, raw, outcome, now = /* @__PURE__ */ new Date(), by) {
   const symbol = safeSymbol(raw);
   return change(dir2, now, (list) => {
     const item = list.find((i) => i.symbol === symbol);
     if (!item) throw new QueueRefusal("NOT_ON_LIST", `${symbol} is not on the waiting list`);
-    if (!open(item) && !item.quiet) throw new QueueRefusal("FINISHED", `${symbol} is already ${item.state}`);
-    const finished = "rating" in outcome ? { ...item, state: "done", rating: words(outcome.rating, 30) ?? "recorded", endedAt: now.toISOString(), ...outcome.already ? { already: true } : {} } : { ...item, state: "failed", reason: words(outcome.reason, 300) ?? "no reason was given", endedAt: now.toISOString() };
+    if (fromJournal.has(item) && !("rating" in outcome)) throw new QueueRefusal("FINISHED", `${symbol} is already done: its call (${item.rating}) is in the journal`);
+    if (!open(item) && !item.quiet && !fromJournal.has(item)) throw new QueueRefusal("FINISHED", `${symbol} is already ${item.state}`);
+    const who = item.state === "waiting" ? signed2(by) : {};
+    const finished = "rating" in outcome ? { ...item, ...who, state: "done", rating: words(outcome.rating, 30) ?? "recorded", endedAt: now.toISOString(), ...outcome.already ? { already: true } : {} } : { ...item, ...who, state: "failed", reason: words(outcome.reason, 300) ?? "no reason was given", endedAt: now.toISOString() };
     if (finished.state === "done") delete finished.reason;
     else delete finished.rating;
     delete finished.quiet;
@@ -342,7 +767,7 @@ function finishItem(dir2, raw, outcome, now = /* @__PURE__ */ new Date()) {
 }
 function readDoorbell(dir2) {
   try {
-    const v = JSON.parse(fs4.readFileSync(doorbellFile(dir2), "utf8"));
+    const v = JSON.parse(fs5.readFileSync(doorbellFile(dir2), "utf8"));
     const at = iso(v.at);
     return at ? { at, waiting: Number.isInteger(v.waiting) ? v.waiting : 0, why: v.why === "more" ? "more" : "press" } : null;
   } catch {
@@ -352,7 +777,7 @@ function readDoorbell(dir2) {
 var LISTENER_FRESH_MS = 3 * 6e4;
 function readListener(dir2, now = /* @__PURE__ */ new Date()) {
   try {
-    const v = JSON.parse(fs4.readFileSync(listenerFile(dir2), "utf8"));
+    const v = JSON.parse(fs5.readFileSync(listenerFile(dir2), "utf8"));
     const listener = words(v.listener ?? v.listening, 40), since = iso(v.since), beat = iso(v.beat) ?? iso(v.checked) ?? since;
     if (!listener || !since || !beat) return null;
     const note = { listener, since, beat, fresh: now.getTime() - Date.parse(beat) <= LISTENER_FRESH_MS };
@@ -363,8 +788,8 @@ function readListener(dir2, now = /* @__PURE__ */ new Date()) {
       const result = words([how, words(last.result, 200)].filter(Boolean).join(": "), 200) ?? "finished";
       if (began) note.lastRun = ended && Date.parse(began) <= Date.parse(ended) ? { started: began, at: ended, result } : { at: began, result, startOnly: true };
     } else {
-      const lastAt = iso(last?.at), result = words(last?.result, 200), started = iso(last?.started);
-      if (lastAt && result) note.lastRun = { ...started && Date.parse(started) <= Date.parse(lastAt) ? { started } : {}, at: lastAt, result };
+      const lastAt = iso(last?.at), result = words(last?.result, 200), started = iso(last?.started), runner = typeof last?.runner === "string" && RUNNER_ID.test(last.runner) ? last.runner : void 0;
+      if (lastAt && result) note.lastRun = { ...started && Date.parse(started) <= Date.parse(lastAt) ? { started } : {}, at: lastAt, result, ...runner ? { runner } : {} };
     }
     return note;
   } catch {
@@ -372,18 +797,19 @@ function readListener(dir2, now = /* @__PURE__ */ new Date()) {
   }
 }
 function writeListener(dir2, note) {
-  fs4.mkdirSync(dir2, { recursive: true });
+  fs5.mkdirSync(dir2, { recursive: true });
   writeWhole(listenerFile(dir2), JSON.stringify(note, null, 2) + "\n");
 }
 function removeListener(dir2, pid) {
   if (pid !== void 0 && readListener(dir2)?.pid !== pid) return;
-  fs4.rmSync(listenerFile(dir2), { force: true });
+  fs5.rmSync(listenerFile(dir2), { force: true });
 }
 
 // src/watch/watcher.ts
 var STOCK_MAX_MS = 6 * 60 * 6e4;
 var startedIn = (i, start) => (i.startedAt ?? "") >= start;
 var leftOpen = (i, start) => startedIn(i, start) && (i.state === "running" || i.quiet === true);
+var ownOrEnded = (i, id) => i.runner === id || runEnded(i);
 function stopWhy(dir2, start, now = /* @__PURE__ */ new Date()) {
   const list = readQueue(dir2, now);
   let last = Date.parse(start);
@@ -423,18 +849,20 @@ function watch(o) {
   const runOnce = async () => {
     if (!waitingIn(readQueue(o.dir)).length) return;
     running = true;
-    const start = now().toISOString();
+    const start = now().toISOString(), id = `listener-${crypto.randomUUID().slice(0, 8)}`;
     let trouble = "";
     try {
-      trouble = await o.run(start) ?? "";
+      trouble = await o.run(start, id) ?? "";
     } catch (e) {
       trouble = e.message;
     }
+    const unclear = () => readQueue(o.dir).some((i) => leftOpen(i, start) && i.runner !== id && i.pid !== void 0 && alive(i.pid));
+    for (const until = Date.now() + (o.graceMs ?? 1e4); unclear() && Date.now() < until; ) await new Promise((r) => setTimeout(r, 100));
     const why = trouble || "the run stopped before this stock was finished: press Retry";
-    for (const i of readQueue(o.dir)) if (leftOpen(i, start)) finishItem(o.dir, i.symbol, { reason: why });
-    const ended = readQueue(o.dir).filter((i) => (i.endedAt ?? "") >= start);
+    for (const i of readQueue(o.dir)) if (leftOpen(i, start) && ownOrEnded(i, id)) finishItem(o.dir, i.symbol, { reason: why });
+    const ended = readQueue(o.dir).filter((i) => (i.endedAt ?? "") >= start && ownOrEnded(i, id));
     const done2 = ended.filter((i) => i.state === "done"), a = done2.filter((i) => i.already).length, f = ended.filter((i) => i.state === "failed").length;
-    note.lastRun = { started: start, at: now().toISOString(), result: `${done2.length - a} analysed${a ? `, ${a} already called today` : ""}, ${f} failed${trouble ? `; ${trouble}` : ""}` };
+    note.lastRun = { started: start, at: now().toISOString(), result: `${done2.length - a} analysed${a ? `, ${a} already called today` : ""}, ${f} failed${trouble ? `; ${trouble}` : ""}`, runner: id };
     running = false;
     beat();
     if (owed) {
@@ -461,8 +889,11 @@ function watch(o) {
       else pending = true;
     }
     if (!running && pending && now().getTime() - ringAt >= settle) {
-      pending = false;
-      void runOnce();
+      const list = readQueue(o.dir);
+      if (!list.some((i) => i.state === "running") || !waitingIn(list).length) {
+        pending = false;
+        void runOnce();
+      }
     }
     if (now().getTime() - lastBeat >= beatEvery) beat();
   };
@@ -476,11 +907,11 @@ function watch(o) {
 // src/watch/main.ts
 var root = process.cwd();
 var dir = deskDataDir(root);
-var logFile = path5.join(dir, "watcher.log");
+var logFile = path6.join(dir, "watcher.log");
 var self = fileURLToPath(import.meta.url);
 var print = () => {
   try {
-    return crypto.createHash("sha256").update(fs5.readFileSync(self)).digest("hex");
+    return crypto2.createHash("sha256").update(fs6.readFileSync(self)).digest("hex");
   } catch {
     return "";
   }
@@ -490,11 +921,11 @@ var LOG_MAX = 1e6;
 var LOG_KEEP = 25e4;
 function log(text) {
   try {
-    fs5.mkdirSync(dir, { recursive: true });
-    fs5.appendFileSync(logFile, text);
-    if (fs5.statSync(logFile).size > LOG_MAX) {
-      const all = fs5.readFileSync(logFile, "utf8");
-      fs5.writeFileSync(logFile, all.slice(-LOG_KEEP));
+    fs6.mkdirSync(dir, { recursive: true });
+    fs6.appendFileSync(logFile, text);
+    if (fs6.statSync(logFile).size > LOG_MAX) {
+      const all = fs6.readFileSync(logFile, "utf8");
+      fs6.writeFileSync(logFile, all.slice(-LOG_KEEP));
     }
   } catch {
   }
@@ -510,7 +941,7 @@ try {
     dir,
     listener: "Claude Code",
     retire: () => print() !== born,
-    run: async (start) => {
+    run: async (start, id) => {
       log(`
 === ${(/* @__PURE__ */ new Date()).toISOString()} a run of the waiting list starts ===
 `);
@@ -518,7 +949,7 @@ try {
       const r = await runClaude(claude, root, (t) => {
         log(t);
         said = (said + t).slice(-8e3);
-      }, { stopIf: () => stopWhy(dir, start) });
+      }, { stopIf: () => stopWhy(dir, start) }, RUN_ARGS, { [RUN_ENV]: id });
       log(`
 === ${(/* @__PURE__ */ new Date()).toISOString()} the run ended${r.stopped ? ` (stopped: ${r.stopped})` : ""}, code ${r.code ?? "none"} ===
 `);

@@ -124,7 +124,7 @@ test('a wrong request says what to correct, and a number is never accepted from 
   assert.match(await call('plan_analysis', { symbol: 'NVDA', analysis_date: '2027-01-01' }), /^INPUT_ERROR: .*in the future/);
   assert.match(await call('set_holdings', { positions: [{ ticker: 'NVDA', quantity: 0 }] }), /^INPUT_ERROR: .*quantity of 0/);
   const schema = (await client.listTools()).tools.find((t) => t.name === 'record_outcome')!.inputSchema.properties as Record<string, unknown>;
-  assert.deepEqual(Object.keys(schema).sort(), ['lesson', 'symbol', 'trade_date']);       // no field takes a return, an alpha or a price
+  assert.deepEqual(Object.keys(schema).sort(), ['lesson', 'sweep_id', 'symbol', 'trade_date']);       // no field takes a return, an alpha or a price (sweep_id names a backtest)
   assert.match(await call('record_outcome', { symbol: 'NVDA', trade_date: '2026-09-01', lesson: 'x' }), /^INPUT_ERROR: there is no pending call on NVDA/);
   // the desk checks a lesson's length itself, so a refusal is counted and said in its words, never only by the input rules
   assert.match(await call('record_outcome', { symbol: 'NVDA', trade_date: '2026-09-01', lesson: 'x'.repeat(1300) }), /^INPUT_ERROR: the lesson is 1300 characters; keep it under 1200/);

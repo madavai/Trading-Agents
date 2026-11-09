@@ -182,10 +182,17 @@ const newYorkHour = (now: Date) => Number(new Intl.DateTimeFormat('en-US', { tim
 /** The market day after `day` (New York's, its holidays known): where the switch starts when it is switched on. */
 export { nextMarketDay };
 
+/** Whether the morning switch still has today to act on: a market morning (before noon in New York), from the day it
+ *  starts, and nothing put on the list yet today. The dashboard looks at this while it runs, with no page open. */
+export const switchDue = (dir: string, day: string, now: Date = new Date(), from = ''): boolean =>
+  isMarketDay(day) && day >= from && newYorkHour(now) < MORNING_ENDS && readScreen(dir)?.queued?.day !== day;
+
 /** The morning switch: on a market morning (a day New York's market opens, before noon there), from the day the switch
  *  starts (`from`, the market day after it was switched on), once, the top three picks not already called today nor
  *  waiting or being analysed go on the waiting list at shallow depth. `ring` rings the doorbell for whoever listens (the
- *  dashboard does; the morning routine, which analyses what is waiting itself, does not). Returns what it queued. */
+ *  dashboard does; the morning routine, which analyses what is waiting itself, does not). A screen with nothing to queue
+ *  and names it could not read leaves the day open: what could not be read is unavailable, not "nothing stood out", so
+ *  the next look tries again. Returns what it queued. */
 export function queueTop(dir: string, screen: Screen, day: string, ring: boolean, now: Date = new Date(), from = ''): string[] {
   if (!isMarketDay(day) || day < from || newYorkHour(now) >= MORNING_ENDS) return [];
   if (screen.day !== day || screen.queued?.day === day || readScreen(dir)?.queued?.day === day) return [];
@@ -197,6 +204,7 @@ export function queueTop(dir: string, screen: Screen, day: string, ring: boolean
     if (called.has(p.symbol) || busy.has(p.symbol)) continue;
     try { enqueue(dir, p.symbol, now.toISOString(), 'shallow', now); queued.push(p.symbol); } catch (e) { if (!(e instanceof QueueRefusal)) throw e; break; }   // a full list takes no more
   }
+  if (!queued.length && screen.unavailable.length) return [];
   keep(dir, { ...screen, queued: { day, symbols: queued } });
   if (queued.length && ring) ringDoorbell(dir, 'press', now);
   return queued;
