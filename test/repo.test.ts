@@ -52,7 +52,7 @@ test('the desk tool server offers the desk check, and no tool that trades', asyn
   const { tools } = await client.listTools();
   assert.ok(tools.some((t) => t.name === 'desk_check'));
   assert.ok(tools.every((t) => !isOrderTool(t.name)));
-  const result = await client.callTool({ name: 'desk_check', arguments: {} }) as { content: Array<{ text: string }> };
+  const result = await client.callTool({ name: 'desk_check', arguments: { team_version: 'none' } }) as { content: Array<{ text: string }> };
   assert.match(result.content[0]!.text, /Trading Agents desk check/);
   await client.close();
 });

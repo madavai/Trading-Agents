@@ -1,0 +1,11 @@
+{
+ "about": "Every version the trading-desk team's steps have had, oldest first. npm run agents adds each new one; never remove one. The desk check reads this list to tell a version a conversation kept from before an update from one the steps never had.",
+ "versions": [
+  "d3b14fbc",
+  "5fb0bb75",
+  "12f64620",
+  "446fc181",
+  "d907b239",
+  "1799fe1a"
+ ]
+}

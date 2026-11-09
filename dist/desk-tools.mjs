@@ -36881,6 +36881,15 @@ var TEAM_FILE = ".claude/agents/trading-desk.md";
 function teamVersionOf(shipped) {
   return /team_version "([0-9a-f]{8})"/.exec(shipped.get(TEAM_FILE) ?? "")?.[1];
 }
+var VERSIONS_FILE = "scripts/team-versions.json";
+function knownTeamVersions(source) {
+  try {
+    const versions = JSON.parse(fs5.readFileSync(path5.join(source, VERSIONS_FILE), "utf8")).versions;
+    return Array.isArray(versions) && versions.length && versions.every((v) => typeof v === "string" && /^[0-9a-f]{8}$/.test(v)) ? versions : void 0;
+  } catch {
+    return void 0;
+  }
+}
 var RESET_AGAIN_MS = 30 * 6e4;
 var resetFile = (root) => path5.join(deskDataDir(root), "team-reset.json");
 function lastReset(root) {
@@ -36973,15 +36982,20 @@ function agentsLine(drift) {
 var UPDATED_WHY = "the desk in this folder was updated after the desk's tools in this conversation started";
 var NOT_COMPARED = { ok: false, text: `The desk's agent files in this folder were not compared with the project's version: ${UPDATED_WHY}. Start a new conversation in Madav and check this computer there; reset nothing from this one` };
 var NO_VERSION = "no version was given";
-function teamLine(given, folder2, updated = false) {
+var NONE2 = "none";
+function teamLine(given, folder2, updated = false, known) {
   const v = given?.trim() ?? "";
-  const not = (why) => ({ ok: false, unchecked: true, text: `This conversation's steps for the team were not compared with the ones in this folder: ${why}` });
-  if (updated) return not(UPDATED_WHY);
-  if (!v) return not(NO_VERSION);
+  const not = (why2, askAgain = true) => ({ ok: false, unchecked: true, text: `This conversation's steps for the team were not compared with the ones in this folder: ${why2}`, ...askAgain ? { askAgain } : {} });
+  if (updated) return not(UPDATED_WHY, false);
+  if (!v || v.toLowerCase() === NONE2) return not(NO_VERSION);
   if (!/^[0-9a-f]{8}$/.test(v)) return not("what was given is not a version");
   if (!folder2) return { ok: false, text: `This conversation's steps for the team (version ${v}) could not be compared: the team's file in this folder carries no version` };
-  return v === folder2 ? { ok: true, text: `This conversation's steps for the team are the ones in this folder (version ${folder2})` } : { ok: false, text: `This conversation's steps for the team (version ${v}) are not the ones in this folder now (version ${folder2}): this conversation began before the desk was updated. Start a new conversation in Madav, where the new steps load, and check this computer there; reset nothing from this one` };
+  if (v === folder2) return { ok: true, text: `This conversation's steps for the team are the ones in this folder (version ${folder2})` };
+  if (known && !known.includes(v)) return not(`${v} is not a version the team's steps have ever had`);
+  const why = known ? "this conversation began before the desk was updated" : `this conversation began before the desk was updated, or ${v} was not copied from the team's steps (the list of the steps' earlier versions could not be read)`;
+  return { ok: false, text: `This conversation's steps for the team (version ${v}) are not the ones in this folder now (version ${folder2}): ${why}. Start a new conversation in Madav, where the new steps load, and check this computer there; reset nothing from this one` };
 }
+var ASK_AGAIN = `TEAM VERSION NEEDED: this answer did not compare this conversation's steps for the team with the ones in this folder. If you are the trading-desk team and have not yet called desk_check again in this check, call it once more now, with team_version copied exactly from step 1 of your own "Check this computer" steps (in the instructions this conversation began with), and pass on that answer instead of this one. Otherwise (you are not the trading-desk team, your steps give no version, or you already called again) pass this answer on as it is, and never say this conversation's steps match.`;
 var TWO_LINES = "Pass on the line about this conversation's steps for the team and the line about the desk's agent files in this folder as they are written. Only the first can say whether this conversation's steps are the folder's, and only with a version shown; the second is about the files alone. Never take one for the other.";
 function render(lines, sources) {
   const mark = (ok, unchecked) => unchecked ? "-- " : ok ? "OK " : "NO ";
@@ -37016,8 +37030,11 @@ async function deskCheck(root = process.cwd(), fetchImpl2 = fetch, source = root
     } catch {
     }
   }
-  lines.unshift(teamLine(asker.teamVersion, folder2, asker.updated));
-  return render(lines, sources);
+  const team = teamLine(asker.teamVersion, folder2, asker.updated, knownTeamVersions(source));
+  lines.unshift(team);
+  return `${team.askAgain && asker.viaTool ? `${ASK_AGAIN}
+
+` : ""}${render(lines, sources)}`;
 }
 
 // src/data/http.ts
@@ -41560,10 +41577,12 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root, home) {
   noteWhenUpdated(server, fresh);
   server.registerTool("desk_check", {
     title: "Desk check",
-    description: "Check that this computer is ready for the Trading Agents desk: Node, the desk data folder, whether a Robinhood sign-in is saved, whether the desk's agent files in this folder are as the project ships them, whether this conversation's steps for the team are the ones in this folder (only from the version those steps give; without one it says they were not compared), and whether each free data source answers (naming the one it does not ask). Pass on its line about this conversation's steps and its line about the agent files as written, never one for the other. It sends no order and reads no secret; the contact email is shown masked. All it writes is a test file in desk-data, removed at once.",
-    inputSchema: { team_version: external_exports.string().max(40).optional().describe(`The version of the team's steps, exactly as the trading-desk team's own "Check this computer" step gives it, in the instructions this conversation began with. Never read it from a file and never make one up: left out, the check says this conversation's steps were not compared`) },
+    description: `Check that this computer is ready for the Trading Agents desk: Node, the desk data folder, whether a Robinhood sign-in is saved, whether the desk's agent files in this folder are as the project ships them, whether this conversation's steps for the team are the ones in this folder (only from the version those steps give: team_version is required; the trading-desk team passes the one in step 1 of its own "Check this computer" steps, anyone else "none", and then it says they were not compared), and whether each free data source answers (naming the one it does not ask). If its answer starts with TEAM VERSION NEEDED, do what that line says. Pass on its line about this conversation's steps and its line about the agent files as written, never one for the other. It sends no order and reads no secret; the contact email is shown masked. All it writes is a test file in desk-data, removed at once.`,
+    // Required (8 Nov 2026: in Madav the team twice left out the version its own step 1 names, so a conversation begun
+    // before an update could not be told). Left out, nothing is checked and the caller is told what to pass.
+    inputSchema: { team_version: external_exports.string({ error: (issue2) => issue2.input === void 0 ? 'Nothing was checked: team_version is required. The trading-desk team: call desk_check again with the version in step 1 of your own "Check this computer" steps, copied exactly. Anyone else: call it again with "none". Never read a version from a file and never make one up. The value is missing' : void 0 }).max(40).describe(`Required. The trading-desk team: the version in step 1 of its own "Check this computer" steps, copied exactly from the instructions this conversation began with. Anyone else (a chat that is not the trading-desk team): "none", and the check says this conversation's steps were not compared. Never read it from a file and never make one up`) },
     annotations: READ
-  }, async (a) => text3(await deskCheck(root, fetchImpl2, source, { updated: fresh.updated(), teamVersion: a.team_version }, home)));
+  }, async (a) => text3(await deskCheck(root, fetchImpl2, source, { updated: fresh.updated(), teamVersion: a.team_version, viaTool: true }, home)));
   server.registerTool("reset_team", {
     title: "Reset the team",
     description: "Put the desk's thirteen agents, the trading-desk team's file and its line-up back exactly as the project ships them: each file is written again, even one that already matches, which also brings Madav back to the project's version of the team in place of changes made in its Agent Studio. Only when the person asked in words, in this conversation, for the team to be reset or put back, and confirmed it: never in place of any other request. Call it once: asked again soon after a reset, with the files still matching, it writes nothing. It writes only those files in this folder; the model, permissions and effort the person chose in Madav stay theirs.",

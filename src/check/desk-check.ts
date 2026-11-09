@@ -9,7 +9,7 @@ import { NOT_PROBED, probeAll, type ProbeResult } from './probes.js';
 import { VERSION } from '../version.js';
 import { readSettings } from '../settings.js';
 import { maskEmail, readContactEmail, WHY_EMAIL } from '../contact.js';
-import { driftOf, listed, plainName, shippedAgentFiles, teamVersionOf, type Drift } from '../desk/agent-files.js';
+import { driftOf, knownTeamVersions, listed, plainName, shippedAgentFiles, teamVersionOf, type Drift } from '../desk/agent-files.js';
 
 /** One line of the check. `unchecked`: the check did not look at this, and says so (marked "--", neither OK nor NO). */
 export interface Line { ok: boolean; text: string; unchecked?: true }
@@ -73,21 +73,36 @@ export const NOT_COMPARED: Line = { ok: false, text: `The desk's agent files in 
 /** Why this conversation's steps were not compared when it passed no version: true in Madav and in a plain chat alike. */
 export const NO_VERSION = 'no version was given';
 
+/** What a caller that is not the trading-desk team passes as team_version (the desk check's tool needs one, so leaving the
+ *  version out is never a quiet slip): read like no version at all. */
+export const NONE = 'none';
+
+/** The team's line, and whether the team should call once more with the version its own steps give (`askAgain`). */
+export type TeamLine = Line & { askAgain?: true };
+
 /** Whether this conversation's copy of the team's steps (the version it passed, from its own copy of the team's file, the
  *  one it began with) is the folder's. Always a line, the first under "This computer": nothing else in the check is about
  *  this conversation's steps, so without a version it says plainly that they were not compared. `updated`: these tools
- *  started before the folder was updated, so they hold the old source and cannot tell the folder's version. */
-export function teamLine(given: string | undefined, folder: string | undefined, updated = false): Line {
+ *  started before the folder was updated, so they hold the old source and cannot tell the folder's version. `known`: every
+ *  version the team's steps have had (scripts/team-versions.json), so only a real earlier one is said to show that this
+ *  conversation began before the update; a version never had is not compared, and the team is asked again. */
+export function teamLine(given: string | undefined, folder: string | undefined, updated = false, known?: readonly string[]): TeamLine {
   const v = given?.trim() ?? '';
-  const not = (why: string): Line => ({ ok: false, unchecked: true, text: `This conversation's steps for the team were not compared with the ones in this folder: ${why}` });
-  if (updated) return not(UPDATED_WHY);
-  if (!v) return not(NO_VERSION);
+  const not = (why: string, askAgain = true): TeamLine => ({ ok: false, unchecked: true, text: `This conversation's steps for the team were not compared with the ones in this folder: ${why}`, ...(askAgain ? { askAgain } : {}) });
+  if (updated) return not(UPDATED_WHY, false);
+  if (!v || v.toLowerCase() === NONE) return not(NO_VERSION);
   if (!/^[0-9a-f]{8}$/.test(v)) return not('what was given is not a version');
   if (!folder) return { ok: false, text: `This conversation's steps for the team (version ${v}) could not be compared: the team's file in this folder carries no version` };
-  return v === folder
-    ? { ok: true, text: `This conversation's steps for the team are the ones in this folder (version ${folder})` }
-    : { ok: false, text: `This conversation's steps for the team (version ${v}) are not the ones in this folder now (version ${folder}): this conversation began before the desk was updated. Start a new conversation in Madav, where the new steps load, and check this computer there; reset nothing from this one` };
+  if (v === folder) return { ok: true, text: `This conversation's steps for the team are the ones in this folder (version ${folder})` };
+  if (known && !known.includes(v)) return not(`${v} is not a version the team's steps have ever had`);
+  const why = known ? 'this conversation began before the desk was updated' : `this conversation began before the desk was updated, or ${v} was not copied from the team's steps (the list of the steps' earlier versions could not be read)`;
+  return { ok: false, text: `This conversation's steps for the team (version ${v}) are not the ones in this folder now (version ${folder}): ${why}. Start a new conversation in Madav, where the new steps load, and check this computer there; reset nothing from this one` };
 }
+
+/** What the answer opens with, through the desk's tool, when the team's line compared nothing for want of a real version
+ *  (8 Nov 2026: in Madav the team twice called the check without the version its own step 1 names). The team has the
+ *  version in the steps it began with, so it is asked once to call again with it; anyone else passes the answer on. */
+export const ASK_AGAIN = 'TEAM VERSION NEEDED: this answer did not compare this conversation\'s steps for the team with the ones in this folder. If you are the trading-desk team and have not yet called desk_check again in this check, call it once more now, with team_version copied exactly from step 1 of your own "Check this computer" steps (in the instructions this conversation began with), and pass on that answer instead of this one. Otherwise (you are not the trading-desk team, your steps give no version, or you already called again) pass this answer on as it is, and never say this conversation\'s steps match.';
 
 /** Under the lines: how to pass on the two that sound alike, whichever steps the reader followed (8 Nov 2026: a team that
  *  passed no version read the agent-files line as saying its own steps were the folder's). */
@@ -111,9 +126,10 @@ export async function agentDrift(root: string, source: string = root): Promise<D
   try { return driftOf(root, await shippedAgentFiles(source)); } catch (e) { return (e as Error).message; }
 }
 
-/** What the desk check knows of the conversation asking: whether the desk was updated after its tools started, and the
- *  version of the team's steps it passed. A check from a terminal knows neither. */
-export interface Asker { updated?: boolean; teamVersion?: string }
+/** What the desk check knows of the conversation asking: whether the desk was updated after its tools started, the version
+ *  of the team's steps it passed, and whether it asked through the desk's tool (an agent, which may be the team and can
+ *  call again). A check from a terminal knows none of these. */
+export interface Asker { updated?: boolean; teamVersion?: string; viaTool?: boolean }
 
 /** Where the person's private folder and the sign-in in it are: the real ones, except in a test, which never looks at them. */
 export interface Home { folder: string; signIn: string }
@@ -129,6 +145,7 @@ export async function deskCheck(root: string = process.cwd(), fetchImpl: typeof 
     lines.push(agentsLine(await agentDrift(root, source)));
     try { folder = teamVersionOf(await shippedAgentFiles(source)); } catch { /* the agents line says they could not be compared */ }
   }
-  lines.unshift(teamLine(asker.teamVersion, folder, asker.updated));   // the first thing to read: an old conversation's other answers may not hold
-  return render(lines, sources);
+  const team = teamLine(asker.teamVersion, folder, asker.updated, knownTeamVersions(source));
+  lines.unshift(team);   // the first thing to read: an old conversation's other answers may not hold
+  return `${team.askAgain && asker.viaTool ? `${ASK_AGAIN}\n\n` : ''}${render(lines, sources)}`;
 }
