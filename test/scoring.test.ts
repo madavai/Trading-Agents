@@ -82,6 +82,25 @@ test('a ready call lists its window day by day, so the lesson is written from wh
   assert.ok(t.indexOf('WHAT HAPPENED') > t.indexOf('DECISION:'));   // what was decided, then what happened
 });
 
+// Audit 1, F1: once a dividend has gone ex since the window, its adjusted rows sit below what the market printed, so a
+// level the decision named is checked against the prices as traded, shown beside them; with no dividend, the rows say so.
+test('the window rows show the prices as traded beside the adjusted ones once a dividend has lowered them, and say when none has', async () => {
+  const j = journalWith();
+  configure({ fetch: feed() });
+  const plain = await dueSettlements(j, S);
+  assert.match(plain, /These prices are also the prices as traded \(no dividend has lowered them\), so a price level the decision named can be checked against them\./);
+  assert.doesNotMatch(plain, /as traded \|/);
+  assert.match(plain, /prices adjusted for splits and dividends \(the call is scored on these, so its return counts any dividend\)/);
+  clearCache();
+  // A 1% dividend went ex after the window: every row of the window is 1% lower adjusted than printed.
+  configure({ fetch: feed({ NVDA: NVDA.map((r) => ({ ...r, adj: r.c * 0.99 })) }) });
+  const t = await dueSettlements(j, S), table = t.slice(t.indexOf('WHAT HAPPENED IN THE WINDOW'));
+  assert.match(table, /A dividend has gone ex since some of these days, so their adjusted prices sit below what the market printed then\. The last three columns are the high, low and close as traded: check every price level the decision named \(an entry, a stop, a target\) against those, never against the adjusted prices\./);
+  assert.match(table, /\nSession \| Date \| Open \| High \| Low \| Close \| Change \| Volume \| RSI \| MACD histogram \| 10 EMA \| 50 SMA \| SPY close \| High as traded \| Low as traded \| Close as traded\n/);
+  assert.match(table, /\n5 \| 2026-09-08 \| 108\.90 \| 108\.90 \| 108\.90 \| 108\.90 \| \+5\.77% \| 1,000 \| .* \| 206\.00 \| 110\.00 \| 110\.00 \| 110\.00\n/, 'adjusted 108.90, as traded 110.00');
+  assert.match(table, /\nAS TRADED, IN SESSIONS 1 TO 5: highest close 110\.00 on 2026-09-08; lowest close 101\.00 on 2026-09-02; highest high 110\.00 on 2026-09-08; lowest low 101\.00 on 2026-09-02\./);
+});
+
 test('a window whose rows cannot be fetched says so, and the lesson may then say nothing about any day', async () => {
   const j = journalWith(), base = feed();
   const longAgo = (url: string) => Number(new URL(url).searchParams.get('period1')) < Date.parse('2026-08-01') / 1000;

@@ -202,12 +202,30 @@ test("a US filer's profile and valuation from its SEC filings and the checked cl
   assert.match(t, /Shares outstanding: 24,100,000,000 \(counted on 2026-08-21, filed 2026-08-26\)\nMarket value \(derived: shares × close\): 5,216,927,000,000 USD/);
   assert.match(t, /Diluted EPS, last twelve months \(derived from the full year to 2026-01-25, 4\.9, plus 2026-01-26 to 2026-07-26, 4\.85, less 2025-01-27 to 2025-07-27, 1\.84\): 7\.91 USD\nPrice to earnings \(derived: close ÷ that\): 27\.37/);
   assert.match(t, /Book value per share \(derived: equity ÷ shares\): 9\.50 USD\nPrice to book \(derived: close ÷ that\): 22\.78/);
-  assert.match(t, /Dividends per share, the 12 months to 2026-10-21: none went ex-dividend from 2025-10-22 to 2026-10-21 \(the price source's record of dividends\)/);
+  assert.match(t, /Dividends per share, the 12 months to 2026-10-21: none went ex-dividend from 2025-10-22 to 2026-10-21, as the price source records them \(the filings give no dividend figure to check that record against\)/);
   assert.match(t, /Unavailable from official free sources: forward estimates/);
   const past = await companyOverview('ACME', '2026-08-01');
   assert.doesNotMatch(past, /withheld/, 'a past day has its own valuation, from what was filed by then');
   assert.match(past, /Shares outstanding: unavailable/, 'the cover page of 21 August was not filed by 1 August');
   assert.match(past, /Diluted EPS, last twelve months \(derived from the full year to 2026-01-25, 4\.9\): 4\.90 USD/);
+});
+
+// Audit 2, item G: during the session the overview's price is the latest price, never "Close", and every multiple says so.
+test('while the session is still trading, the overview names its price the latest price and works every multiple from it as such', async () => {
+  const closes = series('2026-10-21', 300).map((r, i, all) => (i === all.length - 1 ? { ...r, c: 216.47 } : r));
+  const session = { start: Date.parse('2026-10-21T13:30:00Z') / 1000, end: Math.floor(Date.now() / 1000) + 3600 };
+  configure({ fetch: route([TICKERS,
+    [/submissions\/CIK0000001234\.json/, () => json(record([]))],
+    [/companyfacts\/CIK0000001234\.json/, () => json(FACTS)],
+    [/v8\/finance\/chart\/ACME/, () => json(chartJson('ACME', closes, { currentTradingPeriod: { regular: session } }))],
+  ]) });
+  clearCache();
+  const t = await companyOverview('ACME', '2026-10-21');
+  assert.match(t, /^Company profile and valuation for ACME, from its SEC filings as they stood on 2026-10-21 and the desk's checked latest price \(not a close\)/);
+  assert.match(t, /\nLatest price \(still trading\): 216\.47 USD on 2026-10-21 \(the checked price table's latest row on or before 2026-10-21; not a close, so every multiple below moves with it\)/);
+  assert.match(t, /Market value \(derived: shares × latest price\)/);
+  assert.match(t, /Price to earnings \(derived: latest price ÷ that\)/);
+  assert.doesNotMatch(t, /\nClose: |× close|close ÷/);
 });
 
 /** A chart answer with dividends, keyed as the chart service keys them (by the time of the ex-dividend day's open). */
@@ -246,6 +264,13 @@ test("dividends per share over the true twelve months to the day, from the price
   const t = await companyOverview('ACME', '2026-10-21');
   assert.match(t, /Dividends per share, the 12 months to 2026-10-21 \(derived: the 4 that went ex-dividend from 2025-10-22 to 2026-10-21, from the price source, 2025-12-04 0\.01, 2026-03-11 0\.01, 2026-06-04 0\.25, 2026-09-10 0\.25\): 0\.5200 USD\nDividend yield \(derived: that ÷ close\): 0\.24%/);
   assert.doesNotMatch(t, /0\.2800/, 'never the filings\' twelve months to July as the last twelve months');
+  // Audit 2, drill C7: the price answer comes without its record of dividends (the chart service leaves it out of an
+  // answer with none, and of a broken one alike) while the filings show dividends: never "none".
+  clearSecCache(); clearCache();
+  answer(() => json(chartJson('ACME', closes)));
+  const missing = await companyOverview('ACME', '2026-10-21');
+  assert.match(missing, /Dividends per share, the 12 months to 2026-10-21: unavailable\. The price source records none that went ex-dividend from 2025-10-22 to 2026-10-21, but the company's filings show 0\.2800 USD a share over the last twelve months filed \(derived from the full year to 2026-01-25, 0\.04, plus 2026-01-26 to 2026-07-26, 0\.26, less 2025-01-27 to 2025-07-27, 0\.02\), so the price source's record of dividends may be missing\./);
+  assert.doesNotMatch(missing, /none went ex-dividend|Dividend yield/);
   // Prices that cannot be read: the filed figure, named as what it is.
   clearSecCache(); clearCache();
   answer(() => new Response('no such symbol', { status: 404 }));

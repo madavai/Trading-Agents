@@ -48,8 +48,8 @@ export function signalsOf(bars: readonly Bar[], newsToday: number | null = null)
   if (!last) return { signals, movePct: null };
   const movePct = prev && prev.close > 0 ? (last.close / prev.close - 1) * 100 : null;
   if (movePct !== null && Math.abs(movePct) >= MOVE_PCT) signals.push({ kind: 'move', words: `${movePct >= 0 ? 'rose' : 'fell'} ${one(Math.abs(movePct))}%` });
-  const usual = bars.slice(Math.max(0, n - 1 - USUAL_DAYS), n - 1).map((b) => b.volume).filter((v) => v > 0);
-  if (usual.length >= USUAL_DAYS / 2 && last.volume > 0) {
+  const usual = bars.slice(Math.max(0, n - 1 - USUAL_DAYS), n - 1).map((b) => b.volume).filter((v): v is number => v !== null && v > 0);   // a volume not given is left out, never a zero
+  if (usual.length >= USUAL_DAYS / 2 && last.volume !== null && last.volume > 0) {
     const times = last.volume / (usual.reduce((a, v) => a + v, 0) / usual.length);
     if (times >= VOLUME_TIMES) signals.push({ kind: 'volume', words: `${one(times)} times its usual volume` });
   }

@@ -54,17 +54,30 @@ async function pace(host: string): Promise<void> {
 }
 
 // Answers are kept on disk, shared by every copy of the tool server, so the analysts and a repeated question do not ask a
-// source again. The SEC's filings change only when something is filed; the rest are short-lived. A failure is never kept.
+// source again. A filed document never changes and the SEC's yearly figures change only when something is filed, so they
+// are kept a day; a filer's list of filings gains a Form 4 any hour, so it is kept an hour, as is FRED (a figure released
+// at 8:30 must reach a 9:00 analysis); prices and the rest five minutes. A failure is never kept. Every tool that serves a
+// kept answer can say when it was read (`getTextAt`, `readWords`).
 const MINUTE = 60_000;
-const ttlFor = (host: string): number => (/(^|\.)sec\.gov$/.test(host) ? 24 * 60 * MINUTE : /fred/.test(host) ? 6 * 60 * MINUTE : 5 * MINUTE);
+export function keepFor(url: string): number {
+  const u = new URL(url);
+  if (/(^|\.)sec\.gov$/.test(u.hostname)) return /^\/submissions\//.test(u.pathname) ? 60 * MINUTE : 24 * 60 * MINUTE;
+  return /fred/.test(u.hostname) ? 60 * MINUTE : 5 * MINUTE;
+}
 const keyOf = (url: string): string => { const u = new URL(url); u.searchParams.delete('crumb'); return createHash('sha256').update(u.toString()).digest('hex').slice(0, 40); };
 
-function readCache(url: string): string | null {
+function readCache(url: string): { text: string; at: number } | null {
   if (!cacheDir) return null;
   try {
-    const file = path.join(cacheDir, `${keyOf(url)}.txt`);
-    return Date.now() - fs.statSync(file).mtimeMs < ttlFor(new URL(url).hostname) ? fs.readFileSync(file, 'utf8') : null;
+    const file = path.join(cacheDir, `${keyOf(url)}.txt`), at = fs.statSync(file).mtimeMs;
+    return Date.now() - at < keepFor(url) ? { text: fs.readFileSync(file, 'utf8'), at } : null;
   } catch { return null; }
+}
+
+/** When an answer was read, as a person says it: "09:12 New York time on 2026-11-06" (the desk's day is New York's). */
+export function readWords(at: number): string {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(at)).map((x) => [x.type, x.value]));
+  return `${p.hour}:${p.minute} New York time on ${p.year}-${p.month}-${p.day}`;
 }
 
 function writeCache(url: string, text: string): void {
@@ -80,6 +93,11 @@ function pruneCache(dir: string): void {
 const excerpt = (body: string): string => body.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 140);
 
 export async function getText(url: string, opts: { timeoutMs?: number; headers?: Record<string, string> } = {}): Promise<string> {
+  return (await getTextAt(url, opts)).text;
+}
+
+/** The answer and when it was read from the source: now, or when the kept copy was read. */
+export async function getTextAt(url: string, opts: { timeoutMs?: number; headers?: Record<string, string> } = {}): Promise<{ text: string; at: number }> {
   const host = new URL(url).host, cached = readCache(url);
   if (cached !== null) return cached;
   for (let attempt = 0; ; attempt++) {
@@ -106,8 +124,9 @@ export async function getText(url: string, opts: { timeoutMs?: number; headers?:
       const said = res.status === 403 || res.status === 429 ? excerpt(text) : '';
       throw new Unavailable(`${host} refused (HTTP ${res.status})${said ? `, saying "${said}"` : ''}${res.status === 429 ? '; it is rate-limiting this computer, so try again in a few minutes' : ''}${sec ? (emailNow().trim() ? ' [a contact email was sent]' : ' [no contact email was sent]') : ''}`);
     }
+    const at = Date.now();
     writeCache(url, text);
-    return text;
+    return { text, at };
   }
 }
 
@@ -124,8 +143,13 @@ export async function getCookies(url: string): Promise<string> {
 }
 
 export async function getJson<T>(url: string, opts: { timeoutMs?: number; headers?: Record<string, string> } = {}): Promise<T> {
-  const text = await getText(url, opts);
-  try { return JSON.parse(text) as T; } catch { throw new Unavailable(`${new URL(url).host} answered with something that is not data`); }
+  return (await getJsonAt<T>(url, opts)).value;
+}
+
+/** The answer as data, and when it was read from the source. */
+export async function getJsonAt<T>(url: string, opts: { timeoutMs?: number; headers?: Record<string, string> } = {}): Promise<{ value: T; at: number }> {
+  const { text, at } = await getTextAt(url, opts);
+  try { return { value: JSON.parse(text) as T, at }; } catch { throw new Unavailable(`${new URL(url).host} answered with something that is not data`); }
 }
 
 /** What a tool says when a source failed: never an empty finding, never a number to guess around. */

@@ -5,7 +5,7 @@
 // named functions. Nothing in them is ever run as code.
 import { addDays, analysisDate, daysBetween, parseDate, weekday, withWeekday } from './dates.js';
 import { normalizeSymbol } from './symbols.js';
-import { daily } from './yahoo.js';
+import { daily, type Series } from './yahoo.js';
 
 export interface Sum { label?: string; expression: string }
 export interface DateQuestion { date?: string; from?: string; to?: string; symbol?: string }
@@ -94,16 +94,29 @@ function weekdaysBetween(from: string, to: string): number {
   return n;
 }
 
+/** What the source cannot say about the days up to `end`: the days it lists with no prices, and, when its rows stop
+ *  before `end` while its own record shows a session after its last row (rows are read a little past `end` to tell), the
+ *  day they stop. None of these is a day with no trading. */
+function unpriced(s: Series, end: string, now = Date.now()): { blank: Set<string>; stopsAt: string | null } {
+  const last = s.bars.at(-1)?.date ?? '', session = s.meta.session;
+  const stopped = !!session && now >= session.start && !!last && last < end && session.date > last;
+  return { blank: new Set([...(s.missing ?? []), ...(s.unfilled ?? [])]), stopsAt: stopped ? last : null };
+}
+
 async function dateAnswer(q: DateQuestion, day: string): Promise<string> {
   const sym = q.symbol ? normalizeSymbol(q.symbol) : '';
+  const past = (end: string) => { const x = addDays(end, 10); return x < day ? x : day; };   // a little past a day, to see that the source goes on
   if (q.date && !q.from && !q.to) {
     const d = parseDate(q.date);
     const line = `- ${d} is a ${LONG[weekday(d)]}.`;
     if (!sym) return line;
     if (d > day) return `${line} ${sym}'s sessions after the analysis date, ${day}, are not known to the desk.`;
-    const rows = (await daily(sym, addDays(d, -10), d)).bars;
-    const last = rows.at(-1);
-    return `${line} ${last?.date === d ? `${sym} traded that day.` : `${sym} did not trade that day${last ? `; its session on or before it: ${withWeekday(last.date)}` : ''}.`}`;
+    const s = await daily(sym, addDays(d, -10), past(d)), last = s.bars.filter((r) => r.date <= d).at(-1), gaps = unpriced(s, d);
+    if (last?.date === d) return `${line} ${sym} traded that day.`;
+    const before = last ? `; its session on or before it: ${withWeekday(last.date)}` : '';
+    if (gaps.blank.has(d)) return `${line} The source lists ${d} as a session of ${sym} but gives no prices for it (yet): its prices are not available${last ? ` (the latest session with prices before it: ${withWeekday(last.date)})` : ''}. Do not say ${sym} did not trade that day.`;
+    if (gaps.stopsAt) return `${line} Whether ${sym} traded that day is not known from the source: its own record shows a session on ${s.meta.session!.date}, but its prices stop at ${withWeekday(gaps.stopsAt)}. Do not say ${sym} did not trade that day.`;
+    return `${line} ${sym} did not trade that day${before}.`;
   }
   if (!q.from || !q.to) throw new Refused('give a date, or a from date and a to date');
   let a = parseDate(q.from, 'from date'), b = parseDate(q.to, 'to date');
@@ -112,9 +125,13 @@ async function dateAnswer(q: DateQuestion, day: string): Promise<string> {
   const parts = [`- From ${withWeekday(a)} to ${withWeekday(b)}: ${days} calendar day${days === 1 ? '' : 's'}${weeks(days)}; ${weekdaysBetween(a, b)} weekdays after the first date up to and including the second.`];
   if (sym) {
     if (b > day) parts.push(` ${sym}'s sessions after the analysis date, ${day}, are not known to the desk: counted to ${withWeekday(day)}.`);
-    const end = b > day ? day : b, rows = (await daily(sym, a, end)).bars;
+    const end = b > day ? day : b, s = await daily(sym, a, past(end)), rows = s.bars.filter((r) => r.date <= end), gaps = unpriced(s, end);
     const after = rows.filter((r) => r.date > a), traded = rows.length && rows[0]!.date === a;
-    parts.push(` ${sym} traded on ${after.length} session${after.length === 1 ? '' : 's'} after ${a} up to and including ${end}${after.length ? ` (the first ${withWeekday(after[0]!.date)}, the last ${withWeekday(after.at(-1)!.date)})` : ''}; ${a} itself ${traded ? 'was a session, so both included it is ' + (after.length + 1) : 'was not a session'}.`);
+    const blank = [...gaps.blank].filter((x) => x >= a && x <= end).sort();
+    const sure = !blank.length && !gaps.stopsAt;
+    parts.push(` ${sym} ${sure ? 'traded' : 'has prices'} on ${after.length} session${after.length === 1 ? '' : 's'} after ${a} up to and including ${end}${after.length ? ` (the first ${withWeekday(after[0]!.date)}, the last ${withWeekday(after.at(-1)!.date)})` : ''}; ${a} itself ${traded ? 'was a session, so both included it is ' + (after.length + 1) : blank[0] === a ? 'is listed by the source with no prices' : sure ? 'was not a session' : 'has no prices from the source'}.`);
+    if (blank.length) parts.push(` The source lists ${blank.map(withWeekday).join(', ')} as ${blank.length === 1 ? 'a session' : 'sessions'} with no prices: not counted here, so the true count may be higher. Do not say ${blank.length === 1 ? 'that day' : 'those days'} had no trading.`);
+    if (gaps.stopsAt) parts.push(` The source's prices stop at ${withWeekday(gaps.stopsAt)}, though its own record shows a session on ${s.meta.session!.date}: the sessions after ${gaps.stopsAt} are not known from it, so the true count may be higher.`);
   }
   return parts.join('');
 }

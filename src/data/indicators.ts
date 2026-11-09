@@ -65,11 +65,15 @@ export function atr(bars: Bar[], n = 14): Values {
   return wilder(tr, n, 0);
 }
 
+// The two indicators weighted by volume have no value on a window where a volume is not given, or where no volume traded
+// (a currency pair's zero): a volume-weighted figure from no volume would be a made-up one.
 export function vwma(bars: Bar[], n = 14): Values {
   return bars.map((_, i) => {
     if (i < n - 1) return null;
-    const w = bars.slice(i - n + 1, i + 1), vol = w.reduce((a, b) => a + b.volume, 0);
-    return vol > 0 ? w.reduce((a, b) => a + b.close * b.volume, 0) / vol : null;
+    const w = bars.slice(i - n + 1, i + 1);
+    if (w.some((b) => b.volume === null)) return null;
+    const vol = w.reduce((a, b) => a + b.volume!, 0);
+    return vol > 0 ? w.reduce((a, b) => a + b.close * b.volume!, 0) / vol : null;
   });
 }
 
@@ -78,7 +82,13 @@ export function mfi(bars: Bar[], n = 14): Values {
   return bars.map((_, i) => {
     if (i < n) return null;
     let pos = 0, neg = 0;
-    for (let j = i - n + 1; j <= i; j++) { const flow = tp[j]! * bars[j]!.volume; if (tp[j]! > tp[j - 1]!) pos += flow; else if (tp[j]! < tp[j - 1]!) neg += flow; }
+    for (let j = i - n + 1; j <= i; j++) {
+      const v = bars[j]!.volume;
+      if (v === null) return null;
+      const flow = tp[j]! * v;
+      if (tp[j]! > tp[j - 1]!) pos += flow; else if (tp[j]! < tp[j - 1]!) neg += flow;
+    }
+    if (pos + neg === 0) return null;   // no money moved: no reading, never "overbought"
     return neg === 0 ? 100 : 100 - 100 / (1 + pos / neg);
   });
 }
