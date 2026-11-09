@@ -37041,7 +37041,11 @@ async function pace(host) {
   await turn;
 }
 var MINUTE = 6e4;
-var ttlFor = (host) => /(^|\.)sec\.gov$/.test(host) ? 24 * 60 * MINUTE : /fred/.test(host) ? 6 * 60 * MINUTE : 5 * MINUTE;
+function keepFor(url2) {
+  const u = new URL(url2);
+  if (/(^|\.)sec\.gov$/.test(u.hostname)) return /^\/submissions\//.test(u.pathname) ? 60 * MINUTE : 24 * 60 * MINUTE;
+  return /fred/.test(u.hostname) ? 60 * MINUTE : 5 * MINUTE;
+}
 var keyOf = (url2) => {
   const u = new URL(url2);
   u.searchParams.delete("crumb");
@@ -37050,11 +37054,15 @@ var keyOf = (url2) => {
 function readCache(url2) {
   if (!cacheDir) return null;
   try {
-    const file5 = path7.join(cacheDir, `${keyOf(url2)}.txt`);
-    return Date.now() - fs7.statSync(file5).mtimeMs < ttlFor(new URL(url2).hostname) ? fs7.readFileSync(file5, "utf8") : null;
+    const file5 = path7.join(cacheDir, `${keyOf(url2)}.txt`), at = fs7.statSync(file5).mtimeMs;
+    return Date.now() - at < keepFor(url2) ? { text: fs7.readFileSync(file5, "utf8"), at } : null;
   } catch {
     return null;
   }
+}
+function readWords(at) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(at)).map((x) => [x.type, x.value]));
+  return `${p.hour}:${p.minute} New York time on ${p.year}-${p.month}-${p.day}`;
 }
 function writeCache(url2, text4) {
   if (!cacheDir) return;
@@ -37075,6 +37083,9 @@ function pruneCache(dir) {
 }
 var excerpt = (body) => body.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 140);
 async function getText(url2, opts = {}) {
+  return (await getTextAt(url2, opts)).text;
+}
+async function getTextAt(url2, opts = {}) {
   const host = new URL(url2).host, cached3 = readCache(url2);
   if (cached3 !== null) return cached3;
   for (let attempt = 0; ; attempt++) {
@@ -37104,8 +37115,9 @@ async function getText(url2, opts = {}) {
       const said = res.status === 403 || res.status === 429 ? excerpt(text4) : "";
       throw new Unavailable(`${host} refused (HTTP ${res.status})${said ? `, saying "${said}"` : ""}${res.status === 429 ? "; it is rate-limiting this computer, so try again in a few minutes" : ""}${sec ? emailNow().trim() ? " [a contact email was sent]" : " [no contact email was sent]" : ""}`);
     }
+    const at = Date.now();
     writeCache(url2, text4);
-    return text4;
+    return { text: text4, at };
   }
 }
 async function getCookies(url2) {
@@ -37120,9 +37132,12 @@ async function getCookies(url2) {
   return res.headers.getSetCookie().map((c) => c.split(";")[0]).join("; ");
 }
 async function getJson(url2, opts = {}) {
-  const text4 = await getText(url2, opts);
+  return (await getJsonAt(url2, opts)).value;
+}
+async function getJsonAt(url2, opts = {}) {
+  const { text: text4, at } = await getTextAt(url2, opts);
   try {
-    return JSON.parse(text4);
+    return { value: JSON.parse(text4), at };
   } catch {
     throw new Unavailable(`${new URL(url2).host} answered with something that is not data`);
   }
@@ -37204,8 +37219,10 @@ function atr(bars, n2 = 14) {
 function vwma(bars, n2 = 14) {
   return bars.map((_, i) => {
     if (i < n2 - 1) return null;
-    const w = bars.slice(i - n2 + 1, i + 1), vol4 = w.reduce((a, b) => a + b.volume, 0);
-    return vol4 > 0 ? w.reduce((a, b) => a + b.close * b.volume, 0) / vol4 : null;
+    const w = bars.slice(i - n2 + 1, i + 1);
+    if (w.some((b) => b.volume === null)) return null;
+    const vol3 = w.reduce((a, b) => a + b.volume, 0);
+    return vol3 > 0 ? w.reduce((a, b) => a + b.close * b.volume, 0) / vol3 : null;
   });
 }
 function mfi(bars, n2 = 14) {
@@ -37214,10 +37231,13 @@ function mfi(bars, n2 = 14) {
     if (i < n2) return null;
     let pos = 0, neg = 0;
     for (let j = i - n2 + 1; j <= i; j++) {
-      const flow = tp[j] * bars[j].volume;
+      const v = bars[j].volume;
+      if (v === null) return null;
+      const flow = tp[j] * v;
       if (tp[j] > tp[j - 1]) pos += flow;
       else if (tp[j] < tp[j - 1]) neg += flow;
     }
+    if (pos + neg === 0) return null;
     return neg === 0 ? 100 : 100 - 100 / (1 + pos / neg);
   });
 }
@@ -37396,13 +37416,14 @@ function parseChart(json2, symbol4) {
       blank.push(dayOf2(ts));
       return;
     }
-    const a = num(adj?.[i]), k = a !== null ? a / close : 1, date5 = dayOf2(ts), volume = num(q.volume?.[i]) ?? 0;
-    rows.push({ bar: { date: date5, open: open3 * k, high: high * k, low: low * k, close: close * k, volume }, traded: { date: date5, open: open3, high, low, close, volume } });
+    const a = num(adj?.[i]), k = a !== null ? a / close : 1, date5 = dayOf2(ts), v = num(q.volume?.[i]), volume = v !== null && v >= 0 ? v : null;
+    rows.push({ bar: { date: date5, open: open3 * k, high: high * k, low: low * k, close: close * k, volume }, traded: { date: date5, open: open3, high, low, close, volume }, adjusted: a !== null });
   });
   const seen = /* @__PURE__ */ new Set();
   const kept = rows.filter((x) => seen.has(x.bar.date) ? false : (seen.add(x.bar.date), true));
   const unique = kept.map((x) => x.bar);
-  const lastDay = unique.at(-1)?.date ?? "", unfilled = [...new Set(blank.filter((d) => d > lastDay))];
+  const firstDay = unique[0]?.date ?? "", lastDay = unique.at(-1)?.date ?? "", unfilled = [...new Set(blank.filter((d) => d > lastDay))];
+  const missing = [...new Set(blank.filter((d) => d > firstDay && d < lastDay && !seen.has(d)))].sort();
   const reg = m2.currentTradingPeriod?.regular, session2 = reg?.start && reg.end ? { date: dayOf2(reg.start), start: reg.start * 1e3, end: reg.end * 1e3 } : void 0;
   const paid = /* @__PURE__ */ new Map();
   for (const d of Object.values(r.events?.dividends ?? {})) {
@@ -37413,8 +37434,10 @@ function parseChart(json2, symbol4) {
     meta: { symbol: m2.symbol ?? symbol4, currency: m2.currency, exchange: m2.fullExchangeName ?? m2.exchangeName, type: m2.instrumentType, name: m2.longName ?? m2.shortName, price: m2.regularMarketPrice, timezone: m2.exchangeTimezoneName, session: session2 },
     bars: unique,
     unfilled,
+    missing,
     dividends: [...paid].map(([date5, amount]) => ({ date: date5, amount })).sort((a, b) => a.date.localeCompare(b.date)),
-    traded: kept.map((x) => x.traded)
+    traded: kept.map((x) => x.traded),
+    unadjusted: kept.filter((x) => !x.adjusted).map((x) => x.bar.date)
   };
 }
 async function fetchDaily(symbol4, from, to) {
@@ -37422,7 +37445,8 @@ async function fetchDaily(symbol4, from, to) {
   let last;
   for (const host of HOSTS) {
     try {
-      return parseChart(await getJson(`${host}/v8/finance/chart/${encodeURIComponent(symbol4)}?${qs}`), symbol4);
+      const { value, at } = await getJsonAt(`${host}/v8/finance/chart/${encodeURIComponent(symbol4)}?${qs}`);
+      return { ...parseChart(value, symbol4), fetchedAt: at };
     } catch (e) {
       if (e instanceof NoData) throw e;
       last = e;
@@ -37430,17 +37454,29 @@ async function fetchDaily(symbol4, from, to) {
   }
   throw last;
 }
+var KEEP_MS = keepFor(`${HOSTS[0]}/v8/finance/chart/`);
 async function daily(raw, from, to) {
-  const symbol4 = normalizeSymbol(raw), key = `${symbol4}|${from}|${to}`;
-  if (!cache.has(key)) {
-    const p = fetchDaily(symbol4, from, to);
-    cache.set(key, p);
-    p.catch(() => cache.delete(key));
+  const symbol4 = normalizeSymbol(raw), key = `${symbol4}|${from}|${to}`, hit = cache.get(key);
+  if (!hit || Date.now() - hit.at >= KEEP_MS) {
+    const series = fetchDaily(symbol4, from, to);
+    cache.set(key, { at: Date.now(), series });
+    series.catch(() => {
+      if (cache.get(key)?.series === series) cache.delete(key);
+    });
   }
-  const s = await cache.get(key);
+  const s = await cache.get(key).series;
   const within3 = (b) => b.date >= from && b.date <= to;
-  const bars = s.bars.filter(within3), lastDay = bars.at(-1)?.date ?? "";
-  return { meta: s.meta, bars, unfilled: (s.unfilled ?? []).filter((d) => d > lastDay && d <= to), dividends: (s.dividends ?? []).filter((d) => d.date >= from && d.date <= to), ...s.traded ? { traded: s.traded.filter(within3) } : {} };
+  const bars = s.bars.filter(within3), firstDay = bars[0]?.date ?? "", lastDay = bars.at(-1)?.date ?? "";
+  return {
+    meta: s.meta,
+    bars,
+    unfilled: (s.unfilled ?? []).filter((d) => d > lastDay && d <= to),
+    missing: (s.missing ?? []).filter((d) => d > firstDay && d < lastDay),
+    dividends: (s.dividends ?? []).filter((d) => d.date >= from && d.date <= to),
+    unadjusted: (s.unadjusted ?? []).filter((d) => d >= from && d <= to),
+    ...s.traded ? { traded: s.traded.filter(within3) } : {},
+    ...s.fetchedAt !== void 0 ? { fetchedAt: s.fetchedAt } : {}
+  };
 }
 async function history(raw, analysis2, calendarDays = 420) {
   const s = await daily(raw, addDays(analysis2, -calendarDays), analysis2);
@@ -37452,7 +37488,14 @@ async function history(raw, analysis2, calendarDays = 420) {
 
 // src/data/market.ts
 var f2 = (v) => v === null || v === void 0 || !Number.isFinite(v) ? "N/A" : v.toFixed(2);
-var vol = (v) => Math.round(v).toLocaleString("en-US");
+var vol = (v) => v === null ? "not given" : Math.round(v).toLocaleString("en-US");
+var listDays = (days) => days.length <= 6 ? days.join(", ") : `${days.slice(0, 5).join(", ")} and ${days.length - 5} more`;
+function adjustedWords(s) {
+  const shown2 = new Set(s.bars.map((b) => b.date)), plain4 = (s.unadjusted ?? []).filter((d) => shown2.has(d));
+  if (!plain4.length) return "adjusted for splits and dividends";
+  if (plain4.length === shown2.size) return "adjusted for splits only: the source gave no dividend-adjusted closes, so a dividend shows as a fall on its ex-dividend day";
+  return `adjusted for splits and dividends, except ${plain4.length === 1 ? "the row" : `${plain4.length} rows`} the source gave no dividend-adjusted close for (${listDays(plain4)}), which ${plain4.length === 1 ? "is" : "are"} adjusted for splits only`;
+}
 var typeWord = (t, raw) => cryptoBase(raw) || t === "CRYPTOCURRENCY" ? "crypto asset" : { EQUITY: "stock", ETF: "fund (ETF)", MUTUALFUND: "fund", INDEX: "index", FUTURE: "future", CURRENCY: "currency pair" }[t ?? ""] ?? "instrument";
 var resolved = (raw) => {
   const s = normalizeSymbol(raw);
@@ -37466,7 +37509,7 @@ async function instrument(raw, analysis2) {
   if (!old && s.meta.exchange) lines.push(`Exchange: ${s.meta.exchange}`);
   if (s.meta.currency) lines.push(`Quote currency: ${s.meta.currency}`);
   lines.push(`Analysis date: ${day3}${old ? " (a past day: use only what was known by then)" : ""}`);
-  lines.push(state.open ? `Latest trading day on or before it: ${last.date}, still trading: latest price ${f2(last.close)} (not a close)` : `Latest trading day on or before it: ${last.date}, close ${f2(last.close)}`);
+  lines.push(`Latest trading day on or before it: ${last.date}, ${state.inline} ${f2(last.close)}${state.open ? " (not a close)" : ""}`);
   lines.push(...state.lines.map((l) => l.replace(/^- /, "")));
   lines.push("", `Refer to it by this exact ticker in every report, keeping any exchange suffix. Do not substitute a different company or ticker unless a tool result disproves this identity.${kind === "crypto asset" ? " It is a crypto asset, not a company: do not assume company fundamentals exist." : ""}`);
   return lines.join("\n");
@@ -37478,15 +37521,32 @@ var clock = (ms, zone = "UTC") => {
     return `${new Date(ms).toISOString().slice(11, 16)} UTC`;
   }
 };
+var SETTLE_MS = 15 * 6e4;
+function gapLines(s) {
+  const days = s.missing ?? [];
+  if (!days.length) return [];
+  const one3 = days.length === 1;
+  return [`- **The source lists ${one3 ? "a session" : "sessions"} on ${listDays(days)} with no prices: ${one3 ? "it is" : "they are"} missing from these rows, so every average, count and change here skips ${one3 ? "it" : "them"} (a change across ${one3 ? "it" : "them"} spans two sessions). Do not say ${listDays(days)} had no trading: say ${one3 ? "its" : "their"} prices are not available from the source.**`];
+}
 function latestState(s, upTo, now = Date.now()) {
-  const last = s.bars[s.bars.length - 1], unfilled = s.unfilled?.at(-1), session2 = s.meta.session;
-  const open3 = !!session2 && session2.date === last.date && now >= session2.start && now < session2.end;
-  if (unfilled) return { open: false, lines: [`- **The source lists a session on ${unfilled}, but its prices are not filled in yet (this happens for a while after a session ends). Every figure here is as of ${last.date}. Do not call ${last.date} the latest session, and do not say ${unfilled} had no trading: say its prices were not available yet.**`] };
-  if (open3) return { open: open3, lines: [`- **The latest row, ${last.date}, is a session still trading (it closes at ${clock(session2.end, s.meta.timezone)}). Its "close" is the latest price so far, not a close; its high, low, volume and every indicator on it will change. Call it the latest price, never the close, and do not treat a level as broken or held on this row alone.**`] };
-  if (session2 && session2.date === last.date) return { open: open3, lines: [`- The latest row, ${last.date}, is a finished session: its figures are final.`] };
-  if (session2 && session2.date > last.date && session2.date <= upTo && now < session2.start) return { open: open3, lines: [`- ${session2.date}'s session has not opened yet (it opens at ${clock(session2.start, s.meta.timezone)}): the latest row, ${last.date}, is the latest finished session.`] };
-  if (!session2 && last.date === today()) return { open: open3, lines: ["- **The latest row is today's session. If the market is still open it is partial: its close, high, low and volume are the latest so far, and every indicator on it will change by the close. Do not treat a level as broken or held on this row alone.**"] };
-  return { open: open3, lines: [] };
+  const last = s.bars[s.bars.length - 1], unfilled = s.unfilled?.at(-1), session2 = s.meta.session, zone = s.meta.timezone, read2 = s.fetchedAt ?? now;
+  const said = (st, lines) => ({ ...st, lines: [...lines, ...gapLines(s)] });
+  const final = { open: false, label: "Close", inline: "close" };
+  if (unfilled) return said(final, [`- **The source lists a session on ${unfilled}, but its prices are not filled in yet (this happens for a while after a session ends). Every figure here is as of ${last.date}. Do not call ${last.date} the latest session, and do not say ${unfilled} had no trading: say its prices were not available yet.**`]);
+  if (session2 && session2.date === last.date) {
+    if (now < session2.end) return said({ open: true, label: "Latest price (still trading)", inline: "still trading: latest price" }, [`- **The latest row, ${last.date}, is a session still trading (it closes at ${clock(session2.end, zone)}). Its "close" is the latest price so far, not a close; its high, low, volume and every indicator on it will change. Call it the latest price, never the close, and do not treat a level as broken or held on this row alone.**`]);
+    if (read2 < session2.end + SETTLE_MS) {
+      const at = clock(read2, zone);
+      return said({ open: true, label: `Latest price (read at ${at}, not the close)`, inline: `latest price as read at ${at}` }, [`- **The latest row, ${last.date}, was read at ${at}, ${read2 < session2.end ? "while its session was still trading" : "just after its session ended"} (it ended at ${clock(session2.end, zone)}, and its figures are taken as final ${SETTLE_MS / 6e4} minutes after). Its "close" is the latest price as read then, not the close; its high, low, volume and every indicator on it may still change. Call it the latest price as read at ${at}, never the close, and do not treat a level as broken or held on this row alone.**`]);
+    }
+    return said(final, [`- The latest row, ${last.date}, is a finished session: its figures are final.`]);
+  }
+  if (session2 && session2.date > last.date && session2.date <= upTo) {
+    if (now < session2.start) return said(final, [`- ${session2.date}'s session has not opened yet (it opens at ${clock(session2.start, zone)}): the latest row, ${last.date}, is the latest finished session.`]);
+    return said(final, [`- **The source's own record shows a session on ${session2.date}${now < session2.end ? ", trading now" : ", which has ended"}, but its rows stop at ${last.date}: it has no prices yet for ${session2.date}, nor for any session between ${last.date} and it. Every figure here is as of ${last.date}. Do not call ${last.date} the latest session, and do not say the days after it had no trading: say their prices are not available from the source yet.**`]);
+  }
+  if (!session2 && last.date === today()) return said(final, ["- **The latest row is today's session. If the market is still open it is partial: its close, high, low and volume are the latest so far, and every indicator on it will change by the close. Do not treat a level as broken or held on this row alone.**"]);
+  return said(final, []);
 }
 var MAX_ROWS = 260;
 async function priceHistory(raw, analysis2, start, end) {
@@ -37494,7 +37554,7 @@ async function priceHistory(raw, analysis2, start, end) {
   const series = await daily(raw, s, e);
   if (!series.bars.length) return `No trading rows for ${resolved(raw)} from ${s} to ${e}.`;
   const rows = series.bars.slice(-MAX_ROWS), notes = latestState(series, e).lines;
-  const head2 = [`Daily prices for ${resolved(raw)} from ${s} to ${e} (${series.bars.length} trading days${series.bars.length > MAX_ROWS ? `, the last ${MAX_ROWS} shown` : ""}; adjusted for splits and dividends${series.meta.currency ? `; ${series.meta.currency}` : ""})`, "", "Date | Open | High | Low | Close | Volume", "---|---:|---:|---:|---:|---:"];
+  const head2 = [`Daily prices for ${resolved(raw)} from ${s} to ${e} (${series.bars.length} trading days${series.bars.length > MAX_ROWS ? `, the last ${MAX_ROWS} shown` : ""}; ${adjustedWords(series)}${series.meta.currency ? `; ${series.meta.currency}` : ""})`, "", "Date | Open | High | Low | Close | Volume", "---|---:|---:|---:|---:|---:"];
   return head2.concat(rows.map((b) => `${b.date} | ${f2(b.open)} | ${f2(b.high)} | ${f2(b.low)} | ${f2(b.close)} | ${vol(b.volume)}`), notes.length ? ["", ...notes] : []).join("\n");
 }
 function indicatorList(input2) {
@@ -37510,6 +37570,7 @@ async function indicatorWindow(raw, analysis2, names, lookBackDays = 30) {
     const values = compute(name, s.bars);
     const rows = s.bars.map((b, i) => [b, values[i]]).filter(([b]) => b.date >= from);
     out.push(`## ${name} for ${resolved(raw)}, ${from} to ${day3} (trading days only)`, ...rows.map(([b, v]) => `${b.date}: ${f2(v)}`), "", INDICATORS[name], "");
+    if ((name === "vwma" || name === "mfi") && rows.some(([, v]) => v === null)) out.push(`${name} is N/A on a day whose window has a session with no volume given by the source, or with no volume traded at all: a volume-weighted reading from no volume would be made up. Do not read N/A as a level.`, "");
   }
   out.push(...latestState(s, day3).lines);
   if (unknown2.length) out.push(`Not computed (unknown names): ${unknown2.join(", ")}. Use: ${INDICATOR_NAMES.join(", ")}.`);
@@ -37526,7 +37587,7 @@ async function verifiedSnapshot(raw, analysis2, lookBack = 30) {
     `- Latest trading row used: ${last.date}`,
     "- Rows after the analysis date are excluded.",
     ...state.lines,
-    `- Prices adjusted for splits and dividends${s.meta.currency ? `, in ${s.meta.currency}` : ""}.`,
+    `- Prices ${adjustedWords(s)}${s.meta.currency ? `, in ${s.meta.currency}` : ""}.`,
     "",
     "### Latest row",
     "",
@@ -37535,7 +37596,7 @@ async function verifiedSnapshot(raw, analysis2, lookBack = 30) {
     `| Open | ${f2(last.open)} |`,
     `| High | ${f2(last.high)} |`,
     `| Low | ${f2(last.low)} |`,
-    `| ${state.open ? "Latest price (still trading)" : "Close"} | ${f2(last.close)} |`,
+    `| ${state.label} | ${f2(last.close)} |`,
     `| Volume | ${vol(last.volume)} |`,
     "",
     "### Indicators on the latest row",
@@ -37588,11 +37649,16 @@ function priceFactsText(sym2, day3, s) {
   const change3 = close.map((c, i) => i && close[i - 1] ? (c / close[i - 1] - 1) * 100 : null);
   const windows = WINDOWS.map(([size, words3]) => ({ size: Math.min(size, n2), words: size <= n2 ? words3 : "all on record", full: size }));
   const from = (w) => n2 - w.size;
+  const anyVolume = bars.some((b) => b.volume !== null && b.volume > 0);
+  const volumeOf2 = (i) => anyVolume ? bars[i].volume : null;
+  const noVolume = bars.map((b, i) => b.volume === null ? i : -1).filter((i) => i >= 0);
+  const volumeNote = !anyVolume ? ["- The source gives no volume for these rows (or none traded): there are no volume facts here, and VWMA has no value."] : noVolume.length ? [`- The source gives no volume for ${plural2(noVolume.length, "session")} (${noVolume.slice(-5).map(d).join("; ")}${noVolume.length > 5 ? ", and earlier ones" : ""}): ${noVolume.length === 1 ? "it is" : "they are"} left out of every volume fact, and VWMA has no value on a window that includes ${noVolume.length === 1 ? "it" : "them"}.`] : [];
   const out = [
     `## Price facts for ${sym2}, worked out by the desk`,
     "",
     `- Analysis date: ${withWeekday(day3)}. Latest row: ${d(L)}. Rows after the analysis date are excluded.`,
-    "- From the same daily prices as the checked price table (adjusted for splits and dividends) and the same indicators (10 EMA, 50 SMA, 200 SMA, VWMA, RSI, MACD, Bollinger bands, ATR). A session is a trading day; every date carries its weekday.",
+    `- From the same daily prices as the checked price table (${adjustedWords(s)}) and the same indicators (10 EMA, 50 SMA, 200 SMA, VWMA, RSI, MACD, Bollinger bands, ATR). A session is a trading day; every date carries its weekday.`,
+    ...volumeNote,
     `- Windows count back from the latest row, which they include: ${windows.map((w) => `the last ${w.size} sessions${w.size < w.full ? " (all on record)" : ""} from ${d(from(w))}`).join("; ")}.`,
     "- Directions and sides are judged on figures rounded to the cent, as the tables show them.",
     ...latestState(s, day3).lines,
@@ -37707,10 +37773,10 @@ function priceFactsText(sym2, day3, s) {
     ["Lowest intraday lows", (i) => bars[i].low, -1, (i) => f22(bars[i].low)],
     ["Biggest daily rises", (i) => change3[i], 1, (i) => `${pct2(i)} (${signed(close[i] - close[i - 1], 2)})`, (i) => (change3[i] ?? 0) > 0],
     ["Biggest daily falls", (i) => change3[i], -1, (i) => `${pct2(i)} (${signed(close[i] - close[i - 1], 2)})`, (i) => (change3[i] ?? 0) < 0],
-    ["Heaviest volume", (i) => bars[i].volume, 1, (i) => `${vol2(bars[i].volume)}${change3[i] === null ? "" : ` (close ${pct2(i)})`}`],
-    ["Heaviest volume on a down close", (i) => bars[i].volume, 1, (i) => `${vol2(bars[i].volume)} (close ${pct2(i)})`, (i) => down(i) === true],
-    ["Heaviest volume on an up close", (i) => bars[i].volume, 1, (i) => `${vol2(bars[i].volume)} (close ${pct2(i)})`, (i) => up(i) === true],
-    ["Lightest volume", (i) => bars[i].volume, -1, (i) => vol2(bars[i].volume)],
+    ["Heaviest volume", volumeOf2, 1, (i) => `${vol2(volumeOf2(i))}${change3[i] === null ? "" : ` (close ${pct2(i)})`}`],
+    ["Heaviest volume on a down close", volumeOf2, 1, (i) => `${vol2(volumeOf2(i))} (close ${pct2(i)})`, (i) => down(i) === true],
+    ["Heaviest volume on an up close", volumeOf2, 1, (i) => `${vol2(volumeOf2(i))} (close ${pct2(i)})`, (i) => up(i) === true],
+    ["Lightest volume", volumeOf2, -1, (i) => vol2(volumeOf2(i))],
     ["Highest RSI", (i) => rsi14[i], 1, (i) => f22(rsi14[i])],
     ["Lowest RSI", (i) => rsi14[i], -1, (i) => f22(rsi14[i])],
     ["Highest MACD", (i) => m2.macd[i], 1, (i) => f22(m2.macd[i])],
@@ -37739,7 +37805,7 @@ function priceFactsText(sym2, day3, s) {
   out.push("", "### The latest row against the past", "");
   out.push(...[
     since("Close", ["highest close", "lowest close"], (i) => close[i], f22),
-    since("Volume", ["heaviest volume", "lightest volume"], (i) => bars[i].volume, vol2),
+    since("Volume", ["heaviest volume", "lightest volume"], volumeOf2, vol2),
     since("Daily move", ["biggest daily rise", "biggest daily fall"], (i) => change3[i], (x) => `${signed(x, 2)}%`, true),
     since("RSI", ["highest RSI", "lowest RSI"], (i) => rsi14[i], f22),
     since("MACD", ["highest MACD", "lowest MACD"], (i) => m2.macd[i], f22),
@@ -37870,16 +37936,28 @@ function weekdaysBetween(from, to) {
   for (let d = addDays(from, 1); d <= to; d = addDays(d, 1)) if (!["Sat", "Sun"].includes(weekday(d))) n2++;
   return n2;
 }
+function unpriced(s, end, now = Date.now()) {
+  const last = s.bars.at(-1)?.date ?? "", session2 = s.meta.session;
+  const stopped = !!session2 && now >= session2.start && !!last && last < end && session2.date > last;
+  return { blank: /* @__PURE__ */ new Set([...s.missing ?? [], ...s.unfilled ?? []]), stopsAt: stopped ? last : null };
+}
 async function dateAnswer(q, day3) {
   const sym2 = q.symbol ? normalizeSymbol(q.symbol) : "";
+  const past = (end) => {
+    const x = addDays(end, 10);
+    return x < day3 ? x : day3;
+  };
   if (q.date && !q.from && !q.to) {
     const d = parseDate(q.date);
     const line2 = `- ${d} is a ${LONG[weekday(d)]}.`;
     if (!sym2) return line2;
     if (d > day3) return `${line2} ${sym2}'s sessions after the analysis date, ${day3}, are not known to the desk.`;
-    const rows = (await daily(sym2, addDays(d, -10), d)).bars;
-    const last = rows.at(-1);
-    return `${line2} ${last?.date === d ? `${sym2} traded that day.` : `${sym2} did not trade that day${last ? `; its session on or before it: ${withWeekday(last.date)}` : ""}.`}`;
+    const s = await daily(sym2, addDays(d, -10), past(d)), last = s.bars.filter((r) => r.date <= d).at(-1), gaps = unpriced(s, d);
+    if (last?.date === d) return `${line2} ${sym2} traded that day.`;
+    const before = last ? `; its session on or before it: ${withWeekday(last.date)}` : "";
+    if (gaps.blank.has(d)) return `${line2} The source lists ${d} as a session of ${sym2} but gives no prices for it (yet): its prices are not available${last ? ` (the latest session with prices before it: ${withWeekday(last.date)})` : ""}. Do not say ${sym2} did not trade that day.`;
+    if (gaps.stopsAt) return `${line2} Whether ${sym2} traded that day is not known from the source: its own record shows a session on ${s.meta.session.date}, but its prices stop at ${withWeekday(gaps.stopsAt)}. Do not say ${sym2} did not trade that day.`;
+    return `${line2} ${sym2} did not trade that day${before}.`;
   }
   if (!q.from || !q.to) throw new Refused("give a date, or a from date and a to date");
   let a = parseDate(q.from, "from date"), b = parseDate(q.to, "to date");
@@ -37888,9 +37966,13 @@ async function dateAnswer(q, day3) {
   const parts = [`- From ${withWeekday(a)} to ${withWeekday(b)}: ${days} calendar day${days === 1 ? "" : "s"}${weeks(days)}; ${weekdaysBetween(a, b)} weekdays after the first date up to and including the second.`];
   if (sym2) {
     if (b > day3) parts.push(` ${sym2}'s sessions after the analysis date, ${day3}, are not known to the desk: counted to ${withWeekday(day3)}.`);
-    const end = b > day3 ? day3 : b, rows = (await daily(sym2, a, end)).bars;
+    const end = b > day3 ? day3 : b, s = await daily(sym2, a, past(end)), rows = s.bars.filter((r) => r.date <= end), gaps = unpriced(s, end);
     const after = rows.filter((r) => r.date > a), traded = rows.length && rows[0].date === a;
-    parts.push(` ${sym2} traded on ${after.length} session${after.length === 1 ? "" : "s"} after ${a} up to and including ${end}${after.length ? ` (the first ${withWeekday(after[0].date)}, the last ${withWeekday(after.at(-1).date)})` : ""}; ${a} itself ${traded ? "was a session, so both included it is " + (after.length + 1) : "was not a session"}.`);
+    const blank = [...gaps.blank].filter((x) => x >= a && x <= end).sort();
+    const sure = !blank.length && !gaps.stopsAt;
+    parts.push(` ${sym2} ${sure ? "traded" : "has prices"} on ${after.length} session${after.length === 1 ? "" : "s"} after ${a} up to and including ${end}${after.length ? ` (the first ${withWeekday(after[0].date)}, the last ${withWeekday(after.at(-1).date)})` : ""}; ${a} itself ${traded ? "was a session, so both included it is " + (after.length + 1) : blank[0] === a ? "is listed by the source with no prices" : sure ? "was not a session" : "has no prices from the source"}.`);
+    if (blank.length) parts.push(` The source lists ${blank.map(withWeekday).join(", ")} as ${blank.length === 1 ? "a session" : "sessions"} with no prices: not counted here, so the true count may be higher. Do not say ${blank.length === 1 ? "that day" : "those days"} had no trading.`);
+    if (gaps.stopsAt) parts.push(` The source's prices stop at ${withWeekday(gaps.stopsAt)}, though its own record shows a session on ${s.meta.session.date}: the sessions after ${gaps.stopsAt} are not known from it, so the true count may be higher.`);
   }
   return parts.join("");
 }
@@ -38128,7 +38210,7 @@ async function economicSeries(indicator, analysis2, lookBackDays = 365) {
   if (!/^[A-Z0-9_]{1,40}$/.test(id)) throw new Error(`"${indicator}" is not a series name or a FRED series id`);
   const window2 = Math.max(30, Math.min(3650, lookBackDays));
   const from = addDays(day3, -Math.max(window2, 365) - 400);
-  const csv = await getText(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${id}&cosd=${from}&coed=${day3}`);
+  const { text: csv, at } = await getTextAt(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${id}&cosd=${from}&coed=${day3}`);
   if (!/^\s*(observation_date|DATE)\s*,/i.test(csv)) throw new Unavailable(`FRED answered with something other than its data download (it may be down for maintenance)`);
   let all = parseCsv(csv).filter((o) => o.date <= day3);
   const past = isHistorical(day3), freq = frequency(all), lag = releaseLag(all);
@@ -38154,7 +38236,8 @@ async function economicSeries(indicator, analysis2, lookBackDays = 365) {
     `- Latest value known by ${day3}: ${fmt2(last.value)} (for ${periodOf(last.date, freq)})`,
     ago ? `- Year over year, from ${fmt2(ago.value)} for ${periodOf(ago.date, freq)}: ${changeOf(ago)}` : `- Year over year: not available (no value for ${periodOf(`${Number(last.date.slice(0, 4)) - 1}${last.date.slice(4)}`, freq)} in FRED's data). Do not work one out from other rows.`,
     `- Change over the look-back window, from ${periodOf(first.date, freq)} to ${periodOf(last.date, freq)}: ${changeOf(first)}${first.date !== ago?.date ? " (not a yearly rate)" : ""}`,
-    past ? `- A past analysis date: values are kept only if published by ${day3} (a ${lag}-day release lag for this series), and are today's revised figures; first releases may have differed slightly.` : "- Values as published today, revisions included.",
+    past ? `- A past analysis date: values are kept only if published by ${day3} (a ${lag}-day release lag for this series), and are today's revised figures; first releases may have differed slightly.` : "- Values as FRED published them, revisions included.",
+    `- Read from FRED at ${readWords(at)} (the desk keeps a read for up to an hour): a figure released after that is not here.`,
     "",
     freq === "monthly" || freq === "quarterly" ? "Date (the first day of the period it stands for) | Value" : "Date | Value",
     "---|---:",
@@ -38378,16 +38461,23 @@ function filedStatement(usGaap, kind, freq, asOf) {
   });
   return { columns: periods.map((p) => p.end + (p.i === 0 && derived2.has(p.end) ? " (derived)" : names[p.i])), rows, notes };
 }
-var DAY_MS = 864e5;
 var cache2 = /* @__PURE__ */ new Map();
 function cached2(url2, timeoutMs) {
   const hit = cache2.get(url2);
-  if (hit && Date.now() - hit.at < DAY_MS) return hit.value;
-  const value = getJson(url2, { timeoutMs });
-  cache2.set(url2, { at: Date.now(), value });
-  value.catch(() => cache2.delete(url2));
+  if (hit && Date.now() - hit.at < keepFor(url2)) return hit.value;
+  const entry = { at: Date.now(), value: Promise.resolve() };
+  const value = getJsonAt(url2, { timeoutMs }).then((r) => {
+    entry.read = r.at;
+    return r.value;
+  });
+  entry.value = value;
+  cache2.set(url2, entry);
+  value.catch(() => {
+    if (cache2.get(url2) === entry) cache2.delete(url2);
+  });
   return value;
 }
+var filingsReadAt = (cik) => cache2.get(`https://data.sec.gov/submissions/CIK${cik}.json`)?.read;
 async function cikFor(symbol4) {
   const table = await cached2("https://www.sec.gov/files/company_tickers.json", 3e4);
   const hit = Object.values(table).find((e) => e.ticker?.toUpperCase() === symbol4.toUpperCase());
@@ -38569,7 +38659,8 @@ var CODES = {
 };
 var fmt = (n2, d = 0) => n2.toLocaleString("en-US", { maximumFractionDigits: d });
 async function secInsiders(symbol4, cik, asOf, days = 90, limit = 25) {
-  const s = await submissions(cik), r = s.filings?.recent ?? {};
+  const s = await submissions(cik), r = s.filings?.recent ?? {}, readAt = filingsReadAt(cik);
+  const listRead = readAt === void 0 ? "" : ` (the SEC's list of filings as read at ${readWords(readAt)})`;
   const forms = r.form ?? [], from = addDays(asOf, -days);
   const oldest = (r.filingDate ?? []).at(-1);
   const picked = forms.map((f, i) => ({ form: f, i, filed: r.filingDate?.[i] ?? "" })).filter((x) => (x.form === "4" || x.form === "4/A") && x.filed <= asOf && x.filed > from).sort((a, b) => b.filed.localeCompare(a.filed));
@@ -38578,7 +38669,7 @@ async function secInsiders(symbol4, cik, asOf, days = 90, limit = 25) {
   const gap2 = partial2 ? ` The SEC's recent list of filings starts on ${oldest}, so filings before that day are not read.` : "";
   if (!picked.length) {
     if (partial2) throw new NoData(`the SEC's recent list of ${symbol4}'s filings starts on ${oldest}, after ${addDays(from, 1)}, so the trades of those days cannot be read`);
-    return `${head2}: none. No director, officer or large owner reported a trade in these ${days} days. That is a fact from the SEC, not a gap in the data.`;
+    return `${head2}: none. No director, officer or large owner reported a trade in these ${days} days. That is a fact from the SEC${listRead}, not a gap in the data.`;
   }
   const read2 = picked.slice(0, limit), filings2 = [];
   let failed = 0, why = "";
@@ -38616,7 +38707,7 @@ async function secInsiders(symbol4, cik, asOf, days = 90, limit = 25) {
   ].filter(Boolean);
   const scope = missing.length ? `Counted from only the ${filings2.length} of the ${picked.length} filings ${span2} that were read (${missing.join("; ")}). These counts are not the whole ${days} days: a "none" below is not a fact about the insiders` : `In these ${days} days`;
   return [
-    `${head2} (${filings2.length} of ${picked.length} filings read, newest first${failed ? `; ${failed} could not be read` : ""}${skipped ? `; the ${skipped} oldest not asked for` : ""}${replaced ? `; ${replaced === 1 ? "one is an amended filing, a Form 4/A, shown in place of the filing it corrects" : `${replaced} are amended filings, Form 4/A, each shown in place of the filing it corrects`}` : ""}). Each trade is dated by the day it happened and the day its filing made it public; only filings public by ${asOf} are shown.${gap2}`,
+    `${head2} (${filings2.length} of ${picked.length} filings read, newest first${failed ? `; ${failed} could not be read` : ""}${skipped ? `; the ${skipped} oldest not asked for` : ""}${replaced ? `; ${replaced === 1 ? "one is an amended filing, a Form 4/A, shown in place of the filing it corrects" : `${replaced} are amended filings, Form 4/A, each shown in place of the filing it corrects`}` : ""}). Each trade is dated by the day it happened and the day its filing made it public; only filings public by ${asOf} are shown${listRead}.${gap2}`,
     "",
     `${scope}: bought (code P) ${total(buys)}; sold (code S) ${total(sales)}; other kinds (awards, option exercises, shares handed back for tax, gifts) ${other}.`,
     "P and S are purchases and sales on the market or in a private deal: a purchase is the insider spending their own money. A sale under a 10b5-1 plan was arranged months ahead. Awards, exercises, tax handbacks and gifts say little about what an insider thinks of the price.",
@@ -38854,24 +38945,24 @@ async function secOverview(sym2, cik, day3) {
   if (fy && Number(fy[1]) >= 1 && Number(fy[1]) <= 12) lines.push(`Fiscal year ends: ${Number(fy[2])} ${MONTHS2[Number(fy[1]) - 1]}`);
   let close = null, paid = [];
   try {
-    const h = await history(sym2, day3), last = h.bars.at(-1);
-    close = { date: last.date, close: Math.round(last.close * 100) / 100, currency: h.meta.currency };
+    const h = await history(sym2, day3), last = h.bars.at(-1), state = latestState(h, day3);
+    close = { date: last.date, close: Math.round(last.close * 100) / 100, currency: h.meta.currency, open: state.open, label: state.open ? state.label : "Close" };
     paid = h.dividends ?? [];
   } catch {
   }
-  const usd = !close?.currency || close.currency === "USD";
-  lines.push(close ? `Close: ${fixed(close.close)} ${close.currency ?? ""} on ${close.date} (the checked price table's latest row on or before ${day3})`.replace("  ", " ") : "Close: unavailable (the prices could not be read), so no multiple can be worked out");
+  const usd = !close?.currency || close.currency === "USD", px = close?.open ? "latest price" : "close";
+  lines.push(close ? `${close.label}: ${fixed(close.close)} ${close.currency ?? ""} on ${close.date} (the checked price table's latest row on or before ${day3}${close.open ? "; not a close, so every multiple below moves with it" : ""})`.replace("  ", " ") : "Close: unavailable (the prices could not be read), so no multiple can be worked out");
   const cover = sharesOutstanding(units(dei.EntityCommonStockSharesOutstanding, "shares"), day3);
   const average = cover ? null : averageDilutedShares(units(g.WeightedAverageNumberOfDilutedSharesOutstanding, "shares"), day3);
   const shares2 = cover ?? average, which = average ? "average diluted shares" : "shares";
   if (cover) lines.push(`Shares outstanding: ${whole(cover.shares)} (counted on ${cover.end}, filed ${cover.filed})`);
   else if (average) lines.push(`Shares outstanding: no single count on a cover page filed by then (a company with more than one class of shares gives one per class there, which the SEC's data leaves out). In its place, the weighted average diluted shares from its accounts for ${average.start} to ${average.end}: ${whole(average.shares)} (filed ${average.filed}), so the figures worked out from it are close, not exact`);
   else lines.push("Shares outstanding: unavailable (not on a cover page filed by then)");
-  if (shares2 && close && usd) lines.push(`Market value (derived: ${which} \xD7 close): ${whole(shares2.shares * close.close)} USD`);
+  if (shares2 && close && usd) lines.push(`Market value (derived: ${which} \xD7 ${px}): ${whole(shares2.shares * close.close)} USD`);
   const eps = trailingYear(units(g.EarningsPerShareDiluted, "USD/shares"), day3);
   if (eps) {
     lines.push(`Diluted EPS, last twelve months (derived from ${eps.parts}): ${fixed(eps.value)} USD`);
-    if (close && usd) lines.push(eps.value > 0 ? `Price to earnings (derived: close \xF7 that): ${fixed(close.close / eps.value)}` : "Price to earnings: not meaningful (the last twelve months lost money)");
+    if (close && usd) lines.push(eps.value > 0 ? `Price to earnings (derived: ${px} \xF7 that): ${fixed(close.close / eps.value)}` : "Price to earnings: not meaningful (the last twelve months lost money)");
   } else lines.push("Diluted EPS, last twelve months: unavailable (not filed in US dollars by then)");
   const equity = latestBalance(units(g.StockholdersEquity, "USD"), day3);
   if (equity) {
@@ -38879,7 +38970,7 @@ async function secOverview(sym2, cik, day3) {
     if (shares2 && shares2.shares > 0) {
       const bv = equity.val / shares2.shares;
       lines.push(`Book value per share (derived: equity \xF7 ${which}): ${fixed(bv)} USD`);
-      if (close && usd && bv > 0) lines.push(`Price to book (derived: close \xF7 that): ${fixed(close.close / bv)}`);
+      if (close && usd && bv > 0) lines.push(`Price to book (derived: ${px} \xF7 that): ${fixed(close.close / bv)}`);
     }
   }
   const dps = trailingYear(units(g.CommonStockDividendsPerShareDeclared, "USD/shares"), day3) ?? trailingYear(units(g.CommonStockDividendsPerShareCashPaid, "USD/shares"), day3);
@@ -38888,12 +38979,13 @@ async function secOverview(sym2, cik, day3) {
     const sum = Number(year.reduce((a, d) => a + d.amount, 0).toFixed(6)), span2 = `${addDays(after, 1)} to ${day3}`;
     if (year.length) {
       lines.push(`Dividends per share, the 12 months to ${day3} (derived: the ${year.length === 1 ? "one" : year.length} that went ex-dividend from ${span2}, from the price source, ${year.map((d) => `${d.date} ${d.amount}`).join(", ")}): ${fixed(sum, 4)} ${unit}`);
-      if (close.close > 0) lines.push(`Dividend yield (derived: that \xF7 close): ${fixed(sum / close.close * 100)}%`);
-    } else lines.push(`Dividends per share, the 12 months to ${day3}: none went ex-dividend from ${span2} (the price source's record of dividends)`);
+      if (close.close > 0) lines.push(`Dividend yield (derived: that \xF7 ${px}): ${fixed(sum / close.close * 100)}%`);
+    } else if (dps && dps.value > 0) lines.push(`Dividends per share, the 12 months to ${day3}: unavailable. The price source records none that went ex-dividend from ${span2}, but the company's filings show ${fixed(dps.value, 4)} USD a share over the last twelve months filed (derived from ${dps.parts}), so the price source's record of dividends may be missing. That filed figure covers the last twelve months filed, not these twelve months, so no yield is worked out from it`);
+    else lines.push(`Dividends per share, the 12 months to ${day3}: none went ex-dividend from ${span2}, as the price source records them${dps ? " (the filings show none over the last twelve months filed either)" : " (the filings give no dividend figure to check that record against)"}`);
   } else if (dps) lines.push(`Dividends per share, the last twelve months filed (derived from ${dps.parts}): ${fixed(dps.value, 4)} USD. Dividends since the last filed period are not in the filings, and the prices that record them could not be read`);
   else lines.push("Dividends per share: not among its filed figures (many companies pay none)");
   lines.push("Unavailable from official free sources: forward estimates (forward P/E, PEG), analysts' price targets and beta.");
-  return [`Company profile and valuation for ${sym2}, from its SEC filings as they stood on ${day3} and the desk's checked closing price, with the dividends its price source records. Every multiple is derived here from those filed figures and that price, and shows what it came from; nothing is an estimate.`, "", ...lines].join("\n");
+  return [`Company profile and valuation for ${sym2}, from its SEC filings as they stood on ${day3} and the desk's checked ${close?.open ? "latest price (not a close)" : "closing price"}, with the dividends its price source records. Every multiple is derived here from those filed figures and that price, and shows what it came from; nothing is an estimate.`, "", ...lines].join("\n");
 }
 async function companyOverview(raw, analysis2) {
   const day3 = analysisDate(analysis2), sym2 = companySymbol(raw), cik = await filer(sym2);
@@ -39993,26 +40085,38 @@ function renderPlan({ plan: p, holdings, lessons, resumed }) {
 
 // src/desk/window.ts
 var f23 = (v) => v === null || v === void 0 || !Number.isFinite(v) ? "N/A" : v.toFixed(2);
-var vol3 = (v) => Math.round(v).toLocaleString("en-US");
 async function windowRows(ticker, o) {
-  const bars = (await history(ticker, o.exit)).bars;
+  const s = await history(ticker, o.exit), bars = s.bars;
   const rsi2 = compute("rsi", bars), macdh = compute("macdh", bars), ema10 = compute("close_10_ema", bars), sma50 = compute("close_50_sma", bars);
   const bench = (await daily(o.benchmark, addDays(o.entry, -7), o.exit)).bars;
   const benchClose = (date5) => [...bench].reverse().find((b) => b.date <= date5)?.close;
+  const tradedOn = new Map((s.traded ?? []).map((b) => [b.date, b]));
+  const inWindow2 = bars.filter((b) => b.date >= o.entry && b.date <= o.exit);
+  const differ = inWindow2.some((b) => {
+    const t = tradedOn.get(b.date);
+    return !!t && [b.open - t.open, b.high - t.high, b.low - t.low, b.close - t.close].some((x) => Math.abs(x) >= 5e-3);
+  });
+  const asTraded = (b) => {
+    const t = tradedOn.get(b.date);
+    return ` | ${f23(t?.high)} | ${f23(t?.low)} | ${f23(t?.close)}`;
+  };
   const rows = [], after = [];
   bars.forEach((b, i) => {
     if (b.date < o.entry || b.date > o.exit) return;
     const entry = b.date === o.entry, before = bars[i - 1];
     const change3 = entry ? "left out" : before ? signedPct(b.close / before.close - 1, 2) : "N/A";
-    if (!entry) after.push({ date: b.date, high: b.high, low: b.low, close: b.close });
-    rows.push(`${entry ? "entry" : after.length} | ${b.date} | ${f23(b.open)} | ${f23(b.high)} | ${f23(b.low)} | ${f23(b.close)} | ${change3} | ${vol3(b.volume)} | ${f23(rsi2[i])} | ${f23(macdh[i])} | ${f23(ema10[i])} | ${f23(sma50[i])} | ${f23(benchClose(b.date))}`);
+    if (!entry) after.push({ date: b.date, high: b.high, low: b.low, close: b.close, ...tradedOn.has(b.date) ? { t: tradedOn.get(b.date) } : {} });
+    rows.push(`${entry ? "entry" : after.length} | ${b.date} | ${f23(b.open)} | ${f23(b.high)} | ${f23(b.low)} | ${f23(b.close)} | ${change3} | ${vol(b.volume)} | ${f23(rsi2[i])} | ${f23(macdh[i])} | ${f23(ema10[i])} | ${f23(sma50[i])} | ${f23(benchClose(b.date))}${differ ? asTraded(b) : ""}`);
   });
-  const most = (pick2, top) => after.reduce((a, r) => (top ? pick2(r) > pick2(a) : pick2(r) < pick2(a)) ? r : a);
-  const glance = after.length ? [`IN SESSIONS 1 TO ${after.length} (the entry row left out): highest close ${f23(most((r) => r.close, true).close)} on ${most((r) => r.close, true).date}; lowest close ${f23(most((r) => r.close, false).close)} on ${most((r) => r.close, false).date}; highest high ${f23(most((r) => r.high, true).high)} on ${most((r) => r.high, true).date}; lowest low ${f23(most((r) => r.low, false).low)} on ${most((r) => r.low, false).date}.`] : [];
+  const most = (list2, pick2, top) => list2.reduce((a, r) => (top ? pick2(r) > pick2(a) : pick2(r) < pick2(a)) ? r : a);
+  const glance = after.length ? [`IN SESSIONS 1 TO ${after.length} (the entry row left out): highest close ${f23(most(after, (r) => r.close, true).close)} on ${most(after, (r) => r.close, true).date}; lowest close ${f23(most(after, (r) => r.close, false).close)} on ${most(after, (r) => r.close, false).date}; highest high ${f23(most(after, (r) => r.high, true).high)} on ${most(after, (r) => r.high, true).date}; lowest low ${f23(most(after, (r) => r.low, false).low)} on ${most(after, (r) => r.low, false).date}.`] : [];
+  const printed = after.map((r) => r.t).filter((t) => !!t);
+  if (differ && printed.length) glance.push(`AS TRADED, IN SESSIONS 1 TO ${after.length}: highest close ${f23(most(printed, (t) => t.close, true).close)} on ${most(printed, (t) => t.close, true).date}; lowest close ${f23(most(printed, (t) => t.close, false).close)} on ${most(printed, (t) => t.close, false).date}; highest high ${f23(most(printed, (t) => t.high, true).high)} on ${most(printed, (t) => t.high, true).date}; lowest low ${f23(most(printed, (t) => t.low, false).low)} on ${most(printed, (t) => t.low, false).date}.`);
   return [
-    `WHAT HAPPENED IN THE WINDOW: ${ticker}'s finished sessions from ${o.entry} (entry) to ${o.exit} (exit), prices adjusted for splits and dividends, and ${o.benchmark}'s close beside each. Anything the lesson says about what happened in the window must be found in these rows.`,
+    `WHAT HAPPENED IN THE WINDOW: ${ticker}'s finished sessions from ${o.entry} (entry) to ${o.exit} (exit), prices ${adjustedWords({ bars: inWindow2, unadjusted: s.unadjusted ?? [] })} (the call is scored on these, so its return counts any dividend), and ${o.benchmark}'s close beside each. Anything the lesson says about what happened in the window must be found in these rows.`,
     `The row marked "entry" is not a session of the window: the call is scored from its close, so its open, high, low and volume came before the window began, and its change, against the session before it, is left out. The window's sessions are numbered from 1${after[0] ? ` (${after[0].date})` : ""}; each one's change is against the session before it.`,
-    `Session | Date | Open | High | Low | Close | Change | Volume | RSI | MACD histogram | 10 EMA | 50 SMA | ${o.benchmark} close`,
+    differ ? "A dividend has gone ex since some of these days, so their adjusted prices sit below what the market printed then. The last three columns are the high, low and close as traded: check every price level the decision named (an entry, a stop, a target) against those, never against the adjusted prices." : "These prices are also the prices as traded (no dividend has lowered them), so a price level the decision named can be checked against them.",
+    `Session | Date | Open | High | Low | Close | Change | Volume | RSI | MACD histogram | 10 EMA | 50 SMA | ${o.benchmark} close${differ ? " | High as traded | Low as traded | Close as traded" : ""}`,
     ...rows,
     ...glance
   ].join("\n");
@@ -40461,8 +40565,8 @@ function signalsOf(bars, newsToday = null) {
   if (!last) return { signals, movePct: null };
   const movePct = prev && prev.close > 0 ? (last.close / prev.close - 1) * 100 : null;
   if (movePct !== null && Math.abs(movePct) >= MOVE_PCT) signals.push({ kind: "move", words: `${movePct >= 0 ? "rose" : "fell"} ${one(Math.abs(movePct))}%` });
-  const usual = bars.slice(Math.max(0, n2 - 1 - USUAL_DAYS), n2 - 1).map((b) => b.volume).filter((v) => v > 0);
-  if (usual.length >= USUAL_DAYS / 2 && last.volume > 0) {
+  const usual = bars.slice(Math.max(0, n2 - 1 - USUAL_DAYS), n2 - 1).map((b) => b.volume).filter((v) => v !== null && v > 0);
+  if (usual.length >= USUAL_DAYS / 2 && last.volume !== null && last.volume > 0) {
     const times2 = last.volume / (usual.reduce((a, v) => a + v, 0) / usual.length);
     if (times2 >= VOLUME_TIMES) signals.push({ kind: "volume", words: `${one(times2)} times its usual volume` });
   }

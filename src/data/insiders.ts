@@ -3,8 +3,8 @@
 // trades known by then. An amended filing (Form 4/A) takes the place of the filing it corrects, never adds to it.
 // Free and official; the SEC asks every caller for a contact email (http.ts sends it).
 import { addDays } from './dates.js';
-import { getText, NoData, Unavailable } from './http.js';
-import { submissions } from './sec.js';
+import { getText, NoData, readWords, Unavailable } from './http.js';
+import { filingsReadAt, submissions } from './sec.js';
 
 /** One line of a Form 4's table of shares: a trade (or an award, a gift, an option exercise) by one insider. */
 export interface InsiderTrade {
@@ -102,7 +102,9 @@ const fmt = (n: number, d = 0) => n.toLocaleString('en-US', { maximumFractionDig
 /** A company's insider trades from the Form 4s made public in the `days` up to `asOf`, newest first, reading at most
  *  `limit` filings. `cik` is the filer's ten-digit number. */
 export async function secInsiders(symbol: string, cik: string, asOf: string, days = 90, limit = 25): Promise<string> {
-  const s = await submissions(cik), r = s.filings?.recent ?? {};
+  const s = await submissions(cik), r = s.filings?.recent ?? {}, readAt = filingsReadAt(cik);
+  // How old the SEC's list is: a Form 4 made public after it was read is not in it.
+  const listRead = readAt === undefined ? '' : ` (the SEC's list of filings as read at ${readWords(readAt)})`;
   const forms = r.form ?? [], from = addDays(asOf, -days);
   const oldest = (r.filingDate ?? []).at(-1);
   const picked = forms.map((f, i) => ({ form: f, i, filed: r.filingDate?.[i] ?? '' }))
@@ -115,7 +117,7 @@ export async function secInsiders(symbol: string, cik: string, asOf: string, day
   const gap = partial ? ` The SEC's recent list of filings starts on ${oldest}, so filings before that day are not read.` : '';
   if (!picked.length) {
     if (partial) throw new NoData(`the SEC's recent list of ${symbol}'s filings starts on ${oldest}, after ${addDays(from, 1)}, so the trades of those days cannot be read`);
-    return `${head}: none. No director, officer or large owner reported a trade in these ${days} days. That is a fact from the SEC, not a gap in the data.`;
+    return `${head}: none. No director, officer or large owner reported a trade in these ${days} days. That is a fact from the SEC${listRead}, not a gap in the data.`;
   }
   // A filing that cannot be read is never taken for one with no trades: the counts say which filings they come from.
   const read = picked.slice(0, limit), filings: Filing[] = [];
@@ -160,7 +162,7 @@ export async function secInsiders(symbol: string, cik: string, asOf: string, day
     ? `Counted from only the ${filings.length} of the ${picked.length} filings ${span} that were read (${missing.join('; ')}). These counts are not the whole ${days} days: a "none" below is not a fact about the insiders`
     : `In these ${days} days`;
   return [
-    `${head} (${filings.length} of ${picked.length} filings read, newest first${failed ? `; ${failed} could not be read` : ''}${skipped ? `; the ${skipped} oldest not asked for` : ''}${replaced ? `; ${replaced === 1 ? 'one is an amended filing, a Form 4/A, shown in place of the filing it corrects' : `${replaced} are amended filings, Form 4/A, each shown in place of the filing it corrects`}` : ''}). Each trade is dated by the day it happened and the day its filing made it public; only filings public by ${asOf} are shown.${gap}`,
+    `${head} (${filings.length} of ${picked.length} filings read, newest first${failed ? `; ${failed} could not be read` : ''}${skipped ? `; the ${skipped} oldest not asked for` : ''}${replaced ? `; ${replaced === 1 ? 'one is an amended filing, a Form 4/A, shown in place of the filing it corrects' : `${replaced} are amended filings, Form 4/A, each shown in place of the filing it corrects`}` : ''}). Each trade is dated by the day it happened and the day its filing made it public; only filings public by ${asOf} are shown${listRead}.${gap}`,
     '',
     `${scope}: bought (code P) ${total(buys)}; sold (code S) ${total(sales)}; other kinds (awards, option exercises, shares handed back for tax, gifts) ${other}.`,
     'P and S are purchases and sales on the market or in a private deal: a purchase is the insider spending their own money. A sale under a 10b5-1 plan was arranged months ahead. Awards, exercises, tax handbacks and gifts say little about what an insider thinks of the price.',

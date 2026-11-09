@@ -3,7 +3,7 @@
 // on file then, with a restatement counted only from the day it was filed. US filers only.
 // Adapted from TradingAgents (tradingagents/dataflows/vendors/sec_edgar.py), Apache License 2.0; rewritten in TypeScript.
 import { daysBetween } from './dates.js';
-import { getJson, NoData } from './http.js';
+import { getJsonAt, keepFor, NoData } from './http.js';
 
 export type Statement = 'balance_sheet' | 'income_statement' | 'cashflow';
 export type Frequency = 'quarterly' | 'annual';
@@ -203,20 +203,26 @@ export function filedStatement(usGaap: Facts, kind: Statement, freq: Frequency, 
   return { columns: periods.map((p) => p.end + (p.i === 0 && derived.has(p.end) ? ' (derived)' : names[p.i]!)), rows, notes };
 }
 
-const DAY_MS = 86_400_000;
-const cache = new Map<string, { at: number; value: Promise<unknown> }>();
+const cache = new Map<string, { at: number; value: Promise<unknown>; read?: number }>();
 
-/** A filing history changes only when something new is filed, so one fetch a day serves every question about it. */
+/** One request for every question asked at once, kept in memory no longer than the desk keeps the answer on disk
+ *  (`keepFor`: an hour for a filer's list of filings, a day for the rest), so memory never adds a day on top. When the
+ *  answer was read from the SEC is kept beside it (`readAtOf`). */
 function cached<T>(url: string, timeoutMs: number): Promise<T> {
   const hit = cache.get(url);
-  if (hit && Date.now() - hit.at < DAY_MS) return hit.value as Promise<T>;
-  const value = getJson<T>(url, { timeoutMs });
-  cache.set(url, { at: Date.now(), value });
-  value.catch(() => cache.delete(url));
+  if (hit && Date.now() - hit.at < keepFor(url)) return hit.value as Promise<T>;
+  const entry: { at: number; value: Promise<unknown>; read?: number } = { at: Date.now(), value: Promise.resolve() };
+  const value = getJsonAt<T>(url, { timeoutMs }).then((r) => { entry.read = r.at; return r.value; });
+  entry.value = value;
+  cache.set(url, entry);
+  value.catch(() => { if (cache.get(url) === entry) cache.delete(url); });
   return value;
 }
 
 export function clearSecCache(): void { cache.clear(); }
+
+/** When the SEC's list of a filer's filings now in hand was read (ms), for a tool to say how old it is. */
+export const filingsReadAt = (cik: string): number | undefined => cache.get(`https://data.sec.gov/submissions/CIK${cik}.json`)?.read;
 
 /** The filer's CIK, or null when the ticker is not a US SEC filer. */
 export async function cikFor(symbol: string): Promise<string | null> {

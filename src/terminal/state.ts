@@ -128,7 +128,7 @@ export function stateOf(root: string, day: string): DeskState {
   const guide = guideOf({ email, watchlist, market: market.symbols, queue, calls, listener: listener?.listener ?? null, autorun: prefs.autorun === true, readCall: !!prefs.readCall, record, ...(prefs.guide ? { pref: prefs.guide } : {}) });
   return {
     version: versionOf(root), today: day, watchlist, queue, calls, startHere, watchTiers: watch, market, guide,
-    record: { summary, text: renderSummary(summary), benchmarkNote: `Each call is judged after ${s.scoring.holdingPeriodDays} trading days against ${yardstickWords(s.scoring)}.` },
+    record: { summary, text: renderSummary(summary), benchmarkNote: `Each call is judged after ${s.scoring.holdingPeriodDays} trading days against ${yardstickWords(s.scoring)}. Both returns count dividends: they are worked out from prices adjusted for them.` },
     desk: { emailSaved: !!email, tradingEnabled: false, holdingDays: s.scoring.holdingPeriodDays, benchmark: resolveBenchmark('SPY', s.scoring) },
     analyses: { depth: depthOfRounds(s.analysis.debateRounds), perRun: s.routines.maxAnalyses, listener },
     paper: { ...record, startUsd: readPaperStart(dir), minWeeks: RECORD_WEEKS, minWords: RECORD_WORDS },

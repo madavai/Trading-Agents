@@ -72,7 +72,8 @@ export const isRange = (s: string): s is RangeKey => s in RANGES;
 
 export interface History {
   symbol: string; name?: string; currency?: string; range: RangeKey;
-  bars: Array<{ date: string; open: number; high: number; low: number; close: number; volume: number }>;
+  /** volume: null when the source does not give it. */
+  bars: Array<{ date: string; open: number; high: number; low: number; close: number; volume: number | null }>;
   ma50: Array<number | null>; ma200: Array<number | null>;
 }
 

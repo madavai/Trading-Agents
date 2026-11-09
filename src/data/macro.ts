@@ -6,7 +6,7 @@
 // worked out from the same period a year earlier, so a change over a shorter window is never read as a yearly rate.
 // The series names are TradingAgents' (tradingagents/dataflows/vendors/fred.py), Apache License 2.0.
 import { addDays, analysisDate, isHistorical } from './dates.js';
-import { getText, NoData, Unavailable } from './http.js';
+import { getTextAt, NoData, readWords, Unavailable } from './http.js';
 import { signed } from '../numbers.js';
 
 export const SERIES: Record<string, [id: string, title: string]> = {
@@ -80,7 +80,7 @@ export async function economicSeries(indicator: string, analysis: string, lookBa
   const window = Math.max(30, Math.min(3650, lookBackDays));
   // Asked from far enough back that the same period a year before the latest one is there, even for a quarterly series.
   const from = addDays(day, -Math.max(window, 365) - 400);
-  const csv = await getText(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${id}&cosd=${from}&coed=${day}`);
+  const { text: csv, at } = await getTextAt(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${id}&cosd=${from}&coed=${day}`);
   if (!/^\s*(observation_date|DATE)\s*,/i.test(csv)) throw new Unavailable(`FRED answered with something other than its data download (it may be down for maintenance)`);
   let all = parseCsv(csv).filter((o) => o.date <= day);
   const past = isHistorical(day), freq = frequency(all), lag = releaseLag(all);
@@ -105,7 +105,8 @@ export async function economicSeries(indicator: string, analysis: string, lookBa
     `- Latest value known by ${day}: ${fmt(last.value)} (for ${periodOf(last.date, freq)})`,
     ago ? `- Year over year, from ${fmt(ago.value)} for ${periodOf(ago.date, freq)}: ${changeOf(ago)}` : `- Year over year: not available (no value for ${periodOf(`${Number(last.date.slice(0, 4)) - 1}${last.date.slice(4)}`, freq)} in FRED's data). Do not work one out from other rows.`,
     `- Change over the look-back window, from ${periodOf(first.date, freq)} to ${periodOf(last.date, freq)}: ${changeOf(first)}${first.date !== ago?.date ? ' (not a yearly rate)' : ''}`,
-    past ? `- A past analysis date: values are kept only if published by ${day} (a ${lag}-day release lag for this series), and are today's revised figures; first releases may have differed slightly.` : '- Values as published today, revisions included.',
+    past ? `- A past analysis date: values are kept only if published by ${day} (a ${lag}-day release lag for this series), and are today's revised figures; first releases may have differed slightly.` : '- Values as FRED published them, revisions included.',
+    `- Read from FRED at ${readWords(at)} (the desk keeps a read for up to an hour): a figure released after that is not here.`,
     '', freq === 'monthly' || freq === 'quarterly' ? 'Date (the first day of the period it stands for) | Value' : 'Date | Value', '---|---:', ...obs.slice(-40).map((o) => `${o.date} | ${fmt(o.value)}`),
   ];
   if (!known) lines.push('', `Names this desk knows: ${Object.keys(SERIES).join(', ')}.`);
