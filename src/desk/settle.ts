@@ -7,14 +7,18 @@
 // the same call sent again after that with no call settled since answers STOP. A scoring started an hour after
 // record_outcome was last used starts afresh, and tries the calls left again.
 import { Journal, type Entry } from './journal.js';
-import { measure, resolveBenchmark, type Outcome } from './scoring.js';
-import type { Scoring } from './scoring.js';
+import { checkName, COIN_YARDSTICK_WORDS, legacyRules, measure, windowWords, type Outcome, type Rules, type Scoring } from './scoring.js';
 import { failureText } from '../data/http.js';
 import { signedPct as pct } from '../numbers.js';
 import { windowRows } from './window.js';
 import { REFUSALS_TO_LEAVE, countRefusal, leftIn, noteStep, readNotes } from './loop-notes.js';
 
-const line = (o: Outcome, e: Entry) => `${e.ticker} ${pct(o.raw)} from ${o.entry} to ${o.exit} (${o.holdingDays} trading days); ${o.benchmark} ${pct(o.benchmarkReturn)}; alpha ${pct(o.alpha)}`;
+const line = (o: Outcome, e: Entry) => `${e.ticker} ${pct(o.raw)} from ${o.entry} to ${o.exit} (${windowWords({ days: o.holdingDays, unit: o.unit })}); ${o.benchmark} ${pct(o.benchmarkReturn)}${o.unit === 'calendar' ? ` (its close of ${o.benchFrom} to its close of ${o.benchTo})` : ''}; alpha ${pct(o.alpha)}`;
+/** The rules a pending call is scored by: those kept with it, or for a call recorded before the desk kept them, the rules
+ *  it was made under. */
+export const rulesOf = (e: Entry, scoring: Scoring): Rules => e.rules ?? legacyRules(e.ticker, scoring, e.holding);
+/** What a ready call's score is, said beside it for the lesson writer: a first check, not the call's horizon. */
+const scoreIs = (o: Outcome, r: Rules) => `THIS SCORE IS ${checkName(r).toUpperCase()}: the ${windowWords(r)} after the call against ${o.benchmark}, not the call's own time horizon (its decision states that). Say in the lesson how much a window this short can show about the thesis.${r.unit === 'calendar' ? ` ${COIN_YARDSTICK_WORDS}` : ''}`;
 export const MAX_REFLECTION = 1200;
 /** A lesson is 2 to 4 sentences (the /settle and /recheck-lessons rule); the desk refuses more. */
 export const MAX_SENTENCES = 4;
@@ -88,10 +92,10 @@ export async function dueSettlements(journal: Journal, scoring: Scoring, ticker?
       continue;
     }
     try {
-      const o = await measure(e.ticker, e.date, resolveBenchmark(e.ticker, scoring), scoring.holdingPeriodDays);
-      if (!o) { out.push(`${head} NOT YET: the ${scoring.holdingPeriodDays}-trading-day window after ${e.date} has not finished. Leave it pending.`); continue; }
+      const r = rulesOf(e, scoring), o = await measure(e.ticker, e.date, r);
+      if (!o) { out.push(`${head} NOT YET: its window, the ${windowWords(r)} after ${e.date} (against ${r.yardstick}), has not finished. Leave it pending.`); continue; }
       ready++;
-      out.push(`${head} READY: ${line(o, e)}\nDECISION:\n${e.decision}\n\n${await windowText(e.ticker, o)}`);
+      out.push(`${head} READY: ${line(o, e)}\n${scoreIs(o, r)}\nDECISION:\n${e.decision}\n\n${await windowText(e.ticker, o)}`);
     } catch (err) {
       out.push(`${head} ${failureText(err, `prices to settle ${e.ticker} on ${e.date}`)} Leave it pending.`);
     }
@@ -124,8 +128,8 @@ async function settleOnce(journal: Journal, scoring: Scoring, ticker: string, da
   if (refused) throw new Error(refused);
   const e = journal.pending().find((x) => x.ticker === ticker && x.date === date);
   if (!e) throw new Error(`there is no pending call on ${ticker} for ${date}`);
-  const o = await measure(ticker, date, resolveBenchmark(ticker, scoring), scoring.holdingPeriodDays);
-  if (!o) return `NOT_YET: the ${scoring.holdingPeriodDays}-trading-day window after ${date} has not finished, so ${ticker} stays pending.`;
+  const r = rulesOf(e, scoring), o = await measure(ticker, date, r);
+  if (!o) return `NOT_YET: its window, the ${windowWords(r)} after ${date}, has not finished, so ${ticker} stays pending.`;
   const from = await windowRows(ticker, o).then(() => 'prices' as const, () => 'no-prices' as const);
   return journal.recordOutcome(ticker, date, o.raw, o.alpha, o.holdingDays, text, o.exit, from)
     ? `Settled: ${line(o, e)}. The lesson is kept and will be read by later analyses from ${o.exit} on.`

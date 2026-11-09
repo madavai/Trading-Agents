@@ -6,12 +6,13 @@ import path from 'node:path';
 import { configure } from '../src/data/http.js';
 import { clearCache } from '../src/data/yahoo.js';
 import { Journal } from '../src/desk/journal.js';
-import { measure, resolveBenchmark } from '../src/desk/scoring.js';
+import { checkName, checkWords, exchangeOf, legacyRules, measure, resolveBenchmark, rulesFor, type Rules } from '../src/desk/scoring.js';
 import { dueSettlements, settleOne } from '../src/desk/settle.js';
 import { DEFAULTS } from '../src/settings.js';
 import { chartFetch, type Row } from './chart.js';
 
 const S = DEFAULTS.scoring;
+const TRADING5 = { yardstick: 'SPY', days: 5, unit: 'trading' } as const;
 const forward = (from: string, n: number): string[] => { const out: string[] = []; const d = new Date(`${from}T00:00:00Z`); while (out.length < n) { if (d.getUTCDay() % 6 !== 0) out.push(d.toISOString().slice(0, 10)); d.setUTCDate(d.getUTCDate() + 1); } return out; };
 const rows = (from: string, n: number, closes: number[]): Row[] => forward(from, n).map((date, i) => ({ date, o: closes[i]!, h: closes[i]!, l: closes[i]!, c: closes[i]!, v: 1000 }));
 // 2026-09-01 is a Tuesday: its 5th trading day after is 2026-09-08.
@@ -35,7 +36,7 @@ test('a stock is judged against its own market\'s index, or the person\'s one ch
 
 test('the outcome is the stock\'s return and the index\'s over the same dates, from price rows alone', async () => {
   configure({ fetch: feed() });
-  const o = (await measure('NVDA', '2026-09-01', 'SPY', 5))!;
+  const o = (await measure('NVDA', '2026-09-01', TRADING5))!;
   assert.deepEqual([o.entry, o.exit, o.holdingDays], ['2026-09-01', '2026-09-08', 5]);
   assert.ok(Math.abs(o.raw - 0.10) < 1e-9);                  // 100 -> 110
   assert.ok(Math.abs(o.benchmarkReturn - 0.03) < 1e-9);       // the index: 200 -> 206
@@ -44,13 +45,13 @@ test('the outcome is the stock\'s return and the index\'s over the same dates, f
 
 test('a window that has not finished trading is not yet, never a partial figure', async () => {
   configure({ fetch: feed() });
-  assert.equal(await measure('NVDA', '2026-09-01', 'SPY', 10), null);                 // only 7 rows after entry
+  assert.equal(await measure('NVDA', '2026-09-01', { ...TRADING5, days: 10 }), null);                 // only 7 rows after entry
   process.env.TRADING_AGENTS_TODAY = '2026-09-08';                                     // the exit session is today's, still moving
-  assert.equal(await measure('NVDA', '2026-09-01', 'SPY', 5), null);
+  assert.equal(await measure('NVDA', '2026-09-01', TRADING5), null);
   process.env.TRADING_AGENTS_TODAY = '2026-10-12';
   configure({ fetch: feed({ SPY: SPY.slice(0, 9) }) });                               // the index has not traded through the exit
   clearCache();
-  assert.equal(await measure('NVDA', '2026-09-01', 'SPY', 5), null);
+  assert.equal(await measure('NVDA', '2026-09-01', TRADING5), null);
 });
 
 const journalWith = () => { const j = new Journal(path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ta-s-')), 'journal.md')); j.storeDecision('NVDA', '2026-09-01', '**Rating**: Buy\n\nAdd.'); return j; };
@@ -61,8 +62,8 @@ test('pending calls are listed with their measured outcome, or why not', async (
   configure({ fetch: feed({ LATE: rows('2026-10-09', 3, [10, 11, 12]) }) });
   const t = await dueSettlements(j, S);
   assert.match(t, /2 pending call\(s\), 1 ready/);
-  assert.match(t, /\[2026-09-01 \| NVDA \| Buy\] READY: NVDA \+10\.0% from 2026-09-01 to 2026-09-08 \(5 trading days\); SPY \+3\.0%; alpha \+7\.0%\nDECISION:\n\*\*Rating\*\*: Buy/);
-  assert.match(t, /\[2026-10-10 \| LATE \| Sell\] NOT YET: the 5-trading-day window/);
+  assert.match(t, /\[2026-09-01 \| NVDA \| Buy\] READY: NVDA \+10\.0% from 2026-09-01 to 2026-09-08 \(5 trading days\); SPY \+3\.0%; alpha \+7\.0%\nTHIS SCORE IS A FIRST-WEEK CHECK: the 5 trading days after the call against SPY, not the call's own time horizon \(its decision states that\)\. Say in the lesson how much a window this short can show about the thesis\.\nDECISION:\n\*\*Rating\*\*: Buy/);
+  assert.match(t, /\[2026-10-10 \| LATE \| Sell\] NOT YET: its window, the 5 trading days after 2026-10-10 \(against SPY\), has not finished\. Leave it pending\./);
   assert.match(await dueSettlements(j, S, 'ZZZ'), /No pending calls on ZZZ/);
 });
 
@@ -186,4 +187,89 @@ test('a call whose window is open stays pending when settling is tried', async (
   configure({ fetch: feed({ LATE: rows('2026-10-09', 3, [10, 11, 12]) }) });
   assert.match(await settleOne(j, S, 'LATE', '2026-10-10', 'Too early.'), /^NOT_YET: /);
   assert.equal(j.pending().length, 2);
+});
+
+// 8 Nov 2026: a score is a first-week check against a named yardstick, never the call's own horizon. Each new call keeps
+// its window and yardstick in its journal tag; a call recorded before keeps the rules it was made under.
+test('a new call gets its window and yardstick by what it is: a US listing, a coin, a listed or an unlisted exchange, or the one choice', () => {
+  assert.deepEqual(rulesFor('NVDA', S), { days: 5, unit: 'trading', yardstick: 'SPY', basis: 'us' });
+  assert.deepEqual(rulesFor('BRK.B', S), { days: 5, unit: 'trading', yardstick: 'SPY', basis: 'us' }, 'a US share class is not an exchange');
+  assert.deepEqual(rulesFor('BTC-USD', S), { days: 7, unit: 'calendar', yardstick: 'SPY', basis: 'coin' }, 'a coin: the same week, in calendar days');
+  assert.deepEqual(rulesFor('7203.T', S), { days: 5, unit: 'trading', yardstick: '^N225', basis: 'market' }, 'the foreign indexes in the settings stay');
+  assert.deepEqual(rulesFor('AMXL.MX', S), { days: 5, unit: 'trading', yardstick: 'SPY', basis: 'unlisted' }, 'an exchange the settings do not list is scored against SPY, and says so');
+  assert.deepEqual(rulesFor('NVDA', { ...S, benchmark: 'qqq' }), { days: 5, unit: 'trading', yardstick: 'QQQ', basis: 'chosen' });
+  assert.deepEqual([exchangeOf('BRK.B'), exchangeOf('7203.T'), exchangeOf('6488.TWO'), exchangeOf('NVDA')], [null, '.T', '.TWO', null]);
+  assert.equal(checkWords('BTC-USD', rulesFor('BTC-USD', S)), "a first-week check against SPY, the fund that copies the S&P 500 (the desk's settings name no yardstick for coins, so a coin is scored against the one for US listings), over the 7 calendar days after the call");
+  assert.equal(checkWords('AMXL.MX', rulesFor('AMXL.MX', S)), "a first-week check against SPY, the fund that copies the S&P 500 (its exchange, .MX, had no index in the desk's settings when the call was made, so it is scored against the one for US listings), over the 5 trading days after the call");
+  assert.deepEqual([checkName({ days: 3, unit: 'trading' }), checkName({ days: 5, unit: 'calendar' })], ['a check over its first 3 trading days', 'a check over its first 5 calendar days']);
+});
+
+test('a call recorded before the desk kept its window is scored as such calls were then: its stored days, and a coin in calendar days', () => {
+  assert.deepEqual(legacyRules('BTC-USD', S, '5d'), { days: 5, unit: 'calendar', yardstick: 'SPY', basis: 'coin' });
+  assert.deepEqual(legacyRules('NVDA', S, null), { days: 5, unit: 'trading', yardstick: 'SPY', basis: 'us' });
+  assert.equal(legacyRules('NVDA', { ...S, holdingPeriodDays: 3 }, '5d').days, 5, 'a scored call keeps the days it was scored over');
+});
+
+test('a call keeps its window and yardstick in its tag, through a settle, and a later change to the settings does not change them', async () => {
+  const j = new Journal(path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ta-s-')), 'journal.md'));
+  j.storeDecision('NVDA', '2026-09-01', '**Rating**: Buy\n\nAdd.', undefined, rulesFor('NVDA', S));
+  assert.match(fs.readFileSync(j.file, 'utf8'), /^\[2026-09-01 \| NVDA \| Buy \| pending \| window:5 trading days \| yardstick:SPY \(us\)\]\n/);
+  assert.deepEqual(j.load()[0]!.rules, { days: 5, unit: 'trading', yardstick: 'SPY', basis: 'us' });
+  configure({ fetch: feed() });
+  const later = { ...S, holdingPeriodDays: 3 };   // the person changes the settings after the call
+  assert.match(await dueSettlements(j, later), /READY: NVDA \+10\.0% from 2026-09-01 to 2026-09-08 \(5 trading days\)/);
+  assert.match(await settleOne(j, later, 'NVDA', '2026-09-01', 'Alpha was +7.0%. The thesis held.'), /^Settled: NVDA \+10\.0% .* alpha \+7\.0%/);
+  assert.match(fs.readFileSync(j.file, 'utf8'), /^\[2026-09-01 \| NVDA \| Buy \| \+10\.0% \| \+7\.0% \| 5d \| resolved:2026-09-08 \| window:5 trading days \| yardstick:SPY \(us\) \| lesson:prices\]\n/);
+  const e = j.load()[0]!;
+  assert.deepEqual([e.rules?.days, e.lesson, e.holding], [5, 'prices', '5d']);
+  assert.match(j.pastContext('NVDA'), /\[2026-09-01 \| NVDA \| Buy \| return \+10\.0% \| alpha \+7\.0% \| a first-week check: against SPY over the 5 trading days after the call, not the call's own time horizon\]/);
+  // a hand-made tag with a window the journal cannot keep reads as none, and storeDecision refuses one
+  assert.throws(() => j.storeDecision('AMD', '2026-09-01', 'x', 'Hold', { days: 0, unit: 'trading', yardstick: 'SPY', basis: 'us' }), /a window of 0 days/);
+  assert.throws(() => j.storeDecision('AMD', '2026-09-01', 'x', 'Hold', { days: 5, unit: 'trading', yardstick: 'S P Y', basis: 'us' }), /is not a ticker the journal can keep/);
+});
+
+// A coin trades every day; SPY only on New York's market days. 2026-09-05 is a Saturday, 2026-09-07 Labor Day.
+const everyDay = (from: string, to: string): string[] => { const out: string[] = []; for (let d = new Date(`${from}T00:00:00Z`); d.toISOString().slice(0, 10) <= to; d.setUTCDate(d.getUTCDate() + 1)) out.push(d.toISOString().slice(0, 10)); return out; };
+const COIN_DAYS = everyDay('2026-08-24', '2026-09-30');
+const BTC: Row[] = COIN_DAYS.map((date, i) => ({ date, o: 1000 + i * 10, h: 1000 + i * 10, l: 1000 + i * 10, c: 1000 + i * 10, v: 5 }));
+const NY_DAYS = COIN_DAYS.filter((d) => new Date(`${d}T00:00:00Z`).getUTCDay() % 6 !== 0 && d !== '2026-09-07');
+const SPY_NY: Row[] = NY_DAYS.map((date, i) => ({ date, o: 600 + i, h: 600 + i, l: 600 + i, c: 600 + i, v: 1000 }));
+const closeOf = (rows: Row[], d: string) => rows.find((r) => r.date === d)!.c;
+const COIN7: Rules = { days: 7, unit: 'calendar', yardstick: 'SPY', basis: 'coin' };
+const coinFeed = (o: { btc?: Row[]; spy?: Row[] } = {}) => chartFetch((sym) => (({ 'BTC-USD': o.btc ?? BTC, SPY: o.spy ?? SPY_NY }) as Record<string, Row[]>)[sym] ?? []);
+
+test("a coin's week is 7 calendar days, against SPY over the same dates: SPY's close on a weekend day is its Friday's", async () => {
+  configure({ fetch: coinFeed() });
+  const o = (await measure('BTC-USD', '2026-09-05', COIN7))!;                        // Saturday to Saturday
+  assert.deepEqual([o.entry, o.exit, o.holdingDays, o.unit, o.benchFrom, o.benchTo], ['2026-09-05', '2026-09-12', 7, 'calendar', '2026-09-04', '2026-09-11']);
+  assert.ok(Math.abs(o.raw - (closeOf(BTC, '2026-09-12') / closeOf(BTC, '2026-09-05') - 1)) < 1e-12);
+  assert.ok(Math.abs(o.benchmarkReturn - (closeOf(SPY_NY, '2026-09-11') / closeOf(SPY_NY, '2026-09-04') - 1)) < 1e-12);
+  assert.ok(Math.abs(o.alpha - (o.raw - o.benchmarkReturn)) < 1e-12);
+});
+
+test("a coin's window that ends on a New York holiday takes SPY's last close before it", async () => {
+  configure({ fetch: coinFeed() });
+  const o = (await measure('BTC-USD', '2026-08-31', COIN7))!;                        // Monday to Labor Day
+  assert.deepEqual([o.entry, o.exit, o.benchFrom, o.benchTo], ['2026-08-31', '2026-09-07', '2026-08-31', '2026-09-04']);
+});
+
+test("a coin's window is not scored while SPY's close for New York's last market day of it is missing, or the coin's own last day is", async () => {
+  configure({ fetch: coinFeed({ spy: SPY_NY.filter((r) => r.date <= '2026-09-03') }) });
+  await assert.rejects(measure('BTC-USD', '2026-08-28', COIN7), /Yahoo Finance gives no SPY close for 2026-09-04 yet, the last New York market day of the window/);
+  clearCache();
+  configure({ fetch: coinFeed({ btc: BTC.filter((r) => r.date !== '2026-09-12') }) });
+  await assert.rejects(measure('BTC-USD', '2026-09-05', COIN7), /Yahoo Finance gives no BTC-USD close for 2026-09-12, the last day of its 7 calendar days window/);
+  clearCache();
+  process.env.TRADING_AGENTS_TODAY = '2026-09-12';                                      // its last day is today's, still moving
+  configure({ fetch: coinFeed() });
+  assert.equal(await measure('BTC-USD', '2026-09-05', COIN7), null);
+});
+
+test("a coin's ready call names its window, SPY's two closes and how they are taken", async () => {
+  const j = new Journal(path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ta-s-')), 'journal.md'));
+  j.storeDecision('BTC-USD', '2026-09-05', '**Rating**: Buy\n\nAdd.', undefined, rulesFor('BTC-USD', S));
+  configure({ fetch: coinFeed() });
+  const t = await dueSettlements(j, S);
+  assert.match(t, /READY: BTC-USD [+-]\d+\.\d% from 2026-09-05 to 2026-09-12 \(7 calendar days\); SPY [+-]\d+\.\d% \(its close of 2026-09-04 to its close of 2026-09-11\); alpha /);
+  assert.match(t, /THIS SCORE IS A FIRST-WEEK CHECK: the 7 calendar days after the call against SPY, not the call's own time horizon .* A coin trades every day, so its window is calendar days; its yardstick trades only on New York's market days/);
 });

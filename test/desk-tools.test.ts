@@ -35,7 +35,7 @@ test('the desk tools are offered, and none of them can order', async () => {
 });
 
 test('a whole analysis, as the agents will run it: plan, write, report, record, then settle', async () => {
-  const { call, client } = await connect();
+  const { call, client, root } = await connect();
   assert.match(await call('plan_analysis', { symbol: 'NVDA', analysis_date: '2026-09-01' }), /^NEEDS_EMAIL: .*set_contact_email/);
   await call('set_contact_email', { email: 'jane@mail.com' });
   assert.match(await call('set_holdings', { positions: [{ ticker: 'NVDA', quantity: 10, average_price: 95 }], cash: 5000, currency: 'USD' }), /Saved 1 position\(s\) and cash 5000/);
@@ -43,7 +43,7 @@ test('a whole analysis, as the agents will run it: plan, write, report, record, 
   const plan = await call('plan_analysis', { symbol: 'nvda', analysis_date: '2026-09-01', analysts: ['market', 'news'] });
   assert.match(plan, /^Analysis plan for NVDA on 2026-09-01 \(a past day/);
   assert.match(plan, /Analysts: market, news/);
-  assert.match(plan, /Judged after 5 trading days against SPY/);
+  assert.match(plan, /Scored: a first-week check against SPY, the fund that copies the S&P 500, over the 5 trading days after the call, once a scoring runs after them\. It is not the call's own time horizon\./);
   assert.match(plan, /Current position in NVDA: 10 units, average price 95.00/);
   assert.match(plan, /Next step: market/);
 
@@ -80,7 +80,8 @@ test('a whole analysis, as the agents will run it: plan, write, report, record, 
   assert.match(report, /Report written: .*complete_report\.md\nRating: Overweight/);
   const file = /Report written: (.*)\n/.exec(report)![1]!;
   assert.match(fs.readFileSync(file, 'utf8'), /- Analysts: market, news; research debate rounds 1, risk debate rounds 1; language English/);
-  assert.match(await call('record_decision', { symbol: 'NVDA', analysis_date: '2026-09-01' }), /^Recorded: NVDA on 2026-09-01, Overweight, pending\. It is scored after 5 trading days\./);
+  assert.match(await call('record_decision', { symbol: 'NVDA', analysis_date: '2026-09-01' }), /^Recorded: NVDA on 2026-09-01, Overweight, pending\. It will be scored as a first-week check against SPY, the fund that copies the S&P 500, over the 5 trading days after the call, kept with the call so a later change to the settings does not change it\. It is not the call's own time horizon\. A call is scored when a scoring runs after its window \(\/settle, an analysis or a routine\), not by itself\./);
+  assert.match(fs.readFileSync(path.join(root, 'desk-data', 'journal.md'), 'utf8'), /\[2026-09-01 \| NVDA \| Overweight \| pending \| window:5 trading days \| yardstick:SPY \(us\)\]/, 'the window and yardstick are kept with the call');
   assert.match(await call('record_decision', { symbol: 'NVDA', analysis_date: '2026-09-01' }), /already in the journal/);
 
   assert.match(await call('list_settlements'), /1 pending call\(s\), 1 ready[\s\S]*READY: NVDA \+10\.0%[\s\S]*alpha \+7\.0%/);

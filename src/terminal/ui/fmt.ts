@@ -42,31 +42,38 @@ export const ratingMeaning = (r: string): string => (isTerm(r) && GLOSSARY[r].gr
 const claimOf = (rating: string): string => (ratingTone(rating) === 'ok' ? 'beats' : ratingTone(rating) === 'danger' ? 'trails' : '');
 const article = (word: string): string => (/^[AEIOU]/i.test(word) ? 'An' : 'A');
 
+/** What a call is scored by, in words: "SPY over the 5 trading days after the call". */
+export const scoredOver = (c: { yardstick: string; window: string }): string => `${c.yardstick} over the ${c.window} after the call`;
+/** Its first check named, and that it is not the horizon: "It is a first-week check, not the call's own time horizon." */
+export const notHorizon = (c: { check: string }): string => `It is ${c.check}, not the call's own time horizon.`;
+
 /** A scored call's result as the page shows it: its colour, its words, why (when pointed at) and its verdict in a few
  *  words. All follow whether the call went the way its rating said (`worked`, which the desk works out with the
- *  scorecard's own rule), never the alpha's sign alone: an Underweight whose stock trailed its index worked, though its
- *  alpha is below zero. A call that claims no direction (a Hold) is plain, and says so. `days` is its holding window. */
-export function resultOf(c: { rating: string; alpha: string | null; worked: boolean | null }, days: number): { tone: '' | 'ok' | 'danger'; words: string; why: string; verdict: string } {
-  const alpha = `alpha ${c.alpha ?? '—'}`, claim = claimOf(c.rating);
+ *  scorecard's own rule), never the alpha's sign alone: an Underweight whose stock trailed its yardstick worked, though
+ *  its alpha is below zero. A call that claims no direction (a Hold) is plain, and says so. The call's own window and
+ *  yardstick are named, and that its score is a first check, not its time horizon. */
+export function resultOf(c: { rating: string; alpha: string | null; worked: boolean | null; yardstick: string; window: string; check: string; why: string }): { tone: '' | 'ok' | 'danger'; words: string; why: string; verdict: string } {
+  const alpha = `alpha ${c.alpha ?? '—'}`, claim = claimOf(c.rating), over = scoredOver(c);
+  const tail = ` ${notHorizon(c)}${c.why ? ` Against ${c.yardstick}: ${c.why}.` : ''}`;
   if (c.worked === null || !claim) {
     return c.rating === 'Hold'
-      ? { tone: '', words: alpha, verdict: 'a Hold claims no direction', why: `A Hold claims no direction, so it neither worked nor failed: its ${alpha} only says how the stock did against its market's index over the ${days} trading days after the call.` }
-      : { tone: '', words: alpha, verdict: '', why: means('alpha') };
+      ? { tone: '', words: alpha, verdict: 'a Hold claims no direction', why: `A Hold claims no direction, so it neither worked nor failed: its ${alpha} only says how the stock did against ${over}.${tail}` }
+      : { tone: '', words: alpha, verdict: '', why: `${means('alpha')}${tail}` };
   }
-  const how = `${article(c.rating)} ${c.rating} works when the stock ${claim} its market's index over the ${days} trading days after the call.`;
+  const how = `${article(c.rating)} ${c.rating} works when the stock ${claim} ${over}.`;
   return c.worked
-    ? { tone: 'ok', words: `worked · ${alpha}`, verdict: 'the call worked', why: `${how} It did (${alpha}): the call worked.` }
-    : { tone: 'danger', words: `did not work · ${alpha}`, verdict: 'the call did not work', why: `${how} It did not (${alpha}): the call did not work.` };
+    ? { tone: 'ok', words: `worked · ${alpha}`, verdict: 'the call worked', why: `${how} It did (${alpha}): the call worked.${tail}` }
+    : { tone: 'danger', words: `did not work · ${alpha}`, verdict: 'the call did not work', why: `${how} It did not (${alpha}): the call did not work.${tail}` };
 }
 
 /** One rating's average alpha on the scorecard: green when, on average, its calls went the way the rating said, red when
  *  they went against it, plain for a Hold (no direction) or an average that rounds to zero; and why, in words. */
 export function averageOf(rating: string, s: { direction: number; meanAlpha: number }): { tone: '' | 'ta-up' | 'ta-down'; why: string } {
   const shown = Math.round(s.meanAlpha * 1000) / 10, by = `${Math.abs(shown).toFixed(1)}%`;   // as the scorecard prints it, to 0.1 of a point
-  if (!s.direction) return { tone: '', why: `${article(rating)} ${rating} claims no direction: its average alpha only says how its stocks did against their index.` };
-  if (shown === 0) return { tone: '', why: `On average the stocks rated ${rating} ended level with their index.` };
+  if (!s.direction) return { tone: '', why: `${article(rating)} ${rating} claims no direction: its average alpha only says how its stocks did against their yardstick in each call's first check.` };
+  if (shown === 0) return { tone: '', why: `On average the stocks rated ${rating} ended level with their yardstick in each call's first check.` };
   const beat = shown > 0, good = (shown > 0) === (s.direction > 0);
-  return { tone: good ? 'ta-up' : 'ta-down', why: `On average the stocks rated ${rating} ${beat ? 'beat' : 'trailed'} their index by ${by}: on average these calls ${good ? 'worked' : 'did not work'}.` };
+  return { tone: good ? 'ta-up' : 'ta-down', why: `On average the stocks rated ${rating} ${beat ? 'beat' : 'trailed'} their yardstick by ${by} in each call's first check: on average these calls ${good ? 'worked' : 'did not work'} so far.` };
 }
 
 /** Why a mark is there, each in one plain line. The trading words themselves are in the glossary (glossary.ts). */

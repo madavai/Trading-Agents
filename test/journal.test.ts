@@ -63,7 +63,7 @@ test('a score that rounds to zero is written as zero, never "-0.0%", and one sto
   assert.match(fs.readFileSync(j.file, 'utf8'), /^\[2026-10-22 \| NVDA \| Buy \| \+0\.7% \| 0\.0% \| 5d \| resolved:2026-10-29\]/);
   fs.writeFileSync(j.file, '[2026-10-22 | NVDA | Hold | +0.7% | -0.0% | 5d | resolved:2026-10-29]\n\nDECISION:\nx\n\n<!-- ENTRY_END -->\n\n[2026-10-23 | NVDA | Hold | -0.0% | +0.0% | 5d | resolved:2026-10-30]\n\nDECISION:\ny\n\n<!-- ENTRY_END -->\n\n');
   assert.deepEqual(j.load().map((e) => [e.raw, e.alpha]), [['+0.7%', '0.0%'], ['0.0%', '0.0%']], 'a call scored before the fix shows no minus on nothing');
-  assert.match(j.pastContext('NVDA'), /\| \+0\.7% \| 0\.0% \| 5d\]/, 'and the lessons read the same');
+  assert.match(j.pastContext('NVDA'), /\| return \+0\.7% \| alpha 0\.0% \| over 5d\]/, 'and the lessons read the same');
   assert.deepEqual([signed(-0.04, 1), signed(0.04, 1), signed(-0.06, 1), signed(0.05, 1), signed(0, 2)], ['0.0', '0.0', '-0.1', '+0.1', '0.00']);
   assert.deepEqual([signedPct(-0.0001234, 2), signedPct(0.0123), signedPct(-0.05)], ['-0.01%', '+1.2%', '-5.0%']);
 });

@@ -134,7 +134,11 @@ the team's "talk" switch shows these messages in the Messages panel; with it off
    reports to the SEC), a fact checker who checks their reports against the same data and corrects them, a bull and a
    bear, a research manager, a trader,
    three risk voices and a portfolio manager work in turn, from free public data, and give a rating. Each call is scored
-   a few trading days later against its market's index (`/settle`), and the lessons go into later analyses.
+   once, in a first-week check against a named yardstick, not over its own time horizon: a US stock or fund against SPY
+   (the fund that copies the S&P 500) over the 5 trading days after the call, a coin against SPY over the 7 calendar
+   days after it. Each call keeps its window and yardstick in the journal from the day it is made. It is scored when a
+   scoring runs after that window (`/settle`, an analysis or a routine), not by itself, and the lessons go into later
+   analyses.
    `/backtest NVDA,AAPL 2026-06-01 2026-08-01` runs the team over past dates in a journal of its own and reports, by
    rating, how often the direction was right and the mean alpha. It is slow and uses a lot of model time, and for past
    dates it reads only what was out by then, though not all of it as it stood then: what US companies and funds filed
@@ -330,6 +334,10 @@ would receive it, and the SPY line is paid its own the same way. No costs are co
 small "paper" badge with what it did there, such as "paper: bought 2 · NVDA −13.59% since": the stock's move since the
 paper buy, not the call's own result (that is its alpha, beside it). Switching trading on with under four weeks of record shows that record first and
 asks you to press "I understand".
+
+The paper record never shows a total that leaves a stock out, and never values a stock it holds at what it cost. When
+the closing prices of a stock it needs cannot be read from Yahoo Finance, it says so plainly, names the stock, shows no
+total, chart or positions, and tries again a minute later.
 
 Bitcoin and Ether are followed on paper only: Robinhood's agent doorway trades stocks and funds, so a crypto call never
 opens a ticket. On paper they are bought in fractions (to six decimal places, at least $1), sized to fit what your crypto

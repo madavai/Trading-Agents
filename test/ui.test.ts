@@ -54,22 +54,27 @@ test('a number that is missing is a dash, never a zero', () => {
 });
 
 test('a call\'s result is coloured and worded by whether it worked for its rating, never by the alpha\'s sign alone', () => {
-  // Round 1 (7 Nov 2026): META's Underweight of 17 Oct trailed its index by 10.5%, so it worked, and showed red.
-  assert.deepEqual(resultOf({ rating: 'Underweight', alpha: '-10.5%', worked: true }, 5), {
+  // Round 1 (7 Nov 2026): META's Underweight of 17 Oct trailed its index by 10.5%, so it worked, and showed red. Since
+  // 8 Nov each result names the call's own window and yardstick, and that it is a first check, not the call's horizon.
+  const spy5 = { yardstick: 'SPY', window: '5 trading days', check: 'a first-week check', why: '' };
+  assert.deepEqual(resultOf({ rating: 'Underweight', alpha: '-10.5%', worked: true, ...spy5 }), {
     tone: 'ok', words: 'worked · alpha -10.5%', verdict: 'the call worked',
-    why: 'An Underweight works when the stock trails its market\'s index over the 5 trading days after the call. It did (alpha -10.5%): the call worked.',
+    why: "An Underweight works when the stock trails SPY over the 5 trading days after the call. It did (alpha -10.5%): the call worked. It is a first-week check, not the call's own time horizon.",
   });
-  const tsla = resultOf({ rating: 'Underweight', alpha: '+9.0%', worked: false }, 5);   // it beat its index: the call failed, and showed green
+  const tsla = resultOf({ rating: 'Underweight', alpha: '+9.0%', worked: false, ...spy5 });   // it beat its index: the call failed, and showed green
   assert.deepEqual([tsla.tone, tsla.words, tsla.verdict], ['danger', 'did not work · alpha +9.0%', 'the call did not work']);
-  const meta = resultOf({ rating: 'Overweight', alpha: '-12.1%', worked: false }, 5);   // META's Overweight of 21 Oct
+  const meta = resultOf({ rating: 'Overweight', alpha: '-12.1%', worked: false, ...spy5 });   // META's Overweight of 21 Oct
   assert.deepEqual([meta.tone, meta.words], ['danger', 'did not work · alpha -12.1%']);
-  assert.match(resultOf({ rating: 'Buy', alpha: '+7.0%', worked: true }, 5).why, /^A Buy works when the stock beats its market's index over the 5 trading days/);
-  const hold = resultOf({ rating: 'Hold', alpha: '+1.8%', worked: null }, 5);
+  assert.match(resultOf({ rating: 'Buy', alpha: '+7.0%', worked: true, ...spy5 }).why, /^A Buy works when the stock beats SPY over the 5 trading days/);
+  const coin = resultOf({ rating: 'Buy', alpha: '+1.0%', worked: true, yardstick: 'SPY', window: '7 calendar days', check: 'a first-week check', why: "the desk's settings name no yardstick for coins, so a coin is scored against the one for US listings" });
+  assert.equal(coin.why, "A Buy works when the stock beats SPY over the 7 calendar days after the call. It did (alpha +1.0%): the call worked. It is a first-week check, not the call's own time horizon. Against SPY: the desk's settings name no yardstick for coins, so a coin is scored against the one for US listings.");
+  const hold = resultOf({ rating: 'Hold', alpha: '+1.8%', worked: null, ...spy5 });
   assert.deepEqual([hold.tone, hold.words, hold.verdict], ['', 'alpha +1.8%', 'a Hold claims no direction'], 'a Hold is plain: it claims no direction');
-  assert.deepEqual([resultOf({ rating: 'Needs review', alpha: '+9.0%', worked: null }, 5).tone, resultOf({ rating: 'Needs review', alpha: '+9.0%', worked: null }, 5).verdict], ['', '']);
+  assert.match(hold.why, /only says how the stock did against SPY over the 5 trading days after the call\. It is a first-week check, not the call's own time horizon\.$/);
+  assert.deepEqual([resultOf({ rating: 'Needs review', alpha: '+9.0%', worked: null, ...spy5 }).tone, resultOf({ rating: 'Needs review', alpha: '+9.0%', worked: null, ...spy5 }).verdict], ['', '']);
   // the scorecard's averages, as round 1's scorecard showed them
   assert.equal(averageOf('Underweight', { direction: -1, meanAlpha: 0.0037 }).tone, 'ta-down', 'the stocks marked down beat the index on average: against the calls');
-  assert.equal(averageOf('Underweight', { direction: -1, meanAlpha: 0.0037 }).why, 'On average the stocks rated Underweight beat their index by 0.4%: on average these calls did not work.');
+  assert.equal(averageOf('Underweight', { direction: -1, meanAlpha: 0.0037 }).why, "On average the stocks rated Underweight beat their yardstick by 0.4% in each call's first check: on average these calls did not work so far.");
   assert.equal(averageOf('Overweight', { direction: 1, meanAlpha: -0.0725 }).tone, 'ta-down');
   assert.equal(averageOf('Sell', { direction: -1, meanAlpha: -0.05 }).tone, 'ta-up');
   assert.deepEqual([averageOf('Hold', { direction: 0, meanAlpha: -0.0118 }).tone, averageOf('Buy', { direction: 1, meanAlpha: 0.0004 }).tone], ['', ''], 'a Hold, and an average that prints as 0.0%, are plain');
@@ -77,7 +82,9 @@ test('a call\'s result is coloured and worded by whether it worked for its ratin
   const page = read('main.ts');
   assert.doesNotMatch(page, /tone\(parseFloat\(/, 'a result coloured by the sign of its alpha');
   assert.match(page, /<td>\$\{resultChip\(c\)\}<\/td>/, 'the stock page\'s list shows the same result chip');
-  assert.match(page, /resultOf\(meta, holdDays\(meta\)\)\.verdict/, 'the call window says whether it worked');
+  assert.match(page, /resultOf\(meta\)\.verdict/, 'the call window says whether it worked');
+  assert.match(page, /\['Scored', scored\]/, 'and names how it is scored, beside the time horizon');
+  assert.doesNotMatch(page, /holdDays|market's index/, 'no result is said as a holding period or against a market index');
   assert.match(page, /averageOf\(n, s\)/, 'the scorecard colours each average by its rating');
 });
 

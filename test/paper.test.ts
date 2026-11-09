@@ -21,7 +21,7 @@ const book = (calls: Array<{ ticker: string; date: string; rating: string }>, o:
 test('every call is followed as its ticket would size it, filled at the first close after its day, against the S&P 500 from the same start', () => {
   const calls = [
     { ticker: 'NVDA', date: '2026-09-01', rating: 'Buy' }, { ticker: 'AAPL', date: '2026-09-01', rating: 'Hold' },
-    { ticker: 'SOL-USD', date: '2026-09-01', rating: 'Buy' }, { ticker: 'TSLA', date: '2026-09-01', rating: 'Buy' },
+    { ticker: 'SOL-USD', date: '2026-09-01', rating: 'Buy' },
     { ticker: 'NVDA', date: '2026-09-03', rating: 'Sell' }, { ticker: 'MSFT', date: '2026-09-04', rating: 'Buy' },
   ];
   const held = book(calls).trades.find((x) => x.ticker === 'NVDA' && x.callDate === '2026-09-03')!;
@@ -33,7 +33,6 @@ test('every call is followed as its ticket would size it, filled at the first cl
   assert.deepEqual([of('NVDA', '2026-09-03').side, of('NVDA', '2026-09-03').quantity, of('NVDA', '2026-09-03').price], ['sell', 4, 90], 'a Sell sells everything held, at the next close');
   assert.deepEqual([of('AAPL', '2026-09-01').status, of('AAPL', '2026-09-01').why], ['none', 'A Hold call asks for no order.']);
   assert.deepEqual([of('SOL-USD', '2026-09-01').status, of('SOL-USD', '2026-09-01').why], ['skipped', 'Among crypto, paper follows Bitcoin and Ether for now.']);
-  assert.equal(of('TSLA', '2026-09-01').status, 'unavailable', 'prices that could not be read are said as unavailable, never as nothing');
   assert.equal(of('MSFT', '2026-09-04').status, 'waiting', 'no close after the call yet');
   assert.deepEqual(b.series.map((p) => [p.date, p.value, p.benchmark]), [['2026-09-01', 10_000, 10_000], ['2026-09-02', 10_000, 10_100], ['2026-09-03', 10_040, 10_200], ['2026-09-04', 9_920, 9_900]]);
   assert.deepEqual([b.cash, b.value, b.positions], [9_920, 9_920, []]);
@@ -102,7 +101,7 @@ test('Bitcoin and Ether are followed on paper in fractions, within the crypto li
   const eth = of('ETH-USD', '2026-09-07');
   assert.deepEqual([eth.status, eth.fillDate], ['filled', '2026-09-08'], 'after Bitcoin fell, the limit has room again');
   const last = (t: string, d: string) => c[t]!.filter((r) => r.date <= d).at(-1)!.close;
-  const inCrypto = b.positions.reduce((a, p) => a + p.quantity * last(p.ticker, eth.fillDate!), 0), account = b.cash + inCrypto;
+  const inCrypto = b.positions.reduce((a, p) => a + p.quantity * last(p.ticker, eth.fillDate!), 0), account = b.cash! + inCrypto;
   assert.ok(inCrypto <= 0.05 * account + 0.01, `crypto stays within 5% of the account on the day Ether was bought (${inCrypto.toFixed(2)} of ${account.toFixed(2)})`);
   assert.ok(inCrypto > 0.049 * account, 'and Ether takes the room the limit leaves');
   assert.deepEqual([of('DOGE-USD', '2026-09-04').status, of('^GSPC', '2026-09-04').status], ['skipped', 'skipped']);
@@ -122,4 +121,33 @@ test('the record counts weeks and calls on what paper follows since the first; t
   for (const bad of [99, 10_000_001, 2500.5, '5000', null]) assert.throws(() => savePaperStart(dir, bad), /whole number of dollars from \$100 to \$10,000,000/, String(bad));
   fs.writeFileSync(path.join(dir, 'paper.json'), '{"startUsd": -4}');
   assert.equal(readPaperStart(dir), 10_000, 'a bad value falls back to what ships');
+});
+
+// Audit 2, item C (8 Nov 2026): a total that quietly left a stock out, or valued one at what it cost, is no record. When a
+// stock the book needs has no prices, the book says so, names it, and shows no figure at all.
+test('a stock the book needs whose prices could not be read withholds the whole book, naming it, with no figure at all', () => {
+  const calls = [
+    { ticker: 'NVDA', date: '2026-09-01', rating: 'Buy' }, { ticker: 'TSLA', date: '2026-09-01', rating: 'Buy' },
+    { ticker: 'AAPL', date: '2026-09-01', rating: 'Hold' }, { ticker: 'MSFT', date: '2026-09-04', rating: 'Buy' },
+  ];
+  const b = book(calls, { caps: { ...C, minHoldDays: 0 } });
+  assert.deepEqual(b.missing, ['TSLA']);
+  assert.deepEqual([b.cash, b.value, b.returnPct, b.benchmarkPct, b.dividendsUsd, b.positions, b.series, b.dividends], [null, null, null, null, null, [], [], []]);
+  assert.equal(b.since, '2026-09-01');
+  const of = (t: string) => b.trades.find((x) => x.ticker === t)!;
+  assert.deepEqual([of('NVDA').status, of('NVDA').quantity, of('NVDA').price, of('NVDA').fillDate], ['withheld', undefined, undefined, undefined], 'what it did on paper is not known while another stock is missing');
+  assert.equal(of('NVDA').why, 'Not worked out just now: the paper record needs the closing prices of TSLA, which could not be read, and every order on paper is sized from the whole paper account.');
+  assert.deepEqual([of('TSLA').status, of('AAPL').status, of('MSFT').status], ['unavailable', 'none', 'waiting'], 'what is known regardless stays said');
+  // two missing are both named
+  const two = book([...calls, { ticker: 'AMD', date: '2026-09-02', rating: 'Overweight' }]);
+  assert.deepEqual(two.missing, ['AMD', 'TSLA']);
+  assert.match(two.trades.find((x) => x.ticker === 'NVDA')!.why, /closing prices of AMD and TSLA, which could not be read/);
+});
+
+test('a stock only ever sold on paper never holds anything, so its missing prices withhold nothing; every position is valued at its own close', () => {
+  const b = book([{ ticker: 'NVDA', date: '2026-09-01', rating: 'Buy' }, { ticker: 'TSLA', date: '2026-09-02', rating: 'Sell' }]);
+  assert.deepEqual(b.missing, []);
+  assert.equal(b.trades.find((x) => x.ticker === 'TSLA')!.status, 'unavailable');
+  assert.deepEqual(b.positions.map((p) => [p.ticker, p.quantity, p.price, p.value]), [['NVDA', 4, 90, 360]], "NVDA at its latest close of $90, not the $110 it cost");
+  assert.equal(b.value, b.cash! + 360);
 });

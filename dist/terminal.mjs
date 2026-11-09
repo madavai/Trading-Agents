@@ -7712,6 +7712,10 @@ var clearCache = () => cache.clear();
 import fs5 from "node:fs";
 import path5 from "node:path";
 
+// src/desk/agent-files.ts
+var RESET_AGAIN_MS = 30 * 6e4;
+var listed = (names) => names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+
 // src/desk/ticket.ts
 var COIN_STEP = 1e6;
 var MIN_COIN_USD = 1;
@@ -7939,6 +7943,15 @@ var closeOn = (rows, date4) => {
   }
   return last;
 };
+var NoClose = class extends Error {
+  constructor(ticker) {
+    super(`no close for ${ticker}`);
+    this.ticker = ticker;
+  }
+  ticker;
+};
+var missingFrom = (calls, closes, trading) => [...new Set(calls.filter((c) => followed(c.ticker) && !closes[c.ticker] && actionOf(c.rating, trading).startsWith("buy")).map((c) => c.ticker))].sort();
+var withheldWhy = (missing) => `Not worked out just now: the paper record needs the closing prices of ${listed([...missing])}, which could not be read, and every order on paper is sized from the whole paper account.`;
 function paperBook(calls, closes, o) {
   const benchmark = o.benchmark ?? "SPY";
   const ordered = [...calls].filter((c) => c.date <= o.today).sort((a, b) => a.date.localeCompare(b.date));
@@ -7959,26 +7972,59 @@ function paperBook(calls, closes, o) {
       trades.push({ ...base2, status: "unavailable", why: `Prices for ${c.ticker} could not be read just now.` });
       continue;
     }
-    const next2 = rows.find((r) => r.date > c.date && r.date <= o.today);
-    if (!next2) {
+    const next = rows.find((r) => r.date > c.date && r.date <= o.today);
+    if (!next) {
       trades.push({ ...base2, status: "waiting", why: "Waits for the first closing price after the call." });
       continue;
     }
     const t2 = { ...base2, status: "none", why: "" };
     trades.push(t2);
-    fills.push({ trade: t2, date: next2.date, price: next2.close });
+    fills.push({ trade: t2, date: next.date, price: next.close });
   }
   fills.sort((a, b) => a.date.localeCompare(b.date));
+  const since = ordered.find((c) => followed(c.ticker))?.date ?? null;
+  const withheld2 = (missing2) => {
+    for (const { trade: t2 } of fills) {
+      delete t2.side;
+      delete t2.quantity;
+      delete t2.price;
+      delete t2.fillDate;
+      delete t2.sincePct;
+      Object.assign(t2, { status: "withheld", why: withheldWhy(missing2) });
+    }
+    return {
+      startUsd: o.startUsd,
+      since,
+      missing: missing2,
+      cash: null,
+      value: null,
+      positions: [],
+      series: [],
+      trades: [...trades].reverse(),
+      dividends: [],
+      dividendsUsd: null,
+      returnPct: null,
+      benchmarkPct: null,
+      benchmark
+    };
+  };
+  const missing = missingFrom(ordered, closes, o.trading);
+  if (missing.length) return withheld2(missing);
   let cash = o.startUsd;
   const held = /* @__PURE__ */ new Map(), boughtOn = /* @__PURE__ */ new Map();
+  const priceOf = (ticker, date4) => {
+    const p = closeOn(closes[ticker], date4);
+    if (p === null) throw new NoClose(ticker);
+    return p;
+  };
   const worth = (date4) => {
     let v = cash;
-    for (const [ticker, h] of held) v += h.quantity * (closeOn(closes[ticker], date4) ?? h.cost / (h.quantity || 1));
+    for (const [ticker, h] of held) v += h.quantity * priceOf(ticker, date4);
     return v;
   };
   const apply = (f, ordersThatDay) => {
     const h = held.get(f.trade.ticker) ?? { quantity: 0, cost: 0 };
-    const positions2 = [...held].map(([ticker, x]) => ({ symbol: ticker, quantity: x.quantity, price: closeOn(closes[ticker], f.date) }));
+    const positions2 = [...held].map(([ticker, x]) => ({ symbol: ticker, quantity: x.quantity, price: priceOf(ticker, f.date) }));
     const bought = boughtOn.get(f.trade.ticker);
     const cryptoHeldUsd = cents2(positions2.filter((x) => isCrypto(x.symbol)).reduce((a, x) => a + x.quantity * (x.price ?? 0), 0));
     const context = {
@@ -8030,7 +8076,6 @@ function paperBook(calls, closes, o) {
       dividends.push({ ticker: x.ticker, date: x.date, perShare: x.amount, quantity: h.quantity, usd });
     }
   };
-  const since = ordered.find((c) => followed(c.ticker))?.date ?? null;
   const bench = closes[benchmark] ?? [], benchDividends = o.dividends?.[benchmark] ?? [];
   const days = since ? [.../* @__PURE__ */ new Set([...bench.map((r) => r.date), ...fills.map((f) => f.date)])].filter((d) => d >= since && d <= o.today).sort() : [];
   const benchStart = since ? closeOn(bench, days[0] ?? since) : null;
@@ -8041,23 +8086,29 @@ function paperBook(calls, closes, o) {
     return cents2(shares * (b + paid));
   };
   const series = [];
-  let next = 0;
-  for (const d of days) {
-    let that = 0;
-    payUpTo(d);
-    while (next < fills.length && fills[next].date <= d) apply(fills[next++], that++);
-    series.push({ date: d, value: cents2(worth(d)), benchmark: benchValue(d) });
+  let positions = [], latest = o.today;
+  try {
+    let next = 0;
+    for (const d of days) {
+      let that = 0;
+      payUpTo(d);
+      while (next < fills.length && fills[next].date <= d) apply(fills[next++], that++);
+      series.push({ date: d, value: cents2(worth(d)), benchmark: benchValue(d) });
+    }
+    while (next < fills.length) {
+      payUpTo(fills[next].date);
+      apply(fills[next++], 0);
+    }
+    payUpTo(o.today);
+    latest = series.at(-1)?.date ?? o.today;
+    positions = [...held].map(([ticker, h]) => {
+      const price = priceOf(ticker, latest);
+      return { ticker, quantity: h.quantity, cost: h.cost, price, value: cents2(h.quantity * price) };
+    });
+  } catch (e) {
+    if (e instanceof NoClose) return withheld2([e.ticker]);
+    throw e;
   }
-  while (next < fills.length) {
-    payUpTo(fills[next].date);
-    apply(fills[next++], 0);
-  }
-  payUpTo(o.today);
-  const latest = series.at(-1)?.date ?? o.today;
-  const positions = [...held].map(([ticker, h]) => {
-    const price = closeOn(closes[ticker], latest) ?? h.cost / h.quantity;
-    return { ticker, quantity: h.quantity, cost: h.cost, price, value: cents2(h.quantity * price) };
-  });
   for (const t2 of trades) if (t2.status === "filled" && t2.side === "buy" && t2.price) {
     const now = closeOn(closes[t2.ticker], latest);
     if (now !== null) t2.sincePct = now / t2.price - 1;
@@ -8067,6 +8118,7 @@ function paperBook(calls, closes, o) {
   return {
     startUsd: o.startUsd,
     since,
+    missing: [],
     cash,
     value,
     positions,
@@ -20730,6 +20782,53 @@ function signed(v, digits) {
 var signedPct = (fraction, digits = 1) => `${signed(fraction * 100, digits)}%`;
 var unsignZero = (text2) => text2.replace(/^[+\-−](0(?:\.0+)?%)$/, "$1");
 
+// src/desk/scoring.ts
+var coinDays = (tradingDays) => Math.max(1, Math.round(tradingDays * 7 / 5));
+function exchangeOf(ticker) {
+  const m = /\.([A-Z]{2,3}|[TLVF])$/.exec(normalizeSymbol(ticker));
+  return m ? `.${m[1]}` : null;
+}
+function yardstickFor(ticker, s) {
+  if (s.benchmark.trim()) return { yardstick: normalizeSymbol(s.benchmark), basis: "chosen" };
+  const sym2 = normalizeSymbol(ticker);
+  const suffix = Object.keys(s.benchmarks).filter(Boolean).sort((a, b) => b.length - a.length).find((x) => sym2.endsWith(x.toUpperCase()));
+  if (suffix) return { yardstick: normalizeSymbol(s.benchmarks[suffix]), basis: "market" };
+  return { yardstick: normalizeSymbol(s.benchmarks[""] ?? "SPY"), basis: isCrypto(sym2) ? "coin" : exchangeOf(sym2) ? "unlisted" : "us" };
+}
+var resolveBenchmark = (ticker, s) => yardstickFor(ticker, s).yardstick;
+function rulesFor(ticker, s) {
+  const coin = isCrypto(ticker);
+  return { days: coin ? coinDays(s.holdingPeriodDays) : s.holdingPeriodDays, unit: coin ? "calendar" : "trading", ...yardstickFor(ticker, s) };
+}
+function legacyRules(ticker, s, holding) {
+  const kept = Number(/^(\d+)d$/.exec(holding ?? "")?.[1]);
+  return { days: kept > 0 ? kept : s.holdingPeriodDays, unit: isCrypto(ticker) ? "calendar" : "trading", ...yardstickFor(ticker, s) };
+}
+var plural = (n, one3) => `${n} ${one3}${n === 1 ? "" : "s"}`;
+var windowWords = (r) => plural(r.days, `${r.unit} day`);
+var checkName = (r) => (r.unit === "trading" ? r.days === 5 : r.days === 7) ? "a first-week check" : `a check over its first ${windowWords(r)}`;
+var yardstickName = (y) => y === "SPY" ? "SPY, the fund that copies the S&P 500" : y;
+function basisWords(ticker, r) {
+  const ex = exchangeOf(ticker);
+  switch (r.basis) {
+    case "us":
+      return r.yardstick === "SPY" ? "" : "the desk's yardstick for US listings";
+    case "coin":
+      return "the desk's settings name no yardstick for coins, so a coin is scored against the one for US listings";
+    case "unlisted":
+      return `its exchange${ex ? `, ${ex},` : ""} had no index in the desk's settings when the call was made, so it is scored against the one for US listings`;
+    case "market":
+      return `the index the desk's settings give its exchange${ex ? `, ${ex}` : ""}`;
+    case "chosen":
+      return "the one yardstick the desk's settings set for every call";
+  }
+}
+function yardstickWords(ticker, r) {
+  const why = basisWords(ticker, r);
+  return `${yardstickName(r.yardstick)}${why ? ` (${why})` : ""}`;
+}
+var WHEN_SCORED = "A call is scored when a scoring runs after its window (/settle, an analysis or a routine), not by itself.";
+
 // src/desk/journal.ts
 var UNCHECKED = ["unmarked", "no-prices", "unreliable", "flagged"];
 var WITHHELD = ["unreliable", "flagged"];
@@ -20748,6 +20847,20 @@ function lessonOf(fields, pending) {
 }
 var DATE = /^\d{4}-\d{2}-\d{2}$/;
 var TICKER = /^[A-Za-z0-9.\-=^]{1,20}$/;
+var BASES = ["us", "coin", "unlisted", "market", "chosen"];
+var WINDOW = /^window:(\d{1,3}) (trading|calendar) days?$/;
+var YARDSTICK = /^yardstick:([A-Za-z0-9.\-=^]{1,20}) \(([a-z]+)\)$/;
+var rulesFields = (r) => [`window:${windowWords(r)}`, `yardstick:${r.yardstick} (${r.basis})`];
+function rulesIn(fields) {
+  const w = fields.map((x) => WINDOW.exec(x)).find(Boolean), y = fields.map((x) => YARDSTICK.exec(x)).find(Boolean);
+  if (!w || !y || !BASES.includes(y[2]) || !(Number(w[1]) > 0)) return null;
+  return { days: Number(w[1]), unit: w[2], yardstick: y[1], basis: y[2] };
+}
+function checkRules(r) {
+  if (!Number.isInteger(r.days) || r.days < 1 || r.days > 366) throw new Error(`a window of ${r.days} days is not one the journal can keep`);
+  if (!TICKER.test(r.yardstick)) throw new Error(`the yardstick "${r.yardstick}" in desk-settings.json is not a ticker the journal can keep`);
+  if (!BASES.includes(r.basis)) throw new Error(`"${r.basis}" is not why a yardstick is chosen`);
+}
 function checkTag(ticker, date4) {
   if (!TICKER.test(ticker)) throw new Error(`"${ticker}" is not a ticker the journal can keep`);
   if (!DATE.test(date4)) throw new Error(`"${date4}" is not a date in YYYY-MM-DD form`);
@@ -20766,7 +20879,7 @@ function parse3(block) {
   const firstLesson = /(?:^|\n)FIRST LESSON:\n([\s\S]*)$/.exec(body)?.[1]?.trim() ?? "";
   const resolved = f.slice(6).find((x) => x.startsWith("resolved:"))?.slice("resolved:".length).trim() ?? null;
   const pending = f[3] === "pending", score = (s) => s === void 0 ? null : unsignZero(s);
-  return { date: f[0], ticker: f[1], rating: f[2], pending, raw: pending ? null : score(f[3]), alpha: score(f[4]), holding: f[5] ?? null, resolved, decision, reflection, ...lessonOf(f.slice(6), pending), lessonCheck, earlier, firstLesson };
+  return { date: f[0], ticker: f[1], rating: f[2], pending, raw: pending ? null : score(f[3]), alpha: pending ? null : score(f[4]), holding: pending ? null : f[5] ?? null, resolved, decision, reflection, ...lessonOf(f.slice(6), pending), lessonCheck, earlier, firstLesson, rules: rulesIn(f.slice(4)) };
 }
 var lessonPart = (p) => [keep(p.lesson), ...[["LESSON CHECK", p.check], ["EARLIER CORRECTIONS", p.earlier], ["FIRST LESSON", p.first]].filter(([, words4]) => words4?.trim()).map(([head, words4]) => `${head}:
 ${keep(words4)}`)].join("\n\n");
@@ -20814,15 +20927,18 @@ var Journal = class {
   pending() {
     return this.load().filter((e) => e.pending);
   }
-  /** Adds a pending entry. One entry per stock and day, settled or not: a re-run must not count the same call twice. */
-  storeDecision(ticker, date4, decision, rating) {
+  /** Adds a pending entry, with the window and yardstick it will be scored by when they are given (every call the desk
+   *  records now). One entry per stock and day, settled or not: a re-run must not count the same call twice. */
+  storeDecision(ticker, date4, decision, rating, rules) {
     checkTag(ticker, date4);
+    if (rules) checkRules(rules);
     fs11.mkdirSync(path10.dirname(this.file), { recursive: true });
     return withLock(this.file, () => {
       if (this.load().some((e) => e.date === date4 && e.ticker === ticker)) return "exists";
       const r = rating && RATINGS.includes(rating) ? rating : parseRating(decision);
       const old = this.read();
-      this.write(`${old}${old && !old.endsWith(SEPARATOR) ? SEPARATOR : ""}[${date4} | ${ticker} | ${r} | pending]
+      const kept = rules ? rulesFields(rules).map((x) => ` | ${x}`).join("") : "";
+      this.write(`${old}${old && !old.endsWith(SEPARATOR) ? SEPARATOR : ""}[${date4} | ${ticker} | ${r} | pending${kept}]
 
 DECISION:
 ${keep(decision)}${SEPARATOR}`);
@@ -20830,7 +20946,8 @@ ${keep(decision)}${SEPARATOR}`);
     });
   }
   /** Settles a pending entry with its measured outcome and the lesson. False when it was no longer pending. `from` says
-   *  whether the window's day-by-day prices were at hand for the lesson; left out, the lesson is unmarked (the old way). */
+   *  whether the window's day-by-day prices were at hand for the lesson; left out, the lesson is unmarked (the old way).
+   *  The window and yardstick the entry kept stay in its tag. */
   recordOutcome(ticker, date4, raw, alpha, holdingDays, reflection, resolution, from) {
     return withLock(this.file, () => {
       let done = false;
@@ -20838,7 +20955,8 @@ ${keep(decision)}${SEPARATOR}`);
         const e = parse3(block);
         if (done || !e || !e.pending || e.date !== date4 || e.ticker !== ticker) return block;
         done = true;
-        return `[${date4} | ${ticker} | ${e.rating} | ${signedPct(raw)} | ${signedPct(alpha)} | ${holdingDays}d | resolved:${resolution}${from ? ` | lesson:${from}` : ""}]
+        const kept = e.rules ? rulesFields(e.rules).map((x) => ` | ${x}`).join("") : "";
+        return `[${date4} | ${ticker} | ${e.rating} | ${signedPct(raw)} | ${signedPct(alpha)} | ${holdingDays}d | resolved:${resolution}${kept}${from ? ` | lesson:${from}` : ""}]
 
 DECISION:
 ${e.decision}
@@ -20937,7 +21055,9 @@ Its check before then: ${e.lessonCheck}` : ""}`, earlier: e.earlier, first: e.fi
   /** The lessons for an analysis: the latest settled calls on this stock in full, and the latest on others as lessons only.
    *  With `asOf`, only calls whose outcome was already known on that day - a past-dated run must not learn from its future.
    *  Each lesson says how it was written (see LESSON_NOTE); one marked unreliable or flagged by the person is withheld, and
-   *  is not counted among the other stocks' lessons, since it brings none. */
+   *  is not counted among the other stocks' lessons, since it brings none. Each call's header names what it was scored
+   *  over and against (its own rules, or for a call recorded before the desk kept them, the rules it was made under, from
+   *  `scoring`): a short first check, not the call's own time horizon. */
   pastContext(ticker, o = {}) {
     const { sameLimit = 5, otherLimit = 3 } = o;
     let settled2 = this.load().filter((e) => !e.pending);
@@ -20949,14 +21069,19 @@ Its check before then: ${e.lessonCheck}` : ""}`, earlier: e.earlier, first: e.fi
       if (same.length >= sameLimit && other.length >= otherLimit) break;
     }
     if (!same.length && !other.length) return "";
+    const over = (e) => {
+      const r = e.rules ?? (o.scoring ? legacyRules(e.ticker, o.scoring, e.holding) : null);
+      return r ? `${checkName(r)}: against ${r.yardstick} over the ${windowWords(r)} after the call, not the call's own time horizon` : `over ${e.holding ?? "n/a"}`;
+    };
+    const head = (e) => `[${e.date} | ${e.ticker} | ${e.rating} | return ${e.raw ?? "n/a"} | alpha ${e.alpha ?? "n/a"} | ${over(e)}]`;
     const full = (e) => [
-      `[${e.date} | ${e.ticker} | ${e.rating} | ${e.raw ?? "n/a"} | ${e.alpha ?? "n/a"} | ${e.holding ?? "n/a"}]`,
+      head(e),
       `DECISION:
 ${e.decision}`,
       ...e.lesson === "unreliable" || e.lesson === "flagged" ? [`REFLECTION: ${LESSON_NOTE[e.lesson](e)}`] : e.reflection ? [`REFLECTION${LESSON_NOTE[e.lesson] ? ` (${LESSON_NOTE[e.lesson](e)})` : ""}:
 ${e.reflection}`] : []
     ].join("\n\n");
-    const short = (e) => `[${e.date} | ${e.ticker} | ${e.rating} | ${e.raw ?? "n/a"}]${e.reflection && LESSON_NOTE[e.lesson] ? ` (lesson ${LESSON_NOTE[e.lesson](e)})` : ""}
+    const short = (e) => `${head(e)}${e.reflection && LESSON_NOTE[e.lesson] ? ` (lesson ${LESSON_NOTE[e.lesson](e)})` : ""}
 ${e.reflection || e.decision.slice(0, 300) + (e.decision.length > 300 ? "..." : "")}`;
     const parts = [];
     if (same.length) parts.push(`Past analyses of ${ticker} (most recent first):`, ...same.map(full));
@@ -21598,28 +21723,24 @@ function summarize(entries) {
     byRating[rating] = { count: alphas.length, direction: dir, hitRate: dir ? alphas.filter((a) => worked(rating, a)).length / alphas.length : null, meanAlpha: alphas.reduce((s, a) => s + a, 0) / alphas.length };
   }
   const unscored = entries.filter((e) => e.rating === REVIEW2).length;
-  const windows = [...new Set(resolved.map((x) => x.e.holding).filter((h) => !!h && h.endsWith("d")).map((h) => `${h.slice(0, -1)} trading days`))].sort();
-  return { resolved: resolved.length, pending: entries.length - resolved.length - unscored, unscored, byRating, holding: windows.join(", ") || "the configured window" };
+  const windows = [...new Set(resolved.map(({ e }) => {
+    const days = Number(/^(\d+)d$/.exec(e.holding ?? "")?.[1]);
+    return days > 0 ? windowWords({ days, unit: e.rules?.unit ?? (isCrypto(e.ticker) ? "calendar" : "trading") }) : "";
+  }).filter(Boolean))].sort();
+  const yardsticks = [...new Set(resolved.map(({ e }) => e.rules?.yardstick ?? "").filter(Boolean))].sort();
+  return { resolved: resolved.length, pending: entries.length - resolved.length - unscored, unscored, byRating, holding: windows.join(", ") || "the configured window", yardsticks: yardsticks.join(", ") };
 }
 var pctText = (v) => signedPct(v, 2);
 function renderSummary(s) {
   const lines = [`Resolved cells: ${s.resolved} \xB7 pending: ${s.pending}${s.unscored ? ` \xB7 unscored: ${s.unscored}` : ""}`];
   for (const [rating, sc] of Object.entries(s.byRating)) {
-    lines.push(`- ${rating}: n=${sc.count}, ${sc.hitRate !== null ? `called the direction ${Math.round(sc.hitRate * 100)}%` : "no direction claimed"}, mean alpha ${pctText(sc.meanAlpha)} vs the benchmark`);
+    lines.push(`- ${rating}: n=${sc.count}, ${sc.hitRate !== null ? `called the direction ${Math.round(sc.hitRate * 100)}%` : "no direction claimed"}, mean alpha ${pctText(sc.meanAlpha)} vs the yardstick`);
   }
   lines.push("");
   if (s.pending) lines.push("Pending cells are not scored above; settle them when their window has traded.");
   if (s.unscored) lines.push("Unscored cells had no readable rating (Needs review): they count neither for nor against the desk.");
-  lines.push(`Alpha is measured over ${s.holding} after each analysis date. One model sampling per cell, and text feeds are not archived, so these figures are indicative rather than repeatable. A handful of cells proves nothing: a hit rate over fewer than about 30 calls per rating is noise.`);
+  lines.push(`Alpha is measured over the first ${s.holding} after each analysis date, against each call's yardstick${s.yardsticks ? ` (${s.yardsticks})` : ""}: a short first check, not the calls' own time horizons. One model sampling per cell, and text feeds are not archived, so these figures are indicative rather than repeatable. A handful of cells proves nothing: a hit rate over fewer than about 30 calls per rating is noise.`);
   return lines.join("\n");
-}
-
-// src/desk/scoring.ts
-function resolveBenchmark(ticker, s) {
-  if (s.benchmark.trim()) return normalizeSymbol(s.benchmark);
-  const sym2 = normalizeSymbol(ticker);
-  const suffix = Object.keys(s.benchmarks).filter(Boolean).sort((a, b) => b.length - a.length).find((x) => sym2.endsWith(x.toUpperCase()));
-  return suffix ? s.benchmarks[suffix] : s.benchmarks[""] ?? "SPY";
 }
 
 // src/terminal/store.ts
@@ -21895,10 +22016,43 @@ var stamp = (file4) => {
     return "0";
   }
 };
-function yardstickWords(s) {
-  const us2 = resolveBenchmark("SPY", s);
-  if (s.benchmark.trim()) return `${us2}, the yardstick set for every call`;
-  return `its market's index: for a US stock, ${us2}${us2 === "SPY" ? ", the fund that copies the S&P 500" : ""}`;
+var MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+var dayWords = (iso2) => {
+  const [y, m, d] = iso2.split("-");
+  return `${Number(d)} ${MON[Number(m) - 1]} ${y}`;
+};
+var rulesOfEntry = (e, s) => {
+  if (e.rules) return { r: e.rules, older: false };
+  const r = legacyRules(e.ticker, s, e.holding), now = rulesFor(e.ticker, s);
+  return { r, older: r.days !== now.days || r.unit !== now.unit };
+};
+var OLDER = "it was recorded before the desk kept each call's window with it, so it is scored as such calls were then";
+function scoredBy(e, s) {
+  const { r, older } = rulesOfEntry(e, s);
+  return { window: windowWords(r), yardstick: r.yardstick, check: checkName(r), why: [basisWords(e.ticker, r), older ? OLDER : ""].filter(Boolean).join("; ") };
+}
+function scoringShort(s) {
+  const stock = rulesFor("SPY", s), coin = rulesFor("BTC-USD", s), same = stock.yardstick === coin.yardstick;
+  const name = checkName(stock) === checkName(coin) ? checkName(stock) : "a short first check";
+  return `each scored once, ${name}, not its time horizon: a US stock or fund over ${windowWords(stock)}${same ? "" : ` against ${stock.yardstick}`}, a coin over ${windowWords(coin)}, against ${coin.yardstick}`;
+}
+function scoringNote(entries, s) {
+  const stock = rulesFor("SPY", s), coin = rulesFor("BTC-USD", s);
+  const name = checkName(stock) === checkName(coin) ? checkName(stock) : "a short first check";
+  const coinY = coin.yardstick === stock.yardstick ? `${coin.yardstick} too` : yardstickName(coin.yardstick);
+  const ny = coin.yardstick === "SPY", y = coin.yardstick;
+  const closed = ny ? "New York's market was closed (a weekend or a New York holiday)" : "its market was closed";
+  const same = (r, std) => r.days === std.days && r.unit === std.unit && r.yardstick === std.yardstick && r.basis === std.basis;
+  const otherwise = entries.map((e) => ({ e, ...rulesOfEntry(e, s) })).filter(({ e, r, older }) => older || !same(r, isCrypto(e.ticker) ? coin : stock));
+  const listed2 = otherwise.slice(0, 6).map(({ e, r, older }) => `${e.ticker} (${dayWords(e.date)}): against ${yardstickWords(e.ticker, r)}, over the ${windowWords(r)} after the call${older ? `, as ${OLDER}` : ""}`);
+  return [
+    `Each call is scored once, ${name} against a named yardstick, not over the call's own time horizon (its decision states that).`,
+    `A US stock or fund: against ${yardstickWords("SPY", stock)}, over the ${windowWords(stock)} after the call.`,
+    `A coin: against ${coinY}${coin.basis === "coin" ? ", as the desk's settings name no yardstick for coins" : ""}, over the ${windowWords(coin)} after the call. A coin trades every day and ${y} ${ny ? "only on New York's market days" : "only on its own market's days"}, so ${y}'s close on the coin's first and last day is used, or its last close before that day when ${closed}.`,
+    ...listed2.length ? [`Scored otherwise: ${listed2.join("; ")}${otherwise.length > listed2.length ? `; and ${otherwise.length - listed2.length} more` : ""}.`] : [],
+    WHEN_SCORED,
+    "Both returns count dividends: they are worked out from prices adjusted for them."
+  ].join(" ");
 }
 function versionOf(root2) {
   const dir = deskDataDir(root2), runs = path15.join(dir, "runs");
@@ -21934,7 +22088,8 @@ function stateOf(root2, day2) {
     summary: summaryOf(e.decision),
     hasReport: hasReport(dir, e.ticker, e.date),
     ticket: ticketable(e.ticker),
-    paper: followed(e.ticker)
+    paper: followed(e.ticker),
+    ...scoredBy(e, s.scoring)
   })).reverse().sort((a, b) => b.date.localeCompare(a.date));
   const summary = summarize(entries), watchlist = readWatchlist(dir), market = marketView(dir);
   const { startHere, watch } = tiersOf(watchlist, market.symbols, calls);
@@ -21951,8 +22106,8 @@ function stateOf(root2, day2) {
     watchTiers: watch,
     market,
     guide,
-    record: { summary, text: renderSummary(summary), benchmarkNote: `Each call is judged after ${s.scoring.holdingPeriodDays} trading days against ${yardstickWords(s.scoring)}. Both returns count dividends: they are worked out from prices adjusted for them.` },
-    desk: { emailSaved: !!email2, tradingEnabled: false, holdingDays: s.scoring.holdingPeriodDays, benchmark: resolveBenchmark("SPY", s.scoring) },
+    record: { summary, text: renderSummary(summary), benchmarkNote: scoringNote(entries, s.scoring) },
+    desk: { emailSaved: !!email2, tradingEnabled: false, holdingDays: s.scoring.holdingPeriodDays, benchmark: resolveBenchmark("SPY", s.scoring), scoring: scoringShort(s.scoring) },
     analyses: { depth: depthOfRounds(s.analysis.debateRounds), perRun: s.routines.maxAnalyses, listener },
     paper: { ...record2, startUsd: readPaperStart(dir), minWeeks: RECORD_WEEKS, minWords: RECORD_WORDS }
   };
@@ -22284,13 +22439,13 @@ var MEANING = {
   rates: "What prediction markets price for the Federal Reserve's next interest-rate decision, not a forecast of ours. Lower rates tend to help share prices; higher rates tend to weigh on them."
 };
 var whole2 = (n) => n.toLocaleString("en-US", { maximumFractionDigits: 0 });
-var dayWords = (iso2) => {
+var dayWords2 = (iso2) => {
   const [y, m, d] = iso2.split("-");
   return `${Number(d)} ${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][Number(m) - 1]} ${y}`;
 };
 var unavailable = (key, name, why) => ({ key, name, state: null, tone: "", words: `Unavailable: ${why}.`, meaning: MEANING[key] });
 var newYorkTime = (at) => at.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" });
-var figureWords = (name, figure2, day2, live) => !live ? `${name} closed at ${figure2} on ${dayWords(day2)}` : live.unsure ? `${name}'s latest figure on ${dayWords(day2)}, read at ${newYorkTime(live.at)} New York time, is ${figure2} (Yahoo Finance did not say whether that session had ended)` : live.ended ? `${name} was at ${figure2} when read at ${newYorkTime(live.at)} New York time on ${dayWords(day2)}, before that session's close was final (not a close)` : `${name} is at ${figure2} at ${newYorkTime(live.at)} New York time on ${dayWords(day2)}, still trading (not a close)`;
+var figureWords = (name, figure2, day2, live) => !live ? `${name} closed at ${figure2} on ${dayWords2(day2)}` : live.unsure ? `${name}'s latest figure on ${dayWords2(day2)}, read at ${newYorkTime(live.at)} New York time, is ${figure2} (Yahoo Finance did not say whether that session had ended)` : live.ended ? `${name} was at ${figure2} when read at ${newYorkTime(live.at)} New York time on ${dayWords2(day2)}, before that session's close was final (not a close)` : `${name} is at ${figure2} at ${newYorkTime(live.at)} New York time on ${dayWords2(day2)}, still trading (not a close)`;
 function liveOf(s, day2, now) {
   const last = s.bars.at(-1), session = s.meta.session;
   if (!last) return null;
@@ -22327,7 +22482,7 @@ function ratesOf(events, now = /* @__PURE__ */ new Date()) {
   if (!next || !top) return unavailable("rates", "Rates", "Polymarket has no open market on the Federal Reserve's next decision");
   const [state, tone] = top.way === "cut" ? ["A cut", "ok"] : top.way === "rise" ? ["A rise", "warn"] : ["No change", ""];
   const pct = (p) => `${Math.round(p * 100)}%`, second = odds[1] && odds[1].p >= 0.1 ? ` and ${odds[1].words} at ${pct(odds[1].p)}` : "";
-  return { key: "rates", name: "Rates", state, tone, words: `For the Federal Reserve's next decision, by ${dayWords(marketDay(new Date(next.endDate)))}, Polymarket's crowd puts ${top.words} at ${pct(top.p)}${second}.`, meaning: MEANING.rates };
+  return { key: "rates", name: "Rates", state, tone, words: `For the Federal Reserve's next decision, by ${dayWords2(marketDay(new Date(next.endDate)))}, Polymarket's crowd puts ${top.words} at ${pct(top.p)}${second}.`, meaning: MEANING.rates };
 }
 async function weatherNow(day2, now = /* @__PURE__ */ new Date()) {
   const [trend, mood, rates] = await Promise.all([
@@ -22517,7 +22672,12 @@ async function startTerminal(opts) {
         }));
       }
       await sectors.warm(calls.filter((c) => followed(c.ticker)).map((c) => c.ticker));
-      paperMemo = { key, at: Date.now(), book: paperBook(calls, closes, { startUsd, trading, caps, today: today2, sectors, dividends }) };
+      const book = paperBook(calls, closes, { startUsd, trading, caps, today: today2, sectors, dividends });
+      if (book.missing.length) {
+        paperMemo = null;
+        return { ...book, record: recordOf(calls, today2) };
+      }
+      paperMemo = { key, at: Date.now(), book };
     }
     return { ...paperMemo.book, record: recordOf(calls, today2) };
   };

@@ -13,7 +13,8 @@ import { readSettings } from '../settings.js';
 import { forgetHoldings, saveHoldings } from '../desk/holdings.js';
 import { ASK_FOR_EMAIL, readContactEmail } from '../contact.js';
 import { cells, iterGrid, renderSummary, summarize } from '../desk/backtest.js';
-import { buildPlan, journalOf, NeedsEmail, renderPlan, runContext, type Plan } from '../desk/plan.js';
+import { buildPlan, journalOf, NeedsEmail, renderPlan, runContext, scoredWords, type Plan } from '../desk/plan.js';
+import { checkWords, rulesFor, windowWords, WHEN_SCORED, type Rules } from '../desk/scoring.js';
 import { SWEEP_ID, workspaceOf } from '../desk/workspace.js';
 import { DEPTHS, finishItem, QueueRefusal, readQueue, ringDoorbell, startItem, waitingIn, type Depth } from '../desk/queue.js';
 import { Journal } from '../desk/journal.js';
@@ -66,7 +67,7 @@ export function registerDeskTools(server: McpServer, root: string): void {
 
   server.registerTool('plan_analysis', {
     title: 'Plan an analysis',
-    description: 'Draw up the plan for analysing a stock on a date, before any agent speaks: the instrument, the analysts that run, the debate rounds, the report language, the index the call will be judged against, what the person holds, the lessons from past calls, and - for a run that stopped half way - the next step. Refused with NEEDS_EMAIL until the person has given their email. Call it first, and follow it.',
+    description: 'Draw up the plan for analysing a stock on a date, before any agent speaks: the instrument, the analysts that run, the debate rounds, the report language, the window and yardstick the call will be scored by (a short first check, not its time horizon), what the person holds, the lessons from past calls, and - for a run that stopped half way - the next step. Refused with NEEDS_EMAIL until the person has given their email. Call it first, and follow it.',
     inputSchema: {
       symbol, analysis_date: day,
       analysts: z.array(z.enum(['market', 'sentiment', 'news', 'fundamentals'])).optional().describe('Only these analysts; the settings\' when left out'),
@@ -129,14 +130,14 @@ export function registerDeskTools(server: McpServer, root: string): void {
     if (!progress(ws().dir, sym, d)['decision']) throw new Error(`the portfolio manager's decision is not saved yet for ${sym} on ${d}`);
     const rating = parseRating(readSections(ws().dir, sym, d, ['decision']));
     const header = [`Rating: ${rating}`, `Generated: ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC`];
-    if (plan?.analysts) header.push(`Analysts: ${plan.analysts.join(', ')}; research debate rounds ${plan.debateRounds}, risk debate rounds ${plan.riskRounds}; language ${plan.language}`, `Judged after ${plan.holdingDays} trading days against ${plan.benchmark}`);
+    if (plan?.analysts) header.push(`Analysts: ${plan.analysts.join(', ')}; research debate rounds ${plan.debateRounds}, risk debate rounds ${plan.riskRounds}; language ${plan.language}`, `Scored: ${scoredWords(plan)}`);
     const file = writeReport(ws().dir, sym, d, header);
     return `Report written: ${file}\nRating: ${rating}`;
   }));
 
   server.registerTool('record_decision', {
     title: 'Record the decision',
-    description: 'Put the portfolio manager\'s saved decision in the journal as a pending call, to be scored later against its market index. The text is the one saved in the run, so the journal always matches the report. One call per stock and day: a repeat is ignored. Pass the rating the decision states; without one it is read from the text, and a decision with no readable rating is recorded as Needs review.',
+    description: 'Put the portfolio manager\'s saved decision in the journal as a pending call, with the window and yardstick it will be scored by (the plan\'s), so a later change to the settings never re-scores it. It is scored once a scoring runs after that window (/settle, an analysis or a routine): a short first check, not the call\'s own time horizon. The text is the one saved in the run, so the journal always matches the report. One call per stock and day: a repeat is ignored. Pass the rating the decision states; without one it is read from the text, and a decision with no readable rating is recorded as Needs review.',
     inputSchema: { symbol, analysis_date: day, rating: z.enum(RATINGS).optional() },
     annotations: write,
   }, async (a) => act(() => {
@@ -144,14 +145,16 @@ export function registerDeskTools(server: McpServer, root: string): void {
     const decision = readSections(ws().dir, sym, d, ['decision']);
     if (!progress(ws().dir, sym, d)['decision']) throw new Error(`the portfolio manager's decision is not saved yet for ${sym} on ${d}`);
     const body = decision.replace(/^## [^\n]*\n/, '');
-    const r = journalOf(root, ws()).storeDecision(sym, d, body, a.rating ?? undefined);
+    // The window and yardstick the plan gave this run; a run planned before the desk kept them gets the settings' now.
+    const rules: Rules = (savedPlan(ws().dir, sym, d) as Plan | undefined)?.window ?? rulesFor(sym, readSettings(root).scoring);
+    const r = journalOf(root, ws()).storeDecision(sym, d, body, a.rating ?? undefined, rules);
     const rating = a.rating ?? parseRating(body);
-    return r === 'stored' ? `Recorded: ${sym} on ${d}, ${rating}, pending. It is scored after ${readSettings(root).scoring.holdingPeriodDays} trading days.` : `${sym} on ${d} is already in the journal; nothing changed.`;
+    return r === 'stored' ? `Recorded: ${sym} on ${d}, ${rating}, pending. It will be scored as ${checkWords(sym, rules)}, kept with the call so a later change to the settings does not change it. It is not the call's own time horizon. ${WHEN_SCORED} Until then it stays pending: for the ${windowWords(rules)} after the call, and after them until a scoring runs.` : `${sym} on ${d} is already in the journal; nothing changed.`;
   }));
 
   server.registerTool('list_settlements', {
     title: 'Pending calls',
-    description: 'List the calls in the journal that are not settled yet. For each whose holding window has finished trading, it shows the measured outcome (return, the index\'s return, alpha), the decision, and what happened in the window day by day (the stock\'s prices, volume and main indicators beside the index\'s close), so you can write the lesson from what happened; the others are marked NOT YET. A call record_outcome failed to settle twice in this scoring is LEFT: named, not shown, and left pending. The figures come from price rows only.',
+    description: 'List the calls in the journal that are not settled yet. For each whose scoring window has passed (the window kept with the call: a short first check, not the call\'s own time horizon), it shows the measured outcome (return, its yardstick\'s return, alpha), the decision, and what happened in the window day by day (the stock\'s prices, volume and main indicators beside the yardstick\'s close), so you can write the lesson from what happened; the others are marked NOT YET. A call record_outcome failed to settle twice in this scoring is LEFT: named, not shown, and left pending. The figures come from price rows only.',
     inputSchema: { symbol: symbol.optional() },
     annotations: { readOnlyHint: true, openWorldHint: true },
   }, async (a) => act(() => dueSettlements(journalOf(root, ws()), readSettings(root).scoring, a.symbol ? safeSymbol(a.symbol) : undefined)));
@@ -167,7 +170,7 @@ export function registerDeskTools(server: McpServer, root: string): void {
 
   server.registerTool('recheck_lessons', {
     title: 'Lessons to re-check',
-    description: 'Find the settled calls whose lesson was not written from the holding window\'s prices (written before the desk showed them, when they could not be had, or marked unreliable before), or that the person said is wrong (flag_lesson). Up to three at a time are shown to rewrite: the call\'s score and its index\'s return over the same days, which stay as they are, the decision, the lesson as it stands, what the person said is wrong (for a flagged one), and the window\'s entry and finished sessions day by day; call again once those are saved for the next ones. A call whose window\'s prices cannot be had is marked unreliable by the desk itself, so later analyses stop reading its lesson. A lesson correct_lesson refused twice in this re-check is LEFT, named but not shown; the same lessons asked for again with nothing saved since answer STOP. With nothing left to rewrite, its last words say what a later re-check does. Never changes a call, its rating or its score.',
+    description: 'Find the settled calls whose lesson was not written from the holding window\'s prices (written before the desk showed them, when they could not be had, or marked unreliable before), or that the person said is wrong (flag_lesson). Up to three at a time are shown to rewrite: the call\'s score and its yardstick\'s return over the same days, which stay as they are, the decision, the lesson as it stands, what the person said is wrong (for a flagged one), and the window\'s entry and finished sessions day by day; call again once those are saved for the next ones. A call whose window\'s prices cannot be had is marked unreliable by the desk itself, so later analyses stop reading its lesson. A lesson correct_lesson refused twice in this re-check is LEFT, named but not shown; the same lessons asked for again with nothing saved since answer STOP. With nothing left to rewrite, its last words say what a later re-check does. Never changes a call, its rating or its score.',
     inputSchema: { symbol: symbol.optional() },
     annotations: { readOnlyHint: false, openWorldHint: true },
   }, async (a) => act(() => lessonsToRecheck(journalOf(root, ws()), readSettings(root).scoring, a.symbol ? safeSymbol(a.symbol) : undefined)));
@@ -198,7 +201,7 @@ export function registerDeskTools(server: McpServer, root: string): void {
 
   server.registerTool('start_backtest', {
     title: 'Start a backtest sweep',
-    description: 'Lay out a backtest: the team is run over every stock on every date from start to end (every few days) and the calls are scored later against the market index. From now until end_backtest every desk tool records into this sweep\'s own journal and runs, so the live journal and its lessons are untouched. Repeat the call with the same sweep_id to resume: cells already recorded are skipped. Every cell is a full team run, so tell the person the number of cells before running any.',
+    description: 'Lay out a backtest: the team is run over every stock on every date from start to end (every few days) and the calls are scored later, each over its short first window against its yardstick, as a live call is. From now until end_backtest every desk tool records into this sweep\'s own journal and runs, so the live journal and its lessons are untouched. Repeat the call with the same sweep_id to resume: cells already recorded are skipped. Every cell is a full team run, so tell the person the number of cells before running any.',
     inputSchema: {
       symbols: z.array(symbol).min(1).max(10), start_date: day, end_date: day,
       every_days: z.number().int().min(1).max(60).optional().describe('Days between analysis dates; 7 when left out'),
@@ -232,7 +235,7 @@ export function registerDeskTools(server: McpServer, root: string): void {
 
   server.registerTool('backtest_summary', {
     title: 'Backtest results',
-    description: 'Score a sweep\'s settled calls by rating: how many, how often the direction was called right (not for Hold, which claims none), and the mean alpha against each stock\'s market index. Calls whose window has not traded are pending; calls with no readable rating are unscored. Report the figures as they are and say that a few calls prove nothing.',
+    description: 'Score a sweep\'s settled calls by rating: how many, how often the direction was called right (not for Hold, which claims none), and the mean alpha against each call\'s yardstick over its first window (the summary names them), not over the calls\' own time horizons. Calls whose window has not traded are pending; calls with no readable rating are unscored. Report the figures as they are and say that a few calls prove nothing.',
     inputSchema: { sweep_id: z.string().max(40).optional().describe('The sweep to score; the running one when left out') },
     annotations: { readOnlyHint: true, openWorldHint: false },
   }, async (a) => act(() => {

@@ -211,7 +211,10 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
         }));
       }
       await sectors.warm(calls.filter((c) => followed(c.ticker)).map((c) => c.ticker));
-      paperMemo = { key, at: Date.now(), book: paperBook(calls, closes, { startUsd, trading, caps, today, sectors, dividends }) };
+      const book = paperBook(calls, closes, { startUsd, trading, caps, today, sectors, dividends });
+      // A book withheld for want of a stock's prices is not kept: the next ask reads them again.
+      if (book.missing.length) { paperMemo = null; return { ...book, record: recordOf(calls, today) }; }
+      paperMemo = { key, at: Date.now(), book };
     }
     return { ...paperMemo.book, record: recordOf(calls, today) };
   };

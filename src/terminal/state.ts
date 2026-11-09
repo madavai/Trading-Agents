@@ -10,7 +10,8 @@ import { alphaOf, renderSummary, summarize, worked, type Summary } from '../desk
 import { depthOfRounds, readListener, readQueue, type Depth, type QueueItem } from '../desk/queue.js';
 import { followed, readPaperStart, recordOf, RECORD_WEEKS, RECORD_WORDS, type PaperRecord } from '../desk/paper.js';
 import { readSettings } from '../settings.js';
-import { resolveBenchmark, type Scoring } from '../desk/scoring.js';
+import { basisWords, checkName, legacyRules, resolveBenchmark, rulesFor, WHEN_SCORED, windowWords, yardstickName, yardstickWords, type Rules, type Scoring } from '../desk/scoring.js';
+import { isCrypto } from '../data/symbols.js';
 import { deskDataDir } from '../paths.js';
 import { today } from '../data/dates.js';
 import { readWatchlist, type WatchItem } from './store.js';
@@ -31,12 +32,17 @@ export interface Call {
   summary: string; hasReport: boolean;
   /** Whether Decide… can open an order ticket from it (not for crypto or an index), and whether paper follows it. */
   ticket: boolean; paper: boolean;
+  /** What the call is scored by, as its journal entry keeps it (or, for one recorded before the desk kept it, as such
+   *  calls are scored): its window ("5 trading days"), its yardstick ("SPY"), the check's name ("a first-week check")
+   *  and, when it is not a US listing scored against SPY, why that yardstick ('' otherwise). */
+  window: string; yardstick: string; check: string; why: string;
 }
 export interface DeskState {
   version: string; today: string; watchlist: WatchItem[]; queue: QueueView[]; calls: Call[];
   record: { summary: Summary; text: string; benchmarkNote: string };
-  /** `benchmark`: what a US stock's call is scored against (SPY as shipped: the fund that copies the S&P 500). */
-  desk: { emailSaved: boolean; tradingEnabled: boolean; holdingDays: number; benchmark: string };
+  /** `benchmark`: what a US stock's call is scored against (SPY as shipped: the fund that copies the S&P 500); `scoring`:
+   *  how a call made now is scored, in a few words for the calls list. */
+  desk: { emailSaved: boolean; tradingEnabled: boolean; holdingDays: number; benchmark: string; scoring: string };
   /** The depth the page offers first (the settings'), how many one run analyses, and who listens for the doorbell. */
   analyses: { depth: Depth; perRun: number; listener: ListenerView | null };
   /** How much record the desk has on paper, the paper money it starts with, and the weeks under which switching trading
@@ -78,12 +84,51 @@ export function summaryOf(decision: string): string {
 
 const stamp = (file: string): string => { try { return String(fs.statSync(file).mtimeMs); } catch { return '0'; } };
 
-/** What a call is scored against, named for what it is: as shipped, its market's index, which for a US stock is SPY, the
- *  fund that copies the S&P 500 (the index itself cannot be bought); one yardstick set for every call is named as itself. */
-export function yardstickWords(s: Pick<Scoring, 'benchmark' | 'benchmarks'>): string {
-  const us = resolveBenchmark('SPY', s);
-  if (s.benchmark.trim()) return `${us}, the yardstick set for every call`;
-  return `its market's index: for a US stock, ${us}${us === 'SPY' ? ', the fund that copies the S&P 500' : ''}`;
+// ---------- how calls are scored, in words: each call's own rules, and the scorecard's note ----------
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** 2026-10-16 as "16 Oct 2026", as the page writes days. */
+const dayWords = (iso: string): string => { const [y, m, d] = iso.split('-'); return `${Number(d)} ${MON[Number(m) - 1]} ${y}`; };
+/** A call's rules: those its entry keeps, or for one recorded before the desk kept them, the rules it was made under. */
+const rulesOfEntry = (e: Entry, s: Scoring): { r: Rules; older: boolean } => {
+  if (e.rules) return { r: e.rules, older: false };
+  const r = legacyRules(e.ticker, s, e.holding), now = rulesFor(e.ticker, s);
+  return { r, older: r.days !== now.days || r.unit !== now.unit };
+};
+const OLDER = "it was recorded before the desk kept each call's window with it, so it is scored as such calls were then";
+
+/** What one call is scored by, for its chips and its window on the page. */
+export function scoredBy(e: Entry, s: Scoring): Pick<Call, 'window' | 'yardstick' | 'check' | 'why'> {
+  const { r, older } = rulesOfEntry(e, s);
+  return { window: windowWords(r), yardstick: r.yardstick, check: checkName(r), why: [basisWords(e.ticker, r), older ? OLDER : ''].filter(Boolean).join('; ') };
+}
+
+/** How a call made now is scored, in a few words for the calls list: "each scored once, a first-week check, not its time
+ *  horizon: a US stock or fund over 5 trading days, a coin over 7 calendar days, against SPY". */
+export function scoringShort(s: Scoring): string {
+  const stock = rulesFor('SPY', s), coin = rulesFor('BTC-USD', s), same = stock.yardstick === coin.yardstick;
+  const name = checkName(stock) === checkName(coin) ? checkName(stock) : 'a short first check';
+  return `each scored once, ${name}, not its time horizon: a US stock or fund over ${windowWords(stock)}${same ? '' : ` against ${stock.yardstick}`}, a coin over ${windowWords(coin)}, against ${coin.yardstick}`;
+}
+
+/** The scorecard's note: how a stock or fund and a coin are scored now, each call the journal keeps that is scored
+ *  otherwise (another exchange's index, an exchange the settings do not list, rules from before the desk kept them),
+ *  that it is not the call's own horizon, and when scoring happens. */
+export function scoringNote(entries: Entry[], s: Scoring): string {
+  const stock = rulesFor('SPY', s), coin = rulesFor('BTC-USD', s);
+  const name = checkName(stock) === checkName(coin) ? checkName(stock) : 'a short first check';
+  const coinY = coin.yardstick === stock.yardstick ? `${coin.yardstick} too` : yardstickName(coin.yardstick);
+  const ny = coin.yardstick === 'SPY', y = coin.yardstick;
+  const closed = ny ? "New York's market was closed (a weekend or a New York holiday)" : 'its market was closed';
+  const same = (r: Rules, std: Rules) => r.days === std.days && r.unit === std.unit && r.yardstick === std.yardstick && r.basis === std.basis;
+  const otherwise = entries.map((e) => ({ e, ...rulesOfEntry(e, s) })).filter(({ e, r, older }) => older || !same(r, isCrypto(e.ticker) ? coin : stock));
+  const listed = otherwise.slice(0, 6).map(({ e, r, older }) => `${e.ticker} (${dayWords(e.date)}): against ${yardstickWords(e.ticker, r)}, over the ${windowWords(r)} after the call${older ? `, as ${OLDER}` : ''}`);
+  return [
+    `Each call is scored once, ${name} against a named yardstick, not over the call's own time horizon (its decision states that).`,
+    `A US stock or fund: against ${yardstickWords('SPY', stock)}, over the ${windowWords(stock)} after the call.`,
+    `A coin: against ${coinY}${coin.basis === 'coin' ? ", as the desk's settings name no yardstick for coins" : ''}, over the ${windowWords(coin)} after the call. A coin trades every day and ${y} ${ny ? "only on New York's market days" : 'only on its own market\'s days'}, so ${y}'s close on the coin's first and last day is used, or its last close before that day when ${closed}.`,
+    ...(listed.length ? [`Scored otherwise: ${listed.join('; ')}${otherwise.length > listed.length ? `; and ${otherwise.length - listed.length} more` : ''}.`] : []),
+    WHEN_SCORED, 'Both returns count dividends: they are worked out from prices adjusted for them.',
+  ].join(' ');
 }
 
 /** A short fingerprint of everything the page reads, so the page can ask "did anything change?" cheaply and refresh only then. */
@@ -120,6 +165,7 @@ export function stateOf(root: string, day: string): DeskState {
     date: e.date, ticker: e.ticker, rating: e.rating, pending: e.pending, raw: e.raw, alpha: e.alpha, holding: e.holding,
     worked: e.pending ? null : worked(e.rating, alphaOf(e)),
     summary: summaryOf(e.decision), hasReport: hasReport(dir, e.ticker, e.date), ticket: ticketable(e.ticker), paper: followed(e.ticker),
+    ...scoredBy(e, s.scoring),
   })).reverse().sort((a, b) => b.date.localeCompare(a.date));
   const summary = summarize(entries), watchlist = readWatchlist(dir), market = marketView(dir);
   const { startHere, watch } = tiersOf(watchlist, market.symbols, calls);
@@ -128,8 +174,8 @@ export function stateOf(root: string, day: string): DeskState {
   const guide = guideOf({ email, watchlist, market: market.symbols, queue, calls, listener: listener?.listener ?? null, autorun: prefs.autorun === true, readCall: !!prefs.readCall, record, ...(prefs.guide ? { pref: prefs.guide } : {}) });
   return {
     version: versionOf(root), today: day, watchlist, queue, calls, startHere, watchTiers: watch, market, guide,
-    record: { summary, text: renderSummary(summary), benchmarkNote: `Each call is judged after ${s.scoring.holdingPeriodDays} trading days against ${yardstickWords(s.scoring)}. Both returns count dividends: they are worked out from prices adjusted for them.` },
-    desk: { emailSaved: !!email, tradingEnabled: false, holdingDays: s.scoring.holdingPeriodDays, benchmark: resolveBenchmark('SPY', s.scoring) },
+    record: { summary, text: renderSummary(summary), benchmarkNote: scoringNote(entries, s.scoring) },
+    desk: { emailSaved: !!email, tradingEnabled: false, holdingDays: s.scoring.holdingPeriodDays, benchmark: resolveBenchmark('SPY', s.scoring), scoring: scoringShort(s.scoring) },
     analyses: { depth: depthOfRounds(s.analysis.debateRounds), perRun: s.routines.maxAnalyses, listener },
     paper: { ...record, startUsd: readPaperStart(dir), minWeeks: RECORD_WEEKS, minWords: RECORD_WORDS },
   };

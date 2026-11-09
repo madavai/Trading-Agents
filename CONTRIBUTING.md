@@ -99,9 +99,21 @@ built, which decisions stand, every document, and what is pending.
 - `src/numbers.ts` - signed figures in words (`signed`, `signedPct`): what rounds to zero is written as zero, never
   "-0.0%"; `unsignZero` reads a score stored that way back as "0.0%". The page's own `pct` and `money`
   (`src/terminal/ui/fmt.ts`) follow the same rule.
+- `src/desk/scoring.ts` - how a call is scored: once, a first-week check against a named yardstick, never over the
+  call's own time horizon. `rulesFor` gives a new call its `Rules` (days, unit, yardstick and why that yardstick:
+  `us`, `coin`, `unlisted`, `market` or `chosen`): a US stock or fund over `holdingPeriodDays` (5) trading days, a coin
+  over `coinDays` (7) calendar days, both against SPY; a stock from an exchange the settings do not list (`exchangeOf`)
+  against SPY too, said so. `record_decision` writes them into the call's journal tag (`window:5 trading days`,
+  `yardstick:SPY (us)`), and every scoring, lesson and page reads them from there; a call recorded before the tag kept
+  them gets `legacyRules` (its stored days, a coin in calendar days, the yardstick by suffix), so no score already
+  given changes. `measure` scores a trading window on the yardstick's own sessions; a coin's calendar window ends
+  exactly N days after the call, the coin's close on that day, and SPY's last close on or before the coin's first and
+  last day (a weekend or a New York holiday, `holidays.ts`, takes the close before it); while New York's last market
+  day on or before the end has no SPY close yet, it is not scored. `checkWords`, `windowWords` and `WHEN_SCORED` are
+  the words every place says it in.
 - `src/desk/window.ts` - what happened in a settled call's holding window (`windowRows`): the entry row, marked
   "entry" with its change left out (the call is scored from its close; its own move came before the window), then the
-  finished sessions numbered from 1, with change, volume, RSI, MACD histogram, 10 EMA and 50 SMA beside the index's
+  finished sessions numbered from 1, with change, volume, RSI, MACD histogram, 10 EMA and 50 SMA beside the yardstick's
   close, and a glance line over sessions 1 to N only. The rows are dividend-adjusted, as the call is scored; when a
   dividend has lowered them, the high, low and close as traded are added beside them, for the levels a decision named.
   `list_settlements` shows it under each READY call, so a lesson
@@ -248,7 +260,10 @@ built, which decisions stand, every document, and what is pending.
   its ticket would be, filled at the first close after the call's day as printed (Yahoo's `traded` rows, never the
   dividend-adjusted ones), each dividend paid into paper cash on its ex-day for the shares held that morning, valued
   daily against SPY bought at the same start and paid its own dividends; worked out afresh from the journal and Yahoo's
-  daily closes (the dashboard's `/api/paper`, kept ten minutes). Only the starting money is
+  daily closes (the dashboard's `/api/paper`, kept ten minutes). A held stock is valued only at a close of its own,
+  never at its cost: when a stock with a buy-asking call has no closes (`missing`), or a held one has none for a day
+  (`NoClose`), the book is withheld, with no total, chart or positions, its fills marked `withheld`, and not kept, so
+  the page (which asks again a minute later) says which stock's prices could not be read. Only the starting money is
   kept (`desk-data/paper.json`). `recordOf` is the record (weeks, calls) the trading switch's four-week press and Get started's fifth step use;
   `RECORD_WEEKS` and `RECORD_WORDS` are that paper time, one number said one way everywhere.
 - `desk-settings.json` - the desk's settings (read and checked by `src/settings.ts`, trading part included, but never
