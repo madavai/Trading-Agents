@@ -307,7 +307,8 @@ Before you risk money, every call the desk makes on a stock, a fund, Bitcoin or 
 Start here and This morning the dashboard shows what that would have done: one sentence, a line of the paper money
 against SPY (the fund that copies the S&P 500) from the same start, and how many weeks and calls stand behind it. Each call is sized exactly as its order ticket would size it (the rating, a full
 position of 10%, your caps), takes no order the real ticket would refuse, and fills at the first closing price after
-the call's day. No costs are counted. The paper money starts at $10,000; change it on the scorecard. Each call shows a
+the call's day, as the market printed it. Each dividend is paid into paper cash on its ex-dividend day, as an account
+would receive it, and the SPY line is paid its own the same way. No costs are counted. The paper money starts at $10,000; change it on the scorecard. Each call shows a
 small "paper" badge with what it did there, such as "paper: bought 2 · NVDA −13.59% since": the stock's move since the
 paper buy, not the call's own result (that is its alpha, beside it). Switching trading on with under four weeks of record shows that record first and
 asks you to press "I understand".

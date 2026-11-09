@@ -12,6 +12,7 @@ import { history, HOSTS } from './yahoo.js';
 import { averageDilutedShares, cikFor, companyFacts, fundTickers, latestBalance, sectorOfSic, secStatement, sharesOutstanding, SHOWN, STATEMENTS, submissions, trailingYear, type Fact, type Frequency, type Statement, type Table } from './sec.js';
 import { secInsiders } from './insiders.js';
 import { latestReport, renderReport } from './nport.js';
+import { latestState } from './market.js';
 import { ASK_FOR_EMAIL } from '../contact.js';
 
 /** The filer's CIK, or null when the SEC does not list it (or its list could not be read). */
@@ -118,11 +119,16 @@ async function secOverview(sym: string, cik: string, day: string): Promise<strin
   const fy = /^(\d\d)(\d\d)$/.exec(s.fiscalYearEnd ?? '');
   if (fy && Number(fy[1]) >= 1 && Number(fy[1]) <= 12) lines.push(`Fiscal year ends: ${Number(fy[2])} ${MONTHS[Number(fy[1]) - 1]}`);
 
-  let close: { date: string; close: number; currency?: string } | null = null, paid: Array<{ date: string; amount: number }> = [];
-  // The close in cents, as the price table shows it, so a product like the market value carries no rounding noise.
-  try { const h = await history(sym, day), last = h.bars.at(-1)!; close = { date: last.date, close: Math.round(last.close * 100) / 100, currency: h.meta.currency }; paid = h.dividends ?? []; } catch { /* no price: the multiples are unavailable */ }
-  const usd = !close?.currency || close.currency === 'USD';
-  lines.push(close ? `Close: ${fixed(close.close)} ${close.currency ?? ''} on ${close.date} (the checked price table's latest row on or before ${day})`.replace('  ', ' ') : 'Close: unavailable (the prices could not be read), so no multiple can be worked out');
+  let close: { date: string; close: number; currency?: string; open: boolean; label: string } | null = null, paid: Array<{ date: string; amount: number }> = [];
+  // The close in cents, as the price table shows it, so a product like the market value carries no rounding noise; while
+  // its session is still trading (or was when it was read) it is the latest price, and every multiple says so.
+  try {
+    const h = await history(sym, day), last = h.bars.at(-1)!, state = latestState(h, day);
+    close = { date: last.date, close: Math.round(last.close * 100) / 100, currency: h.meta.currency, open: state.open, label: state.open ? state.label : 'Close' };
+    paid = h.dividends ?? [];
+  } catch { /* no price: the multiples are unavailable */ }
+  const usd = !close?.currency || close.currency === 'USD', px = close?.open ? 'latest price' : 'close';
+  lines.push(close ? `${close.label}: ${fixed(close.close)} ${close.currency ?? ''} on ${close.date} (the checked price table's latest row on or before ${day}${close.open ? '; not a close, so every multiple below moves with it' : ''})`.replace('  ', ' ') : 'Close: unavailable (the prices could not be read), so no multiple can be worked out');
 
   const cover = sharesOutstanding(units(dei.EntityCommonStockSharesOutstanding, 'shares'), day);
   const average = cover ? null : averageDilutedShares(units(g.WeightedAverageNumberOfDilutedSharesOutstanding, 'shares'), day);
@@ -130,12 +136,12 @@ async function secOverview(sym: string, cik: string, day: string): Promise<strin
   if (cover) lines.push(`Shares outstanding: ${whole(cover.shares)} (counted on ${cover.end}, filed ${cover.filed})`);
   else if (average) lines.push(`Shares outstanding: no single count on a cover page filed by then (a company with more than one class of shares gives one per class there, which the SEC's data leaves out). In its place, the weighted average diluted shares from its accounts for ${average.start} to ${average.end}: ${whole(average.shares)} (filed ${average.filed}), so the figures worked out from it are close, not exact`);
   else lines.push('Shares outstanding: unavailable (not on a cover page filed by then)');
-  if (shares && close && usd) lines.push(`Market value (derived: ${which} × close): ${whole(shares.shares * close.close)} USD`);
+  if (shares && close && usd) lines.push(`Market value (derived: ${which} × ${px}): ${whole(shares.shares * close.close)} USD`);
 
   const eps = trailingYear(units(g.EarningsPerShareDiluted, 'USD/shares'), day);
   if (eps) {
     lines.push(`Diluted EPS, last twelve months (derived from ${eps.parts}): ${fixed(eps.value)} USD`);
-    if (close && usd) lines.push(eps.value > 0 ? `Price to earnings (derived: close ÷ that): ${fixed(close.close / eps.value)}` : 'Price to earnings: not meaningful (the last twelve months lost money)');
+    if (close && usd) lines.push(eps.value > 0 ? `Price to earnings (derived: ${px} ÷ that): ${fixed(close.close / eps.value)}` : 'Price to earnings: not meaningful (the last twelve months lost money)');
   } else lines.push('Diluted EPS, last twelve months: unavailable (not filed in US dollars by then)');
 
   const equity = latestBalance(units(g.StockholdersEquity, 'USD'), day);
@@ -144,7 +150,7 @@ async function secOverview(sym: string, cik: string, day: string): Promise<strin
     if (shares && shares.shares > 0) {
       const bv = equity.val / shares.shares;
       lines.push(`Book value per share (derived: equity ÷ ${which}): ${fixed(bv)} USD`);
-      if (close && usd && bv > 0) lines.push(`Price to book (derived: close ÷ that): ${fixed(close.close / bv)}`);
+      if (close && usd && bv > 0) lines.push(`Price to book (derived: ${px} ÷ that): ${fixed(close.close / bv)}`);
     }
   }
   // Dividends over the true twelve months to the day, from the price source's record of each one (the filings stop at
@@ -155,12 +161,15 @@ async function secOverview(sym: string, cik: string, day: string): Promise<strin
     const sum = Number(year.reduce((a, d) => a + d.amount, 0).toFixed(6)), span = `${addDays(after, 1)} to ${day}`;
     if (year.length) {
       lines.push(`Dividends per share, the 12 months to ${day} (derived: the ${year.length === 1 ? 'one' : year.length} that went ex-dividend from ${span}, from the price source, ${year.map((d) => `${d.date} ${d.amount}`).join(', ')}): ${fixed(sum, 4)} ${unit}`);
-      if (close.close > 0) lines.push(`Dividend yield (derived: that ÷ close): ${fixed((sum / close.close) * 100)}%`);
-    } else lines.push(`Dividends per share, the 12 months to ${day}: none went ex-dividend from ${span} (the price source's record of dividends)`);
+      if (close.close > 0) lines.push(`Dividend yield (derived: that ÷ ${px}): ${fixed((sum / close.close) * 100)}%`);
+    // The price source leaves its record of dividends out of an answer with none in it, and out of a broken one alike, so
+    // "none" is checked against the filings: dividends filed while the source records none make the record unavailable.
+    } else if (dps && dps.value > 0) lines.push(`Dividends per share, the 12 months to ${day}: unavailable. The price source records none that went ex-dividend from ${span}, but the company's filings show ${fixed(dps.value, 4)} USD a share over the last twelve months filed (derived from ${dps.parts}), so the price source's record of dividends may be missing. That filed figure covers the last twelve months filed, not these twelve months, so no yield is worked out from it`);
+    else lines.push(`Dividends per share, the 12 months to ${day}: none went ex-dividend from ${span}, as the price source records them${dps ? ' (the filings show none over the last twelve months filed either)' : ' (the filings give no dividend figure to check that record against)'}`);
   } else if (dps) lines.push(`Dividends per share, the last twelve months filed (derived from ${dps.parts}): ${fixed(dps.value, 4)} USD. Dividends since the last filed period are not in the filings, and the prices that record them could not be read`);
   else lines.push('Dividends per share: not among its filed figures (many companies pay none)');
   lines.push('Unavailable from official free sources: forward estimates (forward P/E, PEG), analysts\' price targets and beta.');
-  return [`Company profile and valuation for ${sym}, from its SEC filings as they stood on ${day} and the desk's checked closing price, with the dividends its price source records. Every multiple is derived here from those filed figures and that price, and shows what it came from; nothing is an estimate.`, '', ...lines].join('\n');
+  return [`Company profile and valuation for ${sym}, from its SEC filings as they stood on ${day} and the desk's checked ${close?.open ? 'latest price (not a close)' : 'closing price'}, with the dividends its price source records. Every multiple is derived here from those filed figures and that price, and shows what it came from; nothing is an estimate.`, '', ...lines].join('\n');
 }
 
 export async function companyOverview(raw: string, analysis: string): Promise<string> {

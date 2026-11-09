@@ -4,7 +4,7 @@
 // agents' own mistakes in exactly such claims, so the agents now state one only as this tool gives it.
 import { analysisDate, withWeekday } from './dates.js';
 import { atr, bollinger, ema, macd, rsi, sma, vwma, type Values } from './indicators.js';
-import { latestState } from './market.js';
+import { adjustedWords, latestState } from './market.js';
 import { normalizeSymbol } from './symbols.js';
 import { history, type Series } from './yahoo.js';
 import { signed } from '../numbers.js';
@@ -41,11 +41,19 @@ export function priceFactsText(sym: string, day: string, s: Series): string {
   const change: Values = close.map((c, i) => (i && close[i - 1] ? (c / close[i - 1]! - 1) * 100 : null));
   const windows = WINDOWS.map(([size, words]) => ({ size: Math.min(size, n), words: size <= n ? words : 'all on record', full: size }));
   const from = (w: { size: number }) => n - w.size;
+  // A volume the source does not give is left out of every volume fact, never ranked as a zero; with no volume traded on
+  // any row (a currency pair's zeros) there are no volume facts at all.
+  const anyVolume = bars.some((b) => b.volume !== null && b.volume > 0);
+  const volumeOf = (i: number): number | null => (anyVolume ? bars[i]!.volume : null);
+  const noVolume = bars.map((b, i) => (b.volume === null ? i : -1)).filter((i) => i >= 0);
+  const volumeNote = !anyVolume ? ['- The source gives no volume for these rows (or none traded): there are no volume facts here, and VWMA has no value.']
+    : noVolume.length ? [`- The source gives no volume for ${plural(noVolume.length, 'session')} (${noVolume.slice(-5).map(d).join('; ')}${noVolume.length > 5 ? ', and earlier ones' : ''}): ${noVolume.length === 1 ? 'it is' : 'they are'} left out of every volume fact, and VWMA has no value on a window that includes ${noVolume.length === 1 ? 'it' : 'them'}.`] : [];
 
   const out = [
     `## Price facts for ${sym}, worked out by the desk`, '',
     `- Analysis date: ${withWeekday(day)}. Latest row: ${d(L)}. Rows after the analysis date are excluded.`,
-    '- From the same daily prices as the checked price table (adjusted for splits and dividends) and the same indicators (10 EMA, 50 SMA, 200 SMA, VWMA, RSI, MACD, Bollinger bands, ATR). A session is a trading day; every date carries its weekday.',
+    `- From the same daily prices as the checked price table (${adjustedWords(s)}) and the same indicators (10 EMA, 50 SMA, 200 SMA, VWMA, RSI, MACD, Bollinger bands, ATR). A session is a trading day; every date carries its weekday.`,
+    ...volumeNote,
     `- Windows count back from the latest row, which they include: ${windows.map((w) => `the last ${w.size} sessions${w.size < w.full ? ' (all on record)' : ''} from ${d(from(w))}`).join('; ')}.`,
     '- Directions and sides are judged on figures rounded to the cent, as the tables show them.',
     ...latestState(s, day).lines, '',
@@ -140,10 +148,10 @@ export function priceFactsText(sym: string, day: string, s: Series): string {
     ['Highest intraday highs', (i) => bars[i]!.high, 1, (i) => f2(bars[i]!.high)], ['Lowest intraday lows', (i) => bars[i]!.low, -1, (i) => f2(bars[i]!.low)],
     ['Biggest daily rises', (i) => change[i], 1, (i) => `${pct(i)} (${signed(close[i]! - close[i - 1]!, 2)})`, (i) => (change[i] ?? 0) > 0],
     ['Biggest daily falls', (i) => change[i], -1, (i) => `${pct(i)} (${signed(close[i]! - close[i - 1]!, 2)})`, (i) => (change[i] ?? 0) < 0],
-    ['Heaviest volume', (i) => bars[i]!.volume, 1, (i) => `${vol(bars[i]!.volume)}${change[i] === null ? '' : ` (close ${pct(i)})`}`],
-    ['Heaviest volume on a down close', (i) => bars[i]!.volume, 1, (i) => `${vol(bars[i]!.volume)} (close ${pct(i)})`, (i) => down(i) === true],
-    ['Heaviest volume on an up close', (i) => bars[i]!.volume, 1, (i) => `${vol(bars[i]!.volume)} (close ${pct(i)})`, (i) => up(i) === true],
-    ['Lightest volume', (i) => bars[i]!.volume, -1, (i) => vol(bars[i]!.volume)],
+    ['Heaviest volume', volumeOf, 1, (i) => `${vol(volumeOf(i)!)}${change[i] === null ? '' : ` (close ${pct(i)})`}`],
+    ['Heaviest volume on a down close', volumeOf, 1, (i) => `${vol(volumeOf(i)!)} (close ${pct(i)})`, (i) => down(i) === true],
+    ['Heaviest volume on an up close', volumeOf, 1, (i) => `${vol(volumeOf(i)!)} (close ${pct(i)})`, (i) => up(i) === true],
+    ['Lightest volume', volumeOf, -1, (i) => vol(volumeOf(i)!)],
     ['Highest RSI', (i) => rsi14[i], 1, (i) => f2(rsi14[i]!)], ['Lowest RSI', (i) => rsi14[i], -1, (i) => f2(rsi14[i]!)],
     ['Highest MACD', (i) => m.macd[i], 1, (i) => f2(m.macd[i]!)], ['Lowest MACD', (i) => m.macd[i], -1, (i) => f2(m.macd[i]!)],
     ['Highest MACD histogram', (i) => m.hist[i], 1, (i) => f2(m.hist[i]!)], ['Lowest MACD histogram', (i) => m.hist[i], -1, (i) => f2(m.hist[i]!)],
@@ -172,7 +180,7 @@ export function priceFactsText(sym: string, day: string, s: Series): string {
   };
   out.push('', '### The latest row against the past', '');
   out.push(...[
-    since('Close', ['highest close', 'lowest close'], (i) => close[i], f2), since('Volume', ['heaviest volume', 'lightest volume'], (i) => bars[i]!.volume, vol),
+    since('Close', ['highest close', 'lowest close'], (i) => close[i], f2), since('Volume', ['heaviest volume', 'lightest volume'], volumeOf, vol),
     since('Daily move', ['biggest daily rise', 'biggest daily fall'], (i) => change[i], (x) => `${signed(x, 2)}%`, true),
     since('RSI', ['highest RSI', 'lowest RSI'], (i) => rsi14[i], f2), since('MACD', ['highest MACD', 'lowest MACD'], (i) => m.macd[i], f2),
     since('MACD histogram', ['highest MACD histogram', 'lowest MACD histogram'], (i) => m.hist[i], f2),
