@@ -7333,8 +7333,10 @@ var file = (root2) => path2.join(deskDataDir(root2), "contact.json");
 var EMAIL = /^[^\s@<>()",;:]+@[^\s@<>()",;:]+\.[a-z]{2,}$/i;
 var RESERVED = /@(?:[^@]*\.)?(?:example\.(?:com|net|org)|example|test|invalid|localhost)$/i;
 function checkEmail(raw) {
-  const email2 = String(raw ?? "").trim();
+  const email2 = String(raw ?? "").replace(new RegExp("\\p{Cf}", "gu"), "").trim();
   if (!EMAIL.test(email2)) throw new Error(`"${raw}" is not an email address`);
+  const odd = [...email2].find((c) => c < "!" || c > "~");
+  if (odd) throw new Error(`"${email2}" cannot be sent to the SEC: it has "${odd}", and the SEC can only be sent an address written with the letters a to z, digits and marks such as . _ - + (it goes in the header of every request)`);
   if (RESERVED.test(email2)) throw new Error(`${email2} is a made-up example address: the SEC needs one that reaches the person`);
   return email2;
 }

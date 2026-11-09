@@ -7921,12 +7921,12 @@ function cleanRegex(source) {
   return source.slice(start, end);
 }
 function floatSafeRemainder(val, step) {
-  const ratio = val / step;
-  const roundedRatio = Math.round(ratio);
-  const tolerance = 4 * Number.EPSILON * Math.max(Math.abs(ratio), 1);
-  if (Math.abs(ratio - roundedRatio) < tolerance)
+  const ratio2 = val / step;
+  const roundedRatio = Math.round(ratio2);
+  const tolerance = 4 * Number.EPSILON * Math.max(Math.abs(ratio2), 1);
+  if (Math.abs(ratio2 - roundedRatio) < tolerance)
     return 0;
-  return ratio - roundedRatio;
+  return ratio2 - roundedRatio;
 }
 var EVALUATING = /* @__PURE__ */ Symbol("evaluating");
 function defineLazy(object3, key, getter) {
@@ -36628,8 +36628,10 @@ var file2 = (root) => path3.join(deskDataDir(root), "contact.json");
 var EMAIL = /^[^\s@<>()",;:]+@[^\s@<>()",;:]+\.[a-z]{2,}$/i;
 var RESERVED = /@(?:[^@]*\.)?(?:example\.(?:com|net|org)|example|test|invalid|localhost)$/i;
 function checkEmail(raw) {
-  const email3 = String(raw ?? "").trim();
+  const email3 = String(raw ?? "").replace(new RegExp("\\p{Cf}", "gu"), "").trim();
   if (!EMAIL.test(email3)) throw new Error(`"${raw}" is not an email address`);
+  const odd = [...email3].find((c) => c < "!" || c > "~");
+  if (odd) throw new Error(`"${email3}" cannot be sent to the SEC: it has "${odd}", and the SEC can only be sent an address written with the letters a to z, digits and marks such as . _ - + (it goes in the header of every request)`);
   if (RESERVED.test(email3)) throw new Error(`${email3} is a made-up example address: the SEC needs one that reaches the person`);
   return email3;
 }
@@ -38251,7 +38253,6 @@ function frequency(obs) {
   const median = gaps[Math.floor(gaps.length / 2)] ?? 1;
   return median <= 3 ? "daily" : median <= 10 ? "weekly" : median <= 45 ? "monthly" : median <= 120 ? "quarterly" : "yearly";
 }
-var releaseLag = (obs) => ({ daily: 1, weekly: 6, monthly: 45, quarterly: 120, yearly: 120 })[frequency(obs)];
 function periodOf(date5, freq) {
   const y = date5.slice(0, 4), m2 = Number(date5.slice(5, 7));
   if (freq === "monthly") return `${new Date(Date.UTC(Number(y), m2 - 1, 1)).toLocaleString("en-US", { month: "long", timeZone: "UTC" })} ${y}`;
@@ -38268,12 +38269,18 @@ async function economicSeries(indicator, analysis2, lookBackDays = 365) {
   const id = known?.[0] ?? indicator.trim().toUpperCase();
   if (!/^[A-Z0-9_]{1,40}$/.test(id)) throw new Error(`"${indicator}" is not a series name or a FRED series id`);
   const window2 = Math.max(30, Math.min(3650, lookBackDays));
-  const from = addDays(day3, -Math.max(window2, 365) - 400);
-  const { text: csv, at } = await getTextAt(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${id}&cosd=${from}&coed=${day3}`);
-  if (!/^\s*(observation_date|DATE)\s*,/i.test(csv)) throw new Unavailable(`FRED answered with something other than its data download (it may be down for maintenance)`);
-  let all = parseCsv(csv).filter((o) => o.date <= day3);
-  const past = isHistorical(day3), freq = frequency(all), lag = releaseLag(all);
-  if (past) all = all.filter((o) => addDays(o.date, lag) <= day3);
+  const from = addDays(day3, -Math.max(window2, 365) - 400), past = isHistorical(day3);
+  const url2 = past ? `https://alfred.stlouisfed.org/graph/alfredgraph.csv?id=${id}&vintage_date=${day3}&cosd=${from}&coed=${day3}` : `https://fred.stlouisfed.org/graph/fredgraph.csv?id=${id}&cosd=${from}&coed=${day3}`;
+  let read2;
+  try {
+    read2 = await getTextAt(url2);
+  } catch (e) {
+    if (past && e instanceof NoData) throw new NoData(`FRED's archive of past releases (ALFRED) does not hold ${id} as it stood on ${day3} (${e.message}); today's revised figures are not given for a past day, since they would carry what was published or revised later into it`);
+    throw e;
+  }
+  const { text: csv, at } = read2;
+  if (!/^\s*(observation_date|DATE)\s*,/i.test(csv)) throw new Unavailable(`${past ? "FRED's archive (ALFRED)" : "FRED"} answered with something other than its data download (it may be down for maintenance)`);
+  const all = parseCsv(csv).filter((o) => o.date <= day3), freq = frequency(all);
   const obs = all.filter((o) => o.date >= addDays(day3, -window2));
   if (!obs.length) throw new NoData(`FRED has no ${id} values published by ${day3} in this window`);
   const first = obs[0], last = obs[obs.length - 1], ago = yearBefore(all, last.date);
@@ -38295,8 +38302,8 @@ async function economicSeries(indicator, analysis2, lookBackDays = 365) {
     `- Latest value known by ${day3}: ${fmt2(last.value)} (for ${periodOf(last.date, freq)})`,
     ago ? `- Year over year, from ${fmt2(ago.value)} for ${periodOf(ago.date, freq)}: ${changeOf(ago)}` : `- Year over year: not available (no value for ${periodOf(`${Number(last.date.slice(0, 4)) - 1}${last.date.slice(4)}`, freq)} in FRED's data). Do not work one out from other rows.`,
     `- Change over the look-back window, from ${periodOf(first.date, freq)} to ${periodOf(last.date, freq)}: ${changeOf(first)}${first.date !== ago?.date ? " (not a yearly rate)" : ""}`,
-    past ? `- A past analysis date: values are kept only if published by ${day3} (a ${lag}-day release lag for this series), and are today's revised figures; first releases may have differed slightly.` : "- Values as FRED published them, revisions included.",
-    `- Read from FRED at ${readWords(at)} (the desk keeps a read for up to an hour): a figure released after that is not here.`,
+    past ? `- A past analysis date: these are the figures as FRED's archive of past releases (ALFRED) held them on ${day3}: only what was published by then, before any later revision.` : "- Values as FRED published them, revisions included.",
+    past ? `- Read from FRED's archive at ${readWords(at)}.` : `- Read from FRED at ${readWords(at)} (the desk keeps a read for up to an hour): a figure released after that is not here.`,
     "",
     freq === "monthly" || freq === "quarterly" ? "Date (the first day of the period it stands for) | Value" : "Date | Value",
     "---|---:",
@@ -38370,7 +38377,8 @@ var STATEMENTS = {
     ["Gross Profit", ["GrossProfit"]],
     ["Operating Income", ["OperatingIncomeLoss"]],
     ["Net Income", ["NetIncomeLoss"]],
-    ["Diluted EPS", ["EarningsPerShareDiluted"]]
+    // A company with nothing that dilutes its shares files one figure for both, under its own tag.
+    ["Diluted EPS", ["EarningsPerShareDiluted", "EarningsPerShareBasicAndDiluted"]]
   ] },
   cashflow: { title: "Cash flow statement", lines: [
     ["Operating Cash Flow", ["NetCashProvidedByUsedInOperatingActivities", "NetCashProvidedByUsedInOperatingActivitiesContinuingOperations"]],
@@ -38418,32 +38426,85 @@ var spanWords = (f) => {
   const d = f.start ? daysBetween(f.start, f.end) : 0;
   return d <= QUARTER[1] ? "the quarter" : d <= 200 ? "the six months" : d <= 290 ? "the nine months" : "the year";
 };
-function quartersOf(values, years) {
-  const out = /* @__PURE__ */ new Map();
+function refilingsOf(facts, tags, asOf) {
+  const recasts = [], kept = [];
+  for (const tag of tags) for (const list2 of Object.values(facts[tag]?.units ?? {})) {
+    const periods = /* @__PURE__ */ new Map();
+    for (const f of list2) if (f.filed <= asOf && f.start) (periods.get(`${f.start}|${f.end}`) ?? periods.set(`${f.start}|${f.end}`, []).get(`${f.start}|${f.end}`)).push(f);
+    for (const fs20 of periods.values()) {
+      const byDay = [...fs20].sort((a, b) => a.filed.localeCompare(b.filed));
+      for (let n2 = 1; n2 < byDay.length; n2++) {
+        const a = byDay[n2 - 1], b = byDay[n2];
+        if (a.filed === b.filed) continue;
+        if (Math.abs(b.val - a.val) > 1e-3 * Math.max(Math.abs(a.val), Math.abs(b.val))) recasts.push({ filed: b.filed, prev: a.filed, start: b.start, end: b.end, first: byDay[0].val, now: b.val });
+        else kept.push([a.filed, b.filed]);
+      }
+    }
+  }
+  return { recasts: recasts.sort((a, b) => a.filed.localeCompare(b.filed)), kept };
+}
+function changesOf({ recasts, kept }) {
+  const out = [];
+  for (const r of recasts) {
+    const last = out.at(-1);
+    if (last && r.prev < last.by) last.from = r.prev > last.from ? r.prev : last.from;
+    else out.push({ from: r.prev, by: r.filed, r });
+  }
+  for (const c of out) {
+    for (let moved = true; moved; ) {
+      moved = false;
+      for (const [a, b] of kept) {
+        if (a <= c.from && b > c.from && b < c.by) {
+          c.from = b;
+          moved = true;
+        } else if (a > c.from && a < c.by && b >= c.by) {
+          c.by = a;
+          moved = true;
+        }
+      }
+    }
+  }
+  return out;
+}
+function quartersOf(values, years, changes) {
+  const out = /* @__PURE__ */ new Map(), blocked = /* @__PURE__ */ new Map();
   const all = [...values.values(), ...years.values()].filter((f) => f.start);
-  for (const f of all) if (daysBetween(f.start, f.end) <= QUARTER[1]) out.set(f.end, { val: f.val, start: f.start });
+  for (const f of all) if (daysBetween(f.start, f.end) <= QUARTER[1]) out.set(f.end, { val: f.val, start: f.start, lo: f.filed, hi: f.filed });
   const near = (a, b, lo, hi) => {
     const d = daysBetween(a, b);
     return d >= lo && d <= hi;
   };
+  const across = (lo, hi) => changes.find((c) => lo < c.by && hi > c.from);
+  const min = (a, b) => a < b ? a : b, max = (a, b) => a > b ? a : b;
   for (const c of all.filter((f) => daysBetween(f.start, f.end) > QUARTER[1]).sort((a, b) => daysBetween(a.start, a.end) - daysBetween(b.start, b.end))) {
     if (out.has(c.end)) continue;
     const prior = all.find((p) => p !== c && Math.abs(daysBetween(c.start, p.start)) <= 7 && near(p.end, c.end, 80, 100));
     if (prior) {
-      out.set(c.end, { val: c.val - prior.val, start: prior.end, how: `${spanWords(c)} to ${c.end} less ${spanWords(prior)} to ${prior.end}` });
-      continue;
+      const lo2 = min(c.filed, prior.filed), hi2 = max(c.filed, prior.filed), ch2 = across(lo2, hi2);
+      if (!ch2) {
+        out.set(c.end, { val: c.val - prior.val, start: prior.end, how: `${spanWords(c)} to ${c.end} less ${spanWords(prior)} to ${prior.end}`, lo: lo2, hi: hi2 });
+        continue;
+      }
+      if (!blocked.has(c.end)) blocked.set(c.end, { c, other: `${spanWords(prior)} to ${prior.end} (filed ${prior.filed})`, ch: ch2, lo: lo2, hi: hi2 });
     }
-    let sum = 0, at = "", parts = 0;
+    let sum = 0, at = "", parts = 0, qlo = "9999-12-31", qhi = "";
     for (let q = [...out.entries()].find(([, v]) => Math.abs(daysBetween(c.start, v.start)) <= 7); q; ) {
       sum += q[1].val;
       at = q[0];
       parts++;
+      qlo = min(qlo, q[1].lo);
+      qhi = max(qhi, q[1].hi);
       if (near(at, c.end, 80, 100)) break;
       q = [...out.entries()].find(([e, v]) => e > at && near(at, v.start, 0, 7) && !v.how?.includes(c.end));
     }
-    if (parts && near(at, c.end, 80, 100)) out.set(c.end, { val: c.val - sum, start: at, how: `${spanWords(c)} to ${c.end} less its ${parts} quarter${parts > 1 ? "s" : ""} to ${at}` });
+    if (!parts || !near(at, c.end, 80, 100)) continue;
+    const lo = min(c.filed, qlo), hi = max(c.filed, qhi), ch = across(lo, hi);
+    if (!ch) {
+      out.set(c.end, { val: c.val - sum, start: at, how: `${spanWords(c)} to ${c.end} less its ${parts} quarter${parts > 1 ? "s" : ""} to ${at}`, lo, hi });
+      blocked.delete(c.end);
+    } else if (!blocked.has(c.end)) blocked.set(c.end, { c, other: `its ${parts} quarter${parts > 1 ? "s" : ""} to ${at} (filed by ${qhi})`, ch, lo, hi });
   }
-  return out;
+  return { quarters: out, blocked };
 }
 function splitsIn(list2, asOf) {
   const periods = /* @__PURE__ */ new Map();
@@ -38479,13 +38540,20 @@ function splitsIn(list2, asOf) {
 }
 var splitWords = (k) => k >= 1 ? `${k === 1.5 ? "3-for-2" : `${k}-for-1`} split` : `1-for-${Math.round(1 / k)} reverse split`;
 var plain2 = (n2) => Number(n2.toFixed(6)).toString();
-function filedStatement(usGaap, kind, freq, asOf) {
+var filingSplits = (list2, asOf) => splitsIn(list2, asOf).map((s) => ({ date: s.from, factor: s.factor, old: s.old, words: `the ${splitWords(s.factor)} the filings show between ${s.old} and ${s.from}` }));
+function rebase(basis, filed, day3) {
+  const after = basis.filter((s) => filed < s.date), named = after.filter((s) => s.date <= day3);
+  return { k: after.reduce((a, s) => a * s.factor, 1), named, silent: named.length < after.length };
+}
+var splitList = (splits) => splits.map((s) => s.words).join(" and ");
+function filedStatement(usGaap, kind, freq, asOf, basis) {
   const quarterly = freq === "quarterly", flows = kind !== "balance_sheet";
   const spans = quarterly ? [QUARTER, ...YEAR_TO_DATE.map(([lo, hi]) => [lo, hi])] : [YEAR];
   const names = quarterly ? ["", ...YEAR_TO_DATE.map(([, , m2]) => ` (${m2} months to date)`)] : [""];
   const lines = STATEMENTS[kind].lines.map(([label, tags]) => ({ label, ...lineAsOf(usGaap, tags, asOf, spans, quarterly ? [] : ANNUAL_FORMS) }));
   const notes = [];
-  const quarters = lines.map((l, n2) => quarterly && flows && !perShareUnit(l.unit) ? quartersOf(l.values, lineAsOf(usGaap, STATEMENTS[kind].lines[n2][1], asOf, [YEAR], ANNUAL_FORMS).values) : /* @__PURE__ */ new Map());
+  const worked2 = lines.map((l, n2) => quarterly && flows && !perShareUnit(l.unit) ? quartersOf(l.values, lineAsOf(usGaap, STATEMENTS[kind].lines[n2][1], asOf, [YEAR], ANNUAL_FORMS).values, changesOf(refilingsOf(usGaap, STATEMENTS[kind].lines[n2][1], asOf))) : { quarters: /* @__PURE__ */ new Map(), blocked: /* @__PURE__ */ new Map() });
+  const quarters = worked2.map((w) => w.quarters);
   const chosen = lines.map((l, n2) => {
     const m2 = /* @__PURE__ */ new Map();
     for (const key of l.values.keys()) {
@@ -38501,23 +38569,35 @@ function filedStatement(usGaap, kind, freq, asOf) {
   const derived2 = /* @__PURE__ */ new Map();
   for (const q of quarters) for (const [end, v] of q) if (v.how && ends.includes(end)) (derived2.get(end) ?? derived2.set(end, /* @__PURE__ */ new Set()).get(end)).add(v.how);
   for (const [end, how] of [...derived2].sort((a, b) => b[0].localeCompare(a[0]))) notes.push(`The quarter to ${end} is derived (no filing states it): ${[...how].join("; or ")}.`);
+  const million = (v) => (v / 1e6).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  worked2.forEach((w, n2) => {
+    for (const [end, { c, other, ch, lo, hi }] of [...w.blocked].sort((a, b) => b[0].localeCompare(a[0]))) {
+      if (quarters[n2].has(end) || !ends.length || end < ends.at(-1)) continue;
+      const r = ch.r, what = `a filing of ${r.filed} restated an earlier figure of it (${spanWords({ ...r, val: 0 })} to ${r.end}, first filed as ${million(r.first)} million ${lines[n2].unit}, refiled then as ${million(r.now)} million), as when a business is sold or spun off`;
+      notes.push(lo <= ch.from && hi >= ch.by ? `${lines[n2].label} for the quarter to ${end} is not derived: ${spanWords(c)} to ${c.end} (filed ${c.filed}) and ${other} are on different bases, since ${what}. The one less the other would not be a quarter.` : `${lines[n2].label} for the quarter to ${end} is not derived: ${spanWords(c)} to ${c.end} (filed ${c.filed}) and ${other} may be on different bases: ${what}, and the filings show only that the change came after ${ch.from} and by ${ch.by}. The one less the other may not be a quarter.`);
+    }
+  });
+  const onto = "the basis of the later filings";
+  let perShare = false;
   const rows = lines.map((l, n2) => {
     const every = STATEMENTS[kind].lines[n2][1].flatMap((tag) => Object.entries(usGaap[tag]?.units ?? {}).filter(([u]) => perShareUnit(u)).flatMap(([, list2]) => list2));
-    const splits = perShareUnit(l.unit) ? splitsIn(every, asOf) : [];
+    const splits = !perShareUnit(l.unit) ? [] : basis ?? filingSplits(every, asOf);
     const cells2 = periods.map((p) => {
       if (chosen[n2].get(p.end) !== p.i) return null;
       const q = p.i === 0 ? quarters[n2].get(p.end) : void 0;
       if (q) return q.val;
       const f = l.values.get(`${p.end}|${p.i}`);
       if (!f) return null;
-      const k = splits.filter((s) => f.filed < s.from).reduce((a, s) => a * s.factor, 1);
+      if (perShareUnit(l.unit)) perShare = true;
+      const { k, named, silent } = rebase(splits, f.filed, asOf);
       if (k === 1) return f.val;
       const v = Number((f.val / k).toFixed(6));
-      notes.push(`${l.label} for ${spanWords(f)} to ${f.end} was filed on ${f.filed} as ${plain2(f.val)}, before ${splits.filter((s) => f.filed < s.from).map((s) => `the ${splitWords(s.factor)} the filings show between ${s.old} and ${s.from}`).join(" and ")}; shown here on the basis of the later filings: ${plain2(v)}.`);
+      if (named.length && !basis) notes.push(silent ? `${l.label} for ${spanWords(f)} to ${f.end} was filed on ${f.filed}, before ${splitList(named)}; shown here on ${onto}.` : `${l.label} for ${spanWords(f)} to ${f.end} was filed on ${f.filed} as ${plain2(f.val)}, before ${splitList(named)}; shown here on ${onto}: ${plain2(v)}.`);
       return v;
     });
     return { label: l.label, unit: l.unit, cells: cells2 };
   });
+  if (basis && perShare) notes.push("Per-share figures are on the price source's share basis of today, the one its prices are on: a figure filed before a share split since then is divided by that split's ratio, so it can differ from the number in its filing.");
   return { columns: periods.map((p) => p.end + (p.i === 0 && derived2.has(p.end) ? " (derived)" : names[p.i])), rows, notes };
 }
 var cache2 = /* @__PURE__ */ new Map();
@@ -38543,12 +38623,20 @@ async function cikFor(symbol4) {
   return hit ? String(hit.cik_str).padStart(10, "0") : null;
 }
 var companyFacts = (cik) => cached2(`https://data.sec.gov/api/xbrl/companyfacts/CIK${cik}.json`, 45e3);
-async function secStatement(symbol4, kind, freq, asOf) {
+async function secStatement(symbol4, kind, freq, asOf, basis) {
   const cik = await cikFor(symbol4);
   if (!cik) throw new NoData(`${symbol4} is not in the SEC's list of US filers`);
   const usGaap = (await companyFacts(cik)).facts?.["us-gaap"];
   if (!usGaap) throw new NoData(`${symbol4} files with the SEC but not in US GAAP terms`);
-  return filedStatement(usGaap, kind, freq, asOf);
+  return filedStatement(usGaap, kind, freq, asOf, basis);
+}
+function annualFormIn(facts, day3) {
+  let best = null;
+  const lists = [facts?.dei?.EntityCommonStockSharesOutstanding, facts?.["us-gaap"]?.StockholdersEquity, facts?.["us-gaap"]?.Assets, facts?.["us-gaap"]?.EarningsPerShareDiluted];
+  for (const x of lists) for (const list2 of Object.values(x?.units ?? {})) for (const f of list2) {
+    if (f.filed <= day3 && /^(10-K|20-F|40-F)/.test(f.form ?? "") && (!best || f.filed > best.filed)) best = f;
+  }
+  return best ? /^(10-K|20-F|40-F)/.exec(best.form)[1] : null;
 }
 var submissions = (cik) => cached2(`https://data.sec.gov/submissions/CIK${cik}.json`, 3e4);
 function sectorOfSic(raw) {
@@ -38613,16 +38701,33 @@ function knownBy(list2, asOf) {
   }
   return [...best.values()];
 }
-function trailingYear(list2, asOf) {
+function trailingYear(list2, asOf, basis = []) {
   const known = knownBy(list2, asOf).filter((f) => f.start);
-  const year = known.filter((f) => ANNUAL(f) && span(f) >= YEAR[0] && span(f) <= YEAR[1]).sort((a, b) => b.end.localeCompare(a.end))[0];
+  const year = known.filter((f) => ANNUAL(f) && span(f) >= YEAR[0] && span(f) <= YEAR[1]).sort((a2, b2) => b2.end.localeCompare(a2.end))[0];
   if (!year) return null;
-  const after = known.filter((f) => f.end > year.end && daysBetween(year.end, f.start) >= 0 && daysBetween(year.end, f.start) <= 7 && span(f) >= 60 && span(f) <= 290).sort((a, b) => b.end.localeCompare(a.end) || span(b) - span(a))[0];
+  const after = known.filter((f) => f.end > year.end && daysBetween(year.end, f.start) >= 0 && daysBetween(year.end, f.start) <= 7 && span(f) >= 60 && span(f) <= 290).sort((a2, b2) => b2.end.localeCompare(a2.end) || span(b2) - span(a2))[0];
   const round = (n2) => Number(n2.toFixed(6));
-  if (!after) return { value: round(year.val), parts: `the full year to ${year.end}, ${year.val}` };
+  const on = (f) => {
+    const { k, named, silent } = rebase(basis, f.filed, asOf), v = round(f.val / k);
+    return { v, words: `${plain2(v)}${!named.length ? "" : silent ? ` (filed before ${splitList(named)})` : ` (${plain2(f.val)} as filed, before ${splitList(named)})`}` };
+  };
+  const y = on(year);
+  if (!after) return { value: y.v, parts: `the full year to ${year.end}, ${y.words}` };
   const before = known.find((f) => Math.abs(daysBetween(f.end, after.end) - 365) <= 10 && Math.abs(span(f) - span(after)) <= 10);
-  if (!before) return { value: round(year.val), parts: `the full year to ${year.end}, ${year.val} (the same span a year before ${after.end} was not filed, so the year to date cannot be added)` };
-  return { value: round(year.val + after.val - before.val), parts: `the full year to ${year.end}, ${year.val}, plus ${after.start} to ${after.end}, ${after.val}, less ${before.start} to ${before.end}, ${before.val}` };
+  if (!before) return { value: y.v, parts: `the full year to ${year.end}, ${y.words} (the same span a year before ${after.end} was not filed, so the year to date cannot be added)` };
+  const a = on(after), b = on(before);
+  return { value: round(y.v + a.v - b.v), parts: `the full year to ${year.end}, ${y.words}, plus ${after.start} to ${after.end}, ${a.words}, less ${before.start} to ${before.end}, ${b.words}` };
+}
+function firstTagPerPeriod(...lists) {
+  const seen = /* @__PURE__ */ new Set(), out = [];
+  for (const list2 of lists) {
+    const mine = list2.filter((f) => !seen.has(`${f.start ?? ""}|${f.end}`));
+    for (const f of mine) {
+      out.push(f);
+    }
+    for (const f of mine) seen.add(`${f.start ?? ""}|${f.end}`);
+  }
+  return out;
 }
 function latestBalance(list2, asOf) {
   return knownBy(list2, asOf).filter((f) => !f.start).sort((a, b) => b.end.localeCompare(a.end) || b.filed.localeCompare(a.filed))[0] ?? null;
@@ -38662,25 +38767,34 @@ function parseForm4(xml, filed) {
     yes(field(r, "isTenPercentOwner")) && "owner of over 10%",
     yes(field(r, "isOther")) && (field(r, "otherText") || "other")
   ].filter(Boolean).join(", ") || "insider";
-  const plan = yes(field(xml, "aff10b5One"));
-  return blocks(xml, "nonDerivativeTransaction").map((t) => ({
-    owner,
-    role,
-    filed,
-    plan,
-    date: field(t, "transactionDate").slice(0, 10),
-    code: field(t, "transactionCode").toUpperCase(),
-    shares: num2(field(t, "transactionShares")) ?? 0,
-    price: num2(field(t, "transactionPricePerShare")),
-    acquired: field(t, "transactionAcquiredDisposedCode").toUpperCase() === "A",
-    after: num2(field(t, "sharesOwnedFollowingTransaction")),
-    indirect: field(t, "directOrIndirectOwnership").toUpperCase() === "I" ? field(t, "natureOfOwnership") || "indirectly" : null
-  })).filter((t) => t.date && t.code);
+  const box = yes(field(xml, "aff10b5One"));
+  const notes = new Map([...xml.matchAll(/<footnote\s+id="([^"]+)"\s*>([\s\S]*?)<\/footnote>/g)].map((m2) => [m2[1], decode4(m2[2].replace(/<[^>]*>/g, ""))]));
+  const planNotes = new Set([...notes].filter(([, text4]) => /10b5-1/i.test(text4) && !/\bnot\b[^.]{0,60}10b5-1/i.test(text4)).map(([id]) => id));
+  return blocks(xml, "nonDerivativeTransaction").map((t) => {
+    const code = field(t, "transactionCode").toUpperCase();
+    const tied = [...t.matchAll(/<footnoteId\s+id="([^"]+)"/g)].some((m2) => planNotes.has(m2[1]));
+    const plan = box && tied, planBox = box && !planNotes.size && (code === "P" || code === "S");
+    return {
+      owner,
+      role,
+      filed,
+      plan,
+      ...planBox ? { planBox } : {},
+      date: field(t, "transactionDate").slice(0, 10),
+      code,
+      shares: num2(field(t, "transactionShares")) ?? 0,
+      price: num2(field(t, "transactionPricePerShare")),
+      acquired: field(t, "transactionAcquiredDisposedCode").toUpperCase() === "A",
+      after: num2(field(t, "sharesOwnedFollowingTransaction")),
+      indirect: field(t, "directOrIndirectOwnership").toUpperCase() === "I" ? field(t, "natureOfOwnership") || "indirectly" : null
+    };
+  }).filter((t) => t.date && t.code);
 }
 function parseFiling(xml, form, filed) {
   const owners = blocks(xml, "reportingOwner").map((o) => field(o, "rptOwnerCik").replace(/^0+/, "") || field(o, "rptOwnerName").toUpperCase()).sort().join("+");
   const original = form.endsWith("/A") ? field(xml, "dateOfOriginalSubmission").slice(0, 10) || null : null;
-  return { form, filed, owners, original, period: field(xml, "periodOfReport").slice(0, 10), trades: parseForm4(xml, filed) };
+  const issuer = field(xml, "issuerCik").replace(/^0+/, ""), large = blocks(xml, "reportingOwner").some((o) => yes(field(o, "isTenPercentOwner")));
+  return { form, filed, owners, original, period: field(xml, "periodOfReport").slice(0, 10), trades: parseForm4(xml, filed), issuer, issuerName: field(xml, "issuerName"), large };
 }
 function amended(filings2) {
   const state = new Map(filings2.map((f) => [f, { first: f.filed, by: null }]));
@@ -38746,18 +38860,26 @@ async function secInsiders(symbol4, cik, asOf, days = 90, limit = 25) {
   }
   const span2 = `made public from ${addDays(from, 1)} to ${asOf}`;
   if (!filings2.length) throw new Unavailable(`the SEC lists ${read2.length === 1 ? "one Form 4 filing" : `${read2.length} Form 4 filings`} of ${symbol4}'s insiders ${span2}, but none of them could be read (${why}), so their trades are not known`);
-  const { trades: all, replaced } = amended(filings2), trades = all.filter((t) => t.filed > from);
+  const self = Number(cik).toString(), others = filings2.filter((f) => f.issuer && f.issuer !== self), own2 = filings2.filter((f) => !others.includes(f));
+  const names = [...new Set(others.map((f) => f.issuerName || `the SEC filer ${f.issuer}`))].join(", "), large = others.every((f) => f.large);
+  const elsewhere = others.length === 1 ? `${symbol4}'s own trade in another company's shares (${names}), filed as ${large ? "that company's large owner" : "one of that company's insiders"}` : `${symbol4}'s own trades in other companies' shares (${names}), filed as ${large ? "a large owner of each" : "an insider of each"}`;
+  if (others.length && !own2.length && !failed && read2.length === picked.length && !partial2) {
+    const n2 = others.length === 1 ? `The one Form 4 filing in its SEC list for these days is ${elsewhere}: not a trade in ${symbol4}, so it is left out` : `The ${others.length} Form 4 filings in its SEC list for these days are ${elsewhere}: not trades in ${symbol4}, so they are left out`;
+    return `${head2}: none by its own insiders. ${n2}. That is a fact from the SEC${listRead}, not a gap in the data.`;
+  }
+  const { trades: all, replaced } = amended(own2), trades = all.filter((t) => t.filed > from);
   const market = (code) => trades.filter((t) => t.code === code);
   const total = (list2) => {
     if (!list2.length) return "none";
-    const shares2 = list2.reduce((a, t) => a + t.shares, 0), priced = list2.filter((t) => t.price !== null), planned = list2.filter((t) => t.plan).length;
+    const shares2 = list2.reduce((a, t) => a + t.shares, 0), priced = list2.filter((t) => t.price !== null), planned = list2.filter((t) => t.plan).length, boxed = list2.filter((t) => t.planBox).length;
     const value = priced.reduce((a, t) => a + t.shares * t.price, 0), bare = list2.length - priced.length;
     const usd = !priced.length ? `${list2.length === 1 ? "its filing gives" : "their filings give"} no price, so no sum in USD` : `about ${fmt(value)} USD at their own prices${bare ? `; ${bare === 1 ? "one gives" : `${bare} give`} no price and ${bare === 1 ? "is" : "are"} not in that sum` : ""}`;
-    return `${list2.length} (${fmt(shares2)} shares, ${usd}${planned ? `; ${planned} under a pre-arranged 10b5-1 plan` : ""})`;
+    const box = boxed ? `; ${boxed}${planned ? " more" : ""} in a filing whose 10b5-1 box covers at least one of its trades without saying which` : "";
+    return `${list2.length} (${fmt(shares2)} shares, ${usd}${planned ? `; ${planned} under a pre-arranged 10b5-1 plan` : ""}${box})`;
   };
   const buys = market("P"), sales = market("S"), other = trades.length - buys.length - sales.length;
   const when = (t) => !t.corrected ? `made public ${t.filed}` : `made public ${t.filed}${t.filed > from ? "" : ", before these days"}; corrected ${t.corrected} by an amended filing, a Form 4/A${t.filed > from ? "" : ", so not counted above"}`;
-  const lines = all.map((t) => `- ${t.date} (${when(t)}) \xB7 ${t.owner} (${t.role}): ${CODES[t.code] ?? `transaction ${t.code} of`} ${fmt(t.shares, 4)} shares${t.price ? ` at ${fmt(t.price, 4)}` : ", no price"}${t.after !== null ? ` \xB7 holds ${fmt(t.after, 4)} after` : ""}${t.indirect ? ` \xB7 indirectly (${t.indirect})` : ""}${t.plan ? " \xB7 under a 10b5-1 plan" : ""}`);
+  const lines = all.map((t) => `- ${t.date} (${when(t)}) \xB7 ${t.owner} (${t.role}): ${CODES[t.code] ?? `transaction ${t.code} of`} ${fmt(t.shares, 4)} shares${t.price ? ` at ${fmt(t.price, 4)}` : ", no price"}${t.after !== null ? ` \xB7 holds ${fmt(t.after, 4)} after` : ""}${t.indirect ? ` \xB7 indirectly (${t.indirect})` : ""}${t.plan ? " \xB7 under a 10b5-1 plan" : t.planBox ? " \xB7 its filing's 10b5-1 box is ticked: at least one trade in that filing was under a plan, and the filing does not say which" : ""}`);
   const skipped = picked.length - read2.length;
   const missing = [
     failed ? `${failed} of the filings could not be read (${why})` : "",
@@ -38766,12 +38888,12 @@ async function secInsiders(symbol4, cik, asOf, days = 90, limit = 25) {
   ].filter(Boolean);
   const scope = missing.length ? `Counted from only the ${filings2.length} of the ${picked.length} filings ${span2} that were read (${missing.join("; ")}). These counts are not the whole ${days} days: a "none" below is not a fact about the insiders` : `In these ${days} days`;
   return [
-    `${head2} (${filings2.length} of ${picked.length} filings read, newest first${failed ? `; ${failed} could not be read` : ""}${skipped ? `; the ${skipped} oldest not asked for` : ""}${replaced ? `; ${replaced === 1 ? "one is an amended filing, a Form 4/A, shown in place of the filing it corrects" : `${replaced} are amended filings, Form 4/A, each shown in place of the filing it corrects`}` : ""}). Each trade is dated by the day it happened and the day its filing made it public; only filings public by ${asOf} are shown${listRead}.${gap2}`,
+    `${head2} (${filings2.length} of ${picked.length} filings read, newest first${failed ? `; ${failed} could not be read` : ""}${skipped ? `; the ${skipped} oldest not asked for` : ""}${replaced ? `; ${replaced === 1 ? "one is an amended filing, a Form 4/A, shown in place of the filing it corrects" : `${replaced} are amended filings, Form 4/A, each shown in place of the filing it corrects`}` : ""}${others.length ? `; ${others.length === 1 ? "one is" : `${others.length} are`} ${elsewhere}, and ${others.length === 1 ? "is" : "are"} left out` : ""}). Each trade is dated by the day it happened and the day its filing made it public; only filings public by ${asOf} are shown${listRead}.${gap2}`,
     "",
     `${scope}: bought (code P) ${total(buys)}; sold (code S) ${total(sales)}; other kinds (awards, option exercises, shares handed back for tax, gifts) ${other}.`,
     "P and S are purchases and sales on the market or in a private deal: a purchase is the insider spending their own money. A sale under a 10b5-1 plan was arranged months ahead. Awards, exercises, tax handbacks and gifts say little about what an insider thinks of the price.",
     "",
-    ...lines.length ? lines : [missing.length ? `(the ${filings2.length === 1 ? "one filing" : `${filings2.length} filings`} read ${filings2.length === 1 ? "lists" : "list"} no trades in shares, only options or holdings; the others were not read, so nothing is known of their trades)` : "(these filings list no trades in shares, only options or holdings)"]
+    ...lines.length ? lines : [missing.length ? own2.length ? `(the ${own2.length === 1 ? "one filing" : `${own2.length} filings`}${others.length ? " of its insiders" : ""} read ${own2.length === 1 ? "lists" : "list"} no trades in shares, only options or holdings; the others were not read, so nothing is known of their trades)` : "(no filing read is one of its own insiders'; the others were not read, so nothing is known of their trades)" : `(${others.length ? "its insiders' filings" : "these filings"} list no trades in shares, only options or holdings)`]
   ].join("\n");
 }
 
@@ -38785,15 +38907,24 @@ function parseReport(xml, cls) {
   const gen = blocks(xml, "genInfo")[0], info = blocks(xml, "fundInfo")[0];
   const asOf = gen ? text(gen, "repPdDate") : "", netAssets = info ? num3(text(info, "netAssets")) : null;
   if (!gen || !DAY2.test(asOf) || netAssets === null) throw new Unavailable("the SEC answered with something that is not a fund's portfolio report");
-  const holdings = blocks(xml, "invstOrSec").map((h) => ({
-    name: text(h, "name") || text(h, "title") || "unnamed",
-    pct: num3(text(h, "pctVal")) ?? 0,
-    asset: text(h, "assetCat") || attr(h, "assetConditional", "assetCat") || "OTHER",
-    issuer: text(h, "issuerCat") || attr(h, "issuerConditional", "issuerCat") || "OTHER",
-    country: text(h, "invCountry"),
-    maturity: DAY2.test(text(h, "maturityDt")) ? text(h, "maturityDt") : null,
-    coupon: num3(text(h, "annualizedRt"))
-  }));
+  const holdings = blocks(xml, "invstOrSec").map((h) => {
+    const d = blocks(h, "derivativeInfo")[0], ref = d === void 0 ? "" : blocks(d, "descRefInstrmnt")[0] ?? "";
+    return {
+      name: text(h, "name") || text(h, "title") || "unnamed",
+      pct: num3(text(h, "pctVal")) ?? 0,
+      asset: text(h, "assetCat") || attr(h, "assetConditional", "assetCat") || "OTHER",
+      issuer: text(h, "issuerCat") || attr(h, "issuerConditional", "issuerCat") || "OTHER",
+      country: text(h, "invCountry"),
+      maturity: DAY2.test(text(h, "maturityDt")) ? text(h, "maturityDt") : null,
+      coupon: num3(text(h, "annualizedRt")),
+      ...d === void 0 ? {} : { derivative: {
+        kind: /\bderivCat="([^"]*)"/.exec(d)?.[1] ?? "OTH",
+        notional: num3(text(d, "notionalAmt")),
+        currency: text(d, "curCd"),
+        ref: text(ref, "indexName") || text(ref, "issueTitle") || text(ref, "name")
+      } }
+    };
+  });
   const rows = [...xml.matchAll(/<monthlyTotReturn\s([^>]*)\/?>/g)].map((m2) => m2[1]);
   const row = rows.find((r) => cls && r.includes(`classId="${cls}"`)) ?? (rows.length === 1 ? rows[0] : void 0);
   const returns = row ? ["rtn1", "rtn2", "rtn3"].map((k) => num3(new RegExp(`\\b${k}="([^"]*)"`).exec(row)?.[1] ?? "")) : null;
@@ -38803,7 +38934,8 @@ function parseReport(xml, cls) {
     asOf,
     netAssets,
     holdings,
-    returns: returns && returns.every((r) => r !== null) ? returns : null
+    returns: returns && returns.every((r) => r !== null) ? returns : null,
+    classes: rows.length
   };
 }
 async function fromSec(what, ask) {
@@ -38852,6 +38984,7 @@ var ASSETS = {
   LON: "loans",
   COMM: "commodities",
   SN: "structured notes",
+  RA: "repurchase agreements",
   DCO: "derivatives",
   DCR: "derivatives",
   DE: "derivatives",
@@ -38870,6 +39003,15 @@ var ISSUERS = {
   RF: "other funds",
   PF: "private funds",
   OTHER: "other"
+};
+var KINDS = {
+  SWP: ["swap", "swaps"],
+  FUT: ["future", "futures"],
+  FWD: ["forward", "forwards"],
+  OPT: ["option", "options"],
+  SWO: ["swaption", "swaptions"],
+  WAR: ["warrant", "warrants"],
+  OTH: ["other derivative", "other derivatives"]
 };
 var MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 var regions = null;
@@ -38899,7 +39041,9 @@ function renderReport(sym2, day3, r, topN = 10) {
     "",
     `Name: ${r.series}`,
     ...r.registrant && r.registrant.toLowerCase() !== r.series.toLowerCase() ? [`Filed by: ${r.registrant}`] : [],
-    `Net assets (its size): ${Math.round(r.netAssets).toLocaleString("en-US")} USD on ${r.asOf}`,
+    // A trust's report covers the fund with all its share classes (an ETF is often one of a mutual fund's): its size is
+    // theirs together, and the report does not split it.
+    `Net assets (its size): ${Math.round(r.netAssets).toLocaleString("en-US")} USD on ${r.asOf}${(r.classes ?? 1) > 1 ? `, for the whole fund: all its ${r.classes} share classes together, of which ${sym2} is one; the report does not give ${sym2}'s own part` : ""}`,
     `Holdings: ${r.holdings.length.toLocaleString("en-US")} lines`,
     `Held in: ${shares(r.holdings, (h) => ASSETS[h.asset] ?? h.asset).map(([k, p]) => `${k} ${pct(p)}`).join(", ") || "not given"}`,
     `Issued by: ${shares(r.holdings, (h) => ISSUERS[h.issuer] ?? h.issuer).map(([k, p]) => `${k} ${pct(p)}`).join(", ") || "not given"}`
@@ -38916,6 +39060,22 @@ function renderReport(sym2, day3, r, topN = 10) {
     const paying = bonds.filter((h) => h.coupon !== null), w2 = paying.reduce((a, h) => a + h.pct, 0);
     const coupon = w2 ? paying.reduce((a, h) => a + h.pct * h.coupon, 0) / w2 : null;
     lines.push(`Bonds (${pct(weight)} of the fund): on average ${years.toFixed(1)} years to repayment${coupon !== null ? ` and ${coupon.toFixed(2)}% yearly interest` : ""}, weighted by value (worked out here from each bond's maturity and rate)`);
+  }
+  const derivs = r.holdings.filter((h) => h.derivative);
+  if (derivs.length) {
+    const kinds = /* @__PURE__ */ new Map();
+    for (const h of derivs) kinds.set(h.derivative.kind, (kinds.get(h.derivative.kind) ?? 0) + 1);
+    const kindWords = [...kinds].sort((a, b) => b[1] - a[1]).map(([k, n2]) => {
+      const [one3, many] = KINDS[k] ?? KINDS.OTH;
+      return `${n2} ${n2 === 1 ? one3 : many}`;
+    }).join(", ");
+    const refs = [...new Set(derivs.map((h) => h.derivative.ref).filter(Boolean))];
+    const tied = refs.length ? `, tied to: ${refs.slice(0, 5).join(", ")}${refs.length > 5 ? `, and ${refs.length - 5} more` : ""}` : "";
+    const usd = derivs.filter((h) => h.derivative.notional !== null && h.derivative.currency === "USD"), left = derivs.length - usd.length;
+    const sum = usd.reduce((a, h) => a + h.derivative.notional, 0), abs = usd.reduce((a, h) => a + Math.abs(h.derivative.notional), 0);
+    const whole2 = (n2) => Math.round(n2).toLocaleString("en-US"), share = (n2) => r.netAssets > 0 ? pct(n2 / r.netAssets * 100) : "its net assets are not above zero";
+    const sums = !usd.length ? "The report gives none of their notional amounts in US dollars, so the exposure they give is not known here." : `As the report gives them, their notional amounts add up to ${whole2(sum)} USD (${share(sum)} of its net assets); counted without their signs, ${whole2(abs)} USD (${share(abs)}).${left ? ` ${left === 1 ? "One more gives" : `${left} more give`} no notional amount in US dollars and ${left === 1 ? "is" : "are"} not in these sums.` : ""} Added up here from the report's figures; whether each is long or short is not worked out.`;
+    lines.push(`Derivatives: ${derivs.length === 1 ? "1 line" : `${derivs.length} lines`} (${kindWords})${tied}. The shares above count a derivative only at its value (its gain or loss so far), not at the exposure it gives, which is its notional amount. ${sums}`);
   }
   if (r.returns) {
     const end = /* @__PURE__ */ new Date(`${r.asOf}T12:00:00Z`), month = (back) => {
@@ -38994,6 +39154,44 @@ var units = (facts, unit) => facts?.units?.[unit] ?? [];
 var fixed = (n2, d = 2) => n2.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
 var whole = (n2) => Math.round(n2).toLocaleString("en-US");
 var yearBefore2 = (day3) => `${Number(day3.slice(0, 4)) - 1}${day3.slice(4) === "-02-29" ? "-02-28" : day3.slice(4)}`;
+var ratio = (n2) => Number(n2.toFixed(4)).toString();
+async function priceSplits(sym2) {
+  const qs = `period1=${epoch2("2009-01-01")}&period2=${epoch2(addDays(today(), 1))}&interval=1mo&events=split`;
+  let last;
+  for (const host of HOSTS) {
+    try {
+      const r = (await getJson(`${host}/v8/finance/chart/${encodeURIComponent(sym2)}?${qs}`)).chart?.result?.[0];
+      if (!r?.timestamp?.length) throw new Unavailable(`the price source answered with no record for ${sym2}`);
+      const offset = r.meta?.gmtoffset ?? 0;
+      return Object.values(r.events?.splits ?? {}).flatMap((e) => {
+        const n2 = Number(e.numerator), d = Number(e.denominator);
+        if (!(n2 > 0 && d > 0 && Number.isFinite(n2 / d)) || n2 === d || typeof e.date !== "number") return [];
+        const date5 = new Date((e.date + offset) * 1e3).toISOString().slice(0, 10);
+        return [{ date: date5, factor: n2 / d, words: `the ${ratio(n2)}-for-${ratio(d)}${n2 < d ? " reverse" : ""} split of ${date5}` }];
+      }).sort((a, b) => a.date.localeCompare(b.date));
+    } catch (e) {
+      if (e instanceof NoData) throw e;
+      last = e;
+    }
+  }
+  throw last;
+}
+async function shareBasis(sym2, perShare) {
+  const filed = filingSplits(perShare, today());
+  try {
+    const splits = await priceSplits(sym2);
+    const missing = filed.find((f) => !splits.some((s) => Math.abs(s.factor / f.factor - 1) <= 0.03 && s.date > f.old && s.date <= f.date));
+    return missing ? { splits: filed, why: `its record does not show ${missing.words}` } : { splits };
+  } catch (e) {
+    return { splits: filed, why: e.message };
+  }
+}
+function foreignForm(s, facts, day3) {
+  const r = s?.filings?.recent, at = (r?.form ?? []).findIndex((f, i) => /^(10-K|20-F|40-F)/.test(f) && (r?.filingDate?.[i] ?? "") <= day3);
+  const form = at >= 0 ? /^(10-K|20-F|40-F)/.exec(r.form[at])[1] : annualFormIn(facts, day3);
+  return form === "20-F" || form === "40-F" ? form : null;
+}
+var NO_MULTIPLES = (why) => `Market value, price to earnings and price to book: unavailable. The price source's record of share splits could not be read (${why}), so the filed figures cannot be put on the share basis of its prices: a split since a figure was filed would put a multiple off by its ratio.`;
 async function secOverview(sym2, cik, day3) {
   const [s, facts] = await Promise.all([submissions(cik), companyFacts(cik)]);
   const g = facts.facts?.["us-gaap"] ?? {}, dei = facts.facts?.dei ?? {};
@@ -39002,37 +39200,59 @@ async function secOverview(sym2, cik, day3) {
   if (s.sic) lines.push(`Industry (the SEC's code ${s.sic}): ${s.sicDescription || "not named"}`, `Sector (worked out from that code, so approximate): ${sectorOfSic(s.sic) ?? "not known"}`);
   const fy = /^(\d\d)(\d\d)$/.exec(s.fiscalYearEnd ?? "");
   if (fy && Number(fy[1]) >= 1 && Number(fy[1]) <= 12) lines.push(`Fiscal year ends: ${Number(fy[2])} ${MONTHS2[Number(fy[1]) - 1]}`);
+  const epsFacts = firstTagPerPeriod(units(g.EarningsPerShareDiluted, "USD/shares"), units(g.EarningsPerShareBasicAndDiluted, "USD/shares"));
+  const foreign = foreignForm(s, facts.facts, day3);
+  const basis = foreign ? { splits: filingSplits(epsFacts, day3) } : await shareBasis(sym2, epsFacts);
+  const priced = !foreign && basis.why === void 0;
   let close = null, paid = [];
   try {
-    const h = await history(sym2, day3), last = h.bars.at(-1), state = latestState(h, day3);
-    close = { date: last.date, close: Math.round(last.close * 100) / 100, currency: h.meta.currency, open: state.open, label: state.open ? state.label : "Close" };
+    const h = await history(sym2, day3), bar = h.bars.at(-1), state = latestState(h, day3), traded = h.traded?.at(-1);
+    const row = traded?.date === bar.date ? traded : bar, cents = (n2) => Math.round(n2 * 100) / 100;
+    close = { date: row.date, close: cents(row.close), table: cents(bar.close), currency: h.meta.currency, open: state.open, label: state.open ? state.label : "Close" };
     paid = h.dividends ?? [];
   } catch {
   }
-  const usd = !close?.currency || close.currency === "USD", px = close?.open ? "latest price" : "close";
-  lines.push(close ? `${close.label}: ${fixed(close.close)} ${close.currency ?? ""} on ${close.date} (the checked price table's latest row on or before ${day3}${close.open ? "; not a close, so every multiple below moves with it" : ""})`.replace("  ", " ") : "Close: unavailable (the prices could not be read), so no multiple can be worked out");
+  const usd = !close?.currency || close.currency === "USD", px = close?.open ? "latest price" : "close", past = isHistorical(day3);
+  if (close) {
+    const where = past ? `the price it traded at that day, on the price source's share basis of today: it adjusts every past price for any share split since${priced ? ", and the filed per-share figures and share counts below are put on that same basis" : ""}` : `the checked price table's latest row on or before ${day3}`;
+    const table = close.table !== close.close ? `; the checked price table shows ${fixed(close.table)} for that day, lowered by the dividends paid since` : "";
+    lines.push(`${close.label}: ${fixed(close.close)} ${close.currency ?? ""} on ${close.date} (${where}${close.open ? "; not a close, so every multiple below moves with it" : ""}${table})`.replace("  ", " "));
+  } else lines.push("Close: unavailable (the prices could not be read), so no multiple can be worked out");
+  const counted = (val, filed) => {
+    if (foreign) return { n: val, words: "" };
+    const { k, named, silent } = rebase(basis.splits, filed, day3), n2 = Math.round(val * k);
+    return { n: n2, words: !named.length ? "" : silent ? `, before ${splitList(named)}` : ` as ${whole(val)}, before ${splitList(named)}` };
+  };
   const cover = sharesOutstanding(units(dei.EntityCommonStockSharesOutstanding, "shares"), day3);
-  const average = cover ? null : averageDilutedShares(units(g.WeightedAverageNumberOfDilutedSharesOutstanding, "shares"), day3);
-  const shares2 = cover ?? average, which = average ? "average diluted shares" : "shares";
-  if (cover) lines.push(`Shares outstanding: ${whole(cover.shares)} (counted on ${cover.end}, filed ${cover.filed})`);
-  else if (average) lines.push(`Shares outstanding: no single count on a cover page filed by then (a company with more than one class of shares gives one per class there, which the SEC's data leaves out). In its place, the weighted average diluted shares from its accounts for ${average.start} to ${average.end}: ${whole(average.shares)} (filed ${average.filed}), so the figures worked out from it are close, not exact`);
-  else lines.push("Shares outstanding: unavailable (not on a cover page filed by then)");
-  if (shares2 && close && usd) lines.push(`Market value (derived: ${which} \xD7 ${px}): ${whole(shares2.shares * close.close)} USD`);
-  const eps = trailingYear(units(g.EarningsPerShareDiluted, "USD/shares"), day3);
+  const dilutedAvg = cover ? null : averageDilutedShares(units(g.WeightedAverageNumberOfDilutedSharesOutstanding, "shares"), day3);
+  const bothAvg = cover || dilutedAvg ? null : averageDilutedShares(units(g.WeightedAverageNumberOfShareOutstandingBasicAndDiluted, "shares"), day3);
+  const average = dilutedAvg ?? bothAvg, which = average ? "average diluted shares" : "shares";
+  const shares2 = cover ? counted(cover.shares, cover.filed).n : average ? counted(average.shares, average.filed).n : null;
+  if (cover) {
+    const c = counted(cover.shares, cover.filed);
+    lines.push(`Shares outstanding: ${whole(c.n)}${foreign ? " ordinary shares" : ""} (counted on ${cover.end}, filed ${cover.filed}${c.words})`);
+  } else if (average) {
+    const c = counted(average.shares, average.filed);
+    lines.push(`Shares outstanding: no single count on a cover page filed by then (a company with more than one class of shares gives one per class there, which the SEC's data leaves out). In its place, the weighted average ${bothAvg ? "shares from its accounts (one figure, filed as both basic and diluted)" : "diluted shares from its accounts"} for ${average.start} to ${average.end}: ${whole(c.n)} (filed ${average.filed}${c.words}), so the figures worked out from it are close, not exact`);
+  } else lines.push("Shares outstanding: unavailable (not on a cover page filed by then)");
+  if (foreign) lines.push(`Market value, price to earnings and price to book: not worked out. ${sym2} files with the SEC as a foreign company (its yearly report is a form ${foreign}): the count on its cover and any per-share figure in its accounts are of its ordinary shares, and its US listing may be depositary shares (ADS) that each stand for several of them, a ratio its SEC filings do not give in a form the desk can read. A multiple from these figures and the price of one US share could be off by that ratio.`);
+  else if (!priced) lines.push(NO_MULTIPLES(basis.why));
+  else if (shares2 && close && usd) lines.push(`Market value (derived: ${which} \xD7 ${px}): ${whole(shares2 * close.close)} USD`);
+  const eps = trailingYear(epsFacts, day3, basis.splits);
   if (eps) {
-    lines.push(`Diluted EPS, last twelve months (derived from ${eps.parts}): ${fixed(eps.value)} USD`);
-    if (close && usd) lines.push(eps.value > 0 ? `Price to earnings (derived: ${px} \xF7 that): ${fixed(close.close / eps.value)}` : "Price to earnings: not meaningful (the last twelve months lost money)");
-  } else lines.push("Diluted EPS, last twelve months: unavailable (not filed in US dollars by then)");
+    lines.push(`Diluted EPS, last twelve months${foreign ? ", per ordinary share" : priced ? "" : ", on the basis of its latest filings"} (derived from ${eps.parts}): ${fixed(eps.value)} USD`);
+    if (priced && close && usd) lines.push(eps.value > 0 ? `Price to earnings (derived: ${px} \xF7 that): ${fixed(close.close / eps.value)}` : "Price to earnings: not meaningful (the last twelve months lost money)");
+  } else lines.push("Diluted EPS, last twelve months: unavailable (no full year of it in US dollars among its filed figures by then)");
   const equity = latestBalance(units(g.StockholdersEquity, "USD"), day3);
   if (equity) {
     lines.push(`Stockholders' equity: ${whole(equity.val)} USD (at ${equity.end}, filed ${equity.filed})`);
-    if (shares2 && shares2.shares > 0) {
-      const bv = equity.val / shares2.shares;
-      lines.push(`Book value per share (derived: equity \xF7 ${which}): ${fixed(bv)} USD`);
-      if (close && usd && bv > 0) lines.push(`Price to book (derived: ${px} \xF7 that): ${fixed(close.close / bv)}`);
+    if (!foreign && shares2 && shares2 > 0) {
+      const bv = equity.val / shares2;
+      lines.push(`Book value per share (derived: equity \xF7 ${which}${priced ? "" : ", on the basis of its latest filings"}): ${fixed(bv)} USD`);
+      if (priced && close && usd && bv > 0) lines.push(`Price to book (derived: ${px} \xF7 that): ${fixed(close.close / bv)}`);
     }
   }
-  const dps = trailingYear(units(g.CommonStockDividendsPerShareDeclared, "USD/shares"), day3) ?? trailingYear(units(g.CommonStockDividendsPerShareCashPaid, "USD/shares"), day3);
+  const dps = trailingYear(units(g.CommonStockDividendsPerShareDeclared, "USD/shares"), day3, basis.splits) ?? trailingYear(units(g.CommonStockDividendsPerShareCashPaid, "USD/shares"), day3, basis.splits);
   if (close) {
     const after = yearBefore2(day3), year = paid.filter((d) => d.date > after && d.date <= day3), unit = close.currency ?? "USD";
     const sum = Number(year.reduce((a, d) => a + d.amount, 0).toFixed(6)), span2 = `${addDays(after, 1)} to ${day3}`;
@@ -39126,8 +39346,8 @@ async function fundProfile(raw, analysis2, topN = 10) {
   const p = r.price ?? {}, d = r.summaryDetail ?? {}, k = r.defaultKeyStatistics ?? {}, f = r.fundProfile ?? {}, fees = f.feesExpensesInvestment ?? {}, t = r.topHoldings ?? {};
   const main = p.currency ? MAIN_UNIT[p.currency] ?? p.currency : void 0;
   const inception = has(k.fundInceptionDate) ? new Date(k.fundInceptionDate.raw * 1e3).toISOString().slice(0, 10) : null;
-  const ratio = [fees.annualReportExpenseRatio, fees.netExpRatio, k.annualReportExpenseRatio].find(has);
-  const cost = ratio ? `${Number((ratio.raw * 100).toPrecision(3))}%` : null;
+  const ratio2 = [fees.annualReportExpenseRatio, fees.netExpRatio, k.annualReportExpenseRatio].find(has);
+  const cost = ratio2 ? `${Number((ratio2.raw * 100).toPrecision(3))}%` : null;
   const size = money(d.totalAssets ?? k.totalAssets, main);
   const lines = [];
   const line2 = (label, v, always = false) => {
@@ -39196,7 +39416,7 @@ function withWorkedRows(t, kind, freq) {
     const v = f(i);
     return v === null || !Number.isFinite(v) ? null : v;
   });
-  const ratio = (a, b, label, worked2, abs = false) => {
+  const ratio2 = (a, b, label, worked2, abs = false) => {
     if (!a || !b) return null;
     const cells2 = each((i) => {
       const x = a.cells[i] ?? null, y = b.cells[i] ?? null;
@@ -39226,9 +39446,9 @@ function withWorkedRows(t, kind, freq) {
       return r === null || c === null ? null : r - c;
     }) };
     out.push(
-      ratio(gross, revenue, `Gross margin (worked out: gross profit \xF7 revenue${row("Gross Profit") ? "" : ", gross profit being revenue less cost of revenue"})`, "percent"),
-      ratio(op, revenue, "Operating margin (worked out: operating income \xF7 revenue)", "percent"),
-      ratio(net, revenue, "Net margin (worked out: net income \xF7 revenue)", "percent")
+      ratio2(gross, revenue, `Gross margin (worked out: gross profit \xF7 revenue${row("Gross Profit") ? "" : ", gross profit being revenue less cost of revenue"})`, "percent"),
+      ratio2(op, revenue, "Operating margin (worked out: operating income \xF7 revenue)", "percent"),
+      ratio2(net, revenue, "Net margin (worked out: net income \xF7 revenue)", "percent")
     );
     if (freq === "quarterly") out.push(growth(revenue, "Revenue growth on the quarter just before (worked out)", 80, 100));
     const year = freq === "quarterly" ? "the same quarter a year before" : "the year before";
@@ -39241,11 +39461,11 @@ function withWorkedRows(t, kind, freq) {
         return o === null || c === null ? null : o - Math.abs(c);
       });
       if (fcf.some((c) => c !== null)) out.push({ label: "Free cash flow (worked out: operating cash flow less capital expenditure)", unit: money2, cells: fcf, worked: "money" });
-      out.push(ratio(capex, ocf, "Capital expenditure as a share of operating cash flow (worked out)", "percent", true));
+      out.push(ratio2(capex, ocf, "Capital expenditure as a share of operating cash flow (worked out)", "percent", true));
     }
   } else {
     const ca = row("Current Assets"), cl = row("Current Liabilities"), tl = row("Total Liabilities"), eq = row("Stockholders Equity"), cash = row("Cash and Equivalents");
-    out.push(ratio(ca, cl, "Current ratio (worked out: current assets \xF7 current liabilities)", "times"), ratio(tl, eq, "Liabilities to equity (worked out: total liabilities \xF7 equity)", "times"));
+    out.push(ratio2(ca, cl, "Current ratio (worked out: current assets \xF7 current liabilities)", "times"), ratio2(tl, eq, "Liabilities to equity (worked out: total liabilities \xF7 equity)", "times"));
     const less = (a, b, label) => {
       if (!a || !b) return null;
       const cells2 = each((i) => {
@@ -39281,13 +39501,27 @@ var reason = (e) => {
   const m2 = e.message;
   return /sec\.gov refused \(HTTP 403\)/.test(m2) && m2.includes("[no contact email was sent]") ? `${m2}: ${ASK_FOR_EMAIL}` : m2;
 };
+async function statementBasis(sym2, day3) {
+  try {
+    const cik = await cikFor(sym2);
+    if (!cik) return { note: "" };
+    const [s, facts] = await Promise.all([submissions(cik).catch(() => null), companyFacts(cik)]);
+    if (foreignForm(s, facts.facts, day3)) return { note: "" };
+    const g = facts.facts?.["us-gaap"] ?? {};
+    const b = await shareBasis(sym2, firstTagPerPeriod(units(g.EarningsPerShareDiluted, "USD/shares"), units(g.EarningsPerShareBasicAndDiluted, "USD/shares")));
+    return b.why === void 0 ? { splits: b.splits, note: "" } : { note: ` The price source's record of share splits could not be used (${b.why}), so per-share figures are on the basis of the company's latest filings by that day; a split since then would put them off its prices by the split's ratio.` };
+  } catch {
+    return { note: "" };
+  }
+}
 async function financialStatement(raw, kind, freq, analysis2) {
   const day3 = analysisDate(analysis2), sym2 = companySymbol(raw), title = STATEMENTS[kind].title;
   let secFailure;
   try {
-    const t = withWorkedRows(await secStatement(sym2, kind, freq, day3), kind, freq);
+    const basis = kind === "income_statement" ? await statementBasis(sym2, day3) : { note: "" };
+    const t = withWorkedRows(await secStatement(sym2, kind, freq, day3, basis.splits), kind, freq);
     const q = kind !== "balance_sheet" && freq === "quarterly" ? ' Every column is one quarter in a row of quarters; a quarter no filing states (a fourth quarter, which only the annual report covers, or one filed only inside a year to date) is derived from two filed figures of the same year, its column marked "(derived)", and the notes below say from which. Per-share figures are never derived.' : "";
-    return renderTable(t, `${title} for ${sym2} (${freq}), as filed with the SEC on or before ${day3}`, `Each figure is the latest filing of it by that day; a restatement counts only from the day it was filed.${q}`);
+    return renderTable(t, `${title} for ${sym2} (${freq}), as filed with the SEC on or before ${day3}`, `Each figure is the latest filing of it by that day; a restatement counts only from the day it was filed.${q}${basis.note}`);
   } catch (e) {
     secFailure = e;
   }
