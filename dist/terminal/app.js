@@ -80,7 +80,8 @@
     removeWatch: (symbol) => call("DELETE", `/api/watchlist?${q({ symbol })}`),
     favourite: (symbol, favourite) => call("POST", "/api/favourite", { symbol, favourite }),
     /** Asks the desk to analyse a stock at a depth (Analyse, Retry); rings for whoever listens. */
-    enqueue: (symbol, depth) => call("POST", "/api/queue", { symbol, depth }),
+    /** With no depth, the desk's settings' own rounds: nothing is sent for it. */
+    enqueue: (symbol, depth) => call("POST", "/api/queue", depth ? { symbol, depth } : { symbol }),
     dequeue: (symbol) => call("DELETE", `/api/queue?${q({ symbol })}`),
     /** Rings again for what is waiting (Run now). */
     runQueue: () => call("POST", "/api/queue/run", {}),
@@ -533,6 +534,27 @@
   }
   var sameFigures = (asked, now) => asked.id === now.id && asked.quantity === now.quantity && asked.limit === now.limit;
 
+  // src/terminal/ui/depth.ts
+  var DEPTH_ORDER = ["shallow", "medium", "deep"];
+  var DEPTH_WORDS = {
+    shallow: ["Shallow", "Quick: the bull and the bear each make their case once, and so do the three risk voices."],
+    medium: ["Medium", "The two sides answer each other three times, and so do the risk voices. Slower, and costs more."],
+    deep: ["Deep", "Five rounds of each debate. The slowest and costliest: for a call you may act on."]
+  };
+  var rounds = (n, word) => n === 1 ? `one ${word}` : `${n} ${word}s`;
+  function depthChoices(a) {
+    const depths = DEPTH_ORDER.map((d) => ({ depth: d, label: DEPTH_WORDS[d][0], means: DEPTH_WORDS[d][1] }));
+    if (!a.rounds) return { choices: depths, first: a.depth };
+    const { debate, risk } = a.rounds;
+    const settings = {
+      depth: null,
+      label: `Settings (${debate} and ${risk} rounds)`,
+      means: `The rounds in the desk's settings when it runs, now ${rounds(debate, "round")} of the bull and bear debate and ${risk === 1 ? "one" : risk} of the risk debate.`
+    };
+    return { choices: [settings, ...depths], first: null };
+  }
+  var retryDepth = (item) => item?.depth;
+
   // src/data/symbols.ts
   var CRYPTO_BASES = /* @__PURE__ */ new Set(["BTC", "ETH", "SOL", "XRP", "ADA", "DOGE", "LTC", "BCH", "DOT", "AVAX", "LINK"]);
   var CRYPTO_QUOTES = ["USDT", "USDC", "USD"];
@@ -676,7 +698,7 @@
   var fundWords = (sym) => sym === "SPY" ? "SPY (the S&P 500 fund)" : sym;
   var priceWords = (sym, q2) => priceDayWords(priceText(sym, q2), q2.changePct === null ? null : moveText(q2), q2);
   var latestCall = (sym) => S.desk?.calls.find((c) => c.ticker === sym) ?? null;
-  var nameOf = (sym) => quoteOf(sym)?.name ?? S.history?.name ?? marketOf(sym)?.name ?? sym;
+  var nameOf = (sym) => quoteOf(sym)?.name ?? (S.history?.symbol === sym ? S.history.name : void 0) ?? marketOf(sym)?.name ?? sym;
   var life = { stopped: false, updating: false, noKey: false };
   function renderSub() {
     const d = S.desk;
@@ -1463,12 +1485,6 @@
     <span class="ta-callbar-t ta-clamp" title="${esc(c.summary)}">${esc(c.summary)}</span>
     <span class="ta-callbar-do">${readButton(c.ticker, c.date, "Read the reasoning")}${decideButton(c)}</span>`;
   }
-  var DEPTH_ORDER = ["shallow", "medium", "deep"];
-  var DEPTH_WORDS = {
-    shallow: ["Shallow", "Quick: the bull and the bear each make their case once, and so do the three risk voices."],
-    medium: ["Medium", "The two sides answer each other three times, and so do the risk voices. Slower, and costs more."],
-    deep: ["Deep", "Five rounds of each debate. The slowest and costliest: for a call you may act on."]
-  };
   var isOpenItem = (x) => x.state === "waiting" || x.state === "running";
   var itemOf = (sym) => S.desk?.queue.find((x) => x.symbol === sym);
   var isOpen = (sym) => {
@@ -1825,7 +1841,8 @@
     const facts = [["Price target", target], ["Time horizon", horizon], ["Scored", scored]].filter(([, v]) => v).map(([k, v]) => `<div><dt>${esc(k)}</dt><dd title="${esc(v)}">${esc(k === "Scored" ? v : clip(v))}</dd></div>`).join("");
     const shown = new Set(STAGES.flatMap((s) => s.keys)), extra = Object.keys(c.sections).filter((k) => k !== "decision" && !shown.has(k) && c.sections[k]?.length);
     const stages = STAGES.map((s) => ({ ...s, keys: s.keys.filter((k) => c.sections[k]?.length) })).filter((s) => s.keys.length);
-    dlg.innerHTML = `<div class="ta-pophead"><div class="ta-pop-id"><h2>${esc(symbol)}</h2><span class="at-quiet">${esc(nameOf(symbol))} \xB7 the desk's call of ${esc(dayText(date))}</span></div><button class="icon-btn" data-act="close-dialog" aria-label="Close"><svg class="g"><use href="#i-x"/></svg></button></div>
+    const named = nameOf(symbol), of = `the desk's call of ${dayText(date)}`;
+    dlg.innerHTML = `<div class="ta-pophead"><div class="ta-pop-id"><h2>${esc(symbol)}</h2><span class="at-quiet">${esc(named !== symbol ? `${named} \xB7 ${of}` : of[0].toUpperCase() + of.slice(1))}</span></div><button class="icon-btn" data-act="close-dialog" aria-label="Close"><svg class="g"><use href="#i-x"/></svg></button></div>
     <div class="ta-callhero ${verdictClass(rating)}">
       <div class="ta-callhero-main">
         <span class="at-kicker">The portfolio manager's rating</span>
@@ -1992,28 +2009,29 @@
       toast(`${added?.symbol ?? sym} is on the watchlist.`);
     });
   }
-  var ASK = { symbol: "", depth: "shallow" };
+  var ASK = { symbol: "", depth: null };
   function ask(sym) {
     ASK.symbol = sym;
-    ASK.depth = S.desk?.analyses.depth ?? "shallow";
+    ASK.depth = depthChoices(S.desk?.analyses ?? { depth: "shallow" }).first;
     renderAsk();
     $("#askDialog").showModal();
   }
   function renderAsk() {
     const l = S.desk?.analyses.listener;
     const coin = isCrypto(ASK.symbol), it = tierItem(ASK.symbol);
+    const { choices } = depthChoices(S.desk?.analyses ?? { depth: "shallow" }), chosen = choices.find((c) => c.depth === ASK.depth) ?? choices[0];
     const reads = coin ? "the price, the news and the mood (a coin has no accounts to read)" : "the price, the news, the mood and the accounts (for a fund: what it holds, and its yearly cost where the desk reads it, which for a US fund it does not)";
     $("#askDialog").innerHTML = `<h2 id="askTitle">Analyse ${esc(it?.name ? `${it.name} (${ASK.symbol})` : ASK.symbol)}</h2>
     <p class="at-lede">The desk's thirteen agents read ${reads}, check the facts, argue both sides, and record a call you can read and decide on. It never places an order${coin ? `: ${it?.paper === false ? "among crypto, the desk follows only Bitcoin and Ether on paper" : "a coin is followed on paper only"}` : ""}.</p>
-    <div class="at-seg" role="radiogroup" aria-label="How deep">${DEPTH_ORDER.map((d) => `<button class="at-seg-b${d === ASK.depth ? " on" : ""}" role="radio" aria-checked="${d === ASK.depth}" data-act="ask-depth" data-depth="${d}">${DEPTH_WORDS[d][0]}</button>`).join("")}</div>
-    <p class="at-quiet">${term("depth")} \xB7 ${esc(DEPTH_WORDS[ASK.depth][1])}</p>
+    <div class="at-seg" role="radiogroup" aria-label="How deep">${choices.map((c) => `<button class="at-seg-b${c === chosen ? " on" : ""}" role="radio" aria-checked="${c === chosen}" data-act="ask-depth" data-depth="${c.depth ?? ""}">${esc(c.label)}</button>`).join("")}</div>
+    <p class="at-quiet">${term("depth")} \xB7 ${esc(chosen.means)}</p>
     <p class="at-honest">${l ? `It runs by itself: ${esc(l.listener)} is listening.` : "Nothing is listening on this computer yet, so it waits until a run starts: see Analyses you asked for."}</p>
     <div class="at-pop-do"><button class="at-btn at-press" data-act="ask-cancel">Cancel</button><button class="at-btn at-press primary" data-act="ask-yes"><svg class="g"><use href="#i-bot"/></svg><span>Ask the desk</span></button></div>`;
   }
   async function askNow() {
     const sym = ASK.symbol, l = S.desk?.analyses.listener;
     await run(async () => {
-      await api.enqueue(sym, ASK.depth);
+      await api.enqueue(sym, ASK.depth ?? void 0);
       $("#askDialog").close();
       await refreshState();
       toast(l ? `${sym} is asked for: it runs by itself, and its call appears here.` : `${sym} is waiting. Nothing is listening yet: see Analyses you asked for.`);
@@ -2221,10 +2239,12 @@
           await refreshState();
         });
         break;
-      case "ask-depth":
-        ASK.depth = el.dataset.depth ?? "shallow";
+      case "ask-depth": {
+        const d = el.dataset.depth ?? "";
+        ASK.depth = DEPTH_ORDER.includes(d) ? d : null;
         renderAsk();
         break;
+      }
       case "ask-cancel":
         $("#askDialog").close();
         break;
@@ -2234,7 +2254,7 @@
       case "q-retry": {
         const x = S.desk?.queue.find((i) => i.symbol === sym);
         void run(async () => {
-          await api.enqueue(sym, x?.depth ?? S.desk?.analyses.depth ?? "shallow");
+          await api.enqueue(sym, retryDepth(x));
           await refreshState();
           toast(`${sym} is asked for again.`);
         });
