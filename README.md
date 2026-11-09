@@ -277,12 +277,12 @@ forecast:
   own measure of expected swings (under 15 calm, 15 to 25 normal, over 25 wild). The **rates**: what Polymarket's crowd
   prices for the Federal Reserve's next interest-rate decision, or "unavailable".
 - **Worth a look today**: up to five of the whole market, the eleven sectors and your watchlist, ranked by how many of
-  these fire, then by the size of the move (its foot names the session the moves are from, and while that session still
-  trades, says the move is so far, not a close): a move of 3% or more in a day; volume at least twice its usual (its
-  20-day average); a new 52-week high or low; a close across its 50- or 200-day average; and, for a company or a coin,
-  news about it today. Each comes with its reason in one line, such as "Fell 4.2% on 3.1 times its usual volume, a new
-  52-week low", and the robot beside it. A name whose news could not be read is listed as such: whether it is in the
-  news today is not known, and it is never called "no news".
+  these fire, then by the size of the move (its foot names the session the moves are from, and when they were read
+  before that session's close was final, says the move is so far, not a close): a move of 3% or more in a day; volume at
+  least twice its usual (its 20-day average); a new 52-week high or low; a close across its 50- or 200-day average; and,
+  for a company or a coin, news about it today. Each comes with its reason in one line, such as "Fell 4.2% on 3.1 times
+  its usual volume, a new 52-week low", and the robot beside it. A name whose news could not be read is listed as such:
+  whether it is in the news today is not known, and it is never called "no news".
 
 Under the list, the switch **"Analyse the top 3 each market morning"** is off as shipped. Switching it on puts nothing
 on the list at once: it starts the next market morning. Then, once each market morning (before noon in New York; a
@@ -316,7 +316,8 @@ Before you risk money, every call the desk makes on a stock, a fund, Bitcoin or 
 Start here and This morning the dashboard shows what that would have done: one sentence, a line of the paper money
 against SPY (the fund that copies the S&P 500) from the same start, and how many weeks and calls stand behind it. Each call is sized exactly as its order ticket would size it (the rating, a full
 position of 10%, your caps), takes no order the real ticket would refuse, and fills at the first closing price after
-the call's day. No costs are counted. The paper money starts at $10,000; change it on the scorecard. Each call shows a
+the call's day, as the market printed it. Each dividend is paid into paper cash on its ex-dividend day, as an account
+would receive it, and the SPY line is paid its own the same way. No costs are counted. The paper money starts at $10,000; change it on the scorecard. Each call shows a
 small "paper" badge with what it did there, such as "paper: bought 2 · NVDA −13.59% since": the stock's move since the
 paper buy, not the call's own result (that is its alpha, beside it). Switching trading on with under four weeks of record shows that record first and
 asks you to press "I understand".

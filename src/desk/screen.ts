@@ -32,7 +32,8 @@ export interface Pick {
   why: string;
   /** The session the figures are from: the latest daily row. */
   session: string;
-  /** That session was still trading when the screen was worked out: its move is so far, not a close. */
+  /** That session's close was not final when the screen was worked out (it was still trading, or had just ended:
+   *  market.ts latestState): its move is so far, not a close. */
   live?: true;
 }
 export interface Screen {
@@ -43,7 +44,7 @@ export interface Screen {
   /** The news read for the person's companies and coins: how many were read, and which could not be (never "no news").
    *  Missing in a screen kept before it was recorded: then nothing is said about news. */
   news?: { read: number; unread: string[] };
-  /** The latest session most of the names were read on, and whether it was still trading then. */
+  /** The latest session most of the names were read on, and whether its close was not yet final then. */
   session?: string; live?: true;
   /** What the morning switch put on the waiting list, and on which day (once a day at most). */
   queued?: { day: string; symbols: string[] };
@@ -58,8 +59,8 @@ export function signalsOf(bars: readonly Bar[], newsToday: number | null = null)
   if (!last) return { signals, movePct: null };
   const movePct = prev && prev.close > 0 ? (last.close / prev.close - 1) * 100 : null;
   if (movePct !== null && Math.abs(movePct) >= MOVE_PCT) signals.push({ kind: 'move', words: `${movePct >= 0 ? 'rose' : 'fell'} ${one(Math.abs(movePct))}%` });
-  const usual = bars.slice(Math.max(0, n - 1 - USUAL_DAYS), n - 1).map((b) => b.volume).filter((v) => v > 0);
-  if (usual.length >= USUAL_DAYS / 2 && last.volume > 0) {
+  const usual = bars.slice(Math.max(0, n - 1 - USUAL_DAYS), n - 1).map((b) => b.volume).filter((v): v is number => v !== null && v > 0);   // a volume not given is left out, never a zero
+  if (usual.length >= USUAL_DAYS / 2 && last.volume !== null && last.volume > 0) {
     const times = last.volume / (usual.reduce((a, v) => a + v, 0) / usual.length);
     if (times >= VOLUME_TIMES) signals.push({ kind: 'volume', words: `${one(times)} times its usual volume` });
   }

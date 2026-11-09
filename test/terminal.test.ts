@@ -215,6 +215,24 @@ test('the paper record: every call followed at its ticket size from the closing 
   assert.equal((await call(term, 'GET', '/api/paper', { token: false })).status, 401);
 });
 
+// Audit 1, F1 (7 Nov 2026): the paper record filled at Yahoo's dividend-adjusted close, which every later dividend lowers.
+// Made-up figures in Verizon's shape: a 0.69 dividend went ex on 9 Oct 2026, so every adjusted close before it is 1.53%
+// below the price the market printed (45.95 printed, 45.25 adjusted).
+test('a call made before a dividend fills on paper at the close the market printed, and the dividend is paid into paper cash on its ex-day', async () => {
+  const EX = '2026-10-09', days = weekdays('2026-10-09', 420);
+  const vz: Row[] = days.map((date) => (date < EX ? { date, o: 45.95, h: 46.1, l: 45.8, c: 45.95, v: 1e6, adj: 45.25 } : { date, o: 45.26, h: 45.4, l: 45.1, c: 45.26, v: 1e6 }));
+  const at = Date.parse(`${EX}T13:30:00Z`) / 1000, j = chartJson('VZ', vz);
+  const withDividend = { chart: { ...j.chart, result: [{ ...j.chart.result[0]!, events: { dividends: { [String(at)]: { amount: 0.69, date: at } } } }] } };
+  configure({ fetch: async (input) => (/\/v8\/finance\/chart\/VZ\?/.test(String(input)) ? new Response(JSON.stringify(withDividend)) : yahoo(input)) });
+  new Journal(path.join(dir(), 'journal.md')).storeDecision('VZ', '2026-10-01', '**Rating**: Buy\n\n**Executive Summary**: Buy.');
+  const book = (await call(term, 'GET', '/api/paper')).json();
+  const t = book.trades.find((x: any) => x.ticker === 'VZ');
+  assert.deepEqual([t.status, t.side, t.fillDate, t.price], ['filled', 'buy', '2026-10-02', 45.95], 'the close printed on 2 Oct, not the 45.25 a later dividend made of it');
+  assert.equal(t.why, `Bought ${t.quantity} at the close of 2026-10-02.`);
+  assert.deepEqual(book.dividends, [{ ticker: 'VZ', date: EX, perShare: 0.69, quantity: t.quantity, usd: Math.round(t.quantity * 0.69 * 100) / 100 }], 'paid on its ex-day for the shares held that morning');
+  assert.equal(book.dividendsUsd, Math.round(t.quantity * 0.69 * 100) / 100);
+});
+
 test('"Run automatically with Claude Code": started and stopped from the page, remembered across starts, and never over another listener', async () => {
   assert.equal((await call(term, 'POST', '/api/listen', { body: { on: true } })).status, 404, 'a dashboard given no way to start it has no switch');
   let started = 0, claude = true;
@@ -265,7 +283,7 @@ test('the page\'s state is the desk\'s own files: calls, how they turned out, an
   assert.equal(s.record.summary.byRating.Overweight.count, 1);
   assert.match(s.record.text, /Overweight: n=1, called the direction 100%, mean alpha \+7\.50%/);
   // the yardstick named for what it is: SPY is the fund that copies the S&P 500, not the index itself
-  assert.equal(s.record.benchmarkNote, "Each call is judged after 5 trading days against its market's index: for a US stock, SPY, the fund that copies the S&P 500.");
+  assert.equal(s.record.benchmarkNote, "Each call is judged after 5 trading days against its market's index: for a US stock, SPY, the fund that copies the S&P 500. Both returns count dividends: they are worked out from prices adjusted for them.");
   assert.equal(s.desk.benchmark, 'SPY');
   assert.equal(yardstickWords({ benchmark: 'VOO', benchmarks: {} }), 'VOO, the yardstick set for every call', 'one yardstick set for every call is named as itself');
   assert.equal(yardstickWords({ benchmark: '', benchmarks: { '': 'IVV' } }), "its market's index: for a US stock, IVV");

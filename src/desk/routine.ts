@@ -57,8 +57,9 @@ const holdingsLine = (dir: string): string => {
     : `Holdings: as the person gave them, on ${h.savedOn}.`;
 };
 
-/** The session a move is from: "2026-11-06 (Fri)", or, while it trades, "2026-11-09 (Mon), still trading: a move so far". */
-const sessionWords = (session: string, live?: boolean): string => `${withWeekday(session)}${live ? ', still trading: a move so far, not a close' : ''}`;
+/** The session a move is from: "2026-11-06 (Fri)", or, read before its close was final (while it traded, or within the
+ *  minutes before its figures are final), "2026-11-09 (Mon), read before its close was final: a move so far". */
+const sessionWords = (session: string, live?: boolean): string => `${withWeekday(session)}${live ? ', read before its close was final: a move so far, not a close' : ''}`;
 
 /** What "nothing stood out" can say of the news: only of the names whose news was read today. */
 export function quietNews(news: Screen['news']): string {

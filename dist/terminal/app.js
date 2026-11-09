@@ -362,7 +362,7 @@
     const bars = [], ma50 = [], ma200 = [];
     for (let i = 0; i < h.bars.length; i += 5) {
       const g = h.bars.slice(i, i + 5), end = g[g.length - 1];
-      bars.push({ date: end.date, label: monthYear(end.date), o: g[0].open, h: Math.max(...g.map((b) => b.high)), l: Math.min(...g.map((b) => b.low)), c: end.close, v: g.reduce((a, b) => a + b.volume, 0) });
+      bars.push({ date: end.date, label: monthYear(end.date), o: g[0].open, h: Math.max(...g.map((b) => b.high)), l: Math.min(...g.map((b) => b.low)), c: end.close, v: g.some((b) => b.volume === null) ? null : g.reduce((a, b) => a + b.volume, 0) });
       ma50.push(h.ma50[i + g.length - 1] ?? null);
       ma200.push(h.ma200[i + g.length - 1] ?? null);
     }
@@ -396,8 +396,9 @@
     const every = Math.ceil(n / 6);
     for (let i = Math.floor(every / 2); i < n; i += every) s += `<text x="${x(i)}" y="${H - 6}" text-anchor="middle" class="ch-axis">${bars[i].label}</text>`;
     if (VOL) {
-      const vmax = Math.max(...bars.map((b) => b.v)) || 1, vb = PB + 10 + VOL;
+      const vmax = Math.max(0, ...bars.map((b) => b.v ?? 0)) || 1, vb = PB + 10 + VOL;
       bars.forEach((b, i) => {
+        if (b.v === null) return;
         const bh = Math.max(1.5, b.v / vmax * VOL), w = Math.max(1, step * 0.6);
         s += `<rect x="${x(i) - w / 2}" y="${vb - bh}" width="${w}" height="${bh}" rx="${Math.min(2, w / 2)}" class="vol-${b.c >= b.o ? "ok" : "bad"}"/>`;
       });
@@ -430,7 +431,7 @@
       xhd.setAttribute("cx", String(x(i)));
       xhd.setAttribute("cy", String(y(b.c)));
       const move = (b.c / b.o - 1) * 100;
-      tip.innerHTML = `<div class="at-tile-name">${dayText(b.date)}</div><dl class="at-facts"><div><dt>Open</dt><dd>${num(b.o)}</dd></div><div><dt>High</dt><dd>${num(b.h)}</dd></div><div><dt>Low</dt><dd>${num(b.l)}</dd></div><div><dt>Close</dt><dd>${num(b.c)} <span class="at-chip ${tone(move)}">${pct(move)}</span></dd></div><div><dt>Volume</dt><dd>${(b.v / 1e6).toFixed(1)}M</dd></div></dl>`;
+      tip.innerHTML = `<div class="at-tile-name">${dayText(b.date)}</div><dl class="at-facts"><div><dt>Open</dt><dd>${num(b.o)}</dd></div><div><dt>High</dt><dd>${num(b.h)}</dd></div><div><dt>Low</dt><dd>${num(b.l)}</dd></div><div><dt>Close</dt><dd>${num(b.c)} <span class="at-chip ${tone(move)}">${pct(move)}</span></dd></div><div><dt>Volume</dt><dd>${b.v === null ? "not given" : `${(b.v / 1e6).toFixed(1)}M`}</dd></div></dl>`;
       tip.classList.add("on");
       const tw = tip.offsetWidth;
       let left = x(i) + 16;
@@ -1344,7 +1345,7 @@
     const unit = marketOf(sym)?.unit, cur = h.currency ?? "USD";
     const p = (n) => unit ? `${num(n)}${unit}` : isIndex(sym) ? num(n) : money(n, cur);
     const hi = Math.max(...bars.map((b) => b.high)), lo = Math.min(...bars.map((b) => b.low));
-    const vols = bars.map((b) => b.volume).filter((v) => v > 0), avg = vols.length ? vols.reduce((a, b) => a + b, 0) / vols.length : null;
+    const vols = bars.map((b) => b.volume).filter((v) => v !== null && v > 0), avg = vols.length ? vols.reduce((a, b) => a + b, 0) / vols.length : null;
     const fact = (k, v, word) => `<div><dt${word ? ` title="${esc(means(word))}"` : ""}>${esc(k)}</dt><dd>${v}</dd></div>`;
     el.innerHTML = [
       fact(`Open \xB7 ${shortDay(last.date)}`, p(last.open)),
@@ -1583,7 +1584,7 @@
   }
   function lookRow(p) {
     const it = tierItem(p.symbol), name = it?.name ?? quoteOf(p.symbol)?.name ?? p.symbol;
-    const move = p.movePct === null ? '<span class="at-chip">\u2014</span>' : `<span class="at-chip ${tone(p.movePct)}" title="${p.live ? `The move so far on ${esc(dayText(p.session))}, still trading, from the close before` : `The move on ${esc(dayText(p.session))}, from the close before`}">${pct(p.movePct)}</span>`;
+    const move = p.movePct === null ? '<span class="at-chip">\u2014</span>' : `<span class="at-chip ${tone(p.movePct)}" title="${p.live ? `The move on ${esc(dayText(p.session))} as read before its close was final, from the close before` : `The move on ${esc(dayText(p.session))}, from the close before`}">${pct(p.movePct)}</span>`;
     return `<div class="ta-look">
     <button class="ta-look-go" data-act="select" data-symbol="${esc(p.symbol)}" title="Chart ${esc(p.symbol)}"><span class="ta-tier-top"><b class="at-tile-name">${esc(name)}</b>${move}</span><span class="at-tile-sub">${esc(p.symbol)} \xB7 ${esc(p.why)}</span></button>
     <span class="at-tail">${isOpen(p.symbol) ? openChip(p.symbol) : robot(p.symbol)}</span></div>`;
@@ -1600,7 +1601,7 @@
     const list = s.picks.length ? `<div class="ta-looks">${s.picks.map(lookRow).join("")}</div>` : `<p class="at-lede">Nothing stood out among the ${s.looked} looked at: no move of 3% or more, no volume twice its usual, no 52-week high or low, no cross of an average${!s.news?.read ? "" : s.news.unread.length ? ", and no news today about your other companies or coins" : ", and no news today about your companies or coins"}.</p>`;
     const unread = s.news?.unread.length ? `<p class="at-quiet">News could not be read just now for ${esc(listWords(s.news.unread))}: whether ${s.news.unread.length === 1 ? "it is" : "they are"} in the news today is not known.</p>` : "";
     el.innerHTML = `${head}${list}${s.unavailable.length ? `<p class="at-quiet">Could not be read just now: ${esc(listWords(s.unavailable))}.</p>` : ""}${unread}${sw}
-    <p class="at-honest">Ranked by how many of these fire, then by the size of the move: a move of 3% or more in a day; volume at least twice its usual (its average over 20 days); a new 52-week high or low (the highest or lowest price in a year); a close across its 50- or 200-day average (its average closing price over that many days); and, for a company or a coin, news about it today. From Yahoo Finance's daily prices at ${esc(when(s.at))}${s.session ? `; the moves are from the session of ${esc(dayText(s.session))}${s.live ? ", still trading: so far, not a close" : ""}` : ""}. A move says what happened, not what comes next. Nothing here is investment advice.</p>`;
+    <p class="at-honest">Ranked by how many of these fire, then by the size of the move: a move of 3% or more in a day; volume at least twice its usual (its average over 20 days); a new 52-week high or low (the highest or lowest price in a year); a close across its 50- or 200-day average (its average closing price over that many days); and, for a company or a coin, news about it today. From Yahoo Finance's daily prices at ${esc(when(s.at))}${s.session ? `; the moves are from the session of ${esc(dayText(s.session))}${s.live ? ", read before its close was final: so far, not a close" : ""}` : ""}. A move says what happened, not what comes next. Nothing here is investment advice.</p>`;
   }
   function renderMorning() {
     renderWeather();
@@ -1688,10 +1689,11 @@
     else if (!b) lede = PAPER.failed ? "The paper record could not be worked out just now: Yahoo Finance did not answer. It tries again in a moment." : "Working out the paper record from the closing prices.";
     else if (b.series.length < 2 || b.returnPct === null) lede = `Following the desk on paper since ${dayText(b.since ?? d.paper.since)}: nothing has filled yet. A call fills at the first closing price after its day.`;
     else lede = `Following the desk on paper since ${dayText(b.since ?? d.paper.since)}: ${pct(b.returnPct * 100)} (${money(b.value)} from ${money(b.startUsd)}), ${fundWords(b.benchmark)} ${b.benchmarkPct === null ? "unavailable" : pct(b.benchmarkPct * 100)} over the same days.`;
-    const held = b?.positions.length ? `<p class="at-quiet">${term("position", "Positions")} on paper now: ${b.positions.map((p) => `${esc(p.ticker)} ${p.quantity}`).join(", ")}, and ${esc(money(b.cash))} in cash.</p>` : "";
+    const paidIn = b && b.dividendsUsd > 0 ? ` Dividends paid into paper cash so far: ${esc(money(b.dividendsUsd))}.` : "";
+    const held = b?.positions.length ? `<p class="at-quiet">${term("position", "Positions")} on paper now: ${b.positions.map((p) => `${esc(p.ticker)} ${p.quantity}`).join(", ")}, and ${esc(money(b.cash))} in cash.${paidIn}</p>` : paidIn ? `<p class="at-quiet">${paidIn.trim()}</p>` : "";
     $("#paperCard").innerHTML = `<div class="at-card-head"><h3>Your ${term("paper", "paper")} record</h3><span class="at-chip">${esc(weeksWords(d.paper))} of record</span></div>
-    <p class="at-lede">${esc(lede)}</p>${b && b.series.length > 1 ? `<div class="ta-spark-tall" id="paperChart"></div><p class="at-quiet">The solid line is the paper money; the dashed one is ${esc(b.benchmark)}${b.benchmark === "SPY" ? `, the fund that copies the ${term("sp500", "S&P 500")},` : ""} from the same start.</p>` : ""}${held}
-    <p class="at-honest">Every call on a stock, a fund, Bitcoin or Ether is followed as its order ticket would size it, and fills at the first closing price after its day. Crypto is bought in fractions within your crypto limit, on paper only: Robinhood's agent doorway trades stocks and funds. No costs are counted (Robinhood charges no commission). A few weeks of record are noise, not proof, and nothing here is investment advice.</p>`;
+    <p class="at-lede">${esc(lede)}</p>${b && b.series.length > 1 ? `<div class="ta-spark-tall" id="paperChart"></div><p class="at-quiet">The solid line is the paper money; the dashed one is ${esc(b.benchmark)}${b.benchmark === "SPY" ? `, the fund that copies the ${term("sp500", "S&P 500")},` : ""} from the same start, each paid its dividends in cash.</p>` : ""}${held}
+    <p class="at-honest">Every call on a stock, a fund, Bitcoin or Ether is followed as its order ticket would size it, and fills at the first closing price after its day, as the market printed it. Each dividend is paid into paper cash on its ex-dividend day, as an account would receive it. Crypto is bought in fractions within your crypto limit, on paper only: Robinhood's agent doorway trades stocks and funds. No costs are counted (Robinhood charges no commission). A few weeks of record are noise, not proof, and nothing here is investment advice.</p>`;
     const el = document.getElementById("paperChart");
     if (el && b) paperChart(el, b.series);
   }

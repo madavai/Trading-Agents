@@ -1,12 +1,16 @@
 // Daily prices from Yahoo Finance's public chart service (no key), as the desk reads them: one row per trading day, in
 // the exchange's own calendar, adjusted for splits and dividends so averages do not jump, with rows missing a price
 // left out rather than filled in. A day the service lists with its prices still blank (for a while after a session ends,
-// until its end-of-day figures are filled in) is named in `unfilled`, so the desk can say so instead of skipping it.
+// until its end-of-day figures are filled in) is named in `unfilled`, and one blank among the rows in `missing`, so the
+// desk can say so instead of skipping it. A volume the service does not give is null, never a zero. Each answer carries
+// when it was read (`fetchedAt`), and is kept in memory no longer than on disk, so a run that goes on past the close
+// reads the close, not the price of the afternoon.
 import { addDays, daysBetween } from './dates.js';
-import { getJson, NoData } from './http.js';
+import { getJsonAt, keepFor, NoData } from './http.js';
 import { normalizeSymbol } from './symbols.js';
 
-export interface Bar { date: string; open: number; high: number; low: number; close: number; volume: number }
+/** `volume` is null when the source does not give it: never counted as a zero. */
+export interface Bar { date: string; open: number; high: number; low: number; close: number; volume: number | null }
 export interface Meta {
   symbol: string; currency?: string; exchange?: string; type?: string; name?: string; price?: number; timezone?: string;
   /** The current or latest regular session the service knows of: its day in the exchange's calendar, its opening and close (ms). */
@@ -19,7 +23,15 @@ export interface Dividend { date: string; amount: number }
  *  `dividends`: those that went ex-dividend in the range, oldest first. `traded`: the same days at the prices the stock
  *  traded at (adjusted for later splits only, as an exchange's own history shows them), for a chart a person compares with
  *  prices quoted anywhere: `bars` lowers every day before a dividend by it, so a five-year low there is a price never traded. */
-export interface Series { meta: Meta; bars: Bar[]; unfilled?: string[]; dividends?: Dividend[]; traded?: Bar[] }
+export interface Series {
+  meta: Meta; bars: Bar[]; unfilled?: string[]; dividends?: Dividend[]; traded?: Bar[];
+  /** Days among the rows (after the first) that the service lists with blank prices: a session whose prices are missing. */
+  missing?: string[];
+  /** Days the service gave no dividend-adjusted close for: those rows are adjusted for splits only. */
+  unadjusted?: string[];
+  /** When the answer was read from the source (ms), or from the desk's kept copy of it. */
+  fetchedAt?: number;
+}
 
 interface ChartJson {
   chart?: {
@@ -34,7 +46,7 @@ interface ChartJson {
 }
 
 export const HOSTS = ['https://query1.finance.yahoo.com', 'https://query2.finance.yahoo.com'];
-const cache = new Map<string, Promise<Series>>();
+const cache = new Map<string, { at: number; series: Promise<Series> }>();
 
 const epoch = (date: string) => Math.floor(Date.parse(`${date}T00:00:00Z`) / 1000);
 const num = (v: number | null | undefined) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
@@ -45,17 +57,18 @@ export function parseChart(json: ChartJson, symbol: string): Series {
   if (!r) throw new NoData(`Yahoo Finance has no prices for ${symbol}${json.chart?.error?.description ? ` (${json.chart.error.description})` : ''}`);
   const m = r.meta ?? {}, q = r.indicators?.quote?.[0] ?? {}, adj = r.indicators?.adjclose?.[0]?.adjclose;
   const offset = m.gmtoffset ?? 0, dayOf = (ts: number) => new Date((ts + offset) * 1000).toISOString().slice(0, 10);
-  const rows: Array<{ bar: Bar; traded: Bar }> = [], blank: string[] = [];
+  const rows: Array<{ bar: Bar; traded: Bar; adjusted: boolean }> = [], blank: string[] = [];
   (r.timestamp ?? []).forEach((ts, i) => {
     const open = num(q.open?.[i]), high = num(q.high?.[i]), low = num(q.low?.[i]), close = num(q.close?.[i]);
     if (open === null || high === null || low === null || close === null || close <= 0) { blank.push(dayOf(ts)); return; }
-    const a = num(adj?.[i]), k = a !== null ? a / close : 1, date = dayOf(ts), volume = num(q.volume?.[i]) ?? 0;
-    rows.push({ bar: { date, open: open * k, high: high * k, low: low * k, close: close * k, volume }, traded: { date, open, high, low, close, volume } });
+    const a = num(adj?.[i]), k = a !== null ? a / close : 1, date = dayOf(ts), v = num(q.volume?.[i]), volume = v !== null && v >= 0 ? v : null;
+    rows.push({ bar: { date, open: open * k, high: high * k, low: low * k, close: close * k, volume }, traded: { date, open, high, low, close, volume }, adjusted: a !== null });
   });
   const seen = new Set<string>();   // one row a day: the chart service can repeat today's row
   const kept = rows.filter((x) => (seen.has(x.bar.date) ? false : (seen.add(x.bar.date), true)));
   const unique = kept.map((x) => x.bar);
-  const lastDay = unique.at(-1)?.date ?? '', unfilled = [...new Set(blank.filter((d) => d > lastDay))];
+  const firstDay = unique[0]?.date ?? '', lastDay = unique.at(-1)?.date ?? '', unfilled = [...new Set(blank.filter((d) => d > lastDay))];
+  const missing = [...new Set(blank.filter((d) => d > firstDay && d < lastDay && !seen.has(d)))].sort();
   const reg = m.currentTradingPeriod?.regular, session = reg?.start && reg.end ? { date: dayOf(reg.start), start: reg.start * 1000, end: reg.end * 1000 } : undefined;
   const paid = new Map<string, number>();   // one a day: the service keys them by time, and a day is the dividend
   for (const d of Object.values(r.events?.dividends ?? {})) {
@@ -64,8 +77,8 @@ export function parseChart(json: ChartJson, symbol: string): Series {
   }
   return {
     meta: { symbol: m.symbol ?? symbol, currency: m.currency, exchange: m.fullExchangeName ?? m.exchangeName, type: m.instrumentType, name: m.longName ?? m.shortName, price: m.regularMarketPrice, timezone: m.exchangeTimezoneName, session },
-    bars: unique, unfilled, dividends: [...paid].map(([date, amount]) => ({ date, amount })).sort((a, b) => a.date.localeCompare(b.date)),
-    traded: kept.map((x) => x.traded),
+    bars: unique, unfilled, missing, dividends: [...paid].map(([date, amount]) => ({ date, amount })).sort((a, b) => a.date.localeCompare(b.date)),
+    traded: kept.map((x) => x.traded), unadjusted: kept.filter((x) => !x.adjusted).map((x) => x.bar.date),
   };
 }
 
@@ -73,24 +86,31 @@ async function fetchDaily(symbol: string, from: string, to: string): Promise<Ser
   const qs = `period1=${epoch(from)}&period2=${epoch(addDays(to, 1))}&interval=1d&events=div%2Csplit&includeAdjustedClose=true`;
   let last: unknown;
   for (const host of HOSTS) {
-    try { return parseChart(await getJson<ChartJson>(`${host}/v8/finance/chart/${encodeURIComponent(symbol)}?${qs}`), symbol); }
+    try { const { value, at } = await getJsonAt<ChartJson>(`${host}/v8/finance/chart/${encodeURIComponent(symbol)}?${qs}`); return { ...parseChart(value, symbol), fetchedAt: at }; }
     catch (e) { if (e instanceof NoData) throw e; last = e; }
   }
   throw last;
 }
 
+/** How long a series is kept in memory: as long as the disk keeps the chart service's answer, and no longer. */
+const KEEP_MS = keepFor(`${HOSTS[0]}/v8/finance/chart/`);
+
 /** Daily rows for a symbol from `from` to `to` (both included), never after `to`. */
 export async function daily(raw: string, from: string, to: string): Promise<Series> {
-  const symbol = normalizeSymbol(raw), key = `${symbol}|${from}|${to}`;
-  if (!cache.has(key)) {
-    const p = fetchDaily(symbol, from, to);
-    cache.set(key, p);
-    p.catch(() => cache.delete(key));
+  const symbol = normalizeSymbol(raw), key = `${symbol}|${from}|${to}`, hit = cache.get(key);
+  if (!hit || Date.now() - hit.at >= KEEP_MS) {
+    const series = fetchDaily(symbol, from, to);
+    cache.set(key, { at: Date.now(), series });
+    series.catch(() => { if (cache.get(key)?.series === series) cache.delete(key); });
   }
-  const s = await cache.get(key)!;
+  const s = await cache.get(key)!.series;
   const within = (b: Bar) => b.date >= from && b.date <= to;
-  const bars = s.bars.filter(within), lastDay = bars.at(-1)?.date ?? '';
-  return { meta: s.meta, bars, unfilled: (s.unfilled ?? []).filter((d) => d > lastDay && d <= to), dividends: (s.dividends ?? []).filter((d) => d.date >= from && d.date <= to), ...(s.traded ? { traded: s.traded.filter(within) } : {}) };
+  const bars = s.bars.filter(within), firstDay = bars[0]?.date ?? '', lastDay = bars.at(-1)?.date ?? '';
+  return {
+    meta: s.meta, bars, unfilled: (s.unfilled ?? []).filter((d) => d > lastDay && d <= to), missing: (s.missing ?? []).filter((d) => d > firstDay && d < lastDay),
+    dividends: (s.dividends ?? []).filter((d) => d.date >= from && d.date <= to), unadjusted: (s.unadjusted ?? []).filter((d) => d >= from && d <= to),
+    ...(s.traded ? { traded: s.traded.filter(within) } : {}), ...(s.fetchedAt !== undefined ? { fetchedAt: s.fetchedAt } : {}),
+  };
 }
 
 /** Daily rows up to the analysis date with enough history before it for the slowest average (200 trading days). */

@@ -1,8 +1,11 @@
 // The paper book: what following every one of the desk's calls would have done, with no money at stake. Each call is
 // sized exactly as its order ticket would size it (the rating, a full position, the person's caps), must pass the same
-// checks, and is filled at the first closing price after the call's day: a price the person could really have had,
-// nothing from hindsight. No costs are counted (Robinhood charges no commission). It is worked out afresh from the
-// journal and daily closing prices every time, so it can never drift from the calls; only the starting money is kept.
+// checks, and is filled at the first closing price after the call's day, as the market printed it: a price the person
+// could really have had, nothing from hindsight (a dividend-adjusted close would lower it after every later dividend).
+// Each dividend is paid into paper cash on its ex-dividend day for the shares held at the start of that day, as an
+// account receives it; the benchmark's line is bought at the same start and paid its own dividends the same way. No
+// costs are counted (Robinhood charges no commission). It is worked out afresh from the journal and daily closing prices
+// every time, so it can never drift from the calls; only the starting money is kept.
 import fs from 'node:fs';
 import path from 'node:path';
 import { daysBetween } from '../data/dates.js';
@@ -14,8 +17,13 @@ import { tradingDaysBetween } from './orders.js';
 import type { Sectors } from './sectors.js';
 
 export interface PaperCall { ticker: string; date: string; rating: string }
-/** Closing prices by symbol, oldest first. A symbol missing here could not be read; an empty list has no prices. */
+/** Closing prices by symbol as the market printed them, oldest first. A symbol missing here could not be read; an empty
+ *  list has no prices. */
 export type Closes = Record<string, ReadonlyArray<{ date: string; close: number }>>;
+/** Dividends by symbol: each ex-dividend day and the amount a share, on the same footing as the closes. */
+export type Dividends = Record<string, ReadonlyArray<{ date: string; amount: number }>>;
+/** A dividend paid into paper cash. */
+export interface PaperDividend { ticker: string; date: string; perShare: number; quantity: number; usd: number }
 
 export interface PaperTrade {
   ticker: string; callDate: string; rating: string;
@@ -37,6 +45,8 @@ export interface PaperBook {
   /** The paper book's value at each close since the first call, beside the benchmark's, both starting at startUsd. */
   series: Array<{ date: string; value: number; benchmark: number | null }>;
   trades: PaperTrade[];
+  /** The dividends paid into paper cash, oldest first, and their total. */
+  dividends: PaperDividend[]; dividendsUsd: number;
   returnPct: number | null; benchmarkPct: number | null;
   benchmark: string;
 }
@@ -72,8 +82,9 @@ const closeOn = (rows: Closes[string] | undefined, date: string): number | null 
   return last;
 };
 
-/** sectors: where each ticker's sector comes from, for the sector limit (without it, each stock counts as its own). */
-export function paperBook(calls: readonly PaperCall[], closes: Closes, o: { startUsd: number; trading: Trading; caps: Caps; today: string; benchmark?: string; sectors?: Pick<Sectors, 'context'> }): PaperBook {
+/** sectors: where each ticker's sector comes from, for the sector limit (without it, each stock counts as its own).
+ *  dividends: each symbol's dividends, paid on paper for the shares held (the benchmark's too). */
+export function paperBook(calls: readonly PaperCall[], closes: Closes, o: { startUsd: number; trading: Trading; caps: Caps; today: string; benchmark?: string; sectors?: Pick<Sectors, 'context'>; dividends?: Dividends }): PaperBook {
   const benchmark = o.benchmark ?? 'SPY';
   const ordered = [...calls].filter((c) => c.date <= o.today).sort((a, b) => a.date.localeCompare(b.date));
   const trades: PaperTrade[] = [];
@@ -121,20 +132,43 @@ export function paperBook(calls: readonly PaperCall[], closes: Closes, o: { star
     Object.assign(f.trade, { status: 'filled', side, quantity, price: limitPrice, fillDate: f.date, why: `${side === 'buy' ? 'Bought' : 'Sold'} ${quantity} at the close of ${f.date}.` });
   };
 
-  // Day by day from the first call, on the benchmark's trading days: the fills of that day, then the day's value.
+  // Dividends, oldest first: one goes ex on its day to the shares held at the start of that day, so it is paid before that
+  // day's fills (a buy at that close is too late for it; a sale at that close still had it).
+  const due = Object.entries(o.dividends ?? {}).flatMap(([ticker, list]) => list.map((x) => ({ ticker, ...x }))).sort((a, b) => a.date.localeCompare(b.date));
+  const dividends: PaperDividend[] = [];
+  let nextDividend = 0;
+  const payUpTo = (date: string): void => {
+    for (; nextDividend < due.length && due[nextDividend]!.date <= date; nextDividend++) {
+      const x = due[nextDividend]!, h = held.get(x.ticker);
+      if (!h || h.quantity <= 0 || !(x.amount > 0)) continue;
+      const usd = cents(h.quantity * x.amount);
+      cash = cents(cash + usd);
+      dividends.push({ ticker: x.ticker, date: x.date, perShare: x.amount, quantity: h.quantity, usd });
+    }
+  };
+
+  // Day by day from the first call, on the benchmark's trading days: the dividends and fills of that day, then the day's
+  // value. The benchmark is bought with the starting money at the first day's close and is paid its dividends in cash.
   const since = ordered.find((c) => followed(c.ticker))?.date ?? null;
-  const bench = closes[benchmark] ?? [];
+  const bench = closes[benchmark] ?? [], benchDividends = o.dividends?.[benchmark] ?? [];
   const days = since ? [...new Set([...bench.map((r) => r.date), ...fills.map((f) => f.date)])].filter((d) => d >= since && d <= o.today).sort() : [];
   const benchStart = since ? closeOn(bench, days[0] ?? since) : null;
+  const benchValue = (d: string): number | null => {
+    const b = closeOn(bench, d);
+    if (b === null || !benchStart) return null;
+    const shares = o.startUsd / benchStart, paid = benchDividends.filter((x) => x.date > days[0]! && x.date <= d).reduce((a, x) => a + x.amount, 0);
+    return cents(shares * (b + paid));
+  };
   const series: PaperBook['series'] = [];
   let next = 0;
   for (const d of days) {
     let that = 0;
+    payUpTo(d);
     while (next < fills.length && fills[next]!.date <= d) apply(fills[next++]!, that++);
-    const b = closeOn(bench, d);
-    series.push({ date: d, value: cents(worth(d)), benchmark: b !== null && benchStart ? cents((o.startUsd * b) / benchStart) : null });
+    series.push({ date: d, value: cents(worth(d)), benchmark: benchValue(d) });
   }
-  while (next < fills.length) apply(fills[next++]!, 0);   // fills after the benchmark's last day
+  while (next < fills.length) { payUpTo(fills[next]!.date); apply(fills[next++]!, 0); }   // fills after the benchmark's last day
+  payUpTo(o.today);
 
   const latest = series.at(-1)?.date ?? o.today;
   const positions: PaperPosition[] = [...held].map(([ticker, h]) => {
@@ -149,6 +183,7 @@ export function paperBook(calls: readonly PaperCall[], closes: Closes, o: { star
   const lastBench = series.at(-1)?.benchmark ?? null;
   return {
     startUsd: o.startUsd, since, cash, value, positions, series, trades: trades.reverse(),   // newest call first, as the page lists them
+    dividends, dividendsUsd: cents(dividends.reduce((a, x) => a + x.usd, 0)),
     returnPct: since ? value / o.startUsd - 1 : null, benchmarkPct: lastBench !== null ? lastBench / o.startUsd - 1 : null, benchmark,
   };
 }

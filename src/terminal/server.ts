@@ -17,7 +17,7 @@ import { configure } from '../data/http.js';
 import { clearCache, daily } from '../data/yahoo.js';
 import { addDays } from '../data/dates.js';
 import { readContactEmail, saveContactEmail } from '../contact.js';
-import { followed, paperBook, readPaperStart, recordOf, RECORD_WEEKS, RECORD_WORDS, savePaperStart, type Closes, type PaperBook } from '../desk/paper.js';
+import { followed, paperBook, readPaperStart, recordOf, RECORD_WEEKS, RECORD_WORDS, savePaperStart, type Closes, type Dividends, type PaperBook } from '../desk/paper.js';
 import { isCrypto, safeSymbol } from '../data/symbols.js';
 import { dashboardKeyFile, deskDataDir, robinhoodFile } from '../paths.js';
 import { writePrivate } from '../private.js';
@@ -202,15 +202,16 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
     try { stamp = String(fs.statSync(path.join(dir, 'journal.md')).mtimeMs); } catch { /* no journal yet */ }
     const key = `${stamp}|${startUsd}|${JSON.stringify(caps)}|${today}`;
     if (!paperMemo || paperMemo.key !== key || Date.now() - paperMemo.at > 10 * 60_000) {
-      const record = recordOf(calls, today), closes: Closes = {};
+      const record = recordOf(calls, today), closes: Closes = {}, dividends: Dividends = {};
       if (record.since) {
         const from = addDays(record.since, -7);
+        // The closes as the market printed them, and each dividend apart, paid into paper cash on its ex-day.
         await Promise.all([...new Set([...calls.filter((c) => followed(c.ticker)).map((c) => c.ticker), 'SPY'])].map(async (s) => {
-          try { closes[s] = (await daily(s, from, today)).bars.map((r) => ({ date: r.date, close: r.close })); } catch { /* left out: said as unavailable */ }
+          try { const d = await daily(s, from, today); closes[s] = (d.traded ?? d.bars).map((r) => ({ date: r.date, close: r.close })); dividends[s] = d.dividends ?? []; } catch { /* left out: said as unavailable */ }
         }));
       }
       await sectors.warm(calls.filter((c) => followed(c.ticker)).map((c) => c.ticker));
-      paperMemo = { key, at: Date.now(), book: paperBook(calls, closes, { startUsd, trading, caps, today, sectors }) };
+      paperMemo = { key, at: Date.now(), book: paperBook(calls, closes, { startUsd, trading, caps, today, sectors, dividends }) };
     }
     return { ...paperMemo.book, record: recordOf(calls, today) };
   };

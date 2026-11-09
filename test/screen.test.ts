@@ -182,7 +182,10 @@ test('during the session the weather says "still trading", never "closed at": a 
   assert.equal(live.words, 'The S&P 500 is at 6,295 at 11:05 AM New York time on 16 Oct 2026, still trading (not a close), above its 50-day average (6,173) and above its 200-day average (5,798).');
   assert.doesNotMatch(live.words, /closed/);
   assert.equal(moodOf(bars.map((b) => ({ ...b, close: 17.42 })), liveOf(s, '2026-10-16', open)).words, 'The VIX is at 17.4 at 11:05 AM New York time on 16 Oct 2026, still trading (not a close).');
-  assert.match(trendOf(bars, liveOf(s, '2026-10-16', after)).words, /^The S&P 500 closed at 6,295 on 16 Oct 2026,/, 'after 4:00 p.m. the row is a close');
+  assert.match(trendOf(bars, liveOf(s, '2026-10-16', after)).words, /^The S&P 500 closed at 6,295 on 16 Oct 2026,/, 'read 30 minutes after 4:00 p.m., the row is a close');
+  const settling = new Date('2026-10-16T20:05:00Z'), readEarly = { ...s, fetchedAt: Date.parse('2026-10-16T19:30:00Z') };
+  assert.match(trendOf(bars, liveOf(s, '2026-10-16', settling)).words, /^The S&P 500 was at 6,295 when read at 4:05 PM New York time on 16 Oct 2026, before that session's close was final \(not a close\),/, 'five minutes after the close its figures are not final yet');
+  assert.match(trendOf(bars, liveOf(readEarly, '2026-10-16', after)).words, /^The S&P 500 was at 6,295 when read at 3:30 PM New York time on 16 Oct 2026, before that session's close was final/, 'rows read before the close are the price then, however late they are shown');
   assert.match(trendOf(bars, liveOf(s, '2026-10-19', new Date('2026-10-19T12:00:00Z'))).words, /^The S&P 500 closed at 6,295 on 16 Oct 2026,/, "before Monday's open, Friday's close");
   const unsure = trendOf(bars, liveOf({ meta: { symbol: '^GSPC' }, bars }, '2026-10-16', open));
   assert.match(unsure.words, /^The S&P 500's latest figure on 16 Oct 2026, read at 11:05 AM New York time, is 6,295 \(Yahoo Finance did not say whether that session had ended\)/, 'no session to tell by: neither "closed" nor "still trading"');
@@ -202,7 +205,7 @@ test('a news read that fails is named, never "no news today"; the brief names th
   assert.deepEqual([screen.session, screen.live], ['2026-10-16', true], 'read at 11:00 in New York: the session is still trading');
   const quiet = { ...screen, picks: [] }, dir = desk();
   const brief = morningBrief(dir, '2026-10-16', 5, { screen: quiet, on: false });
-  assert.match(brief, /the moves are from the session of 2026-10-16 \(Fri\), still trading: a move so far, not a close\):/);
+  assert.match(brief, /the moves are from the session of 2026-10-16 \(Fri\), read before its close was final: a move so far, not a close\):/);
   assert.match(brief, /- nothing stood out: no move of 3% or more, no volume twice its usual, no 52-week high or low, no cross of an average, no news today about the other companies and coins the person watches\./);
   assert.match(brief, /News could not be read just now for NVDA: whether it is in the news today is not known\. Never say "no news" for it\./);
   const allFailed = morningBrief(dir, '2026-10-16', 5, { screen: { ...quiet, news: { read: 0, unread: ['NVDA', 'AAPL'] } }, on: false });
