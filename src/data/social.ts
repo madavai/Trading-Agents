@@ -5,7 +5,7 @@
 // The sources, subreddits and their reading rules are TradingAgents' (sentiment analyst, stocktwits.py, reddit.py),
 // Apache License 2.0.
 import { addDays, analysisDate } from './dates.js';
-import { getJson, getText } from './http.js';
+import { getJson, getText, Unavailable } from './http.js';
 import { reaches, spanOf, within } from './news.js';
 import { cryptoBase, normalizeSymbol } from './symbols.js';
 
@@ -18,17 +18,25 @@ const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…`
 const decode = (s: string) => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;|&#x27;/g, "'").replace(/&amp;/g, '&');
 const plain = (html: string) => decode(decode(html).replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
 
-interface TwitsJson { messages?: Array<{ body?: string; created_at?: string; entities?: { sentiment?: { basic?: string } | null } }> }
+interface TwitsJson { messages?: Array<{ body?: string; created_at?: string; entities?: { sentiment?: { basic?: string } | null } }>; errors?: Array<{ message?: string }> }
 
 const oldestOf = (posts: Post[]) => posts.map((p) => p.time).sort()[0];
 
-/** StockTwits' stream: its latest messages, a page of up to 30 (older ones need a request per page). */
+/** StockTwits' stream: its latest messages, a page of up to 30 (older ones need a request per page). It serves its latest
+ *  messages however old they are (a symbol it does not know is refused), so an answer with no list of messages, or an
+ *  empty one, is a broken answer: unavailable, never a quiet crowd. */
 export async function stocktwits(raw: string, from: string, to: string, limit: number): Promise<Sample> {
   const base = cryptoBase(raw), sym = base ? `${base}.X` : normalizeSymbol(raw);
   const j = await getJson<TwitsJson>(`https://api.stocktwits.com/api/2/streams/symbol/${encodeURIComponent(sym)}.json`);
-  const all = (j.messages ?? []).filter((m) => m.body && m.created_at)
+  if (!Array.isArray(j.messages)) {
+    const said = j.errors?.map((e) => e.message).filter(Boolean).join('; ');
+    throw new Unavailable(`api.stocktwits.com answered without its list of messages${said ? `, saying "${clip(said, 140)}"` : ''}`);
+  }
+  if (!j.messages.length) throw new Unavailable(`the stream for ${sym} came back with no messages at all, though it serves its latest messages however old they are: an empty stream is a fault, or a symbol no one has posted about`);
+  const all = j.messages.filter((m) => m.body && m.created_at)
     .map((m) => ({ time: m.created_at!.slice(0, 16).replace('T', ' '), text: clip(m.body!.replace(/\s+/g, ' ').trim(), 280), tag: m.entities?.sentiment?.basic ?? undefined }));
-  return { posts: all.filter((p) => within(p.time, from, to)).slice(0, limit), oldest: oldestOf(all), full: (j.messages ?? []).length >= 30 };
+  if (!all.length) throw new Unavailable(`none of the ${j.messages.length} messages in the stream for ${sym} came with a text and a time`);
+  return { posts: all.filter((p) => within(p.time, from, to)).slice(0, limit), oldest: oldestOf(all), full: j.messages.length >= 30 };
 }
 
 /** The entries of a Reddit Atom feed. Exported for the tests. */
@@ -40,11 +48,17 @@ export function parseAtom(xml: string): Post[] {
   }).filter((p) => p.time && p.title);
 }
 
-/** Reddit's search of the past week in these communities, newest first: up to 100 posts. */
+/** Reddit's search of the past week in these communities, newest first: up to 100 posts. Its feed with no posts is an
+ *  answer; a web page in its place (a check or a block page) is not, and is said as unavailable. */
 export async function reddit(raw: string, from: string, to: string, subs: string[]): Promise<Sample> {
   const base = cryptoBase(raw), q = base ?? normalizeSymbol(raw).replace(/\..*$/, '');
   const url = `https://www.reddit.com/r/${subs.map(encodeURIComponent).join('+')}/search.rss?q=${encodeURIComponent(q)}&restrict_sr=on&sort=new&t=week&limit=100`;
-  const all = parseAtom(await getText(url, { headers: { Accept: 'application/atom+xml' } }));
+  const body = await getText(url, { headers: { Accept: 'application/atom+xml' } });
+  if (!/<feed[\s>]/.test(body)) {
+    const title = plain(/<title[^>]*>([\s\S]*?)<\/title>/i.exec(body)?.[1] ?? '');
+    throw new Unavailable(`www.reddit.com answered with something that is not its feed of posts${title ? ` (a page titled "${clip(title, 80)}")` : ''}`);
+  }
+  const all = parseAtom(body);
   return { posts: all.filter((p) => within(p.time, from, to)), oldest: oldestOf(all), full: all.length >= 100 };
 }
 

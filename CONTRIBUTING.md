@@ -10,7 +10,14 @@ built, which decisions stand, every document, and what is pending.
 
 ## Layout
 - `src/tools/` - the desk tool server, the one MCP server this folder gives the engine (`.mcp.json`).
-- `src/data/` - the free sources, each held to the analysis date, official ones first. `company.ts` is a company's
+- `src/data/` - the free sources, each held to the analysis date, official ones first. `http.ts` keeps answers on disk
+  (`keepFor`: a day for SEC documents and figures, an hour for a filer's list of filings and for FRED, five minutes for
+  the rest) and says when each was read (`getTextAt`, `getJsonAt`, `readWords`). `yahoo.ts` keeps a price series in
+  memory no longer than on disk, with when it was read (`fetchedAt`), a volume it does not give as null (never 0), and
+  the days it lists with no prices (`missing`, `unfilled`) and without a dividend-adjusted close (`unadjusted`).
+  `market.ts` `latestState` calls a row final only when it was read 15 minutes or more after its session ended
+  (`SETTLE_MS`), and names a source behind its own session record; `adjustedWords` says how the rows are adjusted.
+  `company.ts` is a company's
   accounts, profile, valuation and insider trades: for a US filer all from the SEC as filed by the analysis date
   (`sec.ts`: statements, `submissions` for name and industry code, `sectorOfSic`, `trailingYear` for the last twelve
   months no filing states, `sharesOutstanding` from the cover page, or `averageDilutedShares` from the accounts when
@@ -75,7 +82,9 @@ built, which decisions stand, every document, and what is pending.
 - `src/desk/window.ts` - what happened in a settled call's holding window (`windowRows`): the entry row, marked
   "entry" with its change left out (the call is scored from its close; its own move came before the window), then the
   finished sessions numbered from 1, with change, volume, RSI, MACD histogram, 10 EMA and 50 SMA beside the index's
-  close, and a glance line over sessions 1 to N only. `list_settlements` shows it under each READY call, so a lesson
+  close, and a glance line over sessions 1 to N only. The rows are dividend-adjusted, as the call is scored; when a
+  dividend has lowered them, the high, low and close as traded are added beside them, for the levels a decision named.
+  `list_settlements` shows it under each READY call, so a lesson
   says what a stock did only as a row shows it; the /settle skill holds the lesson to those rows. `settle.ts` counts a
   lesson's sentences (`sentencesOf`, `sentencesIn`) and refuses more than `MAX_SENTENCES` (four), in `record_outcome`
   and `correct_lesson` alike (`lessonRefusal`, which says how it counts and where it cut). A full stop in a run of
@@ -209,8 +218,10 @@ built, which decisions stand, every document, and what is pending.
   by day in `values.json` beside the sign-in.
 - `src/desk/paper.ts` - the paper book: every live call on a stock, a fund or a coin in `PAPER_CRYPTO` (Bitcoin and
   Ether) sized by `propose` and held to `check` as
-  its ticket would be, filled at the first close after the call's day, valued daily against SPY; worked out afresh from
-  the journal and Yahoo's daily closes (the dashboard's `/api/paper`, kept ten minutes). Only the starting money is
+  its ticket would be, filled at the first close after the call's day as printed (Yahoo's `traded` rows, never the
+  dividend-adjusted ones), each dividend paid into paper cash on its ex-day for the shares held that morning, valued
+  daily against SPY bought at the same start and paid its own dividends; worked out afresh from the journal and Yahoo's
+  daily closes (the dashboard's `/api/paper`, kept ten minutes). Only the starting money is
   kept (`desk-data/paper.json`). `recordOf` is the record (weeks, calls) the trading switch's four-week press and Get started's fifth step use;
   `RECORD_WEEKS` and `RECORD_WORDS` are that paper time, one number said one way everywhere.
 - `desk-settings.json` - the desk's settings (read and checked by `src/settings.ts`, trading part included, but never

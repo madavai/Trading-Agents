@@ -7174,8 +7174,8 @@ var require_dist = __commonJS({
         return ajv;
       }
       const [formats, exportName] = opts.mode === "fast" ? [formats_1.fastFormats, fastName] : [formats_1.fullFormats, fullName];
-      const list2 = opts.formats || formats_1.formatNames;
-      addFormats(ajv, list2, formats, exportName);
+      const list3 = opts.formats || formats_1.formatNames;
+      addFormats(ajv, list3, formats, exportName);
       if (opts.keywords)
         (0, limit_1.default)(ajv);
       return ajv;
@@ -7187,11 +7187,11 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list2, fs21, exportName) {
+    function addFormats(ajv, list3, fs21, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
-      for (const f of list2)
+      for (const f of list3)
         ajv.addFormat(f, fs21[f]);
     }
     module.exports = exports = formatsPlugin;
@@ -7450,7 +7450,11 @@ async function pace(host) {
   await turn;
 }
 var MINUTE = 6e4;
-var ttlFor = (host) => /(^|\.)sec\.gov$/.test(host) ? 24 * 60 * MINUTE : /fred/.test(host) ? 6 * 60 * MINUTE : 5 * MINUTE;
+function keepFor(url2) {
+  const u = new URL(url2);
+  if (/(^|\.)sec\.gov$/.test(u.hostname)) return /^\/submissions\//.test(u.pathname) ? 60 * MINUTE : 24 * 60 * MINUTE;
+  return /fred/.test(u.hostname) ? 60 * MINUTE : 5 * MINUTE;
+}
 var keyOf = (url2) => {
   const u = new URL(url2);
   u.searchParams.delete("crumb");
@@ -7459,8 +7463,8 @@ var keyOf = (url2) => {
 function readCache(url2) {
   if (!cacheDir) return null;
   try {
-    const file4 = path3.join(cacheDir, `${keyOf(url2)}.txt`);
-    return Date.now() - fs3.statSync(file4).mtimeMs < ttlFor(new URL(url2).hostname) ? fs3.readFileSync(file4, "utf8") : null;
+    const file4 = path3.join(cacheDir, `${keyOf(url2)}.txt`), at = fs3.statSync(file4).mtimeMs;
+    return Date.now() - at < keepFor(url2) ? { text: fs3.readFileSync(file4, "utf8"), at } : null;
   } catch {
     return null;
   }
@@ -7483,7 +7487,7 @@ function pruneCache(dir) {
   }
 }
 var excerpt = (body) => body.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 140);
-async function getText(url2, opts = {}) {
+async function getTextAt(url2, opts = {}) {
   const host = new URL(url2).host, cached3 = readCache(url2);
   if (cached3 !== null) return cached3;
   for (let attempt = 0; ; attempt++) {
@@ -7513,14 +7517,18 @@ async function getText(url2, opts = {}) {
       const said = res.status === 403 || res.status === 429 ? excerpt(text2) : "";
       throw new Unavailable(`${host} refused (HTTP ${res.status})${said ? `, saying "${said}"` : ""}${res.status === 429 ? "; it is rate-limiting this computer, so try again in a few minutes" : ""}${sec ? emailNow().trim() ? " [a contact email was sent]" : " [no contact email was sent]" : ""}`);
     }
+    const at = Date.now();
     writeCache(url2, text2);
-    return text2;
+    return { text: text2, at };
   }
 }
 async function getJson(url2, opts = {}) {
-  const text2 = await getText(url2, opts);
+  return (await getJsonAt(url2, opts)).value;
+}
+async function getJsonAt(url2, opts = {}) {
+  const { text: text2, at } = await getTextAt(url2, opts);
   try {
-    return JSON.parse(text2);
+    return { value: JSON.parse(text2), at };
   } catch {
     throw new Unavailable(`${new URL(url2).host} answered with something that is not data`);
   }
@@ -7632,13 +7640,14 @@ function parseChart(json, symbol) {
       blank.push(dayOf(ts));
       return;
     }
-    const a = num(adj?.[i]), k = a !== null ? a / close : 1, date4 = dayOf(ts), volume = num(q.volume?.[i]) ?? 0;
-    rows.push({ bar: { date: date4, open: open4 * k, high: high * k, low: low * k, close: close * k, volume }, traded: { date: date4, open: open4, high, low, close, volume } });
+    const a = num(adj?.[i]), k = a !== null ? a / close : 1, date4 = dayOf(ts), v = num(q.volume?.[i]), volume = v !== null && v >= 0 ? v : null;
+    rows.push({ bar: { date: date4, open: open4 * k, high: high * k, low: low * k, close: close * k, volume }, traded: { date: date4, open: open4, high, low, close, volume }, adjusted: a !== null });
   });
   const seen = /* @__PURE__ */ new Set();
   const kept = rows.filter((x) => seen.has(x.bar.date) ? false : (seen.add(x.bar.date), true));
   const unique = kept.map((x) => x.bar);
-  const lastDay = unique.at(-1)?.date ?? "", unfilled = [...new Set(blank.filter((d) => d > lastDay))];
+  const firstDay = unique[0]?.date ?? "", lastDay = unique.at(-1)?.date ?? "", unfilled = [...new Set(blank.filter((d) => d > lastDay))];
+  const missing = [...new Set(blank.filter((d) => d > firstDay && d < lastDay && !seen.has(d)))].sort();
   const reg = m.currentTradingPeriod?.regular, session = reg?.start && reg.end ? { date: dayOf(reg.start), start: reg.start * 1e3, end: reg.end * 1e3 } : void 0;
   const paid = /* @__PURE__ */ new Map();
   for (const d of Object.values(r.events?.dividends ?? {})) {
@@ -7649,8 +7658,10 @@ function parseChart(json, symbol) {
     meta: { symbol: m.symbol ?? symbol, currency: m.currency, exchange: m.fullExchangeName ?? m.exchangeName, type: m.instrumentType, name: m.longName ?? m.shortName, price: m.regularMarketPrice, timezone: m.exchangeTimezoneName, session },
     bars: unique,
     unfilled,
+    missing,
     dividends: [...paid].map(([date4, amount]) => ({ date: date4, amount })).sort((a, b) => a.date.localeCompare(b.date)),
-    traded: kept.map((x) => x.traded)
+    traded: kept.map((x) => x.traded),
+    unadjusted: kept.filter((x) => !x.adjusted).map((x) => x.bar.date)
   };
 }
 async function fetchDaily(symbol, from, to) {
@@ -7658,7 +7669,8 @@ async function fetchDaily(symbol, from, to) {
   let last;
   for (const host of HOSTS) {
     try {
-      return parseChart(await getJson(`${host}/v8/finance/chart/${encodeURIComponent(symbol)}?${qs}`), symbol);
+      const { value, at } = await getJsonAt(`${host}/v8/finance/chart/${encodeURIComponent(symbol)}?${qs}`);
+      return { ...parseChart(value, symbol), fetchedAt: at };
     } catch (e) {
       if (e instanceof NoData) throw e;
       last = e;
@@ -7666,17 +7678,29 @@ async function fetchDaily(symbol, from, to) {
   }
   throw last;
 }
+var KEEP_MS = keepFor(`${HOSTS[0]}/v8/finance/chart/`);
 async function daily(raw, from, to) {
-  const symbol = normalizeSymbol(raw), key = `${symbol}|${from}|${to}`;
-  if (!cache.has(key)) {
-    const p = fetchDaily(symbol, from, to);
-    cache.set(key, p);
-    p.catch(() => cache.delete(key));
+  const symbol = normalizeSymbol(raw), key = `${symbol}|${from}|${to}`, hit = cache.get(key);
+  if (!hit || Date.now() - hit.at >= KEEP_MS) {
+    const series = fetchDaily(symbol, from, to);
+    cache.set(key, { at: Date.now(), series });
+    series.catch(() => {
+      if (cache.get(key)?.series === series) cache.delete(key);
+    });
   }
-  const s = await cache.get(key);
+  const s = await cache.get(key).series;
   const within2 = (b) => b.date >= from && b.date <= to;
-  const bars = s.bars.filter(within2), lastDay = bars.at(-1)?.date ?? "";
-  return { meta: s.meta, bars, unfilled: (s.unfilled ?? []).filter((d) => d > lastDay && d <= to), dividends: (s.dividends ?? []).filter((d) => d.date >= from && d.date <= to), ...s.traded ? { traded: s.traded.filter(within2) } : {} };
+  const bars = s.bars.filter(within2), firstDay = bars[0]?.date ?? "", lastDay = bars.at(-1)?.date ?? "";
+  return {
+    meta: s.meta,
+    bars,
+    unfilled: (s.unfilled ?? []).filter((d) => d > lastDay && d <= to),
+    missing: (s.missing ?? []).filter((d) => d > firstDay && d < lastDay),
+    dividends: (s.dividends ?? []).filter((d) => d.date >= from && d.date <= to),
+    unadjusted: (s.unadjusted ?? []).filter((d) => d >= from && d <= to),
+    ...s.traded ? { traded: s.traded.filter(within2) } : {},
+    ...s.fetchedAt !== void 0 ? { fetchedAt: s.fetchedAt } : {}
+  };
 }
 var clearCache = () => cache.clear();
 
@@ -7936,19 +7960,41 @@ function paperBook(calls, closes, o) {
     }
     Object.assign(f.trade, { status: "filled", side, quantity, price: limitPrice, fillDate: f.date, why: `${side === "buy" ? "Bought" : "Sold"} ${quantity} at the close of ${f.date}.` });
   };
+  const due = Object.entries(o.dividends ?? {}).flatMap(([ticker, list3]) => list3.map((x) => ({ ticker, ...x }))).sort((a, b) => a.date.localeCompare(b.date));
+  const dividends = [];
+  let nextDividend = 0;
+  const payUpTo = (date4) => {
+    for (; nextDividend < due.length && due[nextDividend].date <= date4; nextDividend++) {
+      const x = due[nextDividend], h = held.get(x.ticker);
+      if (!h || h.quantity <= 0 || !(x.amount > 0)) continue;
+      const usd = cents2(h.quantity * x.amount);
+      cash = cents2(cash + usd);
+      dividends.push({ ticker: x.ticker, date: x.date, perShare: x.amount, quantity: h.quantity, usd });
+    }
+  };
   const since = ordered.find((c) => followed(c.ticker))?.date ?? null;
-  const bench = closes[benchmark] ?? [];
+  const bench = closes[benchmark] ?? [], benchDividends = o.dividends?.[benchmark] ?? [];
   const days = since ? [.../* @__PURE__ */ new Set([...bench.map((r) => r.date), ...fills.map((f) => f.date)])].filter((d) => d >= since && d <= o.today).sort() : [];
   const benchStart = since ? closeOn(bench, days[0] ?? since) : null;
+  const benchValue = (d) => {
+    const b = closeOn(bench, d);
+    if (b === null || !benchStart) return null;
+    const shares = o.startUsd / benchStart, paid = benchDividends.filter((x) => x.date > days[0] && x.date <= d).reduce((a, x) => a + x.amount, 0);
+    return cents2(shares * (b + paid));
+  };
   const series = [];
   let next = 0;
   for (const d of days) {
     let that = 0;
+    payUpTo(d);
     while (next < fills.length && fills[next].date <= d) apply(fills[next++], that++);
-    const b = closeOn(bench, d);
-    series.push({ date: d, value: cents2(worth(d)), benchmark: b !== null && benchStart ? cents2(o.startUsd * b / benchStart) : null });
+    series.push({ date: d, value: cents2(worth(d)), benchmark: benchValue(d) });
   }
-  while (next < fills.length) apply(fills[next++], 0);
+  while (next < fills.length) {
+    payUpTo(fills[next].date);
+    apply(fills[next++], 0);
+  }
+  payUpTo(o.today);
   const latest = series.at(-1)?.date ?? o.today;
   const positions = [...held].map(([ticker, h]) => {
     const price = closeOn(closes[ticker], latest) ?? h.cost / h.quantity;
@@ -7969,6 +8015,8 @@ function paperBook(calls, closes, o) {
     series,
     trades: trades.reverse(),
     // newest call first, as the page lists them
+    dividends,
+    dividendsUsd: cents2(dividends.reduce((a, x) => a + x.usd, 0)),
     returnPct: since ? value / o.startUsd - 1 : null,
     benchmarkPct: lastBench !== null ? lastBench / o.startUsd - 1 : null,
     benchmark
@@ -8257,8 +8305,8 @@ function languageName(v, fallback = "English") {
 }
 var OLD_WORLD_SEARCHES = ["Federal Reserve interest rates inflation", "S&P 500 earnings GDP economic outlook", "geopolitical risk trade war sanctions", "ECB Bank of England BOJ central bank policy", "oil commodities supply chain energy"];
 function searchesOf(v) {
-  const list2 = Array.isArray(v) ? v.filter((x) => typeof x === "string" && x.trim() !== "").map((x) => x.trim()).slice(0, 10) : [];
-  return !list2.length || list2.join("\n") === OLD_WORLD_SEARCHES.join("\n") ? [...DEFAULTS.analysis.worldNewsSearches] : list2;
+  const list3 = Array.isArray(v) ? v.filter((x) => typeof x === "string" && x.trim() !== "").map((x) => x.trim()).slice(0, 10) : [];
+  return !list3.length || list3.join("\n") === OLD_WORLD_SEARCHES.join("\n") ? [...DEFAULTS.analysis.worldNewsSearches] : list3;
 }
 function readSettings(root2) {
   let raw = {};
@@ -13285,8 +13333,8 @@ var contributors = {
 function aggregateChecks(schema) {
   const agg = {};
   const def = schema._zod.def;
-  const list2 = schema._zod.traits.has("$ZodCheck") ? [schema, ...def.checks ?? []] : def.checks ?? [];
-  for (const ch of list2)
+  const list3 = schema._zod.traits.has("$ZodCheck") ? [schema, ...def.checks ?? []] : def.checks ?? [];
+  for (const ch of list3)
     contributors[ch._zod.def.check]?.(agg, ch._zod.def);
   const bag = schema._zod.bag;
   if (bag.minimum !== void 0)
@@ -21012,32 +21060,32 @@ function load2(dir, now) {
   return out;
 }
 var open2 = (i) => i.state === "waiting" || i.state === "running";
-function trimmed(list2) {
-  const finished = list2.filter((i) => !open2(i)).sort((a, b) => (b.endedAt ?? "").localeCompare(a.endedAt ?? ""));
+function trimmed(list3) {
+  const finished = list3.filter((i) => !open2(i)).sort((a, b) => (b.endedAt ?? "").localeCompare(a.endedAt ?? ""));
   const keep3 = new Set(finished.slice(0, MAX_FINISHED));
-  return list2.filter((i) => open2(i) || keep3.has(i));
+  return list3.filter((i) => open2(i) || keep3.has(i));
 }
 function change(dir, now, edit) {
   const file4 = queueFile(dir);
   fs13.mkdirSync(dir, { recursive: true });
   return withLock(file4, () => {
-    const { list: list2, result } = edit(load2(dir, now));
-    writeWhole(file4, JSON.stringify(trimmed(list2), null, 2) + "\n");
+    const { list: list3, result } = edit(load2(dir, now));
+    writeWhole(file4, JSON.stringify(trimmed(list3), null, 2) + "\n");
     return result;
   });
 }
 var readQueue = (dir, now = /* @__PURE__ */ new Date()) => load2(dir, now);
-var waitingIn = (list2) => list2.filter((i) => i.state === "waiting");
+var waitingIn = (list3) => list3.filter((i) => i.state === "waiting");
 function enqueue(dir, raw, at, depth, now = /* @__PURE__ */ new Date()) {
   const symbol = safeSymbol(raw);
-  return change(dir, now, (list2) => {
-    const was = list2.find((i) => i.symbol === symbol);
-    if (was?.state === "running") return { list: list2, result: list2 };
+  return change(dir, now, (list3) => {
+    const was = list3.find((i) => i.symbol === symbol);
+    if (was?.state === "running") return { list: list3, result: list3 };
     if (was?.state === "waiting") {
-      const next2 = list2.map((i) => i === was ? { ...i, ...depth ? { depth } : {} } : i);
+      const next2 = list3.map((i) => i === was ? { ...i, ...depth ? { depth } : {} } : i);
       return { list: next2, result: next2 };
     }
-    const rest = list2.filter((i) => i !== was);
+    const rest = list3.filter((i) => i !== was);
     if (rest.filter(open2).length >= MAX_OPEN) throw new QueueRefusal("FULL", `${MAX_OPEN} analyses are already waiting: let them run first`);
     const next = [...rest, { symbol, requestedAt: at, state: "waiting", ...depth ? { depth } : {} }];
     return { list: next, result: next };
@@ -21045,9 +21093,9 @@ function enqueue(dir, raw, at, depth, now = /* @__PURE__ */ new Date()) {
 }
 function dequeue(dir, raw, now = /* @__PURE__ */ new Date()) {
   const symbol = safeSymbol(raw);
-  return change(dir, now, (list2) => {
-    if (list2.some((i) => i.symbol === symbol && i.state === "running")) throw new QueueRefusal("RUNNING", `${symbol} is being analysed now: it can be taken off once its run ends`);
-    const next = list2.filter((i) => i.symbol !== symbol);
+  return change(dir, now, (list3) => {
+    if (list3.some((i) => i.symbol === symbol && i.state === "running")) throw new QueueRefusal("RUNNING", `${symbol} is being analysed now: it can be taken off once its run ends`);
+    const next = list3.filter((i) => i.symbol !== symbol);
     return { list: next, result: next };
   });
 }
@@ -21150,14 +21198,20 @@ function watched(care, prices) {
 }
 
 // src/data/sec.ts
-var DAY_MS = 864e5;
 var cache2 = /* @__PURE__ */ new Map();
 function cached2(url2, timeoutMs) {
   const hit = cache2.get(url2);
-  if (hit && Date.now() - hit.at < DAY_MS) return hit.value;
-  const value = getJson(url2, { timeoutMs });
-  cache2.set(url2, { at: Date.now(), value });
-  value.catch(() => cache2.delete(url2));
+  if (hit && Date.now() - hit.at < keepFor(url2)) return hit.value;
+  const entry = { at: Date.now(), value: Promise.resolve() };
+  const value = getJsonAt(url2, { timeoutMs }).then((r) => {
+    entry.read = r.at;
+    return r.value;
+  });
+  entry.value = value;
+  cache2.set(url2, entry);
+  value.catch(() => {
+    if (cache2.get(url2) === entry) cache2.delete(url2);
+  });
   return value;
 }
 async function cikFor(symbol) {
@@ -21212,6 +21266,150 @@ async function fundTickers() {
   const at = t2.fields?.indexOf("symbol") ?? 3;
   return new Set((t2.data ?? []).map((r) => String(r[at] ?? "").toUpperCase()).filter(Boolean));
 }
+
+// src/data/indicators.ts
+function sma(xs, n) {
+  const out = [];
+  let sum = 0;
+  xs.forEach((x, i) => {
+    sum += x;
+    if (i >= n) sum -= xs[i - n];
+    out.push(i >= n - 1 ? sum / n : null);
+  });
+  return out;
+}
+function ema(xs, n) {
+  const k = 1 - 2 / (n + 1);
+  let numer = 0, denom = 0, seen = 0;
+  return xs.map((x) => {
+    if (x === null) return null;
+    numer = x + k * numer;
+    denom = 1 + k * denom;
+    seen++;
+    return seen >= n ? numer / denom : null;
+  });
+}
+function wilder(xs, n, startAt) {
+  const out = xs.map(() => null);
+  let prev = 0;
+  for (let i = startAt; i < xs.length; i++) {
+    const k = i - startAt;
+    if (k < n - 1) continue;
+    prev = k === n - 1 ? xs.slice(startAt, i + 1).reduce((a, b) => a + b, 0) / n : (prev * (n - 1) + xs[i]) / n;
+    out[i] = prev;
+  }
+  return out;
+}
+function rsi(closes, n = 14) {
+  const gains = closes.map((c, i) => i ? Math.max(0, c - closes[i - 1]) : 0);
+  const losses = closes.map((c, i) => i ? Math.max(0, closes[i - 1] - c) : 0);
+  const g = wilder(gains, n, 1), l = wilder(losses, n, 1);
+  return g.map((gv, i) => {
+    const lv = l[i];
+    if (gv === null || lv === null || lv === void 0) return null;
+    return lv === 0 ? gv === 0 ? 50 : 100 : 100 - 100 / (1 + gv / lv);
+  });
+}
+function macd(closes) {
+  const fast = ema(closes, 12), slow = ema(closes, 26);
+  const line = fast.map((f, i) => f === null || slow[i] === null ? null : f - slow[i]);
+  const signal = ema(line, 9);
+  return { macd: line, signal, hist: line.map((m, i) => m === null || signal[i] === null ? null : m - signal[i]) };
+}
+function bollinger(closes, n = 20, k = 2) {
+  const mid = sma(closes, n), upper = [], lower = [];
+  closes.forEach((_, i) => {
+    const m = mid[i];
+    if (m === null || m === void 0) {
+      upper.push(null);
+      lower.push(null);
+      return;
+    }
+    const w = closes.slice(i - n + 1, i + 1), sd = Math.sqrt(w.reduce((a, x) => a + (x - m) ** 2, 0) / (n - 1));
+    upper.push(m + k * sd);
+    lower.push(m - k * sd);
+  });
+  return { mid, upper, lower };
+}
+function atr(bars, n = 14) {
+  const tr = bars.map((b, i) => i ? Math.max(b.high - b.low, Math.abs(b.high - bars[i - 1].close), Math.abs(b.low - bars[i - 1].close)) : b.high - b.low);
+  return wilder(tr, n, 0);
+}
+function vwma(bars, n = 14) {
+  return bars.map((_, i) => {
+    if (i < n - 1) return null;
+    const w = bars.slice(i - n + 1, i + 1);
+    if (w.some((b) => b.volume === null)) return null;
+    const vol = w.reduce((a, b) => a + b.volume, 0);
+    return vol > 0 ? w.reduce((a, b) => a + b.close * b.volume, 0) / vol : null;
+  });
+}
+function mfi(bars, n = 14) {
+  const tp = bars.map((b) => (b.high + b.low + b.close) / 3);
+  return bars.map((_, i) => {
+    if (i < n) return null;
+    let pos = 0, neg = 0;
+    for (let j = i - n + 1; j <= i; j++) {
+      const v = bars[j].volume;
+      if (v === null) return null;
+      const flow = tp[j] * v;
+      if (tp[j] > tp[j - 1]) pos += flow;
+      else if (tp[j] < tp[j - 1]) neg += flow;
+    }
+    if (pos + neg === 0) return null;
+    return neg === 0 ? 100 : 100 - 100 / (1 + pos / neg);
+  });
+}
+var INDICATORS = {
+  close_50_sma: "50 SMA: a medium-term trend indicator. Use: trend direction and dynamic support/resistance. It lags price; combine with faster indicators.",
+  close_200_sma: "200 SMA: a long-term trend benchmark. Use: the overall trend and golden/death crosses. It reacts slowly; better for strategy than entries.",
+  close_10_ema: "10 EMA: a responsive short-term average. Use: quick shifts in momentum and entry points. Noisy in choppy markets.",
+  macd: "MACD: momentum from the difference of two EMAs (12, 26). Use: crossovers and divergence. Confirm in sideways markets.",
+  macds: "MACD signal: the 9-day EMA of MACD. Use: crossovers with the MACD line. Part of a broader view, not a trigger alone.",
+  macdh: "MACD histogram: MACD minus its signal. Use: momentum strength and early divergence. Can be volatile.",
+  rsi: "RSI (14): momentum, 70/30 for overbought/oversold. In strong trends it can stay extreme; cross-check with the trend.",
+  boll: "Bollinger middle: the 20-day SMA under the bands. Use: a dynamic benchmark for price.",
+  boll_ub: "Bollinger upper band: 2 standard deviations above the middle. Use: overbought zones and breakouts; price can ride it in strong trends.",
+  boll_lb: "Bollinger lower band: 2 standard deviations below the middle. Use: oversold zones; confirm before calling a reversal.",
+  atr: "ATR (14): average true range, the size of daily moves. Use: stop-loss distance and position size.",
+  vwma: "VWMA (14): a moving average weighted by volume. Use: confirm trends with volume; watch for skew from volume spikes.",
+  mfi: "MFI (14): money flow, momentum from price and volume. Use: overbought (>80) or oversold (<20) and divergence."
+};
+var INDICATOR_NAMES = Object.keys(INDICATORS);
+function compute(name, bars) {
+  const closes = bars.map((b) => b.close);
+  switch (name) {
+    case "close_50_sma":
+      return sma(closes, 50);
+    case "close_200_sma":
+      return sma(closes, 200);
+    case "close_10_ema":
+      return ema(closes, 10);
+    case "macd":
+      return macd(closes).macd;
+    case "macds":
+      return macd(closes).signal;
+    case "macdh":
+      return macd(closes).hist;
+    case "rsi":
+      return rsi(closes);
+    case "boll":
+      return bollinger(closes).mid;
+    case "boll_ub":
+      return bollinger(closes).upper;
+    case "boll_lb":
+      return bollinger(closes).lower;
+    case "atr":
+      return atr(bars);
+    case "vwma":
+      return vwma(bars);
+    case "mfi":
+      return mfi(bars);
+  }
+}
+
+// src/data/market.ts
+var SETTLE_MS = 15 * 6e4;
 
 // src/data/company.ts
 function companySymbol(raw) {
@@ -21357,22 +21555,22 @@ var watchFile = (dir) => path13.join(dir, "watchlist.json");
 var readWatchlist = (dir) => read(watchFile(dir), isWatch);
 function addWatch(dir, raw, onDay) {
   const symbol = safeSymbol(raw);
-  return change2(watchFile(dir), (list2) => {
-    if (list2.some((w) => w.symbol === symbol)) return list2;
-    if (list2.length >= MAX_WATCH) throw new Error(`the watchlist holds ${MAX_WATCH} stocks: remove one first`);
-    return [...list2, { symbol, favourite: false, addedOn: onDay }];
+  return change2(watchFile(dir), (list3) => {
+    if (list3.some((w) => w.symbol === symbol)) return list3;
+    if (list3.length >= MAX_WATCH) throw new Error(`the watchlist holds ${MAX_WATCH} stocks: remove one first`);
+    return [...list3, { symbol, favourite: false, addedOn: onDay }];
   }, isWatch);
 }
 function setFavourite(dir, raw, favourite) {
   const symbol = safeSymbol(raw);
-  return change2(watchFile(dir), (list2) => {
-    if (!list2.some((w) => w.symbol === symbol)) throw new Error(`${symbol} is not on the watchlist`);
-    return list2.map((w) => w.symbol === symbol ? { ...w, favourite } : w);
+  return change2(watchFile(dir), (list3) => {
+    if (!list3.some((w) => w.symbol === symbol)) throw new Error(`${symbol} is not on the watchlist`);
+    return list3.map((w) => w.symbol === symbol ? { ...w, favourite } : w);
   }, isWatch);
 }
 function removeWatch(dir, raw) {
   const symbol = safeSymbol(raw);
-  return change2(watchFile(dir), (list2) => list2.filter((w) => w.symbol !== symbol), isWatch);
+  return change2(watchFile(dir), (list3) => list3.filter((w) => w.symbol !== symbol), isWatch);
 }
 
 // src/terminal/prefs.ts
@@ -21446,7 +21644,7 @@ function cleanMarket(raw) {
   return out;
 }
 var ticketable = (symbol) => !isCrypto(symbol) && !/[\^=]/.test(symbol);
-var isShipped = (list2) => list2.length === SHIPPED_MARKET.length && list2.every((s, i) => s === SHIPPED_MARKET[i]);
+var isShipped = (list3) => list3.length === SHIPPED_MARKET.length && list3.every((s, i) => s === SHIPPED_MARKET[i]);
 function tierOf(symbol, market = SHIPPED_MARKET) {
   if (isCrypto(symbol)) return "crypto";
   if (SECTOR_FUNDS[symbol]) return "sectors";
@@ -21482,8 +21680,8 @@ function tiersOf(watchlist, market, calls) {
   const view = (tier, symbols, more = 0) => ({ tier, ...TIER_WORDS[tier], items: symbols.map(item), ...more > 0 ? { more } : {} });
   const of = (t2) => watchlist.filter((w) => tierOf(w.symbol, market) === t2).map((w) => w.symbol);
   const own2 = (t2) => {
-    const list2 = watchlist.filter((w) => tierOf(w.symbol, market) === t2).sort((a, b) => Number(b.favourite) - Number(a.favourite)).map((w) => w.symbol);
-    return view(t2, list2.slice(0, START_NAMES), list2.length - START_NAMES);
+    const list3 = watchlist.filter((w) => tierOf(w.symbol, market) === t2).sort((a, b) => Number(b.favourite) - Number(a.favourite)).map((w) => w.symbol);
+    return view(t2, list3.slice(0, START_NAMES), list3.length - START_NAMES);
   };
   return {
     startHere: [view("market", market), view("sectors", Object.keys(SECTOR_FUNDS)), own2("names"), ...of("crypto").length ? [own2("crypto")] : []],
@@ -21560,7 +21758,7 @@ function savePrefs(dir, change3, drop = []) {
   });
 }
 var marketOf = (dir) => readPrefs(dir).market ?? [...SHIPPED_MARKET];
-var saveMarket = (dir, list2) => (isShipped(list2) ? savePrefs(dir, {}, ["market"]) : savePrefs(dir, { market: list2 })).market ?? [...SHIPPED_MARKET];
+var saveMarket = (dir, list3) => (isShipped(list3) ? savePrefs(dir, {}, ["market"]) : savePrefs(dir, { market: list3 })).market ?? [...SHIPPED_MARKET];
 
 // src/terminal/guide.ts
 var NAMES_TO_PICK = 3;
@@ -21665,7 +21863,7 @@ function stateOf(root2, day2) {
     watchTiers: watch,
     market,
     guide,
-    record: { summary, text: renderSummary(summary), benchmarkNote: `Each call is judged after ${s.scoring.holdingPeriodDays} trading days against ${yardstickWords(s.scoring)}.` },
+    record: { summary, text: renderSummary(summary), benchmarkNote: `Each call is judged after ${s.scoring.holdingPeriodDays} trading days against ${yardstickWords(s.scoring)}. Both returns count dividends: they are worked out from prices adjusted for them.` },
     desk: { emailSaved: !!email2, tradingEnabled: false, holdingDays: s.scoring.holdingPeriodDays, benchmark: resolveBenchmark("SPY", s.scoring) },
     analyses: { depth: depthOfRounds(s.analysis.debateRounds), perRun: s.routines.maxAnalyses, listener },
     paper: { ...record2, startUsd: readPaperStart(dir), minWeeks: RECORD_WEEKS, minWords: RECORD_WORDS }
@@ -21675,142 +21873,6 @@ function callOf(root2, ticker, date4) {
   const dir = deskDataDir(root2), e = new Journal(path15.join(dir, "journal.md")).load().find((x) => x.ticker === ticker && x.date === date4);
   if (!e) return null;
   return { decision: e.decision, sections: sectionsOf(dir, ticker, date4), hasReport: hasReport(dir, ticker, date4) };
-}
-
-// src/data/indicators.ts
-function sma(xs, n) {
-  const out = [];
-  let sum = 0;
-  xs.forEach((x, i) => {
-    sum += x;
-    if (i >= n) sum -= xs[i - n];
-    out.push(i >= n - 1 ? sum / n : null);
-  });
-  return out;
-}
-function ema(xs, n) {
-  const k = 1 - 2 / (n + 1);
-  let numer = 0, denom = 0, seen = 0;
-  return xs.map((x) => {
-    if (x === null) return null;
-    numer = x + k * numer;
-    denom = 1 + k * denom;
-    seen++;
-    return seen >= n ? numer / denom : null;
-  });
-}
-function wilder(xs, n, startAt) {
-  const out = xs.map(() => null);
-  let prev = 0;
-  for (let i = startAt; i < xs.length; i++) {
-    const k = i - startAt;
-    if (k < n - 1) continue;
-    prev = k === n - 1 ? xs.slice(startAt, i + 1).reduce((a, b) => a + b, 0) / n : (prev * (n - 1) + xs[i]) / n;
-    out[i] = prev;
-  }
-  return out;
-}
-function rsi(closes, n = 14) {
-  const gains = closes.map((c, i) => i ? Math.max(0, c - closes[i - 1]) : 0);
-  const losses = closes.map((c, i) => i ? Math.max(0, closes[i - 1] - c) : 0);
-  const g = wilder(gains, n, 1), l = wilder(losses, n, 1);
-  return g.map((gv, i) => {
-    const lv = l[i];
-    if (gv === null || lv === null || lv === void 0) return null;
-    return lv === 0 ? gv === 0 ? 50 : 100 : 100 - 100 / (1 + gv / lv);
-  });
-}
-function macd(closes) {
-  const fast = ema(closes, 12), slow = ema(closes, 26);
-  const line = fast.map((f, i) => f === null || slow[i] === null ? null : f - slow[i]);
-  const signal = ema(line, 9);
-  return { macd: line, signal, hist: line.map((m, i) => m === null || signal[i] === null ? null : m - signal[i]) };
-}
-function bollinger(closes, n = 20, k = 2) {
-  const mid = sma(closes, n), upper = [], lower = [];
-  closes.forEach((_, i) => {
-    const m = mid[i];
-    if (m === null || m === void 0) {
-      upper.push(null);
-      lower.push(null);
-      return;
-    }
-    const w = closes.slice(i - n + 1, i + 1), sd = Math.sqrt(w.reduce((a, x) => a + (x - m) ** 2, 0) / (n - 1));
-    upper.push(m + k * sd);
-    lower.push(m - k * sd);
-  });
-  return { mid, upper, lower };
-}
-function atr(bars, n = 14) {
-  const tr = bars.map((b, i) => i ? Math.max(b.high - b.low, Math.abs(b.high - bars[i - 1].close), Math.abs(b.low - bars[i - 1].close)) : b.high - b.low);
-  return wilder(tr, n, 0);
-}
-function vwma(bars, n = 14) {
-  return bars.map((_, i) => {
-    if (i < n - 1) return null;
-    const w = bars.slice(i - n + 1, i + 1), vol = w.reduce((a, b) => a + b.volume, 0);
-    return vol > 0 ? w.reduce((a, b) => a + b.close * b.volume, 0) / vol : null;
-  });
-}
-function mfi(bars, n = 14) {
-  const tp = bars.map((b) => (b.high + b.low + b.close) / 3);
-  return bars.map((_, i) => {
-    if (i < n) return null;
-    let pos = 0, neg = 0;
-    for (let j = i - n + 1; j <= i; j++) {
-      const flow = tp[j] * bars[j].volume;
-      if (tp[j] > tp[j - 1]) pos += flow;
-      else if (tp[j] < tp[j - 1]) neg += flow;
-    }
-    return neg === 0 ? 100 : 100 - 100 / (1 + pos / neg);
-  });
-}
-var INDICATORS = {
-  close_50_sma: "50 SMA: a medium-term trend indicator. Use: trend direction and dynamic support/resistance. It lags price; combine with faster indicators.",
-  close_200_sma: "200 SMA: a long-term trend benchmark. Use: the overall trend and golden/death crosses. It reacts slowly; better for strategy than entries.",
-  close_10_ema: "10 EMA: a responsive short-term average. Use: quick shifts in momentum and entry points. Noisy in choppy markets.",
-  macd: "MACD: momentum from the difference of two EMAs (12, 26). Use: crossovers and divergence. Confirm in sideways markets.",
-  macds: "MACD signal: the 9-day EMA of MACD. Use: crossovers with the MACD line. Part of a broader view, not a trigger alone.",
-  macdh: "MACD histogram: MACD minus its signal. Use: momentum strength and early divergence. Can be volatile.",
-  rsi: "RSI (14): momentum, 70/30 for overbought/oversold. In strong trends it can stay extreme; cross-check with the trend.",
-  boll: "Bollinger middle: the 20-day SMA under the bands. Use: a dynamic benchmark for price.",
-  boll_ub: "Bollinger upper band: 2 standard deviations above the middle. Use: overbought zones and breakouts; price can ride it in strong trends.",
-  boll_lb: "Bollinger lower band: 2 standard deviations below the middle. Use: oversold zones; confirm before calling a reversal.",
-  atr: "ATR (14): average true range, the size of daily moves. Use: stop-loss distance and position size.",
-  vwma: "VWMA (14): a moving average weighted by volume. Use: confirm trends with volume; watch for skew from volume spikes.",
-  mfi: "MFI (14): money flow, momentum from price and volume. Use: overbought (>80) or oversold (<20) and divergence."
-};
-var INDICATOR_NAMES = Object.keys(INDICATORS);
-function compute(name, bars) {
-  const closes = bars.map((b) => b.close);
-  switch (name) {
-    case "close_50_sma":
-      return sma(closes, 50);
-    case "close_200_sma":
-      return sma(closes, 200);
-    case "close_10_ema":
-      return ema(closes, 10);
-    case "macd":
-      return macd(closes).macd;
-    case "macds":
-      return macd(closes).signal;
-    case "macdh":
-      return macd(closes).hist;
-    case "rsi":
-      return rsi(closes);
-    case "boll":
-      return bollinger(closes).mid;
-    case "boll_ub":
-      return bollinger(closes).upper;
-    case "boll_lb":
-      return bollinger(closes).lower;
-    case "atr":
-      return atr(bars);
-    case "vwma":
-      return vwma(bars);
-    case "mfi":
-      return mfi(bars);
-  }
 }
 
 // src/terminal/quotes.ts
@@ -21825,6 +21887,7 @@ function parseQuote(json, symbol, nowSec = Date.now() / 1e3) {
   const reg = m.currentTradingPeriod?.regular;
   const open4 = m.instrumentType === "CRYPTOCURRENCY" || finite2(reg?.start) && finite2(reg?.end) && nowSec >= reg.start && nowSec <= reg.end;
   const t2 = finite2(m.regularMarketTime) ? m.regularMarketTime : (r.timestamp ?? [])[Math.max(0, (r.timestamp ?? []).length - 1)];
+  if (!finite2(t2)) throw new NoData(`Yahoo Finance gave a price for ${symbol} with no time, so when it is from is not known`);
   return {
     symbol,
     name: m.longName ?? m.shortName,
@@ -21834,7 +21897,7 @@ function parseQuote(json, symbol, nowSec = Date.now() / 1e3) {
     change: previousClose === null ? null : price - previousClose,
     changePct: previousClose === null ? null : (price / previousClose - 1) * 100,
     open: open4,
-    asOf: finite2(t2) ? new Date(t2 * 1e3).toISOString() : new Date(nowSec * 1e3).toISOString(),
+    asOf: new Date(t2 * 1e3).toISOString(),
     points: points.length ? points : [price]
   };
 }
@@ -21950,7 +22013,8 @@ async function search(q, count) {
   for (const host of HOSTS) {
     try {
       const j = await getJson(`${host}/v1/finance/search?${qs}`);
-      return (j.news ?? []).filter((n) => n.title && n.providerPublishTime).map((n) => ({ title: n.title, publisher: n.publisher ?? "unknown", link: n.link ?? "", time: stamp2(n.providerPublishTime), tickers: (n.relatedTickers ?? []).map((t2) => t2.toUpperCase()) }));
+      if (!Array.isArray(j.news)) throw new Unavailable(`${new URL(host).host} answered its news search without a list of articles`);
+      return j.news.filter((n) => n.title && n.providerPublishTime).map((n) => ({ title: n.title, publisher: n.publisher ?? "unknown", link: n.link ?? "", time: stamp2(n.providerPublishTime), tickers: (n.relatedTickers ?? []).map((t2) => t2.toUpperCase()) }));
     } catch (e) {
       last = e;
     }
@@ -21971,8 +22035,8 @@ function signalsOf(bars, newsToday = null) {
   if (!last) return { signals, movePct: null };
   const movePct = prev && prev.close > 0 ? (last.close / prev.close - 1) * 100 : null;
   if (movePct !== null && Math.abs(movePct) >= MOVE_PCT) signals.push({ kind: "move", words: `${movePct >= 0 ? "rose" : "fell"} ${one2(Math.abs(movePct))}%` });
-  const usual = bars.slice(Math.max(0, n - 1 - USUAL_DAYS), n - 1).map((b) => b.volume).filter((v) => v > 0);
-  if (usual.length >= USUAL_DAYS / 2 && last.volume > 0) {
+  const usual = bars.slice(Math.max(0, n - 1 - USUAL_DAYS), n - 1).map((b) => b.volume).filter((v) => v !== null && v > 0);
+  if (usual.length >= USUAL_DAYS / 2 && last.volume !== null && last.volume > 0) {
     const times = last.volume / (usual.reduce((a, v) => a + v, 0) / usual.length);
     if (times >= VOLUME_TIMES) signals.push({ kind: "volume", words: `${one2(times)} times its usual volume` });
   }
@@ -22027,8 +22091,8 @@ async function newsOn(symbol, day2) {
   }
 }
 async function workScreen(symbols, news, day2, now = /* @__PURE__ */ new Date()) {
-  const list2 = [...new Set(symbols)].filter((s) => !/[\^=]/.test(s));
-  const read2 = await inTurn(list2, 4, async (symbol) => {
+  const list3 = [...new Set(symbols)].filter((s) => !/[\^=]/.test(s));
+  const read2 = await inTurn(list3, 4, async (symbol) => {
     try {
       const bars = (await daily(symbol, addDays(day2, -400), day2)).bars;
       if (!bars.length || bars[bars.length - 1].date < addDays(day2, -7)) return { symbol, bars: null, news: null };
@@ -22040,7 +22104,7 @@ async function workScreen(symbols, news, day2, now = /* @__PURE__ */ new Date())
   return {
     day: day2,
     at: now.toISOString(),
-    looked: list2.length,
+    looked: list3.length,
     unavailable: read2.filter((r) => !r.bars).map((r) => r.symbol),
     picks: rank(read2.filter((r) => !!r.bars))
   };
@@ -22099,6 +22163,26 @@ function queueTop(dir, screen, day2, ring, now = /* @__PURE__ */ new Date(), fro
   return queued;
 }
 
+// src/data/odds.ts
+var list2 = (s) => {
+  try {
+    const v = JSON.parse(s ?? "[]");
+    return Array.isArray(v) ? v.map(String) : [];
+  } catch {
+    return [];
+  }
+};
+function eventsOf(j) {
+  if (Array.isArray(j.events)) return j.events;
+  if (j.error === void 0 && typeof j.pagination === "object" && j.pagination !== null) return [];
+  throw new Unavailable(`gamma-api.polymarket.com answered without its search results${typeof j.error === "string" && j.error ? `, saying "${j.error.slice(0, 140)}"` : ""}`);
+}
+function firstPrice(outcomePrices) {
+  const s = list2(outcomePrices)[0]?.trim();
+  const p = s ? Number(s) : NaN;
+  return Number.isFinite(p) && p >= 0 && p <= 1 ? p : null;
+}
+
 // src/desk/weather.ts
 var MEANING = {
   trend: "The S&P 500 against its 50- and 200-day averages: above both is rising, between them mixed, below both falling. It tells where the market has been, not where it goes next.",
@@ -22134,15 +22218,7 @@ function outcomeWords(title) {
 }
 function ratesOf(events, now = /* @__PURE__ */ new Date()) {
   const next = events.filter((e) => /^fed decision in /i.test(e.title ?? "") && !e.closed && e.endDate && Date.parse(e.endDate) > now.getTime()).sort((a, b) => Date.parse(a.endDate) - Date.parse(b.endDate))[0];
-  const list2 = (s) => {
-    try {
-      const v = JSON.parse(s ?? "[]");
-      return Array.isArray(v) ? v.map(String) : [];
-    } catch {
-      return [];
-    }
-  };
-  const odds = (next?.markets ?? []).filter((m) => m.groupItemTitle && !m.closed && m.active !== false).map((m) => ({ ...outcomeWords(m.groupItemTitle), p: Number(list2(m.outcomePrices)[0]) })).filter((o) => Number.isFinite(o.p)).sort((a, b) => b.p - a.p);
+  const odds = (next?.markets ?? []).filter((m) => m.groupItemTitle && !m.closed && m.active !== false).map((m) => ({ ...outcomeWords(m.groupItemTitle), p: firstPrice(m.outcomePrices) })).filter((o) => o.p !== null).sort((a, b) => b.p - a.p);
   const top = odds[0];
   if (!next || !top) return unavailable("rates", "Rates", "Polymarket has no open market on the Federal Reserve's next decision");
   const [state, tone] = top.way === "cut" ? ["A cut", "ok"] : top.way === "rise" ? ["A rise", "warn"] : ["No change", ""];
@@ -22153,7 +22229,16 @@ async function weatherNow(day2, now = /* @__PURE__ */ new Date()) {
   const [trend, mood, rates] = await Promise.all([
     daily("^GSPC", addDays(day2, -400), day2).then((s) => trendOf(s.bars), () => unavailable("trend", "Trend", "Yahoo Finance did not answer for the S&P 500")),
     daily("^VIX", addDays(day2, -14), day2).then((s) => moodOf(s.bars), () => unavailable("mood", "Mood", "Yahoo Finance did not answer for the VIX")),
-    getJson("https://gamma-api.polymarket.com/public-search?q=fed%20decision&limit_per_type=20").then((j) => ratesOf(j.events ?? [], now), () => unavailable("rates", "Rates", "Polymarket did not answer"))
+    getJson("https://gamma-api.polymarket.com/public-search?q=fed%20decision&limit_per_type=20").then(
+      (j) => {
+        try {
+          return ratesOf(eventsOf(j), now);
+        } catch {
+          return unavailable("rates", "Rates", "Polymarket answered without its search results");
+        }
+      },
+      () => unavailable("rates", "Rates", "Polymarket did not answer")
+    )
   ]);
   return { at: now.toISOString(), lines: [trend, mood, rates] };
 }
@@ -22315,18 +22400,20 @@ async function startTerminal(opts) {
     }
     const key = `${stamp3}|${startUsd}|${JSON.stringify(caps)}|${today2}`;
     if (!paperMemo || paperMemo.key !== key || Date.now() - paperMemo.at > 10 * 6e4) {
-      const record2 = recordOf(calls, today2), closes = {};
+      const record2 = recordOf(calls, today2), closes = {}, dividends = {};
       if (record2.since) {
         const from = addDays(record2.since, -7);
         await Promise.all([.../* @__PURE__ */ new Set([...calls.filter((c) => followed(c.ticker)).map((c) => c.ticker), "SPY"])].map(async (s) => {
           try {
-            closes[s] = (await daily(s, from, today2)).bars.map((r) => ({ date: r.date, close: r.close }));
+            const d = await daily(s, from, today2);
+            closes[s] = (d.traded ?? d.bars).map((r) => ({ date: r.date, close: r.close }));
+            dividends[s] = d.dividends ?? [];
           } catch {
           }
         }));
       }
       await sectors.warm(calls.filter((c) => followed(c.ticker)).map((c) => c.ticker));
-      paperMemo = { key, at: Date.now(), book: paperBook(calls, closes, { startUsd, trading, caps, today: today2, sectors }) };
+      paperMemo = { key, at: Date.now(), book: paperBook(calls, closes, { startUsd, trading, caps, today: today2, sectors, dividends }) };
     }
     return { ...paperMemo.book, record: recordOf(calls, today2) };
   };
@@ -22434,8 +22521,8 @@ async function startTerminal(opts) {
       if (p === "/api/robinhood/snapshot") return json(res, 200, { snapshot: robinhood.snapshot(), chosen: robinhood.chosen() });
       if (p === "/api/care") return json(res, 200, await care(day2));
       if (p === "/api/quotes") {
-        const list2 = [...new Set((url2.searchParams.get("symbols") ?? "").split(",").map((s) => s.trim()).filter(Boolean))].slice(0, 30);
-        return json(res, 200, { quotes: await Promise.all(list2.map(quote)) });
+        const list3 = [...new Set((url2.searchParams.get("symbols") ?? "").split(",").map((s) => s.trim()).filter(Boolean))].slice(0, 30);
+        return json(res, 200, { quotes: await Promise.all(list3.map(quote)) });
       }
       if (p === "/api/markets") return json(res, 200, { markets: await Promise.all(MARKETS.map(async (m) => ({ ...m, quote: await quote(m.symbol) }))) });
       if (p === "/api/history") {
@@ -22532,7 +22619,7 @@ async function startTerminal(opts) {
     }
     if (p === "/api/tiers/market" && method === "POST") {
       if (!Array.isArray(b.symbols) || b.symbols.length > MAX_MARKET) throw new Refused2(400, `choose up to ${MAX_MARKET} funds for the whole market`);
-      const list2 = [];
+      const list3 = [];
       for (const v of b.symbols) {
         let s;
         try {
@@ -22540,10 +22627,10 @@ async function startTerminal(opts) {
         } catch (e) {
           throw new Refused2(400, e.message);
         }
-        if (!list2.includes(s)) list2.push(s);
+        if (!list3.includes(s)) list3.push(s);
       }
-      for (const q of await Promise.all(list2.map(quote))) if ("error" in q && q.error === "no-data") throw new Refused2(422, q.message);
-      saveMarket(dir, list2);
+      for (const q of await Promise.all(list3.map(quote))) if ("error" in q && q.error === "no-data") throw new Refused2(422, q.message);
+      saveMarket(dir, list3);
       return json(res, 200, { market: marketView(dir) });
     }
     if (p === "/api/paper" && method === "POST") {

@@ -34,10 +34,13 @@ export function parseQuote(json: IntradayJson, symbol: string, nowSec = Date.now
   // A coin trades all day; anything else is open between the exchange's own session start and end.
   const open = m.instrumentType === 'CRYPTOCURRENCY' || (finite(reg?.start) && finite(reg?.end) && nowSec >= reg!.start! && nowSec <= reg!.end!);
   const t = finite(m.regularMarketTime) ? m.regularMarketTime : (r.timestamp ?? [])[Math.max(0, (r.timestamp ?? []).length - 1)];
+  // Every price on the page says when it is from ("now", a close, a day): one that comes with no time is not shown at all,
+  // never stamped with the moment it was read.
+  if (!finite(t)) throw new NoData(`Yahoo Finance gave a price for ${symbol} with no time, so when it is from is not known`);
   return {
     symbol, name: m.longName ?? m.shortName, currency: m.currency, price, previousClose,
     change: previousClose === null ? null : price - previousClose, changePct: previousClose === null ? null : (price / previousClose - 1) * 100,
-    open, asOf: finite(t) ? new Date(t * 1000).toISOString() : new Date(nowSec * 1000).toISOString(), points: points.length ? points : [price],
+    open, asOf: new Date(t * 1000).toISOString(), points: points.length ? points : [price],
   };
 }
 
@@ -69,7 +72,8 @@ export const isRange = (s: string): s is RangeKey => s in RANGES;
 
 export interface History {
   symbol: string; name?: string; currency?: string; range: RangeKey;
-  bars: Array<{ date: string; open: number; high: number; low: number; close: number; volume: number }>;
+  /** volume: null when the source does not give it. */
+  bars: Array<{ date: string; open: number; high: number; low: number; close: number; volume: number | null }>;
   ma50: Array<number | null>; ma200: Array<number | null>;
 }
 

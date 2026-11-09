@@ -5,6 +5,7 @@
 import { addDays, marketDay } from '../data/dates.js';
 import { getJson } from '../data/http.js';
 import { sma } from '../data/indicators.js';
+import { eventsOf, firstPrice, type SearchJson } from '../data/odds.js';
 import { daily, type Bar } from '../data/yahoo.js';
 
 export type Tone = 'ok' | 'warn' | 'bad' | '';
@@ -64,10 +65,10 @@ export function outcomeWords(title: string): { words: string; way: 'none' | 'cut
 export function ratesOf(events: readonly PolyEvent[], now: Date = new Date()): WeatherLine {
   const next = events.filter((e) => /^fed decision in /i.test(e.title ?? '') && !e.closed && e.endDate && Date.parse(e.endDate) > now.getTime())
     .sort((a, b) => Date.parse(a.endDate!) - Date.parse(b.endDate!))[0];
-  const list = (s?: string): string[] => { try { const v = JSON.parse(s ?? '[]') as unknown; return Array.isArray(v) ? v.map(String) : []; } catch { return []; } };
+  // A blank price is no price: never read as 0%.
   const odds = (next?.markets ?? []).filter((m) => m.groupItemTitle && !m.closed && m.active !== false)
-    .map((m) => ({ ...outcomeWords(m.groupItemTitle!), p: Number(list(m.outcomePrices)[0]) }))
-    .filter((o) => Number.isFinite(o.p)).sort((a, b) => b.p - a.p);
+    .map((m) => ({ ...outcomeWords(m.groupItemTitle!), p: firstPrice(m.outcomePrices) }))
+    .filter((o): o is typeof o & { p: number } => o.p !== null).sort((a, b) => b.p - a.p);
   const top = odds[0];
   if (!next || !top) return unavailable('rates', 'Rates', "Polymarket has no open market on the Federal Reserve's next decision");
   const [state, tone]: [string, Tone] = top.way === 'cut' ? ['A cut', 'ok'] : top.way === 'rise' ? ['A rise', 'warn'] : ['No change', ''];
@@ -75,13 +76,15 @@ export function ratesOf(events: readonly PolyEvent[], now: Date = new Date()): W
   return { key: 'rates', name: 'Rates', state, tone, words: `For the Federal Reserve's next decision, by ${dayWords(marketDay(new Date(next.endDate!)))}, Polymarket's crowd puts ${top.words} at ${pct(top.p)}${second}.`, meaning: MEANING.rates };
 }
 
-/** The weather now, each line on its own: a source that fails leaves its line unavailable and the others standing. */
+/** The weather now, each line on its own: a source that fails leaves its line unavailable and the others standing. A
+ *  Polymarket answer without its search results is a broken answer, not "no open market". */
 export async function weatherNow(day: string, now: Date = new Date()): Promise<Weather> {
   const [trend, mood, rates] = await Promise.all([
     daily('^GSPC', addDays(day, -400), day).then((s) => trendOf(s.bars), () => unavailable('trend', 'Trend', 'Yahoo Finance did not answer for the S&P 500')),
     daily('^VIX', addDays(day, -14), day).then((s) => moodOf(s.bars), () => unavailable('mood', 'Mood', 'Yahoo Finance did not answer for the VIX')),
-    getJson<{ events?: PolyEvent[] }>('https://gamma-api.polymarket.com/public-search?q=fed%20decision&limit_per_type=20')
-      .then((j) => ratesOf(j.events ?? [], now), () => unavailable('rates', 'Rates', 'Polymarket did not answer')),
+    getJson<SearchJson<PolyEvent>>('https://gamma-api.polymarket.com/public-search?q=fed%20decision&limit_per_type=20').then(
+      (j) => { try { return ratesOf(eventsOf(j), now); } catch { return unavailable('rates', 'Rates', 'Polymarket answered without its search results'); } },
+      () => unavailable('rates', 'Rates', 'Polymarket did not answer')),
   ]);
   return { at: now.toISOString(), lines: [trend, mood, rates] };
 }

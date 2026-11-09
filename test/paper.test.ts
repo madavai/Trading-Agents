@@ -42,6 +42,31 @@ test('every call is followed as its ticket would size it, filled at the first cl
   assert.equal(b.trades[0]!.ticker, 'MSFT', 'newest call first, as the page lists them');
 });
 
+// Audit 1, F1: a dividend is paid into paper cash on its ex-day, for the shares held at the start of that day, as an
+// account receives it; the benchmark's line is paid its own the same way.
+test('a dividend is paid into paper cash on its ex-day for the shares held that morning; a buy at that close is too late, a sale at it is not', () => {
+  const c: Closes = {
+    VZ: rows(['2026-09-01', 40], ['2026-09-02', 40], ['2026-09-03', 39.5], ['2026-09-04', 39.5]),
+    KO: rows(['2026-09-01', 60], ['2026-09-02', 60], ['2026-09-03', 60], ['2026-09-04', 59.5]),
+    SPY: rows(['2026-09-01', 500], ['2026-09-02', 500], ['2026-09-03', 500], ['2026-09-04', 497]),
+  };
+  const dividends = { VZ: [{ date: '2026-09-03', amount: 0.5 }], KO: [{ date: '2026-09-04', amount: 0.5 }], SPY: [{ date: '2026-09-04', amount: 3 }] };
+  // VZ bought at the close of 2 Sep, held into its ex-day; KO bought at the close of its ex-day, too late for it.
+  const calls = [{ ticker: 'VZ', date: '2026-09-01', rating: 'Buy' }, { ticker: 'KO', date: '2026-09-03', rating: 'Buy' }];
+  const b = paperBook(calls, c, { startUsd: 10_000, trading: T, caps: C, today: '2026-09-04', dividends });
+  const vz = b.trades.find((t) => t.ticker === 'VZ')!, ko = b.trades.find((t) => t.ticker === 'KO')!;
+  assert.deepEqual([vz.price, vz.quantity, vz.fillDate, ko.fillDate], [40, 12, '2026-09-02', '2026-09-04'], '$500 at $40: twelve shares');
+  assert.deepEqual(b.dividends, [{ ticker: 'VZ', date: '2026-09-03', perShare: 0.5, quantity: 12, usd: 6 }], 'twelve shares at 0.50 on the ex-day; nothing for KO bought at its ex-day close');
+  assert.equal(b.dividendsUsd, 6);
+  assert.deepEqual(b.series.map((p) => [p.date, p.value]), [['2026-09-01', 10_000], ['2026-09-02', 10_000], ['2026-09-03', 10_000], ['2026-09-04', 10_000]], 'on the ex-day the price falls by the dividend and the cash rises by it: the value holds');
+  assert.deepEqual([b.cash, b.positions.map((p) => [p.ticker, p.quantity, p.price])], [9_050, [['VZ', 12, 39.5], ['KO', 8, 59.5]]]);
+  assert.equal(b.series.at(-1)!.benchmark, 10_000, 'the benchmark: 20 shares at $500, then $497 and $3 a share paid in cash');
+  // A sale at the close of the ex-day still had the shares that morning.
+  const sold = paperBook([...calls.slice(0, 1), { ticker: 'VZ', date: '2026-09-02', rating: 'Sell' }], c, { startUsd: 10_000, trading: T, caps: { ...C, minHoldDays: 0 }, today: '2026-09-04', dividends });
+  assert.deepEqual([sold.trades.find((t) => t.side === 'sell')?.fillDate, sold.dividendsUsd], ['2026-09-03', 6]);
+  assert.deepEqual(paperBook(calls, c, { startUsd: 10_000, trading: T, caps: C, today: '2026-09-04' }).dividends, [], 'with no dividends given, none is paid');
+});
+
 test('paper takes no order the real ticket would refuse: your caps, the orders a day, what is held to sell, your sector limit', async () => {
   const twice = book([{ ticker: 'NVDA', date: '2026-09-01', rating: 'Buy' }, { ticker: 'NVDA', date: '2026-09-02', rating: 'Buy' }], { caps: { ...C, perStockPercent: 5 } });
   const second = twice.trades.find((t) => t.callDate === '2026-09-02')!;

@@ -67,7 +67,7 @@ export function paperChart(el: HTMLElement, series: ReadonlyArray<{ date: string
   el.innerHTML = s;
 }
 
-interface Bar { date: string; label: string; o: number; h: number; l: number; c: number; v: number }
+interface Bar { date: string; label: string; o: number; h: number; l: number; c: number; v: number | null }
 export interface HeroOptions { kind: 'area' | 'candles'; layers: { ma50: boolean; ma200: boolean; vol: boolean } }
 export interface HeroInfo { first: number; last: number; hasAverages: boolean }
 
@@ -80,7 +80,7 @@ function barsOf(h: History): { bars: Bar[]; ma50: Array<number | null>; ma200: A
   const bars: Bar[] = [], ma50: Array<number | null> = [], ma200: Array<number | null> = [];
   for (let i = 0; i < h.bars.length; i += 5) {
     const g = h.bars.slice(i, i + 5), end = g[g.length - 1]!;
-    bars.push({ date: end.date, label: monthYear(end.date), o: g[0]!.open, h: Math.max(...g.map((b) => b.high)), l: Math.min(...g.map((b) => b.low)), c: end.close, v: g.reduce((a, b) => a + b.volume, 0) });
+    bars.push({ date: end.date, label: monthYear(end.date), o: g[0]!.open, h: Math.max(...g.map((b) => b.high)), l: Math.min(...g.map((b) => b.low)), c: end.close, v: g.some((b) => b.volume === null) ? null : g.reduce((a, b) => a + b.volume!, 0) });
     ma50.push(h.ma50[i + g.length - 1] ?? null); ma200.push(h.ma200[i + g.length - 1] ?? null);
   }
   return { bars, ma50, ma200 };
@@ -106,8 +106,8 @@ export function heroChart(el: HTMLElement, tip: HTMLElement, h: History, o: Hero
   const every = Math.ceil(n / 6);
   for (let i = Math.floor(every / 2); i < n; i += every) s += `<text x="${x(i)}" y="${H - 6}" text-anchor="middle" class="ch-axis">${bars[i]!.label}</text>`;
   if (VOL) {
-    const vmax = Math.max(...bars.map((b) => b.v)) || 1, vb = PB + 10 + VOL;
-    bars.forEach((b, i) => { const bh = Math.max(1.5, (b.v / vmax) * VOL), w = Math.max(1, step * 0.6); s += `<rect x="${x(i) - w / 2}" y="${vb - bh}" width="${w}" height="${bh}" rx="${Math.min(2, w / 2)}" class="vol-${b.c >= b.o ? 'ok' : 'bad'}"/>`; });
+    const vmax = Math.max(0, ...bars.map((b) => b.v ?? 0)) || 1, vb = PB + 10 + VOL;
+    bars.forEach((b, i) => { if (b.v === null) return; const bh = Math.max(1.5, (b.v / vmax) * VOL), w = Math.max(1, step * 0.6); s += `<rect x="${x(i) - w / 2}" y="${vb - bh}" width="${w}" height="${bh}" rx="${Math.min(2, w / 2)}" class="vol-${b.c >= b.o ? 'ok' : 'bad'}"/>`; });
   }
   const path = (arr: Array<number | null>) => smooth(arr.map((v, i): Pt | null => (v === null ? null : [x(i), y(v)])).filter((p): p is Pt => p !== null));
   const has50 = ma50.some((v) => v !== null), has200 = ma200.some((v) => v !== null);
@@ -135,7 +135,7 @@ export function heroChart(el: HTMLElement, tip: HTMLElement, h: History, o: Hero
     xh.classList.remove('hide');
     xhl.setAttribute('x1', String(x(i))); xhl.setAttribute('x2', String(x(i))); xhd.setAttribute('cx', String(x(i))); xhd.setAttribute('cy', String(y(b.c)));
     const move = (b.c / b.o - 1) * 100;
-    tip.innerHTML = `<div class="at-tile-name">${dayText(b.date)}</div><dl class="at-facts"><div><dt>Open</dt><dd>${num(b.o)}</dd></div><div><dt>High</dt><dd>${num(b.h)}</dd></div><div><dt>Low</dt><dd>${num(b.l)}</dd></div><div><dt>Close</dt><dd>${num(b.c)} <span class="at-chip ${tone(move)}">${pct(move)}</span></dd></div><div><dt>Volume</dt><dd>${(b.v / 1e6).toFixed(1)}M</dd></div></dl>`;
+    tip.innerHTML = `<div class="at-tile-name">${dayText(b.date)}</div><dl class="at-facts"><div><dt>Open</dt><dd>${num(b.o)}</dd></div><div><dt>High</dt><dd>${num(b.h)}</dd></div><div><dt>Low</dt><dd>${num(b.l)}</dd></div><div><dt>Close</dt><dd>${num(b.c)} <span class="at-chip ${tone(move)}">${pct(move)}</span></dd></div><div><dt>Volume</dt><dd>${b.v === null ? 'not given' : `${(b.v / 1e6).toFixed(1)}M`}</dd></div></dl>`;
     tip.classList.add('on');
     const tw = tip.offsetWidth; let left = x(i) + 16; if (left + tw > pw) left = x(i) - tw - 16;
     tip.style.left = `${Math.max(0, left)}px`; tip.style.top = `${T}px`;

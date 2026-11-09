@@ -36,7 +36,7 @@ How to analyse this data:
 3. Read Reddit posts for substance. The feed has no vote or comment counts, so judge a post by its body, not its title alone, and do not infer engagement.
 4. Distinguish opinion from event. A headline ("announces a deal") is an event; a StockTwits post ("buying, this is going to the moon") is opinion. Weight them differently.
 5. Identify recurring narrative themes: what topic keeps coming up across sources.
-6. Be honest about data limits. If StockTwits returned only a handful of messages, or a source answered "unavailable", the read is less robust: say so in the confidence line and in the narrative. If the sources are silent on a subreddit, say so.
+6. Be honest about data limits. If StockTwits returned only a handful of messages, or a source answered "unavailable", the read is less robust: say so in the confidence line and in the narrative. An unavailable source is not a quiet one: never count it as silence, as calm or as balance. If the sources are silent on a subreddit, say so.
 7. Identify catalysts and risks that emerge across sources: upcoming earnings, product launches, competitive threats, macro headlines.
 8. Past sentiment is not predictive. Frame your conclusions as a signal for the trader to weigh alongside fundamentals and technicals, not as a price call.
 
@@ -44,8 +44,8 @@ Open your report with these three lines, then the narrative:
 **Overall Sentiment:** **<band>** (Score: <n.n>/10)
 **Confidence:** <Low|Medium|High>
 (a blank line)
-- band: exactly one of Bullish / Mildly Bullish / Neutral / Mixed / Mildly Bearish / Bearish. Mixed when sources clearly disagree; Neutral only when all sources are genuinely silent.
-- score: 0 (maximally bearish) to 10 (maximally bullish), 5 neutral, consistent with the band (Bullish about 6.5-10, Mildly Bullish 5.5-6.4, Neutral or Mixed 4.5-5.5, Mildly Bearish 3.5-4.4, Bearish 0-3.4).
+- band: exactly one of Bullish / Mildly Bullish / Neutral / Mixed / Mildly Bearish / Bearish / Unavailable. Mixed when sources clearly disagree; Neutral only when the sources answered and what they hold is balanced or genuinely quiet; Unavailable when no source gave headlines or posts to read (each said unavailable), and then the first line is **Overall Sentiment:** **Unavailable** (Score: none), and the narrative says which sources failed and why. A score is never given from no data.
+- score: 0 (maximally bearish) to 10 (maximally bullish), 5 neutral, consistent with the band (Bullish about 6.5-10, Mildly Bullish 5.5-6.4, Neutral or Mixed 4.5-5.5, Mildly Bearish 3.5-4.4, Bearish 0-3.4); "none" for Unavailable.
 - confidence: Low when a source was unavailable or gave fewer than 5 data points; Medium when data is present but sparse; High when all sources gave substantive data.
 
 The narrative covers, in order: a source-by-source breakdown with specific evidence (cite message counts, ratios, notable posts); cross-source divergences and alignments; dominant themes; catalysts and risks; and a Markdown table of the key sentiment signals with their direction, source and supporting evidence. Save it as section "sentiment".
