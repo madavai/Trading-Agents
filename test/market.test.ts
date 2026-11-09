@@ -5,7 +5,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { configure, getText, NoData, Unavailable } from '../src/data/http.js';
 import { clearCache, daily, parseChart } from '../src/data/yahoo.js';
 import { history } from '../src/terminal/quotes.js';
-import { indicatorWindow, instrument, latestState, priceHistory, verifiedSnapshot } from '../src/data/market.js';
+import { indicatorWindow, instrument, lastClose, latestState, priceHistory, verifiedSnapshot } from '../src/data/market.js';
 import { deskServer } from '../src/tools/server.js';
 import { chartFetch, chartJson, series, type Row } from './chart.js';
 
@@ -83,6 +83,15 @@ test('a session still trading is the latest price, never "the close"', async () 
   assert.doesNotMatch(t, /\n\| Close \| /);   // the closes table's own header may say Close
   assert.match(await instrument('nvda', '2026-10-12'), /Latest trading day on or before it: 2026-10-12, still trading: latest price \d+\.\d\d \(not a close\)\n\*\*The latest row, 2026-10-12, is a session still trading/);
   assert.doesNotMatch(await verifiedSnapshot('nvda', '2026-10-09'), /still trading|finished session|not opened|partial/);   // a past day is simply final
+});
+
+test('the evening wrap-up\'s last close is a finished session: a day still trading gives the close before it (audit 1 F5)', async () => {
+  const rows = series('2026-10-12', 30), friday = rows.at(-2)!, monday = rows.at(-1)!;
+  configure({ fetch: withSession(rows, { start: MONDAY.start, end: Date.now() + 3_600_000 }) });
+  assert.deepEqual(await lastClose('nvda', '2026-10-12'), { date: friday.date, close: friday.c }, 'Monday is still trading: Friday\'s close');
+  clearCache();
+  configure({ fetch: withSession(rows, MONDAY) });
+  assert.deepEqual(await lastClose('nvda', '2026-10-12'), { date: monday.date, close: monday.c }, 'Monday has closed: its own close');
 });
 
 test('a finished session is final, with no hedge; one not open yet is named, with the last finished row', async () => {

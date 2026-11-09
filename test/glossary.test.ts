@@ -37,7 +37,7 @@ test('alpha says how to read it for each rating: above zero is good only for a B
 
 test('the S&P 500 is the index, SPY the fund the desk measures itself against, and a move is named for its day', () => {
   // Round 1 (7 Nov 2026): "S&P 500" named both the index (7,377) and SPY ($735.29), and a Saturday showed Friday's moves as today's.
-  assert.match(GLOSSARY.sp500.means, /^the index of the 500 largest US companies/);
+  assert.match(GLOSSARY.sp500.means, /^the index of about 500 large US companies, chosen by a committee at S&P, taken together. /);
   assert.match(GLOSSARY.sp500.means, /SPY, the S&P 500 fund, copies it .* and is the yardstick the desk measures itself against\./);
   assert.match(GLOSSARY.scorecard.means, /against SPY, the S&P 500 fund,/);
   assert.equal(GLOSSARY.today.term, "Day's move");

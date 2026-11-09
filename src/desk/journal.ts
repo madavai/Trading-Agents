@@ -281,7 +281,7 @@ export class Journal {
       ...(e.lesson === 'unreliable' || e.lesson === 'flagged' ? [`REFLECTION: ${LESSON_NOTE[e.lesson](e)}`] : e.reflection ? [`REFLECTION${LESSON_NOTE[e.lesson] ? ` (${LESSON_NOTE[e.lesson]!(e)})` : ''}:\n${e.reflection}`] : [])].join('\n\n');
     const short = (e: Entry) => `${head(e)}${e.reflection && LESSON_NOTE[e.lesson] ? ` (lesson ${LESSON_NOTE[e.lesson]!(e)})` : ''}\n${e.reflection || e.decision.slice(0, 300) + (e.decision.length > 300 ? '...' : '')}`;
     const parts: string[] = [];
-    if (same.length) parts.push(`Past analyses of ${ticker} (most recent first):`, ...same.map(full));
+    if (same.length) parts.push(`Past analyses of ${ticker} (latest recorded first):`, ...same.map(full));
     if (other.length) parts.push('Recent cross-ticker lessons:', ...other.map(short));
     return parts.join('\n\n');
   }

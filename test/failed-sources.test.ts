@@ -244,7 +244,7 @@ test('the market weather: a broken Polymarket answer and a blank price are unava
   const fed = (prices: Record<string, string>): PolyEvent => ({ title: 'Fed decision in December?', endDate: '2026-12-10T00:00:00Z', closed: false,
     markets: Object.entries(prices).map(([groupItemTitle, p]) => ({ groupItemTitle, outcomePrices: `["${p}",""]`, closed: false, active: true })) });
   const r = ratesOf([fed({ 'No change': '', '25 bps decrease': '0.70' })], NOW);
-  assert.match(r.words, /puts a cut of 0\.25% at 70%\.$/);
+  assert.match(r.words, /puts a cut of 0\.25 percentage points at 70%\.$/);
   assert.doesNotMatch(r.words, /no change at 0%/);
   assert.equal(ratesOf([fed({ 'No change': '', '25 bps decrease': '' })], NOW).state, null, 'blank prices are no odds');
   configure({ fetch: route([[/polymarket/, () => json({ error: 'internal error' })], [/finance\/chart/, noAnswer]]) });
