@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { safeSymbol } from '../data/symbols.js';
 import { withLock, writeWhole } from './lock.js';
+import { lastSaved } from './runs.js';
 
 export const DEPTHS = { shallow: 1, medium: 3, deep: 5 } as const;
 export type Depth = keyof typeof DEPTHS;
@@ -32,13 +33,21 @@ export interface QueueItem {
   /** Done: the rating the desk recorded. Failed: why, in plain words. */
   rating?: string;
   reason?: string;
+  /** Failed only because nothing was saved for it for `QUIET_MS`: the desk's own inference, so its run can still finish
+   *  it (done when its call is recorded, or failed in that run's own words). */
+  quiet?: true;
+  /** Done without an analysis: it had been called already that day. */
+  already?: true;
 }
 
 /** At most this many stocks waiting or running, and this many finished ones kept for the person to see (oldest go first). */
 export const MAX_OPEN = 20, MAX_FINISHED = 20;
-/** A stock marked running for longer than this belongs to a run that died: it counts as failed and can be retried. */
-export const STALE_MS = 2 * 60 * 60_000;
-export const STALE_REASON = 'the run did not finish (it stopped, or took over two hours): press Retry';
+/** A stock being analysed saves each step as it is written. One with nothing saved for this long (since it started, or
+ *  since its run last saved a step) belongs to a run that stopped without a word: it reads as failed and can be retried.
+ *  However long an analysis takes, it is never marked failed while it is still saving its steps: in the desk's first real
+ *  runs a shallow one took about 40 minutes and a medium one 2 h 47 min, with no step near this long. */
+export const QUIET_MS = 2 * 60 * 60_000;
+export const QUIET_REASON = 'nothing was saved for this analysis for two hours, so its run has most likely stopped: press Retry. If it was still going, it shows done once its call is recorded';
 
 /** A refusal the desk's tools and the dashboard say in plain words; `code` lets a playbook tell them apart. */
 export class QueueRefusal extends Error {
@@ -74,20 +83,31 @@ function itemOf(v: unknown): QueueItem | null {
   if (startedAt) out.startedAt = startedAt;
   if (endedAt) out.endedAt = endedAt;
   if (state === 'done' && rating) out.rating = rating;
+  if (state === 'done' && r.already === true) out.already = true;
   if (state === 'failed') out.reason = reason ?? 'no reason was given';
+  if (state === 'failed' && r.quiet === true) out.quiet = true;
   return out;
+}
+
+/** When a running stock last showed that its analysis was going: when it started, or when its run last saved anything. */
+export function lastSignOf(dir: string, item: QueueItem): number {
+  const started = Date.parse(item.startedAt ?? item.requestedAt);
+  const saved = item.date ? lastSaved(dir, item.symbol, item.date) : null;
+  return Math.max(started, saved ?? 0);
 }
 
 /** A run that died leaves its stock "running" for ever. When the listener's note says the run that started it has ended
  *  (its last run started before the stock and ended after), it reads as failed with the listener's own words, whoever
- *  the listener is; and past two hours it reads as failed anyway, the same everywhere. */
-function settled(item: QueueItem, now: Date, note: ListenerNote | null): QueueItem {
+ *  the listener is. Otherwise it reads as failed only once nothing has been saved for it for `QUIET_MS`, the same
+ *  everywhere: a long analysis that is still saving its steps stays "running", however long it takes. */
+function settled(dir: string, item: QueueItem, now: Date, note: ListenerNote | null): QueueItem {
   if (item.state !== 'running') return item;
   const last = note?.lastRun, started = Date.parse(item.startedAt ?? item.requestedAt);
   if (last?.started && Date.parse(last.started) <= started && started <= Date.parse(last.at)) {
     return { ...item, state: 'failed', reason: words(`${note!.listener}'s run ended before this stock was finished: ${last.result}`, 300)!, endedAt: last.at };
   }
-  return now.getTime() - started > STALE_MS ? { ...item, state: 'failed', reason: STALE_REASON, endedAt: now.toISOString() } : item;
+  const sign = lastSignOf(dir, item);
+  return now.getTime() - sign > QUIET_MS ? { ...item, state: 'failed', reason: QUIET_REASON, quiet: true, endedAt: new Date(sign + QUIET_MS).toISOString() } : item;
 }
 
 function load(dir: string, now: Date): QueueItem[] {
@@ -97,7 +117,7 @@ function load(dir: string, now: Date): QueueItem[] {
   for (const v of Array.isArray(raw) ? raw : []) {
     const item = itemOf(v);
     if (!item || seen.has(item.symbol)) continue;   // one entry per stock
-    seen.add(item.symbol); out.push(settled(item, now, note));
+    seen.add(item.symbol); out.push(settled(dir, item, now, note));
   }
   return out;
 }
@@ -161,22 +181,26 @@ export function startItem(dir: string, raw: string, date: string, now: Date = ne
     if (item.state === 'running') return { list, result: item };   // the same run asking again
     if (item.state !== 'waiting') throw new QueueRefusal('NOT_WAITING', `${symbol} is not waiting (it is ${item.state}): the person presses Retry to ask again`);
     const started: QueueItem = { ...item, state: 'running', date, startedAt: now.toISOString() };
-    delete started.endedAt; delete started.rating; delete started.reason;
+    delete started.endedAt; delete started.rating; delete started.reason; delete started.quiet; delete started.already;
     return { list: list.map((i) => (i === item ? started : i)), result: started };
   });
 }
 
-/** Marks a stock done, with the rating the desk recorded, or failed, with why. A finished stock stays finished. */
-export function finishItem(dir: string, raw: string, outcome: { rating: string } | { reason: string }, now: Date = new Date()): QueueItem {
+/** Marks a stock done, with the rating the desk recorded (`already`: called earlier that day, so not analysed again), or
+ *  failed, with why. A finished stock stays finished, except one marked failed only because nothing was saved for it for
+ *  two hours: that was the desk's guess, so its own run can still finish it, done or failed in its own words. */
+export function finishItem(dir: string, raw: string, outcome: { rating: string; already?: boolean } | { reason: string }, now: Date = new Date()): QueueItem {
   const symbol = safeSymbol(raw);
   return change(dir, now, (list) => {
     const item = list.find((i) => i.symbol === symbol);
     if (!item) throw new QueueRefusal('NOT_ON_LIST', `${symbol} is not on the waiting list`);
-    if (!open(item)) throw new QueueRefusal('FINISHED', `${symbol} is already ${item.state}`);
+    if (!open(item) && !item.quiet) throw new QueueRefusal('FINISHED', `${symbol} is already ${item.state}`);
     const finished: QueueItem = 'rating' in outcome
-      ? { ...item, state: 'done', rating: words(outcome.rating, 30) ?? 'recorded', endedAt: now.toISOString() }
+      ? { ...item, state: 'done', rating: words(outcome.rating, 30) ?? 'recorded', endedAt: now.toISOString(), ...(outcome.already ? { already: true as const } : {}) }
       : { ...item, state: 'failed', reason: words(outcome.reason, 300) ?? 'no reason was given', endedAt: now.toISOString() };
     if (finished.state === 'done') delete finished.reason; else delete finished.rating;
+    delete finished.quiet;
+    if (!('rating' in outcome && outcome.already)) delete finished.already;
     return { list: list.map((i) => (i === item ? finished : i)), result: finished };
   });
 }
@@ -220,7 +244,7 @@ export const LISTENER_FRESH_MS = 3 * 60_000;
 /** The listener's note, checked; `fresh` says whether its heartbeat is recent enough to believe it still listens. Two
  *  shapes are read: the desk's own (above), and Madav's for a routine it runs (`listening` for who, `checked` for the
  *  heartbeat, and a last run whose `at` is when it started, `ended` how: finished, failed or stopped, and `endedAt`, when
- *  it gives it, when). Without an end time a run's stock is left to the two-hour rule. */
+ *  it gives it, when). Without an end time a run's stock is left to the quiet rule (`QUIET_MS` with nothing saved). */
 export function readListener(dir: string, now: Date = new Date()): (ListenerNote & { fresh: boolean }) | null {
   try {
     const v = JSON.parse(fs.readFileSync(listenerFile(dir), 'utf8')) as Record<string, unknown>;

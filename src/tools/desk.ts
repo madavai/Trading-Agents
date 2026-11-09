@@ -273,7 +273,8 @@ export function registerDeskTools(server: McpServer, root: string): void {
     annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false },
   }, async () => act(() => openDashboard(root)));
 
-  // The waiting list: the stocks the person asked for on the dashboard. A run takes them one at a time, in order, up to the
+  // The waiting list: the stocks the person asked for on the dashboard, and those Monday's re-rating and the morning switch
+  // put there. A run takes them one at a time, in order, up to the
   // routines' limit: start_queue_item marks one running (one at a time, whoever started the run), finish_queue_item marks
   // it done with the rating recorded or failed with why, and end_queue_run asks for another run when stocks still wait.
   const perRun = () => readSettings(root).routines.maxAnalyses;
@@ -283,14 +284,18 @@ export function registerDeskTools(server: McpServer, root: string): void {
 
   server.registerTool('read_queue', {
     title: 'The waiting list',
-    description: 'The stocks the person asked the desk to analyse from the dashboard: those waiting, in the order to run them, each with the depth asked, any being analysed now, and how many one run may analyse. /analyse with no ticker runs them. Read-only.',
+    description: 'The waiting list: the stocks the person asked the desk to analyse on the dashboard, and those Monday\'s re-rating and the morning switch put on it. It gives those waiting, in the order to run them, each with the depth asked, any being analysed now, and how many one run may analyse. /analyse with no ticker runs them. Read-only.',
     annotations: { readOnlyHint: true, openWorldHint: false },
   }, async () => act(() => {
     const list = readQueue(dir), waiting = waitingIn(list), running = list.find((i) => i.state === 'running');
     const lines: string[] = [];
     if (running) lines.push(`Being analysed now: ${running.symbol} (started ${running.startedAt?.slice(11, 16) ?? '?'} UTC). One stock runs at a time: if this run did not start it, stop and say so.`);
-    if (!waiting.length) lines.push('Nothing is waiting: the person has not asked for any analysis from the dashboard.');
-    else {
+    if (!waiting.length) {
+      const doneN = list.filter((i) => i.state === 'done').length, failedN = list.filter((i) => i.state === 'failed').length;
+      const kept = [doneN ? `${doneN} done` : '', failedN ? `${failedN} failed (the person presses Retry on the dashboard to ask again)` : ''].filter(Boolean).join(' and ');
+      lines.push(!list.length ? 'Nothing is waiting: the list is empty.'
+        : `Nothing ${running ? 'else ' : ''}is waiting.${kept ? ` The list also keeps finished analyses for the person to see, ${kept}: none of them needs a run.` : ''}`);
+    } else {
       lines.push(`${waiting.length} waiting, in the order to run them; one run analyses at most ${perRun()}:`);
       waiting.forEach((i, n) => lines.push(`${n + 1}. ${i.symbol}, depth ${depthWords(i.depth)}, asked ${i.requestedAt.slice(0, 16).replace('T', ' ')} UTC`));
       lines.push('For each, in order: start_queue_item, the analysis, then finish_queue_item. At the end, end_queue_run.');
@@ -306,7 +311,7 @@ export function registerDeskTools(server: McpServer, root: string): void {
   }, async (a) => queueAct(() => {
     if (ws().sweep) return `BUSY: a backtest sweep (${ws().sweep}) is running; the waiting list runs only on the live desk. Stop and say so.`;
     const sym = safeSymbol(a.symbol), d = today(), done = called(sym, d);
-    if (done) { finishItem(dir, sym, { rating: done.rating }); return `ALREADY: ${sym} was already called today (${done.rating}); it is marked done. Take the next.`; }
+    if (done) { finishItem(dir, sym, { rating: done.rating, already: true }); return `ALREADY: ${sym} was already called today (${done.rating}); it is marked done. Take the next.`; }
     const item = startItem(dir, sym, d);
     return `START: ${sym} is marked as being analysed. Plan it with analysis date ${d}, depth ${depthWords(item.depth)}. When its call is recorded, call finish_queue_item; if it cannot be finished, call finish_queue_item with failed_because.`;
   }));
@@ -318,11 +323,12 @@ export function registerDeskTools(server: McpServer, root: string): void {
     annotations: write,
   }, async (a) => queueAct(() => {
     const sym = safeSymbol(a.symbol);
-    if (a.failed_because) { finishItem(dir, sym, { reason: a.failed_because }); return `Marked failed: ${sym}. The person sees why on the dashboard and can press Retry.`; }
-    const item = readQueue(dir).find((i) => i.symbol === sym), call = called(sym, item?.date ?? today());
+    const item = readQueue(dir).find((i) => i.symbol === sym), late = item?.quiet ? ` It had read as failed, because nothing was saved for it for two hours; this run's word replaces that.` : '';
+    if (a.failed_because) { finishItem(dir, sym, { reason: a.failed_because }); return `Marked failed: ${sym}. The person sees why on the dashboard and can press Retry.${late}`; }
+    const call = called(sym, item?.date ?? today());
     if (!call) throw new Error(`no call for ${sym} on ${item?.date ?? today()} is recorded yet: call record_decision first, or pass failed_because`);
     finishItem(dir, sym, { rating: call.rating });
-    return `Marked done: ${sym}, ${call.rating}. The dashboard shows it.`;
+    return `Marked done: ${sym}, ${call.rating}. The dashboard shows it.${late}`;
   }));
 
   server.registerTool('end_queue_run', {

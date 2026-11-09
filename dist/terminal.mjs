@@ -20966,161 +20966,20 @@ ${e.reflection || e.decision.slice(0, 300) + (e.decision.length > 300 ? "..." : 
 };
 
 // src/desk/queue.ts
-import fs12 from "node:fs";
-import path11 from "node:path";
-var DEPTHS = { shallow: 1, medium: 3, deep: 5 };
-var isDepth = (v) => typeof v === "string" && Object.hasOwn(DEPTHS, v);
-var depthOfRounds = (rounds) => rounds >= 5 ? "deep" : rounds >= 3 ? "medium" : "shallow";
-var MAX_OPEN = 20;
-var MAX_FINISHED = 20;
-var STALE_MS2 = 2 * 60 * 6e4;
-var STALE_REASON = "the run did not finish (it stopped, or took over two hours): press Retry";
-var QueueRefusal = class extends Error {
-  constructor(code2, message) {
-    super(message);
-    this.code = code2;
-  }
-  code;
-};
-var queueFile = (dir) => path11.join(dir, "queue.json");
-var doorbellFile = (dir) => path11.join(dir, "doorbell.json");
-var listenerFile = (dir) => path11.join(dir, "listener.json");
-var iso = (v) => typeof v === "string" && v.length <= 40 && !Number.isNaN(Date.parse(v)) ? v : void 0;
-var day = (v) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : void 0;
-var words2 = (v, max) => {
-  const s = typeof v === "string" ? v.replace(/<[^>]*>/g, "").replace(/[<>]/g, "").replace(/\s+/g, " ").trim().slice(0, max) : "";
-  return s || void 0;
-};
-var STATES = ["waiting", "running", "done", "failed"];
-function itemOf(v) {
-  if (!v || typeof v !== "object" || Array.isArray(v)) return null;
-  const r = v;
-  let symbol;
-  try {
-    symbol = safeSymbol(String(r.symbol ?? ""));
-  } catch {
-    return null;
-  }
-  const requestedAt = iso(r.requestedAt);
-  if (!requestedAt) return null;
-  const state = STATES.includes(r.state) ? r.state : "waiting";
-  const out = { symbol, requestedAt, state };
-  if (isDepth(r.depth)) out.depth = r.depth;
-  const date4 = day(r.date), startedAt = iso(r.startedAt), endedAt = iso(r.endedAt), rating = words2(r.rating, 30), reason = words2(r.reason, 300);
-  if (date4) out.date = date4;
-  if (startedAt) out.startedAt = startedAt;
-  if (endedAt) out.endedAt = endedAt;
-  if (state === "done" && rating) out.rating = rating;
-  if (state === "failed") out.reason = reason ?? "no reason was given";
-  return out;
-}
-function settled(item, now, note) {
-  if (item.state !== "running") return item;
-  const last = note?.lastRun, started = Date.parse(item.startedAt ?? item.requestedAt);
-  if (last?.started && Date.parse(last.started) <= started && started <= Date.parse(last.at)) {
-    return { ...item, state: "failed", reason: words2(`${note.listener}'s run ended before this stock was finished: ${last.result}`, 300), endedAt: last.at };
-  }
-  return now.getTime() - started > STALE_MS2 ? { ...item, state: "failed", reason: STALE_REASON, endedAt: now.toISOString() } : item;
-}
-function load(dir, now) {
-  let raw = [];
-  try {
-    raw = JSON.parse(fs12.readFileSync(queueFile(dir), "utf8"));
-  } catch {
-  }
-  const seen = /* @__PURE__ */ new Set(), out = [], note = readListener(dir, now);
-  for (const v of Array.isArray(raw) ? raw : []) {
-    const item = itemOf(v);
-    if (!item || seen.has(item.symbol)) continue;
-    seen.add(item.symbol);
-    out.push(settled(item, now, note));
-  }
-  return out;
-}
-var open2 = (i) => i.state === "waiting" || i.state === "running";
-function trimmed(list3) {
-  const finished = list3.filter((i) => !open2(i)).sort((a, b) => (b.endedAt ?? "").localeCompare(a.endedAt ?? ""));
-  const keep3 = new Set(finished.slice(0, MAX_FINISHED));
-  return list3.filter((i) => open2(i) || keep3.has(i));
-}
-function change(dir, now, edit) {
-  const file4 = queueFile(dir);
-  fs12.mkdirSync(dir, { recursive: true });
-  return withLock(file4, () => {
-    const { list: list3, result } = edit(load(dir, now));
-    writeWhole(file4, JSON.stringify(trimmed(list3), null, 2) + "\n");
-    return result;
-  });
-}
-var readQueue = (dir, now = /* @__PURE__ */ new Date()) => load(dir, now);
-var waitingIn = (list3) => list3.filter((i) => i.state === "waiting");
-function enqueue(dir, raw, at, depth, now = /* @__PURE__ */ new Date()) {
-  const symbol = safeSymbol(raw);
-  return change(dir, now, (list3) => {
-    const was = list3.find((i) => i.symbol === symbol);
-    if (was?.state === "running") return { list: list3, result: list3 };
-    if (was?.state === "waiting") {
-      const next2 = list3.map((i) => i === was ? { ...i, ...depth ? { depth } : {} } : i);
-      return { list: next2, result: next2 };
-    }
-    const rest = list3.filter((i) => i !== was);
-    if (rest.filter(open2).length >= MAX_OPEN) throw new QueueRefusal("FULL", `${MAX_OPEN} analyses are already waiting: let them run first`);
-    const next = [...rest, { symbol, requestedAt: at, state: "waiting", ...depth ? { depth } : {} }];
-    return { list: next, result: next };
-  });
-}
-function dequeue(dir, raw, now = /* @__PURE__ */ new Date()) {
-  const symbol = safeSymbol(raw);
-  return change(dir, now, (list3) => {
-    if (list3.some((i) => i.symbol === symbol && i.state === "running")) throw new QueueRefusal("RUNNING", `${symbol} is being analysed now: it can be taken off once its run ends`);
-    const next = list3.filter((i) => i.symbol !== symbol);
-    return { list: next, result: next };
-  });
-}
-function ringDoorbell(dir, why, now = /* @__PURE__ */ new Date()) {
-  const bell = { at: now.toISOString(), waiting: waitingIn(readQueue(dir, now)).length, why };
-  fs12.mkdirSync(dir, { recursive: true });
-  writeWhole(doorbellFile(dir), JSON.stringify(bell, null, 2) + "\n");
-  return bell;
-}
-var LISTENER_FRESH_MS = 3 * 6e4;
-function readListener(dir, now = /* @__PURE__ */ new Date()) {
-  try {
-    const v = JSON.parse(fs12.readFileSync(listenerFile(dir), "utf8"));
-    const listener = words2(v.listener ?? v.listening, 40), since = iso(v.since), beat = iso(v.beat) ?? iso(v.checked) ?? since;
-    if (!listener || !since || !beat) return null;
-    const note = { listener, since, beat, fresh: now.getTime() - Date.parse(beat) <= LISTENER_FRESH_MS };
-    if (Number.isInteger(v.pid) && v.pid > 0) note.pid = v.pid;
-    const last = v.lastRun;
-    if (typeof last?.ended === "string") {
-      const began = iso(last.at), ended = iso(last.endedAt), how = { failed: "failed", stopped: "stopped" }[last.ended];
-      const result = words2([how, words2(last.result, 200)].filter(Boolean).join(": "), 200) ?? "finished";
-      if (began) note.lastRun = ended && Date.parse(began) <= Date.parse(ended) ? { started: began, at: ended, result } : { at: began, result, startOnly: true };
-    } else {
-      const lastAt = iso(last?.at), result = words2(last?.result, 200), started = iso(last?.started);
-      if (lastAt && result) note.lastRun = { ...started && Date.parse(started) <= Date.parse(lastAt) ? { started } : {}, at: lastAt, result };
-    }
-    return note;
-  } catch {
-    return null;
-  }
-}
-function removeListener(dir, pid) {
-  if (pid !== void 0 && readListener(dir)?.pid !== pid) return;
-  fs12.rmSync(listenerFile(dir), { force: true });
-}
-
-// src/desk/runs.ts
 import fs13 from "node:fs";
 import path12 from "node:path";
+
+// src/desk/runs.ts
+import fs12 from "node:fs";
+import path11 from "node:path";
 var SECTIONS = ["market", "sentiment", "news", "fundamentals", "fact_check", "bull", "bear", "research_plan", "trader", "aggressive", "conservative", "neutral", "decision"];
 var DEBATES = { investment_debate: ["bull", "bear"], risk_debate: ["aggressive", "conservative", "neutral"] };
 var TURNS = new Set(Object.values(DEBATES).flat());
-var folder = (dir, ticker, date4) => path12.join(dir, "runs", `${safeSymbol(ticker).replace(/\^/g, "IDX_").replace(/=/g, "_EQ_")}_${date4}`);
-var runFile = (dir, ticker, date4) => path12.join(folder(dir, ticker, date4), "run.json");
-function load2(dir, ticker, date4) {
+var folder = (dir, ticker, date4) => path11.join(dir, "runs", `${safeSymbol(ticker).replace(/\^/g, "IDX_").replace(/=/g, "_EQ_")}_${date4}`);
+var runFile = (dir, ticker, date4) => path11.join(folder(dir, ticker, date4), "run.json");
+function load(dir, ticker, date4) {
   try {
-    return JSON.parse(fs13.readFileSync(runFile(dir, ticker, date4), "utf8"));
+    return JSON.parse(fs12.readFileSync(runFile(dir, ticker, date4), "utf8"));
   } catch {
     return { ticker: safeSymbol(ticker), date: date4, startedAt: (/* @__PURE__ */ new Date()).toISOString(), log: [] };
   }
@@ -21128,10 +20987,20 @@ function load2(dir, ticker, date4) {
 var isSection = (s) => SECTIONS.includes(s);
 function progress(dir, ticker, date4) {
   const out = {};
-  for (const e of load2(dir, ticker, date4).log) out[e.section] = (out[e.section] ?? 0) + 1;
+  for (const e of load(dir, ticker, date4).log) out[e.section] = (out[e.section] ?? 0) + 1;
   return out;
 }
-var savedPlan = (dir, ticker, date4) => load2(dir, ticker, date4).plan;
+var savedPlan = (dir, ticker, date4) => load(dir, ticker, date4).plan;
+function lastSaved(dir, ticker, date4) {
+  let latest = null;
+  for (const file4 of [runFile(dir, ticker, date4), path11.join(folder(dir, ticker, date4), "complete_report.md")]) {
+    try {
+      latest = Math.max(latest ?? 0, fs12.statSync(file4).mtimeMs);
+    } catch {
+    }
+  }
+  return latest;
+}
 function stepWords(dir, ticker, date4) {
   const plan = savedPlan(dir, ticker, date4);
   const steps = Array.isArray(plan?.steps) ? plan.steps.filter((s) => isSection(String(s.section)) && Number.isInteger(s.turn)) : [];
@@ -21165,10 +21034,161 @@ function stepWords(dir, ticker, date4) {
 }
 function sectionsOf(dir, ticker, date4) {
   const out = {};
-  for (const e of load2(dir, ticker, date4).log) (out[e.section] ??= []).push(e.text);
+  for (const e of load(dir, ticker, date4).log) (out[e.section] ??= []).push(e.text);
   return out;
 }
-var hasReport = (dir, ticker, date4) => fs13.existsSync(path12.join(folder(dir, ticker, date4), "complete_report.md"));
+var hasReport = (dir, ticker, date4) => fs12.existsSync(path11.join(folder(dir, ticker, date4), "complete_report.md"));
+
+// src/desk/queue.ts
+var DEPTHS = { shallow: 1, medium: 3, deep: 5 };
+var isDepth = (v) => typeof v === "string" && Object.hasOwn(DEPTHS, v);
+var depthOfRounds = (rounds) => rounds >= 5 ? "deep" : rounds >= 3 ? "medium" : "shallow";
+var MAX_OPEN = 20;
+var MAX_FINISHED = 20;
+var QUIET_MS = 2 * 60 * 6e4;
+var QUIET_REASON = "nothing was saved for this analysis for two hours, so its run has most likely stopped: press Retry. If it was still going, it shows done once its call is recorded";
+var QueueRefusal = class extends Error {
+  constructor(code2, message) {
+    super(message);
+    this.code = code2;
+  }
+  code;
+};
+var queueFile = (dir) => path12.join(dir, "queue.json");
+var doorbellFile = (dir) => path12.join(dir, "doorbell.json");
+var listenerFile = (dir) => path12.join(dir, "listener.json");
+var iso = (v) => typeof v === "string" && v.length <= 40 && !Number.isNaN(Date.parse(v)) ? v : void 0;
+var day = (v) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : void 0;
+var words2 = (v, max) => {
+  const s = typeof v === "string" ? v.replace(/<[^>]*>/g, "").replace(/[<>]/g, "").replace(/\s+/g, " ").trim().slice(0, max) : "";
+  return s || void 0;
+};
+var STATES = ["waiting", "running", "done", "failed"];
+function itemOf(v) {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+  const r = v;
+  let symbol;
+  try {
+    symbol = safeSymbol(String(r.symbol ?? ""));
+  } catch {
+    return null;
+  }
+  const requestedAt = iso(r.requestedAt);
+  if (!requestedAt) return null;
+  const state = STATES.includes(r.state) ? r.state : "waiting";
+  const out = { symbol, requestedAt, state };
+  if (isDepth(r.depth)) out.depth = r.depth;
+  const date4 = day(r.date), startedAt = iso(r.startedAt), endedAt = iso(r.endedAt), rating = words2(r.rating, 30), reason = words2(r.reason, 300);
+  if (date4) out.date = date4;
+  if (startedAt) out.startedAt = startedAt;
+  if (endedAt) out.endedAt = endedAt;
+  if (state === "done" && rating) out.rating = rating;
+  if (state === "done" && r.already === true) out.already = true;
+  if (state === "failed") out.reason = reason ?? "no reason was given";
+  if (state === "failed" && r.quiet === true) out.quiet = true;
+  return out;
+}
+function lastSignOf(dir, item) {
+  const started = Date.parse(item.startedAt ?? item.requestedAt);
+  const saved = item.date ? lastSaved(dir, item.symbol, item.date) : null;
+  return Math.max(started, saved ?? 0);
+}
+function settled(dir, item, now, note) {
+  if (item.state !== "running") return item;
+  const last = note?.lastRun, started = Date.parse(item.startedAt ?? item.requestedAt);
+  if (last?.started && Date.parse(last.started) <= started && started <= Date.parse(last.at)) {
+    return { ...item, state: "failed", reason: words2(`${note.listener}'s run ended before this stock was finished: ${last.result}`, 300), endedAt: last.at };
+  }
+  const sign = lastSignOf(dir, item);
+  return now.getTime() - sign > QUIET_MS ? { ...item, state: "failed", reason: QUIET_REASON, quiet: true, endedAt: new Date(sign + QUIET_MS).toISOString() } : item;
+}
+function load2(dir, now) {
+  let raw = [];
+  try {
+    raw = JSON.parse(fs13.readFileSync(queueFile(dir), "utf8"));
+  } catch {
+  }
+  const seen = /* @__PURE__ */ new Set(), out = [], note = readListener(dir, now);
+  for (const v of Array.isArray(raw) ? raw : []) {
+    const item = itemOf(v);
+    if (!item || seen.has(item.symbol)) continue;
+    seen.add(item.symbol);
+    out.push(settled(dir, item, now, note));
+  }
+  return out;
+}
+var open2 = (i) => i.state === "waiting" || i.state === "running";
+function trimmed(list3) {
+  const finished = list3.filter((i) => !open2(i)).sort((a, b) => (b.endedAt ?? "").localeCompare(a.endedAt ?? ""));
+  const keep3 = new Set(finished.slice(0, MAX_FINISHED));
+  return list3.filter((i) => open2(i) || keep3.has(i));
+}
+function change(dir, now, edit) {
+  const file4 = queueFile(dir);
+  fs13.mkdirSync(dir, { recursive: true });
+  return withLock(file4, () => {
+    const { list: list3, result } = edit(load2(dir, now));
+    writeWhole(file4, JSON.stringify(trimmed(list3), null, 2) + "\n");
+    return result;
+  });
+}
+var readQueue = (dir, now = /* @__PURE__ */ new Date()) => load2(dir, now);
+var waitingIn = (list3) => list3.filter((i) => i.state === "waiting");
+function enqueue(dir, raw, at, depth, now = /* @__PURE__ */ new Date()) {
+  const symbol = safeSymbol(raw);
+  return change(dir, now, (list3) => {
+    const was = list3.find((i) => i.symbol === symbol);
+    if (was?.state === "running") return { list: list3, result: list3 };
+    if (was?.state === "waiting") {
+      const next2 = list3.map((i) => i === was ? { ...i, ...depth ? { depth } : {} } : i);
+      return { list: next2, result: next2 };
+    }
+    const rest = list3.filter((i) => i !== was);
+    if (rest.filter(open2).length >= MAX_OPEN) throw new QueueRefusal("FULL", `${MAX_OPEN} analyses are already waiting: let them run first`);
+    const next = [...rest, { symbol, requestedAt: at, state: "waiting", ...depth ? { depth } : {} }];
+    return { list: next, result: next };
+  });
+}
+function dequeue(dir, raw, now = /* @__PURE__ */ new Date()) {
+  const symbol = safeSymbol(raw);
+  return change(dir, now, (list3) => {
+    if (list3.some((i) => i.symbol === symbol && i.state === "running")) throw new QueueRefusal("RUNNING", `${symbol} is being analysed now: it can be taken off once its run ends`);
+    const next = list3.filter((i) => i.symbol !== symbol);
+    return { list: next, result: next };
+  });
+}
+function ringDoorbell(dir, why, now = /* @__PURE__ */ new Date()) {
+  const bell = { at: now.toISOString(), waiting: waitingIn(readQueue(dir, now)).length, why };
+  fs13.mkdirSync(dir, { recursive: true });
+  writeWhole(doorbellFile(dir), JSON.stringify(bell, null, 2) + "\n");
+  return bell;
+}
+var LISTENER_FRESH_MS = 3 * 6e4;
+function readListener(dir, now = /* @__PURE__ */ new Date()) {
+  try {
+    const v = JSON.parse(fs13.readFileSync(listenerFile(dir), "utf8"));
+    const listener = words2(v.listener ?? v.listening, 40), since = iso(v.since), beat = iso(v.beat) ?? iso(v.checked) ?? since;
+    if (!listener || !since || !beat) return null;
+    const note = { listener, since, beat, fresh: now.getTime() - Date.parse(beat) <= LISTENER_FRESH_MS };
+    if (Number.isInteger(v.pid) && v.pid > 0) note.pid = v.pid;
+    const last = v.lastRun;
+    if (typeof last?.ended === "string") {
+      const began = iso(last.at), ended = iso(last.endedAt), how = { failed: "failed", stopped: "stopped" }[last.ended];
+      const result = words2([how, words2(last.result, 200)].filter(Boolean).join(": "), 200) ?? "finished";
+      if (began) note.lastRun = ended && Date.parse(began) <= Date.parse(ended) ? { started: began, at: ended, result } : { at: began, result, startOnly: true };
+    } else {
+      const lastAt = iso(last?.at), result = words2(last?.result, 200), started = iso(last?.started);
+      if (lastAt && result) note.lastRun = { ...started && Date.parse(started) <= Date.parse(lastAt) ? { started } : {}, at: lastAt, result };
+    }
+    return note;
+  } catch {
+    return null;
+  }
+}
+function removeListener(dir, pid) {
+  if (pid !== void 0 && readListener(dir)?.pid !== pid) return;
+  fs13.rmSync(listenerFile(dir), { force: true });
+}
 
 // src/desk/care.ts
 var RERATE_DAYS = 7;

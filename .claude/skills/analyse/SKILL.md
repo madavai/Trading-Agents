@@ -26,7 +26,7 @@ Call `plan_analysis` with the ticker, date, and any rounds, analysts or language
 - **INPUT_ERROR**: tell the person what to correct and stop.
 - **Otherwise**: keep the plan. It lists the steps, marks any already done (a run that stopped is resumed), and gives the manager model. It also shows the holdings and the lessons it saved with the run: the agents read those from the desk themselves, so never copy them into a request.
 
-Tell the person in two lines what will run: the analysts, the rounds, the language, and that it takes a few minutes.
+Tell the person in two lines what will run: the analysts, the rounds, the language, and how long it can take: in the desk's first real runs, about 40 minutes at shallow depth and up to about 3 hours at medium; deep runs more rounds, so longer.
 
 If the plan starts with a line naming a backtest sweep, and you were not asked to run one by the /backtest skill, an earlier sweep was left running: call `end_backtest`, then plan again, so this analysis goes into the live journal.
 

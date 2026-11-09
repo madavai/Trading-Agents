@@ -57,7 +57,7 @@ Call `plan_analysis` with the ticker, date, and any rounds, analysts or language
 - **INPUT_ERROR**: tell the person what to correct and stop.
 - **Otherwise**: keep the plan. It lists the steps, marks any already done (a run that stopped is resumed), and gives the manager model. It also shows the holdings and the lessons it saved with the run: the agents read those from the desk themselves, so never copy them into a request.
 
-Tell the person in two lines what will run: the analysts, the rounds, the language, and that it takes a few minutes.
+Tell the person in two lines what will run: the analysts, the rounds, the language, and how long it can take: in the desk's first real runs, about 40 minutes at shallow depth and up to about 3 hours at medium; deep runs more rounds, so longer.
 
 If the plan starts with a line naming a backtest sweep, and you were not asked to run one by the /backtest skill, an earlier sweep was left running: call `end_backtest`, then plan again, so this analysis goes into the live journal.
 
@@ -162,7 +162,7 @@ One analysis gives one decision, which cannot tell whether the desk decides well
 Call `start_backtest`.
 - **NEEDS_EMAIL**: ask the person for their own email as /analyse does, save it with `set_contact_email`, and call again.
 - **INPUT_ERROR**: tell the person what to correct and stop.
-- Otherwise, **tell the person before running anything**: the number of cells (a stock on a date), that each cell is a full team run that takes minutes and a real amount of model use, and the limits it reports (for a past date, only prices, indicators, economic figures and SEC accounts are as known then; news, posts, odds, profile and insider trades are recent-only, so those reads are thin or unavailable and say so). If there are more than 3 cells, **ask whether to go ahead and wait for a yes**; on a no, call `end_backtest`.
+- Otherwise, **tell the person before running anything**: the number of cells (a stock on a date), that each cell is a full team run (in the desk's first real runs, about 40 minutes at shallow depth and up to about 3 hours at medium) and a real amount of model use, and the limits it reports (for a past date, only prices, indicators, economic figures and SEC accounts are as known then; news, posts, odds, profile and insider trades are recent-only, so those reads are thin or unavailable and say so). If there are more than 3 cells, **ask whether to go ahead and wait for a yes**; on a no, call `end_backtest`.
 - To resume an interrupted sweep, call `start_backtest` again with the same `sweep_id` and the same stocks and dates: cells already recorded are skipped.
 
 ### 3. Run the cells
@@ -181,7 +181,7 @@ For each cell still to run, one at a time, in the order listed: run the /analyse
 
 ## Check this computer
 
-1. Call `desk_check` with team_version "a48980ff" (the version of these steps, so the desk can tell whether this conversation began before the desk was updated). If the tool is missing, this folder's tools did not start: tell the person to check that Madav may use this folder's tools and that Node 22 or later is installed, then stop.
+1. Call `desk_check` with team_version "446fc181" (the version of these steps, so the desk can tell whether this conversation began before the desk was updated). If the tool is missing, this folder's tools did not start: tell the person to check that Madav may use this folder's tools and that Node 22 or later is installed, then stop.
 2. Call `get_verified_snapshot` for SPY with today's date, to prove the price data works end to end; if it answers DATA_UNAVAILABLE or NO_DATA_AVAILABLE, say so and give its reason.
 3. If no contact email is saved, ask the person for their own (the SEC asks every program that reads its filings for one; it stays in this folder and is sent to the SEC alone) and save exactly what they give with `set_contact_email`. Never invent, guess or reuse an address.
 4. Tell the person in a short plain list what is ready, what is not, and what to do about each. If the check starts with DESK UPDATED, or says this conversation's steps for the team are not the ones in this folder, say that first, in one line: this conversation began before the desk was updated, so they should start a new conversation in Madav and check this computer there. Offer no reset in this conversation. Otherwise, if the check says the desk's agent files differ from the project's version, say which, and offer to reset the team (below).

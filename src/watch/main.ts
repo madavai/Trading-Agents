@@ -9,7 +9,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { deskDataDir } from '../paths.js';
 import { findClaude, runClaude, stopReason } from './claude.js';
-import { AlreadyListening, watch } from './watcher.js';
+import { AlreadyListening, stopWhy, watch } from './watcher.js';
 
 const root = process.cwd(), dir = deskDataDir(root), logFile = path.join(dir, 'watcher.log');
 // Its own code: when an update changes it, it hands over to a fresh copy between runs, never during one.
@@ -37,12 +37,12 @@ let w;
 try {
   w = watch({
     dir, listener: 'Claude Code', retire: () => print() !== born,
-    run: async () => {
+    run: async (start) => {
       log(`\n=== ${new Date().toISOString()} a run of the waiting list starts ===\n`);
       let said = '';   // its last words, for why it stopped
-      const r = await runClaude(claude, root, (t) => { log(t); said = (said + t).slice(-8000); });
-      log(`\n=== ${new Date().toISOString()} the run ended${r.timedOut ? ' (stopped after three hours)' : ''}, code ${r.code ?? 'none'} ===\n`);
-      if (r.timedOut) return 'the run took over three hours and was stopped: press Retry';
+      const r = await runClaude(claude, root, (t) => { log(t); said = (said + t).slice(-8000); }, { stopIf: () => stopWhy(dir, start) });
+      log(`\n=== ${new Date().toISOString()} the run ended${r.stopped ? ` (stopped: ${r.stopped})` : ''}, code ${r.code ?? 'none'} ===\n`);
+      if (r.stopped) return r.stopped;
       if (r.code === 0) return undefined;
       return stopReason(said) ?? 'Claude Code stopped before the run was finished (its words are in desk-data/watcher.log): press Retry';
     },

@@ -124,6 +124,17 @@ export function progress(dir: string, ticker: string, date: string): Record<stri
 
 export const savedPlan = (dir: string, ticker: string, date: string): unknown => load(dir, ticker, date).plan;
 
+/** When this run last saved anything (its plan, a step, a correction, its finished report), in milliseconds, or null
+ *  when it has saved nothing yet. Every save rewrites the file whole, so its time is the run's latest sign of work,
+ *  whatever program runs the agents. */
+export function lastSaved(dir: string, ticker: string, date: string): number | null {
+  let latest: number | null = null;
+  for (const file of [runFile(dir, ticker, date), path.join(folder(dir, ticker, date), 'complete_report.md')]) {
+    try { latest = Math.max(latest ?? 0, fs.statSync(file).mtimeMs); } catch { /* not written yet */ }
+  }
+  return latest;
+}
+
 /** Where a run stands, in a few plain words for the dashboard: its next unfinished step, from its plan and what is saved. */
 export function stepWords(dir: string, ticker: string, date: string): string {
   const plan = savedPlan(dir, ticker, date) as { steps?: Array<{ section?: unknown; turn?: unknown }>; debateRounds?: unknown; riskRounds?: unknown } | undefined;

@@ -97,10 +97,11 @@ function rerateLines(dir: string, today: string): string[] {
   if (!held.positions.length) return ['', `${head}: nothing is held, so there is nothing to re-rate.`];
   const out = [''], names = due.map((s) => s.symbol).join(', '), are = due.length === 1 ? 'is' : 'are';
   if (done.length) out.push(`${head}: ${done.map((s) => `${s.symbol} (${lastView(s)})`).join(', ')} ${done.length === 1 ? 'was' : 'were'} put on the waiting list at shallow depth, for a view under ${RERATE_DAYS} days old (at most ${RERATE_MAX} a week). ${done.length === 1 ? 'It is' : 'They are'} analysed in step 2 with the rest of the list.`);
-  else if (due.length && ran) out.push(`${head}: ${names} ${are} due, but the waiting list is full, so nothing went on it. Say so at the end.`);
+  else if (due.length && ran && r.full) out.push(`${head}: ${names} ${are} due, but the waiting list was full, so nothing went on it. Say so at the end.`);
+  else if (due.length && ran) out.push(`${head}: ${names} ${are} due now, but the re-rating ran earlier today, when ${due.length === 1 ? 'it was' : 'they were'} not due, and it runs once a week: left for next week's re-rating. Say so at the end.`);
   else if (due.length) out.push(`${head}: ${names} ${are} due, but the re-rating could not put ${due.length === 1 ? 'it' : 'them'} on the waiting list today. Say so at the end.`);
   else out.push(`${head}: each has a view under ${RERATE_DAYS} days old, or is already on the waiting list. Nothing to re-rate.`);
-  if (done.length && due.length) out.push(`   Due as well, left for next week's re-rating: ${due.map((s) => s.symbol).join(', ')}.`);
+  if (done.length && due.length) out.push(`   Due as well, left for next week's re-rating${r?.full ? ' (the waiting list was full)' : ''}: ${due.map((s) => s.symbol).join(', ')}.`);
   return out;
 }
 
@@ -137,9 +138,12 @@ export function morningBrief(dir: string, today: string, max: number, look?: Mor
     m.analyse.forEach((a, i) => lines.push(`   ${i + 1}. ${a.symbol} (${a.why})`));
     if (m.analyse.some((a) => a.queued)) lines.push('   A stock asked for on the dashboard is run as the /analyse playbook\'s waiting list says: start_queue_item first (it gives the depth), finish_queue_item once its call is recorded or with why it failed. A starred stock uses the settings\' depth.');
   }
-  if (m.later.length) lines.push(`   Left for another morning, over the limit of ${max}: ${m.later.join(', ')}.`);
+  const waitingNow = new Set(readQueue(dir).filter((q) => q.state === 'waiting').map((q) => q.symbol));
+  const laterWaiting = m.later.filter((s) => waitingNow.has(s)), laterStarred = m.later.filter((s) => !waitingNow.has(s));
+  if (laterWaiting.length) lines.push(`   Over the limit of ${max}, still waiting on the dashboard: ${laterWaiting.join(', ')}. Not left for another morning: end_queue_run asks for another run, which starts at once when something listens on this computer.`);
+  if (laterStarred.length) lines.push(`   Left for another morning, over the limit of ${max}: ${laterStarred.join(', ')}.`);
   if (m.calledToday.length) lines.push(`   Already called today, so not analysed again: ${m.calledToday.join(', ')}.`);
-  if (m.analyse.some((a) => a.queued) || m.later.length) lines.push('   Last, call end_queue_run once: stocks still waiting on the dashboard get another run.');
+  if (m.analyse.some((a) => a.queued) || laterWaiting.length) lines.push('   Last, call end_queue_run once: it asks for another run when stocks are still waiting on the dashboard.');
   lines.push('', `3. ${holdingsLine(dir)}`);
   lines.push('', '4. Finish with a short plain list: each new call (stock, rating, one sentence of its executive summary; for a re-rated holding, its new rating beside its last one), anything skipped and why, and any data that was unavailable. Then: decide on the dashboard ("Decide…" on a call); only the person\'s own Confirm there places an order. A Sell or Underweight on a holding of the Agentic account shows there as "the desk says sell", with a Sell button that opens a ticket: nothing is ever sold by itself. Not investment advice.');
   lines.push('', 'No one may be watching: do not wait for an answer. If a step needs the person (for example no contact email is saved), skip what depends on it and say so at the end.');

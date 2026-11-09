@@ -157,10 +157,15 @@ built, which decisions stand, every document, and what is pending.
 - `src/desk/queue.ts` - the analyses asked for on the dashboard, and the contract with whatever runs the agents. Three
   files in `desk-data`, each read field by field as data from another program:
   - `queue.json`: `[{ symbol, requestedAt, depth?: "shallow"|"medium"|"deep", state: "waiting"|"running"|"done"|"failed",
-    date?, startedAt?, endedAt?, rating?, reason? }]`. The dashboard adds (and takes off what is not running); the desk
-    tools `start_queue_item`, `finish_queue_item` and `end_queue_run` mark the rest. One stock runs at a time; one left
-    running for two hours reads as failed. `plan_analysis` plans a stock running from the list at its `depth` (no depth:
-    the settings'), whatever rounds the lead asks for, and says so in the plan's notes.
+    date?, startedAt?, endedAt?, rating?, reason?, quiet?: true, already?: true }]`. The dashboard adds (and takes off
+    what is not running); the desk tools `start_queue_item`, `finish_queue_item` and `end_queue_run` mark the rest
+    (`already`: done because it was called earlier that day, not analysed again). One stock runs at a time. A running
+    stock with nothing saved for `QUIET_MS` (two hours: since it started, or since its run record, `runs.ts`
+    `lastSaved`, last changed; `lastSignOf`) reads as failed with `QUIET_REASON` and `quiet`, however long it has run:
+    an analysis still saving its steps is never failed. That is the desk's guess, so `finishItem` still lets its own
+    run finish it (done when its call is recorded, or failed in its words); any other finished stock stays finished.
+    `plan_analysis` plans a stock running from the list at its `depth` (no depth: the settings'), whatever rounds the
+    lead asks for, and says so in the plan's notes.
   - `doorbell.json`: `{ at, waiting, why: "press"|"more" }`, written when the person presses Analyse, Retry or Run now,
     and by `end_queue_run` when stocks still wait. A runner starts a run when `at` changes, and never because the
     waiting list changed.
@@ -168,16 +173,21 @@ built, which decisions stand, every document, and what is pending.
     `beat` renewed at least once a minute (older than three minutes: not believed). The dashboard says who listens from
     it. `lastRun` is the last run: when it started and ended, and what it did or why it stopped, in plain words. With
     `started`, a stock that run left running reads as failed at once, with the listener's words as its reason (without
-    it, only after two hours). Madav's routine writes the same note in its own words, which `readListener` reads too:
+    it, only by the quiet rule). Madav's routine writes the same note in its own words, which `readListener` reads too:
     `{ listening, routine, since, checked, running, lastRun?: { at, ended: "finished"|"failed"|"stopped", endedAt?,
     result } }`, where `checked` is the heartbeat and `lastRun.at` is when the run started (`endedAt`, when given,
     when it ended).
 - `src/watch/` - the desk's own listener for Claude Code (`node dist/watch.mjs`): `watcher.ts` keeps the contract above
   (a short wait so several presses make one run, one run at a time with at most one owed, no run when nothing waits,
-  stopping when its note is taken away, and making way for an update between runs); `claude.ts` finds Claude Code
-  without a shell and runs it with the fixed words and options in `RUN_ARGS`, never from a project file, and
-  `stopReason` turns its last words, when it stops early, into the stock's reason (its usage limit and when it resets,
-  a sign-in, no credit, a busy service); `main.ts` is the program, logging to `desk-data/watcher.log`.
+  stopping when its note is taken away, and making way for an update between runs; after a run, its own words go
+  beside each stock it started and left unfinished, also one the quiet rule already read as failed; its last run's
+  `result` counts `already` stocks apart from those analysed). `stopWhy` is when it stops a run: nothing saved for
+  `QUIET_MS` by the stocks this run started (or since it began), or one stock analysed for `STOCK_MAX_MS` (six hours,
+  in case the team goes round in a loop); a long run that keeps saving goes on, however many stocks it takes.
+  `claude.ts` finds Claude Code without a shell and runs it with the fixed words and options in `RUN_ARGS`, never from a
+  project file, asking `stopIf` (`stopWhy`) each minute, and `stopReason` turns its last words, when it stops early,
+  into the stock's reason (its usage limit and when it resets, a sign-in, no credit, a busy service); `main.ts` is the
+  program, logging to `desk-data/watcher.log`.
 - `src/desk/routine.ts` - the morning and evening briefs the routines run from (desk tool `routine_brief`, skill
   `/routine`, the team's playbook); `src/desk/orders.ts` - the dashboard's log of the orders it sent.
 - `src/desk/care.ts` - care for what is held, and it never sells. `viewOf` is a holding's latest call and its age;
@@ -188,9 +198,10 @@ built, which decisions stand, every document, and what is pending.
   whether a ticket can open, the shortest hold); `watched` holds each stop against Yahoo Finance's price (the dashboard's
   `/api/care`; the page draws what it is sent and tells a new fall below a stop once). `rerateWeekly` is the week's
   re-rating from `routine_brief`, on its first market day (`isRerateDay`: a Monday, or the Tuesday after a Monday
-  holiday): up to three of the holdings the desk sizes trades to (`holdings.ts` positions), with no
-  view or one a week old, the stalest first, go on the waiting list at shallow depth, once that week
-  (`desk-data/rerate.json`), with no doorbell. A coin held is named as the desk calls it (BTC as BTC-USD), also in what
+  holiday): up to three of the holdings the desk sizes trades to (`holdings.ts` positions), with no view or one a week
+  old, the stalest first, go on the waiting list at shallow depth, once that week (`desk-data/rerate.json`, with `full`
+  when the waiting list refused one, so the brief says the true reason), with no doorbell. A coin held is named as the
+  desk calls it (BTC as BTC-USD), also in what
   the agents see.
 - `src/desk/screen.ts` - "Worth a look today": `signalsOf` reads a symbol's daily rows into plain signals (a move of 3%
   or more, volume twice its 20-day average, a 52-week high or low by the calendar, a close across the 50- or 200-day
