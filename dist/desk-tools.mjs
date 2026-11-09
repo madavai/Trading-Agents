@@ -37383,6 +37383,10 @@ function window(start, end, analysis2) {
 var FOREX = /* @__PURE__ */ new Set(["USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD", "CNY", "CNH", "HKD", "SGD", "SEK", "NOK", "DKK", "PLN", "MXN", "ZAR", "TRY", "INR", "KRW", "BRL", "RUB", "THB"]);
 var CRYPTO_BASES = /* @__PURE__ */ new Set(["BTC", "ETH", "SOL", "XRP", "ADA", "DOGE", "LTC", "BCH", "DOT", "AVAX", "LINK"]);
 var CRYPTO_QUOTES = ["USDT", "USDC", "USD"];
+var NOT_COINS = /* @__PURE__ */ new Set([...FOREX, "XAU", "XAG", "XPT", "XPD"]);
+var COIN_PAIR = /^([A-Z0-9]{1,15})-(USDT|USDC|USD)$/;
+var SHARE_CLASS = /^([A-Z]{1,5})\.([A-Z])$/;
+var ONE_LETTER_EXCHANGES = /* @__PURE__ */ new Set(["T", "L", "V", "F"]);
 var ALIASES = {
   XAUUSD: "GC=F",
   XAU: "GC=F",
@@ -37394,7 +37398,6 @@ var ALIASES = {
   XPDUSD: "PA=F",
   WTICOUSD: "CL=F",
   USOIL: "CL=F",
-  WTI: "CL=F",
   BCOUSD: "BZ=F",
   UKOIL: "BZ=F",
   BRENT: "BZ=F",
@@ -37422,7 +37425,10 @@ var ALIASES = {
   HK50: "^HSI"
 };
 function cryptoBase(raw) {
-  const compact = raw.trim().toUpperCase().replace(/\+$/, "").replaceAll("-", "");
+  const s = raw.trim().toUpperCase().replace(/\+$/, "");
+  const pair = COIN_PAIR.exec(s);
+  if (pair) return /[A-Z]/.test(pair[1]) && !NOT_COINS.has(pair[1]) ? pair[1] : null;
+  const compact = s.replaceAll("-", "");
   for (const q of CRYPTO_QUOTES) {
     if (compact.endsWith(q)) {
       const base = compact.slice(0, -q.length);
@@ -37431,6 +37437,10 @@ function cryptoBase(raw) {
   }
   return null;
 }
+var yahooClass = (s) => {
+  const m2 = SHARE_CLASS.exec(s);
+  return m2 && !ONE_LETTER_EXCHANGES.has(m2[2]) ? `${m2[1]}-${m2[2]}` : s;
+};
 function normalizeSymbol(raw) {
   const s = raw.trim().toUpperCase().replace(/\+$/, "");
   if (!s) return s;
@@ -37442,9 +37452,13 @@ function normalizeSymbol(raw) {
   if (hk) return `${String(Number(hk[1])).padStart(4, "0")}.HK`;
   const sh = /^(\d{6})\.SH$/.exec(s);
   if (sh) return `${sh[1]}.SS`;
-  return s;
+  return yahooClass(s);
 }
 var isCrypto = (raw) => cryptoBase(raw) !== null;
+function deskSymbol(symbol4, kind) {
+  const s = symbol4.trim().toUpperCase();
+  return kind === "crypto" ? `${cryptoBase(s) ?? s}-USD` : yahooClass(s);
+}
 function safeSymbol(raw) {
   const s = normalizeSymbol(raw);
   if (!/^[A-Z0-9.\-=^]{1,20}$/.test(s)) throw new Error(`"${raw}" is not a ticker symbol this desk can look up`);
@@ -39419,9 +39433,10 @@ function forgetHoldings(dir) {
 }
 var n = (v) => v.toLocaleString("en-US", { maximumSignificantDigits: 4 });
 var m = (v) => v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+var holdingOf = (positions, ticker) => positions.find((p) => deskSymbol(p.ticker, "stock") === deskSymbol(ticker, "stock"));
 function renderAccounts(h, ticker) {
   const lines = (h.accounts ?? []).map((a) => {
-    const held = a.positions.find((p) => p.ticker === ticker), others = a.positions.filter((p) => p !== held), cur = a.currency ? ` ${a.currency}` : "";
+    const held = holdingOf(a.positions, ticker), others = a.positions.filter((p) => p !== held), cur = a.currency ? ` ${a.currency}` : "";
     const parts = [held ? `position in ${ticker}: ${n(held.quantity)} units${held.averagePrice ? `, average price ${m(held.averagePrice)}` : ""}` : `no position in ${ticker}`];
     if (a.cash !== void 0) parts.push(`cash ${m(a.cash)}${cur}`);
     if (a.buyingPower !== void 0) parts.push(`buying power ${m(a.buyingPower)}${cur}`);
@@ -39436,7 +39451,7 @@ var BACKTEST_HOLDINGS = "Portfolio context: not used in a backtest. A backtest j
 function renderHoldings(h, ticker) {
   if (h?.accounts?.length) return renderAccounts(h, ticker);
   if (!h) return NO_HOLDINGS;
-  const held = h.positions.find((p) => p.ticker === ticker);
+  const held = holdingOf(h.positions, ticker);
   const lines = [held ? `- Current position in ${ticker}: ${n(held.quantity)} units${held.averagePrice ? `, average price ${m(held.averagePrice)}` : ""}` : `- No current position in ${ticker}`];
   if (h.cash !== void 0) lines.push(`- Cash available: ${m(h.cash)}${h.currency ? ` ${h.currency}` : ""}`);
   const others = h.positions.filter((p) => p !== held);
@@ -39458,10 +39473,17 @@ function yardstickFor(ticker, s) {
   if (suffix) return { yardstick: normalizeSymbol(s.benchmarks[suffix]), basis: "market" };
   return { yardstick: normalizeSymbol(s.benchmarks[""] ?? "SPY"), basis: isCrypto(sym2) ? "coin" : exchangeOf(sym2) ? "unlisted" : "us" };
 }
+var SAME_INDEX = [["SPY", "VOO", "IVV"]];
+var copiesOf = (yardstick) => (SAME_INDEX.find((g) => g.includes(yardstick)) ?? []).filter((x) => x !== yardstick);
+var isOwnYardstick = (ticker, yardstick) => {
+  const sym2 = normalizeSymbol(ticker);
+  return sym2 === yardstick || copiesOf(yardstick).includes(sym2);
+};
 function rulesFor(ticker, s) {
-  const coin = isCrypto(ticker);
-  return { days: coin ? coinDays(s.holdingPeriodDays) : s.holdingPeriodDays, unit: coin ? "calendar" : "trading", ...yardstickFor(ticker, s) };
+  const coin = isCrypto(ticker), y = yardstickFor(ticker, s);
+  return { days: coin ? coinDays(s.holdingPeriodDays) : s.holdingPeriodDays, unit: coin ? "calendar" : "trading", yardstick: y.yardstick, basis: isOwnYardstick(ticker, y.yardstick) ? "same" : y.basis };
 }
+var ownReturn = (r) => r.basis === "same";
 function legacyRules(ticker, s, holding) {
   const kept = Number(/^(\d+)d$/.exec(holding ?? "")?.[1]);
   return { days: kept > 0 ? kept : s.holdingPeriodDays, unit: isCrypto(ticker) ? "calendar" : "trading", ...yardstickFor(ticker, s) };
@@ -39483,13 +39505,17 @@ function basisWords(ticker, r) {
       return `the index the desk's settings give its exchange${ex ? `, ${ex}` : ""}`;
     case "chosen":
       return "the one yardstick the desk's settings set for every call";
+    case "same":
+      return normalizeSymbol(ticker) === r.yardstick ? `${r.yardstick} is the yardstick itself, so against it the alpha would always be zero` : `${normalizeSymbol(ticker)} copies the same index as ${r.yardstick}, so against it the alpha would be about zero whatever happened`;
   }
 }
 function yardstickWords(ticker, r) {
   const why = basisWords(ticker, r);
   return `${yardstickName(r.yardstick)}${why ? ` (${why})` : ""}`;
 }
-var checkWords = (ticker, r) => `${checkName(r)} against ${yardstickWords(ticker, r)}, over the ${windowWords(r)} after the call`;
+var checkWords = (ticker, r) => `${checkName(r)} ${againstWords(ticker, r)}, over the ${windowWords(r)} after the call`;
+var againstWords = (ticker, r) => ownReturn(r) ? `on its own return (${basisWords(ticker, r)})` : `against ${yardstickWords(ticker, r)}`;
+var OWN_RETURN_WORDS = "A Buy or Overweight works when it rose over the window, an Underweight or Sell when it fell; a Hold is shown, not judged.";
 var COIN_YARDSTICK_WORDS = "A coin trades every day, so its window is calendar days; its yardstick trades only on New York's market days, so it is taken at its close on the coin's first and last day, or at its last close before that day when New York's market was closed (a weekend or a New York holiday).";
 var WHEN_SCORED = "A call is scored when a scoring runs after its window (/settle, an analysis or a routine), not by itself.";
 var rowOn = (bars, date5) => [...bars].reverse().find((b) => b.date <= date5);
@@ -39499,11 +39525,21 @@ function lastMarketDay(day3) {
   return d;
 }
 async function measure(ticker, tradeDate, r) {
-  return r.unit === "calendar" ? measureCalendar(ticker, tradeDate, r) : measureTrading(ticker, tradeDate, r);
+  const o = r.unit === "calendar" ? await measureCalendar(ticker, tradeDate, r) : await measureTrading(ticker, tradeDate, r);
+  return o && r.basis === "same" ? { ...o, alpha: o.raw, benchmarkReturn: 0, benchFrom: o.entry, benchTo: o.exit, own: true } : o;
 }
+var STOPPED_DAYS = 10;
 async function measureTrading(ticker, tradeDate, r) {
-  const end = addDays(tradeDate, Math.round(r.days * 7 / 5) + 7);
-  const stock = (await daily(ticker, tradeDate, end)).bars;
+  let end = addDays(tradeDate, Math.round(r.days * 7 / 5) + 7);
+  let stock = (await daily(ticker, tradeDate, end)).bars;
+  if (stock.length <= r.days && end < today()) {
+    end = today();
+    stock = (await daily(ticker, tradeDate, end)).bars;
+    const last = stock.at(-1)?.date;
+    if (stock.length <= r.days && last && daysBetween(last, today()) > STOPPED_DAYS) {
+      throw new NoData(`Yahoo Finance gives no price for ${normalizeSymbol(ticker)} after ${last}, ${plural3(stock.length - 1, "session")} into its ${plural3(r.days, "trading day")} window: it may have stopped trading or been halted, so this call cannot be scored unless it trades again`);
+    }
+  }
   if (stock.length <= r.days) return null;
   const entry = stock[0].date, exit = stock[r.days].date;
   if (exit >= today()) return null;
@@ -39625,6 +39661,7 @@ var UNCHECKED = ["unmarked", "no-prices", "unreliable", "flagged"];
 var WITHHELD = ["unreliable", "flagged"];
 var SEPARATOR = "\n\n<!-- ENTRY_END -->\n\n";
 var MARK = /<!--\s*ENTRY_END\s*-->/i;
+var SPLIT = /\s*<!--\s*ENTRY_END\s*-->\s*/i;
 function keep(text4) {
   let s = text4;
   while (MARK.test(s)) s = s.replace(MARK, "");
@@ -39638,7 +39675,9 @@ function lessonOf(fields, pending) {
 }
 var DATE = /^\d{4}-\d{2}-\d{2}$/;
 var TICKER = /^[A-Za-z0-9.\-=^]{1,20}$/;
-var BASES = ["us", "coin", "unlisted", "market", "chosen"];
+var BASES = ["us", "coin", "unlisted", "market", "chosen", "same"];
+var RECORDED = /^recorded:(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z)$/;
+var recordedIn = (fields) => fields.map((x) => RECORDED.exec(x)?.[1]).find(Boolean) ?? null;
 var WINDOW = /^window:(\d{1,3}) (trading|calendar) days?$/;
 var YARDSTICK = /^yardstick:([A-Za-z0-9.\-=^]{1,20}) \(([a-z]+)\)$/;
 var rulesFields = (r) => [`window:${windowWords(r)}`, `yardstick:${r.yardstick} (${r.basis})`];
@@ -39670,7 +39709,7 @@ function parse3(block) {
   const firstLesson = /(?:^|\n)FIRST LESSON:\n([\s\S]*)$/.exec(body)?.[1]?.trim() ?? "";
   const resolved2 = f.slice(6).find((x) => x.startsWith("resolved:"))?.slice("resolved:".length).trim() ?? null;
   const pending = f[3] === "pending", score = (s) => s === void 0 ? null : unsignZero(s);
-  return { date: f[0], ticker: f[1], rating: f[2], pending, raw: pending ? null : score(f[3]), alpha: pending ? null : score(f[4]), holding: pending ? null : f[5] ?? null, resolved: resolved2, decision, reflection, ...lessonOf(f.slice(6), pending), lessonCheck, earlier, firstLesson, rules: rulesIn(f.slice(4)) };
+  return { date: f[0], ticker: f[1], rating: f[2], pending, raw: pending ? null : score(f[3]), alpha: pending ? null : score(f[4]), holding: pending ? null : f[5] ?? null, resolved: resolved2, decision, reflection, ...lessonOf(f.slice(6), pending), lessonCheck, earlier, firstLesson, rules: rulesIn(f.slice(4)), recorded: recordedIn(f.slice(4)) };
 }
 var lessonPart = (p) => [keep(p.lesson), ...[["LESSON CHECK", p.check], ["EARLIER CORRECTIONS", p.earlier], ["FIRST LESSON", p.first]].filter(([, words3]) => words3?.trim()).map(([head2, words3]) => `${head2}:
 ${keep(words3)}`)].join("\n\n");
@@ -39703,19 +39742,23 @@ var Journal = class {
   }
   file;
   maxResolved;
+  /** The file's own line ends, as last read: written back the same way. */
+  eol = "\n";
   read() {
     try {
-      return fs9.readFileSync(this.file, "utf8");
+      const t = fs9.readFileSync(this.file, "utf8");
+      this.eol = t.includes("\r\n") ? "\r\n" : "\n";
+      return t.replace(/\r\n/g, "\n");
     } catch {
       return "";
     }
   }
   write(text4) {
     fs9.mkdirSync(path9.dirname(this.file), { recursive: true });
-    writeWhole(this.file, text4);
+    writeWhole(this.file, this.eol === "\n" ? text4 : text4.replace(/\n/g, this.eol));
   }
   blocks() {
-    return this.read().split(SEPARATOR).filter((b) => b.trim());
+    return this.read().split(SPLIT).filter((b) => b.trim());
   }
   load() {
     return this.blocks().map(parse3).filter((e) => e !== null);
@@ -39724,17 +39767,23 @@ var Journal = class {
     return this.load().filter((e) => e.pending);
   }
   /** Adds a pending entry, with the window and yardstick it will be scored by when they are given (every call the desk
-   *  records now). One entry per stock and day, settled or not: a re-run must not count the same call twice. */
-  storeDecision(ticker, date5, decision, rating, rules) {
+   *  records now), and when it was recorded (`at`, which record_decision gives). The rating kept is the one the decision
+   *  states: a `rating` passed that differs from it is refused, and a decision that states none is Needs review. One
+   *  entry per stock and day, settled or not: a re-run must not count the same call twice. */
+  storeDecision(ticker, date5, decision, rating, rules, at) {
     checkTag(ticker, date5);
     if (rules) checkRules(rules);
+    const stated = parseRating(decision);
+    if (rating && RATINGS.includes(rating) && stated !== REVIEW && rating !== stated) throw new Error(`the decision states ${stated}, not ${rating}: the journal keeps the rating the decision's words give. Correct the decision, or pass ${stated}`);
     fs9.mkdirSync(path9.dirname(this.file), { recursive: true });
     return withLock(this.file, () => {
       if (this.load().some((e) => e.date === date5 && e.ticker === ticker)) return "exists";
-      const r = rating && RATINGS.includes(rating) ? rating : parseRating(decision);
-      const old = this.read();
-      const kept = rules ? rulesFields(rules).map((x) => ` | ${x}`).join("") : "";
-      this.write(`${old}${old && !old.endsWith(SEPARATOR) ? SEPARATOR : ""}[${date5} | ${ticker} | ${r} | pending${kept}]
+      const old = this.read().replace(/\s+$/, "");
+      const kept = [...rules ? rulesFields(rules) : [], ...at ? [`recorded:${at.toISOString().slice(0, 16)}Z`] : []].map((x) => ` | ${x}`).join("");
+      const before = !old ? "" : /<!--\s*ENTRY_END\s*-->$/i.test(old) ? `${old}
+
+` : `${old}${SEPARATOR}`;
+      this.write(`${before}[${date5} | ${ticker} | ${stated} | pending${kept}]
 
 DECISION:
 ${keep(decision)}${SEPARATOR}`);
@@ -39751,7 +39800,7 @@ ${keep(decision)}${SEPARATOR}`);
         const e = parse3(block);
         if (done || !e || !e.pending || e.date !== date5 || e.ticker !== ticker) return block;
         done = true;
-        const kept = e.rules ? rulesFields(e.rules).map((x) => ` | ${x}`).join("") : "";
+        const kept = [...e.rules ? rulesFields(e.rules) : [], ...e.recorded ? [`recorded:${e.recorded}`] : []].map((x) => ` | ${x}`).join("");
         return `[${date5} | ${ticker} | ${e.rating} | ${signedPct(raw)} | ${signedPct(alpha)} | ${holdingDays}d | resolved:${resolution}${kept}${from ? ` | lesson:${from}` : ""}]
 
 DECISION:
@@ -39867,7 +39916,7 @@ Its check before then: ${e.lessonCheck}` : ""}`, earlier: e.earlier, first: e.fi
     if (!same.length && !other.length) return "";
     const over = (e) => {
       const r = e.rules ?? (o.scoring ? legacyRules(e.ticker, o.scoring, e.holding) : null);
-      return r ? `${checkName(r)}: against ${r.yardstick} over the ${windowWords(r)} after the call, not the call's own time horizon` : `over ${e.holding ?? "n/a"}`;
+      return r ? `${checkName(r)}: ${ownReturn(r) ? `on its own return (${r.yardstick} is its own yardstick or copies the same index), so its alpha is its return,` : `against ${r.yardstick}`} over the ${windowWords(r)} after the call, not the call's own time horizon` : `over ${e.holding ?? "n/a"}`;
     };
     const head2 = (e) => `[${e.date} | ${e.ticker} | ${e.rating} | return ${e.raw ?? "n/a"} | alpha ${e.alpha ?? "n/a"} | ${over(e)}]`;
     const full = (e) => [
@@ -40302,7 +40351,7 @@ function buildPlan(root, req, ws = workspaceOf(root)) {
   saveContext(dir, symbol4, day3, ctx);
   return { plan, ...ctx, resumed };
 }
-var scoredWords = (p) => p.window ? `${checkName(p.window)} against ${yardstickWords(p.symbol, p.window)}, over the ${windowWords(p.window)} after the call, once a scoring runs after them. It is not the call's own time horizon.` : `after ${p.holdingDays} trading days against ${p.benchmark}`;
+var scoredWords = (p) => p.window ? `${checkName(p.window)} ${againstWords(p.symbol, p.window)}, over the ${windowWords(p.window)} after the call, once a scoring runs after them. It is not the call's own time horizon.` : `after ${p.holdingDays} trading days against ${p.benchmark}`;
 function renderPlan({ plan: p, holdings, lessons, resumed }) {
   const next = p.steps.find((x) => !x.done);
   const step = (x) => `${x.section}${x.turn > 1 || p.steps.filter((y) => y.section === x.section).length > 1 ? ` (turn ${x.turn})` : ""}`;
@@ -40384,7 +40433,8 @@ function readNotes(j, kind, now) {
       }
       const l = n2.listed;
       const listedOk = l && typeof l.of === "string" && Array.isArray(l.shown) && l.shown.every((s) => typeof s === "string") && typeof l.saved === "number" && typeof l.at === "number";
-      return { at: n2.at, saved: typeof n2.saved === "number" ? n2.saved : 0, refused, ...listedOk ? { listed: l } : {} };
+      const unrowed = Array.isArray(n2.unrowed) ? n2.unrowed.filter((k) => typeof k === "string") : [];
+      return { at: n2.at, saved: typeof n2.saved === "number" ? n2.saved : 0, refused, ...listedOk ? { listed: l } : {}, ...unrowed.length ? { unrowed } : {} };
     }
   } catch {
   }
@@ -40401,9 +40451,23 @@ function noteStep(j, kind, now, saved) {
   if (saved) {
     notes.saved++;
     delete notes.refused[keyOf2(saved.ticker, saved.date)];
+    const unrowed = (notes.unrowed ?? []).filter((k) => k !== keyOf2(saved.ticker, saved.date));
+    if (unrowed.length) notes.unrowed = unrowed;
+    else delete notes.unrowed;
   }
   writeNotes(j, kind, notes, now);
 }
+function noteRows(j, kind, shown2, now) {
+  const notes = readNotes(j, kind, now), before = notes.unrowed ?? [];
+  const after = [.../* @__PURE__ */ new Set([...before.filter((k) => !shown2.with.includes(k)), ...shown2.without])];
+  if (after.length === before.length && after.every((k) => before.includes(k))) return;
+  const { unrowed: _, ...rest } = notes;
+  try {
+    writeWhole(fileOf(j, kind), JSON.stringify(after.length ? { ...rest, unrowed: after } : rest));
+  } catch {
+  }
+}
+var listedUnrowed = (notes, ticker, date5) => (notes.unrowed ?? []).includes(keyOf2(ticker, date5));
 function countRefusal(j, kind, ticker, date5, why, now) {
   const notes = readNotes(j, kind, now), key = keyOf2(ticker, date5), before = notes.refused[key];
   const n2 = (before?.n ?? 0) + 1;
@@ -40418,9 +40482,9 @@ function leftIn(notes, ticker, date5) {
 }
 
 // src/desk/settle.ts
-var line = (o, e) => `${e.ticker} ${signedPct(o.raw)} from ${o.entry} to ${o.exit} (${windowWords({ days: o.holdingDays, unit: o.unit })}); ${o.benchmark} ${signedPct(o.benchmarkReturn)}${o.unit === "calendar" ? ` (its close of ${o.benchFrom} to its close of ${o.benchTo})` : ""}; alpha ${signedPct(o.alpha)}`;
+var line = (o, e) => `${e.ticker} ${signedPct(o.raw)} from ${o.entry} to ${o.exit} (${windowWords({ days: o.holdingDays, unit: o.unit })}); ${o.own ? `scored on its own return, not against ${o.benchmark}: score ${signedPct(o.alpha)}` : `${o.benchmark} ${signedPct(o.benchmarkReturn)}${o.unit === "calendar" ? ` (its close of ${o.benchFrom} to its close of ${o.benchTo})` : ""}; alpha ${signedPct(o.alpha)}`}`;
 var rulesOf = (e, scoring) => e.rules ?? legacyRules(e.ticker, scoring, e.holding);
-var scoreIs = (o, r) => `THIS SCORE IS ${checkName(r).toUpperCase()}: the ${windowWords(r)} after the call against ${o.benchmark}, not the call's own time horizon (its decision states that). Say in the lesson how much a window this short can show about the thesis.${r.unit === "calendar" ? ` ${COIN_YARDSTICK_WORDS}` : ""}`;
+var scoreIs = (o, r, ticker) => `THIS SCORE IS ${checkName(r).toUpperCase()}: the ${windowWords(r)} after the call ${o.own ? `on its own return (${basisWords(ticker, r)}). ${OWN_RETURN_WORDS} It is` : `against ${o.benchmark},`} not the call's own time horizon (its decision states that). Say in the lesson how much a window this short can show about the thesis.${r.unit === "calendar" && !o.own ? ` ${COIN_YARDSTICK_WORDS}` : ""}`;
 var MAX_REFLECTION = 1200;
 var MAX_SENTENCES = 4;
 var SCORING = "settle-check";
@@ -40457,16 +40521,16 @@ function lessonRefusal(text4) {
 }
 async function windowText(ticker, o) {
   try {
-    return await windowRows(ticker, o);
+    return { text: await windowRows(ticker, o), rows: true };
   } catch (err) {
-    return `WHAT HAPPENED IN THE WINDOW: ${failureText(err, `the day-by-day rows of ${ticker}'s window`)} Write the lesson from the outcome line alone, and say nothing about what happened on any day of the window.`;
+    return { text: `WHAT HAPPENED IN THE WINDOW: ${failureText(err, `the day-by-day rows of ${ticker}'s window`)} Write the lesson from the outcome line alone, and say nothing about what happened on any day of the window.`, rows: false };
   }
 }
 var LATER = "A later scoring, started an hour or more after record_outcome was last used, tries it again.";
 async function dueSettlements(journal, scoring, ticker, now = Date.now()) {
   const pending = journal.pending().filter((e) => !ticker || e.ticker === ticker);
   if (!pending.length) return ticker ? `No pending calls on ${ticker}.` : "No pending calls: every call in the journal is settled.";
-  const notes = readNotes(journal, SCORING, now), out = [];
+  const notes = readNotes(journal, SCORING, now), out = [], rows = { without: [], with: [] };
   let ready = 0, left = 0;
   for (const e of pending) {
     const head2 = `[${e.date} | ${e.ticker} | ${e.rating}]`;
@@ -40479,27 +40543,30 @@ async function dueSettlements(journal, scoring, ticker, now = Date.now()) {
     try {
       const r = rulesOf(e, scoring), o = await measure(e.ticker, e.date, r);
       if (!o) {
-        out.push(`${head2} NOT YET: its window, the ${windowWords(r)} after ${e.date} (against ${r.yardstick}), has not finished. Leave it pending.`);
+        out.push(`${head2} NOT YET: its window, the ${windowWords(r)} after ${e.date} (${ownReturn(r) ? "on its own return" : `against ${r.yardstick}`}), has not finished. Leave it pending.`);
         continue;
       }
       ready++;
+      const w = await windowText(e.ticker, o);
+      rows[w.rows ? "with" : "without"].push(keyOf2(e.ticker, e.date));
       out.push(`${head2} READY: ${line(o, e)}
-${scoreIs(o, r)}
+${scoreIs(o, r, e.ticker)}
 DECISION:
 ${e.decision}
 
-${await windowText(e.ticker, o)}`);
+${w.text}`);
     } catch (err) {
       out.push(`${head2} ${failureText(err, `prices to settle ${e.ticker} on ${e.date}`)} Leave it pending.`);
     }
   }
+  noteRows(journal, SCORING, rows, now);
   return [`${pending.length} pending call(s), ${ready} ready to settle${left ? `, ${left} left in this scoring after ${REFUSALS_TO_LEAVE} failed tries` : ""}. Settle a ready one with record_outcome, using only the figures shown here. Before writing about a level, stop, target or trigger the decision named, find it in that call's window rows: say what happened only as a row shows it, naming its date.`, "", ...out].join("\n\n");
 }
 async function settleOne(journal, scoring, ticker, date5, reflection, now = Date.now()) {
   const pending = journal.pending().some((x) => x.ticker === ticker && x.date === date5);
   let answer2;
   try {
-    answer2 = await settleOnce(journal, scoring, ticker, date5, reflection);
+    answer2 = await settleOnce(journal, scoring, ticker, date5, reflection, now);
   } catch (err) {
     if (!(err instanceof Error) || !pending) {
       noteStep(journal, SCORING, now);
@@ -40513,14 +40580,14 @@ async function settleOne(journal, scoring, ticker, date5, reflection, now = Date
   noteStep(journal, SCORING, now, answer2.startsWith("Settled: ") ? { ticker, date: date5 } : void 0);
   return answer2;
 }
-async function settleOnce(journal, scoring, ticker, date5, reflection) {
+async function settleOnce(journal, scoring, ticker, date5, reflection, now) {
   const text4 = reflection.trim(), refused = lessonRefusal(text4);
   if (refused) throw new Error(refused);
   const e = journal.pending().find((x) => x.ticker === ticker && x.date === date5);
   if (!e) throw new Error(`there is no pending call on ${ticker} for ${date5}`);
   const r = rulesOf(e, scoring), o = await measure(ticker, date5, r);
   if (!o) return `NOT_YET: its window, the ${windowWords(r)} after ${date5}, has not finished, so ${ticker} stays pending.`;
-  const from = await windowRows(ticker, o).then(() => "prices", () => "no-prices");
+  const from = listedUnrowed(readNotes(journal, SCORING, now), ticker, date5) ? "no-prices" : await windowRows(ticker, o).then(() => "prices", () => "no-prices");
   return journal.recordOutcome(ticker, date5, o.raw, o.alpha, o.holdingDays, text4, o.exit, from) ? `Settled: ${line(o, e)}. The lesson is kept and will be read by later analyses from ${o.exit} on.` : `${ticker} on ${date5} was settled by another run already.`;
 }
 
@@ -40612,7 +40679,7 @@ ${laterWords(ticker)}`;
       const w = await windowOf(e, scoring);
       shown2.push([
         `${tagOf(e)} TO REWRITE: ${whyOf(e)}.`,
-        `ITS SCORE, WHICH STAYS AS IT IS: ${e.ticker} ${e.raw} from ${w.o.entry} to ${w.o.exit} (${windowWords({ days: w.o.holdingDays, unit: w.o.unit })}); its yardstick, ${w.o.benchmark}, ${signedPct(w.o.benchmarkReturn)} over the same days; alpha ${e.alpha}. It is ${checkName({ days: w.o.holdingDays, unit: w.o.unit })}, not the call's own time horizon.`,
+        `ITS SCORE, WHICH STAYS AS IT IS: ${e.ticker} ${e.raw} from ${w.o.entry} to ${w.o.exit} (${windowWords({ days: w.o.holdingDays, unit: w.o.unit })}); ${w.o.own ? `scored on its own return, not against ${w.o.benchmark} (it is its own yardstick or copies the same index), so its alpha is its return: ${e.alpha}` : `its yardstick, ${w.o.benchmark}, ${signedPct(w.o.benchmarkReturn)} over the same days; alpha ${e.alpha}`}. It is ${checkName({ days: w.o.holdingDays, unit: w.o.unit })}, not the call's own time horizon.`,
         `DECISION:
 ${e.decision}`,
         `LESSON AS IT STANDS:
@@ -40999,23 +41066,41 @@ async function stopsAtClose(dir, today2, closeOf) {
   return { state: "checked", held: symbols.length, stops };
 }
 var rerateFile = (dir) => path18.join(dir, "rerate.json");
+var DAY3 = /^\d{4}-\d{2}-\d{2}$/;
 function readRerate(dir) {
   try {
     const v = JSON.parse(fs16.readFileSync(rerateFile(dir), "utf8"));
     if (typeof v.day !== "string" || !Array.isArray(v.symbols)) return null;
     const dayOrNull = (x) => x === null || typeof x === "string";
-    return { day: v.day, symbols: v.symbols.filter((s) => typeof s?.symbol === "string" && dayOrNull(s.called) && dayOrNull(s.rating)), ...v.full === true ? { full: true } : {} };
+    const tried = Object.fromEntries(Object.entries(v.tried && typeof v.tried === "object" ? v.tried : {}).filter(([, d]) => typeof d === "string" && DAY3.test(d)));
+    return {
+      day: v.day,
+      symbols: v.symbols.filter((s) => typeof s?.symbol === "string" && dayOrNull(s.called) && dayOrNull(s.rating)).map((s) => ({ symbol: s.symbol, called: s.called, rating: s.rating, ...typeof s.tried === "string" && DAY3.test(s.tried) ? { tried: s.tried } : {} })),
+      ...v.full === true ? { full: true } : {},
+      ...Object.keys(tried).length ? { tried } : {}
+    };
   } catch {
     return null;
   }
+}
+function leftNoCall(kept, calls, today2) {
+  const out = {};
+  if (!kept) return out;
+  const add = (symbol4, day3) => {
+    if (day3 >= today2 || calls.some((c) => c.ticker === symbol4 && c.date >= day3) || out[symbol4] !== void 0 && out[symbol4] <= day3) return;
+    out[symbol4] = day3;
+  };
+  for (const [symbol4, day3] of Object.entries(kept.tried ?? {})) add(symbol4, day3);
+  for (const s of kept.symbols) add(s.symbol, kept.day);
+  return out;
 }
 var isRerateDay = (day3) => firstMarketDayOfWeek(day3) === day3;
 function dueForRerate(dir, today2, now = /* @__PURE__ */ new Date()) {
   const held = readHoldings(dir)?.positions ?? [];
   if (!held.length) return [];
-  const calls = new Journal(path18.join(dir, "journal.md")).load();
+  const calls = new Journal(path18.join(dir, "journal.md")).load(), tried = leftNoCall(readRerate(dir), calls, today2);
   const busy = new Set(readQueue(dir, now).filter((q) => q.state === "waiting" || q.state === "running").map((q) => q.symbol));
-  return [...new Set(held.map((p) => p.ticker))].filter((s) => !/[\^=]/.test(s) && !busy.has(s)).map((symbol4) => ({ symbol: symbol4, view: viewOf(calls, symbol4, today2) })).filter((x) => isStale(x.view)).sort((a, b) => (a.view?.date ?? "").localeCompare(b.view?.date ?? "")).map((x) => ({ symbol: x.symbol, called: x.view?.date ?? null, rating: x.view?.rating ?? null }));
+  return [...new Set(held.map((p) => p.ticker))].filter((s) => !/[\^=]/.test(s) && !busy.has(s)).map((symbol4) => ({ symbol: symbol4, view: viewOf(calls, symbol4, today2), tried: tried[symbol4] })).filter((x) => isStale(x.view)).sort((a, b) => Number(a.tried !== void 0) - Number(b.tried !== void 0) || (a.view?.date ?? "").localeCompare(b.view?.date ?? "") || (a.tried ?? "").localeCompare(b.tried ?? "")).map((x) => ({ symbol: x.symbol, called: x.view?.date ?? null, rating: x.view?.rating ?? null, ...x.tried ? { tried: x.tried } : {} }));
 }
 function rerateWeekly(dir, today2, now = /* @__PURE__ */ new Date()) {
   if (!isRerateDay(today2)) return [];
@@ -41023,7 +41108,7 @@ function rerateWeekly(dir, today2, now = /* @__PURE__ */ new Date()) {
   return withLock(rerateFile(dir), () => {
     const kept = readRerate(dir);
     if (kept?.day === today2) return kept.symbols;
-    const queued = [];
+    const tried = leftNoCall(kept, new Journal(path18.join(dir, "journal.md")).load(), today2), queued = [];
     let full = false;
     for (const due of dueForRerate(dir, today2, now)) {
       if (queued.length >= RERATE_MAX) break;
@@ -41036,7 +41121,7 @@ function rerateWeekly(dir, today2, now = /* @__PURE__ */ new Date()) {
         break;
       }
     }
-    writeWhole(rerateFile(dir), JSON.stringify({ day: today2, symbols: queued, ...full ? { full: true } : {} }, null, 2) + "\n");
+    writeWhole(rerateFile(dir), JSON.stringify({ day: today2, symbols: queued, ...full ? { full: true } : {}, ...Object.keys(tried).length ? { tried } : {} }, null, 2) + "\n");
     return queued;
   });
 }
@@ -41049,7 +41134,7 @@ var reratedToday = (dir, today2) => {
   const r = readRerate(dir);
   return new Map(r?.day === today2 ? r.symbols.map((s) => [s.symbol, s]) : []);
 };
-var lastView = (s) => s.called ? `its latest view: ${s.rating ?? "a call"} on ${s.called}` : "the desk has no view of it yet";
+var lastView = (s) => s.called ? `its latest view: ${s.rating ?? "a call"} on ${s.called}` : s.tried ? `the desk has no view of it yet: the re-rating of ${s.tried} left no call on it, so it may not be one the desk can analyse` : "the desk has no view of it yet";
 function morningList(dir, today2, max, screen = null) {
   const called = new Set(new Journal(path19.join(dir, "journal.md")).load().filter((e) => e.date === today2).map((e) => e.ticker));
   const queue2 = readQueue(dir), running = queue2.find((q) => q.state === "running")?.symbol ?? null;
@@ -41428,7 +41513,7 @@ Rating: ${rating}`;
   }));
   server.registerTool("record_decision", {
     title: "Record the decision",
-    description: "Put the portfolio manager's saved decision in the journal as a pending call, with the window and yardstick it will be scored by (the plan's), so a later change to the settings never re-scores it. It is scored once a scoring runs after that window (/settle, an analysis or a routine): a short first check, not the call's own time horizon. The text is the one saved in the run, so the journal always matches the report. One call per stock and day: a repeat is ignored. Pass the rating the decision states; without one it is read from the text, and a decision with no readable rating is recorded as Needs review.",
+    description: "Put the portfolio manager's saved decision in the journal as a pending call, with the window and yardstick it will be scored by (the plan's), so a later change to the settings never re-scores it. It is scored once a scoring runs after that window (/settle, an analysis or a routine): a short first check, not the call's own time horizon. The text is the one saved in the run, so the journal always matches the report. One call per stock and day: a repeat is ignored. The rating kept is the one the decision's words state: a rating passed that differs from it is refused, and a decision whose words state none is recorded as Needs review.",
     inputSchema: { symbol: symbol2, analysis_date: day2, rating: external_exports.enum(RATINGS).optional() },
     annotations: write
   }, async (a) => act(() => {
@@ -41437,8 +41522,8 @@ Rating: ${rating}`;
     if (!progress(ws().dir, sym2, d)["decision"]) throw new Error(`the portfolio manager's decision is not saved yet for ${sym2} on ${d}`);
     const body = decision.replace(/^## [^\n]*\n/, "");
     const rules = savedPlan(ws().dir, sym2, d)?.window ?? rulesFor(sym2, readSettings(root).scoring);
-    const r = journalOf(root, ws()).storeDecision(sym2, d, body, a.rating ?? void 0, rules);
-    const rating = a.rating ?? parseRating(body);
+    const r = journalOf(root, ws()).storeDecision(sym2, d, body, a.rating ?? void 0, rules, /* @__PURE__ */ new Date());
+    const rating = parseRating(body);
     return r === "stored" ? `Recorded: ${sym2} on ${d}, ${rating}, pending. It will be scored as ${checkWords(sym2, rules)}, kept with the call so a later change to the settings does not change it. It is not the call's own time horizon. ${WHEN_SCORED} Until then it stays pending: for the ${windowWords(rules)} after the call, and after them until a scoring runs.` : `${sym2} on ${d} is already in the journal; nothing changed.`;
   }));
   server.registerTool("list_settlements", {

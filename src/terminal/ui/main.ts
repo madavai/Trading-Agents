@@ -131,7 +131,9 @@ const changeChip = (q: Quote | null) => {
 /** In place of an order ticket for what Robinhood's agent doorway does not trade: a coin on paper, or one not followed at all. */
 /** A coin's call (or an index's) has no Decide…: on paper only, or no order ticket, with why. A Bitcoin call recorded after
  *  the close it would have filled at is not on paper either, and says that, not that paper follows only Bitcoin and Ether. */
-const noTicketChip = (paper: boolean, late = '') => (paper ? `<span class="at-chip" title="${esc(`${means('paper')} ${NOTES.coinOnPaper}`)}">on paper only</span>` : `<span class="at-chip" title="${esc(late ? `${NOTES.coinOnPaper} Not on paper: ${late}` : NOTES.noTicket)}">no order ticket</span>`);
+const noTicketChip = (paper: boolean, late = '') => (paper ? `<span class="at-chip" title="${esc(`${means('paper')} ${NOTES.coinOnPaper}`)}">on paper only</span>` : `<span class="at-chip" title="${esc(late ? `${NOTES.coinOnPaper} ${daysInWords(late)}` : NOTES.noTicket)}">no order ticket</span>`);
+/** Every day in a sentence the desk wrote (2026-10-26) as the page writes days: "26 Oct 2026". */
+const daysInWords = (s: string): string => s.replace(/\b\d{4}-\d{2}-\d{2}\b/g, (day) => dayText(day));
 const robot = (sym: string) => `<button class="icon-btn" data-act="analyse" data-symbol="${esc(sym)}" title="Ask the desk to analyse ${esc(sym)}" aria-label="Ask the desk to analyse ${esc(sym)}"><svg class="g"><use href="#i-bot"/></svg></button>`;
 /** "SPY, QQQ, VT and BND". */
 const listWords = (xs: readonly string[]) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
@@ -1121,7 +1123,7 @@ const PAPER_WORDS: Record<PaperTrade['status'], string> = { filled: 'paper', non
 function paperChip(ticker: string, date: string): string {
   const t = tradeOf(ticker, date);
   if (!t) return '';
-  const reason = t.why.replace(/\b\d{4}-\d{2}-\d{2}\b/g, (day) => dayText(day));   // "the close of 26 Oct 2026", as the page writes days
+  const reason = daysInWords(t.why);   // "the close of 26 Oct 2026", as the page writes days
   // The figure is the stock's move since the paper buy, labelled as that: never the call's own result (its alpha, beside
   // it), and never a paper profit for this call alone, since the paper book keeps one average cost a stock.
   if (t.status === 'filled' && t.side === 'buy') {
