@@ -335,6 +335,23 @@ test('server-6: with the morning switch on, the dashboard puts the top picks on 
   assert.deepEqual(readScreen(dir)?.queued, { day: DAY, symbols: ['TSLA', 'AMD'] }, 'once that day');
 });
 
+test('server-6: an "on" from another tab or an old page never moves the morning switch\'s first day on', async (t) => {
+  const { root, dir } = desk();
+  process.env.TRADING_AGENTS_TODAY = DAY;   // a Monday
+  savePrefs(dir, { morning: true, morningFrom: '2026-11-09' });   // switched on last Friday: this Monday is its first morning
+  const term = await dashboard(root);
+  t.after(() => term.close());
+  const again = await ask(term, 'POST', '/api/screen/morning', { on: true });
+  assert.equal(again.status, 200);
+  assert.equal(again.json().morning.from, '2026-11-09', 'it answers the day it really starts');
+  assert.equal(readPrefs(dir).morningFrom, '2026-11-09', 'this morning is not skipped');
+  // switched off and on again, it starts afresh the next market morning, as the person's own press says
+  await ask(term, 'POST', '/api/screen/morning', { on: false });
+  assert.equal(readPrefs(dir).morningFrom, undefined);
+  assert.equal((await ask(term, 'POST', '/api/screen/morning', { on: true })).json().morning.from, '2026-11-10');
+  assert.equal(readPrefs(dir).morningFrom, '2026-11-10');
+});
+
 test('server-9: with "Run automatically with Claude Code" left on, the dashboard starts its listener again once nothing has listened for a while', async (t) => {
   const { root, dir } = desk();
   savePrefs(dir, { autorun: true });

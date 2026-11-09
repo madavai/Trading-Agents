@@ -22919,7 +22919,7 @@ async function startTerminal(opts) {
     }
     if (p === "/api/screen/morning" && method === "POST") {
       if (typeof b.on !== "boolean") throw new Refused2(400, "say on or off");
-      const from = b.on ? nextMarketDay(day2) : void 0;
+      const was = readPrefs(dir), from = b.on ? was.morning === true && was.morningFrom ? was.morningFrom : nextMarketDay(day2) : void 0;
       savePrefs(dir, b.on ? { morning: true, morningFrom: from } : { morning: false }, b.on ? [] : ["morningFrom"]);
       return json(res, 200, { morning: { on: b.on, top: TOP_QUEUED, from }, queued: [] });
     }

@@ -396,7 +396,8 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
     // waiting list at once: it starts the next market morning, and then acts once each market morning.
     if (p === '/api/screen/morning' && method === 'POST') {
       if (typeof b.on !== 'boolean') throw new Refused(400, 'say on or off');
-      const from = b.on ? nextMarketDay(day) : undefined;
+      // Already on: an "on" from another tab or an old page keeps the day it starts, so it never skips a morning.
+      const was = readPrefs(dir), from = b.on ? (was.morning === true && was.morningFrom ? was.morningFrom : nextMarketDay(day)) : undefined;
       savePrefs(dir, b.on ? { morning: true, morningFrom: from } : { morning: false }, b.on ? [] : ['morningFrom']);
       return json(res, 200, { morning: { on: b.on, top: TOP_QUEUED, from }, queued: [] });
     }
