@@ -461,7 +461,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "Ask the team about a company it has not analysed today, for example Microsoft: [[Analyse MSFT medium]]"],
       "see": [
         "Three rounds of the bull and bear debate and of the risk debate. It takes longer and uses more model time."] },
-    { "id": "B8", "title": "A fund is read for what it holds", "tags": [], "changed": "2026-10-22",
+    { "id": "B8", "title": "A fund is read for what it holds", "tags": [], "changed": "2026-11-08",
       "about": "A fund such as SPY (the S&P 500 in one ticker) has no company accounts. For a fund the desk reads what it holds instead, from the report every US fund files with the SEC each quarter (form N-PORT), a few months after the day it speaks for.",
       "where": "Madav › Agent Studio › trading-desk › Put to work, then the call's Fundamentals report",
       "do": [
@@ -470,16 +470,21 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "\"Fund profile for SPY, from its portfolio report to the SEC (form N-PORT, filed …): what it held on …\", with how many days before the analysis that was.",
         "Its size (\"Net assets\"), what it is held in (stocks, bonds, cash), its countries, its own monthly returns, and its top ten holdings added up by issuer (Alphabet's two kinds of shares as one).",
+        "In the countries line, holdings the report gives no country for (cash, futures) are named apart, as \"no country given for …\", and never counted as \"outside the US\".",
         "For BND, the US Treasury's many bonds as one line with their count, and the bonds' average years to repayment and yearly interest.",
-        "The yearly cost (the expense ratio) is \"unavailable\": no official free source gives it. Never a made-up figure."] },
-    { "id": "B9", "title": "NVIDIA's valuation and insider trades, from the SEC", "tags": [], "changed": "2026-11-06",
-      "about": "Insider trades are shares bought or sold by a company's own directors and officers, reported to the SEC on Form 4. They are a fact, so \"none\" is an answer, not a gap. When an insider corrects a filing, the correction (a Form 4/A) takes the old filing's place, so no trade is counted twice.",
+        "The yearly cost (the expense ratio) is \"unavailable\": no official free source gives it. Never a made-up figure.",
+        "If the SEC could not be reached, or sent back an empty or broken list of the fund's reports, the report says the fund profile was \"unavailable\" and names the SEC. It never says SPY is \"not a fund\" or \"a company or a trust\" because of that."] },
+    { "id": "B9", "title": "NVIDIA's valuation and insider trades, from the SEC", "tags": [], "changed": "2026-11-08",
+      "about": "Insider trades are shares bought or sold by a company's own directors and officers, reported to the SEC on Form 4. When every filing was read, they are a fact, so \"none\" is an answer, not a gap. When some filings could not be read, the desk says how many and that the counts are not the whole picture. When an insider corrects a filing, the correction (a Form 4/A) takes the old filing's place, so no trade is counted twice.",
       "where": "Dashboard › NVDA's call › Fundamentals report",
       "do": [
         "Find the valuation and the insider trades in NVDA's report."],
       "see": [
         "The valuation is worked out from the SEC filings and the checked closing price. Forward estimates are named as \"Unavailable from official free sources\".",
         "\"Insider trades in NVDA, from the Form 4 filings with the SEC\", over 90 days: what was bought (code P) and sold (code S), or \"none\", which it says is a fact from the SEC, not a gap in the data.",
+        "Its first line says how many of the filings were read (normally all of them). If some could not be read, it says how many, and the counts begin \"Counted from only the … of the … filings\": the report then never calls a \"none\" a fact.",
+        "If the SEC could not be reached at all, the insider trades are \"unavailable\" and the report names the SEC. Never \"no insider trades\", and never \"withheld\".",
+        "A sale whose filing gives no price is listed with \"no price\" and left out of the sum in US dollars, which says so. It is never priced at 0.",
         "A trade an insider corrected counts once, at its corrected size. For example, an analysis of NVIDIA on 6 Nov 2026 gives Nicholas Parker's award of 9 Sep once, as 160,418 shares (a Form 4/A corrected it from 172,507), and 12 other kinds of transactions, not 13.",
         "If the report gives one award or trade twice, at two sizes, that is a fault: note both."] },
     { "id": "B10", "title": "The analysts talk only with a reason", "tags": ["Optional"], "changed": "2026-10-21",
@@ -518,7 +523,7 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "A world news part with the latest market headlines (the stock market, interest rates, oil, gold, the dollar and euro), from publishers such as Reuters, AP or Yahoo Finance. On a busy day they may cover only the last few hours, and the report should say so (B15).",
         "Not \"Yahoo Finance search returned no world/economic news\"."] },
-    { "id": "B15", "title": "News and posts say the hours they really cover", "tags": [], "changed": "2026-11-06",
+    { "id": "B15", "title": "News and posts say the hours they really cover", "tags": [], "changed": "2026-11-08",
       "about": "The free news and post sources give only their latest items. For a busy company like NVIDIA that is often the last two or three hours, not the week the analysts ask for. The desk now tells the analysts the span each sample really covers, so a report never reads a quiet evening as a quiet week. Days are New York's, as everywhere on the desk, so an evening's news counts on its own day.",
       "where": "Dashboard › any call made after this update › Sentiment report and News report",
       "do": [
@@ -528,7 +533,8 @@ b, strong { font-weight: var(--weight-semibold); }
         "Where they describe NVIDIA's news or its StockTwits posts, the reports give the hours those cover (for NVIDIA usually a few hours of that day, in UTC), not the whole week.",
         "No report says there was no news, or no bad news, over the week on the strength of those few hours.",
         "The evening's own news and posts are there: the reports do not say StockTwits had no messages.",
-        "If a report calls a few hours' sample \"this week's\" news or mood, that is a fault: note the sentence."] },
+        "If a report calls a few hours' sample \"this week's\" news or mood, that is a fault: note the sentence.",
+        "If StockTwits or Reddit sent back an error or an empty answer, the Sentiment report calls that source \"unavailable\", never a quiet crowd or a calm mood. If no source gave anything to read, its first line is \"Overall Sentiment: Unavailable (Score: none)\", never \"Neutral\"."] },
     { "id": "B13", "title": "The day's prices are called what they are", "tags": [], "changed": "2026-11-06",
       "about": "During trading hours a stock's latest price is still moving, after the close it is final, and for a while after a day ends the price source has not filled that day in yet. The desk now says which, so the reports never call a moving price \"the close\", never doubt a final one, and never say a day that traded had no trading.",
       "where": "Dashboard › any call made after this update › Market report",
@@ -539,7 +545,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "The daytime report calls the day's figure \"the latest price\" (the session is still trading), not \"the close\", and treats no level as broken on that day alone.",
         "The evening report uses the day's close as final, without \"may be partial\" or \"if the market is still open\".",
         "If a report says the day's prices were \"not available yet\", it names the last day it used and does not claim the day had no trading."] },
-    { "id": "B14", "title": "Economic figures are named and compared honestly", "tags": [], "changed": "2026-11-06",
+    { "id": "B14", "title": "Economic figures are named and compared honestly", "tags": [], "changed": "2026-11-08",
       "about": "The news analyst quotes official figures from FRED (the St. Louis Fed's public data). A monthly figure is named by its month, a change over a year is taken from the same month a year earlier, and the Fed's rate is today's rate rather than last month's average.",
       "where": "Dashboard › any call made after this update › News report",
       "do": [
@@ -547,7 +553,8 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "Inflation and jobs figures are named by their month (\"August 2026\"), not by a date like \"2026-08-01\".",
         "A yearly change (\"year over year\") compares the same month a year apart. No other change is called yearly.",
-        "The federal funds rate is the latest daily rate, and a change in a rate is given in percentage points."] },
+        "The federal funds rate is the latest daily rate, and a change in a rate is given in percentage points.",
+        "A figure the desk does not know the units of (one asked for by its FRED code) changes \"in the series' own units\", with no percentage. A change from zero has no percentage either. Never a percent of a percent."] },
     { "id": "B17", "title": "Streaks, records and counts are worked out by the desk", "tags": [], "changed": "2026-11-07",
       "about": "The agents used to count by eye in long tables of prices and often got it wrong: \"down six days in a row\" when it was five, \"the only time\" when it had happened 13 times. The desk now works these out itself (how many days in a row, the first or last time, the highest or lowest since when, how often, the biggest days), every date with its day of the week, and every agent takes them from there.",
       "where": "Madav › Agent Studio › trading-desk › Put to work, then Dashboard › any call made after this update › Market report",
@@ -578,7 +585,17 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "The fact checker works after the four analysts and before the bull. (For a stock asked for on the dashboard, its line under Analyses you asked for says \"the fact checker is checking the reports\" at that point.)",
         "Under \"Gathering the facts\", after the four reports, a \"Fact check\" card by the Fact checker. It starts \"Checked the\" and the reports it read, with how many claims were wrong, misleading or could not be checked, then has a table of what each report said, what is right and where that comes from, or says nothing needed correcting.",
-        "Where it corrected a report, the report shows the new words with [corrected: was \"...\"] beside them, and the debate and the decision use the corrected figure."] }
+        "Where it corrected a report, the report shows the new words with [corrected: was \"...\"] beside them, and the debate and the decision use the corrected figure."] },
+    { "id": "B20", "title": "Prediction-market odds come only from markets that traded", "tags": [], "changed": "2026-11-08",
+      "about": "Polymarket is a site where people bet on events, so its prices read as the crowd's odds. A market no one has traded on still shows a price, but that is only a starting offer, not anyone's view. The desk now passes on only markets that have traded and have a price, says how many it left out and why, and treats a broken answer from Polymarket as \"unavailable\", never as \"no markets\".",
+      "where": "Dashboard › any call made after this update › News report",
+      "do": [
+        "Run a new analysis of NVIDIA, if you have not since this update: [[Analyse NVDA shallow]]",
+        "Open its News report and find the Polymarket odds."],
+      "see": [
+        "Each market it quotes has a traded volume in dollars above $0 and a chance for its first answer, such as \"Yes 55%\". A very small one reads \"under 1%\" or \"under $1\", never \"0%\" or \"$0\".",
+        "Where some open markets were left out, the desk's own line says so: \"Left out of the … open markets that matched: … with no traded volume …\" or \"… with no price given\". The report does not quote their prices.",
+        "If Polymarket sent back an error, the report calls its odds \"unavailable\", never \"no markets\" or \"the crowd expects nothing\"."] }
   ] },
   { "id": "C", "name": "The dashboard",
     "sub": "The page on your own computer: markets, charts, watchlist, the desk's calls, the scorecard and a page per company.",
@@ -602,7 +619,7 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "Its tip says \"Switch to the light face\" or \"Switch to the dark face\". The first visit follows your computer's own setting.",
         "Both faces are easy to read, including the account cards, the charts and the ticket."] },
-    { "id": "C3", "title": "Markets", "tags": [], "changed": "2026-11-07",
+    { "id": "C3", "title": "Markets", "tags": [], "changed": "2026-11-08",
       "about": "A glance at the big markets, from Yahoo Finance (up to 15 minutes late). Each move belongs to the latest trading day, so on a weekend or before the open it names that day rather than passing for today's. A yield is already a percent, so its move is in points.",
       "where": "Dashboard › Markets",
       "do": [
@@ -612,6 +629,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "\"S&P 500\", \"Nasdaq\", \"Dow\", \"Volatility (VIX)\", \"US 10-year yield\" and \"Bitcoin\", each with a price, its move and \"now\" or \"close\".",
         "On a weekend each move names its day, for example \"+0.62% · Fri\", and pointing at it ends \"This move is from Fri 6 Nov.\" Bitcoin trades every day, so its move needs no day.",
         "The US 10-year yield's move is in points, for example \"+0.02 points\", never a percent of a percent.",
+        "If Yahoo Finance gives a price without saying when it is from, that tile shows \"No data\", never a price stamped with the time the page asked.",
         "Pressing one charts it."] },
     { "id": "C4", "title": "Your watchlist", "tags": [], "changed": "2026-11-07",
       "about": "The watchlist is the list of companies and funds you follow. Starred ones also sit in the side list and are what the morning routine analyses first.",
@@ -1154,14 +1172,15 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "The watchlist is grouped as The whole market, Sectors, Single names and Crypto.",
         "The tier folds away and stays folded after the reload; pressing its name opens it again."] },
-    { "id": "J4", "title": "Market weather", "tags": [], "changed": "2026-10-21",
+    { "id": "J4", "title": "Market weather", "tags": [], "changed": "2026-11-08",
       "about": "Three plain lines on the ground the market stands on, each from figures (never a forecast): the trend of the S&P 500, the mood from the VIX (the market's own measure of expected swings), and what the crowd expects from the Federal Reserve's next interest-rate decision.",
       "where": "Dashboard › This morning › Market weather",
       "do": [
-        "Read \"Market weather\"."],
+        "Read \"Market weather\" on a weekday while the market trades (9:30 to 16:00 New York time), and again after the close."],
       "see": [
         "Marked \"never a forecast\", three lines: the trend (Rising, Mixed or Falling: the S&P 500 against its 50- and 200-day averages), the mood (Calm, Normal or Wild: the VIX) and rates (A cut, A rise or No change: Polymarket's odds on the Federal Reserve's next decision).",
-        "A line that cannot be read says \"Unavailable\", never a guess.",
+        "While the market trades, the trend and the mood say the S&P 500 and the VIX \"is at\" a level, with the day and \"still trading\". After the close they say \"closed at\" a level \"on\" that day.",
+        "A line that cannot be read says \"Unavailable\", never a guess. If Polymarket sends back an error, the rates line says \"Unavailable: Polymarket answered without its search results.\", never that there is no open market. An outcome with no price is never shown as 0%.",
         "\"From Yahoo Finance and Polymarket at <time>. Nothing here is investment advice.\""] },
     { "id": "J5", "title": "Worth a look today", "tags": [], "changed": "2026-10-21",
       "about": "A cheap morning screen before the costly team run: up to five names that moved in a way worth reading about, each with its reason.",

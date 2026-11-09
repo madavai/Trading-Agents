@@ -7174,8 +7174,8 @@ var require_dist = __commonJS({
         return ajv;
       }
       const [formats, exportName] = opts.mode === "fast" ? [formats_1.fastFormats, fastName] : [formats_1.fullFormats, fullName];
-      const list2 = opts.formats || formats_1.formatNames;
-      addFormats(ajv, list2, formats, exportName);
+      const list3 = opts.formats || formats_1.formatNames;
+      addFormats(ajv, list3, formats, exportName);
       if (opts.keywords)
         (0, limit_1.default)(ajv);
       return ajv;
@@ -7187,11 +7187,11 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list2, fs21, exportName) {
+    function addFormats(ajv, list3, fs21, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
-      for (const f of list2)
+      for (const f of list3)
         ajv.addFormat(f, fs21[f]);
     }
     module.exports = exports = formatsPlugin;
@@ -8257,8 +8257,8 @@ function languageName(v, fallback = "English") {
 }
 var OLD_WORLD_SEARCHES = ["Federal Reserve interest rates inflation", "S&P 500 earnings GDP economic outlook", "geopolitical risk trade war sanctions", "ECB Bank of England BOJ central bank policy", "oil commodities supply chain energy"];
 function searchesOf(v) {
-  const list2 = Array.isArray(v) ? v.filter((x) => typeof x === "string" && x.trim() !== "").map((x) => x.trim()).slice(0, 10) : [];
-  return !list2.length || list2.join("\n") === OLD_WORLD_SEARCHES.join("\n") ? [...DEFAULTS.analysis.worldNewsSearches] : list2;
+  const list3 = Array.isArray(v) ? v.filter((x) => typeof x === "string" && x.trim() !== "").map((x) => x.trim()).slice(0, 10) : [];
+  return !list3.length || list3.join("\n") === OLD_WORLD_SEARCHES.join("\n") ? [...DEFAULTS.analysis.worldNewsSearches] : list3;
 }
 function readSettings(root2) {
   let raw = {};
@@ -13285,8 +13285,8 @@ var contributors = {
 function aggregateChecks(schema) {
   const agg = {};
   const def = schema._zod.def;
-  const list2 = schema._zod.traits.has("$ZodCheck") ? [schema, ...def.checks ?? []] : def.checks ?? [];
-  for (const ch of list2)
+  const list3 = schema._zod.traits.has("$ZodCheck") ? [schema, ...def.checks ?? []] : def.checks ?? [];
+  for (const ch of list3)
     contributors[ch._zod.def.check]?.(agg, ch._zod.def);
   const bag = schema._zod.bag;
   if (bag.minimum !== void 0)
@@ -20665,11 +20665,11 @@ function parse3(block) {
 var lessonPart = (p) => [keep(p.lesson), ...[["LESSON CHECK", p.check], ["EARLIER CORRECTIONS", p.earlier], ["FIRST LESSON", p.first]].filter(([, words4]) => words4?.trim()).map(([head, words4]) => `${head}:
 ${keep(words4)}`)].join("\n\n");
 function withLesson(block, mark, lessonPart2) {
-  const b = block.trim(), nl = b.indexOf("\n"), at = b.search(/^REFLECTION:\r?$/m);
+  const b = block.trim(), nl = b.indexOf("\n"), at2 = b.search(/^REFLECTION:\r?$/m);
   const tag = b.slice(1, nl).replace(/\]\s*$/, "").split("|").map((s) => s.trim()).filter((x) => !x.startsWith("lesson:"));
-  return `[${[...tag, mark].join(" | ")}]${at < 0 ? `${b.slice(nl)}
+  return `[${[...tag, mark].join(" | ")}]${at2 < 0 ? `${b.slice(nl)}
 
-` : b.slice(nl, at)}REFLECTION:
+` : b.slice(nl, at2)}REFLECTION:
 ${lessonPart2}`;
 }
 var LESSON_NOTE = {
@@ -20932,42 +20932,42 @@ function load(dir, now) {
   return out;
 }
 var open2 = (i) => i.state === "waiting" || i.state === "running";
-function trimmed(list2) {
-  const finished = list2.filter((i) => !open2(i)).sort((a, b) => (b.endedAt ?? "").localeCompare(a.endedAt ?? ""));
+function trimmed(list3) {
+  const finished = list3.filter((i) => !open2(i)).sort((a, b) => (b.endedAt ?? "").localeCompare(a.endedAt ?? ""));
   const keep3 = new Set(finished.slice(0, MAX_FINISHED));
-  return list2.filter((i) => open2(i) || keep3.has(i));
+  return list3.filter((i) => open2(i) || keep3.has(i));
 }
 function change(dir, now, edit) {
   const file4 = queueFile(dir);
   fs12.mkdirSync(dir, { recursive: true });
   return withLock(file4, () => {
-    const { list: list2, result } = edit(load(dir, now));
-    writeWhole(file4, JSON.stringify(trimmed(list2), null, 2) + "\n");
+    const { list: list3, result } = edit(load(dir, now));
+    writeWhole(file4, JSON.stringify(trimmed(list3), null, 2) + "\n");
     return result;
   });
 }
 var readQueue = (dir, now = /* @__PURE__ */ new Date()) => load(dir, now);
-var waitingIn = (list2) => list2.filter((i) => i.state === "waiting");
-function enqueue(dir, raw, at, depth, now = /* @__PURE__ */ new Date()) {
+var waitingIn = (list3) => list3.filter((i) => i.state === "waiting");
+function enqueue(dir, raw, at2, depth, now = /* @__PURE__ */ new Date()) {
   const symbol = safeSymbol(raw);
-  return change(dir, now, (list2) => {
-    const was = list2.find((i) => i.symbol === symbol);
-    if (was?.state === "running") return { list: list2, result: list2 };
+  return change(dir, now, (list3) => {
+    const was = list3.find((i) => i.symbol === symbol);
+    if (was?.state === "running") return { list: list3, result: list3 };
     if (was?.state === "waiting") {
-      const next2 = list2.map((i) => i === was ? { ...i, ...depth ? { depth } : {} } : i);
+      const next2 = list3.map((i) => i === was ? { ...i, ...depth ? { depth } : {} } : i);
       return { list: next2, result: next2 };
     }
-    const rest = list2.filter((i) => i !== was);
+    const rest = list3.filter((i) => i !== was);
     if (rest.filter(open2).length >= MAX_OPEN) throw new QueueRefusal("FULL", `${MAX_OPEN} analyses are already waiting: let them run first`);
-    const next = [...rest, { symbol, requestedAt: at, state: "waiting", ...depth ? { depth } : {} }];
+    const next = [...rest, { symbol, requestedAt: at2, state: "waiting", ...depth ? { depth } : {} }];
     return { list: next, result: next };
   });
 }
 function dequeue(dir, raw, now = /* @__PURE__ */ new Date()) {
   const symbol = safeSymbol(raw);
-  return change(dir, now, (list2) => {
-    if (list2.some((i) => i.symbol === symbol && i.state === "running")) throw new QueueRefusal("RUNNING", `${symbol} is being analysed now: it can be taken off once its run ends`);
-    const next = list2.filter((i) => i.symbol !== symbol);
+  return change(dir, now, (list3) => {
+    if (list3.some((i) => i.symbol === symbol && i.state === "running")) throw new QueueRefusal("RUNNING", `${symbol} is being analysed now: it can be taken off once its run ends`);
+    const next = list3.filter((i) => i.symbol !== symbol);
     return { list: next, result: next };
   });
 }
@@ -21189,8 +21189,8 @@ function sectorOfSic(raw) {
 }
 async function fundTickers() {
   const t2 = await cached2("https://www.sec.gov/files/company_tickers_mf.json", 3e4);
-  const at = t2.fields?.indexOf("symbol") ?? 3;
-  return new Set((t2.data ?? []).map((r) => String(r[at] ?? "").toUpperCase()).filter(Boolean));
+  const at2 = t2.fields?.indexOf("symbol") ?? 3;
+  return new Set((t2.data ?? []).map((r) => String(r[at2] ?? "").toUpperCase()).filter(Boolean));
 }
 
 // src/data/company.ts
@@ -21337,22 +21337,22 @@ var watchFile = (dir) => path13.join(dir, "watchlist.json");
 var readWatchlist = (dir) => read(watchFile(dir), isWatch);
 function addWatch(dir, raw, onDay) {
   const symbol = safeSymbol(raw);
-  return change2(watchFile(dir), (list2) => {
-    if (list2.some((w) => w.symbol === symbol)) return list2;
-    if (list2.length >= MAX_WATCH) throw new Error(`the watchlist holds ${MAX_WATCH} stocks: remove one first`);
-    return [...list2, { symbol, favourite: false, addedOn: onDay }];
+  return change2(watchFile(dir), (list3) => {
+    if (list3.some((w) => w.symbol === symbol)) return list3;
+    if (list3.length >= MAX_WATCH) throw new Error(`the watchlist holds ${MAX_WATCH} stocks: remove one first`);
+    return [...list3, { symbol, favourite: false, addedOn: onDay }];
   }, isWatch);
 }
 function setFavourite(dir, raw, favourite) {
   const symbol = safeSymbol(raw);
-  return change2(watchFile(dir), (list2) => {
-    if (!list2.some((w) => w.symbol === symbol)) throw new Error(`${symbol} is not on the watchlist`);
-    return list2.map((w) => w.symbol === symbol ? { ...w, favourite } : w);
+  return change2(watchFile(dir), (list3) => {
+    if (!list3.some((w) => w.symbol === symbol)) throw new Error(`${symbol} is not on the watchlist`);
+    return list3.map((w) => w.symbol === symbol ? { ...w, favourite } : w);
   }, isWatch);
 }
 function removeWatch(dir, raw) {
   const symbol = safeSymbol(raw);
-  return change2(watchFile(dir), (list2) => list2.filter((w) => w.symbol !== symbol), isWatch);
+  return change2(watchFile(dir), (list3) => list3.filter((w) => w.symbol !== symbol), isWatch);
 }
 
 // src/terminal/prefs.ts
@@ -21426,7 +21426,7 @@ function cleanMarket(raw) {
   return out;
 }
 var ticketable = (symbol) => !isCrypto(symbol) && !/[\^=]/.test(symbol);
-var isShipped = (list2) => list2.length === SHIPPED_MARKET.length && list2.every((s, i) => s === SHIPPED_MARKET[i]);
+var isShipped = (list3) => list3.length === SHIPPED_MARKET.length && list3.every((s, i) => s === SHIPPED_MARKET[i]);
 function tierOf(symbol, market = SHIPPED_MARKET) {
   if (isCrypto(symbol)) return "crypto";
   if (SECTOR_FUNDS[symbol]) return "sectors";
@@ -21462,8 +21462,8 @@ function tiersOf(watchlist, market, calls) {
   const view = (tier, symbols, more = 0) => ({ tier, ...TIER_WORDS[tier], items: symbols.map(item), ...more > 0 ? { more } : {} });
   const of = (t2) => watchlist.filter((w) => tierOf(w.symbol, market) === t2).map((w) => w.symbol);
   const own2 = (t2) => {
-    const list2 = watchlist.filter((w) => tierOf(w.symbol, market) === t2).sort((a, b) => Number(b.favourite) - Number(a.favourite)).map((w) => w.symbol);
-    return view(t2, list2.slice(0, START_NAMES), list2.length - START_NAMES);
+    const list3 = watchlist.filter((w) => tierOf(w.symbol, market) === t2).sort((a, b) => Number(b.favourite) - Number(a.favourite)).map((w) => w.symbol);
+    return view(t2, list3.slice(0, START_NAMES), list3.length - START_NAMES);
   };
   return {
     startHere: [view("market", market), view("sectors", Object.keys(SECTOR_FUNDS)), own2("names"), ...of("crypto").length ? [own2("crypto")] : []],
@@ -21540,13 +21540,13 @@ function savePrefs(dir, change3, drop = []) {
   });
 }
 var marketOf = (dir) => readPrefs(dir).market ?? [...SHIPPED_MARKET];
-var saveMarket = (dir, list2) => (isShipped(list2) ? savePrefs(dir, {}, ["market"]) : savePrefs(dir, { market: list2 })).market ?? [...SHIPPED_MARKET];
+var saveMarket = (dir, list3) => (isShipped(list3) ? savePrefs(dir, {}, ["market"]) : savePrefs(dir, { market: list3 })).market ?? [...SHIPPED_MARKET];
 
 // src/terminal/guide.ts
 var NAMES_TO_PICK = 3;
 function maskEmail(email2) {
-  const at = email2.lastIndexOf("@");
-  return at > 0 ? `${email2[0]}\u2026${email2.slice(at)}` : "";
+  const at2 = email2.lastIndexOf("@");
+  return at2 > 0 ? `${email2[0]}\u2026${email2.slice(at2)}` : "";
 }
 function guideOf(f) {
   const picked = /* @__PURE__ */ new Set([...f.watchlist.map((w) => w.symbol), ...f.queue.map((q) => q.symbol), ...f.calls.map((c) => c.ticker)]);
@@ -21805,6 +21805,7 @@ function parseQuote(json, symbol, nowSec = Date.now() / 1e3) {
   const reg = m.currentTradingPeriod?.regular;
   const open4 = m.instrumentType === "CRYPTOCURRENCY" || finite2(reg?.start) && finite2(reg?.end) && nowSec >= reg.start && nowSec <= reg.end;
   const t2 = finite2(m.regularMarketTime) ? m.regularMarketTime : (r.timestamp ?? [])[Math.max(0, (r.timestamp ?? []).length - 1)];
+  if (!finite2(t2)) throw new NoData(`Yahoo Finance gave a price for ${symbol} with no time, so when it is from is not known`);
   return {
     symbol,
     name: m.longName ?? m.shortName,
@@ -21814,7 +21815,7 @@ function parseQuote(json, symbol, nowSec = Date.now() / 1e3) {
     change: previousClose === null ? null : price - previousClose,
     changePct: previousClose === null ? null : (price / previousClose - 1) * 100,
     open: open4,
-    asOf: finite2(t2) ? new Date(t2 * 1e3).toISOString() : new Date(nowSec * 1e3).toISOString(),
+    asOf: new Date(t2 * 1e3).toISOString(),
     points: points.length ? points : [price]
   };
 }
@@ -21930,7 +21931,8 @@ async function search(q, count) {
   for (const host of HOSTS) {
     try {
       const j = await getJson(`${host}/v1/finance/search?${qs}`);
-      return (j.news ?? []).filter((n) => n.title && n.providerPublishTime).map((n) => ({ title: n.title, publisher: n.publisher ?? "unknown", link: n.link ?? "", time: stamp2(n.providerPublishTime), tickers: (n.relatedTickers ?? []).map((t2) => t2.toUpperCase()) }));
+      if (!Array.isArray(j.news)) throw new Unavailable(`${new URL(host).host} answered its news search without a list of articles`);
+      return j.news.filter((n) => n.title && n.providerPublishTime).map((n) => ({ title: n.title, publisher: n.publisher ?? "unknown", link: n.link ?? "", time: stamp2(n.providerPublishTime), tickers: (n.relatedTickers ?? []).map((t2) => t2.toUpperCase()) }));
     } catch (e) {
       last = e;
     }
@@ -22007,8 +22009,8 @@ async function newsOn(symbol, day2) {
   }
 }
 async function workScreen(symbols, news, day2, now = /* @__PURE__ */ new Date()) {
-  const list2 = [...new Set(symbols)].filter((s) => !/[\^=]/.test(s));
-  const read2 = await inTurn(list2, 4, async (symbol) => {
+  const list3 = [...new Set(symbols)].filter((s) => !/[\^=]/.test(s));
+  const read2 = await inTurn(list3, 4, async (symbol) => {
     try {
       const bars = (await daily(symbol, addDays(day2, -400), day2)).bars;
       if (!bars.length || bars[bars.length - 1].date < addDays(day2, -7)) return { symbol, bars: null, news: null };
@@ -22020,7 +22022,7 @@ async function workScreen(symbols, news, day2, now = /* @__PURE__ */ new Date())
   return {
     day: day2,
     at: now.toISOString(),
-    looked: list2.length,
+    looked: list3.length,
     unavailable: read2.filter((r) => !r.bars).map((r) => r.symbol),
     picks: rank(read2.filter((r) => !!r.bars))
   };
@@ -22079,6 +22081,26 @@ function queueTop(dir, screen, day2, ring, now = /* @__PURE__ */ new Date(), fro
   return queued;
 }
 
+// src/data/odds.ts
+var list2 = (s) => {
+  try {
+    const v = JSON.parse(s ?? "[]");
+    return Array.isArray(v) ? v.map(String) : [];
+  } catch {
+    return [];
+  }
+};
+function eventsOf(j) {
+  if (Array.isArray(j.events)) return j.events;
+  if (j.error === void 0 && typeof j.pagination === "object" && j.pagination !== null) return [];
+  throw new Unavailable(`gamma-api.polymarket.com answered without its search results${typeof j.error === "string" && j.error ? `, saying "${j.error.slice(0, 140)}"` : ""}`);
+}
+function firstPrice(outcomePrices) {
+  const s = list2(outcomePrices)[0]?.trim();
+  const p = s ? Number(s) : NaN;
+  return Number.isFinite(p) && p >= 0 && p <= 1 ? p : null;
+}
+
 // src/desk/weather.ts
 var MEANING = {
   trend: "The S&P 500 against its 50- and 200-day averages: above both is rising, between them mixed, below both falling. It tells where the market has been, not where it goes next.",
@@ -22091,19 +22113,24 @@ var dayWords = (iso2) => {
   return `${Number(d)} ${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][Number(m) - 1]} ${y}`;
 };
 var unavailable = (key, name, why) => ({ key, name, state: null, tone: "", words: `Unavailable: ${why}.`, meaning: MEANING[key] });
-function trendOf(bars) {
+var stillTrading = (s, now) => {
+  const last = s.bars.at(-1), session = s.meta.session;
+  return !!last && !!session && session.date === last.date && now.getTime() >= session.start && now.getTime() < session.end;
+};
+var at = (price, date4, trading) => trading ? `is at ${price} (${dayWords(date4)}, still trading)` : `closed at ${price} on ${dayWords(date4)}`;
+function trendOf(bars, trading = false) {
   const closes = bars.map((b) => b.close), n = closes.length;
   const ma50 = sma(closes, 50)[n - 1], ma200 = sma(closes, 200)[n - 1], last = closes[n - 1];
   if (last === void 0 || ma50 == null || ma200 == null) return unavailable("trend", "Trend", "too few days of S&P 500 prices for its 200-day average");
   const above = (ma) => last > ma ? "above" : "below";
   const [state, tone] = last > ma50 && last > ma200 ? ["Rising", "ok"] : last < ma50 && last < ma200 ? ["Falling", "bad"] : ["Mixed", "warn"];
-  return { key: "trend", name: "Trend", state, tone, words: `The S&P 500 closed at ${whole2(last)} on ${dayWords(bars[n - 1].date)}, ${above(ma50)} its 50-day average (${whole2(ma50)}) and ${above(ma200)} its 200-day average (${whole2(ma200)}).`, meaning: MEANING.trend };
+  return { key: "trend", name: "Trend", state, tone, words: `The S&P 500 ${at(whole2(last), bars[n - 1].date, trading)}, ${above(ma50)} its 50-day average (${whole2(ma50)}) and ${above(ma200)} its 200-day average (${whole2(ma200)}).`, meaning: MEANING.trend };
 }
-function moodOf(bars) {
+function moodOf(bars, trading = false) {
   const last = bars[bars.length - 1];
   if (!last) return unavailable("mood", "Mood", "no VIX figure came from Yahoo Finance");
   const v = last.close, [state, tone] = v < 15 ? ["Calm", "ok"] : v <= 25 ? ["Normal", ""] : ["Wild", "bad"];
-  return { key: "mood", name: "Mood", state, tone, words: `The VIX closed at ${v.toFixed(1)} on ${dayWords(last.date)}.`, meaning: MEANING.mood };
+  return { key: "mood", name: "Mood", state, tone, words: `The VIX ${at(v.toFixed(1), last.date, trading)}.`, meaning: MEANING.mood };
 }
 function outcomeWords(title) {
   if (/no change/i.test(title)) return { words: "no change", way: "none" };
@@ -22114,15 +22141,7 @@ function outcomeWords(title) {
 }
 function ratesOf(events, now = /* @__PURE__ */ new Date()) {
   const next = events.filter((e) => /^fed decision in /i.test(e.title ?? "") && !e.closed && e.endDate && Date.parse(e.endDate) > now.getTime()).sort((a, b) => Date.parse(a.endDate) - Date.parse(b.endDate))[0];
-  const list2 = (s) => {
-    try {
-      const v = JSON.parse(s ?? "[]");
-      return Array.isArray(v) ? v.map(String) : [];
-    } catch {
-      return [];
-    }
-  };
-  const odds = (next?.markets ?? []).filter((m) => m.groupItemTitle && !m.closed && m.active !== false).map((m) => ({ ...outcomeWords(m.groupItemTitle), p: Number(list2(m.outcomePrices)[0]) })).filter((o) => Number.isFinite(o.p)).sort((a, b) => b.p - a.p);
+  const odds = (next?.markets ?? []).filter((m) => m.groupItemTitle && !m.closed && m.active !== false).map((m) => ({ ...outcomeWords(m.groupItemTitle), p: firstPrice(m.outcomePrices) })).filter((o) => o.p !== null).sort((a, b) => b.p - a.p);
   const top = odds[0];
   if (!next || !top) return unavailable("rates", "Rates", "Polymarket has no open market on the Federal Reserve's next decision");
   const [state, tone] = top.way === "cut" ? ["A cut", "ok"] : top.way === "rise" ? ["A rise", "warn"] : ["No change", ""];
@@ -22131,9 +22150,18 @@ function ratesOf(events, now = /* @__PURE__ */ new Date()) {
 }
 async function weatherNow(day2, now = /* @__PURE__ */ new Date()) {
   const [trend, mood, rates] = await Promise.all([
-    daily("^GSPC", addDays(day2, -400), day2).then((s) => trendOf(s.bars), () => unavailable("trend", "Trend", "Yahoo Finance did not answer for the S&P 500")),
-    daily("^VIX", addDays(day2, -14), day2).then((s) => moodOf(s.bars), () => unavailable("mood", "Mood", "Yahoo Finance did not answer for the VIX")),
-    getJson("https://gamma-api.polymarket.com/public-search?q=fed%20decision&limit_per_type=20").then((j) => ratesOf(j.events ?? [], now), () => unavailable("rates", "Rates", "Polymarket did not answer"))
+    daily("^GSPC", addDays(day2, -400), day2).then((s) => trendOf(s.bars, stillTrading(s, now)), () => unavailable("trend", "Trend", "Yahoo Finance did not answer for the S&P 500")),
+    daily("^VIX", addDays(day2, -14), day2).then((s) => moodOf(s.bars, stillTrading(s, now)), () => unavailable("mood", "Mood", "Yahoo Finance did not answer for the VIX")),
+    getJson("https://gamma-api.polymarket.com/public-search?q=fed%20decision&limit_per_type=20").then(
+      (j) => {
+        try {
+          return ratesOf(eventsOf(j), now);
+        } catch {
+          return unavailable("rates", "Rates", "Polymarket answered without its search results");
+        }
+      },
+      () => unavailable("rates", "Rates", "Polymarket did not answer")
+    )
   ]);
   return { at: now.toISOString(), lines: [trend, mood, rates] };
 }
@@ -22414,8 +22442,8 @@ async function startTerminal(opts) {
       if (p === "/api/robinhood/snapshot") return json(res, 200, { snapshot: robinhood.snapshot(), chosen: robinhood.chosen() });
       if (p === "/api/care") return json(res, 200, await care(day2));
       if (p === "/api/quotes") {
-        const list2 = [...new Set((url2.searchParams.get("symbols") ?? "").split(",").map((s) => s.trim()).filter(Boolean))].slice(0, 30);
-        return json(res, 200, { quotes: await Promise.all(list2.map(quote)) });
+        const list3 = [...new Set((url2.searchParams.get("symbols") ?? "").split(",").map((s) => s.trim()).filter(Boolean))].slice(0, 30);
+        return json(res, 200, { quotes: await Promise.all(list3.map(quote)) });
       }
       if (p === "/api/markets") return json(res, 200, { markets: await Promise.all(MARKETS.map(async (m) => ({ ...m, quote: await quote(m.symbol) }))) });
       if (p === "/api/history") {
@@ -22512,7 +22540,7 @@ async function startTerminal(opts) {
     }
     if (p === "/api/tiers/market" && method === "POST") {
       if (!Array.isArray(b.symbols) || b.symbols.length > MAX_MARKET) throw new Refused2(400, `choose up to ${MAX_MARKET} funds for the whole market`);
-      const list2 = [];
+      const list3 = [];
       for (const v of b.symbols) {
         let s;
         try {
@@ -22520,10 +22548,10 @@ async function startTerminal(opts) {
         } catch (e) {
           throw new Refused2(400, e.message);
         }
-        if (!list2.includes(s)) list2.push(s);
+        if (!list3.includes(s)) list3.push(s);
       }
-      for (const q of await Promise.all(list2.map(quote))) if ("error" in q && q.error === "no-data") throw new Refused2(422, q.message);
-      saveMarket(dir, list2);
+      for (const q of await Promise.all(list3.map(quote))) if ("error" in q && q.error === "no-data") throw new Refused2(422, q.message);
+      saveMarket(dir, list3);
       return json(res, 200, { market: marketView(dir) });
     }
     if (p === "/api/paper" && method === "POST") {

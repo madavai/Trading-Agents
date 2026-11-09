@@ -90,9 +90,16 @@ export async function economicSeries(indicator: string, analysis: string, lookBa
   const first = obs[0]!, last = obs[obs.length - 1]!, ago = yearBefore(all, last.date);
   const fmt = (v: number) => (Math.abs(v) >= 1000 ? v.toLocaleString('en-US', { maximumFractionDigits: 1 }) : v.toFixed(2));
   const plusMinus = (v: number) => { const t = fmt(Math.abs(v)); return Number(t.replace(/,/g, '')) === 0 ? t : `${v > 0 ? '+' : '-'}${t}`; };
-  // A rate or a spread changes by percentage points; a level or an index changes by a percentage of itself as well.
+  // A rate or a spread changes by percentage points; a level or an index changes by a percentage of itself as well. A
+  // series asked by its FRED id is of units the desk does not know (a rate's percent change would be a percent of a
+  // percent), so its change is in its own units alone; and nothing has a percentage change from zero.
   const points = /\((percent|percentage points)\)/.test(known?.[1] ?? '');
-  const changeOf = (from: Obs) => { const d = last.value - from.value; return points ? `${plusMinus(d)} percentage points` : `${plusMinus(d)} (${signed(from.value ? (d / Math.abs(from.value)) * 100 : 0, 1)}%)`; };
+  const changeOf = (from: Obs) => {
+    const d = last.value - from.value;
+    if (points) return `${plusMinus(d)} percentage points`;
+    if (!known) return `${plusMinus(d)} in the series' own units (no percentage change: the desk does not know this series' units)`;
+    return from.value ? `${plusMinus(d)} (${signed((d / Math.abs(from.value)) * 100, 1)}%)` : `${plusMinus(d)} (no percentage change from zero)`;
+  };
   const lines = [
     `## ${known?.[1] ?? id} - FRED series ${id}`, '',
     `- Latest value known by ${day}: ${fmt(last.value)} (for ${periodOf(last.date, freq)})`,

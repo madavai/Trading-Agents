@@ -54,27 +54,41 @@ export function parseReport(xml: string, cls: string | null): Omit<Report, 'file
   };
 }
 
-/** A fund's portfolio reports (originals; an amendment's period cannot be told from the list), newest first. */
-async function filings(cik: string, series: string | null): Promise<Array<{ accession: string; filed: string }>> {
-  let list: Array<{ form: string; accession: string; filed: string }>;
-  if (series) {
-    // A trust files for many funds under one number: the SEC lists each fund's (its series') reports apart.
-    const atom = await getText(`https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${series}&type=NPORT-P&dateb=&owner=include&count=40&output=atom`, { timeoutMs: 30_000 });
-    list = blocks(atom, 'entry').map((e) => ({ form: text(e, 'filing-type'), accession: text(e, 'accession-number'), filed: text(e, 'filing-date') }));
-  } else {
-    const r = (await submissions(cik)).filings?.recent ?? {};
-    list = (r.form ?? []).map((form, i) => ({ form, accession: r.accessionNumber?.[i] ?? '', filed: r.filingDate?.[i] ?? '' }));
-  }
-  return list.filter((f) => f.form === 'NPORT-P' && ACCESSION.test(f.accession) && DAY.test(f.filed)).sort((a, b) => b.filed.localeCompare(a.filed));
+/** An SEC list the desk asks for, with a failure said as the SEC's: never read as an answer. */
+async function fromSec<T>(what: string, ask: () => Promise<T>): Promise<T> {
+  try { return await ask(); } catch (e) { throw new Unavailable(`${what} could not be read (${(e as Error).message})`); }
 }
 
-/** The latest portfolio report a fund had made public by `day`; null when the ticker is not a fund that files them (a
- *  company, a trust holding gold or bitcoin, a fund outside the US). */
+/** A fund's portfolio reports (originals; an amendment's period cannot be told from the list), newest first. A list that
+ *  is not the SEC's list, or comes back empty, is the SEC's fault: never "not a fund". A filer whose list holds filings
+ *  and no portfolio report among them is a company or a trust (NoData). */
+async function filings(sym: string, cik: string, series: string | null): Promise<Array<{ accession: string; filed: string }>> {
+  const reports = (list: Array<{ form: string; accession: string; filed: string }>) =>
+    list.filter((f) => f.form === 'NPORT-P' && ACCESSION.test(f.accession) && DAY.test(f.filed)).sort((a, b) => b.filed.localeCompare(a.filed));
+  if (series) {
+    // A trust files for many funds under one number: the SEC lists each fund's (its series') reports apart.
+    const atom = await fromSec(`the SEC's list of ${sym}'s portfolio reports`, () => getText(`https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${series}&type=NPORT-P&dateb=&owner=include&count=40&output=atom`, { timeoutMs: 30_000 }));
+    if (!/<feed[\s>]/.test(atom)) throw new Unavailable(`the SEC answered with something that is not its list of ${sym}'s portfolio reports`);
+    const found = reports(blocks(atom, 'entry').map((e) => ({ form: text(e, 'filing-type'), accession: text(e, 'accession-number'), filed: text(e, 'filing-date') })));
+    if (!found.length) throw new Unavailable(`the SEC lists ${sym} as a fund, but its list of the fund's portfolio reports (form N-PORT) came back empty`);
+    return found;
+  }
+  const r = (await fromSec(`the SEC's list of ${sym}'s filings`, () => submissions(cik))).filings?.recent ?? {};
+  const list = (r.form ?? []).map((form, i) => ({ form, accession: r.accessionNumber?.[i] ?? '', filed: r.filingDate?.[i] ?? '' }));
+  if (!list.length) throw new Unavailable(`the SEC's list of ${sym}'s filings came back empty`);
+  const found = reports(list);
+  const seen = list.length === 1 ? 'the one filing in the SEC\'s list of its recent filings is not one' : `none of the ${list.length.toLocaleString('en-US')} filings in the SEC's list of its recent filings is one`;
+  if (!found.length) throw new NoData(`${sym} reports to the SEC as a company or a trust, not as a fund that lists its holdings (form N-PORT): ${seen}. For a company, use the company tools; a trust that holds gold or bitcoin holds just that`);
+  return found;
+}
+
+/** The latest portfolio report a fund had made public by `day`; null only when the SEC's lists of funds and of filers were
+ *  both read and name it in neither (a fund outside the US). A company or a trust that files no such report is NoData; a
+ *  list that cannot be read is the SEC's outage (Unavailable). */
 export async function latestReport(sym: string, day: string): Promise<Report | null> {
-  const fund = await fundOf(sym), cik = fund?.cik ?? (await cikFor(sym));
+  const fund = await fromSec('the SEC\'s list of funds', () => fundOf(sym)), cik = fund?.cik ?? (await fromSec('the SEC\'s list of US filers', () => cikFor(sym)));
   if (!cik) return null;
-  const all = await filings(cik, fund?.series ?? null);
-  if (!all.length) return null;
+  const all = await filings(sym, cik, fund?.series ?? null);
   const pick = all.find((f) => f.filed <= day);
   if (!pick) throw new NoData(`${sym}'s first portfolio report to the SEC (form N-PORT) was filed on ${all.at(-1)!.filed}, after ${day}`);
   const xml = await getText(`https://www.sec.gov/Archives/edgar/data/${Number(cik)}/${pick.accession.replace(/-/g, '')}/primary_doc.xml`, { timeoutMs: 60_000 });
@@ -94,8 +108,9 @@ const ISSUERS: Record<string, string> = {
 };
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 let regions: Intl.DisplayNames | null = null;
+const NO_COUNTRY = 'not given';
 const country = (code: string): string => {
-  if (!/^[A-Z]{2}$/.test(code)) return 'not given';   // the SEC's "N/A", or nothing
+  if (!/^[A-Z]{2}$/.test(code)) return NO_COUNTRY;   // the SEC's "N/A", or nothing
   try { regions ??= new Intl.DisplayNames(['en'], { type: 'region' }); return regions.of(code) ?? code; } catch { return code; }
 };
 const pct = (n: number) => `${n.toFixed(2)}%`;
@@ -122,8 +137,9 @@ export function renderReport(sym: string, day: string, r: Report, topN = 10): st
   ];
   const where = shares(r.holdings, (h) => country(h.country));
   if (where.length) {
-    const us = where.find(([k]) => k === 'United States')?.[1] ?? 0, total = where.reduce((a, [, p]) => a + p, 0);
-    lines.push(`Countries: ${where.slice(0, 5).map(([k, p]) => `${k} ${pct(p)}`).join(', ')}${where.length > 5 ? `, and ${where.length - 5} more` : ''} (outside the US together: ${pct(total - us)})`);
+    // A line with no country (cash, a future) is not known to be outside the US: it is named apart, never added there.
+    const of = (k: string) => where.find(([c]) => c === k)?.[1] ?? 0, us = of('United States'), none = of(NO_COUNTRY), total = where.reduce((a, [, p]) => a + p, 0);
+    lines.push(`Countries: ${where.slice(0, 5).map(([k, p]) => `${k} ${pct(p)}`).join(', ')}${where.length > 5 ? `, and ${where.length - 5} more` : ''} (outside the US together: ${pct(total - us - none)}${none ? `; no country given for ${pct(none)}` : ''})`);
   }
   const bonds = r.holdings.filter((h) => h.maturity && h.pct > 0);
   const weight = bonds.reduce((a, h) => a + h.pct, 0);
