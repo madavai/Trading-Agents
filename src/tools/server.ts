@@ -62,8 +62,8 @@ export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetc
 
   server.registerTool('desk_check', {
     title: 'Desk check',
-    description: 'Check that this computer is ready for the Trading Agents desk: Node, the desk data folder, whether a Robinhood sign-in is saved, whether the desk\'s agents and team are as the project ships them, whether this conversation\'s steps for the team are the ones in this folder, and whether each free data source answers (naming the one it does not ask). It sends no order and reads no secret; the contact email is shown masked. All it writes is a test file in desk-data, removed at once.',
-    inputSchema: { team_version: z.string().max(40).optional().describe('The version of the team\'s steps, exactly as the team\'s own "Check this computer" step gives it; left out when the steps give none') },
+    description: 'Check that this computer is ready for the Trading Agents desk: Node, the desk data folder, whether a Robinhood sign-in is saved, whether the desk\'s agent files in this folder are as the project ships them, whether this conversation\'s steps for the team are the ones in this folder (only from the version those steps give; without one it says they were not compared), and whether each free data source answers (naming the one it does not ask). Pass on its line about this conversation\'s steps and its line about the agent files as written, never one for the other. It sends no order and reads no secret; the contact email is shown masked. All it writes is a test file in desk-data, removed at once.',
+    inputSchema: { team_version: z.string().max(40).optional().describe('The version of the team\'s steps, exactly as the trading-desk team\'s own "Check this computer" step gives it, in the instructions this conversation began with. Never read it from a file and never make one up: left out, the check says this conversation\'s steps were not compared') },
     annotations: READ,
   }, async (a) => text(await deskCheck(root, fetchImpl, source, { updated: fresh.updated(), teamVersion: a.team_version }, home)));
 

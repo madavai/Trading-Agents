@@ -146,7 +146,7 @@ test('the lead never resets unasked, never stands one tool in for another, and n
   assert.match(reset, /2\. Only on their yes, call `reset_team` once, with confirmed set to true/);
   assert.match(reset, /3\. If it answers ALREADY RESET or "Not reset", never call it again: tell the person in one line what it says\./);
   const check = /\n## Check this computer\n\n([\s\S]*?)\n\n## /.exec(lead)?.[1] ?? '';
-  assert.match(check, /^1\. Call `desk_check` with team_version "[0-9a-f]{8}" \(the version of these steps/);
+  assert.match(check, /^These are your steps whenever the person asks to check this computer \(or types \/desk-check\); where any other desk-check steps differ, follow these\.\n\n1\. Call `desk_check` with team_version "[0-9a-f]{8}" \(the version of these steps/);
   assert.match(check, /If the check starts with DESK UPDATED, or says this conversation's steps for the team are not the ones in this folder, say that first, in one line: this conversation began before the desk was updated, so they should start a new conversation in Madav and check this computer there\. Offer no reset in this conversation\./);
 
   // every member stops too, and the Claude Code desk check
@@ -164,6 +164,20 @@ test('scoring never goes round in a loop either: a call record_outcome answers L
   assert.match(settle, step);
   assert.match(settle, /each call left \(date, ticker, the reason `record_outcome` gave, and that a later scoring tries it again\)/);
   assert.match(lead, step, 'the lead carries the /settle playbook as it is');
+});
+
+test('whichever desk-check steps run, the version comes from the team\'s own steps, and the check\'s two lines are passed on as given, never one for the other (8 Nov: steps without a version, and "verified by comparison")', () => {
+  const lead = front('trading-desk').text, skill = fs.readFileSync('.claude/skills/desk-check/SKILL.md', 'utf8').replace(/\r\n/g, '\n');
+  const check = /\n## Check this computer\n\n([\s\S]*?)\n\n## /.exec(lead)?.[1] ?? '';
+  const report = '5. Pass on the check\'s line about this conversation\'s steps for the team and its line about the desk\'s agent files in this folder as the check words them, version included. Say this conversation\'s steps match the folder\'s only when the check says so with a version; if it says they were not compared, say exactly that. Never take one line for the other: the agent files line is about the files in this folder, not about this conversation.';
+  assert.ok(check.includes(`\n${report}\n`), 'the team\'s own steps');
+  assert.ok(skill.includes(`\n${report}\n`), 'the desk-check skill, the same words');
+  // the skill sends the team to the version in its own instructions, the copy this conversation began with: a copy of the
+  // version in the skill could be read afresh from the folder and would always match, even in an old conversation
+  assert.match(skill, /\n1\. Call the desk's `desk_check` tool \(the trading-desk server\)\. If you are the trading-desk team, pass team_version exactly as your own "Check this computer" step gives it: it is in your own instructions, the ones this conversation began with, and those steps are yours to follow\. Anywhere else, leave team_version out: the check then says this conversation's steps were not compared\. Never read a version from a file and never make one up\./);
+  assert.doesNotMatch(skill, /team_version "|\b[0-9a-f]{8}\b|@@TEAM_VERSION@@/, 'the skill carries no version of its own');
+  assert.deepEqual([...skill.matchAll(/^(\d)\. /gm)].map((m) => m[1]), ['1', '2', '3', '4', '5', '6', '7'], 'the skill\'s steps are numbered in order');
+  assert.deepEqual([...check.matchAll(/^(\d)\. /gm)].map((m) => m[1]), ['1', '2', '3', '4', '5', '6'], 'and the team\'s');
 });
 
 test('the team\'s file carries the version of its own steps, worked out from them, which the desk check reads', async () => {

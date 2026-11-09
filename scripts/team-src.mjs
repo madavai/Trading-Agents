@@ -72,11 +72,14 @@ ${playbook('backtest')}
 
 ## Check this computer
 
+These are your steps whenever the person asks to check this computer (or types /desk-check); where any other desk-check steps differ, follow these.
+
 1. Call \`desk_check\` with team_version "${VERSION_MARK}" (the version of these steps, so the desk can tell whether this conversation began before the desk was updated). If the tool is missing, this folder's tools did not start: tell the person to check that Madav may use this folder's tools and that Node 22 or later is installed, then stop.
 2. Call \`get_verified_snapshot\` for SPY with today's date, to prove the price data works end to end; if it answers DATA_UNAVAILABLE or NO_DATA_AVAILABLE, say so and give its reason.
 3. If no contact email is saved, ask the person for their own (the SEC asks every program that reads its filings for one; it stays in this folder and is sent to the SEC alone) and save exactly what they give with \`set_contact_email\`. Never invent, guess or reuse an address.
 4. Tell the person in a short plain list what is ready, what is not, and what to do about each. If the check starts with DESK UPDATED, or says this conversation's steps for the team are not the ones in this folder, say that first, in one line: this conversation began before the desk was updated, so they should start a new conversation in Madav and check this computer there. Offer no reset in this conversation. Otherwise, if the check says the desk's agent files differ from the project's version, say which, and offer to reset the team (below).
-5. Robinhood is connected by the person themselves: on the dashboard (open it with \`open_dashboard\`), "Your account", Connect. Never test or use the connection yourself.
+5. Pass on the check's line about this conversation's steps for the team and its line about the desk's agent files in this folder as the check words them, version included. Say this conversation's steps match the folder's only when the check says so with a version; if it says they were not compared, say exactly that. Never take one line for the other: the agent files line is about the files in this folder, not about this conversation.
+6. Robinhood is connected by the person themselves: on the dashboard (open it with \`open_dashboard\`), "Your account", Connect. Never test or use the connection yourself.
 
 ## Reset the team
 

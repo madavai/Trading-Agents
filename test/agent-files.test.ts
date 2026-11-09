@@ -7,7 +7,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { deskServer } from '../src/tools/server.js';
 import { driftOf, lastReset, noteReset, RESET_AGAIN_MS, resetAgainWords, resetAgentFiles, shippedAgentFiles, teamVersionOf } from '../src/desk/agent-files.js';
-import { agentDrift, agentsLine, teamLine } from '../src/check/desk-check.js';
+import { agentDrift, agentsLine, NO_VERSION, teamLine, TWO_LINES } from '../src/check/desk-check.js';
 import { UPDATED_NOTE } from '../src/desk/freshness.js';
 import { awayHome } from './away.js';
 
@@ -31,10 +31,15 @@ function saveInMadav(root: string): void {
   fs.writeFileSync(path.join(root, AG, 'my-own.md'), 'mine');
 }
 
-test('a clone\'s agent files are the project\'s version, and the desk check says so', async () => {
+test('a clone\'s agent files are the project\'s version, and the desk check says so of the files in this folder alone', async () => {
   const drift = await agentDrift(clone(), repo);
   assert.deepEqual(drift, { changed: [], missing: [] });
-  assert.deepEqual(agentsLine(drift), { ok: true, text: 'The desk\'s agents and the trading-desk team are as the project ships them' });
+  assert.deepEqual(agentsLine(drift), { ok: true, text: 'The desk\'s agent files in this folder (its thirteen agents, the team\'s file and its line-up) are as the project ships them' });
+  // the words name what was compared: thirteen agents, the team's file and its line-up
+  const shipped = await shippedAgentFiles(repo);
+  assert.equal(shipped.size, 15);
+  assert.equal([...shipped.keys()].filter((p) => !p.startsWith(`${AG}/trading-desk.`)).length, 13);
+  assert.ok(shipped.has(`${AG}/trading-desk.md`) && shipped.has(`${AG}/trading-desk.team.json`));
 });
 
 test('the desk check names each agent file a save changed, and the reset puts back only the desk\'s own', async () => {
@@ -44,7 +49,8 @@ test('the desk check names each agent file a save changed, and the reset puts ba
   assert.deepEqual(drift, { changed: [`${AG}/bull-researcher.md`, `${AG}/trading-desk.team.json`], missing: [`${AG}/trader.md`] });
   const line = agentsLine(drift);
   assert.equal(line.ok, false);
-  assert.match(line.text, /^3 of the desk's agent files differ from the project's version \(bull-researcher, the team's line-up and trader\)\. An edit, or an older version of Madav, can do this\. Ask the desk to reset the team/);
+  assert.match(line.text, /^3 of the desk's agent files in this folder differ from the project's version \(bull-researcher, the team's line-up and trader\)\. An edit, or an older version of Madav, can do this\. Ask the desk to reset the team/);
+  assert.match(agentsLine({ changed: [`${AG}/trader.md`], missing: [] }).text, /^One of the desk's agent files in this folder differs from the project's version \(trader\)\. /);
 
   assert.deepEqual(resetAgentFiles(root, shipped), [`${AG}/bull-researcher.md`, `${AG}/trading-desk.team.json`, `${AG}/trader.md`]);
   assert.deepEqual(driftOf(root, shipped), { changed: [], missing: [] });
@@ -147,7 +153,9 @@ test('tools started before the desk was updated say so in every answer, never re
   const root = project(), shipped = await shippedAgentFiles(root);
   const { client, call } = await serve(root);
   assert.doesNotMatch(await call('read_queue'), /DESK UPDATED/, 'nothing is said while the folder holds the code these tools started with');
-  assert.doesNotMatch(await call('desk_check'), /DESK UPDATED|not compared/);
+  const before = await call('desk_check');
+  assert.doesNotMatch(before, /DESK UPDATED|not compared with the project's version|updated after/);
+  assert.match(before, /- --  This conversation's steps for the team were not compared with the ones in this folder: no version was given\n/);
 
   fs.appendFileSync(path.join(root, 'dist', 'desk-tools.mjs'), '// and after it\n');   // an update, as a pull writes it
   for (const name of ['read_queue', 'list_settlements', 'end_backtest']) {
@@ -167,8 +175,9 @@ test('tools started before the desk was updated say so in every answer, never re
 
   const check = await call('desk_check', { team_version: teamVersionOf(shipped) });
   assert.ok(check.startsWith(`${UPDATED_NOTE}\n\nTrading Agents desk check`));
-  assert.match(check, /- NO  The desk's agents were not compared with the project's version: the desk in this folder was updated after the desk's tools in this conversation started\. Start a new conversation in Madav and check this computer there; reset nothing from this one/);
-  assert.doesNotMatch(check, /differs from the project's version|steps for the team are the ones/, 'tools from before the update hold the old source: they say nothing about the files');
+  assert.match(check, /\nThis computer:\n- --  This conversation's steps for the team were not compared with the ones in this folder: the desk in this folder was updated after the desk's tools in this conversation started\n/, 'said plainly, first, even with a version given');
+  assert.match(check, /- NO  The desk's agent files in this folder were not compared with the project's version: the desk in this folder was updated after the desk's tools in this conversation started\. Start a new conversation in Madav and check this computer there; reset nothing from this one/);
+  assert.doesNotMatch(check, /differs from the project's version|steps for the team are the ones|are as the project ships them/, 'tools from before the update hold the old source: they say nothing about the files');
   await client.close();
 });
 
@@ -189,16 +198,39 @@ test('a change to the team\'s source or to a skill is an update too; a person\'s
   await client.close();
 });
 
-test('the desk check says whether this conversation\'s steps for the team are the folder\'s, from the version the team\'s file gives it', async () => {
+test('the desk check says whether this conversation\'s steps for the team are the folder\'s, from the version the team\'s file gives it, and plainly when it did not compare them', async () => {
   const root = clone(), shipped = await shippedAgentFiles(repo), now = teamVersionOf(shipped)!;
   assert.match(now, /^[0-9a-f]{8}$/);
   const { client, call } = await serve(root, repo);
+  const filesLine = "- OK  The desk's agent files in this folder (its thirteen agents, the team's file and its line-up) are as the project ships them\n";
+  const two = `\n${TWO_LINES}\n\nFree data sources:\n`;
+  assert.match(TWO_LINES, /^Pass on the line about this conversation's steps for the team and the line about the desk's agent files in this folder as they are written\. Only the first can say whether this conversation's steps are the folder's, and only with a version shown; the second is about the files alone\. Never take one for the other\.$/);
+
+  // the version this conversation's steps give, the folder's: it is shown and said to match
   const same = await call('desk_check', { team_version: now });
   assert.match(same, new RegExp(`\\nThis computer:\\n- OK  This conversation's steps for the team are the ones in this folder \\(version ${now}\\)\\n`));
+  assert.ok(same.includes(filesLine) && same.includes(two), 'the files line, then how to pass on the two');
+  const computer = (check: string) => check.split('\nFree data sources:\n')[0];   // the sources' timings vary
+  assert.equal(computer(await call('desk_check', { team_version: ` ${now} ` })), computer(same), 'spaces around it do not matter');
+
+  // an older version: not the folder's, first, with both versions
   const old = await call('desk_check', { team_version: '0badc0de' });
   assert.match(old, new RegExp(`\\nThis computer:\\n- NO  This conversation's steps for the team \\(version 0badc0de\\) are not the ones in this folder now \\(version ${now}\\): this conversation began before the desk was updated\\. Start a new conversation in Madav, where the new steps load, and check this computer there; reset nothing from this one\\n`), 'the first line under This computer');
-  for (const none of [{}, { team_version: 'the latest' }, { team_version: '' }]) assert.doesNotMatch(await call('desk_check', none), /steps for the team/, `${JSON.stringify(none)} says nothing either way`);
-  assert.equal(teamLine('0badc0de', undefined)!.ok, false);
+  assert.ok(old.includes(filesLine), 'the files in the folder can match while this conversation\'s steps do not: one never stands for the other');
+
+  // no version (8 Nov 2026: steps that gave none, and a team that then read the files line as its own steps): said plainly,
+  // in a line of its own, first, marked neither OK nor NO, and true in a plain chat too
+  for (const [given, why] of [[{}, NO_VERSION], [{ team_version: '' }, NO_VERSION], [{ team_version: '   ' }, NO_VERSION], [{ team_version: 'the latest' }, 'what was given is not a version'], [{ team_version: '446FC181X' }, 'what was given is not a version']] as const) {
+    const none = await call('desk_check', given);
+    assert.match(none, new RegExp(`\\nThis computer:\\n- --  This conversation's steps for the team were not compared with the ones in this folder: ${why}\\n- OK  Node `), JSON.stringify(given));
+    assert.doesNotMatch(none, /steps for the team are the ones|\(version [0-9a-f]{8}\)/, `${JSON.stringify(given)}: no match and no version is claimed`);
+    assert.ok(none.includes(filesLine) && none.includes(two), JSON.stringify(given));
+  }
+  assert.equal(NO_VERSION, 'no version was given');
+  assert.deepEqual(teamLine(undefined, now), { ok: false, unchecked: true, text: "This conversation's steps for the team were not compared with the ones in this folder: no version was given" });
+  assert.equal(teamLine('0badc0de', undefined).ok, false);
+  assert.match(teamLine('0badc0de', undefined).text, /^This conversation's steps for the team \(version 0badc0de\) could not be compared: the team's file in this folder carries no version$/);
+  assert.equal(teamLine(now, now, true).unchecked, true, 'tools started before an update compare nothing, a version given or not');
   await client.close();
 });
 
@@ -206,7 +238,7 @@ test('a folder without the project\'s source says the agents could not be compar
   const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'ta-agents-'));
   const line = agentsLine(await agentDrift(empty));
   assert.equal(line.ok, false);
-  assert.match(line.text, /^The desk's agents could not be compared with the project's version: /);
+  assert.match(line.text, /^The desk's agent files in this folder could not be compared with the project's version: /);
   const [a, b] = InMemoryTransport.createLinkedPair();
   await deskServer(empty, undefined, empty, awayHome()).connect(a);
   const client = new Client({ name: 'test', version: '0' });
