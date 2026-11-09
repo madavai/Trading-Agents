@@ -56,7 +56,8 @@ async function pace(host: string): Promise<void> {
 // Answers are kept on disk, shared by every copy of the tool server, so the analysts and a repeated question do not ask a
 // source again. A filed document never changes and the SEC's yearly figures change only when something is filed, so they
 // are kept a day; a filer's list of filings gains a Form 4 any hour, so it is kept an hour, as is FRED (a figure released
-// at 8:30 must reach a 9:00 analysis); prices and the rest five minutes. A failure is never kept. Every tool that serves a
+// at 8:30 must reach a 9:00 analysis); prices and the rest five minutes. A failure is never kept, nor an answer asked for
+// as data that is not data (a web page saying the service will be right back). Every tool that serves a
 // kept answer can say when it was read (`getTextAt`, `readWords`).
 const MINUTE = 60_000;
 export function keepFor(url: string): number {
@@ -96,10 +97,12 @@ export async function getText(url: string, opts: { timeoutMs?: number; headers?:
   return (await getTextAt(url, opts)).text;
 }
 
-/** The answer and when it was read from the source: now, or when the kept copy was read. */
-export async function getTextAt(url: string, opts: { timeoutMs?: number; headers?: Record<string, string> } = {}): Promise<{ text: string; at: number }> {
+/** The answer and when it was read from the source: now, or when the kept copy was read. `usable`, when given, says
+ *  whether an answer is what was asked for (data, not a web page): one that is not is neither kept nor served from the
+ *  kept copy, so the next question asks the source again. */
+export async function getTextAt(url: string, opts: { timeoutMs?: number; headers?: Record<string, string>; usable?: (text: string) => boolean } = {}): Promise<{ text: string; at: number }> {
   const host = new URL(url).host, cached = readCache(url);
-  if (cached !== null) return cached;
+  if (cached !== null && (!opts.usable || opts.usable(cached.text))) return cached;
   for (let attempt = 0; ; attempt++) {
     let res: Response;
     await pace(host);
@@ -125,7 +128,7 @@ export async function getTextAt(url: string, opts: { timeoutMs?: number; headers
       throw new Unavailable(`${host} refused (HTTP ${res.status})${said ? `, saying "${said}"` : ''}${res.status === 429 ? '; it is rate-limiting this computer, so try again in a few minutes' : ''}${sec ? (emailNow().trim() ? ' [a contact email was sent]' : ' [no contact email was sent]') : ''}`);
     }
     const at = Date.now();
-    writeCache(url, text);
+    if (!opts.usable || opts.usable(text)) writeCache(url, text);
     return { text, at };
   }
 }
@@ -148,8 +151,12 @@ export async function getJson<T>(url: string, opts: { timeoutMs?: number; header
 
 /** The answer as data, and when it was read from the source. */
 export async function getJsonAt<T>(url: string, opts: { timeoutMs?: number; headers?: Record<string, string> } = {}): Promise<{ value: T; at: number }> {
-  const { text, at } = await getTextAt(url, opts);
-  try { return { value: JSON.parse(text) as T, at }; } catch { throw new Unavailable(`${new URL(url).host} answered with something that is not data`); }
+  // Read once: the check that decides whether the answer is kept is the reading itself.
+  const read: { text?: string; value?: T } = {};
+  const usable = (text: string): boolean => { try { read.value = JSON.parse(text) as T; read.text = text; return true; } catch { return false; } };
+  const { text, at } = await getTextAt(url, { ...opts, usable });
+  if (read.text !== text) throw new Unavailable(`${new URL(url).host} answered with something that is not data`);
+  return { value: read.value as T, at };
 }
 
 /** What a tool says when a source failed: never an empty finding, never a number to guess around. */
