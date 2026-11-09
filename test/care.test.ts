@@ -6,12 +6,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { agoWords, careOf, deskSymbol, dueForRerate, isStale, readRerate, rerateWeekly, stopIn, stopOf, toWatch, viewOf, watched, type CareInput, type HoldingCare, type Stop } from '../src/desk/care.js';
-import { readHoldings, saveHoldings } from '../src/desk/holdings.js';
+import { agoWords, careOf, deskSymbol, dueForRerate, isStale, readRerate, rerateWeekly, stopIn, stopOf, stopsAtClose, toWatch, viewOf, watched, type CareInput, type HoldingCare, type Stop } from '../src/desk/care.js';
+import { readHoldings, saveAccountHoldings, saveHoldings } from '../src/desk/holdings.js';
 import { Journal } from '../src/desk/journal.js';
 import { saveSection } from '../src/desk/runs.js';
 import { enqueue, MAX_OPEN, readQueue } from '../src/desk/queue.js';
-import { morningBrief, morningList } from '../src/desk/routine.js';
+import { eveningBrief, morningBrief, morningList, stopLines } from '../src/desk/routine.js';
 import { Sectors } from '../src/desk/sectors.js';
 import { configure } from '../src/data/http.js';
 import { DEFAULT_CAPS, readSettings } from '../src/settings.js';
@@ -254,4 +254,42 @@ test('on the dashboard: each holding with the desk\'s view, the Agentic account\
     enqueue(dir, 'AMD', new Date().toISOString(), 'shallow');
     assert.equal((await get('/api/care')).holdings.find((c) => c.agentic && c.symbol === 'AMD')?.rerating, 'waiting');
   } finally { await term.close(); delete process.env.TRADING_AGENTS_TODAY; }
+});
+
+test('with the dashboard closed, the evening wrap-up names each holding whose last close is below its stop, and never calls an unread close above it (audit 1 F5)', async () => {
+  const { dir } = desk();
+  const plan = (level: string) => `**Action**: Buy\n\n**Entry Price**: 190\n**Stop Loss**: ${level}\n**Position Sizing**: 2% of the account`;
+  saveAccountHoldings(dir, [
+    { label: 'Desk', tradable: true, positions: [{ ticker: 'NVDA', quantity: 3 }, { ticker: 'AMD', quantity: 2 }, { ticker: 'TSLA', quantity: 1 }, { ticker: 'META', quantity: 1 }, { ticker: 'KO', quantity: 5 }] },
+    { label: 'Individual account', tradable: false, positions: [{ ticker: 'AAPL', quantity: 9 }] },
+  ], '2026-11-06');
+  for (const [ticker, level] of [['NVDA', '185.30'], ['AMD', '150'], ['TSLA', 'not provided'], ['META', '600'], ['AAPL', '250']] as const) {
+    call(dir, ticker, '2026-11-02', 'Hold'); saveSection(dir, ticker, '2026-11-02', 'trader', plan(level));
+  }
+  const closes: Record<string, number> = { NVDA: 182.4, AMD: 150, AAPL: 1 };
+  const asked: string[] = [];
+  const s = await stopsAtClose(dir, '2026-11-06', async (symbol) => { asked.push(symbol); if (!(symbol in closes)) throw new Error('Yahoo Finance did not answer'); return { date: '2026-11-06', close: closes[symbol]! }; });
+  assert.deepEqual(asked, ['NVDA', 'AMD', 'META'], 'the Agentic account\'s holdings with a stop at a price level alone: no call (KO), no level (TSLA), another account (AAPL)');
+  const lines = stopLines(s).join('\n');
+  assert.match(lines, /^4\. Stops at the last close \(the dashboard warns of a stop only while its page is open, so the wrap-up checks them here\):\n/);
+  assert.match(lines, /\n {3}- BELOW ITS STOP: NVDA closed at 182\.40 on 2026-11-06 \(Fri\), below the stop of 185\.30 the desk's trader proposed in the call of 2026-11-02 \(Mon\)\.\n/);
+  assert.match(lines, /\n {3}- AMD closed at 150\.00 on 2026-11-06 \(Fri\), at or above the stop of 150\.00/, 'at the stop is not below it');
+  assert.match(lines, /\n {3}- META: its last close could not be read \(Yahoo Finance did not answer\), so whether it is below the stop of 600\.00 the desk's trader proposed in the call of 2026-11-02 \(Mon\) is not known\. Never say it is above\.\n/);
+  assert.match(lines, /Name it first in your report, with its close and its stop \(NVDA\)\. Nothing is sold by itself: selling is the person's own decision, on the dashboard or in the Robinhood app\.$/);
+
+  // what it says when there is nothing it can check: never "none is below"
+  assert.match(stopLines(undefined).join('\n'), /: not checked this evening\. Say so\.$/);
+  assert.match(stopLines({ state: 'failed', why: 'the journal could not be read' }).join('\n'), /they could not be checked \(the journal could not be read\)\. Say so: whether a holding closed below its stop is not known\.$/);
+  const empty = desk().dir;
+  assert.deepEqual((await stopsAtClose(empty, '2026-11-06', async () => { throw new Error('not asked'); })).state, 'unknown', 'no holdings known: not "nothing held"');
+  saveAccountHoldings(empty, [{ label: 'Individual account', tradable: false, positions: [{ ticker: 'AAPL', quantity: 9 }] }], '2026-11-06');
+  assert.equal((await stopsAtClose(empty, '2026-11-06', async () => { throw new Error('not asked'); })).state, 'no-agentic');
+  saveAccountHoldings(empty, [{ label: 'Desk', tradable: true, positions: [] }], '2026-11-06');
+  assert.equal((await stopsAtClose(empty, '2026-11-06', async () => { throw new Error('not asked'); })).state, 'nothing-held');
+  assert.match(stopLines({ state: 'checked', held: 2, stops: [] }).join('\n'), /none of the 2 holdings has a stop at a price level in the desk's latest call on it, so there is none to check\.$/);
+  assert.match(stopLines({ state: 'checked', held: 1, stops: [{ symbol: 'AMD', level: 150, called: '2026-11-02', close: { date: '2026-11-06', close: 151 } }] }).join('\n'), /None closed below its stop: say so in one line\.$/);
+
+  // the evening brief carries them, as step 4, before the calls still to score
+  const brief = eveningBrief(dir, '2026-11-06', new Date('2026-11-06T22:00:00Z'), s);
+  assert.ok(brief.indexOf('4. Stops at the last close') < brief.indexOf('5. Calls still waiting to be scored'), 'stops, then what is left to score');
 });

@@ -31,7 +31,8 @@ In a chat here:
   the person's press) and has its own Stop.
 - `/routine morning|evening`: the morning routine (score past calls, on a Monday re-rate up to three holdings whose
   view is a week old (the Tuesday, when Monday is a market holiday), on a day New York's market is closed only score, analyse what is waiting and the starred watchlist stocks, list the new calls to decide on) or the
-  evening wrap-up (score what is ready, report the day's calls and orders). Madav's scheduler can start them as the trading-desk team. They never place an order.
+  evening wrap-up (score what is ready, name any holding whose last close is below its stop, report the day's calls
+  and orders). Madav's scheduler can start them as the trading-desk team. They never place an order.
 
 ## Rules for every agent in this folder
 - Never place, change or cancel an order, and never use a broker connection or Robinhood's site. Orders come only from

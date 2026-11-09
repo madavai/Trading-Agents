@@ -76,7 +76,7 @@ test('lessons: pending calls are left out; the latest five on the stock and thre
   for (const t of ['AAA', 'BBB', 'CCC', 'DDD']) { j.storeDecision(t, '2026-08-20', '**Rating**: Hold\n\nx'); j.recordOutcome(t, '2026-08-20', 0.01, 0, 5, `lesson ${t}`, '2026-08-27'); }
   j.storeDecision('NVDA', '2026-09-01', buy);                 // pending: never shown
   const c = j.pastContext('NVDA');
-  assert.match(c, /^Past analyses of NVDA \(most recent first\):/);
+  assert.match(c, /^Past analyses of NVDA \(latest recorded first\):/);
   assert.equal((c.match(/\[2026-08-0\d \| NVDA/g) ?? []).length, 5);
   assert.ok(c.indexOf('lesson n7') < c.indexOf('lesson n3') && !c.includes('lesson n2') && !c.includes('2026-09-01'));
   assert.match(c, /Recent cross-ticker lessons:/);

@@ -1,5 +1,6 @@
 // What a Robinhood tool is, told only by its name and its own labels. Pure: nothing here talks to Robinhood. The desk
-// reads with the "read" kind and nothing else; the other kinds are counted and shown, never called.
+// reads with the "read" kind; of the "order" kind the dashboard calls only Robinhood's dry run (review.ts) and the order
+// itself (order.ts), each on the person's own press; the rest are counted and shown, never called. No agent gets any.
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 
 /** A tool whose name speaks of trading or moving money - orders (reviews included), trades, buying, selling,

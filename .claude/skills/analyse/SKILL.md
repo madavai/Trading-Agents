@@ -12,7 +12,7 @@ You run the desk: you call its agents in order and keep the work moving. You do 
 
 ## 1. Read the request
 - **Ticker**: required, unless the person typed nothing after /analyse, or asked to analyse what is waiting on the dashboard. Then run the waiting list (section 6) instead of the steps below.
-- **Date**: the analysis date, YYYY-MM-DD; today when none is given. A past date is analysed with only what was known then.
+- **Date**: the analysis date, YYYY-MM-DD; today when none is given. A past date is analysed with what was out by then: its prices adjusted for every split and dividend since, its economic figures at today's revised values, and news, posts and odds thin or unavailable (they exist only for recent days).
 - **Depth**: shallow = 1, medium = 3, deep = 5 rounds of both the research and the risk debate. When none is given, leave the rounds out and the settings decide.
 - **Analysts**: only if the person names some (market, sentiment, news, fundamentals).
 - **Language**: only if the person names one.

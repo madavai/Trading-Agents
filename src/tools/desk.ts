@@ -27,7 +27,8 @@ import { failureText, NoData, Unavailable } from '../data/http.js';
 import { openDashboard } from '../terminal/launch.js';
 import { eveningBrief, morningBrief, type MorningLook } from '../desk/routine.js';
 import { queueTop, readScreen, screenToday } from '../desk/screen.js';
-import { rerateWeekly } from '../desk/care.js';
+import { rerateWeekly, stopsAtClose } from '../desk/care.js';
+import { lastClose } from '../data/market.js';
 import { marketOf, readPrefs } from '../terminal/prefs.js';
 import { readWatchlist } from '../terminal/store.js';
 import { screenUniverse } from '../terminal/tiers.js';
@@ -41,7 +42,7 @@ const DEBATES = ['investment_debate', 'risk_debate'] as const;
 async function act(run: () => string | Promise<string>) {
   try { return text(await run()); } catch (e) {
     if (e instanceof NeedsEmail) return text(`NEEDS_EMAIL: ${e.message}`);
-    if (e instanceof Unavailable || e instanceof NoData) return text(failureText(e, 'this desk record'));
+    if (e instanceof Unavailable || e instanceof NoData) return text(failureText(e, 'a source this desk tool reads'));
     return text(`INPUT_ERROR: ${(e as Error).message}. Correct it and call again.`);
   }
 }
@@ -223,7 +224,7 @@ export function registerDeskTools(server: McpServer, root: string): void {
       'From now until end_backtest every desk tool records into this sweep\'s own journal and runs. The live journal and its lessons are untouched.',
       '', `Cells to run, in order (${todo.length ? 'each is a full team run' : 'none left'}):`,
       ...todo.slice(0, 30).map((c, i) => `${i + 1}. ${c.symbol} ${c.date}`), ...(todo.length > 30 ? [`... and ${todo.length - 30} more`] : []),
-      '', 'Limits to tell the person: for a past date, prices, indicators, economic figures and SEC accounts are as known on that date, but news, posts, odds, the company profile and insider trades exist only for recent days, so those reads are thin or unavailable and say so. Results are indicative, not repeatable.',
+      '', "Limits to tell the person: for a past date the desk reads only what was out by then, but not all of it as it stood then. A US company's accounts, profile and insider trades, and a US fund's holdings, are its SEC filings as made public by that date; economic figures are those released by then, at today's revised values; prices and indicators are adjusted for every split and dividend since, so before a split they read as a fraction of the price traded then; news, posts and odds exist only for recent days, so those reads are thin or unavailable and say so. Results are indicative, not repeatable.",
     ].join('\n');
   }));
 
@@ -251,12 +252,16 @@ export function registerDeskTools(server: McpServer, root: string): void {
 
   server.registerTool('routine_brief', {
     title: "Today's routine",
-    description: "What the morning routine should do today (on a day New York's market is closed, a weekend or one of its holidays, only score past calls; otherwise score past calls; on a Monday, or the Tuesday after a Monday holiday, re-rate the holdings whose view is a week old; \"Worth a look today\", the same list the dashboard shows, worked out from prices if it was not this hour; then the stocks to analyse in order, within the person's limit) or what the evening wrap-up has to report (today's calls, the orders the dashboard sent and Robinhood's answer, what is still to be scored). It changes nothing but the waiting list: on a Monday (the Tuesday after a Monday holiday), up to three holdings with no view or one a week old or more go on it at shallow depth, once that week; and with the person's switch \"Analyse the top three each market morning\" on, the top three of the list go on it at shallow depth, once a market day. Call it first when asked to run the morning routine or the evening wrap-up.",
+    description: "What the morning routine should do today (on a day New York's market is closed, a weekend or one of its holidays, only score past calls; otherwise score past calls; on a Monday, or the Tuesday after a Monday holiday, re-rate the holdings whose view is a week old; \"Worth a look today\", the same list the dashboard shows, worked out from prices if it was not this hour; then the stocks to analyse in order, within the person's limit) or what the evening wrap-up has to report (today's calls, the orders the dashboard sent and Robinhood's answer, any holding whose last close is below the stop the desk's trader proposed, since the dashboard warns of a stop only while its page is open, and what is still to be scored). It changes nothing but the waiting list: on a Monday (the Tuesday after a Monday holiday), up to three holdings with no view or one a week old or more go on it at shallow depth, once that week; and with the person's switch \"Analyse the top three each market morning\" on, the top three of the list go on it at shallow depth, once a market day. Call it first when asked to run the morning routine or the evening wrap-up.",
     inputSchema: { kind: z.enum(['morning', 'evening']).describe('morning: before the open; evening: after the close') },
     annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: true },
   }, async (a) => act(async () => {
     const day = today();
-    if (a.kind === 'evening') return eveningBrief(dir, day, new Date());
+    if (a.kind === 'evening') {
+      let stops: Parameters<typeof eveningBrief>[3];
+      try { stops = await stopsAtClose(dir, day, (sym) => lastClose(sym, day)); } catch (e) { stops = { state: 'failed', why: (e as Error).message }; }
+      return eveningBrief(dir, day, new Date(), stops);
+    }
     const on = readPrefs(dir).morning === true, open = isMarketDay(day);
     let look: MorningLook | undefined;
     if (open) {
