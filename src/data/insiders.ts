@@ -14,8 +14,12 @@ export interface InsiderTrade {
   shares: number; price: number | null; acquired: boolean;
   /** Shares held after it, and how (null: directly). */
   after: number | null; indirect: string | null;
-  /** Made under a pre-arranged trading plan (Rule 10b5-1). */
+  /** Made under a pre-arranged trading plan (Rule 10b5-1): the filing's 10b5-1 box is ticked and a footnote of this trade
+   *  ties it to the plan. */
   plan: boolean;
+  /** A purchase or sale in a filing whose 10b5-1 box is ticked with no footnote saying which trades the plan covers: the
+   *  box says at least one trade in the filing was under a plan, not that this one was. */
+  planBox?: boolean;
   /** The day an amended filing (Form 4/A) gave this trade as it now stands; `filed` is then the day the trade was first
    *  made public, the day of the filing that amendment corrects. */
   corrected?: string;
@@ -23,7 +27,12 @@ export interface InsiderTrade {
 
 /** One Form 4 or 4/A as read: whose it is (their SEC numbers, which tie an amendment to the filing it corrects), the day
  *  of the filing an amendment corrects (null for a Form 4), the period it reports, and its trades. */
-export interface Filing { form: string; filed: string; owners: string; original: string | null; period: string; trades: InsiderTrade[] }
+export interface Filing {
+  form: string; filed: string; owners: string; original: string | null; period: string; trades: InsiderTrade[];
+  /** The company whose shares it reports (its SEC number, without leading zeros) and its name; a filer's list holds the
+   *  Form 4s it files as an owner of another company's shares too. `large`: filed as an owner of over 10% of them. */
+  issuer?: string; issuerName?: string; large?: boolean;
+}
 
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
 export const decode = (s: string): string => s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e: string) => (e[0] === '#' ? String.fromCodePoint(e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : Number(e.slice(1))) : ENTITIES[e.toLowerCase()] ?? m));
@@ -46,24 +55,34 @@ export function parseForm4(xml: string, filed: string): InsiderTrade[] {
   const r = owners[0] ?? '';
   const role = [yes(field(r, 'isDirector')) && 'Director', yes(field(r, 'isOfficer')) && (field(r, 'officerTitle') || 'Officer'),
     yes(field(r, 'isTenPercentOwner')) && 'owner of over 10%', yes(field(r, 'isOther')) && (field(r, 'otherText') || 'other')].filter(Boolean).join(', ') || 'insider';
-  const plan = yes(field(xml, 'aff10b5One'));
-  return blocks(xml, 'nonDerivativeTransaction').map((t) => ({
-    owner, role, filed, plan,
+  // The 10b5-1 box covers the whole filing: "at least one" of its trades was under a plan. Which ones, a footnote says
+  // when there is one tying a trade to the plan; else a purchase or sale is only said to be in a filing with the box ticked.
+  const box = yes(field(xml, 'aff10b5One'));
+  const notes = new Map([...xml.matchAll(/<footnote\s+id="([^"]+)"\s*>([\s\S]*?)<\/footnote>/g)].map((m) => [m[1]!, decode(m[2]!.replace(/<[^>]*>/g, ''))]));
+  const planNotes = new Set([...notes].filter(([, text]) => /10b5-1/i.test(text) && !/\bnot\b[^.]{0,60}10b5-1/i.test(text)).map(([id]) => id));
+  return blocks(xml, 'nonDerivativeTransaction').map((t) => {
+    const code = field(t, 'transactionCode').toUpperCase();
+    const tied = [...t.matchAll(/<footnoteId\s+id="([^"]+)"/g)].some((m) => planNotes.has(m[1]!));
+    const plan = box && tied, planBox = box && !planNotes.size && (code === 'P' || code === 'S');
+    return {
+    owner, role, filed, plan, ...(planBox ? { planBox } : {}),
     date: field(t, 'transactionDate').slice(0, 10),
-    code: field(t, 'transactionCode').toUpperCase(),
+    code,
     shares: num(field(t, 'transactionShares')) ?? 0,
     price: num(field(t, 'transactionPricePerShare')),
     acquired: field(t, 'transactionAcquiredDisposedCode').toUpperCase() === 'A',
     after: num(field(t, 'sharesOwnedFollowingTransaction')),
     indirect: field(t, 'directOrIndirectOwnership').toUpperCase() === 'I' ? field(t, 'natureOfOwnership') || 'indirectly' : null,
-  })).filter((t) => t.date && t.code);
+    };
+  }).filter((t) => t.date && t.code);
 }
 
 /** A Form 4 or 4/A with what ties an amendment to the filing it corrects. Exported for the tests. */
 export function parseFiling(xml: string, form: string, filed: string): Filing {
   const owners = blocks(xml, 'reportingOwner').map((o) => field(o, 'rptOwnerCik').replace(/^0+/, '') || field(o, 'rptOwnerName').toUpperCase()).sort().join('+');
   const original = form.endsWith('/A') ? field(xml, 'dateOfOriginalSubmission').slice(0, 10) || null : null;
-  return { form, filed, owners, original, period: field(xml, 'periodOfReport').slice(0, 10), trades: parseForm4(xml, filed) };
+  const issuer = field(xml, 'issuerCik').replace(/^0+/, ''), large = blocks(xml, 'reportingOwner').some((o) => yes(field(o, 'isTenPercentOwner')));
+  return { form, filed, owners, original, period: field(xml, 'periodOfReport').slice(0, 10), trades: parseForm4(xml, filed), issuer, issuerName: field(xml, 'issuerName'), large };
 }
 
 /** The trades of these filings, each amendment in place of the filing it corrects: the same insiders' filing made public
@@ -134,23 +153,36 @@ export async function secInsiders(symbol: string, cik: string, asOf: string, day
   }
   const span = `made public from ${addDays(from, 1)} to ${asOf}`;
   if (!filings.length) throw new Unavailable(`the SEC lists ${read.length === 1 ? 'one Form 4 filing' : `${read.length} Form 4 filings`} of ${symbol}'s insiders ${span}, but none of them could be read (${why}), so their trades are not known`);
+  // A filer's list holds the Form 4s it files itself as an owner of another company's shares: those are its own trades in
+  // that company, not its insiders' in it, and are left out, said by name.
+  const self = Number(cik).toString(), others = filings.filter((f) => f.issuer && f.issuer !== self), own = filings.filter((f) => !others.includes(f));
+  const names = [...new Set(others.map((f) => f.issuerName || `the SEC filer ${f.issuer}`))].join(', '), large = others.every((f) => f.large);
+  const elsewhere = others.length === 1
+    ? `${symbol}'s own trade in another company's shares (${names}), filed as ${large ? "that company's large owner" : "one of that company's insiders"}`
+    : `${symbol}'s own trades in other companies' shares (${names}), filed as ${large ? 'a large owner of each' : 'an insider of each'}`;
+  if (others.length && !own.length && !failed && read.length === picked.length && !partial) {
+    const n = others.length === 1 ? `The one Form 4 filing in its SEC list for these days is ${elsewhere}: not a trade in ${symbol}, so it is left out`
+      : `The ${others.length} Form 4 filings in its SEC list for these days are ${elsewhere}: not trades in ${symbol}, so they are left out`;
+    return `${head}: none by its own insiders. ${n}. That is a fact from the SEC${listRead}, not a gap in the data.`;
+  }
   // Every trade is listed; the counts hold only those first made public in these days (a correction made now of a trade
   // made public before them is listed, not counted).
-  const { trades: all, replaced } = amended(filings), trades = all.filter((t) => t.filed > from);
+  const { trades: all, replaced } = amended(own), trades = all.filter((t) => t.filed > from);
   const market = (code: string) => trades.filter((t) => t.code === code);
   // A trade whose filing gives no price (one given only in a footnote) is left out of the sum in dollars, and counted.
   const total = (list: InsiderTrade[]) => {
     if (!list.length) return 'none';
-    const shares = list.reduce((a, t) => a + t.shares, 0), priced = list.filter((t) => t.price !== null), planned = list.filter((t) => t.plan).length;
+    const shares = list.reduce((a, t) => a + t.shares, 0), priced = list.filter((t) => t.price !== null), planned = list.filter((t) => t.plan).length, boxed = list.filter((t) => t.planBox).length;
     const value = priced.reduce((a, t) => a + t.shares * t.price!, 0), bare = list.length - priced.length;
     const usd = !priced.length ? `${list.length === 1 ? 'its filing gives' : 'their filings give'} no price, so no sum in USD`
       : `about ${fmt(value)} USD at their own prices${bare ? `; ${bare === 1 ? 'one gives' : `${bare} give`} no price and ${bare === 1 ? 'is' : 'are'} not in that sum` : ''}`;
-    return `${list.length} (${fmt(shares)} shares, ${usd}${planned ? `; ${planned} under a pre-arranged 10b5-1 plan` : ''})`;
+    const box = boxed ? `; ${boxed}${planned ? ' more' : ''} in a filing whose 10b5-1 box covers at least one of its trades without saying which` : '';
+    return `${list.length} (${fmt(shares)} shares, ${usd}${planned ? `; ${planned} under a pre-arranged 10b5-1 plan` : ''}${box})`;
   };
   const buys = market('P'), sales = market('S'), other = trades.length - buys.length - sales.length;
   const when = (t: InsiderTrade) => (!t.corrected ? `made public ${t.filed}`
     : `made public ${t.filed}${t.filed > from ? '' : ', before these days'}; corrected ${t.corrected} by an amended filing, a Form 4/A${t.filed > from ? '' : ', so not counted above'}`);
-  const lines = all.map((t) => `- ${t.date} (${when(t)}) · ${t.owner} (${t.role}): ${CODES[t.code] ?? `transaction ${t.code} of`} ${fmt(t.shares, 4)} shares${t.price ? ` at ${fmt(t.price, 4)}` : ', no price'}${t.after !== null ? ` · holds ${fmt(t.after, 4)} after` : ''}${t.indirect ? ` · indirectly (${t.indirect})` : ''}${t.plan ? ' · under a 10b5-1 plan' : ''}`);
+  const lines = all.map((t) => `- ${t.date} (${when(t)}) · ${t.owner} (${t.role}): ${CODES[t.code] ?? `transaction ${t.code} of`} ${fmt(t.shares, 4)} shares${t.price ? ` at ${fmt(t.price, 4)}` : ', no price'}${t.after !== null ? ` · holds ${fmt(t.after, 4)} after` : ''}${t.indirect ? ` · indirectly (${t.indirect})` : ''}${t.plan ? ' · under a 10b5-1 plan' : t.planBox ? " · its filing's 10b5-1 box is ticked: at least one trade in that filing was under a plan, and the filing does not say which" : ''}`);
   // What the counts leave out: filings that could not be read, older ones beyond the newest `limit`, days before the list.
   const skipped = picked.length - read.length;
   const missing = [
@@ -162,12 +194,13 @@ export async function secInsiders(symbol: string, cik: string, asOf: string, day
     ? `Counted from only the ${filings.length} of the ${picked.length} filings ${span} that were read (${missing.join('; ')}). These counts are not the whole ${days} days: a "none" below is not a fact about the insiders`
     : `In these ${days} days`;
   return [
-    `${head} (${filings.length} of ${picked.length} filings read, newest first${failed ? `; ${failed} could not be read` : ''}${skipped ? `; the ${skipped} oldest not asked for` : ''}${replaced ? `; ${replaced === 1 ? 'one is an amended filing, a Form 4/A, shown in place of the filing it corrects' : `${replaced} are amended filings, Form 4/A, each shown in place of the filing it corrects`}` : ''}). Each trade is dated by the day it happened and the day its filing made it public; only filings public by ${asOf} are shown${listRead}.${gap}`,
+    `${head} (${filings.length} of ${picked.length} filings read, newest first${failed ? `; ${failed} could not be read` : ''}${skipped ? `; the ${skipped} oldest not asked for` : ''}${replaced ? `; ${replaced === 1 ? 'one is an amended filing, a Form 4/A, shown in place of the filing it corrects' : `${replaced} are amended filings, Form 4/A, each shown in place of the filing it corrects`}` : ''}${others.length ? `; ${others.length === 1 ? 'one is' : `${others.length} are`} ${elsewhere}, and ${others.length === 1 ? 'is' : 'are'} left out` : ''}). Each trade is dated by the day it happened and the day its filing made it public; only filings public by ${asOf} are shown${listRead}.${gap}`,
     '',
     `${scope}: bought (code P) ${total(buys)}; sold (code S) ${total(sales)}; other kinds (awards, option exercises, shares handed back for tax, gifts) ${other}.`,
     'P and S are purchases and sales on the market or in a private deal: a purchase is the insider spending their own money. A sale under a 10b5-1 plan was arranged months ahead. Awards, exercises, tax handbacks and gifts say little about what an insider thinks of the price.',
     '', ...(lines.length ? lines : [missing.length
-      ? `(the ${filings.length === 1 ? 'one filing' : `${filings.length} filings`} read ${filings.length === 1 ? 'lists' : 'list'} no trades in shares, only options or holdings; the others were not read, so nothing is known of their trades)`
-      : '(these filings list no trades in shares, only options or holdings)']),
+      ? (own.length ? `(the ${own.length === 1 ? 'one filing' : `${own.length} filings`}${others.length ? ' of its insiders' : ''} read ${own.length === 1 ? 'lists' : 'list'} no trades in shares, only options or holdings; the others were not read, so nothing is known of their trades)`
+        : '(no filing read is one of its own insiders\'; the others were not read, so nothing is known of their trades)')
+      : `(${others.length ? 'its insiders\' filings' : 'these filings'} list no trades in shares, only options or holdings)`]),
   ].join('\n');
 }

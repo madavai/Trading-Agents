@@ -52,7 +52,9 @@ beforeEach(() => { process.env.TRADING_AGENTS_TODAY = '2026-10-21'; clearSecCach
 
 test('a Form 4 read from the filing itself: who, their role, each trade, the price, what is held after and how, and a pre-arranged plan', () => {
   const t = parseForm4(FORM4('KRESS COLETTE', ROW('2026-09-17', 'S', 20369, 219.0172, 'D', 774971) + ROW('2026-10-07', 'G', 500000, null, 'D', 23671360, 'I')), '2026-10-09');
-  assert.deepEqual(t[0], { owner: 'KRESS COLETTE', role: 'EVP & Chief Financial Officer', filed: '2026-10-09', plan: true, date: '2026-09-17', code: 'S', shares: 20369, price: 219.0172, acquired: false, after: 774971, indirect: null });
+  // The 10b5-1 box is ticked and no footnote says which trade it covers: the sale is in a filing with the box ticked, not
+  // said to be under a plan itself.
+  assert.deepEqual(t[0], { owner: 'KRESS COLETTE', role: 'EVP & Chief Financial Officer', filed: '2026-10-09', plan: false, planBox: true, date: '2026-09-17', code: 'S', shares: 20369, price: 219.0172, acquired: false, after: 774971, indirect: null });
   assert.deepEqual([t[1]!.code, t[1]!.price, t[1]!.indirect], ['G', null, 'By Trust'], 'a gift has no price; held by a trust is held indirectly');
   assert.equal(t.length, 2, 'a holding with no trade is not a trade');
   assert.equal(parseForm4(FORM4('X', ROW('2026-09-17', 'P', 10, 5, 'A', 10), '0'), '2026-09-18')[0]!.plan, false);
@@ -75,7 +77,8 @@ test("a US filer's insider trades come from its Form 4s at the SEC, only those m
   const t = await insiderTransactions('ACME', '2026-10-21');
   assert.match(t, /^Insider trades in ACME, from the Form 4 filings with the SEC made public from 2026-07-24 to 2026-10-21 \(2 of 2 filings read, newest first\)/);
   assert.match(t, /bought \(code P\) 1 \(100 shares, about 20,000 USD at their own prices\); sold \(code S\) 1 \(20,369 shares, about 4,461,161 USD at their own prices\); other kinds .* 1\./);
-  assert.match(t, /- 2026-10-07 \(made public 2026-10-09\) · COXE TENCH \(EVP & Chief Financial Officer\): gave away 500,000 shares, no price · holds 23,671,360 after · indirectly \(By Trust\) · under a 10b5-1 plan/);
+  // The filing's 10b5-1 box is ticked with no footnote saying which trade it covers: a gift is not said to be under a plan.
+  assert.match(t, /- 2026-10-07 \(made public 2026-10-09\) · COXE TENCH \(EVP & Chief Financial Officer\): gave away 500,000 shares, no price · holds 23,671,360 after · indirectly \(By Trust\)$/m);
   assert.match(t, /- 2026-09-17 \(made public 2026-09-18\) · KRESS COLETTE \(EVP & Chief Financial Officer\): sold 20,369 shares at 219\.0172 · holds 774,971 after$/m);
   assert.ok(!seen.some((u) => /late\.xml|old\.xml|a8k/.test(u)), 'a filing made public after the day, one from before the window and an 8-K are never read');
   assert.ok(seen.some((u) => /\/gift\.xml$/.test(u)), 'the filing itself, not its formatted page');

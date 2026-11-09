@@ -25,7 +25,8 @@ export const STATEMENTS: Record<Statement, { title: string; lines: Array<[string
     ['Gross Profit', ['GrossProfit']],
     ['Operating Income', ['OperatingIncomeLoss']],
     ['Net Income', ['NetIncomeLoss']],
-    ['Diluted EPS', ['EarningsPerShareDiluted']],
+    // A company with nothing that dilutes its shares files one figure for both, under its own tag.
+    ['Diluted EPS', ['EarningsPerShareDiluted', 'EarningsPerShareBasicAndDiluted']],
   ] },
   cashflow: { title: 'Cash flow statement', lines: [
     ['Operating Cash Flow', ['NetCashProvidedByUsedInOperatingActivities', 'NetCashProvidedByUsedInOperatingActivitiesContinuingOperations']],
@@ -95,28 +96,97 @@ function lineAsOf(facts: Facts, tags: string[], asOf: string, spans: Array<[numb
 const perShareUnit = (u: string) => u.includes('/');
 const spanWords = (f: Fact) => { const d = f.start ? daysBetween(f.start, f.end) : 0; return d <= QUARTER[1] ? 'the quarter' : d <= 200 ? 'the six months' : d <= 290 ? 'the nine months' : 'the year'; };
 
+/** A figure of a line filed again at another value (beyond rounding): a restatement, or a recast of earlier periods on a
+ *  new basis, as when a business is sold or spun off. `filed` is the day of the filing that changed it, `prev` the day of
+ *  the filing of it just before: the basis changed between the two. */
+interface Recast { filed: string; prev: string; start?: string; end: string; first: number; now: number }
+
+/** A change of basis of a line: it came after `from` and on or before `by`; `r` is its first refiling, which names it. */
+interface Change { from: string; by: string; r: Recast }
+
+/** How a line's figures were filed again by `asOf`: every restatement (`recasts`, oldest first), and every figure filed
+ *  again at the same value (`kept`: the two filing days, between which its basis did not change). Exported for the tests. */
+export function refilingsOf(facts: Facts, tags: string[], asOf: string): { recasts: Recast[]; kept: Array<[string, string]> } {
+  const recasts: Recast[] = [], kept: Array<[string, string]> = [];
+  for (const tag of tags) for (const list of Object.values(facts[tag]?.units ?? {})) {
+    const periods = new Map<string, Fact[]>();
+    for (const f of list) if (f.filed <= asOf && f.start) (periods.get(`${f.start}|${f.end}`) ?? periods.set(`${f.start}|${f.end}`, []).get(`${f.start}|${f.end}`)!).push(f);
+    for (const fs of periods.values()) {
+      const byDay = [...fs].sort((a, b) => a.filed.localeCompare(b.filed));
+      for (let n = 1; n < byDay.length; n++) {
+        const a = byDay[n - 1]!, b = byDay[n]!;
+        if (a.filed === b.filed) continue;
+        if (Math.abs(b.val - a.val) > 0.001 * Math.max(Math.abs(a.val), Math.abs(b.val))) recasts.push({ filed: b.filed, prev: a.filed, start: b.start, end: b.end, first: byDay[0]!.val, now: b.val });
+        else kept.push([a.filed, b.filed]);
+      }
+    }
+  }
+  return { recasts: recasts.sort((a, b) => a.filed.localeCompare(b.filed)), kept };
+}
+
+/** The changes of basis a line's refilings show, as few as explain them all. A company that spins off a business refiles
+ *  each earlier period on the new basis as it next reports it, over a year or more, and each refiling says only that the
+ *  change came after that period's last filing and by this one. Taken by the day of the refiling, each joins the change
+ *  before it when it could be the same one, narrowing when it came; a period filed again unchanged across part of that
+ *  time narrows it further (the change came before or after that, not during it). Exported for the tests. */
+export function changesOf({ recasts, kept }: { recasts: readonly Recast[]; kept: ReadonlyArray<readonly [string, string]> }): Change[] {
+  const out: Change[] = [];
+  for (const r of recasts) {
+    const last = out.at(-1);
+    if (last && r.prev < last.by) last.from = r.prev > last.from ? r.prev : last.from;
+    else out.push({ from: r.prev, by: r.filed, r });
+  }
+  for (const c of out) {
+    for (let moved = true; moved; ) {
+      moved = false;
+      for (const [a, b] of kept) {
+        if (a <= c.from && b > c.from && b < c.by) { c.from = b; moved = true; }
+        else if (a > c.from && a < c.by && b >= c.by) { c.by = a; moved = true; }
+      }
+    }
+  }
+  return out;
+}
+
+type Quarter = { val: number; start: string; how?: string; lo: string; hi: string };
+type Blocked = { c: Fact; other: string; ch: Change; lo: string; hi: string };
 /** A line's quarters: each filed quarter, and each quarter a filed year to date (or year) gives when the same year's
- *  figure to the quarter before is filed too (or its quarters are), with how it was worked out. Keyed by the end date. */
-function quartersOf(values: Map<string, Fact>, years: Map<string, Fact>): Map<string, { val: number; start: string; how?: string }> {
-  const out = new Map<string, { val: number; start: string; how?: string }>();
+ *  figure to the quarter before is filed too (or its quarters are), with how it was worked out. Keyed by the end date.
+ *  `lo` and `hi` are the first and last filing day of the figures a quarter comes from. A quarter is never worked out
+ *  from figures that a change of basis of the line (`changes`) may fall between: the later one may be on a new basis (a
+ *  business sold or spun off left out) and the earlier on the old, and the one less the other is then no quarter;
+ *  `blocked` says why for each such quarter. */
+function quartersOf(values: Map<string, Fact>, years: Map<string, Fact>, changes: readonly Change[]): { quarters: Map<string, Quarter>; blocked: Map<string, Blocked> } {
+  const out = new Map<string, Quarter>(), blocked = new Map<string, Blocked>();
   const all = [...values.values(), ...years.values()].filter((f) => f.start);
-  for (const f of all) if (daysBetween(f.start!, f.end) <= QUARTER[1]) out.set(f.end, { val: f.val, start: f.start! });
+  for (const f of all) if (daysBetween(f.start!, f.end) <= QUARTER[1]) out.set(f.end, { val: f.val, start: f.start!, lo: f.filed, hi: f.filed });
   const near = (a: string, b: string, lo: number, hi: number) => { const d = daysBetween(a, b); return d >= lo && d <= hi; };
+  // A change that came after `from` and by `by` may fall between figures filed on `lo` and `hi` (after the one, by the
+  // other) unless both were filed by `from` (both on the old basis) or both on or after `by` (both on the new).
+  const across = (lo: string, hi: string) => changes.find((c) => lo < c.by && hi > c.from);
+  const min = (a: string, b: string) => (a < b ? a : b), max = (a: string, b: string) => (a > b ? a : b);
   // The shortest spans first, so a quarter worked out from six months can serve the nine months after it.
   for (const c of all.filter((f) => daysBetween(f.start!, f.end) > QUARTER[1]).sort((a, b) => daysBetween(a.start!, a.end) - daysBetween(b.start!, b.end))) {
     if (out.has(c.end)) continue;
     // The same year's figure to the quarter before: filed as one figure, or added up from its quarters.
     const prior = all.find((p) => p !== c && Math.abs(daysBetween(c.start!, p.start!)) <= 7 && near(p.end, c.end, 80, 100));
-    if (prior) { out.set(c.end, { val: c.val - prior.val, start: prior.end, how: `${spanWords(c)} to ${c.end} less ${spanWords(prior)} to ${prior.end}` }); continue; }
-    let sum = 0, at = '', parts = 0;
+    if (prior) {
+      const lo = min(c.filed, prior.filed), hi = max(c.filed, prior.filed), ch = across(lo, hi);
+      if (!ch) { out.set(c.end, { val: c.val - prior.val, start: prior.end, how: `${spanWords(c)} to ${c.end} less ${spanWords(prior)} to ${prior.end}`, lo, hi }); continue; }
+      if (!blocked.has(c.end)) blocked.set(c.end, { c, other: `${spanWords(prior)} to ${prior.end} (filed ${prior.filed})`, ch, lo, hi });
+    }
+    let sum = 0, at = '', parts = 0, qlo = '9999-12-31', qhi = '';
     for (let q = [...out.entries()].find(([, v]) => Math.abs(daysBetween(c.start!, v.start)) <= 7); q; ) {
-      sum += q[1].val; at = q[0]; parts++;
+      sum += q[1].val; at = q[0]; parts++; qlo = min(qlo, q[1].lo); qhi = max(qhi, q[1].hi);
       if (near(at, c.end, 80, 100)) break;
       q = [...out.entries()].find(([e, v]) => e > at && near(at, v.start, 0, 7) && !v.how?.includes(c.end));
     }
-    if (parts && near(at, c.end, 80, 100)) out.set(c.end, { val: c.val - sum, start: at, how: `${spanWords(c)} to ${c.end} less its ${parts} quarter${parts > 1 ? 's' : ''} to ${at}` });
+    if (!parts || !near(at, c.end, 80, 100)) continue;
+    const lo = min(c.filed, qlo), hi = max(c.filed, qhi), ch = across(lo, hi);
+    if (!ch) { out.set(c.end, { val: c.val - sum, start: at, how: `${spanWords(c)} to ${c.end} less its ${parts} quarter${parts > 1 ? 's' : ''} to ${at}`, lo, hi }); blocked.delete(c.end); }
+    else if (!blocked.has(c.end)) blocked.set(c.end, { c, other: `its ${parts} quarter${parts > 1 ? 's' : ''} to ${at} (filed by ${qhi})`, ch, lo, hi });
   }
-  return out;
+  return { quarters: out, blocked };
 }
 
 /** Share splits as the filer's own per-share figures show them: one period filed again at a whole multiple (or a whole
@@ -157,17 +227,38 @@ export function splitsIn(list: readonly Fact[], asOf: string): Array<{ factor: n
 const splitWords = (k: number) => (k >= 1 ? `${k === 1.5 ? '3-for-2' : `${k}-for-1`} split` : `1-for-${Math.round(1 / k)} reverse split`);
 const plain = (n: number) => Number(n.toFixed(6)).toString();
 
-/** One statement from a filer's us-gaap facts, as filed on or before `asOf`. Exported for the tests. */
-export function filedStatement(usGaap: Facts, kind: Statement, freq: Frequency, asOf: string): Table {
+/** A share split as a basis for filed figures: a per-share figure filed before `date` is divided by `factor` (new shares
+ *  for one old), a share count multiplied by it. `words` names it; `old`, for one the filings show, is their last filing
+ *  on the old basis (`date` is then their first on the new). */
+export interface Split { date: string; factor: number; words: string; old?: string }
+
+/** The splits the filer's own per-share figures show by `asOf`, as a basis. */
+export const filingSplits = (list: readonly Fact[], asOf: string): Split[] =>
+  splitsIn(list, asOf).map((s) => ({ date: s.from, factor: s.factor, old: s.old, words: `the ${splitWords(s.factor)} the filings show between ${s.old} and ${s.from}` }));
+
+/** What a figure filed on `filed` takes from a basis: the factor of every split after its filing, and of those the ones
+ *  that can be named on `day` (on or before it). A split after the analysis day is applied and never named: it would
+ *  tell an analysis of a past day what came later. */
+export function rebase(basis: readonly Split[], filed: string, day: string): { k: number; named: Split[]; silent: boolean } {
+  const after = basis.filter((s) => filed < s.date), named = after.filter((s) => s.date <= day);
+  return { k: after.reduce((a, s) => a * s.factor, 1), named, silent: named.length < after.length };
+}
+export const splitList = (splits: readonly Split[]) => splits.map((s) => s.words).join(' and ');
+
+/** One statement from a filer's us-gaap facts, as filed on or before `asOf`. Per-share figures filed before a split are
+ *  put on the basis of the later filings it shows by then; or, given `basis`, on that one (the prices' share basis).
+ *  Exported for the tests. */
+export function filedStatement(usGaap: Facts, kind: Statement, freq: Frequency, asOf: string, basis?: readonly Split[]): Table {
   const quarterly = freq === 'quarterly', flows = kind !== 'balance_sheet';
   const spans: Array<[number, number]> = quarterly ? [QUARTER, ...YEAR_TO_DATE.map(([lo, hi]) => [lo, hi] as [number, number])] : [YEAR];
   const names = quarterly ? ['', ...YEAR_TO_DATE.map(([, , m]) => ` (${m} months to date)`)] : [''];
   const lines = STATEMENTS[kind].lines.map(([label, tags]) => ({ label, ...lineAsOf(usGaap, tags, asOf, spans, quarterly ? [] : ANNUAL_FORMS) }));
   const notes: string[] = [];
   // A quarterly flow: every quarter filed or derived; a year to date only where it gives no quarter.
-  const quarters = lines.map((l, n) => (quarterly && flows && !perShareUnit(l.unit)
-    ? quartersOf(l.values, lineAsOf(usGaap, STATEMENTS[kind].lines[n]![1], asOf, [YEAR], ANNUAL_FORMS).values)
-    : new Map<string, { val: number; start: string; how?: string }>()));
+  const worked = lines.map((l, n) => (quarterly && flows && !perShareUnit(l.unit)
+    ? quartersOf(l.values, lineAsOf(usGaap, STATEMENTS[kind].lines[n]![1], asOf, [YEAR], ANNUAL_FORMS).values, changesOf(refilingsOf(usGaap, STATEMENTS[kind].lines[n]![1], asOf)))
+    : { quarters: new Map<string, Quarter>(), blocked: new Map<string, Blocked>() }));
+  const quarters = worked.map((w) => w.quarters);
   // Each row shows a period at the shortest span it was filed for; a column is one span of one period.
   const chosen = lines.map((l, n) => {
     const m = new Map<string, number>();
@@ -181,25 +272,44 @@ export function filedStatement(usGaap: Facts, kind: Statement, freq: Frequency, 
   const derived = new Map<string, Set<string>>();
   for (const q of quarters) for (const [end, v] of q) if (v.how && ends.includes(end)) (derived.get(end) ?? derived.set(end, new Set()).get(end)!).add(v.how);
   for (const [end, how] of [...derived].sort((a, b) => b[0].localeCompare(a[0]))) notes.push(`The quarter to ${end} is derived (no filing states it): ${[...how].join('; or ')}.`);
-  // Per-share figures filed before a split, put on the basis of the latest filings. Every filing of the line, quarters
-  // and years alike, brackets the split as closely as the filings allow.
+  // A quarter left out because its figures straddle a restatement, said for every one as recent as the oldest column.
+  const million = (v: number) => (v / 1e6).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  worked.forEach((w, n) => {
+    for (const [end, { c, other, ch, lo, hi }] of [...w.blocked].sort((a, b) => b[0].localeCompare(a[0]))) {
+      if (quarters[n]!.has(end) || !ends.length || end < ends.at(-1)!) continue;
+      const r = ch.r, what = `a filing of ${r.filed} restated an earlier figure of it (${spanWords({ ...r, val: 0 })} to ${r.end}, first filed as ${million(r.first)} million ${lines[n]!.unit}, refiled then as ${million(r.now)} million), as when a business is sold or spun off`;
+      // Sure only when the one was filed before the change could have come and the other after it surely had.
+      notes.push(lo <= ch.from && hi >= ch.by
+        ? `${lines[n]!.label} for the quarter to ${end} is not derived: ${spanWords(c)} to ${c.end} (filed ${c.filed}) and ${other} are on different bases, since ${what}. The one less the other would not be a quarter.`
+        : `${lines[n]!.label} for the quarter to ${end} is not derived: ${spanWords(c)} to ${c.end} (filed ${c.filed}) and ${other} may be on different bases: ${what}, and the filings show only that the change came after ${ch.from} and by ${ch.by}. The one less the other may not be a quarter.`);
+    }
+  });
+  // Per-share figures filed before a split, put on the basis of the latest filings, each named; or on the basis given (the
+  // prices' share basis of today), said once, since naming a split after the analysis day would tell it what came later.
+  // Every filing of the line, quarters and years alike, brackets a split the filings show as closely as they allow.
+  const onto = 'the basis of the later filings';
+  let perShare = false;
   const rows = lines.map((l, n) => {
     const every = STATEMENTS[kind].lines[n]![1].flatMap((tag) => Object.entries(usGaap[tag]?.units ?? {}).filter(([u]) => perShareUnit(u)).flatMap(([, list]) => list));
-    const splits = perShareUnit(l.unit) ? splitsIn(every, asOf) : [];
+    const splits = !perShareUnit(l.unit) ? [] : basis ?? filingSplits(every, asOf);
     const cells = periods.map((p) => {
       if (chosen[n]!.get(p.end) !== p.i) return null;
       const q = p.i === 0 ? quarters[n]!.get(p.end) : undefined;
       if (q) return q.val;
       const f = l.values.get(`${p.end}|${p.i}`);
       if (!f) return null;
-      const k = splits.filter((s) => f.filed < s.from).reduce((a, s) => a * s.factor, 1);
+      if (perShareUnit(l.unit)) perShare = true;
+      const { k, named, silent } = rebase(splits, f.filed, asOf);
       if (k === 1) return f.val;
       const v = Number((f.val / k).toFixed(6));
-      notes.push(`${l.label} for ${spanWords(f)} to ${f.end} was filed on ${f.filed} as ${plain(f.val)}, before ${splits.filter((s) => f.filed < s.from).map((s) => `the ${splitWords(s.factor)} the filings show between ${s.old} and ${s.from}`).join(' and ')}; shown here on the basis of the later filings: ${plain(v)}.`);
+      if (named.length && !basis) notes.push(silent
+        ? `${l.label} for ${spanWords(f)} to ${f.end} was filed on ${f.filed}, before ${splitList(named)}; shown here on ${onto}.`
+        : `${l.label} for ${spanWords(f)} to ${f.end} was filed on ${f.filed} as ${plain(f.val)}, before ${splitList(named)}; shown here on ${onto}: ${plain(v)}.`);
       return v;
     });
     return { label: l.label, unit: l.unit, cells };
   });
+  if (basis && perShare) notes.push('Per-share figures are on the price source\'s share basis of today, the one its prices are on: a figure filed before a share split since then is divided by that split\'s ratio, so it can differ from the number in its filing.');
   return { columns: periods.map((p) => p.end + (p.i === 0 && derived.has(p.end) ? ' (derived)' : names[p.i]!)), rows, notes };
 }
 
@@ -234,13 +344,24 @@ export async function cikFor(symbol: string): Promise<string | null> {
 /** Every XBRL fact a filer has filed: its accounts (us-gaap) and its cover page (dei: shares outstanding). */
 export const companyFacts = (cik: string) => cached<{ facts?: { 'us-gaap'?: Facts; dei?: Facts } }>(`https://data.sec.gov/api/xbrl/companyfacts/CIK${cik}.json`, 45_000);
 
-/** A statement of a US filer as filed with the SEC on or before `asOf`. */
-export async function secStatement(symbol: string, kind: Statement, freq: Frequency, asOf: string): Promise<Table> {
+/** A statement of a US filer as filed with the SEC on or before `asOf`, its per-share figures on `basis` when given. */
+export async function secStatement(symbol: string, kind: Statement, freq: Frequency, asOf: string, basis?: readonly Split[]): Promise<Table> {
   const cik = await cikFor(symbol);
   if (!cik) throw new NoData(`${symbol} is not in the SEC's list of US filers`);
   const usGaap = (await companyFacts(cik)).facts?.['us-gaap'];
   if (!usGaap) throw new NoData(`${symbol} files with the SEC but not in US GAAP terms`);
-  return filedStatement(usGaap, kind, freq, asOf);
+  return filedStatement(usGaap, kind, freq, asOf, basis);
+}
+
+/** The form of the filer's latest yearly report filed by `day` as its facts show it: 10-K for a US company, 20-F or 40-F
+ *  for a foreign one; null when none is among them. */
+export function annualFormIn(facts: { 'us-gaap'?: Facts; dei?: Facts } | undefined, day: string): string | null {
+  let best: Fact | null = null;
+  const lists = [facts?.dei?.EntityCommonStockSharesOutstanding, facts?.['us-gaap']?.StockholdersEquity, facts?.['us-gaap']?.Assets, facts?.['us-gaap']?.EarningsPerShareDiluted];
+  for (const x of lists) for (const list of Object.values(x?.units ?? {})) for (const f of list) {
+    if (f.filed <= day && /^(10-K|20-F|40-F)/.test(f.form ?? '') && (!best || f.filed > best.filed)) best = f;
+  }
+  return best ? /^(10-K|20-F|40-F)/.exec(best.form!)![1]! : null;
 }
 
 // ---------- a filer's own record: its name, industry code and filings ----------
@@ -327,20 +448,40 @@ function knownBy(list: readonly Fact[], asOf: string): Fact[] {
   return [...best.values()];
 }
 
-/** The last twelve months of a flow (diluted EPS, dividends per share) as filed by `asOf`: the last full year, plus this
- *  year to date, less the same span a year before (no filing gives twelve months that end mid-year). With no year to date
- *  filed since the last full year, that year itself. `parts` says which filed figures it came from. */
-export function trailingYear(list: readonly Fact[], asOf: string): { value: number; parts: string } | null {
+/** The last twelve months of a per-share flow (diluted EPS, dividends per share) as filed by `asOf`: the last full year,
+ *  plus this year to date, less the same span a year before (no filing gives twelve months that end mid-year). With no
+ *  year to date filed since the last full year, that year itself. Each figure is first put on `basis`, by the splits
+ *  after its own filing, so figures filed on either side of a split are never added as they stand. `parts` says which
+ *  filed figures it came from, and what a split it can name on `asOf` changed. */
+export function trailingYear(list: readonly Fact[], asOf: string, basis: readonly Split[] = []): { value: number; parts: string } | null {
   const known = knownBy(list, asOf).filter((f) => f.start);
   const year = known.filter((f) => ANNUAL(f) && span(f) >= YEAR[0] && span(f) <= YEAR[1]).sort((a, b) => b.end.localeCompare(a.end))[0];
   if (!year) return null;
   const after = known.filter((f) => f.end > year.end && daysBetween(year.end, f.start!) >= 0 && daysBetween(year.end, f.start!) <= 7 && span(f) >= 60 && span(f) <= 290)
     .sort((a, b) => b.end.localeCompare(a.end) || span(b) - span(a))[0];
   const round = (n: number) => Number(n.toFixed(6));
-  if (!after) return { value: round(year.val), parts: `the full year to ${year.end}, ${year.val}` };
+  const on = (f: Fact) => {
+    const { k, named, silent } = rebase(basis, f.filed, asOf), v = round(f.val / k);
+    return { v, words: `${plain(v)}${!named.length ? '' : silent ? ` (filed before ${splitList(named)})` : ` (${plain(f.val)} as filed, before ${splitList(named)})`}` };
+  };
+  const y = on(year);
+  if (!after) return { value: y.v, parts: `the full year to ${year.end}, ${y.words}` };
   const before = known.find((f) => Math.abs(daysBetween(f.end, after.end) - 365) <= 10 && Math.abs(span(f) - span(after)) <= 10);
-  if (!before) return { value: round(year.val), parts: `the full year to ${year.end}, ${year.val} (the same span a year before ${after.end} was not filed, so the year to date cannot be added)` };
-  return { value: round(year.val + after.val - before.val), parts: `the full year to ${year.end}, ${year.val}, plus ${after.start} to ${after.end}, ${after.val}, less ${before.start} to ${before.end}, ${before.val}` };
+  if (!before) return { value: y.v, parts: `the full year to ${year.end}, ${y.words} (the same span a year before ${after.end} was not filed, so the year to date cannot be added)` };
+  const a = on(after), b = on(before);
+  return { value: round(y.v + a.v - b.v), parts: `the full year to ${year.end}, ${y.words}, plus ${after.start} to ${after.end}, ${a.words}, less ${before.start} to ${before.end}, ${b.words}` };
+}
+
+/** The facts of the first list, and of each later one those for periods no earlier list gives: a line a filer reports
+ *  under one tag or another, never both added. */
+export function firstTagPerPeriod(...lists: Array<readonly Fact[]>): Fact[] {
+  const seen = new Set<string>(), out: Fact[] = [];
+  for (const list of lists) {
+    const mine = list.filter((f) => !seen.has(`${f.start ?? ''}|${f.end}`));
+    for (const f of mine) { out.push(f); }
+    for (const f of mine) seen.add(`${f.start ?? ''}|${f.end}`);
+  }
+  return out;
 }
 
 /** The latest balance (a figure at a date, like equity) filed by `asOf`. */

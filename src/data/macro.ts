@@ -1,9 +1,10 @@
 // Economic figures from FRED (the St. Louis Fed), through its public download (no key): rates, yields, inflation, jobs,
-// growth, for the US and the euro area. For a past analysis date, an observation is kept only if it would have been
-// published by then (a conservative release lag by how often the series is reported), so a figure released later never
-// reaches an analysis of an earlier day. The download serves today's revised values; that is said with them. A figure is
-// named by the period it stands for ("August 2026", not the first day FRED dates it on), and the change over a year is
-// worked out from the same period a year earlier, so a change over a shorter window is never read as a yearly rate.
+// growth, for the US and the euro area. For a past analysis date they come from FRED's archive of past releases (ALFRED),
+// as it stood that day: only what had been published by then, at the values first given (or as revised by then). A
+// figure released later, or a revision made later, never reaches an analysis of an earlier day; when the archive does
+// not hold a series for that day, nothing is given, never today's revised figures. A figure is named by the period it
+// stands for ("August 2026", not the first day FRED dates it on), and the change over a year is worked out from the same
+// period a year earlier, so a change over a shorter window is never read as a yearly rate.
 // The series names are TradingAgents' (tradingagents/dataflows/vendors/fred.py), Apache License 2.0.
 import { addDays, analysisDate, isHistorical } from './dates.js';
 import { getTextAt, NoData, readWords, Unavailable } from './http.js';
@@ -55,9 +56,6 @@ export function frequency(obs: Obs[]): Frequency {
   return median <= 3 ? 'daily' : median <= 10 ? 'weekly' : median <= 45 ? 'monthly' : median <= 120 ? 'quarterly' : 'yearly';
 }
 
-/** Days after an observation's date before it is published, by how often the series is reported (conservative). */
-export const releaseLag = (obs: Obs[]): number => ({ daily: 1, weekly: 6, monthly: 45, quarterly: 120, yearly: 120 })[frequency(obs)];
-
 /** The period an observation stands for, as people name it: FRED dates a month's or a quarter's figure on its first day. */
 export function periodOf(date: string, freq: Frequency): string {
   const y = date.slice(0, 4), m = Number(date.slice(5, 7));
@@ -79,12 +77,19 @@ export async function economicSeries(indicator: string, analysis: string, lookBa
   if (!/^[A-Z0-9_]{1,40}$/.test(id)) throw new Error(`"${indicator}" is not a series name or a FRED series id`);
   const window = Math.max(30, Math.min(3650, lookBackDays));
   // Asked from far enough back that the same period a year before the latest one is there, even for a quarterly series.
-  const from = addDays(day, -Math.max(window, 365) - 400);
-  const { text: csv, at } = await getTextAt(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${id}&cosd=${from}&coed=${day}`);
-  if (!/^\s*(observation_date|DATE)\s*,/i.test(csv)) throw new Unavailable(`FRED answered with something other than its data download (it may be down for maintenance)`);
-  let all = parseCsv(csv).filter((o) => o.date <= day);
-  const past = isHistorical(day), freq = frequency(all), lag = releaseLag(all);
-  if (past) all = all.filter((o) => addDays(o.date, lag) <= day);
+  const from = addDays(day, -Math.max(window, 365) - 400), past = isHistorical(day);
+  // A past day reads the series as the archive held it that day; today's download would carry every later release and
+  // revision into it.
+  const url = past ? `https://alfred.stlouisfed.org/graph/alfredgraph.csv?id=${id}&vintage_date=${day}&cosd=${from}&coed=${day}`
+    : `https://fred.stlouisfed.org/graph/fredgraph.csv?id=${id}&cosd=${from}&coed=${day}`;
+  let read: { text: string; at: number };
+  try { read = await getTextAt(url); } catch (e) {
+    if (past && e instanceof NoData) throw new NoData(`FRED's archive of past releases (ALFRED) does not hold ${id} as it stood on ${day} (${(e as Error).message}); today's revised figures are not given for a past day, since they would carry what was published or revised later into it`);
+    throw e;
+  }
+  const { text: csv, at } = read;
+  if (!/^\s*(observation_date|DATE)\s*,/i.test(csv)) throw new Unavailable(`${past ? "FRED's archive (ALFRED)" : 'FRED'} answered with something other than its data download (it may be down for maintenance)`);
+  const all = parseCsv(csv).filter((o) => o.date <= day), freq = frequency(all);
   const obs = all.filter((o) => o.date >= addDays(day, -window));
   if (!obs.length) throw new NoData(`FRED has no ${id} values published by ${day} in this window`);
   const first = obs[0]!, last = obs[obs.length - 1]!, ago = yearBefore(all, last.date);
@@ -105,8 +110,8 @@ export async function economicSeries(indicator: string, analysis: string, lookBa
     `- Latest value known by ${day}: ${fmt(last.value)} (for ${periodOf(last.date, freq)})`,
     ago ? `- Year over year, from ${fmt(ago.value)} for ${periodOf(ago.date, freq)}: ${changeOf(ago)}` : `- Year over year: not available (no value for ${periodOf(`${Number(last.date.slice(0, 4)) - 1}${last.date.slice(4)}`, freq)} in FRED's data). Do not work one out from other rows.`,
     `- Change over the look-back window, from ${periodOf(first.date, freq)} to ${periodOf(last.date, freq)}: ${changeOf(first)}${first.date !== ago?.date ? ' (not a yearly rate)' : ''}`,
-    past ? `- A past analysis date: values are kept only if published by ${day} (a ${lag}-day release lag for this series), and are today's revised figures; first releases may have differed slightly.` : '- Values as FRED published them, revisions included.',
-    `- Read from FRED at ${readWords(at)} (the desk keeps a read for up to an hour): a figure released after that is not here.`,
+    past ? `- A past analysis date: these are the figures as FRED's archive of past releases (ALFRED) held them on ${day}: only what was published by then, before any later revision.` : '- Values as FRED published them, revisions included.',
+    past ? `- Read from FRED's archive at ${readWords(at)}.` : `- Read from FRED at ${readWords(at)} (the desk keeps a read for up to an hour): a figure released after that is not here.`,
     '', freq === 'monthly' || freq === 'quarterly' ? 'Date (the first day of the period it stands for) | Value' : 'Date | Value', '---|---:', ...obs.slice(-40).map((o) => `${o.date} | ${fmt(o.value)}`),
   ];
   if (!known) lines.push('', `Names this desk knows: ${Object.keys(SERIES).join(', ')}.`);
