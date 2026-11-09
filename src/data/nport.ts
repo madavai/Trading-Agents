@@ -15,12 +15,17 @@ export interface Holding {
   asset: string; issuer: string; country: string;
   /** For a bond: when it is repaid, and its yearly interest in percent. */
   maturity: string | null; coupon: number | null;
+  /** For a derivative: its kind (the SEC's code: SWP swap, FUT future, FWD forward, OPT option, ...), its notional amount
+   *  as reported (signed as the fund signs it; null when none is given) and that amount's currency, and what it is tied to. */
+  derivative?: { kind: string; notional: number | null; currency: string; ref: string };
 }
 export interface Report {
   series: string; registrant: string; asOf: string; filed: string;
   netAssets: number; holdings: Holding[];
   /** The fund's own total return for each month of the quarter, oldest first, in percent (its share class's). */
   returns: number[] | null;
+  /** How many share classes the report gives returns for: its net assets are theirs together. */
+  classes?: number;
 }
 
 const ACCESSION = /^\d{10}-\d{2}-\d{6}$/, DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -35,15 +40,22 @@ export function parseReport(xml: string, cls: string | null): Omit<Report, 'file
   const gen = blocks(xml, 'genInfo')[0], info = blocks(xml, 'fundInfo')[0];
   const asOf = gen ? text(gen, 'repPdDate') : '', netAssets = info ? num(text(info, 'netAssets')) : null;
   if (!gen || !DAY.test(asOf) || netAssets === null) throw new Unavailable('the SEC answered with something that is not a fund\'s portfolio report');
-  const holdings = blocks(xml, 'invstOrSec').map((h): Holding => ({
-    name: text(h, 'name') || text(h, 'title') || 'unnamed',
-    pct: num(text(h, 'pctVal')) ?? 0,
-    asset: text(h, 'assetCat') || attr(h, 'assetConditional', 'assetCat') || 'OTHER',
-    issuer: text(h, 'issuerCat') || attr(h, 'issuerConditional', 'issuerCat') || 'OTHER',
-    country: text(h, 'invCountry'),
-    maturity: DAY.test(text(h, 'maturityDt')) ? text(h, 'maturityDt') : null,
-    coupon: num(text(h, 'annualizedRt')),
-  }));
+  const holdings = blocks(xml, 'invstOrSec').map((h): Holding => {
+    const d = blocks(h, 'derivativeInfo')[0], ref = d === undefined ? '' : blocks(d, 'descRefInstrmnt')[0] ?? '';
+    return {
+      name: text(h, 'name') || text(h, 'title') || 'unnamed',
+      pct: num(text(h, 'pctVal')) ?? 0,
+      asset: text(h, 'assetCat') || attr(h, 'assetConditional', 'assetCat') || 'OTHER',
+      issuer: text(h, 'issuerCat') || attr(h, 'issuerConditional', 'issuerCat') || 'OTHER',
+      country: text(h, 'invCountry'),
+      maturity: DAY.test(text(h, 'maturityDt')) ? text(h, 'maturityDt') : null,
+      coupon: num(text(h, 'annualizedRt')),
+      ...(d === undefined ? {} : { derivative: {
+        kind: /\bderivCat="([^"]*)"/.exec(d)?.[1] ?? 'OTH', notional: num(text(d, 'notionalAmt')), currency: text(d, 'curCd'),
+        ref: text(ref, 'indexName') || text(ref, 'issueTitle') || text(ref, 'name'),
+      } }),
+    };
+  });
   const rows = [...xml.matchAll(/<monthlyTotReturn\s([^>]*)\/?>/g)].map((m) => m[1]!);
   const row = rows.find((r) => cls && r.includes(`classId="${cls}"`)) ?? (rows.length === 1 ? rows[0] : undefined);
   const returns = row ? ['rtn1', 'rtn2', 'rtn3'].map((k) => num(new RegExp(`\\b${k}="([^"]*)"`).exec(row)?.[1] ?? '')) : null;
@@ -51,6 +63,7 @@ export function parseReport(xml: string, cls: string | null): Omit<Report, 'file
     series: text(gen, 'seriesName').replace(/\((?:R|TM)\)/g, '').replace(/\s+/g, ' ').trim() || text(gen, 'regName'),
     registrant: text(gen, 'regName'), asOf, netAssets, holdings,
     returns: returns && returns.every((r) => r !== null) ? returns as number[] : null,
+    classes: rows.length,
   };
 }
 
@@ -99,12 +112,16 @@ export async function latestReport(sym: string, day: string): Promise<Report | n
 const ASSETS: Record<string, string> = {
   EC: 'stocks', EP: 'preferred stocks', DBT: 'bonds and other debt', 'ABS-MBS': 'mortgage-backed bonds', 'ABS-ASBS': 'asset-backed bonds',
   'ABS-CBDO': 'collateralised debt', 'ABS-O': 'other asset-backed bonds', STIV: 'cash and money-market funds', RE: 'real estate',
-  LON: 'loans', COMM: 'commodities', SN: 'structured notes', DCO: 'derivatives', DCR: 'derivatives', DE: 'derivatives',
+  LON: 'loans', COMM: 'commodities', SN: 'structured notes', RA: 'repurchase agreements', DCO: 'derivatives', DCR: 'derivatives', DE: 'derivatives',
   DFE: 'derivatives', DIR: 'derivatives', DO: 'derivatives', OTHER: 'other',
 };
 const ISSUERS: Record<string, string> = {
   CORP: 'companies', UST: 'the US Treasury', USGA: 'US government agencies', USGSE: 'US government-sponsored enterprises (such as Fannie Mae)',
   MUN: 'US states and cities', NUSS: 'governments outside the US', RF: 'other funds', PF: 'private funds', OTHER: 'other',
+};
+const KINDS: Record<string, [string, string]> = {
+  SWP: ['swap', 'swaps'], FUT: ['future', 'futures'], FWD: ['forward', 'forwards'], OPT: ['option', 'options'], SWO: ['swaption', 'swaptions'],
+  WAR: ['warrant', 'warrants'], OTH: ['other derivative', 'other derivatives'],
 };
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 let regions: Intl.DisplayNames | null = null;
@@ -130,7 +147,9 @@ export function renderReport(sym: string, day: string, r: Report, topN = 10): st
     '',
     `Name: ${r.series}`,
     ...(r.registrant && r.registrant.toLowerCase() !== r.series.toLowerCase() ? [`Filed by: ${r.registrant}`] : []),
-    `Net assets (its size): ${Math.round(r.netAssets).toLocaleString('en-US')} USD on ${r.asOf}`,
+    // A trust's report covers the fund with all its share classes (an ETF is often one of a mutual fund's): its size is
+    // theirs together, and the report does not split it.
+    `Net assets (its size): ${Math.round(r.netAssets).toLocaleString('en-US')} USD on ${r.asOf}${(r.classes ?? 1) > 1 ? `, for the whole fund: all its ${r.classes} share classes together, of which ${sym} is one; the report does not give ${sym}'s own part` : ''}`,
     `Holdings: ${r.holdings.length.toLocaleString('en-US')} lines`,
     `Held in: ${shares(r.holdings, (h) => ASSETS[h.asset] ?? h.asset).map(([k, p]) => `${k} ${pct(p)}`).join(', ') || 'not given'}`,
     `Issued by: ${shares(r.holdings, (h) => ISSUERS[h.issuer] ?? h.issuer).map(([k, p]) => `${k} ${pct(p)}`).join(', ') || 'not given'}`,
@@ -148,6 +167,22 @@ export function renderReport(sym: string, day: string, r: Report, topN = 10): st
     const paying = bonds.filter((h) => h.coupon !== null), w2 = paying.reduce((a, h) => a + h.pct, 0);
     const coupon = w2 ? paying.reduce((a, h) => a + h.pct * h.coupon!, 0) / w2 : null;
     lines.push(`Bonds (${pct(weight)} of the fund): on average ${years.toFixed(1)} years to repayment${coupon !== null ? ` and ${coupon.toFixed(2)}% yearly interest` : ''}, weighted by value (worked out here from each bond's maturity and rate)`);
+  }
+  const derivs = r.holdings.filter((h) => h.derivative);
+  if (derivs.length) {
+    // A derivative's share of the fund is its value (the gain or loss on it so far), never the exposure it gives: a fund
+    // built on swaps and futures (a leveraged or inverse one) reads as one of cash without the notional amounts.
+    const kinds = new Map<string, number>();
+    for (const h of derivs) kinds.set(h.derivative!.kind, (kinds.get(h.derivative!.kind) ?? 0) + 1);
+    const kindWords = [...kinds].sort((a, b) => b[1] - a[1]).map(([k, n]) => { const [one, many] = KINDS[k] ?? KINDS.OTH!; return `${n} ${n === 1 ? one : many}`; }).join(', ');
+    const refs = [...new Set(derivs.map((h) => h.derivative!.ref).filter(Boolean))];
+    const tied = refs.length ? `, tied to: ${refs.slice(0, 5).join(', ')}${refs.length > 5 ? `, and ${refs.length - 5} more` : ''}` : '';
+    const usd = derivs.filter((h) => h.derivative!.notional !== null && h.derivative!.currency === 'USD'), left = derivs.length - usd.length;
+    const sum = usd.reduce((a, h) => a + h.derivative!.notional!, 0), abs = usd.reduce((a, h) => a + Math.abs(h.derivative!.notional!), 0);
+    const whole = (n: number) => Math.round(n).toLocaleString('en-US'), share = (n: number) => (r.netAssets > 0 ? pct((n / r.netAssets) * 100) : 'its net assets are not above zero');
+    const sums = !usd.length ? 'The report gives none of their notional amounts in US dollars, so the exposure they give is not known here.'
+      : `As the report gives them, their notional amounts add up to ${whole(sum)} USD (${share(sum)} of its net assets); counted without their signs, ${whole(abs)} USD (${share(abs)}).${left ? ` ${left === 1 ? 'One more gives' : `${left} more give`} no notional amount in US dollars and ${left === 1 ? 'is' : 'are'} not in these sums.` : ''} Added up here from the report's figures; whether each is long or short is not worked out.`;
+    lines.push(`Derivatives: ${derivs.length === 1 ? '1 line' : `${derivs.length} lines`} (${kindWords})${tied}. The shares above count a derivative only at its value (its gain or loss so far), not at the exposure it gives, which is its notional amount. ${sums}`);
   }
   if (r.returns) {
     const end = new Date(`${r.asOf}T12:00:00Z`), month = (back: number) => { const d = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() - back, 15)); return `${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`; };
