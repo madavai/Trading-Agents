@@ -1,6 +1,7 @@
 // The page's charts, drawn as SVG from the desk's own numbers. Colours and type come from classes in dashboard.css (the page's
 // security policy allows no inline styles), and the gradients are the three fixed ones in index.html.
-import { dayText, esc, num, pct, shortDay, tone } from './fmt.js';
+import { esc, num, shortDay } from './fmt.js';
+import { barsOf, tipOf } from './bars.js';
 import type { History } from './api.js';
 
 export type Tone = 'accent' | 'ok' | 'bad';
@@ -67,24 +68,9 @@ export function paperChart(el: HTMLElement, series: ReadonlyArray<{ date: string
   el.innerHTML = s;
 }
 
-interface Bar { date: string; label: string; o: number; h: number; l: number; c: number; v: number | null }
-export interface HeroOptions { kind: 'area' | 'candles'; layers: { ma50: boolean; ma200: boolean; vol: boolean } }
+/** How the main chart is drawn; `unit` is '%' for a yield, whose moves are in points. */
+export interface HeroOptions { kind: 'area' | 'candles'; layers: { ma50: boolean; ma200: boolean; vol: boolean }; unit?: '%' }
 export interface HeroInfo { first: number; last: number; hasAverages: boolean }
-
-const monthYear = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
-
-/** Five years of days is too many to read: they are drawn a week at a time, each week's average at its last day. */
-function barsOf(h: History): { bars: Bar[]; ma50: Array<number | null>; ma200: Array<number | null> } {
-  const day = (b: History['bars'][number]): Bar => ({ date: b.date, label: shortDay(b.date), o: b.open, h: b.high, l: b.low, c: b.close, v: b.volume });
-  if (h.range !== '5Y') return { bars: h.bars.map(day), ma50: h.ma50, ma200: h.ma200 };
-  const bars: Bar[] = [], ma50: Array<number | null> = [], ma200: Array<number | null> = [];
-  for (let i = 0; i < h.bars.length; i += 5) {
-    const g = h.bars.slice(i, i + 5), end = g[g.length - 1]!;
-    bars.push({ date: end.date, label: monthYear(end.date), o: g[0]!.open, h: Math.max(...g.map((b) => b.high)), l: Math.min(...g.map((b) => b.low)), c: end.close, v: g.some((b) => b.volume === null) ? null : g.reduce((a, b) => a + b.volume!, 0) });
-    ma50.push(h.ma50[i + g.length - 1] ?? null); ma200.push(h.ma200[i + g.length - 1] ?? null);
-  }
-  return { bars, ma50, ma200 };
-}
 
 /** The main chart: area or candles, the 50- and 200-day averages, volume, a price tag and a crosshair with a tooltip. */
 export function heroChart(el: HTMLElement, tip: HTMLElement, h: History, o: HeroOptions): HeroInfo | null {
@@ -134,8 +120,7 @@ export function heroChart(el: HTMLElement, tip: HTMLElement, h: History, o: Hero
     const r = el.getBoundingClientRect(), i = Math.max(0, Math.min(n - 1, Math.floor((e.clientX - r.left) / step))), b = bars[i]!;
     xh.classList.remove('hide');
     xhl.setAttribute('x1', String(x(i))); xhl.setAttribute('x2', String(x(i))); xhd.setAttribute('cx', String(x(i))); xhd.setAttribute('cy', String(y(b.c)));
-    const move = (b.c / b.o - 1) * 100;
-    tip.innerHTML = `<div class="at-tile-name">${dayText(b.date)}</div><dl class="at-facts"><div><dt>Open</dt><dd>${num(b.o)}</dd></div><div><dt>High</dt><dd>${num(b.h)}</dd></div><div><dt>Low</dt><dd>${num(b.l)}</dd></div><div><dt>Close</dt><dd>${num(b.c)} <span class="at-chip ${tone(move)}">${pct(move)}</span></dd></div><div><dt>Volume</dt><dd>${b.v === null ? 'not given' : `${(b.v / 1e6).toFixed(1)}M`}</dd></div></dl>`;
+    tip.innerHTML = tipOf(bars, i, o.unit);
     tip.classList.add('on');
     const tw = tip.offsetWidth; let left = x(i) + 16; if (left + tw > pw) left = x(i) - tw - 16;
     tip.style.left = `${Math.max(0, left)}px`; tip.style.top = `${T}px`;
