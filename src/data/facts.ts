@@ -11,6 +11,8 @@ import { signed } from '../numbers.js';
 
 /** The windows facts are counted in: sessions back from the latest row, the latest included. */
 export const WINDOWS: ReadonlyArray<readonly [number, string]> = [[20, 'about a month'], [63, 'about three months'], [126, 'about six months'], [252, 'about a year']];
+/** The same for a coin, which trades every day: its windows are counted in calendar days. */
+export const COIN_WINDOWS: ReadonlyArray<readonly [number, string]> = [[30, 'about a month'], [91, 'about three months'], [182, 'about six months'], [365, 'about a year']];
 // Enough calendar days for the 200-day average to have a value across the year's window.
 const CALENDAR_DAYS = 700;
 const CROSSES_SHOWN = 6, TOP = 3;
@@ -39,24 +41,29 @@ export function priceFactsText(sym: string, day: string, s: Series): string {
   const close = bars.map((b) => b.close), m = macd(close), bb = bollinger(close);
   const ema10 = ema(close, 10), sma50 = sma(close, 50), sma200 = sma(close, 200), vw = vwma(bars), rsi14 = rsi(close), atr14 = atr(bars);
   const change: Values = close.map((c, i) => (i && close[i - 1] ? (c / close[i - 1]! - 1) * 100 : null));
-  const windows = WINDOWS.map(([size, words]) => ({ size: Math.min(size, n), words: size <= n ? words : 'all on record', full: size }));
+  // A coin trades every day (Yahoo calls it a cryptocurrency): its month, quarter, half-year and year are counted in days.
+  const coin = s.meta.type === 'CRYPTOCURRENCY', sizes = coin ? COIN_WINDOWS : WINDOWS;
+  const windows = sizes.map(([size, words]) => ({ size: Math.min(size, n), words: size <= n ? words : 'all on record', full: size }));
   const from = (w: { size: number }) => n - w.size;
+  const state = latestState(s, day);
   // A volume the source does not give is left out of every volume fact, never ranked as a zero; with no volume traded on
-  // any row (a currency pair's zeros) there are no volume facts at all.
-  const anyVolume = bars.some((b) => b.volume !== null && b.volume > 0);
-  const volumeOf = (i: number): number | null => (anyVolume ? bars[i]!.volume : null);
+  // any row (a currency pair's zeros) there are no volume facts at all. A session not yet final has only part of a day's
+  // volume, so it is left out too: half an hour in, it would be "the lightest of all sessions on record".
+  const anyVolume = bars.some((b) => b.volume !== null && b.volume > 0), partial = state.open && anyVolume && bars[L]!.volume !== null;
+  const volumeOf = (i: number): number | null => (anyVolume && !(partial && i === L) ? bars[i]!.volume : null);
   const noVolume = bars.map((b, i) => (b.volume === null ? i : -1)).filter((i) => i >= 0);
   const volumeNote = !anyVolume ? ['- The source gives no volume for these rows (or none traded): there are no volume facts here, and VWMA has no value.']
     : noVolume.length ? [`- The source gives no volume for ${plural(noVolume.length, 'session')} (${noVolume.slice(-5).map(d).join('; ')}${noVolume.length > 5 ? ', and earlier ones' : ''}): ${noVolume.length === 1 ? 'it is' : 'they are'} left out of every volume fact, and VWMA has no value on a window that includes ${noVolume.length === 1 ? 'it' : 'them'}.`] : [];
+  if (partial) volumeNote.push(`- The latest row, ${d(L)}, is not a finished session: its volume so far is not a whole day's, so it is left out of every volume fact here.`);
 
   const out = [
     `## Price facts for ${sym}, worked out by the desk`, '',
     `- Analysis date: ${withWeekday(day)}. Latest row: ${d(L)}. Rows after the analysis date are excluded.`,
-    `- From the same daily prices as the checked price table (${adjustedWords(s)}) and the same indicators (10 EMA, 50 SMA, 200 SMA, VWMA, RSI, MACD, Bollinger bands, ATR). A session is a trading day; every date carries its weekday.`,
+    `- From the same daily prices as the checked price table (${adjustedWords(s)}) and the same indicators (10 EMA, 50 SMA, 200 SMA, VWMA, RSI, MACD, Bollinger bands, ATR). ${coin ? 'A coin trades every day, so a session here is a calendar day' : 'A session is a trading day'}; every date carries its weekday.`,
     ...volumeNote,
     `- Windows count back from the latest row, which they include: ${windows.map((w) => `the last ${w.size} sessions${w.size < w.full ? ' (all on record)' : ''} from ${d(from(w))}`).join('; ')}.`,
     '- Directions and sides are judged on figures rounded to the cent, as the tables show them.',
-    ...latestState(s, day).lines, '',
+    ...state.lines, '',
     'Quote a fact as it stands here, naming its window ("the lowest RSI of the last 63 sessions"). A run, a first or a last time, a record, a rank, a count of sessions or a crossing that is not here is not known to the desk: leave it out rather than count it by eye.', '',
   ];
 
@@ -81,7 +88,7 @@ export function priceFactsText(sym: string, day: string, s: Series): string {
   ].filter((x): x is string => x !== null));
 
   // Which side of a line, since when, and the crossings of the last year, newest first.
-  const year = Math.max(0, n - 252);
+  const year = Math.max(0, n - sizes.at(-1)![0]);
   const sides = (a: string, av: Values, b: string, bv: Values, what = 'session'): string | null => {
     const sd = (i: number) => cmp(av[i], bv[i]), now = sd(L);
     if (now === null) return null;
@@ -185,14 +192,14 @@ export function priceFactsText(sym: string, day: string, s: Series): string {
     since('RSI', ['highest RSI', 'lowest RSI'], (i) => rsi14[i], f2), since('MACD', ['highest MACD', 'lowest MACD'], (i) => m.macd[i], f2),
     since('MACD histogram', ['highest MACD histogram', 'lowest MACD histogram'], (i) => m.hist[i], f2),
   ].filter((x): x is string => x !== null));
-  for (const w of windows.filter((w) => w.full === 63 || w.full === 252)) {
+  for (const w of windows.filter((_, k) => k === 1 || k === 3)) {   // about three months and about a year
     const idx = Array.from({ length: w.size }, (_, k) => from(w) + k);
     const hi = idx.reduce((a, i) => (close[i]! >= close[a]! ? i : a)), lo = idx.reduce((a, i) => (close[i]! <= close[a]! ? i : a));
     out.push(`- The close ${f2(close[L]!)} is ${f2(Math.abs((close[L]! / close[hi]! - 1) * 100))}% ${close[L]! < close[hi]! ? 'below' : 'at'} the highest close of the last ${w.size} sessions (${f2(close[hi]!)} on ${d(hi)}) and ${f2(Math.abs((close[L]! / close[lo]! - 1) * 100))}% ${close[L]! > close[lo]! ? 'above' : 'at'} the lowest (${f2(close[lo]!)} on ${d(lo)}).`);
   }
 
   // Changes of the close over whole windows, and the calendar year so far.
-  const moves = [1, 5, 20, 63, 126, 252].filter((k) => k <= L).map((k) => `${plural(k, 'session')} ${signed((close[L]! / close[L - k]! - 1) * 100, 2)}% (from ${f2(close[L - k]!)} on ${d(L - k)})`);
+  const moves = [1, 5, ...sizes.map(([k]) => k)].filter((k) => k <= L).map((k) => `${plural(k, 'session')} ${signed((close[L]! / close[L - k]! - 1) * 100, 2)}% (from ${f2(close[L - k]!)} on ${d(L - k)})`);
   const lastOfYear = Array.from({ length: L }, (_, k) => L - 1 - k).find((i) => bars[i]!.date.slice(0, 4) < bars[L]!.date.slice(0, 4));
   if (lastOfYear !== undefined) moves.push(`this calendar year ${signed((close[L]! / close[lastOfYear]! - 1) * 100, 2)}% (from the last close of ${bars[lastOfYear]!.date.slice(0, 4)}, ${f2(close[lastOfYear]!)} on ${d(lastOfYear)})`);
   out.push('', '### Change of the close to the latest row', '', `- ${moves.join('; ')}.`);

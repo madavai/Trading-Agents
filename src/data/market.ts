@@ -37,7 +37,7 @@ export async function instrument(raw: string, analysis: string): Promise<string>
 }
 
 /** A time of day in the exchange's own zone, as a person reads it. */
-const clock = (ms: number, zone = 'UTC'): string => {
+export const clock =(ms: number, zone = 'UTC'): string => {
   try { return `${new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: zone })} ${zone} time`; } catch { return `${new Date(ms).toISOString().slice(11, 16)} UTC`; }
 };
 
@@ -89,7 +89,12 @@ const MAX_ROWS = 260;
 export async function priceHistory(raw: string, analysis: string, start: string, end: string): Promise<string> {
   const day = analysisDate(analysis), [s, e] = window(start, end, day);
   const series = await daily(raw, s, e);
-  if (!series.bars.length) return `No trading rows for ${resolved(raw)} from ${s} to ${e}.`;
+  if (!series.bars.length) {
+    // A session the source lists with its prices still blank is not a day with no trading.
+    const blank = [...new Set([...(series.unfilled ?? []), ...(series.missing ?? [])])].filter((d) => d >= s && d <= e).sort(), one = blank.length === 1;
+    if (!blank.length) return `No trading rows for ${resolved(raw)} from ${s} to ${e}.`;
+    return `No prices yet for ${resolved(raw)} from ${s} to ${e}: the source lists ${one ? 'a session' : 'sessions'} on ${listDays(blank)}, but ${one ? 'its' : 'their'} prices are not filled in yet (this happens for a while after a session ends). Do not say ${listDays(blank)} had no trading: say ${one ? 'its' : 'their'} prices were not available yet.`;
+  }
   const rows = series.bars.slice(-MAX_ROWS), notes = latestState(series, e).lines;
   const head = [`Daily prices for ${resolved(raw)} from ${s} to ${e} (${series.bars.length} trading days${series.bars.length > MAX_ROWS ? `, the last ${MAX_ROWS} shown` : ''}; ${adjustedWords(series)}${series.meta.currency ? `; ${series.meta.currency}` : ''})`, '', 'Date | Open | High | Low | Close | Volume', '---|---:|---:|---:|---:|---:'];
   return head.concat(rows.map((b) => `${b.date} | ${f2(b.open)} | ${f2(b.high)} | ${f2(b.low)} | ${f2(b.close)} | ${vol(b.volume)}`), notes.length ? ['', ...notes] : []).join('\n');

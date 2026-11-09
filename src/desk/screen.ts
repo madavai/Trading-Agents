@@ -1,5 +1,6 @@
 // "Worth a look today": a cheap pass over the whole market, the sector funds and the person's own names that says, from
-// figures alone, which moved in a way worth reading about: a day's move of 3% or more, volume at least twice its usual,
+// figures alone (the prices traded, as the dashboard's chart shows them), which moved in a way worth reading about: a
+// day's move of 3% or more, volume at least twice its usual,
 // a new 52-week high or low, a close across its 50- or 200-day average, and, for a single name or a coin, news about it
 // published today. No model is asked and nothing here is a forecast. Ranked by how many signals fire, then by the size
 // of the move; five are shown. It is worked out at most once an hour and kept in desk-data/screen.json, so the dashboard
@@ -129,7 +130,9 @@ export async function workScreen(symbols: readonly string[], news: ReadonlySet<s
   const list = [...new Set(symbols)].filter((s) => !/[\^=]/.test(s));
   const read = await inTurn(list, 4, async (symbol) => {
     try {
-      const s = await daily(symbol, addDays(day, -400), day), bars = s.bars;
+      // At the prices traded, as the chart beside it shows them: dividend-adjusted rows lower every day before a dividend,
+      // so a fund that pays would reach "a new 52-week high" below its traded high.
+      const s = await daily(symbol, addDays(day, -400), day), bars = s.traded?.length === s.bars.length ? s.traded : s.bars;
       if (!bars.length || bars[bars.length - 1]!.date < addDays(day, -7)) return { symbol, bars: null, news: null, asked: false, live: false };
       const asked = news.has(symbol);
       return { symbol, bars, news: asked ? await newsOn(symbol, day) : null, asked, live: latestState(s, day, now.getTime()).open };

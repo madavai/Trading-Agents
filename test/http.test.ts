@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { configure, getText, Unavailable } from '../src/data/http.js';
+import { configure, getJson, getText, Unavailable } from '../src/data/http.js';
 import { clearSecCache } from '../src/data/sec.js';
 import { deskServer } from '../src/tools/server.js';
 import { financialStatement } from '../src/data/company.js';
@@ -108,4 +108,22 @@ test('answers expire: five minutes for most sources, a day for the SEC, and old 
   age(4 * 24 * 60);
   configure({ cacheDir });                                                                                  // clearing happens when the cache is opened
   assert.deepEqual(fs.readdirSync(cacheDir), []);
+});
+
+// Audit 3 prices-6 (9 Nov 2026): a 200 answer that was a web page ("will be right back") was kept on disk before it was
+// found not to be data, so every copy of the tool server said the prices were unavailable for five minutes without asking
+// the source again, although it was back.
+test('an answer that is not data is never kept, and one kept by an older desk is not served: the source is asked again', async () => {
+  const cacheDir = path.join(tmp(), 'cache'), url = 'https://query1.finance.yahoo.com/v8/finance/chart/NVDA?interval=1d';
+  let calls = 0, page = true;
+  configure({ cacheDir, fetch: async () => { calls++; return new Response(page ? '<html>Will be right back</html>' : `{"v":${calls}}`); } });
+  await assert.rejects(getJson(url), (e: Error) => e instanceof Unavailable && /answered with something that is not data/.test(e.message));
+  assert.deepEqual(fs.existsSync(cacheDir) ? fs.readdirSync(cacheDir) : [], [], 'nothing kept');
+  page = false;
+  assert.deepEqual(await getJson(url), { v: 2 }, 'asked again at once');
+  assert.deepEqual(await getJson(url), { v: 2 }, 'the good answer is kept');
+  assert.equal(calls, 2);
+  for (const f of fs.readdirSync(cacheDir)) fs.writeFileSync(path.join(cacheDir, f), '<html>kept by an older desk</html>');
+  assert.deepEqual(await getJson(url), { v: 3 }, 'a kept page is not served as data');
+  assert.equal(await getText('https://www.sec.gov/Archives/x.htm'), '{"v":4}', 'a page asked for as text is still kept as before');
 });
