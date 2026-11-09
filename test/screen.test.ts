@@ -96,14 +96,14 @@ test('the rates line: what Polymarket prices for the Federal Reserve\'s next dec
   ];
   const r = ratesOf(events, now);
   assert.deepEqual([r.state, r.tone], ['No change', '']);
-  assert.equal(r.words, "For the Federal Reserve's next decision, by 28 Oct 2026, Polymarket's crowd puts no change at 88% and a rise of 0.25% at 12%.");
+  assert.equal(r.words, "For the Federal Reserve's next decision, by 28 Oct 2026, Polymarket's crowd puts no change at 88% and a rise of 0.25 percentage points at 12%.");
   assert.match(r.meaning, /not a forecast of ours/);
   const cut = ratesOf([fed('Fed decision in March?', '2027-03-18T00:00:00Z', { '50+ bps decrease': 0.6, '25 bps decrease': 0.05 })], now);
-  assert.deepEqual([cut.state, cut.tone, cut.words.endsWith('puts a cut of 0.5% or more at 60%.')], ['A cut', 'ok', true], 'a second outcome under 10% is not named');
+  assert.deepEqual([cut.state, cut.tone, cut.words.endsWith('puts a cut of 0.5 percentage points or more at 60%.')], ['A cut', 'ok', true], 'a second outcome under 10% is not named');
   assert.deepEqual([ratesOf([events[1]!], now).state, ratesOf([events[1]!], now).tone], ['A rise', 'warn']);
   assert.equal(ratesOf([events[0]!], now).state, null, 'a decided meeting is not the next one');
   assert.match(ratesOf([], now).words, /^Unavailable: Polymarket has no open market/);
-  assert.deepEqual([outcomeWords('No change'), outcomeWords('25+ bps increase'), outcomeWords('100 bps decrease')].map((o) => o.words), ['no change', 'a rise of 0.25% or more', 'a cut of 1%']);
+  assert.deepEqual([outcomeWords('No change'), outcomeWords('25+ bps increase'), outcomeWords('100 bps decrease')].map((o) => o.words), ['no change', 'a rise of 0.25 percentage points or more', 'a cut of 1 percentage point']);
 });
 
 const screenOf = (day: string, picks: string[]): Screen => ({ day, at: `${day}T13:00:00.000Z`, looked: 20, unavailable: [], picks: picks.map((symbol) => ({ symbol, signals: [{ kind: 'move', words: 'rose 4.0%' }], movePct: 4, why: 'Rose 4.0%', session: day })) });

@@ -1,7 +1,7 @@
 // A fund's holdings and size as it reports them to the SEC on form N-PORT: every US fund, and every ETF set up as a unit
 // investment trust (SPY, DIA), files one each month, and the last month of each quarter is made public about two months
 // later. EDGAR dates each report by the day it was filed, so an analysis of a past day reads only what was public by then.
-// Free and official; the SEC asks every caller for a contact email (http.ts sends it). It gives no yearly cost.
+// Free and official; the SEC asks every caller for a contact email (http.ts sends it). It gives no yearly cost, and for a US fund the desk reads none elsewhere.
 import { daysBetween } from './dates.js';
 import { getText, NoData, Unavailable } from './http.js';
 import { blocks, decode } from './insiders.js';
@@ -153,7 +153,7 @@ export function renderReport(sym: string, day: string, r: Report, topN = 10): st
     const end = new Date(`${r.asOf}T12:00:00Z`), month = (back: number) => { const d = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() - back, 15)); return `${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`; };
     lines.push(`Its own total return by month, as it reported it: ${r.returns.map((v, i) => `${month(2 - i)} ${signed(v)}`).join(', ')}`);
   } else lines.push('Its own monthly returns: not in this report');
-  lines.push('Yearly cost (expense ratio): unavailable (no official free source gives it in a form the desk can read; the fund\'s prospectus states it)');
+  lines.push('Yearly cost (expense ratio): unavailable (the desk does not read it; the fund\'s prospectus states it)');
   const top = shares(r.holdings, (h) => h.name).slice(0, topN);
   if (top.length) {
     const together = top.reduce((a, [, p]) => a + p, 0);

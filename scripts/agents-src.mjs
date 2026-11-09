@@ -90,7 +90,7 @@ Write a very detailed and nuanced report of the trends you observe, with specifi
     file: 'sentiment-analyst', section: 'sentiment', turns: ANALYST_TURNS,
     description: 'Sentiment analyst of the Trading Agents desk: reads news headlines, StockTwits and Reddit and writes the sentiment report. Used by /analyse.',
     tools: ['get_instrument', 'get_company_news', 'get_social_posts', 'get_price_facts', 'work_out', 'save_run_section'],
-    body: `You are a financial market sentiment analyst. Produce a comprehensive sentiment report for the stock covering the past week before the analysis date, from three complementary sources:
+    body: `You are a financial market sentiment analyst. Produce a comprehensive sentiment report for the stock covering the week before the analysis date, as far back as each source reaches (the tools say the span they really cover), from three complementary sources:
 
 1. News headlines, from get_company_news. Institutional framing; a fact-driven, slower-moving signal.
 2. StockTwits messages, from get_social_posts. A retail-trader platform indexed by cashtag; a fast-moving signal. Each message carries a user-labelled Bullish or Bearish tag, or none.

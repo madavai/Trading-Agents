@@ -79,12 +79,14 @@ export function moodOf(bars: readonly Bar[], live: Live = null): WeatherLine {
 interface PolyMarket { groupItemTitle?: string; outcomePrices?: string; closed?: boolean; active?: boolean }
 export interface PolyEvent { title?: string; endDate?: string; closed?: boolean; markets?: PolyMarket[] }
 
-/** "25 bps increase" as "a rise of 0.25%"; "No change" as "no change". */
+/** "25 bps increase" as "a rise of 0.25 percentage points"; "No change" as "no change". A move in a rate is said in
+ *  percentage points: "0.25%" would read as a quarter of a percent of the rate itself (audit 1 W2). */
 export function outcomeWords(title: string): { words: string; way: 'none' | 'cut' | 'rise' } {
   if (/no change/i.test(title)) return { words: 'no change', way: 'none' };
   const m = /(\d+)\s*(\+?)\s*bps?\s*(decrease|cut|increase|hike|rise)/i.exec(title);
   if (!m) return { words: title.toLowerCase(), way: 'none' };
-  const cut = /decrease|cut/i.test(m[3]!), size = `${Number((Number(m[1]) / 100).toFixed(2))}%`;   // 25 bps is 0.25%
+  const points = Number((Number(m[1]) / 100).toFixed(2));   // 25 basis points are 0.25 percentage points
+  const cut = /decrease|cut/i.test(m[3]!), size = `${points} percentage point${points === 1 ? '' : 's'}`;
   return { words: `${cut ? 'a cut' : 'a rise'} of ${size}${m[2] ? ' or more' : ''}`, way: cut ? 'cut' : 'rise' };
 }
 

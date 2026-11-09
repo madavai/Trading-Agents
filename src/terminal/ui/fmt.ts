@@ -1,5 +1,6 @@
 // How numbers and words are written on the page. A number that is missing is a dash, never a zero.
 import { GLOSSARY, isTerm, means } from './glossary.js';
+import { LATE, type PriceMarket } from '../../data/delay.js';
 
 const MINUS = '−';
 
@@ -7,6 +8,11 @@ export const esc = (s: unknown): string => String(s ?? '').replace(/[&<>"']/g, (
 
 export const num = (n: number | null | undefined, d = 2): string =>
   n === null || n === undefined || !Number.isFinite(n) ? '—' : n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+
+/** A quantity of shares or coins as Robinhood counts it: a whole number plainly ("12"), a fraction in full ("0.18",
+ *  "0.000123"), never rounded to a whole share or to four places. Up to eight decimals, the finest a coin is counted in. */
+export const qty = (n: number | null | undefined): string =>
+  n === null || n === undefined || !Number.isFinite(n) ? '—' : n.toLocaleString('en-US', { maximumFractionDigits: 8 });
 
 export const money = (n: number | null | undefined, currency = 'USD'): string => {
   if (n === null || n === undefined || !Number.isFinite(n)) return '—';
@@ -75,6 +81,7 @@ export const NOTES = {
   coinOnPaper: "Robinhood's agent doorway trades stocks and funds, so a coin never gets an order ticket.",
   noTicket: 'No order ticket: Robinhood\'s agent doorway trades stocks and funds, and among crypto the desk follows only Bitcoin and Ether on paper.',
   noView: "No view yet: the desk has not analysed it. Ask it to (the robot); in the Agentic account, Monday's morning routine rates it.",
+  stopWatch: "A stop is the desk's trader's, watched against Yahoo Finance's price only while this page is open in a browser. With the page closed nothing watches it: the evening wrap-up names any holding whose last close is below its stop, but only when it runs (your routines switched on in Madav, or asked for in a chat). It only reports.",
 } as const;
 
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -116,10 +123,11 @@ export const when = (iso: string, now: Date = new Date()): string => {
   return `${d.getFullYear() === now.getFullYear() ? weekDay(local(d)) : `${d.getDate()} ${MON[d.getMonth()]} ${d.getFullYear()}`}, ${clock(iso)}`;
 };
 /** A price and its move in words, saying which day they are: while the market is open, "$188.08 (+1.20% today) on Yahoo
- *  Finance, up to 15 min late"; after today's close, "$188.08, today's close (+1.20% today)"; on a weekend or before the
- *  open, "$188.08, the close of Fri 6 Nov (+1.20% that day)", never "today". */
-export const priceDayWords = (price: string, move: string | null, q: { open: boolean; asOf: string }, now: Date = new Date()): string => {
-  if (q.open) return `${price}${move ? ` (${move} today)` : ''} on Yahoo Finance, up to 15 min late`;
+ *  Finance, real-time" (how late it may be, as far as that is known: data/delay.ts); after today's close, "$188.08,
+ *  today's close (+1.20% today)"; on a weekend or before the open, "$188.08, the close of Fri 6 Nov (+1.20% that day)",
+ *  never "today". A close is final, so nothing is said of lateness beside one. */
+export const priceDayWords = (price: string, move: string | null, q: { open: boolean; asOf: string; market?: PriceMarket }, now: Date = new Date()): string => {
+  if (q.open) return `${price}${move ? ` (${move} today)` : ''} on Yahoo Finance, ${LATE[q.market ?? 'other']}`;
   const day = moveDayOf(q.asOf, now);
   return day ? `${price}, the close of ${weekDay(day)}${move ? ` (${move} that day)` : ''}, from Yahoo Finance`
     : `${price}, today's close${move ? ` (${move} today)` : ''}, from Yahoo Finance`;

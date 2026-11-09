@@ -1,7 +1,9 @@
 // Prices for the dashboard, from Yahoo Finance's public chart service: a quote with the day's intraday points for a small
-// chart, and daily history with the 50- and 200-day averages. Yahoo's free prices may be delayed by up to 15 minutes, and
-// the page says so. A symbol that cannot be priced is reported as unavailable, never as a zero.
+// chart, and daily history with the 50- and 200-day averages. Each quote carries the market it is from, so the page says
+// how late it may be as far as that is known (data/delay.ts). A symbol that cannot be priced is reported as unavailable,
+// never as a zero.
 import { addDays, today } from '../data/dates.js';
+import { priceMarket, type PriceMarket } from '../data/delay.js';
 import { getJson, NoData, Unavailable } from '../data/http.js';
 import { compute } from '../data/indicators.js';
 import { safeSymbol } from '../data/symbols.js';
@@ -10,12 +12,14 @@ import { daily, HOSTS } from '../data/yahoo.js';
 export interface Quote {
   symbol: string; name?: string; currency?: string; price: number; previousClose: number | null; change: number | null; changePct: number | null;
   open: boolean; asOf: string; points: number[];
+  /** The market the price is from, for how late it may be (data/delay.ts): a US stock or fund, a coin, or any other. */
+  market: PriceMarket;
 }
 export type QuoteResult = Quote | { symbol: string; error: 'unavailable' | 'no-data'; message: string };
 
 interface IntradayJson {
   chart?: { result?: Array<{
-    meta?: { symbol?: string; currency?: string; longName?: string; shortName?: string; instrumentType?: string; regularMarketPrice?: number; chartPreviousClose?: number; previousClose?: number; regularMarketTime?: number; currentTradingPeriod?: { regular?: { start?: number; end?: number } } };
+    meta?: { symbol?: string; currency?: string; longName?: string; shortName?: string; instrumentType?: string; exchangeName?: string; regularMarketPrice?: number; chartPreviousClose?: number; previousClose?: number; regularMarketTime?: number; currentTradingPeriod?: { regular?: { start?: number; end?: number } } };
     timestamp?: number[]; indicators?: { quote?: Array<{ close?: Array<number | null> }> };
   }> | null; error?: { description?: string } | null };
 }
@@ -40,7 +44,7 @@ export function parseQuote(json: IntradayJson, symbol: string, nowSec = Date.now
   return {
     symbol, name: m.longName ?? m.shortName, currency: m.currency, price, previousClose,
     change: previousClose === null ? null : price - previousClose, changePct: previousClose === null ? null : (price / previousClose - 1) * 100,
-    open, asOf: new Date(t * 1000).toISOString(), points: points.length ? points : [price],
+    open, asOf: new Date(t * 1000).toISOString(), points: points.length ? points : [price], market: priceMarket(m),
   };
 }
 

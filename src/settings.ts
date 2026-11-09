@@ -59,6 +59,9 @@ export const DEFAULT_CAPS: Caps = { perOrderUsd: 500, perStockPercent: 10, order
 export const CAP_RANGES = { perOrderUsd: [1, 100_000], perStockPercent: [1, 100], ordersPerDay: [1, 50], perSectorPercent: [1, 100], cryptoPercent: [0, 100], weeklyLossPercent: [1, 50], minHoldDays: [0, 60] } as const;
 /** The limits counted in whole numbers. */
 const WHOLE_CAPS = new Set<keyof Caps>(['ordersPerDay', 'minHoldDays']);
+/** What the dashboard says when caps are refused: every one of the seven ranges, from CAP_RANGES itself, so a person who
+ *  typed a weekly fall of 60% is told that limit too, not only three of them. */
+export const CAP_RANGE_WORDS = ((r) => `caps are $${r.perOrderUsd[0]} to $${r.perOrderUsd[1].toLocaleString('en-US')} an order, ${r.perStockPercent[0]}% to ${r.perStockPercent[1]}% of the account in one stock, ${r.ordersPerDay[0]} to ${r.ordersPerDay[1]} orders a day, ${r.perSectorPercent[0]}% to ${r.perSectorPercent[1]}% in one sector, ${r.cryptoPercent[0]}% to ${r.cryptoPercent[1]}% in crypto, a weekly fall of ${r.weeklyLossPercent[0]}% to ${r.weeklyLossPercent[1]}% before trading switches itself off, and a shortest hold of ${r.minHoldDays[0]} to ${r.minHoldDays[1]} trading days; orders a day and the shortest hold are whole numbers`)(CAP_RANGES);
 
 export const DEFAULTS: Settings = {
   analysis: {
