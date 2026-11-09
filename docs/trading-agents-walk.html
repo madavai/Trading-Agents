@@ -442,7 +442,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "Pick two figures in NVDA's market report (a price, an indicator) and compare them with the chart or Yahoo Finance."],
       "see": [
         "They match the data. Anything that could not be fetched says \"unavailable\", never a made-up figure."] },
-    { "id": "B5", "title": "A crypto asset", "tags": [], "changed": "2026-11-08",
+    { "id": "B5", "title": "A crypto asset", "tags": [], "changed": "2026-11-09",
       "about": "The desk analyses Bitcoin and other coins too. A coin has no company accounts, so the fundamentals analyst sits it out, and coins are followed on paper only (section L).",
       "where": "Madav › Agent Studio › trading-desk › Put to work, then the dashboard",
       "do": [
@@ -450,7 +450,8 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "The plan says BTC-USD is a crypto asset, so there is no fundamentals analyst: it has no company accounts.",
         "It records a call. On the dashboard that call shows \"on paper only\" where NVDA's shows Decide….",
-        "The team says the call will be scored as a first-week check against SPY over the 7 calendar days after the call (the desk's settings name no yardstick for coins), not the call's own time horizon, once a scoring runs after them."] },
+        "The team says the call will be scored as a first-week check against SPY over the 7 calendar days after the call (the desk's settings name no yardstick for coins), not the call's own time horizon, once a scoring runs after them.",
+        "Any coin Yahoo Finance lists in dollars is a coin to the desk, not only the best known: SHIB-USD is planned as a crypto asset too, never as a stock."] },
     { "id": "B6", "title": "Asking from the dashboard", "tags": [], "changed": "2026-10-21",
       "about": "You can also ask for an analysis on the dashboard with the robot button; it waits on a list until something runs it (section K covers running by itself).",
       "where": "Dashboard › Watchlist › the robot beside a company, then trading-desk › Put to work",
@@ -706,24 +707,29 @@ b, strong { font-weight: var(--weight-semibold); }
       "where": "Dashboard › The desk's calls › NVDA › Read",
       "do": [
         "Open the NVDA call (\"Read\").",
+        "If the journal has a call older than six months, or one on SPY, open it too.",
         "Press inside the window where nothing is written: its margin, and the gap between two reports. Then press the shaded page outside it."],
       "see": [
         "\"The portfolio manager's rating\" first, with the price target, the time horizon and how it scored, and the \"Portfolio manager's decision\" open.",
         "How it scored names the call's own window and yardstick, and that it is not the time horizon just above it: \"Scored: not yet: a first-week check against SPY over the 5 trading days after the call, not the call's own time horizon, once a scoring runs after them.\", or for a scored call \"alpha -12.1% against SPY over the 5 trading days after the call: the call did not work. It is a first-week check, not the call's own time horizon.\", \"…: the call worked\", or for a Hold \"…: a Hold claims no direction\". A coin's says \"the 7 calendar days\".",
+        "A call on SPY itself (or on VOO or IVV, which copy the same index) is scored on its own return, since against SPY its alpha would always be about zero: \"Scored: its return +1.1% on its own return over the 5 trading days after the call: the call worked. It is a first-week check, not the call's own time horizon.\"",
+        "The line under the rating gives the close on or before the call's day, the price now and the change \"since the call\", however old the call: a call from last year reads its close too, never \"No close on or before the call to compare with.\"",
         "Then \"Gathering the facts\", \"The research debate\", \"The trade\" and \"The risk debate\", each readable.",
         "Each report's line previews its first sentence, never a heading alone: round 1's fact check reads \"Instrument confirmed: …\", not just \"Data note and verification.\"",
         "At the foot: \"This is the team's reasoning as it wrote it. It is not investment advice.\"",
         "A press inside the window, its margin and gaps included, leaves it open; only a press on the shaded page around it closes it. Every window on the dashboard does the same: an order ticket, the stop and \"Every word explained\"."] },
-    { "id": "C7", "title": "Scorecard", "tags": [], "changed": "2026-11-08",
+    { "id": "C7", "title": "Scorecard", "tags": [], "changed": "2026-11-09",
       "about": "Each call is scored once, in a first-week check against a named yardstick: SPY, the fund that copies the S&P 500, over the 5 trading days after a call on a US stock or fund, or the 7 calendar days after a call on a coin. It is a short first check, not the call's own time horizon (its decision states that): did it call the direction, and by how much did it beat or trail SPY (its \"alpha\")? The scorecard adds them up by rating. Alpha above zero is good for a Buy or Overweight, and below zero is good for an Underweight or Sell. A call is scored when a scoring runs, not by itself.",
       "where": "Dashboard › How the desk is doing",
       "do": [
         "Look at the scorecard under your paper record.",
-        "Point at each rating's average alpha."],
+        "Point at each rating's average alpha.",
+        "With a scored call on SPY itself (or VOO, IVV) in your journal, read the line under the table."],
       "see": [
         "\"N scored · M waiting\" under the heading, and by rating: Calls, Called the direction, Average alpha vs the yardstick.",
-        "Each average is green when that rating's calls went its way on average, red when they went against it, and plain for Hold. Round 1's Underweight read \"+0.4%\" in red: pointing at it says \"On average the stocks rated Underweight beat their yardstick by 0.4% in each call's first check: on average these calls did not work so far.\"",
-        "Under it: \"Each call is scored once, a first-week check against a named yardstick, not over the call's own time horizon (its decision states that). A US stock or fund: against SPY, the fund that copies the S&P 500, over the 5 trading days after the call. A coin: against SPY too, as the desk's settings name no yardstick for coins, over the 7 calendar days after the call. A coin trades every day and SPY only on New York's market days, so SPY's close on the coin's first and last day is used, or its last close before that day when New York's market was closed (a weekend or a New York holiday).\"",
+        "Each average is green when that rating's calls went its way on average, red when they went against it, and plain for Hold. Round 1's Underweight read \"+0.4%\" in red: pointing at it says \"On average, what the desk rated Underweight beat its yardstick by 0.4% in each call's first check: on average these calls did not work so far.\"",
+        "A call on SPY itself, or on VOO or IVV, is not in the table: its score is how far the fund rose or fell, not how far it beat its yardstick, so it is never averaged with the others. Under the table, for one Buy on SPY that rose 1.1%: \"Left out of the table: 1 call on the yardstick itself or a fund that copies the same index, scored on its own return rather than against it. Buy: 1 call, 1 of 1 worked, average return +1.1%.\" It still counts in \"N scored\".",
+        "Under it: \"Each call is scored once, a first-week check against a named yardstick, not over the call's own time horizon (its decision states that). A US stock or fund: against SPY, the fund that copies the S&P 500, over the 5 trading days after the call. A call on SPY itself, or on a fund that copies the same index (VOO, IVV), is scored on its own return instead: against SPY its alpha would always be about zero, so a Buy works when it rose over the window, a Sell when it fell. A coin: against SPY too, as the desk's settings name no yardstick for coins, over the 7 calendar days after the call. A coin trades every day and SPY only on New York's market days, so SPY's close on the coin's first and last day is used, or its last close before that day when New York's market was closed (a weekend or a New York holiday).\"",
         "With round 1's Bitcoin call in your journal, a call recorded before the desk kept each call's window with it is named: \"Scored otherwise: BTC-USD (16 Oct 2026): against SPY, the fund that copies the S&P 500 (the desk's settings name no yardstick for coins, so a coin is scored against the one for US listings), over the 5 calendar days after the call, as it was recorded before the desk kept each call's window with it, so it is scored as such calls were then.\" Its score does not change.",
         "Then: \"A call is scored when a scoring runs after its window (/settle, an analysis or a routine), not by itself. Both returns count dividends: they are worked out from prices adjusted for them. Green means the calls went the way their rating said in their first check, red that they went against it: a Buy or Overweight works when its stock beats its yardstick, an Underweight or Sell when its stock trails it. A Hold claims no direction, so it stays plain.\"",
         "With few scored calls: \"With so few scored calls these figures are noise, not a record.\" With none: \"Nothing has been scored yet. A call is scored once its window has passed and a scoring runs (/settle, an analysis or a routine), not by itself.\""] },
@@ -732,23 +738,27 @@ b, strong { font-weight: var(--weight-semibold); }
       "where": "Dashboard › chart NVDA › side list › Stock page",
       "do": [
         "Chart NVDA, then open \"Stock page\" in the side list.",
-        "Read the line under \"Everything on NVDA\" while the market trades, after the close, and on a weekend."],
+        "Read the line under \"Everything on NVDA\" while the market trades, after the close, and on a weekend.",
+        "If you hold a share class Robinhood spells with a dot, such as Berkshire Hathaway's BRK.B, chart [[BRK-B]] (as Yahoo Finance spells it) and open its Stock page."],
       "see": [
         "\"Everything on NVDA\": \"What you hold\" in each account (with \"Buy NVDA…\" and \"Sell NVDA…\"), \"Your orders on it\", and \"The desk's calls on it\" with each result.",
         "With no NVDA order, \"Your orders on it\" says which orders it read, for example \"No orders on NVDA among the 3 orders Robinhood listed for the Agentic account at 09:12 AM.\" The dashboard reads 20 of them: when Robinhood listed more, \"No orders on NVDA among the 20 the dashboard reads of the 25 orders Robinhood listed for the Agentic account at 09:12 AM: the other 5 are not read here, so one of them may be.\" For a coin: \"The dashboard reads the Agentic account's stock and fund orders only, so a coin's orders are not shown here.\"",
         "Under the calls: \"Each result is a first-week check against SPY over the 5 trading days after the call, not the call's own time horizon.\"",
         "\"Ask the desk to analyse\", \"Trade…\" and \"Decide…\".",
         "Each price says where it comes from: Yahoo Finance or Robinhood's live price. A Yahoo price while the market trades says how late it may be: \"real-time\" for a US stock or fund on Nasdaq, the New York Stock Exchange, NYSE Arca, NYSE American or Cboe US, and for a coin; \"may be late\" for any other. A close says nothing about lateness.",
-        "The line under the title says which day its price is: \"$188.08 (+1.20% today) on Yahoo Finance, real-time\" while the market trades, \"$188.08, today's close (+1.20% today), from Yahoo Finance\" after it, and on a weekend \"$188.08, the close of Fri 6 Nov (+2.78% that day), from Yahoo Finance\"."] },
+        "The line under the title says which day its price is: \"$188.08 (+1.20% today) on Yahoo Finance, real-time\" while the market trades, \"$188.08, today's close (+1.20% today), from Yahoo Finance\" after it, and on a weekend \"$188.08, the close of Fri 6 Nov (+2.78% that day), from Yahoo Finance\".",
+        "BRK-B's page shows your BRK.B shares under \"What you hold\" and your BRK.B orders under \"Your orders on it\": a dot and a dash are the same stock. Decide… on a BRK-B call shows what you hold of it, and Robinhood is asked about BRK.B."] },
     { "id": "C9", "title": "Search by name", "tags": [], "changed": "2026-11-09",
       "about": "You don't need to know a ticker: type a company's name and pick it from Yahoo Finance's matches. \"Add to watchlist\" adds the match the list marks, as Enter does.",
       "where": "Dashboard › the search box at the top",
       "do": [
         "Type [[NVIDIA]]",
+        "Type [[Bitcoin]]",
         "Empty the box.",
         "Remove AAPL from the watchlist if it is there. Type [[Apple]] and press \"Add to watchlist\" at once, without choosing a match. Then add AAPL back if you removed it."],
       "see": [
         "Matches drop down from Yahoo Finance: the ticker, the name, the market and the kind (Stock, ETF, Index, Fund, Crypto), with the desk's latest rating, and \"Watched\" on those you watch.",
+        "Bitcoin is offered as BTC-USD, in dollars. A coin in another currency, such as BTC-EUR, is not among the matches: the desk follows coins in dollars only, and never takes one for a stock.",
         "An empty box shows \"Recent\": the companies you looked at last, with \"Clear\".",
         "\"AAPL is on the watchlist.\": the match the list marks, Yahoo Finance's first for a name typed in words, never the words themselves (no \"Yahoo Finance has no price for APPLE\"). A ticker typed in capitals marks itself when it is among the matches."] },
     { "id": "C10", "title": "It opens where you left it", "tags": [], "changed": "2026-10-21",
@@ -802,7 +812,7 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "A figure that rounds to zero reads \"alpha 0.0%\", \"0.00%\" or \"$0.00\", never \"-0.0%\", \"−0.00%\" or \"−$0.00\".",
         "Every other figure keeps its sign: \"+0.7%\", \"−0.1%\"."] },
-    { "id": "C16", "title": "A call's result says whether it worked", "tags": [], "changed": "2026-11-08",
+    { "id": "C16", "title": "A call's result says whether it worked", "tags": [], "changed": "2026-11-09",
       "about": "A call is right when its stock goes the way its rating said against its yardstick, SPY as shipped, in its first-week check: above it after a Buy or Overweight, below it after an Underweight or Sell. It is a short first check, not the call's own time horizon, and every result says so. So an Underweight that worked has an alpha below zero. Each scored call says in words whether it worked, and its colour follows the words, not the sign. A Hold claims no direction, so it stays plain. The green chips add up to the scorecard's \"Called the direction\".",
       "where": "Dashboard › The desk's calls; the bar under the chart; a stock's page; a call's window",
       "do": [
@@ -814,7 +824,9 @@ b, strong { font-weight: var(--weight-semibold); }
         "An Underweight whose stock trailed SPY: \"worked · alpha -10.5%\" in green (META, 17 Oct, in round 1). An Underweight whose stock beat SPY: \"did not work · alpha +9.0%\" in red (TSLA). An Overweight that trailed: \"did not work · alpha -12.1%\" in red.",
         "A Hold: just \"alpha -0.2%\", plain. A call not scored yet: \"not scored yet\"; pointing at it says \"Not scored yet. It will be scored against SPY over the 5 trading days after the call: a first-week check, not the call's own time horizon. It is scored when a scoring runs after those days (/settle, an analysis or a routine), not by itself.\"",
         "Pointing at a chip says why, for example \"An Underweight works when the stock trails SPY over the 5 trading days after the call. It did (alpha -10.5%): the call worked. It is a first-week check, not the call's own time horizon.\"",
-        "\"Alpha: how far the stock beat (+) or trailed (−) its yardstick (SPY as shipped) over a call's first week (5 trading days; a coin, 7 days), not its time horizon. Above zero is good for a Buy or Overweight; below zero for an Underweight or Sell.\""] }
+        "A call on a coin or a fund names it so: a Bitcoin Buy's chip says \"A Buy works when the coin beats SPY over the 7 calendar days after the call. …\", and a fund's \"…when the fund beats SPY…\".",
+        "A call on SPY itself (or VOO or IVV) is scored on its own return: \"worked · its return +1.1%\", and pointing at it says \"A Buy works when the fund rises over the 5 trading days after the call. It did (its return +1.1%): the call worked. It is a first-week check, not the call's own time horizon. Scored on its own return: SPY is the yardstick itself, so against it the alpha would always be zero.\" On SPY's page: \"Each result is a first-week check on its own return over the 5 trading days after the call, not the call's own time horizon.\"",
+        "\"Alpha: how far a stock or coin beat (+) or trailed (−) its yardstick (SPY as shipped) in a call's first week (5 trading days; a coin, 7 days), not its time horizon. Above zero is good for a Buy or Overweight; below zero for an Underweight or Sell.\""] }
   ] },
   { "id": "D", "name": "Your Robinhood accounts",
     "sub": "The dashboard reads the accounts you choose, at Robinhood's live prices. It never shows your account numbers.",
@@ -867,7 +879,8 @@ b, strong { font-weight: var(--weight-semibold); }
       "do": [
         "Press \"Refresh from Robinhood\", then read the note under the accounts."],
       "see": [
-        "\"The desk's agents now see these holdings when they analyse a stock: the Agentic account as the one they may size a trade to, the others as view-only context.\""] },
+        "\"The desk's agents now see these holdings when they analyse a stock: the Agentic account as the one they may size a trade to, the others as view-only context.\"",
+        "A share class Robinhood spells with a dot, such as BRK.B, is the stock the desk spells with a dash (BRK-B): an analysis of BRK-B sees what you hold of it."] },
     { "id": "D7", "title": "No account numbers", "tags": [], "changed": "2026-10-21",
       "about": "A full account number never reaches the page or the desk's files.",
       "where": "The whole dashboard",
@@ -1081,7 +1094,7 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "Three routines from the project: \"Run automatically when the dashboard asks\", \"Morning routine\" (8:00 on weekdays) and \"Evening wrap-up\" (17:00 on weekdays), each off until you switch it on.",
         "The morning routine runs as trading-desk without asking you anything and ends with the list of new calls. You can change the times there; your version stays yours."] },
-    { "id": "G4", "title": "Scoring past calls", "tags": ["Later"], "changed": "2026-11-08",
+    { "id": "G4", "title": "Scoring past calls", "tags": ["Later"], "changed": "2026-11-09",
       "about": "Scoring is how the desk learns: each call whose first week is up gets its first-week check against SPY and a short lesson that later analyses read. It is a short first check, not the call's own time horizon, and it happens only when a scoring runs (this one, an analysis or a routine). The lesson is written from those days' actual prices, so it cannot make up what the stock did.",
       "where": "Madav › Agent Studio › trading-desk › Put to work",
       "do": [
@@ -1094,6 +1107,9 @@ b, strong { font-weight: var(--weight-semibold); }
         "A lesson's \"first day\" is the first trading day after the call's date, never the call's own day: check that day on the chart. When it says how SPY did, it gives the figure (for example \"SPY -0.6%\"), never just \"flat\".",
         "If a dividend went ex since those days, a price level the lesson names (an entry, a stop, a target, a high) is the price as traded, the one the chart shows, not a price lowered for the dividend. Its return still counts the dividend.",
         "No lesson is longer than four sentences.",
+        "A call on SPY itself (or VOO or IVV) is scored on its own return, not against SPY, since against itself its alpha would always be about zero: the team says \"scored on its own return, not against SPY\", and its lesson judges whether SPY rose (a Buy) or fell (a Sell).",
+        "A call on a stock that stopped trading or was halted in its window is not \"NOT YET\" for ever: once its window's days have passed and Yahoo Finance has given no price for it for more than ten days, the team says so (\"it may have stopped trading or been halted, so this call cannot be scored unless it trades again\") and leaves it unscored.",
+        "If Yahoo Finance could not give a call's day-by-day prices when the team listed the calls, its lesson is kept as one written without them, so /recheck-lessons rewrites it from the prices later.",
         "If the desk refuses a call's lesson twice, the team leaves that call unscored, goes on with the others and names it at the end, with why. A scoring asked for an hour or more later tries it again. The same goes for the morning routine and the evening wrap-up.",
         "If this happens: the team sends the same call's lesson again and again, or keeps asking for the list of calls with nothing scored. Note the call it names and mark this test Fail.",
         "The scorecard on the dashboard updates (C7)."] },
@@ -1403,28 +1419,33 @@ b, strong { font-weight: var(--weight-semibold); }
     "about": "\"On paper\" means with pretend money. Every call the desk makes on a company, a fund, Bitcoin or Ether is followed exactly as its ticket would size it, starting from $10,000, and compared with simply holding SPY, the fund that copies the S&P 500. It is how you find out whether the desk's calls are any good before real money is at stake.",
     "before": "A few calls recorded (section B). The record grows by itself; it starts with the first call.",
     "tests": [
-    { "id": "L1", "title": "The paper record", "tags": [], "changed": "2026-11-08",
+    { "id": "L1", "title": "The paper record", "tags": [], "changed": "2026-11-09",
       "about": "One sentence and one chart: what following the desk would have done, against SPY, the fund that copies the S&P 500 (the index itself cannot be bought). Paper buys and sells at the closing prices the market really printed, and each dividend is paid into paper cash on its ex-dividend day (the first day a new buyer no longer gets it), as a real account would receive it. SPY's line is paid its own dividends the same way, so the two stay a fair match. It never shows a total that leaves a stock out, and never values a stock it holds at what it cost.",
       "where": "Dashboard › How the desk is doing › Your paper record",
       "do": [
         "Read \"Your paper record\".",
-        "Open the stock page of a stock bought on paper and point at the chart on the day it filled."],
+        "Open the stock page of a stock bought on paper and point at the chart on the day it filled.",
+        "If you have a call the team analysed for a past date (run today for an earlier day, outside a back-test), point at its paper badge."],
       "see": [
         "One sentence: \"No calls yet: the paper record starts with the desk's first call …\", or \"Following the desk on paper since <day>: −1.20% ($9,880.00 from $10,000.00), SPY (the S&P 500 fund) +0.50% over the same days.\"",
         "A line chart: \"The solid line is the paper money; the dashed one is SPY, the fund that copies the S&P 500, from the same start, each paid its dividends in cash.\"",
         "\"N weeks and M calls of record\", and \"Positions on paper now: …\". Once a stock held on paper has paid a dividend: \"Dividends paid into paper cash so far: $…\".",
         "Under it: \"… fills at the first closing price after its day, as the market printed it. Each dividend is paid into paper cash on its ex-dividend day, as an account would receive it.\"",
         "The price a paper buy filled at is that day's close on the stock's chart, even for a stock such as Verizon that has paid a dividend since.",
-        "Only on a day Yahoo Finance cannot give the closing prices of a stock the record needs: \"The paper record cannot be worked out just now: the closing prices of NVDA could not be read from Yahoo Finance, and every order on paper is sized from the whole paper account, so no total is shown rather than one that leaves it out. It tries again in a moment.\" No total, chart or positions; a minute later it asks again by itself."] },
-    { "id": "L2", "title": "Paper badges on calls", "tags": [], "changed": "2026-11-08",
+        "Only on a day Yahoo Finance cannot give the closing prices of a stock the record needs: \"The paper record cannot be worked out just now: the closing prices of NVDA could not be read from Yahoo Finance. Every order on paper is sized from the whole paper account, so no total is shown rather than one that leaves it out. It tries again in a moment.\" No total, chart or positions; a minute later it asks again by itself.",
+        "The same when SPY's closing prices cannot be read: \"…the closing prices of SPY could not be read from Yahoo Finance. The paper account is valued on SPY's trading days and measured against it, so no total is shown rather than one stopped at an earlier day. It tries again in a moment.\" Never a total that stops at an earlier day.",
+        "While the market trades, a call due to fill at today's close shows \"paper: next close\" until that close comes: paper never fills at a price that is still moving.",
+        "A call analysed for a past date is not on paper, and the record's start and weeks do not move back for it: its badge says \"not on paper\", and pointing at it says \"Recorded on 9 Nov 2026, after the close of 2 Jun 2026 it would have filled at: paper follows a call only from when it was made, so an analysis dated in the past is not followed.\" It is still scored like any call."] },
+    { "id": "L2", "title": "Paper badges on calls", "tags": [], "changed": "2026-11-09",
       "about": "Each call shows what following it on paper did. For a paper buy, the figure is the stock's move since that buy, labelled as such: it is not the call's own result (its alpha, in the chip beside it), and not a profit for that call alone, since paper keeps one average cost a stock.",
       "where": "Dashboard › The desk's calls",
       "do": [
         "Point at the paper badge on NVDA's call."],
       "see": [
         "Each call has one: \"paper: bought 2 · NVDA −13.59% since\" (as on round 1's NVDA),\"paper: bought N\" before a close has come, \"paper: sold N\", \"paper: no order\", \"paper: next close\" or \"not on paper\", with its reason when you point at it. While the paper record cannot be worked out (L1), a call it would have filled says \"paper: not worked out\", and pointing at it names the stock whose prices could not be read.",
-        "Pointing at a bought badge says \"Bought 2 at the close of 26 Oct 2026. NVDA has moved −13.59% since that close, to the latest close: the stock's move since the paper buy, not the call's result.\"",
-        "A call fills at the first closing price after its day. No costs are counted."] },
+        "Pointing at a bought badge says \"Bought 2 at the close of 26 Oct 2026. NVDA has moved −13.59% since that close, to the latest close: its move since the paper buy, not the call's result.\"",
+        "A call fills at the first closing price after its day. No costs are counted.",
+        "A call that places no order on paper (\"paper: no order\", such as a Sell of a stock not held) does not use up one of the day's orders: another call that day still fills."] },
     { "id": "L3", "title": "Change the paper money", "tags": [], "changed": "2026-10-21",
       "about": "Start the record from a sum that looks like yours; the record is worked out again from the first call.",
       "where": "Dashboard › How the desk is doing › Paper money $10,000.00 › Change…",
@@ -1434,14 +1455,16 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "\"The paper record is worked out again with the new starting money.\"",
         "50 is refused: \"the paper money is a whole number of dollars from $100 to $10,000,000\"."] },
-    { "id": "L4", "title": "Bitcoin and Ether on paper", "tags": [], "changed": "2026-10-21",
+    { "id": "L4", "title": "Bitcoin and Ether on paper", "tags": [], "changed": "2026-11-09",
       "about": "Coins can never be ordered through the desk, but Bitcoin and Ether are followed on paper so you see how their calls do.",
       "where": "Dashboard › the watchlist and The desk's calls",
       "do": [
-        "Watch [[BTC-USD]] and point at its call's paper badge (B5)."],
+        "Watch [[BTC-USD]] and point at its call's paper badge (B5).",
+        "Watch [[SHIB-USD]] and look at its tile."],
       "see": [
         "It is followed on paper: bought in fractions (at least $1), sized to what your crypto limit (5% as shipped) leaves, filled at the next day's close, weekends included.",
-        "Other coins are \"not on paper\": \"Among crypto, paper follows Bitcoin and Ether for now.\""] },
+        "Other coins, any coin and not only the best known, are \"not on paper\": \"Among crypto, paper follows Bitcoin and Ether for now.\" SHIB-USD's tile says \"no order ticket\", never Trade… as if it were a stock.",
+        "A coin's quantity on paper never shows a long tail of digits: two buys of Bitcoin add up to at most six decimals (0.012345), as an order would."] },
     { "id": "L5", "title": "Four weeks of record before trading", "tags": [], "changed": "2026-10-21",
       "about": "A few weeks of calls are noise, not proof. Before you can switch trading on with less than four weeks of record, the dashboard shows it and asks you to say you understand.",
       "where": "Dashboard › Your account › Trading",
@@ -1548,7 +1571,7 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "\"What you hold needs a look\" is not shown at all.",
         "When it is: \"In the Agentic account, as Robinhood was last read · nothing is ever sold by itself …\", with Holding, Mark and Why, and \"Read the call\" and \"Sell…\"."] },
-    { "id": "N6", "title": "Monday re-rating", "tags": ["Later"], "changed": "2026-11-08",
+    { "id": "N6", "title": "Monday re-rating", "tags": ["Later"], "changed": "2026-11-09",
       "about": "Each Monday (the Tuesday, when Monday is a New York market holiday such as Martin Luther King Jr. Day, 18 Jan 2027) the morning routine puts up to three holdings whose view is a week old (or that have none) on the waiting list, so what you hold is never judged on a stale call. When one that is due does not go on the list, the routine says the real reason.",
       "where": "The morning routine, then the dashboard",
       "do": [
@@ -1557,7 +1580,8 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "Up to three Agentic holdings with no view or a view a week old go on the waiting list at shallow depth, once that week, and show \"re-rating\" until done. After a Monday holiday the routine says \"Monday's re-rating (on Tuesday: Monday was a New York market holiday)\".",
         "Their view is fresh afterwards.",
-        "Run again after the refresh, it says the holdings now due were left for next week's re-rating, because the re-rating ran earlier that day when they were not due. It says \"the waiting list was full\" only when the list really was full (20 waiting or being analysed)."] }
+        "Run again after the refresh, it says the holdings now due were left for next week's re-rating, because the re-rating ran earlier that day when they were not due. It says \"the waiting list was full\" only when the list really was full (20 waiting or being analysed).",
+        "A holding whose re-rating left no call (its analysis failed, or the desk cannot analyse it) is not put first again the next Monday: holdings with a week-old view go before it, and the routine says of it \"the desk has no view of it yet: the re-rating of <day> left no call on it, so it may not be one the desk can analyse\"."] }
   ] },
   { "id": "O", "name": "Your first month: Get started",
     "sub": "A newcomer's safe first month in five steps on the dashboard, each ticked off from the desk's own records, and every trading word explained in one plain line.",

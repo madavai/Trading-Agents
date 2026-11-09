@@ -14,7 +14,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { today } from '../data/dates.js';
 import { configure } from '../data/http.js';
-import { clearCache, daily } from '../data/yahoo.js';
+import { clearCache, daily, type Series } from '../data/yahoo.js';
+import { latestState } from '../data/market.js';
 import { addDays, marketDay } from '../data/dates.js';
 import { readContactEmail, saveContactEmail } from '../contact.js';
 import { followed, paperBook, readPaperStart, recordOf, RECORD_WEEKS, RECORD_WORDS, savePaperStart, type Closes, type Dividends, type PaperBook } from '../desk/paper.js';
@@ -194,7 +195,14 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
 
   // The paper book: worked out from the live journal and daily closes, at the person's caps (beside the trading switch),
   // and kept for ten minutes, or until the journal, the starting money or the caps change.
-  const callsOf = () => new Journal(path.join(dir, 'journal.md')).load().map((e) => ({ ticker: e.ticker, date: e.date, rating: e.rating }));
+  const callsOf = () => new Journal(path.join(dir, 'journal.md')).load().map((e) => ({ ticker: e.ticker, date: e.date, rating: e.rating, ...(e.recorded ? { recorded: e.recorded } : {}) }));
+  /** A series' closes as the market printed them, without a last row whose session is still trading (or was read before
+   *  its close was final): paper fills and values only at a close, never at a price still moving. */
+  const closesOf = (d: Series, today: string): Closes[string] => {
+    const rows = (d.traded ?? d.bars).map((r) => ({ date: r.date, close: r.close }));
+    const unfinished = d.bars.length > 0 && (latestState(d, today).open || (!d.meta.session && d.bars.at(-1)!.date === today));
+    return unfinished ? rows.filter((r) => r.date !== d.bars.at(-1)!.date) : rows;
+  };
   let paperMemo: { key: string; at: number; book: PaperBook } | null = null;
   const paper = async (today: string): Promise<PaperBook & { record: ReturnType<typeof recordOf> }> => {
     const calls = callsOf(), caps = robinhood.trading().caps, startUsd = readPaperStart(dir), trading = readSettings(root).trading;
@@ -207,7 +215,7 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
         const from = addDays(record.since, -7);
         // The closes as the market printed them, and each dividend apart, paid into paper cash on its ex-day.
         await Promise.all([...new Set([...calls.filter((c) => followed(c.ticker)).map((c) => c.ticker), 'SPY'])].map(async (s) => {
-          try { const d = await daily(s, from, today); closes[s] = (d.traded ?? d.bars).map((r) => ({ date: r.date, close: r.close })); dividends[s] = d.dividends ?? []; } catch { /* left out: said as unavailable */ }
+          try { const d = await daily(s, from, today); closes[s] = closesOf(d, today); dividends[s] = d.dividends ?? []; } catch { /* left out: said as unavailable */ }
         }));
       }
       await sectors.warm(calls.filter((c) => followed(c.ticker)).map((c) => c.ticker));

@@ -57,7 +57,7 @@ After each step, check it was saved: call `read_run` without sections and see th
    - the rating, and the executive summary in two or three sentences, from the saved decision (`read_run`, section decision);
    - any data that was unavailable, from the reports;
    - where the full report is;
-   - that the call is now in the journal and, as `record_decision` said, will be scored once a scoring runs after its window (/settle, an analysis or a routine): a first-week check against its yardstick, not the call's own time horizon.
+   - that the call is now in the journal and, as `record_decision` said, will be scored once a scoring runs after its window (/settle, an analysis or a routine): a first-week check against its yardstick (or on its own return, for a call on the yardstick itself), not the call's own time horizon.
 
    Do not add numbers of your own. Say that this is not investment advice, and that the desk proposes but never trades: the person decides on the dashboard ("Decide…" on the call), and only their own Confirm there places an order.
 

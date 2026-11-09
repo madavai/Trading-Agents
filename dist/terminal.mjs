@@ -7576,6 +7576,10 @@ function priceMarket(listing) {
 var FOREX = /* @__PURE__ */ new Set(["USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD", "CNY", "CNH", "HKD", "SGD", "SEK", "NOK", "DKK", "PLN", "MXN", "ZAR", "TRY", "INR", "KRW", "BRL", "RUB", "THB"]);
 var CRYPTO_BASES = /* @__PURE__ */ new Set(["BTC", "ETH", "SOL", "XRP", "ADA", "DOGE", "LTC", "BCH", "DOT", "AVAX", "LINK"]);
 var CRYPTO_QUOTES = ["USDT", "USDC", "USD"];
+var NOT_COINS = /* @__PURE__ */ new Set([...FOREX, "XAU", "XAG", "XPT", "XPD"]);
+var COIN_PAIR = /^([A-Z0-9]{1,15})-(USDT|USDC|USD)$/;
+var SHARE_CLASS = /^([A-Z]{1,5})\.([A-Z])$/;
+var ONE_LETTER_EXCHANGES = /* @__PURE__ */ new Set(["T", "L", "V", "F"]);
 var ALIASES = {
   XAUUSD: "GC=F",
   XAU: "GC=F",
@@ -7587,7 +7591,6 @@ var ALIASES = {
   XPDUSD: "PA=F",
   WTICOUSD: "CL=F",
   USOIL: "CL=F",
-  WTI: "CL=F",
   BCOUSD: "BZ=F",
   UKOIL: "BZ=F",
   BRENT: "BZ=F",
@@ -7615,7 +7618,10 @@ var ALIASES = {
   HK50: "^HSI"
 };
 function cryptoBase(raw) {
-  const compact = raw.trim().toUpperCase().replace(/\+$/, "").replaceAll("-", "");
+  const s = raw.trim().toUpperCase().replace(/\+$/, "");
+  const pair = COIN_PAIR.exec(s);
+  if (pair) return /[A-Z]/.test(pair[1]) && !NOT_COINS.has(pair[1]) ? pair[1] : null;
+  const compact = s.replaceAll("-", "");
   for (const q of CRYPTO_QUOTES) {
     if (compact.endsWith(q)) {
       const base2 = compact.slice(0, -q.length);
@@ -7624,6 +7630,10 @@ function cryptoBase(raw) {
   }
   return null;
 }
+var yahooClass = (s) => {
+  const m = SHARE_CLASS.exec(s);
+  return m && !ONE_LETTER_EXCHANGES.has(m[2]) ? `${m[1]}-${m[2]}` : s;
+};
 function normalizeSymbol(raw) {
   const s = raw.trim().toUpperCase().replace(/\+$/, "");
   if (!s) return s;
@@ -7635,11 +7645,21 @@ function normalizeSymbol(raw) {
   if (hk) return `${String(Number(hk[1])).padStart(4, "0")}.HK`;
   const sh = /^(\d{6})\.SH$/.exec(s);
   if (sh) return `${sh[1]}.SS`;
-  return s;
+  return yahooClass(s);
 }
 var isCrypto = (raw) => cryptoBase(raw) !== null;
+function deskSymbol(symbol, kind) {
+  const s = symbol.trim().toUpperCase();
+  return kind === "crypto" ? `${cryptoBase(s) ?? s}-USD` : yahooClass(s);
+}
+var brokerSymbol = (symbol) => symbol.replace(/^([A-Z]{1,5})-([A-Z])$/, "$1.$2");
 function safeSymbol(raw) {
   const s = normalizeSymbol(raw);
+  if (!/^[A-Z0-9.\-=^]{1,20}$/.test(s)) throw new Error(`"${raw}" is not a ticker symbol this desk can look up`);
+  return s;
+}
+function checkedTicker(raw) {
+  const s = raw.trim().toUpperCase();
   if (!/^[A-Z0-9.\-=^]{1,20}$/.test(s)) throw new Error(`"${raw}" is not a ticker symbol this desk can look up`);
   return s;
 }
@@ -7737,9 +7757,249 @@ async function daily(raw, from, to) {
 }
 var clearCache = () => cache.clear();
 
+// src/data/indicators.ts
+function sma(xs, n) {
+  const out = [];
+  let sum = 0;
+  xs.forEach((x, i) => {
+    sum += x;
+    if (i >= n) sum -= xs[i - n];
+    out.push(i >= n - 1 ? sum / n : null);
+  });
+  return out;
+}
+function ema(xs, n) {
+  const k = 1 - 2 / (n + 1);
+  let numer = 0, denom = 0, seen = 0;
+  return xs.map((x) => {
+    if (x === null) return null;
+    numer = x + k * numer;
+    denom = 1 + k * denom;
+    seen++;
+    return seen >= n ? numer / denom : null;
+  });
+}
+function wilder(xs, n, startAt) {
+  const out = xs.map(() => null);
+  let prev = 0;
+  for (let i = startAt; i < xs.length; i++) {
+    const k = i - startAt;
+    if (k < n - 1) continue;
+    prev = k === n - 1 ? xs.slice(startAt, i + 1).reduce((a, b) => a + b, 0) / n : (prev * (n - 1) + xs[i]) / n;
+    out[i] = prev;
+  }
+  return out;
+}
+function rsi(closes, n = 14) {
+  const gains = closes.map((c, i) => i ? Math.max(0, c - closes[i - 1]) : 0);
+  const losses = closes.map((c, i) => i ? Math.max(0, closes[i - 1] - c) : 0);
+  const g = wilder(gains, n, 1), l = wilder(losses, n, 1);
+  return g.map((gv, i) => {
+    const lv = l[i];
+    if (gv === null || lv === null || lv === void 0) return null;
+    return lv === 0 ? gv === 0 ? 50 : 100 : 100 - 100 / (1 + gv / lv);
+  });
+}
+function macd(closes) {
+  const fast = ema(closes, 12), slow = ema(closes, 26);
+  const line = fast.map((f, i) => f === null || slow[i] === null ? null : f - slow[i]);
+  const signal = ema(line, 9);
+  return { macd: line, signal, hist: line.map((m, i) => m === null || signal[i] === null ? null : m - signal[i]) };
+}
+function bollinger(closes, n = 20, k = 2) {
+  const mid = sma(closes, n), upper = [], lower = [];
+  closes.forEach((_, i) => {
+    const m = mid[i];
+    if (m === null || m === void 0) {
+      upper.push(null);
+      lower.push(null);
+      return;
+    }
+    const w = closes.slice(i - n + 1, i + 1), sd = Math.sqrt(w.reduce((a, x) => a + (x - m) ** 2, 0) / (n - 1));
+    upper.push(m + k * sd);
+    lower.push(m - k * sd);
+  });
+  return { mid, upper, lower };
+}
+function atr(bars, n = 14) {
+  const tr = bars.map((b, i) => i ? Math.max(b.high - b.low, Math.abs(b.high - bars[i - 1].close), Math.abs(b.low - bars[i - 1].close)) : b.high - b.low);
+  return wilder(tr, n, 0);
+}
+function vwma(bars, n = 14) {
+  return bars.map((_, i) => {
+    if (i < n - 1) return null;
+    const w = bars.slice(i - n + 1, i + 1);
+    if (w.some((b) => b.volume === null)) return null;
+    const vol = w.reduce((a, b) => a + b.volume, 0);
+    return vol > 0 ? w.reduce((a, b) => a + b.close * b.volume, 0) / vol : null;
+  });
+}
+function mfi(bars, n = 14) {
+  const tp = bars.map((b) => (b.high + b.low + b.close) / 3);
+  return bars.map((_, i) => {
+    if (i < n) return null;
+    let pos = 0, neg = 0;
+    for (let j = i - n + 1; j <= i; j++) {
+      const v = bars[j].volume;
+      if (v === null) return null;
+      const flow = tp[j] * v;
+      if (tp[j] > tp[j - 1]) pos += flow;
+      else if (tp[j] < tp[j - 1]) neg += flow;
+    }
+    if (pos + neg === 0) return null;
+    return neg === 0 ? 100 : 100 - 100 / (1 + pos / neg);
+  });
+}
+var INDICATORS = {
+  close_50_sma: "50 SMA: a medium-term trend indicator. Use: trend direction and dynamic support/resistance. It lags price; combine with faster indicators.",
+  close_200_sma: "200 SMA: a long-term trend benchmark. Use: the overall trend and golden/death crosses. It reacts slowly; better for strategy than entries.",
+  close_10_ema: "10 EMA: a responsive short-term average. Use: quick shifts in momentum and entry points. Noisy in choppy markets.",
+  macd: "MACD: momentum from the difference of two EMAs (12, 26). Use: crossovers and divergence. Confirm in sideways markets.",
+  macds: "MACD signal: the 9-day EMA of MACD. Use: crossovers with the MACD line. Part of a broader view, not a trigger alone.",
+  macdh: "MACD histogram: MACD minus its signal. Use: momentum strength and early divergence. Can be volatile.",
+  rsi: "RSI (14): momentum, 70/30 for overbought/oversold. In strong trends it can stay extreme; cross-check with the trend.",
+  boll: "Bollinger middle: the 20-day SMA under the bands. Use: a dynamic benchmark for price.",
+  boll_ub: "Bollinger upper band: 2 standard deviations above the middle. Use: overbought zones and breakouts; price can ride it in strong trends.",
+  boll_lb: "Bollinger lower band: 2 standard deviations below the middle. Use: oversold zones; confirm before calling a reversal.",
+  atr: "ATR (14): average true range, the size of daily moves. Use: stop-loss distance and position size.",
+  vwma: "VWMA (14): a moving average weighted by volume. Use: confirm trends with volume; watch for skew from volume spikes.",
+  mfi: "MFI (14): money flow, momentum from price and volume. Use: overbought (>80) or oversold (<20) and divergence."
+};
+var INDICATOR_NAMES = Object.keys(INDICATORS);
+function compute(name, bars) {
+  const closes = bars.map((b) => b.close);
+  switch (name) {
+    case "close_50_sma":
+      return sma(closes, 50);
+    case "close_200_sma":
+      return sma(closes, 200);
+    case "close_10_ema":
+      return ema(closes, 10);
+    case "macd":
+      return macd(closes).macd;
+    case "macds":
+      return macd(closes).signal;
+    case "macdh":
+      return macd(closes).hist;
+    case "rsi":
+      return rsi(closes);
+    case "boll":
+      return bollinger(closes).mid;
+    case "boll_ub":
+      return bollinger(closes).upper;
+    case "boll_lb":
+      return bollinger(closes).lower;
+    case "atr":
+      return atr(bars);
+    case "vwma":
+      return vwma(bars);
+    case "mfi":
+      return mfi(bars);
+  }
+}
+
+// src/data/market.ts
+var listDays = (days) => days.length <= 6 ? days.join(", ") : `${days.slice(0, 5).join(", ")} and ${days.length - 5} more`;
+var clock = (ms, zone = "UTC") => {
+  try {
+    return `${new Date(ms).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: zone })} ${zone} time`;
+  } catch {
+    return `${new Date(ms).toISOString().slice(11, 16)} UTC`;
+  }
+};
+var SETTLE_MS = 15 * 6e4;
+var SETTLE_OTHER_MS = 45 * 6e4;
+var settleMs = (meta2) => meta2.market === "other" ? SETTLE_OTHER_MS : SETTLE_MS;
+function gapLines(s) {
+  const days = s.missing ?? [];
+  if (!days.length) return [];
+  const one3 = days.length === 1;
+  return [`- **The source lists ${one3 ? "a session" : "sessions"} on ${listDays(days)} with no prices: ${one3 ? "it is" : "they are"} missing from these rows, so every average, count and change here skips ${one3 ? "it" : "them"} (a change across ${one3 ? "it" : "them"} spans two sessions). Do not say ${listDays(days)} had no trading: say ${one3 ? "its" : "their"} prices are not available from the source.**`];
+}
+function latestState(s, upTo, now = Date.now()) {
+  const last = s.bars[s.bars.length - 1], unfilled = s.unfilled?.at(-1), session = s.meta.session, zone = s.meta.timezone, read2 = s.fetchedAt ?? now;
+  const said = (st, lines) => ({ ...st, lines: [...lines, ...gapLines(s)] });
+  const final = { open: false, label: "Close", inline: "close" };
+  if (unfilled) return said(final, [`- **The source lists a session on ${unfilled}, but its prices are not filled in yet (this happens for a while after a session ends). Every figure here is as of ${last.date}. Do not call ${last.date} the latest session, and do not say ${unfilled} had no trading: say its prices were not available yet.**`]);
+  if (session && session.date === last.date) {
+    if (now < session.end) return said({ open: true, label: "Latest price (still trading)", inline: "still trading: latest price" }, [`- **The latest row, ${last.date}, is a session still trading (it closes at ${clock(session.end, zone)}). Its "close" is the latest price so far, not a close; its high, low, volume and every indicator on it will change. Call it the latest price, never the close, and do not treat a level as broken or held on this row alone.**`]);
+    const settle2 = settleMs(s.meta);
+    if (read2 < session.end + settle2) {
+      const at = clock(read2, zone);
+      return said({ open: true, label: `Latest price (read at ${at}, not the close)`, inline: `latest price as read at ${at}` }, [`- **The latest row, ${last.date}, was read at ${at}, ${read2 < session.end ? "while its session was still trading" : "just after its session ended"} (it ended at ${clock(session.end, zone)}, and its figures are taken as final ${settle2 / 6e4} minutes after). Its "close" is the latest price as read then, not the close; its high, low, volume and every indicator on it may still change. Call it the latest price as read at ${at}, never the close, and do not treat a level as broken or held on this row alone.**`]);
+    }
+    return said(final, [`- The latest row, ${last.date}, is a finished session: its figures are final.`]);
+  }
+  if (session && session.date > last.date && session.date <= upTo) {
+    if (now < session.start) return said(final, [`- ${session.date}'s session has not opened yet (it opens at ${clock(session.start, zone)}): the latest row, ${last.date}, is the latest finished session.`]);
+    return said(final, [`- **The source's own record shows a session on ${session.date}${now < session.end ? ", trading now" : ", which has ended"}, but its rows stop at ${last.date}: it has no prices yet for ${session.date}, nor for any session between ${last.date} and it. Every figure here is as of ${last.date}. Do not call ${last.date} the latest session, and do not say the days after it had no trading: say their prices are not available from the source yet.**`]);
+  }
+  if (!session && last.date === today()) return said(final, ["- **The latest row is today's session. If the market is still open it is partial: its close, high, low and volume are the latest so far, and every indicator on it will change by the close. Do not treat a level as broken or held on this row alone.**"]);
+  return said(final, []);
+}
+
 // src/desk/paper.ts
 import fs5 from "node:fs";
 import path5 from "node:path";
+
+// src/data/holidays.ts
+var HOLIDAYS = {
+  2026: [
+    ["2026-01-01", "New Year's Day"],
+    ["2026-01-19", "Martin Luther King, Jr. Day"],
+    ["2026-02-16", "Washington's Birthday"],
+    ["2026-04-03", "Good Friday"],
+    ["2026-05-25", "Memorial Day"],
+    ["2026-06-19", "Juneteenth"],
+    ["2026-07-03", "Independence Day (observed)"],
+    ["2026-09-07", "Labor Day"],
+    ["2026-11-26", "Thanksgiving Day"],
+    ["2026-12-25", "Christmas Day"]
+  ],
+  2027: [
+    ["2027-01-01", "New Year's Day"],
+    ["2027-01-18", "Martin Luther King, Jr. Day"],
+    ["2027-02-15", "Washington's Birthday"],
+    ["2027-03-26", "Good Friday"],
+    ["2027-05-31", "Memorial Day"],
+    ["2027-06-18", "Juneteenth (observed)"],
+    ["2027-07-05", "Independence Day (observed)"],
+    ["2027-09-06", "Labor Day"],
+    ["2027-11-25", "Thanksgiving Day"],
+    ["2027-12-24", "Christmas Day (observed)"]
+  ],
+  // 1 Jan 2028 is a Saturday: the NYSE keeps no New Year's Day holiday that year.
+  2028: [
+    ["2028-01-17", "Martin Luther King, Jr. Day"],
+    ["2028-02-21", "Washington's Birthday"],
+    ["2028-04-14", "Good Friday"],
+    ["2028-05-29", "Memorial Day"],
+    ["2028-06-19", "Juneteenth"],
+    ["2028-07-04", "Independence Day"],
+    ["2028-09-04", "Labor Day"],
+    ["2028-11-23", "Thanksgiving Day"],
+    ["2028-12-25", "Christmas Day"]
+  ]
+};
+var NAMES = new Map(Object.values(HOLIDAYS).flat().map(([day2, name]) => [day2, name]));
+var DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+var dayOfWeek = (day2) => (/* @__PURE__ */ new Date(`${day2}T12:00:00Z`)).getUTCDay();
+function marketClosed(day2) {
+  const w = dayOfWeek(day2);
+  if (w === 0 || w === 6) return `a ${DAYS[w]}`;
+  return NAMES.get(day2) ?? null;
+}
+var isMarketDay = (day2) => marketClosed(day2) === null;
+function nextMarketDay(day2) {
+  let d = addDays(day2, 1);
+  while (!isMarketDay(d)) d = addDays(d, 1);
+  return d;
+}
+function marketDaysBetween(from, to) {
+  let n = 0;
+  for (let d = addDays(from, 1); d <= to; d = addDays(d, 1)) if (isMarketDay(d)) n++;
+  return n;
+}
 
 // src/desk/agent-files.ts
 var RESET_AGAIN_MS = 30 * 6e4;
@@ -7864,67 +8124,6 @@ var passes = (checks) => checks.length > 0 && checks.every((x) => x.ok);
 // src/desk/orders.ts
 import fs4 from "node:fs";
 import path4 from "node:path";
-
-// src/data/holidays.ts
-var HOLIDAYS = {
-  2026: [
-    ["2026-01-01", "New Year's Day"],
-    ["2026-01-19", "Martin Luther King, Jr. Day"],
-    ["2026-02-16", "Washington's Birthday"],
-    ["2026-04-03", "Good Friday"],
-    ["2026-05-25", "Memorial Day"],
-    ["2026-06-19", "Juneteenth"],
-    ["2026-07-03", "Independence Day (observed)"],
-    ["2026-09-07", "Labor Day"],
-    ["2026-11-26", "Thanksgiving Day"],
-    ["2026-12-25", "Christmas Day"]
-  ],
-  2027: [
-    ["2027-01-01", "New Year's Day"],
-    ["2027-01-18", "Martin Luther King, Jr. Day"],
-    ["2027-02-15", "Washington's Birthday"],
-    ["2027-03-26", "Good Friday"],
-    ["2027-05-31", "Memorial Day"],
-    ["2027-06-18", "Juneteenth (observed)"],
-    ["2027-07-05", "Independence Day (observed)"],
-    ["2027-09-06", "Labor Day"],
-    ["2027-11-25", "Thanksgiving Day"],
-    ["2027-12-24", "Christmas Day (observed)"]
-  ],
-  // 1 Jan 2028 is a Saturday: the NYSE keeps no New Year's Day holiday that year.
-  2028: [
-    ["2028-01-17", "Martin Luther King, Jr. Day"],
-    ["2028-02-21", "Washington's Birthday"],
-    ["2028-04-14", "Good Friday"],
-    ["2028-05-29", "Memorial Day"],
-    ["2028-06-19", "Juneteenth"],
-    ["2028-07-04", "Independence Day"],
-    ["2028-09-04", "Labor Day"],
-    ["2028-11-23", "Thanksgiving Day"],
-    ["2028-12-25", "Christmas Day"]
-  ]
-};
-var NAMES = new Map(Object.values(HOLIDAYS).flat().map(([day2, name]) => [day2, name]));
-var DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-var dayOfWeek = (day2) => (/* @__PURE__ */ new Date(`${day2}T12:00:00Z`)).getUTCDay();
-function marketClosed(day2) {
-  const w = dayOfWeek(day2);
-  if (w === 0 || w === 6) return `a ${DAYS[w]}`;
-  return NAMES.get(day2) ?? null;
-}
-var isMarketDay = (day2) => marketClosed(day2) === null;
-function nextMarketDay(day2) {
-  let d = addDays(day2, 1);
-  while (!isMarketDay(d)) d = addDays(d, 1);
-  return d;
-}
-function marketDaysBetween(from, to) {
-  let n = 0;
-  for (let d = addDays(from, 1); d <= to; d = addDays(d, 1)) if (isMarketDay(d)) n++;
-  return n;
-}
-
-// src/desk/orders.ts
 var file2 = (dir) => path4.join(dir, "orders.jsonl");
 function logOrder(dir, line) {
   fs4.mkdirSync(dir, { recursive: true });
@@ -7979,8 +8178,24 @@ var cents2 = (n) => Math.round(n * 100) / 100;
 var PAPER_CRYPTO = /* @__PURE__ */ new Set(["BTC-USD", "ETH-USD"]);
 var followed = (ticker) => !/[\^=]/.test(ticker) && (!isCrypto(ticker) || PAPER_CRYPTO.has(ticker));
 var notFollowed = (ticker) => isCrypto(ticker) ? "Among crypto, paper follows Bitcoin and Ether for now." : "An index, a future or a currency cannot be bought: paper follows stocks, funds, Bitcoin and Ether.";
+var EARLY_CLOSES = /* @__PURE__ */ new Set(["2026-11-27", "2026-12-24", "2027-11-26", "2028-07-03", "2028-11-24"]);
+var nyClock = (ms) => {
+  const f = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(ms));
+  const v = (t2) => f.find((x) => x.type === t2)?.value ?? "";
+  return `${v("year")}-${v("month")}-${v("day")} ${v("hour")}:${v("minute")}`;
+};
+function lateWhy(c) {
+  const at = c.recorded ? Date.parse(c.recorded) : NaN;
+  if (!Number.isFinite(at)) return null;
+  if (isCrypto(c.ticker)) {
+    const fill2 = addDays(c.date, 1), closes = Date.parse(`${addDays(c.date, 2)}T00:00:00Z`);
+    return at < closes ? null : `Recorded on ${new Date(at).toISOString().slice(0, 10)}, after the close of ${fill2} it would have filled at: paper follows a call only from when it was made, so an analysis dated in the past is not followed.`;
+  }
+  const fill = nextMarketDay(c.date), seen = nyClock(at);
+  return seen < `${fill} ${EARLY_CLOSES.has(fill) ? "13:00" : "16:00"}` ? null : `Recorded on ${seen.slice(0, 10)}, after the close of ${fill} it would have filled at: paper follows a call only from when it was made, so an analysis dated in the past is not followed.`;
+}
 function recordOf(calls, today2) {
-  const mine = calls.filter((c) => followed(c.ticker) && c.date <= today2);
+  const mine = calls.filter((c) => followed(c.ticker) && !lateWhy(c) && c.date <= today2);
   const since = mine.map((c) => c.date).sort()[0] ?? null;
   return { since, weeks: since ? Math.floor(daysBetween(since, today2) / 7) : 0, calls: mine.length };
 }
@@ -7999,8 +8214,13 @@ var NoClose = class extends Error {
   }
   ticker;
 };
-var missingFrom = (calls, closes, trading) => [...new Set(calls.filter((c) => followed(c.ticker) && !closes[c.ticker] && actionOf(c.rating, trading).startsWith("buy")).map((c) => c.ticker))].sort();
-var withheldWhy = (missing) => `Not worked out just now: the paper record needs the closing prices of ${listed([...missing])}, which could not be read, and every order on paper is sized from the whole paper account.`;
+var missingFrom = (calls, closes, trading, benchmark) => {
+  const stocks = calls.filter((c) => followed(c.ticker) && !closes[c.ticker] && actionOf(c.rating, trading).startsWith("buy")).map((c) => c.ticker);
+  const bench = calls.some((c) => followed(c.ticker)) && !closes[benchmark]?.length ? [benchmark] : [];
+  return [.../* @__PURE__ */ new Set([...stocks, ...bench])].sort();
+};
+var withheldWhy = (missing, benchmark = "SPY") => `Not worked out just now: the paper record needs the closing prices of ${listed([...missing])}, which could not be read, and every order on paper is sized from the whole paper account${missing.includes(benchmark) ? `, valued on ${benchmark}'s trading days and measured against it` : ""}.`;
+var units2 = (n) => Math.round(n * 1e6) / 1e6;
 function paperBook(calls, closes, o) {
   const benchmark = o.benchmark ?? "SPY";
   const ordered = [...calls].filter((c) => c.date <= o.today).sort((a, b) => a.date.localeCompare(b.date));
@@ -8010,6 +8230,11 @@ function paperBook(calls, closes, o) {
     const base2 = { ticker: c.ticker, callDate: c.date, rating: c.rating };
     if (!followed(c.ticker)) {
       trades.push({ ...base2, status: "skipped", why: notFollowed(c.ticker) });
+      continue;
+    }
+    const late = lateWhy(c);
+    if (late) {
+      trades.push({ ...base2, status: "skipped", why: late });
       continue;
     }
     if (actionOf(c.rating, o.trading) === "no order") {
@@ -8031,7 +8256,7 @@ function paperBook(calls, closes, o) {
     fills.push({ trade: t2, date: next.date, price: next.close });
   }
   fills.sort((a, b) => a.date.localeCompare(b.date));
-  const since = ordered.find((c) => followed(c.ticker))?.date ?? null;
+  const since = ordered.find((c) => followed(c.ticker) && !lateWhy(c))?.date ?? null;
   const withheld2 = (missing2) => {
     for (const { trade: t2 } of fills) {
       delete t2.side;
@@ -8039,7 +8264,7 @@ function paperBook(calls, closes, o) {
       delete t2.price;
       delete t2.fillDate;
       delete t2.sincePct;
-      Object.assign(t2, { status: "withheld", why: withheldWhy(missing2) });
+      Object.assign(t2, { status: "withheld", why: withheldWhy(missing2, benchmark) });
     }
     return {
       startUsd: o.startUsd,
@@ -8057,7 +8282,7 @@ function paperBook(calls, closes, o) {
       benchmark
     };
   };
-  const missing = missingFrom(ordered, closes, o.trading);
+  const missing = missingFrom(ordered.filter((c) => !lateWhy(c)), closes, o.trading, benchmark);
   if (missing.length) return withheld2(missing);
   let cash = o.startUsd;
   const held = /* @__PURE__ */ new Map(), boughtOn = /* @__PURE__ */ new Map();
@@ -8093,25 +8318,31 @@ function paperBook(calls, closes, o) {
     const p = propose(context, o.trading, o.caps);
     if (!p.order) {
       f.trade.why = p.why.at(-1) ?? "No order.";
-      return;
+      return false;
     }
     const failing = check(p.order, context, o.trading, o.caps);
     if (!passes(failing)) {
       f.trade.why = `Its order would not pass: ${failing.filter((x) => !x.ok).map((x) => x.words).join("; ")}.`;
-      return;
+      return false;
     }
     const { side, quantity, limitPrice } = p.order, amount = cents2(quantity * limitPrice);
     if (side === "buy") {
       cash = cents2(cash - amount);
-      held.set(f.trade.ticker, { quantity: h.quantity + quantity, cost: cents2(h.cost + amount) });
+      held.set(f.trade.ticker, { quantity: units2(h.quantity + quantity), cost: cents2(h.cost + amount) });
       boughtOn.set(f.trade.ticker, f.date);
     } else {
-      const left = h.quantity - quantity;
+      const left = units2(h.quantity - quantity);
       cash = cents2(cash + amount);
       if (left > 0) held.set(f.trade.ticker, { quantity: left, cost: cents2(h.cost * (left / h.quantity)) });
       else held.delete(f.trade.ticker);
     }
     Object.assign(f.trade, { status: "filled", side, quantity, price: limitPrice, fillDate: f.date, why: `${side === "buy" ? "Bought" : "Sold"} ${quantity} at the close of ${f.date}.` });
+    return true;
+  };
+  const placed = /* @__PURE__ */ new Map();
+  const fill = (f) => {
+    const n = placed.get(f.date) ?? 0;
+    if (apply(f, n)) placed.set(f.date, n + 1);
   };
   const due = Object.entries(o.dividends ?? {}).flatMap(([ticker, list3]) => list3.map((x) => ({ ticker, ...x }))).sort((a, b) => a.date.localeCompare(b.date));
   const dividends = [];
@@ -8139,14 +8370,13 @@ function paperBook(calls, closes, o) {
   try {
     let next = 0;
     for (const d of days) {
-      let that = 0;
       payUpTo(d);
-      while (next < fills.length && fills[next].date <= d) apply(fills[next++], that++);
+      while (next < fills.length && fills[next].date <= d) fill(fills[next++]);
       series.push({ date: d, value: cents2(worth(d)), benchmark: benchValue(d) });
     }
     while (next < fills.length) {
       payUpTo(fills[next].date);
-      apply(fills[next++], 0);
+      fill(fills[next++]);
     }
     payUpTo(o.today);
     latest = series.at(-1)?.date ?? o.today;
@@ -9162,11 +9392,11 @@ function getSizableOrigin(input) {
 }
 var highSurrogate = /[\uD800-\uDBFF]/;
 function codePointLength(str) {
-  const units2 = str.length;
+  const units3 = str.length;
   if (!highSurrogate.test(str))
-    return units2;
-  let count = units2;
-  for (let i = 0; i < units2 - 1; i++) {
+    return units3;
+  let count = units3;
+  for (let i = 0; i < units3 - 1; i++) {
     if ((str.charCodeAt(i) & 64512) === 55296 && (str.charCodeAt(i + 1) & 64512) === 56320) {
       count--;
       i++;
@@ -9969,8 +10199,8 @@ var $ZodCheckMaxLength = /* @__PURE__ */ $constructor("$ZodCheckMaxLength", (ins
   (_a3 = inst._zod.def).when ?? (_a3.when = _whenHasLength);
   inst._zod.check = (payload) => {
     const input = payload.value;
-    const units2 = input.length;
-    const length = typeof input === "string" && units2 > def.maximum ? codePointLength(input) : units2;
+    const units3 = input.length;
+    const length = typeof input === "string" && units3 > def.maximum ? codePointLength(input) : units3;
     if (length <= def.maximum)
       return;
     const origin = getLengthableOrigin(input);
@@ -9991,8 +10221,8 @@ var $ZodCheckMinLength = /* @__PURE__ */ $constructor("$ZodCheckMinLength", (ins
   (_a3 = inst._zod.def).when ?? (_a3.when = _whenHasLength);
   inst._zod.check = (payload) => {
     const input = payload.value;
-    const units2 = input.length;
-    const length = typeof input === "string" && units2 >= def.minimum && units2 < def.minimum * 2 ? codePointLength(input) : units2;
+    const units3 = input.length;
+    const length = typeof input === "string" && units3 >= def.minimum && units3 < def.minimum * 2 ? codePointLength(input) : units3;
     if (length >= def.minimum)
       return;
     const origin = getLengthableOrigin(input);
@@ -10013,8 +10243,8 @@ var $ZodCheckLengthEquals = /* @__PURE__ */ $constructor("$ZodCheckLengthEquals"
   (_a3 = inst._zod.def).when ?? (_a3.when = _whenHasLength);
   inst._zod.check = (payload) => {
     const input = payload.value;
-    const units2 = input.length;
-    const length = typeof input === "string" && units2 >= def.length && units2 <= def.length * 2 ? codePointLength(input) : units2;
+    const units3 = input.length;
+    const length = typeof input === "string" && units3 >= def.length && units3 <= def.length * 2 ? codePointLength(input) : units3;
     if (length === def.length)
       return;
     const origin = getLengthableOrigin(input);
@@ -20605,15 +20835,16 @@ var Link = class {
       };
       const p = parsePortfolio(await data("get_portfolio", { account_number: ids.accountNumber }));
       this.noteValue(p.total, now);
-      const all = parsePositions(await data("get_equity_positions", { account_number: ids.accountNumber }));
-      const held = all.find((x) => x.symbol === symbol)?.quantity ?? 0;
+      const all = parsePositions(await data("get_equity_positions", { account_number: ids.accountNumber })), rh = brokerSymbol(symbol);
+      const same = (s) => deskSymbol(s, "stock") === deskSymbol(symbol, "stock");
+      const held = all.find((x) => same(x.symbol))?.quantity ?? 0;
       const orders = openOrders(await data("get_equity_orders", { account_number: ids.accountNumber }));
       const ordersToday = orders.all.filter((o) => o.at && marketDay(new Date(o.at)) === marketDay(now)).length;
-      const wanted2 = [.../* @__PURE__ */ new Set([symbol, ...all.map((x) => x.symbol), ...orders.open.filter((o) => o.side === "buy" && o.price === null).map((o) => o.symbol)])];
+      const wanted2 = [.../* @__PURE__ */ new Set([rh, ...all.map((x) => x.symbol), ...orders.open.filter((o) => o.side === "buy" && o.price === null).map((o) => o.symbol)])];
       const quotes = /* @__PURE__ */ new Map();
       for (let i = 0; i < wanted2.length; i += QUOTES_PER_CALL) for (const [s, v] of parseQuotes(await data("get_equity_quotes", { symbols: wanted2.slice(i, i + QUOTES_PER_CALL) }))) quotes.set(s, v);
-      const price = quotes.get(symbol) ?? null;
-      const mine = (side) => orders.open.filter((o) => o.symbol === symbol && o.side === side).reduce((n, o) => n + o.quantity, 0);
+      const price = quotes.get(rh) ?? null;
+      const mine = (side) => orders.open.filter((o) => same(o.symbol) && o.side === side).reduce((n, o) => n + o.quantity, 0);
       return {
         symbol,
         accountValue: p.total,
@@ -20621,10 +20852,10 @@ var Link = class {
         held,
         price,
         ordersToday,
-        positions: all.map((x) => ({ symbol: x.symbol, quantity: x.quantity, price: quotes.get(x.symbol) ?? null })),
+        positions: all.map((x) => ({ symbol: deskSymbol(x.symbol, "stock"), quantity: x.quantity, price: quotes.get(x.symbol) ?? null })),
         open: { buy: mine("buy"), sell: mine("sell") },
         unreadOrders: orders.unread,
-        openBuys: orders.open.filter((o) => o.side === "buy").map((o) => ({ symbol: o.symbol, quantity: o.quantity, price: o.price ?? quotes.get(o.symbol) ?? null }))
+        openBuys: orders.open.filter((o) => o.side === "buy").map((o) => ({ symbol: deskSymbol(o.symbol, "stock"), quantity: o.quantity, price: o.price ?? quotes.get(o.symbol) ?? null }))
       };
     }
   }
@@ -20703,11 +20934,11 @@ var Link = class {
       if (!now.on) throw new Error(`trading switched itself off: ${now.offBecause?.words ?? "switch it on in Your account first"}`);
       const failed = (await approve(context)).filter((c) => !c.ok);
       if (failed.length) throw new Error(`the order no longer passes on Robinhood's latest figures: ${failed.map((c) => c.words).join("; ")}`);
-      const account = { accountNumber: this.agenticIds().accountNumber, agentic: true };
-      session.placer.ready(account, order, refId);
+      const account = { accountNumber: this.agenticIds().accountNumber, agentic: true }, sent = { ...order, symbol: brokerSymbol(order.symbol) };
+      session.placer.ready(account, sent, refId);
       sending();
       try {
-        return { placed: await session.placer.place(account, order, refId), context };
+        return { placed: await session.placer.place(account, sent, refId), context };
       } catch (e) {
         throw e instanceof Refused ? e : new AnswerLost(oneLine(masked(e instanceof Error ? e.message : String(e)), 120));
       }
@@ -20722,7 +20953,7 @@ var Link = class {
       const a = await session.reader.read("get_accounts");
       if (a.failed) throw new Error("Robinhood could not list the accounts");
       this.learn(a.data);
-      return await session.reviewer.review({ accountNumber: this.agenticIds().accountNumber, agentic: true }, order);
+      return await session.reviewer.review({ accountNumber: this.agenticIds().accountNumber, agentic: true }, { ...order, symbol: brokerSymbol(order.symbol) });
     } finally {
       await session.close();
     }
@@ -20845,7 +21076,7 @@ function saveAccountHoldings(dir, accounts, today2) {
     ...a.currency ? { currency: a.currency } : {},
     positions: a.positions.flatMap((p) => {
       try {
-        const ticker = safeSymbol(p.ticker), quantity = finite(p.quantity), averagePrice = finite(p.averagePrice);
+        const ticker = checkedTicker(p.ticker), quantity = finite(p.quantity), averagePrice = finite(p.averagePrice);
         if (!quantity) {
           leftOut++;
           return [];
@@ -20917,10 +21148,18 @@ function yardstickFor(ticker, s) {
   return { yardstick: normalizeSymbol(s.benchmarks[""] ?? "SPY"), basis: isCrypto(sym2) ? "coin" : exchangeOf(sym2) ? "unlisted" : "us" };
 }
 var resolveBenchmark = (ticker, s) => yardstickFor(ticker, s).yardstick;
+var SAME_INDEX = [["SPY", "VOO", "IVV"]];
+var copiesOf = (yardstick) => (SAME_INDEX.find((g) => g.includes(yardstick)) ?? []).filter((x) => x !== yardstick);
+var isOwnYardstick = (ticker, yardstick) => {
+  const sym2 = normalizeSymbol(ticker);
+  return sym2 === yardstick || copiesOf(yardstick).includes(sym2);
+};
 function rulesFor(ticker, s) {
-  const coin = isCrypto(ticker);
-  return { days: coin ? coinDays(s.holdingPeriodDays) : s.holdingPeriodDays, unit: coin ? "calendar" : "trading", ...yardstickFor(ticker, s) };
+  const coin = isCrypto(ticker), y = yardstickFor(ticker, s);
+  return { days: coin ? coinDays(s.holdingPeriodDays) : s.holdingPeriodDays, unit: coin ? "calendar" : "trading", yardstick: y.yardstick, basis: isOwnYardstick(ticker, y.yardstick) ? "same" : y.basis };
 }
+var stockRules = (s) => ({ days: s.holdingPeriodDays, unit: "trading", ...yardstickFor("", s) });
+var ownReturn = (r) => r.basis === "same";
 function legacyRules(ticker, s, holding) {
   const kept = Number(/^(\d+)d$/.exec(holding ?? "")?.[1]);
   return { days: kept > 0 ? kept : s.holdingPeriodDays, unit: isCrypto(ticker) ? "calendar" : "trading", ...yardstickFor(ticker, s) };
@@ -20942,12 +21181,15 @@ function basisWords(ticker, r) {
       return `the index the desk's settings give its exchange${ex ? `, ${ex}` : ""}`;
     case "chosen":
       return "the one yardstick the desk's settings set for every call";
+    case "same":
+      return normalizeSymbol(ticker) === r.yardstick ? `${r.yardstick} is the yardstick itself, so against it the alpha would always be zero` : `${normalizeSymbol(ticker)} copies the same index as ${r.yardstick}, so against it the alpha would be about zero whatever happened`;
   }
 }
 function yardstickWords(ticker, r) {
   const why = basisWords(ticker, r);
   return `${yardstickName(r.yardstick)}${why ? ` (${why})` : ""}`;
 }
+var againstWords = (ticker, r) => ownReturn(r) ? `on its own return (${basisWords(ticker, r)})` : `against ${yardstickWords(ticker, r)}`;
 var WHEN_SCORED = "A call is scored when a scoring runs after its window (/settle, an analysis or a routine), not by itself.";
 
 // src/desk/journal.ts
@@ -20955,6 +21197,7 @@ var UNCHECKED = ["unmarked", "no-prices", "unreliable", "flagged"];
 var WITHHELD = ["unreliable", "flagged"];
 var SEPARATOR = "\n\n<!-- ENTRY_END -->\n\n";
 var MARK = /<!--\s*ENTRY_END\s*-->/i;
+var SPLIT = /\s*<!--\s*ENTRY_END\s*-->\s*/i;
 function keep(text2) {
   let s = text2;
   while (MARK.test(s)) s = s.replace(MARK, "");
@@ -20968,7 +21211,9 @@ function lessonOf(fields, pending) {
 }
 var DATE = /^\d{4}-\d{2}-\d{2}$/;
 var TICKER = /^[A-Za-z0-9.\-=^]{1,20}$/;
-var BASES = ["us", "coin", "unlisted", "market", "chosen"];
+var BASES = ["us", "coin", "unlisted", "market", "chosen", "same"];
+var RECORDED = /^recorded:(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z)$/;
+var recordedIn = (fields) => fields.map((x) => RECORDED.exec(x)?.[1]).find(Boolean) ?? null;
 var WINDOW = /^window:(\d{1,3}) (trading|calendar) days?$/;
 var YARDSTICK = /^yardstick:([A-Za-z0-9.\-=^]{1,20}) \(([a-z]+)\)$/;
 var rulesFields = (r) => [`window:${windowWords(r)}`, `yardstick:${r.yardstick} (${r.basis})`];
@@ -21000,7 +21245,7 @@ function parse3(block) {
   const firstLesson = /(?:^|\n)FIRST LESSON:\n([\s\S]*)$/.exec(body)?.[1]?.trim() ?? "";
   const resolved = f.slice(6).find((x) => x.startsWith("resolved:"))?.slice("resolved:".length).trim() ?? null;
   const pending = f[3] === "pending", score = (s) => s === void 0 ? null : unsignZero(s);
-  return { date: f[0], ticker: f[1], rating: f[2], pending, raw: pending ? null : score(f[3]), alpha: pending ? null : score(f[4]), holding: pending ? null : f[5] ?? null, resolved, decision, reflection, ...lessonOf(f.slice(6), pending), lessonCheck, earlier, firstLesson, rules: rulesIn(f.slice(4)) };
+  return { date: f[0], ticker: f[1], rating: f[2], pending, raw: pending ? null : score(f[3]), alpha: pending ? null : score(f[4]), holding: pending ? null : f[5] ?? null, resolved, decision, reflection, ...lessonOf(f.slice(6), pending), lessonCheck, earlier, firstLesson, rules: rulesIn(f.slice(4)), recorded: recordedIn(f.slice(4)) };
 }
 var lessonPart = (p) => [keep(p.lesson), ...[["LESSON CHECK", p.check], ["EARLIER CORRECTIONS", p.earlier], ["FIRST LESSON", p.first]].filter(([, words4]) => words4?.trim()).map(([head, words4]) => `${head}:
 ${keep(words4)}`)].join("\n\n");
@@ -21028,19 +21273,23 @@ var Journal = class {
   }
   file;
   maxResolved;
+  /** The file's own line ends, as last read: written back the same way. */
+  eol = "\n";
   read() {
     try {
-      return fs11.readFileSync(this.file, "utf8");
+      const t2 = fs11.readFileSync(this.file, "utf8");
+      this.eol = t2.includes("\r\n") ? "\r\n" : "\n";
+      return t2.replace(/\r\n/g, "\n");
     } catch {
       return "";
     }
   }
   write(text2) {
     fs11.mkdirSync(path10.dirname(this.file), { recursive: true });
-    writeWhole(this.file, text2);
+    writeWhole(this.file, this.eol === "\n" ? text2 : text2.replace(/\n/g, this.eol));
   }
   blocks() {
-    return this.read().split(SEPARATOR).filter((b) => b.trim());
+    return this.read().split(SPLIT).filter((b) => b.trim());
   }
   load() {
     return this.blocks().map(parse3).filter((e) => e !== null);
@@ -21049,17 +21298,23 @@ var Journal = class {
     return this.load().filter((e) => e.pending);
   }
   /** Adds a pending entry, with the window and yardstick it will be scored by when they are given (every call the desk
-   *  records now). One entry per stock and day, settled or not: a re-run must not count the same call twice. */
-  storeDecision(ticker, date4, decision, rating, rules) {
+   *  records now), and when it was recorded (`at`, which record_decision gives). The rating kept is the one the decision
+   *  states: a `rating` passed that differs from it is refused, and a decision that states none is Needs review. One
+   *  entry per stock and day, settled or not: a re-run must not count the same call twice. */
+  storeDecision(ticker, date4, decision, rating, rules, at) {
     checkTag(ticker, date4);
     if (rules) checkRules(rules);
+    const stated = parseRating(decision);
+    if (rating && RATINGS.includes(rating) && stated !== REVIEW2 && rating !== stated) throw new Error(`the decision states ${stated}, not ${rating}: the journal keeps the rating the decision's words give. Correct the decision, or pass ${stated}`);
     fs11.mkdirSync(path10.dirname(this.file), { recursive: true });
     return withLock(this.file, () => {
       if (this.load().some((e) => e.date === date4 && e.ticker === ticker)) return "exists";
-      const r = rating && RATINGS.includes(rating) ? rating : parseRating(decision);
-      const old = this.read();
-      const kept = rules ? rulesFields(rules).map((x) => ` | ${x}`).join("") : "";
-      this.write(`${old}${old && !old.endsWith(SEPARATOR) ? SEPARATOR : ""}[${date4} | ${ticker} | ${r} | pending${kept}]
+      const old = this.read().replace(/\s+$/, "");
+      const kept = [...rules ? rulesFields(rules) : [], ...at ? [`recorded:${at.toISOString().slice(0, 16)}Z`] : []].map((x) => ` | ${x}`).join("");
+      const before = !old ? "" : /<!--\s*ENTRY_END\s*-->$/i.test(old) ? `${old}
+
+` : `${old}${SEPARATOR}`;
+      this.write(`${before}[${date4} | ${ticker} | ${stated} | pending${kept}]
 
 DECISION:
 ${keep(decision)}${SEPARATOR}`);
@@ -21076,7 +21331,7 @@ ${keep(decision)}${SEPARATOR}`);
         const e = parse3(block);
         if (done || !e || !e.pending || e.date !== date4 || e.ticker !== ticker) return block;
         done = true;
-        const kept = e.rules ? rulesFields(e.rules).map((x) => ` | ${x}`).join("") : "";
+        const kept = [...e.rules ? rulesFields(e.rules) : [], ...e.recorded ? [`recorded:${e.recorded}`] : []].map((x) => ` | ${x}`).join("");
         return `[${date4} | ${ticker} | ${e.rating} | ${signedPct(raw)} | ${signedPct(alpha)} | ${holdingDays}d | resolved:${resolution}${kept}${from ? ` | lesson:${from}` : ""}]
 
 DECISION:
@@ -21192,7 +21447,7 @@ Its check before then: ${e.lessonCheck}` : ""}`, earlier: e.earlier, first: e.fi
     if (!same.length && !other.length) return "";
     const over = (e) => {
       const r = e.rules ?? (o.scoring ? legacyRules(e.ticker, o.scoring, e.holding) : null);
-      return r ? `${checkName(r)}: against ${r.yardstick} over the ${windowWords(r)} after the call, not the call's own time horizon` : `over ${e.holding ?? "n/a"}`;
+      return r ? `${checkName(r)}: ${ownReturn(r) ? `on its own return (${r.yardstick} is its own yardstick or copies the same index), so its alpha is its return,` : `against ${r.yardstick}`} over the ${windowWords(r)} after the call, not the call's own time horizon` : `over ${e.holding ?? "n/a"}`;
     };
     const head = (e) => `[${e.date} | ${e.ticker} | ${e.rating} | return ${e.raw ?? "n/a"} | alpha ${e.alpha ?? "n/a"} | ${over(e)}]`;
     const full = (e) => [
@@ -21448,7 +21703,6 @@ function viewOf(calls, symbol, today2) {
 }
 var isStale = (v) => !v || v.days >= RERATE_DAYS;
 var saysSell = (rating) => rating === "Sell" || rating === "Underweight";
-var deskSymbol = (symbol, kind) => kind === "crypto" ? normalizeSymbol(/USD/i.test(symbol) ? symbol : `${symbol}-USD`) : symbol;
 function stopOf(text2) {
   const m = /\*\*Stop[ -]?Loss:?\*\*:?[ \t]*([^\n]*)/i.exec(text2);
   if (!m) return null;
@@ -21571,187 +21825,6 @@ async function fundTickers() {
   return new Set((t2.data ?? []).map((r) => String(r[at] ?? "").toUpperCase()).filter(Boolean));
 }
 
-// src/data/indicators.ts
-function sma(xs, n) {
-  const out = [];
-  let sum = 0;
-  xs.forEach((x, i) => {
-    sum += x;
-    if (i >= n) sum -= xs[i - n];
-    out.push(i >= n - 1 ? sum / n : null);
-  });
-  return out;
-}
-function ema(xs, n) {
-  const k = 1 - 2 / (n + 1);
-  let numer = 0, denom = 0, seen = 0;
-  return xs.map((x) => {
-    if (x === null) return null;
-    numer = x + k * numer;
-    denom = 1 + k * denom;
-    seen++;
-    return seen >= n ? numer / denom : null;
-  });
-}
-function wilder(xs, n, startAt) {
-  const out = xs.map(() => null);
-  let prev = 0;
-  for (let i = startAt; i < xs.length; i++) {
-    const k = i - startAt;
-    if (k < n - 1) continue;
-    prev = k === n - 1 ? xs.slice(startAt, i + 1).reduce((a, b) => a + b, 0) / n : (prev * (n - 1) + xs[i]) / n;
-    out[i] = prev;
-  }
-  return out;
-}
-function rsi(closes, n = 14) {
-  const gains = closes.map((c, i) => i ? Math.max(0, c - closes[i - 1]) : 0);
-  const losses = closes.map((c, i) => i ? Math.max(0, closes[i - 1] - c) : 0);
-  const g = wilder(gains, n, 1), l = wilder(losses, n, 1);
-  return g.map((gv, i) => {
-    const lv = l[i];
-    if (gv === null || lv === null || lv === void 0) return null;
-    return lv === 0 ? gv === 0 ? 50 : 100 : 100 - 100 / (1 + gv / lv);
-  });
-}
-function macd(closes) {
-  const fast = ema(closes, 12), slow = ema(closes, 26);
-  const line = fast.map((f, i) => f === null || slow[i] === null ? null : f - slow[i]);
-  const signal = ema(line, 9);
-  return { macd: line, signal, hist: line.map((m, i) => m === null || signal[i] === null ? null : m - signal[i]) };
-}
-function bollinger(closes, n = 20, k = 2) {
-  const mid = sma(closes, n), upper = [], lower = [];
-  closes.forEach((_, i) => {
-    const m = mid[i];
-    if (m === null || m === void 0) {
-      upper.push(null);
-      lower.push(null);
-      return;
-    }
-    const w = closes.slice(i - n + 1, i + 1), sd = Math.sqrt(w.reduce((a, x) => a + (x - m) ** 2, 0) / (n - 1));
-    upper.push(m + k * sd);
-    lower.push(m - k * sd);
-  });
-  return { mid, upper, lower };
-}
-function atr(bars, n = 14) {
-  const tr = bars.map((b, i) => i ? Math.max(b.high - b.low, Math.abs(b.high - bars[i - 1].close), Math.abs(b.low - bars[i - 1].close)) : b.high - b.low);
-  return wilder(tr, n, 0);
-}
-function vwma(bars, n = 14) {
-  return bars.map((_, i) => {
-    if (i < n - 1) return null;
-    const w = bars.slice(i - n + 1, i + 1);
-    if (w.some((b) => b.volume === null)) return null;
-    const vol = w.reduce((a, b) => a + b.volume, 0);
-    return vol > 0 ? w.reduce((a, b) => a + b.close * b.volume, 0) / vol : null;
-  });
-}
-function mfi(bars, n = 14) {
-  const tp = bars.map((b) => (b.high + b.low + b.close) / 3);
-  return bars.map((_, i) => {
-    if (i < n) return null;
-    let pos = 0, neg = 0;
-    for (let j = i - n + 1; j <= i; j++) {
-      const v = bars[j].volume;
-      if (v === null) return null;
-      const flow = tp[j] * v;
-      if (tp[j] > tp[j - 1]) pos += flow;
-      else if (tp[j] < tp[j - 1]) neg += flow;
-    }
-    if (pos + neg === 0) return null;
-    return neg === 0 ? 100 : 100 - 100 / (1 + pos / neg);
-  });
-}
-var INDICATORS = {
-  close_50_sma: "50 SMA: a medium-term trend indicator. Use: trend direction and dynamic support/resistance. It lags price; combine with faster indicators.",
-  close_200_sma: "200 SMA: a long-term trend benchmark. Use: the overall trend and golden/death crosses. It reacts slowly; better for strategy than entries.",
-  close_10_ema: "10 EMA: a responsive short-term average. Use: quick shifts in momentum and entry points. Noisy in choppy markets.",
-  macd: "MACD: momentum from the difference of two EMAs (12, 26). Use: crossovers and divergence. Confirm in sideways markets.",
-  macds: "MACD signal: the 9-day EMA of MACD. Use: crossovers with the MACD line. Part of a broader view, not a trigger alone.",
-  macdh: "MACD histogram: MACD minus its signal. Use: momentum strength and early divergence. Can be volatile.",
-  rsi: "RSI (14): momentum, 70/30 for overbought/oversold. In strong trends it can stay extreme; cross-check with the trend.",
-  boll: "Bollinger middle: the 20-day SMA under the bands. Use: a dynamic benchmark for price.",
-  boll_ub: "Bollinger upper band: 2 standard deviations above the middle. Use: overbought zones and breakouts; price can ride it in strong trends.",
-  boll_lb: "Bollinger lower band: 2 standard deviations below the middle. Use: oversold zones; confirm before calling a reversal.",
-  atr: "ATR (14): average true range, the size of daily moves. Use: stop-loss distance and position size.",
-  vwma: "VWMA (14): a moving average weighted by volume. Use: confirm trends with volume; watch for skew from volume spikes.",
-  mfi: "MFI (14): money flow, momentum from price and volume. Use: overbought (>80) or oversold (<20) and divergence."
-};
-var INDICATOR_NAMES = Object.keys(INDICATORS);
-function compute(name, bars) {
-  const closes = bars.map((b) => b.close);
-  switch (name) {
-    case "close_50_sma":
-      return sma(closes, 50);
-    case "close_200_sma":
-      return sma(closes, 200);
-    case "close_10_ema":
-      return ema(closes, 10);
-    case "macd":
-      return macd(closes).macd;
-    case "macds":
-      return macd(closes).signal;
-    case "macdh":
-      return macd(closes).hist;
-    case "rsi":
-      return rsi(closes);
-    case "boll":
-      return bollinger(closes).mid;
-    case "boll_ub":
-      return bollinger(closes).upper;
-    case "boll_lb":
-      return bollinger(closes).lower;
-    case "atr":
-      return atr(bars);
-    case "vwma":
-      return vwma(bars);
-    case "mfi":
-      return mfi(bars);
-  }
-}
-
-// src/data/market.ts
-var listDays = (days) => days.length <= 6 ? days.join(", ") : `${days.slice(0, 5).join(", ")} and ${days.length - 5} more`;
-var clock = (ms, zone = "UTC") => {
-  try {
-    return `${new Date(ms).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: zone })} ${zone} time`;
-  } catch {
-    return `${new Date(ms).toISOString().slice(11, 16)} UTC`;
-  }
-};
-var SETTLE_MS = 15 * 6e4;
-var SETTLE_OTHER_MS = 45 * 6e4;
-var settleMs = (meta2) => meta2.market === "other" ? SETTLE_OTHER_MS : SETTLE_MS;
-function gapLines(s) {
-  const days = s.missing ?? [];
-  if (!days.length) return [];
-  const one3 = days.length === 1;
-  return [`- **The source lists ${one3 ? "a session" : "sessions"} on ${listDays(days)} with no prices: ${one3 ? "it is" : "they are"} missing from these rows, so every average, count and change here skips ${one3 ? "it" : "them"} (a change across ${one3 ? "it" : "them"} spans two sessions). Do not say ${listDays(days)} had no trading: say ${one3 ? "its" : "their"} prices are not available from the source.**`];
-}
-function latestState(s, upTo, now = Date.now()) {
-  const last = s.bars[s.bars.length - 1], unfilled = s.unfilled?.at(-1), session = s.meta.session, zone = s.meta.timezone, read2 = s.fetchedAt ?? now;
-  const said = (st, lines) => ({ ...st, lines: [...lines, ...gapLines(s)] });
-  const final = { open: false, label: "Close", inline: "close" };
-  if (unfilled) return said(final, [`- **The source lists a session on ${unfilled}, but its prices are not filled in yet (this happens for a while after a session ends). Every figure here is as of ${last.date}. Do not call ${last.date} the latest session, and do not say ${unfilled} had no trading: say its prices were not available yet.**`]);
-  if (session && session.date === last.date) {
-    if (now < session.end) return said({ open: true, label: "Latest price (still trading)", inline: "still trading: latest price" }, [`- **The latest row, ${last.date}, is a session still trading (it closes at ${clock(session.end, zone)}). Its "close" is the latest price so far, not a close; its high, low, volume and every indicator on it will change. Call it the latest price, never the close, and do not treat a level as broken or held on this row alone.**`]);
-    const settle2 = settleMs(s.meta);
-    if (read2 < session.end + settle2) {
-      const at = clock(read2, zone);
-      return said({ open: true, label: `Latest price (read at ${at}, not the close)`, inline: `latest price as read at ${at}` }, [`- **The latest row, ${last.date}, was read at ${at}, ${read2 < session.end ? "while its session was still trading" : "just after its session ended"} (it ended at ${clock(session.end, zone)}, and its figures are taken as final ${settle2 / 6e4} minutes after). Its "close" is the latest price as read then, not the close; its high, low, volume and every indicator on it may still change. Call it the latest price as read at ${at}, never the close, and do not treat a level as broken or held on this row alone.**`]);
-    }
-    return said(final, [`- The latest row, ${last.date}, is a finished session: its figures are final.`]);
-  }
-  if (session && session.date > last.date && session.date <= upTo) {
-    if (now < session.start) return said(final, [`- ${session.date}'s session has not opened yet (it opens at ${clock(session.start, zone)}): the latest row, ${last.date}, is the latest finished session.`]);
-    return said(final, [`- **The source's own record shows a session on ${session.date}${now < session.end ? ", trading now" : ", which has ended"}, but its rows stop at ${last.date}: it has no prices yet for ${session.date}, nor for any session between ${last.date} and it. Every figure here is as of ${last.date}. Do not call ${last.date} the latest session, and do not say the days after it had no trading: say their prices are not available from the source yet.**`]);
-  }
-  if (!session && last.date === today()) return said(final, ["- **The latest row is today's session. If the market is still open it is partial: its close, high, low and volume are the latest so far, and every indicator on it will change by the close. Do not treat a level as broken or held on this row alone.**"]);
-  return said(final, []);
-}
-
 // src/data/company.ts
 function companySymbol(raw) {
   const sym2 = normalizeSymbol(raw);
@@ -21843,10 +21916,14 @@ var alphaOf = (e) => {
 };
 function summarize(entries) {
   const resolved = entries.filter((e) => !e.pending && e.rating !== REVIEW2).map((e) => ({ e, a: alphaOf(e) })).filter((x) => x.a !== null);
-  const byRating = {};
+  const byRating = {}, own2 = {};
+  const isOwn = (e) => e.rules !== null && ownReturn(e.rules);
   for (const rating of new Set(resolved.map((x) => x.e.rating))) {
-    const alphas = resolved.filter((x) => x.e.rating === rating).map((x) => x.a), dir = directionOf(rating);
-    byRating[rating] = { count: alphas.length, direction: dir, hitRate: dir ? alphas.filter((a) => worked(rating, a)).length / alphas.length : null, meanAlpha: alphas.reduce((s, a) => s + a, 0) / alphas.length };
+    const of = (mine) => resolved.filter((x) => x.e.rating === rating && isOwn(x.e) === mine).map((x) => x.a), dir = directionOf(rating);
+    const mean = (xs) => xs.reduce((s, a) => s + a, 0) / xs.length;
+    const alphas = of(false), returns = of(true);
+    if (alphas.length) byRating[rating] = { count: alphas.length, direction: dir, hitRate: dir ? alphas.filter((a) => worked(rating, a)).length / alphas.length : null, meanAlpha: mean(alphas) };
+    if (returns.length) own2[rating] = { count: returns.length, worked: dir ? returns.filter((a) => worked(rating, a)).length : null, meanReturn: mean(returns) };
   }
   const unscored = entries.filter((e) => e.rating === REVIEW2).length;
   const windows = [...new Set(resolved.map(({ e }) => {
@@ -21854,7 +21931,7 @@ function summarize(entries) {
     return days > 0 ? windowWords({ days, unit: e.rules?.unit ?? (isCrypto(e.ticker) ? "calendar" : "trading") }) : "";
   }).filter(Boolean))].sort();
   const yardsticks = [...new Set(resolved.map(({ e }) => e.rules?.yardstick ?? "").filter(Boolean))].sort();
-  return { resolved: resolved.length, pending: entries.length - resolved.length - unscored, unscored, byRating, holding: windows.join(", ") || "the configured window", yardsticks: yardsticks.join(", ") };
+  return { resolved: resolved.length, pending: entries.length - resolved.length - unscored, unscored, byRating, ownReturn: own2, holding: windows.join(", ") || "the configured window", yardsticks: yardsticks.join(", ") };
 }
 var pctText = (v) => signedPct(v, 2);
 function renderSummary(s) {
@@ -21862,6 +21939,8 @@ function renderSummary(s) {
   for (const [rating, sc] of Object.entries(s.byRating)) {
     lines.push(`- ${rating}: n=${sc.count}, ${sc.hitRate !== null ? `called the direction ${Math.round(sc.hitRate * 100)}%` : "no direction claimed"}, mean alpha ${pctText(sc.meanAlpha)} vs the yardstick`);
   }
+  const own2 = Object.entries(s.ownReturn);
+  if (own2.length) lines.push(`- On their own return, not in the lines above (a call on the yardstick itself or a fund that copies the same index): ${own2.map(([rating, o]) => `${rating} n=${o.count}, ${o.worked === null ? "no direction claimed" : `worked ${o.worked}`}, mean return ${pctText(o.meanReturn)}`).join("; ")}`);
   lines.push("");
   if (s.pending) lines.push("Pending cells are not scored above; settle them when their window has traded.");
   if (s.unscored) lines.push("Unscored cells had no readable rating (Needs review): they count neither for nor against the desk.");
@@ -22155,25 +22234,32 @@ var rulesOfEntry = (e, s) => {
 var OLDER = "it was recorded before the desk kept each call's window with it, so it is scored as such calls were then";
 function scoredBy(e, s) {
   const { r, older } = rulesOfEntry(e, s);
-  return { window: windowWords(r), yardstick: r.yardstick, check: checkName(r), why: [basisWords(e.ticker, r), older ? OLDER : ""].filter(Boolean).join("; ") };
+  return { window: windowWords(r), yardstick: r.yardstick, check: checkName(r), why: [basisWords(e.ticker, r), older ? OLDER : ""].filter(Boolean).join("; "), own: ownReturn(r) };
 }
+var nounOf = (ticker) => isCrypto(ticker) ? "coin" : MARKET_FUNDS.has(ticker) || ticker in SECTOR_FUNDS ? "fund" : "stock";
+var paperCallOf = (e) => ({ ticker: e.ticker, date: e.date, rating: e.rating, ...e.recorded ? { recorded: e.recorded } : {} });
+var paperOf = (e) => {
+  const late = followed(e.ticker) ? lateWhy(paperCallOf(e)) : null;
+  return { paper: followed(e.ticker) && !late, ...late ? { late } : {} };
+};
 function scoringShort(s) {
-  const stock = rulesFor("SPY", s), coin = rulesFor("BTC-USD", s), same = stock.yardstick === coin.yardstick;
+  const stock = stockRules(s), coin = rulesFor("BTC-USD", s), same = stock.yardstick === coin.yardstick;
   const name = checkName(stock) === checkName(coin) ? checkName(stock) : "a short first check";
   return `each scored once, ${name}, not its time horizon: a US stock or fund over ${windowWords(stock)}${same ? "" : ` against ${stock.yardstick}`}, a coin over ${windowWords(coin)}, against ${coin.yardstick}`;
 }
 function scoringNote(entries, s) {
-  const stock = rulesFor("SPY", s), coin = rulesFor("BTC-USD", s);
+  const stock = stockRules(s), coin = rulesFor("BTC-USD", s), copies = copiesOf(stock.yardstick);
   const name = checkName(stock) === checkName(coin) ? checkName(stock) : "a short first check";
   const coinY = coin.yardstick === stock.yardstick ? `${coin.yardstick} too` : yardstickName(coin.yardstick);
   const ny = coin.yardstick === "SPY", y = coin.yardstick;
   const closed = ny ? "New York's market was closed (a weekend or a New York holiday)" : "its market was closed";
-  const same = (r, std) => r.days === std.days && r.unit === std.unit && r.yardstick === std.yardstick && r.basis === std.basis;
+  const same = (r, std) => r.days === std.days && r.unit === std.unit && r.yardstick === std.yardstick && (r.basis === std.basis || ownReturn(r));
   const otherwise = entries.map((e) => ({ e, ...rulesOfEntry(e, s) })).filter(({ e, r, older }) => older || !same(r, isCrypto(e.ticker) ? coin : stock));
-  const listed2 = otherwise.slice(0, 6).map(({ e, r, older }) => `${e.ticker} (${dayWords(e.date)}): against ${yardstickWords(e.ticker, r)}, over the ${windowWords(r)} after the call${older ? `, as ${OLDER}` : ""}`);
+  const listed2 = otherwise.slice(0, 6).map(({ e, r, older }) => `${e.ticker} (${dayWords(e.date)}): ${againstWords(e.ticker, r)}, over the ${windowWords(r)} after the call${older ? `, as ${OLDER}` : ""}`);
   return [
     `Each call is scored once, ${name} against a named yardstick, not over the call's own time horizon (its decision states that).`,
-    `A US stock or fund: against ${yardstickWords("SPY", stock)}, over the ${windowWords(stock)} after the call.`,
+    `A US stock or fund: against ${yardstickWords("", stock)}, over the ${windowWords(stock)} after the call.`,
+    `A call on ${stock.yardstick} itself${copies.length ? `, or on a fund that copies the same index (${copies.join(", ")})` : ""}, is scored on its own return instead: against ${stock.yardstick} its alpha would always be about zero, so a Buy works when it rose over the window, a Sell when it fell.`,
     `A coin: against ${coinY}${coin.basis === "coin" ? ", as the desk's settings name no yardstick for coins" : ""}, over the ${windowWords(coin)} after the call. A coin trades every day and ${y} ${ny ? "only on New York's market days" : "only on its own market's days"}, so ${y}'s close on the coin's first and last day is used, or its last close before that day when ${closed}.`,
     ...listed2.length ? [`Scored otherwise: ${listed2.join("; ")}${otherwise.length > listed2.length ? `; and ${otherwise.length - listed2.length} more` : ""}.`] : [],
     WHEN_SCORED,
@@ -22214,13 +22300,14 @@ function stateOf(root2, day2) {
     summary: summaryOf(e.decision),
     hasReport: hasReport(dir, e.ticker, e.date),
     ticket: ticketable(e.ticker),
-    paper: followed(e.ticker),
-    ...scoredBy(e, s.scoring)
+    ...paperOf(e),
+    ...scoredBy(e, s.scoring),
+    noun: nounOf(e.ticker)
   })).reverse().sort((a, b) => b.date.localeCompare(a.date));
   const summary = summarize(entries), watchlist = readWatchlist(dir), market = marketView(dir);
   const { startHere, watch } = tiersOf(watchlist, market.symbols, calls);
   const queue2 = queueOf(dir), listener = listenerOf(dir), prefs = readPrefs(dir), email2 = readContactEmail(root2);
-  const record2 = recordOf(entries.map((e) => ({ ticker: e.ticker, date: e.date, rating: e.rating })), day2);
+  const record2 = recordOf(entries.map(paperCallOf), day2);
   const guide = guideOf({ email: email2, watchlist, market: market.symbols, queue: queue2, calls, listener: listener?.listener ?? null, autorun: prefs.autorun === true, readCall: !!prefs.readCall, record: record2, ...prefs.guide ? { pref: prefs.guide } : {} });
   return {
     version: versionOf(root2),
@@ -22340,6 +22427,7 @@ function parseSearch(json, limit = 8) {
     } catch {
       continue;
     }
+    if (q.quoteType === "CRYPTOCURRENCY" && !isCrypto(symbol)) continue;
     if (seen.has(symbol)) continue;
     seen.add(symbol);
     out.push({ symbol, name: (q.longname || q.shortname || symbol).trim(), exchange: (q.exchDisp ?? "").trim(), kind });
@@ -22776,7 +22864,12 @@ async function startTerminal(opts) {
     });
     req.on("error", reject);
   });
-  const callsOf = () => new Journal(path19.join(dir, "journal.md")).load().map((e) => ({ ticker: e.ticker, date: e.date, rating: e.rating }));
+  const callsOf = () => new Journal(path19.join(dir, "journal.md")).load().map((e) => ({ ticker: e.ticker, date: e.date, rating: e.rating, ...e.recorded ? { recorded: e.recorded } : {} }));
+  const closesOf = (d, today2) => {
+    const rows = (d.traded ?? d.bars).map((r) => ({ date: r.date, close: r.close }));
+    const unfinished = d.bars.length > 0 && (latestState(d, today2).open || !d.meta.session && d.bars.at(-1).date === today2);
+    return unfinished ? rows.filter((r) => r.date !== d.bars.at(-1).date) : rows;
+  };
   let paperMemo = null;
   const paper = async (today2) => {
     const calls = callsOf(), caps = robinhood.trading().caps, startUsd = readPaperStart(dir), trading = readSettings(root2).trading;
@@ -22793,7 +22886,7 @@ async function startTerminal(opts) {
         await Promise.all([.../* @__PURE__ */ new Set([...calls.filter((c) => followed(c.ticker)).map((c) => c.ticker), "SPY"])].map(async (s) => {
           try {
             const d = await daily(s, from, today2);
-            closes[s] = (d.traded ?? d.bars).map((r) => ({ date: r.date, close: r.close }));
+            closes[s] = closesOf(d, today2);
             dividends[s] = d.dividends ?? [];
           } catch {
           }

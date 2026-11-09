@@ -45,6 +45,7 @@ test('the outcome is the stock\'s return and the index\'s over the same dates, f
 
 test('a window that has not finished trading is not yet, never a partial figure', async () => {
   configure({ fetch: feed() });
+  process.env.TRADING_AGENTS_TODAY = '2026-09-11';                                     // the day after the last row
   assert.equal(await measure('NVDA', '2026-09-01', { ...TRADING5, days: 10 }), null);                 // only 7 rows after entry
   process.env.TRADING_AGENTS_TODAY = '2026-09-08';                                     // the exit session is today's, still moving
   assert.equal(await measure('NVDA', '2026-09-01', TRADING5), null);

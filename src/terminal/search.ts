@@ -2,7 +2,7 @@
 // ticker, the name, the market and what kind of thing it is. Only what the desk can price and chart is offered: no
 // futures or options. A search that cannot be run is said to be unavailable, never "nothing matches".
 import { getJson, Unavailable } from '../data/http.js';
-import { safeSymbol } from '../data/symbols.js';
+import { isCrypto, safeSymbol } from '../data/symbols.js';
 import { HOSTS } from '../data/yahoo.js';
 
 export interface Match { symbol: string; name: string; exchange: string; kind: string }
@@ -21,6 +21,8 @@ export function parseSearch(json: SearchJson, limit = 8): Match[] {
     if (!kind || !q.symbol || q.isYahooFinance === false) continue;
     let symbol: string;
     try { symbol = safeSymbol(q.symbol); } catch { continue; }
+    // A coin is followed in dollars only (BTC-USD): one in another currency (BTC-EUR) is not offered, never taken for a stock.
+    if (q.quoteType === 'CRYPTOCURRENCY' && !isCrypto(symbol)) continue;
     if (seen.has(symbol)) continue;
     seen.add(symbol);
     out.push({ symbol, name: (q.longname || q.shortname || symbol).trim(), exchange: (q.exchDisp ?? '').trim(), kind });
