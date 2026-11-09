@@ -21,6 +21,19 @@ export function teamVersionOf(shipped: AgentFiles): string | undefined {
   return /team_version "([0-9a-f]{8})"/.exec(shipped.get(TEAM_FILE) ?? '')?.[1];
 }
 
+/** Every version the team's steps have had, oldest first, relative to the project folder: `npm run agents` adds each new
+ *  one and none is ever removed, so the desk check can tell a version a conversation kept from before an update from one
+ *  that was never the steps' (made up, or not copied from them). */
+export const VERSIONS_FILE = 'scripts/team-versions.json';
+
+/** The versions in VERSIONS_FILE under `source`; undefined when it cannot be read or holds anything but versions. */
+export function knownTeamVersions(source: string): string[] | undefined {
+  try {
+    const versions = (JSON.parse(fs.readFileSync(path.join(source, VERSIONS_FILE), 'utf8')) as { versions?: unknown }).versions;
+    return Array.isArray(versions) && versions.length && versions.every((v) => typeof v === 'string' && /^[0-9a-f]{8}$/.test(v)) ? versions as string[] : undefined;
+  } catch { return undefined; }
+}
+
 /** How soon after a reset another one, with the files still matching, is refused: half an hour. A reset takes effect from
  *  the next conversation or run, so a second one soon after cannot add anything the first did not, unless the team was
  *  changed in Agent Studio in between; and a team that has lost its way calls it again within minutes (in a chat on 7 Nov
