@@ -158,8 +158,8 @@ test('tools started before the desk was updated say so in every answer, never re
   assert.ok(before.includes(`- --  This conversation's steps for the team were not compared with the ones in this folder: ${NO_VERSION}\n`));
 
   fs.appendFileSync(path.join(root, 'dist', 'desk-tools.mjs'), '// and after it\n');   // an update, as a pull writes it
-  for (const name of ['read_queue', 'list_settlements', 'end_backtest']) {
-    const answer = await call(name);
+  for (const [name, args] of [['read_queue', {}], ['list_settlements', {}], ['end_backtest', { sweep_id: 'june' }]] as const) {
+    const answer = await call(name, args);
     assert.ok(answer.startsWith(`${UPDATED_NOTE}\n\n`), `${name}: ${answer.slice(0, 80)}`);
   }
   assert.match(UPDATED_NOTE, /^DESK UPDATED: the desk in this folder was updated after the desk's tools in this conversation started, so this conversation still has the old desk tools, and most likely the old steps\. Tell the person in one plain line to start a new conversation in Madav/);

@@ -167,6 +167,11 @@ test('routines-3, scoring-7: while a backtest runs, the live desk\'s own work st
     assert.equal((JSON.parse(fs.readFileSync(active, 'utf8')) as { at: number }).at, was, 'only the sweep\'s own cells keep it alive');
     // the playbook no longer tells a routine or a chat to end a backtest it did not start
     assert.doesNotMatch(fs.readFileSync('.claude/skills/analyse/SKILL.md', 'utf8'), /call `end_backtest`/);
+    // and the desk itself keeps it running: ending one names its sweep, which only the conversation that started it is given
+    assert.match(await live.call('end_backtest').catch((e: unknown) => String(e)), /sweep_id/);
+    assert.match(await live.call('end_backtest', { sweep_id: 'july' }), /^NOT ENDED: the backtest running is not july/);
+    assert.equal((JSON.parse(fs.readFileSync(active, 'utf8')) as { sweep: string }).sweep, 'june', 'still running');
+    assert.match(await sweep.call('end_backtest', { sweep_id: 'june' }), /^Backtest sweep june ended\./);
   } finally { await sweep.close(); await live.close(); }
 });
 

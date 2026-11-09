@@ -253,9 +253,17 @@ export function registerDeskTools(server: McpServer, root: string): void {
 
   server.registerTool('end_backtest', {
     title: 'End the backtest sweep',
-    description: 'End the backtest sweep this conversation started, once it has run and been scored (or the person said to stop it): from now on its cells are recorded on the live desk again. The sweep and its results stay on disk. Never end a sweep this conversation did not start.',
+    description: 'End the backtest sweep this conversation started, named by the sweep_id start_backtest gave it, once it has run and been scored (or the person said to stop it): from now on its cells are recorded on the live desk again. The sweep and its results stay on disk. Never end a sweep this conversation did not start.',
+    inputSchema: { sweep_id: z.string().max(40).describe('The sweep to end: the sweep_id start_backtest gave this conversation') },
     annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false },
-  }, async () => act(() => { const was = getSweep(); setSweep(null); return was ? `Backtest sweep ${was} ended. The desk is back on the live journal.` : 'No backtest was running; the desk is on the live journal.'; }));
+  }, async (a) => act(() => {
+    // Ending names the sweep, so a routine or another chat, which is never given its id, cannot end it by mistake.
+    const was = getSweep();
+    if (!was) return 'No backtest was running; the desk is on the live journal.';
+    if (was !== a.sweep_id) return `NOT ENDED: the backtest running is not ${a.sweep_id}. Only the conversation that started it ends it, with the sweep_id start_backtest gave it; it also ends by itself after two hours with no work on its cells. Nothing was changed.`;
+    setSweep(null);
+    return `Backtest sweep ${was} ended. The desk is back on the live journal.`;
+  }));
 
   server.registerTool('backtest_summary', {
     title: 'Backtest results',

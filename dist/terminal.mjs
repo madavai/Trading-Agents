@@ -21170,6 +21170,16 @@ var hasReport = (dir, ticker, date4) => fs12.existsSync(path11.join(folder(dir, 
 var DEPTHS = { shallow: 1, medium: 3, deep: 5 };
 var isDepth = (v) => typeof v === "string" && Object.hasOwn(DEPTHS, v);
 var depthOfRounds = (rounds) => rounds >= 5 ? "deep" : rounds >= 3 ? "medium" : "shallow";
+var RUNNER_ID = /^[A-Za-z0-9_.:-]{1,64}$/;
+function alive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return e.code === "EPERM";
+  }
+}
+var runEnded = (i) => !i.pid || !alive(i.pid);
 var MAX_OPEN = 20;
 var MAX_FINISHED = 20;
 var QUIET_MS = 2 * 60 * 6e4;
@@ -21213,6 +21223,8 @@ function itemOf(v) {
   if (state === "done" && r.already === true) out.already = true;
   if (state === "failed") out.reason = reason ?? "no reason was given";
   if (state === "failed" && r.quiet === true) out.quiet = true;
+  if (state !== "waiting" && typeof r.runner === "string" && RUNNER_ID.test(r.runner)) out.runner = r.runner;
+  if (state !== "waiting" && Number.isInteger(r.pid) && r.pid > 0) out.pid = r.pid;
   return out;
 }
 function lastSignOf(dir, item) {
@@ -21220,10 +21232,25 @@ function lastSignOf(dir, item) {
   const saved = item.date ? lastSaved(dir, item.symbol, item.date) : null;
   return Math.max(started, saved ?? 0);
 }
-function settled(dir, item, now, note) {
+var fromJournal = /* @__PURE__ */ new WeakSet();
+var callsIn = (dir) => {
+  let kept = null;
+  return () => kept ??= new Map(new Journal(path12.join(dir, "journal.md")).load().map((e) => [`${e.ticker}|${e.date}`, e.rating]));
+};
+function settled(dir, item, now, note, calls) {
+  if (item.state !== "running" && item.state !== "failed") return item;
+  const rating = item.date ? calls().get(`${item.symbol}|${item.date}`) : void 0;
+  if (rating) {
+    const done = { ...item, state: "done", rating, endedAt: item.endedAt ?? new Date(Math.min(now.getTime(), lastSignOf(dir, item))).toISOString() };
+    delete done.reason;
+    delete done.quiet;
+    fromJournal.add(done);
+    return done;
+  }
   if (item.state !== "running") return item;
   const last = note?.lastRun, started = Date.parse(item.startedAt ?? item.requestedAt);
-  if (last?.started && Date.parse(last.started) <= started && started <= Date.parse(last.at)) {
+  const itsRun = !!last && (!!last.runner && item.runner === last.runner || runEnded(item));
+  if (last?.started && Date.parse(last.started) <= started && started <= Date.parse(last.at) && itsRun) {
     return { ...item, state: "failed", reason: words2(`${note.listener}'s run ended before this stock was finished: ${last.result}`, 300), endedAt: last.at };
   }
   const sign = lastSignOf(dir, item);
@@ -21235,12 +21262,12 @@ function load2(dir, now) {
     raw = JSON.parse(fs13.readFileSync(queueFile(dir), "utf8"));
   } catch {
   }
-  const seen = /* @__PURE__ */ new Set(), out = [], note = readListener(dir, now);
+  const seen = /* @__PURE__ */ new Set(), out = [], note = readListener(dir, now), calls = callsIn(dir);
   for (const v of Array.isArray(raw) ? raw : []) {
     const item = itemOf(v);
     if (!item || seen.has(item.symbol)) continue;
     seen.add(item.symbol);
-    out.push(settled(dir, item, now, note));
+    out.push(settled(dir, item, now, note, calls));
   }
   return out;
 }
@@ -21304,8 +21331,8 @@ function readListener(dir, now = /* @__PURE__ */ new Date()) {
       const result = words2([how, words2(last.result, 200)].filter(Boolean).join(": "), 200) ?? "finished";
       if (began) note.lastRun = ended && Date.parse(began) <= Date.parse(ended) ? { started: began, at: ended, result } : { at: began, result, startOnly: true };
     } else {
-      const lastAt = iso(last?.at), result = words2(last?.result, 200), started = iso(last?.started);
-      if (lastAt && result) note.lastRun = { ...started && Date.parse(started) <= Date.parse(lastAt) ? { started } : {}, at: lastAt, result };
+      const lastAt = iso(last?.at), result = words2(last?.result, 200), started = iso(last?.started), runner = typeof last?.runner === "string" && RUNNER_ID.test(last.runner) ? last.runner : void 0;
+      if (lastAt && result) note.lastRun = { ...started && Date.parse(started) <= Date.parse(lastAt) ? { started } : {}, at: lastAt, result, ...runner ? { runner } : {} };
     }
     return note;
   } catch {
@@ -21982,7 +22009,7 @@ function guideOf(f) {
   const tiers = [...picked].filter((s) => !s.startsWith("^")).map((s) => tierOf(s, f.market));
   const names = tiers.filter((t2) => t2 === "names").length, market = tiers.includes("market"), sector = tiers.includes("sectors");
   const asked = (/* @__PURE__ */ new Set([...f.queue.map((q) => q.symbol), ...f.calls.map((c) => c.ticker)])).size;
-  const automatic = f.listener ?? (f.autorun ? "Claude Code" : "");
+  const automatic = f.listener ?? "";
   const latest = [...f.calls].sort((a, b) => b.date.localeCompare(a.date))[0] ?? null;
   const steps = {
     email: { done: !!f.email, saved: f.email ? maskEmail(f.email) : "" },
@@ -22110,7 +22137,7 @@ function stateOf(root2, day2) {
     guide,
     record: { summary, text: renderSummary(summary), benchmarkNote: scoringNote(entries, s.scoring) },
     desk: { emailSaved: !!email2, tradingEnabled: false, holdingDays: s.scoring.holdingPeriodDays, benchmark: resolveBenchmark("SPY", s.scoring), scoring: scoringShort(s.scoring) },
-    analyses: { depth: depthOfRounds(s.analysis.debateRounds), perRun: s.routines.maxAnalyses, listener },
+    analyses: { depth: depthOfRounds(s.analysis.debateRounds), rounds: { debate: s.analysis.debateRounds, risk: s.analysis.riskRounds }, perRun: s.routines.maxAnalyses, listener },
     paper: { ...record2, startUsd: readPaperStart(dir), minWeeks: RECORD_WEEKS, minWords: RECORD_WORDS }
   };
 }
@@ -22401,6 +22428,7 @@ async function screenToday(dir, symbols, news, day2, now = /* @__PURE__ */ new D
 }
 var MORNING_ENDS = 12;
 var newYorkHour = (now) => Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "2-digit", hourCycle: "h23" }).format(now));
+var switchDue = (dir, day2, now = /* @__PURE__ */ new Date(), from = "") => isMarketDay(day2) && day2 >= from && newYorkHour(now) < MORNING_ENDS && readScreen(dir)?.queued?.day !== day2;
 function queueTop(dir, screen, day2, ring, now = /* @__PURE__ */ new Date(), from = "") {
   if (!isMarketDay(day2) || day2 < from || newYorkHour(now) >= MORNING_ENDS) return [];
   if (screen.day !== day2 || screen.queued?.day === day2 || readScreen(dir)?.queued?.day === day2) return [];
@@ -22418,6 +22446,7 @@ function queueTop(dir, screen, day2, ring, now = /* @__PURE__ */ new Date(), fro
       break;
     }
   }
+  if (!queued.length && screen.unavailable.length) return [];
   keep2(dir, { ...screen, queued: { day: day2, symbols: queued } });
   if (queued.length && ring) ringDoorbell(dir, "press", now);
   return queued;
@@ -22703,13 +22732,14 @@ async function startTerminal(opts) {
     return limitedNow(c);
   };
   let screening = null;
+  const clock2 = opts.now ?? (() => /* @__PURE__ */ new Date());
   const screenNow = async (day2) => {
     const { symbols, news } = screenUniverse(readWatchlist(dir), marketOf(dir));
-    screening ??= screenToday(dir, symbols, news, day2).finally(() => {
+    screening ??= screenToday(dir, symbols, news, day2, clock2()).finally(() => {
       screening = null;
     });
     const worked2 = await screening, prefs = readPrefs(dir), on = prefs.morning === true;
-    const queued2 = on ? queueTop(dir, worked2, day2, true, /* @__PURE__ */ new Date(), prefs.morningFrom) : [];
+    const queued2 = on ? queueTop(dir, worked2, day2, true, clock2(), prefs.morningFrom) : [];
     return { screen: readScreen(dir) ?? worked2, morning: { on, top: TOP_QUEUED, from: on ? prefs.morningFrom : void 0 }, queued: queued2 };
   };
   let weatherMemo = null;
@@ -22830,11 +22860,11 @@ async function startTerminal(opts) {
     if (p === "/api/watchlist" && method === "DELETE") return json(res, 200, { watchlist: removeWatch(dir, name) });
     if (p === "/api/favourite" && method === "POST") return json(res, 200, { watchlist: setFavourite(dir, name, b.favourite === true) });
     if (p === "/api/queue" && method === "POST") {
-      const symbol = safeSymbol(name), d = b.depth === void 0 ? depthOfRounds(readSettings(root2).analysis.debateRounds) : b.depth;
-      if (!isDepth(d)) throw new Refused2(400, "the depth is shallow, medium or deep");
+      const symbol = safeSymbol(name), d = b.depth;
+      if (d !== void 0 && !isDepth(d)) throw new Refused2(400, "the depth is shallow, medium or deep");
       const call = new Journal(path19.join(dir, "journal.md")).load().find((e) => e.ticker === symbol && e.date === day2);
       if (call) throw new Refused2(409, `${symbol} was already analysed today (${call.rating}): its call is in the journal. Ask again tomorrow`);
-      queued(() => enqueue(dir, symbol, (/* @__PURE__ */ new Date()).toISOString(), d));
+      queued(() => enqueue(dir, symbol, (/* @__PURE__ */ new Date()).toISOString(), isDepth(d) ? d : void 0));
       ringDoorbell(dir, "press");
       return json(res, 200, { queue: queueOf(dir) });
     }
@@ -23082,12 +23112,32 @@ async function startTerminal(opts) {
   keep3((keys) => {
     keys[deskId] = { port, key: token };
   });
-  if (opts.listen && readPrefs(dir).autorun && !listenerOf(dir) && (opts.listen.claude ?? (() => !!findClaude()))()) {
+  const claudeHere = opts.listen?.claude ?? (() => !!findClaude());
+  if (opts.listen && readPrefs(dir).autorun && !listenerOf(dir) && claudeHere()) {
     try {
       opts.listen.start();
     } catch {
     }
   }
+  let quietLooks = 0;
+  const keeper = setInterval(() => {
+    try {
+      if (opts.listen && readPrefs(dir).autorun && !listenerOf(dir)) {
+        if (++quietLooks >= 5 && claudeHere()) {
+          quietLooks = 0;
+          opts.listen.start();
+        }
+      } else quietLooks = 0;
+    } catch {
+    }
+    try {
+      const prefs = readPrefs(dir), now = clock2(), day2 = today(now);
+      if (prefs.morning === true && switchDue(dir, day2, now, prefs.morningFrom)) void screenNow(day2).catch(() => {
+      });
+    } catch {
+    }
+  }, opts.keepMs ?? 6e4);
+  keeper.unref();
   const sweep = setInterval(() => {
     clearCache();
     clearQuotes();
@@ -23119,6 +23169,7 @@ async function startTerminal(opts) {
         delete keys[deskId];
       });
       clearInterval(sweep);
+      clearInterval(keeper);
       if (updates) clearInterval(updates);
       server.close(() => resolve());
       server.closeAllConnections?.();
