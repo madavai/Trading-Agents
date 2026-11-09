@@ -5,11 +5,11 @@
 // so it is withheld for a past analysis date rather than leak later knowledge into it.
 // Adapted from TradingAgents (tradingagents/dataflows/vendors/yahoo/fundamentals.py and date_window.py), Apache License
 // 2.0; rewritten in TypeScript.
-import { addDays, analysisDate, daysBetween, isHistorical } from './dates.js';
+import { addDays, analysisDate, daysBetween, isHistorical, today } from './dates.js';
 import { getCookies, getJson, getText, NoData, Unavailable } from './http.js';
 import { cryptoBase, normalizeSymbol } from './symbols.js';
 import { history, HOSTS } from './yahoo.js';
-import { averageDilutedShares, cikFor, companyFacts, fundTickers, latestBalance, sectorOfSic, secStatement, sharesOutstanding, SHOWN, STATEMENTS, submissions, trailingYear, type Fact, type Frequency, type Statement, type Table } from './sec.js';
+import { annualFormIn, averageDilutedShares, cikFor, companyFacts, filingSplits, firstTagPerPeriod, fundTickers, latestBalance, rebase, sectorOfSic, secStatement, sharesOutstanding, SHOWN, splitList, STATEMENTS, submissions, trailingYear, type Fact, type Facts, type Frequency, type Split, type Statement, type Submissions, type Table } from './sec.js';
 import { secInsiders } from './insiders.js';
 import { latestReport, renderReport } from './nport.js';
 import { latestState } from './market.js';
@@ -113,9 +113,59 @@ const whole = (n: number) => Math.round(n).toLocaleString('en-US');
 /** The same day a year before (28 February for 29 February): the twelve months to `day` begin the day after it. */
 const yearBefore = (day: string) => `${Number(day.slice(0, 4)) - 1}${day.slice(4) === '-02-29' ? '-02-28' : day.slice(4)}`;
 
+interface SplitJson { chart?: { result?: Array<{ meta?: { gmtoffset?: number }; timestamp?: number[]; events?: { splits?: Record<string, { date?: number; numerator?: number; denominator?: number }> } }> | null } }
+const ratio = (n: number) => Number(n.toFixed(4)).toString();
+
+/** The share splits the price source has applied to its prices, from 2009 (the start of the SEC's figures in XBRL) to
+ *  today, each dated by its first day on the new basis. Its prices are on the basis after all of them. */
+async function priceSplits(sym: string): Promise<Split[]> {
+  const qs = `period1=${epoch('2009-01-01')}&period2=${epoch(addDays(today(), 1))}&interval=1mo&events=split`;
+  let last: unknown;
+  for (const host of HOSTS) {
+    try {
+      const r = (await getJson<SplitJson>(`${host}/v8/finance/chart/${encodeURIComponent(sym)}?${qs}`)).chart?.result?.[0];
+      if (!r?.timestamp?.length) throw new Unavailable(`the price source answered with no record for ${sym}`);
+      const offset = r.meta?.gmtoffset ?? 0;
+      return Object.values(r.events?.splits ?? {}).flatMap((e): Split[] => {
+        const n = Number(e.numerator), d = Number(e.denominator);
+        if (!(n > 0 && d > 0 && Number.isFinite(n / d)) || n === d || typeof e.date !== 'number') return [];
+        const date = new Date((e.date + offset) * 1000).toISOString().slice(0, 10);
+        return [{ date, factor: n / d, words: `the ${ratio(n)}-for-${ratio(d)}${n < d ? ' reverse' : ''} split of ${date}` }];
+      }).sort((a, b) => a.date.localeCompare(b.date));
+    } catch (e) { if (e instanceof NoData) throw e; last = e; }
+  }
+  throw last;
+}
+
+/** The basis to put a US company's filed per-share figures and share counts on before they meet its price: the splits
+ *  the price source applied to its prices, checked against the splits the company's own per-share figures show (a split
+ *  the filings show and the price source does not means its record is missing one). When that record cannot be used,
+ *  the splits the filings show, with `why`: the figures are then on the basis of the latest filings, which a split since
+ *  them would leave behind the prices. */
+async function shareBasis(sym: string, perShare: readonly Fact[]): Promise<{ splits: Split[]; why?: string }> {
+  const filed = filingSplits(perShare, today());
+  try {
+    const splits = await priceSplits(sym);
+    const missing = filed.find((f) => !splits.some((s) => Math.abs(s.factor / f.factor - 1) <= 0.03 && s.date > f.old! && s.date <= f.date));
+    return missing ? { splits: filed, why: `its record does not show ${missing.words}` } : { splits };
+  } catch (e) { return { splits: filed, why: (e as Error).message }; }
+}
+
+/** A foreign company's yearly report (20-F, or 40-F from Canada), from its list of filings by `day` or else its facts;
+ *  null for a US company. Its cover count and per-share figures are of its ordinary shares, and its US listing may be
+ *  depositary shares that each stand for several of them. */
+function foreignForm(s: Submissions | null, facts: { 'us-gaap'?: Facts; dei?: Facts } | undefined, day: string): string | null {
+  const r = s?.filings?.recent, at = (r?.form ?? []).findIndex((f, i) => /^(10-K|20-F|40-F)/.test(f) && (r?.filingDate?.[i] ?? '') <= day);
+  const form = at >= 0 ? /^(10-K|20-F|40-F)/.exec(r!.form![at]!)![1]! : annualFormIn(facts, day);
+  return form === '20-F' || form === '40-F' ? form : null;
+}
+
+const NO_MULTIPLES = (why: string) => `Market value, price to earnings and price to book: unavailable. The price source's record of share splits could not be read (${why}), so the filed figures cannot be put on the share basis of its prices: a split since a figure was filed would put a multiple off by its ratio.`;
+
 /** A US filer's profile and valuation as known on `day`: who it is from its SEC record, and the multiples worked out from
- *  what it had filed by then and the checked closing price on or before then. Every multiple is derived and shows what it
- *  came from; what no official free source gives (forward estimates, analysts' targets) is said to be unavailable. */
+ *  what it had filed by then and the checked closing price on or before then, every filed per-share figure and share count
+ *  first put on the share basis of that price. Every multiple is derived and shows what it came from; what no official
+ *  free source gives (forward estimates, analysts' targets) is said to be unavailable. */
 async function secOverview(sym: string, cik: string, day: string): Promise<string> {
   const [s, facts] = await Promise.all([submissions(cik), companyFacts(cik)]);
   const g = facts.facts?.['us-gaap'] ?? {}, dei = facts.facts?.dei ?? {};
@@ -125,43 +175,70 @@ async function secOverview(sym: string, cik: string, day: string): Promise<strin
   const fy = /^(\d\d)(\d\d)$/.exec(s.fiscalYearEnd ?? '');
   if (fy && Number(fy[1]) >= 1 && Number(fy[1]) <= 12) lines.push(`Fiscal year ends: ${Number(fy[2])} ${MONTHS[Number(fy[1]) - 1]}`);
 
-  let close: { date: string; close: number; currency?: string; open: boolean; label: string } | null = null, paid: Array<{ date: string; amount: number }> = [];
-  // The close in cents, as the price table shows it, so a product like the market value carries no rounding noise; while
-  // its session is still trading (or was when it was read) it is the latest price, and every multiple says so.
+  // Diluted EPS as filed, under the combined "basic and diluted" tag for a period the diluted one does not give.
+  const epsFacts = firstTagPerPeriod(units(g.EarningsPerShareDiluted, 'USD/shares'), units(g.EarningsPerShareBasicAndDiluted, 'USD/shares'));
+  const foreign = foreignForm(s, facts.facts, day);
+  // A foreign company's figures stay as its filings give them by the day (per ordinary share); a US company's go on the
+  // prices' share basis, or, when the price source's record of splits cannot be used, on its latest filings' basis.
+  const basis: { splits: Split[]; why?: string } = foreign ? { splits: filingSplits(epsFacts, day) } : await shareBasis(sym, epsFacts);
+  const priced = !foreign && basis.why === undefined;
+
+  let close: { date: string; close: number; table: number; currency?: string; open: boolean; label: string } | null = null, paid: Array<{ date: string; amount: number }> = [];
+  // The close in cents, so a product like the market value carries no rounding noise: the price it traded at (adjusted
+  // for later splits only, as every price the source gives); the price table's row for a past day is also lowered by the
+  // dividends paid since. While its session is still trading (or was when it was read) it is the latest price, and every
+  // multiple says so.
   try {
-    const h = await history(sym, day), last = h.bars.at(-1)!, state = latestState(h, day);
-    close = { date: last.date, close: Math.round(last.close * 100) / 100, currency: h.meta.currency, open: state.open, label: state.open ? state.label : 'Close' };
+    const h = await history(sym, day), bar = h.bars.at(-1)!, state = latestState(h, day), traded = h.traded?.at(-1);
+    const row = traded?.date === bar.date ? traded : bar, cents = (n: number) => Math.round(n * 100) / 100;
+    close = { date: row.date, close: cents(row.close), table: cents(bar.close), currency: h.meta.currency, open: state.open, label: state.open ? state.label : 'Close' };
     paid = h.dividends ?? [];
   } catch { /* no price: the multiples are unavailable */ }
-  const usd = !close?.currency || close.currency === 'USD', px = close?.open ? 'latest price' : 'close';
-  lines.push(close ? `${close.label}: ${fixed(close.close)} ${close.currency ?? ''} on ${close.date} (the checked price table's latest row on or before ${day}${close.open ? '; not a close, so every multiple below moves with it' : ''})`.replace('  ', ' ') : 'Close: unavailable (the prices could not be read), so no multiple can be worked out');
+  const usd = !close?.currency || close.currency === 'USD', px = close?.open ? 'latest price' : 'close', past = isHistorical(day);
+  if (close) {
+    const where = past
+      ? `the price it traded at that day, on the price source's share basis of today: it adjusts every past price for any share split since${priced ? ', and the filed per-share figures and share counts below are put on that same basis' : ''}`
+      : `the checked price table's latest row on or before ${day}`;
+    const table = close.table !== close.close ? `; the checked price table shows ${fixed(close.table)} for that day, lowered by the dividends paid since` : '';
+    lines.push(`${close.label}: ${fixed(close.close)} ${close.currency ?? ''} on ${close.date} (${where}${close.open ? '; not a close, so every multiple below moves with it' : ''}${table})`.replace('  ', ' '));
+  } else lines.push('Close: unavailable (the prices could not be read), so no multiple can be worked out');
 
+  // A share count on the basis: the count as filed, and what a split it can name changed.
+  const counted = (val: number, filed: string) => {
+    if (foreign) return { n: val, words: '' };
+    const { k, named, silent } = rebase(basis.splits, filed, day), n = Math.round(val * k);
+    return { n, words: !named.length ? '' : silent ? `, before ${splitList(named)}` : ` as ${whole(val)}, before ${splitList(named)}` };
+  };
   const cover = sharesOutstanding(units(dei.EntityCommonStockSharesOutstanding, 'shares'), day);
-  const average = cover ? null : averageDilutedShares(units(g.WeightedAverageNumberOfDilutedSharesOutstanding, 'shares'), day);
-  const shares = cover ?? average, which = average ? 'average diluted shares' : 'shares';
-  if (cover) lines.push(`Shares outstanding: ${whole(cover.shares)} (counted on ${cover.end}, filed ${cover.filed})`);
-  else if (average) lines.push(`Shares outstanding: no single count on a cover page filed by then (a company with more than one class of shares gives one per class there, which the SEC's data leaves out). In its place, the weighted average diluted shares from its accounts for ${average.start} to ${average.end}: ${whole(average.shares)} (filed ${average.filed}), so the figures worked out from it are close, not exact`);
+  const dilutedAvg = cover ? null : averageDilutedShares(units(g.WeightedAverageNumberOfDilutedSharesOutstanding, 'shares'), day);
+  const bothAvg = cover || dilutedAvg ? null : averageDilutedShares(units(g.WeightedAverageNumberOfShareOutstandingBasicAndDiluted, 'shares'), day);
+  const average = dilutedAvg ?? bothAvg, which = average ? 'average diluted shares' : 'shares';
+  const shares = cover ? counted(cover.shares, cover.filed).n : average ? counted(average.shares, average.filed).n : null;
+  if (cover) { const c = counted(cover.shares, cover.filed); lines.push(`Shares outstanding: ${whole(c.n)}${foreign ? ' ordinary shares' : ''} (counted on ${cover.end}, filed ${cover.filed}${c.words})`); }
+  else if (average) { const c = counted(average.shares, average.filed); lines.push(`Shares outstanding: no single count on a cover page filed by then (a company with more than one class of shares gives one per class there, which the SEC's data leaves out). In its place, the weighted average ${bothAvg ? 'shares from its accounts (one figure, filed as both basic and diluted)' : 'diluted shares from its accounts'} for ${average.start} to ${average.end}: ${whole(c.n)} (filed ${average.filed}${c.words}), so the figures worked out from it are close, not exact`); }
   else lines.push('Shares outstanding: unavailable (not on a cover page filed by then)');
-  if (shares && close && usd) lines.push(`Market value (derived: ${which} × ${px}): ${whole(shares.shares * close.close)} USD`);
+  if (foreign) lines.push(`Market value, price to earnings and price to book: not worked out. ${sym} files with the SEC as a foreign company (its yearly report is a form ${foreign}): the count on its cover and any per-share figure in its accounts are of its ordinary shares, and its US listing may be depositary shares (ADS) that each stand for several of them, a ratio its SEC filings do not give in a form the desk can read. A multiple from these figures and the price of one US share could be off by that ratio.`);
+  else if (!priced) lines.push(NO_MULTIPLES(basis.why!));
+  else if (shares && close && usd) lines.push(`Market value (derived: ${which} × ${px}): ${whole(shares * close.close)} USD`);
 
-  const eps = trailingYear(units(g.EarningsPerShareDiluted, 'USD/shares'), day);
+  const eps = trailingYear(epsFacts, day, basis.splits);
   if (eps) {
-    lines.push(`Diluted EPS, last twelve months (derived from ${eps.parts}): ${fixed(eps.value)} USD`);
-    if (close && usd) lines.push(eps.value > 0 ? `Price to earnings (derived: ${px} ÷ that): ${fixed(close.close / eps.value)}` : 'Price to earnings: not meaningful (the last twelve months lost money)');
-  } else lines.push('Diluted EPS, last twelve months: unavailable (not filed in US dollars by then)');
+    lines.push(`Diluted EPS, last twelve months${foreign ? ', per ordinary share' : priced ? '' : ', on the basis of its latest filings'} (derived from ${eps.parts}): ${fixed(eps.value)} USD`);
+    if (priced && close && usd) lines.push(eps.value > 0 ? `Price to earnings (derived: ${px} ÷ that): ${fixed(close.close / eps.value)}` : 'Price to earnings: not meaningful (the last twelve months lost money)');
+  } else lines.push('Diluted EPS, last twelve months: unavailable (no full year of it in US dollars among its filed figures by then)');
 
   const equity = latestBalance(units(g.StockholdersEquity, 'USD'), day);
   if (equity) {
     lines.push(`Stockholders' equity: ${whole(equity.val)} USD (at ${equity.end}, filed ${equity.filed})`);
-    if (shares && shares.shares > 0) {
-      const bv = equity.val / shares.shares;
-      lines.push(`Book value per share (derived: equity ÷ ${which}): ${fixed(bv)} USD`);
-      if (close && usd && bv > 0) lines.push(`Price to book (derived: ${px} ÷ that): ${fixed(close.close / bv)}`);
+    if (!foreign && shares && shares > 0) {
+      const bv = equity.val / shares;
+      lines.push(`Book value per share (derived: equity ÷ ${which}${priced ? '' : ', on the basis of its latest filings'}): ${fixed(bv)} USD`);
+      if (priced && close && usd && bv > 0) lines.push(`Price to book (derived: ${px} ÷ that): ${fixed(close.close / bv)}`);
     }
   }
   // Dividends over the true twelve months to the day, from the price source's record of each one (the filings stop at
   // the last quarter filed, months before); the filed figure only when the prices could not be read.
-  const dps = trailingYear(units(g.CommonStockDividendsPerShareDeclared, 'USD/shares'), day) ?? trailingYear(units(g.CommonStockDividendsPerShareCashPaid, 'USD/shares'), day);
+  const dps = trailingYear(units(g.CommonStockDividendsPerShareDeclared, 'USD/shares'), day, basis.splits) ?? trailingYear(units(g.CommonStockDividendsPerShareCashPaid, 'USD/shares'), day, basis.splits);
   if (close) {
     const after = yearBefore(day), year = paid.filter((d) => d.date > after && d.date <= day), unit = close.currency ?? 'USD';
     const sum = Number(year.reduce((a, d) => a + d.amount, 0).toFixed(6)), span = `${addDays(after, 1)} to ${day}`;
@@ -383,14 +460,30 @@ export function renderTable(t: Table, head: string, note: string): string {
 // A refusal by the SEC asks for the email only when none was sent; if one was, the SEC's own words are the diagnosis.
 const reason = (e: unknown) => { const m = (e as Error).message; return /sec\.gov refused \(HTTP 403\)/.test(m) && m.includes('[no contact email was sent]') ? `${m}: ${ASK_FOR_EMAIL}` : m; };
 
+/** The share basis for a US company's per-share figures in its income statement: the prices' (so they meet the price an
+ *  agent reads), or none with a note saying why they stay on the basis of its latest filings. A foreign company's stay as
+ *  filed (per ordinary share). Never fails: the statement does not depend on it. */
+async function statementBasis(sym: string, day: string): Promise<{ splits?: Split[]; note: string }> {
+  try {
+    const cik = await cikFor(sym);
+    if (!cik) return { note: '' };
+    const [s, facts] = await Promise.all([submissions(cik).catch(() => null), companyFacts(cik)]);
+    if (foreignForm(s, facts.facts, day)) return { note: '' };
+    const g = facts.facts?.['us-gaap'] ?? {};
+    const b = await shareBasis(sym, firstTagPerPeriod(units(g.EarningsPerShareDiluted, 'USD/shares'), units(g.EarningsPerShareBasicAndDiluted, 'USD/shares')));
+    return b.why === undefined ? { splits: b.splits, note: '' } : { note: ` The price source's record of share splits could not be used (${b.why}), so per-share figures are on the basis of the company's latest filings by that day; a split since then would put them off its prices by the split's ratio.` };
+  } catch { return { note: '' }; }
+}
+
 /** A financial statement: as filed with the SEC by the analysis date for a US filer; else, for today only, Yahoo's. */
 export async function financialStatement(raw: string, kind: Statement, freq: Frequency, analysis: string): Promise<string> {
   const day = analysisDate(analysis), sym = companySymbol(raw), title = STATEMENTS[kind].title;
   let secFailure: unknown;
   try {
-    const t = withWorkedRows(await secStatement(sym, kind, freq, day), kind, freq);
+    const basis = kind === 'income_statement' ? await statementBasis(sym, day) : { note: '' };
+    const t = withWorkedRows(await secStatement(sym, kind, freq, day, basis.splits), kind, freq);
     const q = kind !== 'balance_sheet' && freq === 'quarterly' ? ' Every column is one quarter in a row of quarters; a quarter no filing states (a fourth quarter, which only the annual report covers, or one filed only inside a year to date) is derived from two filed figures of the same year, its column marked "(derived)", and the notes below say from which. Per-share figures are never derived.' : '';
-    return renderTable(t, `${title} for ${sym} (${freq}), as filed with the SEC on or before ${day}`, `Each figure is the latest filing of it by that day; a restatement counts only from the day it was filed.${q}`);
+    return renderTable(t, `${title} for ${sym} (${freq}), as filed with the SEC on or before ${day}`, `Each figure is the latest filing of it by that day; a restatement counts only from the day it was filed.${q}${basis.note}`);
   } catch (e) { secFailure = e; }
   if (isHistorical(day)) {
     if (!(secFailure instanceof NoData)) throw new Unavailable(`the SEC, the only source of accounts as filed by ${day}, could not answer (${reason(secFailure)})`);

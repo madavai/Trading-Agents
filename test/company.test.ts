@@ -167,7 +167,9 @@ test('the tool serves a US filer from the SEC, in millions, with the email sent 
   assert.match(t, /Revenue growth on the quarter just before \(worked out\) \| 20\.0% \| – \| –/);      // 120 on 100; never across the gap to 2024
   assert.match(t, /Revenue growth on the same quarter a year before \(worked out\) \| 26\.3% \| – \| –/);
   assert.match(t, /quote them rather than working your own/);
-  assert.ok(seen.every((s) => s.headers['User-Agent'] === 'ta me@example.com'), 'both SEC hosts get the name and the email, with no bracketed address');
+  const sec = seen.filter((s) => /\.sec\.gov\//.test(s.url)), other = seen.filter((s) => !sec.includes(s));
+  assert.ok(sec.length && sec.every((s) => s.headers['User-Agent'] === 'ta me@example.com'), 'both SEC hosts get the name and the email, with no bracketed address');
+  assert.ok(other.every((s) => /finance\/chart\/ACME\?.*events=split/.test(s.url) && !JSON.stringify(s.headers).includes('me@example.com')), 'the price source is asked only for its record of splits, never sent the email');
 });
 
 test('when the SEC refuses, today falls back to Yahoo and a past day is told why', async () => {
