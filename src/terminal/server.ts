@@ -136,7 +136,7 @@ const KEY = /^[0-9a-f]{48}$/, CLAIM = /^[0-9a-f]{36}$/;
 
 export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
   const { root, assets } = opts, dir = deskDataDir(root), deskId = deskIdOf(root);
-  // The SEC asks everyone who reads its filings (a stock's sector comes from them) for a contact email: the person's own,
+  // The SEC asks every program that reads its filings (a stock's sector comes from them) for a contact email: the person's own,
   // looked up at each request, so one saved on this page or in a chat goes at once, and to sec.gov alone.
   configure({ contact: readSettings(root).sources.contact, secEmail: () => readContactEmail(root) });
   const token = opts.key && KEY.test(opts.key) ? opts.key : crypto.randomBytes(24).toString('hex');

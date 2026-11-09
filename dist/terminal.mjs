@@ -6959,7 +6959,7 @@ var require_formats = __commonJS({
       return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
     }
     var DATE2 = /^(\d\d\d\d)-(\d\d)-(\d\d)$/;
-    var DAYS = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    var DAYS2 = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
     function date4(str) {
       const matches = DATE2.exec(str);
       if (!matches)
@@ -6967,7 +6967,7 @@ var require_formats = __commonJS({
       const year = +matches[1];
       const month = +matches[2];
       const day2 = +matches[3];
-      return month >= 1 && month <= 12 && day2 >= 1 && day2 <= (month === 2 && isLeapYear(year) ? 29 : DAYS[month]);
+      return month >= 1 && month <= 12 && day2 >= 1 && day2 <= (month === 2 && isLeapYear(year) ? 29 : DAYS2[month]);
     }
     function compareDate(d1, d2) {
       if (!(d1 && d2))
@@ -7351,6 +7351,10 @@ function saveContactEmail(root2, raw) {
   fs.mkdirSync(deskDataDir(root2), { recursive: true });
   fs.writeFileSync(file(root2), JSON.stringify({ email: email2 }, null, 2) + "\n");
   return email2;
+}
+function maskEmail(email2) {
+  const at = email2.lastIndexOf("@");
+  return at > 0 ? `${email2[0]}\u2026${email2.slice(at)}` : "";
 }
 
 // src/check/probes.ts
@@ -7822,6 +7826,67 @@ var passes = (checks) => checks.length > 0 && checks.every((x) => x.ok);
 // src/desk/orders.ts
 import fs4 from "node:fs";
 import path4 from "node:path";
+
+// src/data/holidays.ts
+var HOLIDAYS = {
+  2026: [
+    ["2026-01-01", "New Year's Day"],
+    ["2026-01-19", "Martin Luther King, Jr. Day"],
+    ["2026-02-16", "Washington's Birthday"],
+    ["2026-04-03", "Good Friday"],
+    ["2026-05-25", "Memorial Day"],
+    ["2026-06-19", "Juneteenth"],
+    ["2026-07-03", "Independence Day (observed)"],
+    ["2026-09-07", "Labor Day"],
+    ["2026-11-26", "Thanksgiving Day"],
+    ["2026-12-25", "Christmas Day"]
+  ],
+  2027: [
+    ["2027-01-01", "New Year's Day"],
+    ["2027-01-18", "Martin Luther King, Jr. Day"],
+    ["2027-02-15", "Washington's Birthday"],
+    ["2027-03-26", "Good Friday"],
+    ["2027-05-31", "Memorial Day"],
+    ["2027-06-18", "Juneteenth (observed)"],
+    ["2027-07-05", "Independence Day (observed)"],
+    ["2027-09-06", "Labor Day"],
+    ["2027-11-25", "Thanksgiving Day"],
+    ["2027-12-24", "Christmas Day (observed)"]
+  ],
+  // 1 Jan 2028 is a Saturday: the NYSE keeps no New Year's Day holiday that year.
+  2028: [
+    ["2028-01-17", "Martin Luther King, Jr. Day"],
+    ["2028-02-21", "Washington's Birthday"],
+    ["2028-04-14", "Good Friday"],
+    ["2028-05-29", "Memorial Day"],
+    ["2028-06-19", "Juneteenth"],
+    ["2028-07-04", "Independence Day"],
+    ["2028-09-04", "Labor Day"],
+    ["2028-11-23", "Thanksgiving Day"],
+    ["2028-12-25", "Christmas Day"]
+  ]
+};
+var NAMES = new Map(Object.values(HOLIDAYS).flat().map(([day2, name]) => [day2, name]));
+var DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+var dayOfWeek = (day2) => (/* @__PURE__ */ new Date(`${day2}T12:00:00Z`)).getUTCDay();
+function marketClosed(day2) {
+  const w = dayOfWeek(day2);
+  if (w === 0 || w === 6) return `a ${DAYS[w]}`;
+  return NAMES.get(day2) ?? null;
+}
+var isMarketDay = (day2) => marketClosed(day2) === null;
+function nextMarketDay(day2) {
+  let d = addDays(day2, 1);
+  while (!isMarketDay(d)) d = addDays(d, 1);
+  return d;
+}
+function marketDaysBetween(from, to) {
+  let n = 0;
+  for (let d = addDays(from, 1); d <= to; d = addDays(d, 1)) if (isMarketDay(d)) n++;
+  return n;
+}
+
+// src/desk/orders.ts
 var file2 = (dir) => path4.join(dir, "orders.jsonl");
 function logOrder(dir, line) {
   fs4.mkdirSync(dir, { recursive: true });
@@ -7843,14 +7908,7 @@ function readOrders(dir) {
 }
 var ordersOn = (dir, now) => readOrders(dir).filter((o) => marketDay(new Date(o.at)) === marketDay(now));
 var placedToday = (dir, now) => ordersOn(dir, now).length;
-function tradingDaysBetween(from, to) {
-  let n = 0;
-  for (let d = Date.parse(`${from}T12:00:00Z`) + 864e5; d <= Date.parse(`${to}T12:00:00Z`); d += 864e5) {
-    const w = new Date(d).getUTCDay();
-    if (w !== 0 && w !== 6) n++;
-  }
-  return n;
-}
+var tradingDaysBetween = (from, to) => marketDaysBetween(from, to);
 function lastBuy(dir, symbol, now) {
   const buy = readOrders(dir).filter((o) => o.symbol === symbol && o.side === "buy" && o.robinhood.answered).at(-1);
   if (!buy) return null;
@@ -21409,7 +21467,41 @@ function compute(name, bars) {
 }
 
 // src/data/market.ts
+var listDays = (days) => days.length <= 6 ? days.join(", ") : `${days.slice(0, 5).join(", ")} and ${days.length - 5} more`;
+var clock = (ms, zone = "UTC") => {
+  try {
+    return `${new Date(ms).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: zone })} ${zone} time`;
+  } catch {
+    return `${new Date(ms).toISOString().slice(11, 16)} UTC`;
+  }
+};
 var SETTLE_MS = 15 * 6e4;
+function gapLines(s) {
+  const days = s.missing ?? [];
+  if (!days.length) return [];
+  const one3 = days.length === 1;
+  return [`- **The source lists ${one3 ? "a session" : "sessions"} on ${listDays(days)} with no prices: ${one3 ? "it is" : "they are"} missing from these rows, so every average, count and change here skips ${one3 ? "it" : "them"} (a change across ${one3 ? "it" : "them"} spans two sessions). Do not say ${listDays(days)} had no trading: say ${one3 ? "its" : "their"} prices are not available from the source.**`];
+}
+function latestState(s, upTo, now = Date.now()) {
+  const last = s.bars[s.bars.length - 1], unfilled = s.unfilled?.at(-1), session = s.meta.session, zone = s.meta.timezone, read2 = s.fetchedAt ?? now;
+  const said = (st, lines) => ({ ...st, lines: [...lines, ...gapLines(s)] });
+  const final = { open: false, label: "Close", inline: "close" };
+  if (unfilled) return said(final, [`- **The source lists a session on ${unfilled}, but its prices are not filled in yet (this happens for a while after a session ends). Every figure here is as of ${last.date}. Do not call ${last.date} the latest session, and do not say ${unfilled} had no trading: say its prices were not available yet.**`]);
+  if (session && session.date === last.date) {
+    if (now < session.end) return said({ open: true, label: "Latest price (still trading)", inline: "still trading: latest price" }, [`- **The latest row, ${last.date}, is a session still trading (it closes at ${clock(session.end, zone)}). Its "close" is the latest price so far, not a close; its high, low, volume and every indicator on it will change. Call it the latest price, never the close, and do not treat a level as broken or held on this row alone.**`]);
+    if (read2 < session.end + SETTLE_MS) {
+      const at = clock(read2, zone);
+      return said({ open: true, label: `Latest price (read at ${at}, not the close)`, inline: `latest price as read at ${at}` }, [`- **The latest row, ${last.date}, was read at ${at}, ${read2 < session.end ? "while its session was still trading" : "just after its session ended"} (it ended at ${clock(session.end, zone)}, and its figures are taken as final ${SETTLE_MS / 6e4} minutes after). Its "close" is the latest price as read then, not the close; its high, low, volume and every indicator on it may still change. Call it the latest price as read at ${at}, never the close, and do not treat a level as broken or held on this row alone.**`]);
+    }
+    return said(final, [`- The latest row, ${last.date}, is a finished session: its figures are final.`]);
+  }
+  if (session && session.date > last.date && session.date <= upTo) {
+    if (now < session.start) return said(final, [`- ${session.date}'s session has not opened yet (it opens at ${clock(session.start, zone)}): the latest row, ${last.date}, is the latest finished session.`]);
+    return said(final, [`- **The source's own record shows a session on ${session.date}${now < session.end ? ", trading now" : ", which has ended"}, but its rows stop at ${last.date}: it has no prices yet for ${session.date}, nor for any session between ${last.date} and it. Every figure here is as of ${last.date}. Do not call ${last.date} the latest session, and do not say the days after it had no trading: say their prices are not available from the source yet.**`]);
+  }
+  if (!session && last.date === today()) return said(final, ["- **The latest row is today's session. If the market is still open it is partial: its close, high, low and volume are the latest so far, and every indicator on it will change by the close. Do not treat a level as broken or held on this row alone.**"]);
+  return said(final, []);
+}
 
 // src/data/company.ts
 function companySymbol(raw) {
@@ -21762,10 +21854,6 @@ var saveMarket = (dir, list3) => (isShipped(list3) ? savePrefs(dir, {}, ["market
 
 // src/terminal/guide.ts
 var NAMES_TO_PICK = 3;
-function maskEmail(email2) {
-  const at = email2.lastIndexOf("@");
-  return at > 0 ? `${email2[0]}\u2026${email2.slice(at)}` : "";
-}
 function guideOf(f) {
   const picked = /* @__PURE__ */ new Set([...f.watchlist.map((w) => w.symbol), ...f.queue.map((q) => q.symbol), ...f.calls.map((c) => c.ticker)]);
   const tiers = [...picked].filter((s) => !s.startsWith("^")).map((s) => tierOf(s, f.market));
@@ -22069,7 +22157,7 @@ function whyOf(signals) {
 function rank(candidates) {
   return candidates.map((c) => {
     const s = signalsOf(c.bars, c.news);
-    return { symbol: c.symbol, signals: s.signals, movePct: s.movePct, why: whyOf(s.signals), session: c.bars[c.bars.length - 1]?.date ?? "" };
+    return { symbol: c.symbol, signals: s.signals, movePct: s.movePct, why: whyOf(s.signals), session: c.bars[c.bars.length - 1]?.date ?? "", ...c.live ? { live: true } : {} };
   }).filter((p) => p.signals.length > 0).sort((a, b) => b.signals.length - a.signals.length || Math.abs(b.movePct ?? 0) - Math.abs(a.movePct ?? 0) || a.symbol.localeCompare(b.symbol)).slice(0, SHOWN2);
 }
 async function inTurn(items, width, job) {
@@ -22090,23 +22178,36 @@ async function newsOn(symbol, day2) {
     return null;
   }
 }
+function commonSession(read2) {
+  const count = /* @__PURE__ */ new Map();
+  for (const r of read2) {
+    const d = r.bars.at(-1).date, c = count.get(d) ?? { n: 0, live: false };
+    count.set(d, { n: c.n + 1, live: c.live || r.live });
+  }
+  const top = [...count].sort((a, b) => b[1].n - a[1].n || b[0].localeCompare(a[0]))[0];
+  return top ? { session: top[0], ...top[1].live ? { live: true } : {} } : {};
+}
 async function workScreen(symbols, news, day2, now = /* @__PURE__ */ new Date()) {
   const list3 = [...new Set(symbols)].filter((s) => !/[\^=]/.test(s));
   const read2 = await inTurn(list3, 4, async (symbol) => {
     try {
-      const bars = (await daily(symbol, addDays(day2, -400), day2)).bars;
-      if (!bars.length || bars[bars.length - 1].date < addDays(day2, -7)) return { symbol, bars: null, news: null };
-      return { symbol, bars, news: news.has(symbol) ? await newsOn(symbol, day2) : null };
+      const s = await daily(symbol, addDays(day2, -400), day2), bars = s.bars;
+      if (!bars.length || bars[bars.length - 1].date < addDays(day2, -7)) return { symbol, bars: null, news: null, asked: false, live: false };
+      const asked2 = news.has(symbol);
+      return { symbol, bars, news: asked2 ? await newsOn(symbol, day2) : null, asked: asked2, live: latestState(s, day2, now.getTime()).open };
     } catch {
-      return { symbol, bars: null, news: null };
+      return { symbol, bars: null, news: null, asked: false, live: false };
     }
   });
+  const ok = read2.filter((r) => !!r.bars), asked = ok.filter((r) => r.asked);
   return {
     day: day2,
     at: now.toISOString(),
     looked: list3.length,
     unavailable: read2.filter((r) => !r.bars).map((r) => r.symbol),
-    picks: rank(read2.filter((r) => !!r.bars))
+    picks: rank(ok),
+    news: { read: asked.filter((r) => r.news !== null).length, unread: asked.filter((r) => r.news === null).map((r) => r.symbol) },
+    ...commonSession(ok)
   };
 }
 var screenFile = (dir) => path16.join(dir, "screen.json");
@@ -22114,7 +22215,9 @@ function readScreen(dir) {
   try {
     const v = JSON.parse(fs17.readFileSync(screenFile(dir), "utf8"));
     if (typeof v.day !== "string" || typeof v.at !== "string" || !Array.isArray(v.picks)) return null;
-    return v;
+    const news = v.news && Number.isInteger(v.news.read) && Array.isArray(v.news.unread) && v.news.unread.every((s) => typeof s === "string") ? v.news : void 0;
+    const { news: _kept, ...rest } = v;
+    return news ? { ...rest, news } : rest;
   } catch {
     return null;
   }
@@ -22130,19 +22233,10 @@ async function screenToday(dir, symbols, news, day2, now = /* @__PURE__ */ new D
   const fresh = await work(symbols, news, day2, now);
   return keep2(dir, { ...fresh, ...kept?.queued?.day === day2 ? { queued: kept.queued } : {} });
 }
-var isWeekday = (day2) => {
-  const w = (/* @__PURE__ */ new Date(`${day2}T12:00:00Z`)).getUTCDay();
-  return w !== 0 && w !== 6;
-};
 var MORNING_ENDS = 12;
 var newYorkHour = (now) => Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "2-digit", hourCycle: "h23" }).format(now));
-function nextMarketDay(day2) {
-  let d = addDays(day2, 1);
-  while (!isWeekday(d)) d = addDays(d, 1);
-  return d;
-}
 function queueTop(dir, screen, day2, ring, now = /* @__PURE__ */ new Date(), from = "") {
-  if (!isWeekday(day2) || day2 < from || newYorkHour(now) >= MORNING_ENDS) return [];
+  if (!isMarketDay(day2) || day2 < from || newYorkHour(now) >= MORNING_ENDS) return [];
   if (screen.day !== day2 || screen.queued?.day === day2 || readScreen(dir)?.queued?.day === day2) return [];
   const called = new Set(new Journal(path16.join(dir, "journal.md")).load().filter((e) => e.date === day2).map((e) => e.ticker));
   const busy = new Set(readQueue(dir, now).filter((q) => q.state === "waiting" || q.state === "running").map((q) => q.symbol));
@@ -22195,19 +22289,29 @@ var dayWords = (iso2) => {
   return `${Number(d)} ${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][Number(m) - 1]} ${y}`;
 };
 var unavailable = (key, name, why) => ({ key, name, state: null, tone: "", words: `Unavailable: ${why}.`, meaning: MEANING[key] });
-function trendOf(bars) {
+var newYorkTime = (at) => at.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" });
+var figureWords = (name, figure2, day2, live) => !live ? `${name} closed at ${figure2} on ${dayWords(day2)}` : live.unsure ? `${name}'s latest figure on ${dayWords(day2)}, read at ${newYorkTime(live.at)} New York time, is ${figure2} (Yahoo Finance did not say whether that session had ended)` : live.ended ? `${name} was at ${figure2} when read at ${newYorkTime(live.at)} New York time on ${dayWords(day2)}, before that session's close was final (not a close)` : `${name} is at ${figure2} at ${newYorkTime(live.at)} New York time on ${dayWords(day2)}, still trading (not a close)`;
+function liveOf(s, day2, now) {
+  const last = s.bars.at(-1), session = s.meta.session;
+  if (!last) return null;
+  const at = new Date(s.fetchedAt ?? now.getTime());
+  if (!session) return last.date === day2 ? { at, unsure: true } : null;
+  if (!latestState(s, day2, now.getTime()).open) return null;
+  return session.date === last.date && now.getTime() < session.end ? { at } : { at, ended: true };
+}
+function trendOf(bars, live = null) {
   const closes = bars.map((b) => b.close), n = closes.length;
   const ma50 = sma(closes, 50)[n - 1], ma200 = sma(closes, 200)[n - 1], last = closes[n - 1];
   if (last === void 0 || ma50 == null || ma200 == null) return unavailable("trend", "Trend", "too few days of S&P 500 prices for its 200-day average");
   const above = (ma) => last > ma ? "above" : "below";
   const [state, tone] = last > ma50 && last > ma200 ? ["Rising", "ok"] : last < ma50 && last < ma200 ? ["Falling", "bad"] : ["Mixed", "warn"];
-  return { key: "trend", name: "Trend", state, tone, words: `The S&P 500 closed at ${whole2(last)} on ${dayWords(bars[n - 1].date)}, ${above(ma50)} its 50-day average (${whole2(ma50)}) and ${above(ma200)} its 200-day average (${whole2(ma200)}).`, meaning: MEANING.trend };
+  return { key: "trend", name: "Trend", state, tone, words: `${figureWords("The S&P 500", whole2(last), bars[n - 1].date, live)}, ${above(ma50)} its 50-day average (${whole2(ma50)}) and ${above(ma200)} its 200-day average (${whole2(ma200)}).`, meaning: MEANING.trend };
 }
-function moodOf(bars) {
+function moodOf(bars, live = null) {
   const last = bars[bars.length - 1];
   if (!last) return unavailable("mood", "Mood", "no VIX figure came from Yahoo Finance");
   const v = last.close, [state, tone] = v < 15 ? ["Calm", "ok"] : v <= 25 ? ["Normal", ""] : ["Wild", "bad"];
-  return { key: "mood", name: "Mood", state, tone, words: `The VIX closed at ${v.toFixed(1)} on ${dayWords(last.date)}.`, meaning: MEANING.mood };
+  return { key: "mood", name: "Mood", state, tone, words: `${figureWords("The VIX", v.toFixed(1), last.date, live)}.`, meaning: MEANING.mood };
 }
 function outcomeWords(title) {
   if (/no change/i.test(title)) return { words: "no change", way: "none" };
@@ -22227,8 +22331,8 @@ function ratesOf(events, now = /* @__PURE__ */ new Date()) {
 }
 async function weatherNow(day2, now = /* @__PURE__ */ new Date()) {
   const [trend, mood, rates] = await Promise.all([
-    daily("^GSPC", addDays(day2, -400), day2).then((s) => trendOf(s.bars), () => unavailable("trend", "Trend", "Yahoo Finance did not answer for the S&P 500")),
-    daily("^VIX", addDays(day2, -14), day2).then((s) => moodOf(s.bars), () => unavailable("mood", "Mood", "Yahoo Finance did not answer for the VIX")),
+    daily("^GSPC", addDays(day2, -400), day2).then((s) => trendOf(s.bars, liveOf(s, day2, now)), () => unavailable("trend", "Trend", "Yahoo Finance did not answer for the S&P 500")),
+    daily("^VIX", addDays(day2, -14), day2).then((s) => moodOf(s.bars, liveOf(s, day2, now)), () => unavailable("mood", "Mood", "Yahoo Finance did not answer for the VIX")),
     getJson("https://gamma-api.polymarket.com/public-search?q=fed%20decision&limit_per_type=20").then(
       (j) => {
         try {

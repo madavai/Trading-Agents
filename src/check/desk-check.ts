@@ -1,13 +1,14 @@
-// The desk check: what this computer needs for the desk, said in plain words. It reads no secret: of the Robinhood
-// sign-in it only says whether one is saved and when.
+// The desk check: what this computer needs for the desk, said in plain words, and only what it looked at. It reads no
+// secret: of the Robinhood sign-in it only says whether one is saved and when, and the contact email is shown masked, as
+// the dashboard shows it. All it writes is a test file in desk-data, removed at once.
 import fs from 'node:fs';
 import path from 'node:path';
 import { deskDataDir, homeDir, robinhoodFile } from '../paths.js';
 import { lockState } from '../private.js';
-import { probeAll, type ProbeResult } from './probes.js';
+import { NOT_PROBED, probeAll, type ProbeResult } from './probes.js';
 import { VERSION } from '../version.js';
 import { readSettings } from '../settings.js';
-import { readContactEmail } from '../contact.js';
+import { maskEmail, readContactEmail, WHY_EMAIL } from '../contact.js';
 import { driftOf, listed, plainName, shippedAgentFiles, teamVersionOf, type Drift } from '../desk/agent-files.js';
 
 export interface Line { ok: boolean; text: string }
@@ -31,7 +32,7 @@ export function dataLine(root: string): Line {
 }
 
 export function robinhoodLine(file = robinhoodFile()): Line {
-  if (!fs.existsSync(file)) return { ok: true, text: 'Robinhood: not connected yet (only needed for trading; analysis works without it)' };
+  if (!fs.existsSync(file)) return { ok: true, text: 'Robinhood: not connected yet (it is for your accounts on the dashboard, and for trading; analysis works without it)' };
   const when = fs.statSync(file).mtime;
   return { ok: true, text: `Robinhood: a sign-in is saved (last refreshed ${when.toISOString().slice(0, 16).replace('T', ' ')} UTC)` };
 }
@@ -41,15 +42,15 @@ export function robinhoodLine(file = robinhoodFile()): Line {
 export function privateFolderLine(dir = homeDir()): Line {
   if (!fs.existsSync(dir)) return { ok: true, text: 'Your private folder: not made yet. It is made, locked to your own account, when you connect Robinhood or open the dashboard' };
   const state = lockState(dir);
-  if (state === 'locked') return { ok: true, text: `Your private folder: locked to your own account${process.platform === 'win32' ? ' and the system' : ''}. No other account on this computer can open it` };
+  if (state === 'locked') return { ok: true, text: `Your private folder: locked to your own account${process.platform === 'win32' ? ' and the system' : ''}` };
   if (state === 'open') return { ok: false, text: 'Your private folder: other accounts on this computer may be able to open it. Open the dashboard once: that locks it to your own account' };
   return { ok: true, text: 'Your private folder: who can open it could not be told (a drive without access lists?). It is as protected as your other files' };
 }
 
 export function contactLine(email: string): Line {
   return email
-    ? { ok: true, text: `Contact email for the SEC: ${email} (sent to sec.gov alone, kept in desk-data)` }
-    : { ok: false, text: 'Contact email for the SEC: not given yet. The desk needs it before the first analysis: the SEC asks everyone who reads its filings for one. Ask the person for their own email and save it with set_contact_email' };
+    ? { ok: true, text: `Contact email for the SEC: ${maskEmail(email)} (shown masked; sent to sec.gov alone, kept in desk-data)` }
+    : { ok: false, text: `Contact email for the SEC: not given yet. The desk needs it before the first analysis: ${WHY_EMAIL}. Ask the person for their own email and save it with set_contact_email` };
 }
 
 /** Whether the desk's agents and the team are as the project ships them; a string when they could not be compared. */
@@ -81,7 +82,8 @@ export function render(lines: Line[], sources: ProbeResult[]): string {
   out.push('', 'Free data sources:');
   for (const s of sources) out.push(`- ${mark(s.ok)} ${s.name}: ${s.detail}`);
   const down = sources.filter((s) => !s.ok).length;
-  out.push('', down === 0 ? 'Everything the desk reads is reachable.' : `${down} source(s) could not be reached. The desk will report them as unavailable, never as "no news".`);
+  out.push('', down === 0 ? 'Every source checked here is reachable.' : `${down} source(s) could not be reached. The desk will report them as unavailable, never as "no news".`);
+  out.push(`Not checked here: ${NOT_PROBED}.`);
   return out.join('\n');
 }
 
@@ -94,10 +96,14 @@ export async function agentDrift(root: string, source: string = root): Promise<D
  *  version of the team's steps it passed. A check from a terminal knows neither. */
 export interface Asker { updated?: boolean; teamVersion?: string }
 
-export async function deskCheck(root: string = process.cwd(), fetchImpl: typeof fetch = fetch, source: string = root, asker: Asker = {}): Promise<string> {
+/** Where the person's private folder and the sign-in in it are: the real ones, except in a test, which never looks at them. */
+export interface Home { folder: string; signIn: string }
+export const realHome = (): Home => ({ folder: homeDir(), signIn: robinhoodFile() });
+
+export async function deskCheck(root: string = process.cwd(), fetchImpl: typeof fetch = fetch, source: string = root, asker: Asker = {}, home: Home = realHome()): Promise<string> {
   const settings = readSettings(root), email = readContactEmail(root);
   const sources = await probeAll(settings.sources.contact, email, fetchImpl);
-  const lines = [nodeLine(), dataLine(root), contactLine(email), robinhoodLine(), privateFolderLine()];
+  const lines = [nodeLine(), dataLine(root), contactLine(email), robinhoodLine(home.signIn), privateFolderLine(home.folder)];
   if (asker.updated) lines.push(NOT_COMPARED);
   else {
     lines.push(agentsLine(await agentDrift(root, source)));

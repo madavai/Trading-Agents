@@ -9,6 +9,7 @@ import { deskServer } from '../src/tools/server.js';
 import { driftOf, lastReset, noteReset, RESET_AGAIN_MS, resetAgainWords, resetAgentFiles, shippedAgentFiles, teamVersionOf } from '../src/desk/agent-files.js';
 import { agentDrift, agentsLine, teamLine } from '../src/check/desk-check.js';
 import { UPDATED_NOTE } from '../src/desk/freshness.js';
+import { awayHome } from './away.js';
 
 const repo = process.cwd();
 const AG = '.claude/agents';
@@ -69,7 +70,7 @@ test('reset_team acts only on the person\'s confirmation, says what it put back,
   const root = clone();
   saveInMadav(root);
   const [a, b] = InMemoryTransport.createLinkedPair();
-  await deskServer(root, undefined, repo).connect(a);
+  await deskServer(root, undefined, repo, awayHome()).connect(a);
   const client = new Client({ name: 'test', version: '0' });
   await client.connect(b);
   const call = async (args: Record<string, unknown>) => {
@@ -107,7 +108,7 @@ const reachable: typeof fetch = async () => new Response('{"chart":1,"news":1,"m
 
 async function serve(root: string, source = root) {
   const [a, b] = InMemoryTransport.createLinkedPair();
-  await deskServer(root, reachable, source).connect(a);
+  await deskServer(root, reachable, source, awayHome()).connect(a);
   const client = new Client({ name: 'test', version: '0' });
   await client.connect(b);
   const call = async (name: string, args: Record<string, unknown> = {}) => ((await client.callTool({ name, arguments: args })) as { content: Array<{ text: string }> }).content[0]!.text;
@@ -207,7 +208,7 @@ test('a folder without the project\'s source says the agents could not be compar
   assert.equal(line.ok, false);
   assert.match(line.text, /^The desk's agents could not be compared with the project's version: /);
   const [a, b] = InMemoryTransport.createLinkedPair();
-  await deskServer(empty).connect(a);
+  await deskServer(empty, undefined, empty, awayHome()).connect(a);
   const client = new Client({ name: 'test', version: '0' });
   await client.connect(b);
   const r = (await client.callTool({ name: 'reset_team', arguments: { confirmed: true } })) as { content: Array<{ text: string }> };

@@ -5,7 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { checkEmail, readContactEmail, saveContactEmail } from '../src/contact.js';
+import { checkEmail, maskEmail, readContactEmail, saveContactEmail } from '../src/contact.js';
+import { awayHome } from './away.js';
 import { contactLine, deskCheck } from '../src/check/desk-check.js';
 import { today } from '../src/data/dates.js';
 import { deskServer } from '../src/tools/server.js';
@@ -33,11 +34,14 @@ test('the desk check says plainly when the email is missing', async () => {
   assert.equal(contactLine('').ok, false);
   assert.match(contactLine('').text, /not given yet\. The desk needs it before the first analysis.*set_contact_email/);
   const root = folder(), seen = new Map<string, string>();
-  const f: typeof fetch = async (url, init) => { seen.set(new URL(String(url)).hostname, String((init?.headers as Record<string, string>)['User-Agent'])); return new Response('{"chart":1,"news":1,"messages":1,"ticker":1} <feed observation_date'); };
-  assert.match(await deskCheck(root, f), /NO  Contact email for the SEC: not given yet/);
+  const f: typeof fetch = async (url, init) => { seen.set(new URL(String(url)).hostname, String((init?.headers as Record<string, string>)['User-Agent'])); return new Response('{"chart":1,"news":1,"messages":1,"ticker":1,"cik":1} <feed observation_date'); };
+  assert.match(await deskCheck(root, f, root, {}, awayHome()), /NO  Contact email for the SEC: not given yet\. The desk needs it before the first analysis: the SEC asks every program that reads its filings for a contact email\. Ask the person for their own email/);
   saveContactEmail(root, 'jane@mail.com');
-  assert.match(await deskCheck(root, f), /OK  Contact email for the SEC: jane@mail\.com \(sent to sec\.gov alone/);
-  for (const [host, ua] of seen) assert.equal(ua.includes('jane@mail.com'), host === 'www.sec.gov', host);
+  const saved = await deskCheck(root, f, root, {}, awayHome());
+  assert.match(saved, /OK  Contact email for the SEC: j…@mail\.com \(shown masked; sent to sec\.gov alone/);
+  assert.ok(!saved.includes('jane@mail.com'), 'the check, which any conversation may run, never carries the whole address');
+  for (const [host, ua] of seen) assert.equal(ua.includes('jane@mail.com'), host.endsWith('sec.gov'), host);
+  assert.deepEqual([maskEmail('jane@mail.com'), maskEmail('not an address')], ['j…@mail.com', '']);
 });
 
 test('the person gives the email through the desk tool, and from then on only the SEC sees it', async () => {

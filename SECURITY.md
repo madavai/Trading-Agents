@@ -72,14 +72,14 @@ order tool.
 - Your Robinhood sign-in, the accounts you chose to show, the trading switch with your caps, the secret your account
   fingerprints are made with and the running dashboard's key stay in your private folder, never in this repository and
   never on the page. On Windows the dashboard locks that folder to your own account (and the system) with an access
-  list of its own, so no other account on this computer can open it; on Linux and macOS the file mode does the same.
-  The desk check says who can open it.
+  list of its own, so another ordinary account on this computer cannot open it (an administrator still can, as with
+  any file); on Linux and macOS the file mode does the same. The desk check says who can open it.
 - Full account numbers never reach the page or the desk's files: the page shows the last four characters and tells
   accounts apart by a short fingerprint, made with a secret kept in your private folder, so the fingerprint says
   nothing about the number even to someone who knows the number.
 - The desk's own records (journal, reports, watchlist, holdings, the log of orders sent) stay in this folder's
   `desk-data`, which git never commits.
-- Your email goes to the SEC alone, which asks every reader of its filings for one. You give it to the desk in a chat or
+- Your email goes to the SEC alone, which asks every program that reads its filings for a contact email. You give it to the desk in a chat or
   in the field in Get started on the dashboard; either way it is checked first (an address that reaches a person,
   never a made-up example, and nothing that could split a request in two), kept in `desk-data/contact.json`, and sent
   only with requests to the SEC (the dashboard's own sector look-ups included). The dashboard never shows it back in
@@ -106,7 +106,7 @@ order tool.
   morning" ships off and starts the next market morning once switched on; it only puts those stocks on the waiting list, never an order.
 - To watch the stops in the Agentic account, the dashboard asks Yahoo Finance for the price of each holding there that
   has one (by ticker only, never a quantity or an account), as often as it refreshes its other prices.
-- On a Monday the morning routine puts up to three of the holdings the desk sizes trades to on the waiting list, to be
+- On a Monday (the Tuesday, when Monday is one of New York's market holidays) the morning routine puts up to three of the holdings the desk sizes trades to on the waiting list, to be
   re-rated, and notes which in `desk-data/rerate.json`: never an order.
 - For the sector limit, the dashboard asks the SEC for the industry of the stocks you trade and hold and for its list of
   funds (by ticker only, never a quantity or an account), with your email as the SEC asks.

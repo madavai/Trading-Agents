@@ -3,14 +3,15 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { Bar } from '../src/data/yahoo.js';
-import { nextMarketDay, queueTop, rank, readScreen, SCREEN_MS, screenToday, signalsOf, whyOf, type Screen } from '../src/desk/screen.js';
-import { moodOf, outcomeWords, ratesOf, trendOf, type PolyEvent } from '../src/desk/weather.js';
+import type { Bar, Series } from '../src/data/yahoo.js';
+import { configure } from '../src/data/http.js';
+import { nextMarketDay, queueTop, rank, readScreen, SCREEN_MS, screenToday, signalsOf, whyOf, workScreen, type Screen } from '../src/desk/screen.js';
+import { liveOf, moodOf, outcomeWords, ratesOf, trendOf, type PolyEvent } from '../src/desk/weather.js';
 import { morningBrief, morningList } from '../src/desk/routine.js';
 import { Journal } from '../src/desk/journal.js';
 import { enqueue, readDoorbell, readQueue } from '../src/desk/queue.js';
 import { screenUniverse } from '../src/terminal/tiers.js';
-import { weekdays } from './chart.js';
+import { chartJson, series, weekdays } from './chart.js';
 
 /** `n` weekday rows ending on `last`, drifting by `slope` a day from 100 (high and low a dollar either side, a million
  *  traded); the last row is then changed as given, its close as a multiple of the close before, and a narrow day (high
@@ -158,7 +159,7 @@ test('the morning switch: on a weekday, once, the top three not called today nor
 test('the morning routine reads the same list: the picks with their reasons, and what the switch put on the waiting list, or that it is off', () => {
   const dir = desk(), s = { ...screenOf('2026-10-19', ['XLE', 'TSLA']), unavailable: ['ZZZZ'] };
   const off = morningBrief(dir, '2026-10-19', 5, { screen: s, on: false });
-  assert.match(off, /Worth a look today, from Yahoo Finance's prices at 13:00 UTC \(figures only, never a forecast; 20 looked at\):\n {3}- XLE: Rose 4\.0%\.\n {3}- TSLA: Rose 4\.0%\.\n {3}Could not be read: ZZZZ\./);
+  assert.match(off, /Worth a look today, from Yahoo Finance's daily prices at 13:00 UTC \(figures only, never a forecast; 20 looked at; the moves are from the session of 2026-10-19 \(Mon\)\):\n {3}- XLE: Rose 4\.0%\.\n {3}- TSLA: Rose 4\.0%\.\n {3}Could not be read: ZZZZ\./);
   assert.match(off, /switch "Analyse the top 3 each market morning" is off: this list is for the person to read, not for you to analyse/);
   enqueue(dir, 'XLE', '2026-10-19T13:00:00Z', 'shallow');
   const on = { ...s, queued: { day: '2026-10-19', symbols: ['XLE'] } };
@@ -168,4 +169,61 @@ test('the morning routine reads the same list: the picks with their reasons, and
   assert.match(morningBrief(dir, '2026-10-19', 5, { screen: { ...s, picks: [] }, on: false }), /nothing stood out/);
   assert.ok(!morningBrief(dir, '2026-10-17', 5, { screen: s, on: true }).includes('Worth a look'), 'not on a weekend');
   assert.ok(!morningBrief(dir, '2026-10-19', 5).includes('Worth a look'), 'without a look, the brief is as before');
+});
+
+/** A made-up S&P 500 day: its session in Yahoo's shape (9:30 to 4:00 New York time, 13:30 to 20:00 UTC in October). */
+const sessionOf = (day: string) => ({ date: day, start: Date.parse(`${day}T13:30:00Z`), end: Date.parse(`${day}T20:00:00Z`) });
+
+test('during the session the weather says "still trading", never "closed at": a price still moving is not a close', () => {
+  const bars = weekdays('2026-10-16', 260).map((date, i) => ({ date, open: 5000 + i * 5, high: 5001 + i * 5, low: 4999 + i * 5, close: 5000 + i * 5, volume: 0 }));
+  const s: Series = { meta: { symbol: '^GSPC', session: sessionOf('2026-10-16') }, bars };
+  const open = new Date('2026-10-16T15:05:00Z'), after = new Date('2026-10-16T20:30:00Z');
+  const live = trendOf(bars, liveOf(s, '2026-10-16', open));
+  assert.equal(live.words, 'The S&P 500 is at 6,295 at 11:05 AM New York time on 16 Oct 2026, still trading (not a close), above its 50-day average (6,173) and above its 200-day average (5,798).');
+  assert.doesNotMatch(live.words, /closed/);
+  assert.equal(moodOf(bars.map((b) => ({ ...b, close: 17.42 })), liveOf(s, '2026-10-16', open)).words, 'The VIX is at 17.4 at 11:05 AM New York time on 16 Oct 2026, still trading (not a close).');
+  assert.match(trendOf(bars, liveOf(s, '2026-10-16', after)).words, /^The S&P 500 closed at 6,295 on 16 Oct 2026,/, 'read 30 minutes after 4:00 p.m., the row is a close');
+  const settling = new Date('2026-10-16T20:05:00Z'), readEarly = { ...s, fetchedAt: Date.parse('2026-10-16T19:30:00Z') };
+  assert.match(trendOf(bars, liveOf(s, '2026-10-16', settling)).words, /^The S&P 500 was at 6,295 when read at 4:05 PM New York time on 16 Oct 2026, before that session's close was final \(not a close\),/, 'five minutes after the close its figures are not final yet');
+  assert.match(trendOf(bars, liveOf(readEarly, '2026-10-16', after)).words, /^The S&P 500 was at 6,295 when read at 3:30 PM New York time on 16 Oct 2026, before that session's close was final/, 'rows read before the close are the price then, however late they are shown');
+  assert.match(trendOf(bars, liveOf(s, '2026-10-19', new Date('2026-10-19T12:00:00Z'))).words, /^The S&P 500 closed at 6,295 on 16 Oct 2026,/, "before Monday's open, Friday's close");
+  const unsure = trendOf(bars, liveOf({ meta: { symbol: '^GSPC' }, bars }, '2026-10-16', open));
+  assert.match(unsure.words, /^The S&P 500's latest figure on 16 Oct 2026, read at 11:05 AM New York time, is 6,295 \(Yahoo Finance did not say whether that session had ended\)/, 'no session to tell by: neither "closed" nor "still trading"');
+});
+
+test('a news read that fails is named, never "no news today"; the brief names the session its moves are from', async () => {
+  const rows = series('2026-10-16', 300);
+  configure({ spacingMs: 0, cacheDir: null, fetch: async (input) => {
+    const url = String(input), chart = /\/v8\/finance\/chart\/([^?]+)/.exec(url), news = /\/v1\/finance\/search\?q=([^&]+)/.exec(url);
+    if (chart) return new Response(JSON.stringify(chartJson(decodeURIComponent(chart[1]!), rows, { currentTradingPeriod: { regular: { start: Date.parse('2026-10-16T13:30:00Z') / 1000, end: Date.parse('2026-10-16T20:00:00Z') / 1000 } } })), { status: 200 });
+    if (news && news[1] === 'NVDA') return new Response('Forbidden', { status: 403 });   // NVDA's news cannot be read
+    if (news) return new Response(JSON.stringify({ news: [] }), { status: 200 });          // AAPL's can: none today
+    return new Response('not found', { status: 404 });
+  } });
+  const screen = await workScreen(['XLE', 'NVDA', 'AAPL'], new Set(['NVDA', 'AAPL']), '2026-10-16', new Date('2026-10-16T15:00:00Z'));
+  assert.deepEqual(screen.news, { read: 1, unread: ['NVDA'] }, 'NVDA is not counted as quiet');
+  assert.deepEqual([screen.session, screen.live], ['2026-10-16', true], 'read at 11:00 in New York: the session is still trading');
+  const quiet = { ...screen, picks: [] }, dir = desk();
+  const brief = morningBrief(dir, '2026-10-16', 5, { screen: quiet, on: false });
+  assert.match(brief, /the moves are from the session of 2026-10-16 \(Fri\), read before its close was final: a move so far, not a close\):/);
+  assert.match(brief, /- nothing stood out: no move of 3% or more, no volume twice its usual, no 52-week high or low, no cross of an average, no news today about the other companies and coins the person watches\./);
+  assert.match(brief, /News could not be read just now for NVDA: whether it is in the news today is not known\. Never say "no news" for it\./);
+  const allFailed = morningBrief(dir, '2026-10-16', 5, { screen: { ...quiet, news: { read: 0, unread: ['NVDA', 'AAPL'] } }, on: false });
+  assert.doesNotMatch(allFailed, /no news today/, 'no news read at all: nothing is said of news but that it could not be read');
+  assert.match(allFailed, /News could not be read just now for NVDA, AAPL: whether they are in the news today is not known/);
+  assert.doesNotMatch(morningBrief(dir, '2026-10-16', 5, { screen: { ...quiet, news: undefined }, on: false }), /no news today/, 'a screen kept before news was recorded says nothing about news');
+  const mixed = { ...screen, picks: [{ symbol: 'XLE', signals: [], movePct: 4, why: 'Rose 4.0%', session: '2026-10-16' }, { symbol: 'BTC-USD', signals: [], movePct: 5, why: 'Rose 5.0%', session: '2026-10-17' }] };
+  assert.match(morningBrief(dir, '2026-10-16', 5, { screen: mixed, on: false }), /- BTC-USD \(session of 2026-10-17 \(Sat\)\): Rose 5\.0%\./, 'moves from different sessions name each one');
+  fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(path.join(dir, 'screen.json'), JSON.stringify({ ...quiet, news: { read: 'x' } }));
+  assert.equal(readScreen(dir)!.news, undefined, 'a news record that cannot be read is not believed');
+  configure({ fetch: globalThis.fetch });
+});
+
+test('the morning switch acts on market days only: never on Thanksgiving, and from the day after it when switched on the day before', () => {
+  const thanksgiving = desk(), morning = new Date('2026-11-26T14:00:00Z');
+  assert.deepEqual(queueTop(thanksgiving, screenOf('2026-11-26', ['XLE']), '2026-11-26', true, morning), [], 'New York is closed on Thanksgiving');
+  assert.equal(readDoorbell(thanksgiving), null);
+  assert.equal(nextMarketDay('2026-11-25'), '2026-11-27', 'switched on the day before Thanksgiving: it starts on the Friday');
+  assert.deepEqual(queueTop(desk(), screenOf('2026-11-27', ['XLE']), '2026-11-27', true, new Date('2026-11-27T14:00:00Z'), '2026-11-27'), ['XLE'], 'and acts that Friday morning');
+  assert.deepEqual(queueTop(desk(), screenOf('2027-01-18', ['XLE']), '2027-01-18', true, new Date('2027-01-18T15:00:00Z')), [], 'nor on Martin Luther King Jr. Day');
 });

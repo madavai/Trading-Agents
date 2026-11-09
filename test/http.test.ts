@@ -52,9 +52,9 @@ test('only a refusal with no email sent asks the person for one; with one sent, 
   const sec = (email: string) => { configure({ secEmail: email, fetch: async (u) => (/company_tickers/.test(String(u)) ? new Response('Forbidden', { status: 403 }) : new Response('x', { status: 500 })) }); clearSecCache(); };
   process.env.TRADING_AGENTS_TODAY = '2026-10-12';
   sec('');
-  await assert.rejects(financialStatement('ACME', 'balance_sheet', 'annual', '2026-09-01'), /\[no contact email was sent\]: the SEC asks everyone who reads its filings for a contact email/);
+  await assert.rejects(financialStatement('ACME', 'balance_sheet', 'annual', '2026-09-01'), /\[no contact email was sent\]: the SEC asks every program that reads its filings for a contact email/);
   sec('jane@mail.com');
-  await assert.rejects(financialStatement('ACME', 'balance_sheet', 'annual', '2026-09-01'), (e: Error) => /\[a contact email was sent\]/.test(e.message) && !/asks everyone who reads/.test(e.message));
+  await assert.rejects(financialStatement('ACME', 'balance_sheet', 'annual', '2026-09-01'), (e: Error) => /\[a contact email was sent\]/.test(e.message) && !/asks every program that reads/.test(e.message));
 });
 
 test('a busy source is asked again, as long as it says, up to three times; then it is named as rate-limiting', async () => {

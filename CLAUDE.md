@@ -30,7 +30,7 @@ In a chat here:
   switched on by them. It remembers where the person left it, offers Restart after an update (new code runs only on
   the person's press) and has its own Stop.
 - `/routine morning|evening`: the morning routine (score past calls, on a Monday re-rate up to three holdings whose
-  view is a week old, analyse what is waiting and the starred watchlist stocks, list the new calls to decide on) or the
+  view is a week old (the Tuesday, when Monday is a market holiday), on a day New York's market is closed only score, analyse what is waiting and the starred watchlist stocks, list the new calls to decide on) or the
   evening wrap-up (score what is ready, report the day's calls and orders). Madav's scheduler can start them as the trading-desk team. They never place an order.
 
 ## Rules for every agent in this folder
@@ -43,7 +43,7 @@ In a chat here:
   checks bypassed.
 - Never invent a number. Every exact price, level and indicator comes from a desk tool (the checked price table
   first). A source that could not be reached is "unavailable", never "nothing happened".
-- The desk needs the person's own email before its first analysis (the SEC asks every reader of its filings for one):
+- The desk needs the person's own email before its first analysis (the SEC asks every program that reads its filings for a contact email):
   ask them for it and save it with `set_contact_email`. Never invent, guess or reuse an address.
 - Nothing here is investment advice; say so when a person treats a call as a certainty.
 

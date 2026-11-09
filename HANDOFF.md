@@ -147,7 +147,7 @@ Each was the owner's, or agreed with them. Change one only on their word.
   (its SEC industry code, mapped approximately to eleven sectors) come from the SEC. A fund's holdings and size come
   from its SEC N-PORT reports. Yahoo stays for prices and news, and only as a today-only fallback for companies that do
   not file with the SEC (mostly unavailable). A fund's yearly cost has no official free source and stays unavailable.
-- The SEC asks every reader for a contact email: the person's own, saved once (dashboard or chat), sent to the SEC
+- The SEC asks every program that reads its filings for a contact email: the person's own, saved once (dashboard or chat), sent to the SEC
   alone. Never invent, guess or reuse an address.
 - Every exact number comes from a desk tool; a source that fails is "unavailable", never "nothing happened".
 - The desk's day is New York's (the market's own), wherever the computer is.
@@ -245,8 +245,8 @@ when asked.
 7. The one-share real order is optional, and only ever the owner's decision.
 
 ## 10. Known gaps, not built unless the owner asks
-- No US market-holiday calendar: the morning switch and Monday's re-rating can run on a holiday, and the shortest hold
-  counts weekdays.
+- New York's market holidays are a list in the code, from the NYSE's own page (`src/data/holidays.ts`, 2026 to 2028).
+  A test fails once next year is missing: add that year from the NYSE's "Holidays & Trading Hours" page.
 - The stop watch only runs while the dashboard is open.
 - At phone width, the stock page's buttons push the page slightly sideways.
 - No official free source for a fund's yearly cost, or for valuation and insider trades of companies outside the US.
@@ -262,7 +262,8 @@ when asked.
    the desk is behind, the next work improves the calls themselves (the analysis, the data, the lessons from scored
    calls) before any new feature. If it is ahead, the owner decides about trading with real money, starting with the
    small shipped limits.
-4. **Small gaps when convenient:** the market-holiday calendar first (it stops wasted runs).
+4. **Small gaps when convenient:** the market-holiday list is in (8 Nov 2026); renew it each year before the test
+   that guards it fails.
 5. **Before 17 April 2027:** remind the owner to renew GitHub's posting limit.
 
 ## 12. Moving to a new Claude account

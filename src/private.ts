@@ -3,7 +3,7 @@
 // that only the person's own account can open them. On Linux and macOS the file mode does it (0700 for the folder,
 // 0600 for a file). Windows ignores modes, so there the folder and each file get an access list of their own, naming
 // the person's own account and the system alone (icacls): nothing is inherited from the folder above, and another
-// account on this computer cannot open them.
+// ordinary account on this computer cannot open them (an administrator can still take them over, as with any file).
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';

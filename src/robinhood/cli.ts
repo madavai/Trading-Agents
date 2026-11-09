@@ -61,7 +61,7 @@ async function main(args: string[]): Promise<number> {
     return 0;
   } catch (e) {
     say(`The Robinhood connection did not work: ${masked((e as Error).message)}`);
-    say('Nothing was ordered. Tell the desk what this says; if Robinhood refuses this program, the desk switches to plan B.');
+    say('Nothing was ordered. The desk\'s analyses do not need Robinhood: they work without it. To try again, run this test again, or press Connect on the dashboard\'s Your account; if Robinhood keeps refusing, the words above say why.');
     return 1;
   }
 }

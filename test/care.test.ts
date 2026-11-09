@@ -128,13 +128,13 @@ test('each Monday the morning routine re-rates the Agentic account\'s holdings w
   const queued = rerateWeekly(dir, '2026-10-26', now);
   assert.deepEqual(queued, [{ symbol: 'NVDA', called: null, rating: null }, { symbol: 'AMD', called: '2026-10-16', rating: 'Hold' }, { symbol: 'TSLA', called: '2026-10-18', rating: 'Overweight' }]);
   assert.deepEqual(readQueue(dir, now).map((q) => [q.symbol, q.state, q.depth ?? 'settings']), [['META', 'waiting', 'settings'], ['NVDA', 'waiting', 'shallow'], ['AMD', 'waiting', 'shallow'], ['TSLA', 'waiting', 'shallow']]);
-  assert.deepEqual(rerateWeekly(dir, '2026-10-26', now), queued, 'once a Monday: asked again, it puts nothing more on the list');
+  assert.deepEqual(rerateWeekly(dir, '2026-10-26', now), queued, 'once a week: asked again, it puts nothing more on the list');
   assert.equal(readQueue(dir, now).length, 4);
   assert.equal(readRerate(dir)?.day, '2026-10-26');
 
   const brief = morningBrief(dir, '2026-10-26', 5);
-  assert.match(brief, /Monday's re-rating, of the holdings the desk sizes trades to: NVDA \(the desk has no view of it yet\), AMD \(its latest view: Hold on 2026-10-16\), TSLA \(its latest view: Overweight on 2026-10-18\) were put on the waiting list at shallow depth, for a view under 7 days old \(at most 3 a Monday\)/);
-  assert.match(brief, /Due as well, left for next Monday: MSFT\./);
+  assert.match(brief, /Monday's re-rating, of the holdings the desk sizes trades to: NVDA \(the desk has no view of it yet\), AMD \(its latest view: Hold on 2026-10-16\), TSLA \(its latest view: Overweight on 2026-10-18\) were put on the waiting list at shallow depth, for a view under 7 days old \(at most 3 a week\)/);
+  assert.match(brief, /Due as well, left for next week's re-rating: MSFT\./);
   assert.match(brief, /4 of at most 5 a morning[\s\S]*1\. META \(asked for on the dashboard, the settings' depth\)[\s\S]*2\. NVDA \(a holding re-rated this Monday \(the desk has no view of it yet\), shallow depth\)/);
   assert.match(brief, /for a re-rated holding, its new rating beside its last one/);
   assert.match(brief, /"the desk says sell", with a Sell button that opens a ticket: nothing is ever sold by itself/);
@@ -159,7 +159,7 @@ test('each Monday the morning routine re-rates the Agentic account\'s holdings w
   assert.deepEqual(rerateWeekly(early, '2026-10-26', now), []);
   saveHoldings(early, { positions: [{ ticker: 'NVDA', quantity: 2 }] }, '2026-10-26');
   const late = morningBrief(early, '2026-10-26', 5);
-  assert.match(late, /NVDA is due now, but the re-rating ran earlier this Monday, when it was not due, and it runs once a Monday: left for next Monday\./);
+  assert.match(late, /NVDA is due now, but the re-rating ran earlier today, when it was not due, and it runs once a week: left for next week's re-rating\./);
   assert.doesNotMatch(late, /waiting list (is|was) full/, 'never "the waiting list is full" when there is no waiting list at all');
   const said = desk().dir; saveHoldings(said, { positions: [{ ticker: 'NVDA', quantity: 2 }] }, '2026-10-24');
   assert.match(morningBrief(said, '2026-10-26', 5), /NVDA is due, but the re-rating could not put it on the waiting list today/, 'a re-rating that did not run is said, never taken for a full list');
@@ -168,6 +168,20 @@ test('each Monday the morning routine re-rates the Agentic account\'s holdings w
   assert.equal(shareHoldings(noAgentic, { at: '2026-10-24T15:00:00Z', views: [account('main', false, [['GOOG', 5]])] }, '2026-10-24'), true);
   assert.match(morningBrief(noAgentic, '2026-10-26', 5), /the Agentic account is not among the accounts shown on the dashboard, so nothing was re-rated/);
   assert.match(morningBrief(said, '2026-10-26', 5), /NVDA \(the desk has no view of it yet\) was put on the waiting list[\s\S]*It is analysed in step 2/);
+});
+
+test('when Monday is a New York market holiday, the week\'s re-rating waits for Tuesday, and runs once that week', () => {
+  const { dir } = desk(), now = new Date('2027-01-19T13:00:00Z');
+  saveHoldings(dir, { positions: [{ ticker: 'NVDA', quantity: 2 }] }, '2027-01-15');
+  assert.deepEqual(rerateWeekly(dir, '2027-01-18', now), [], 'nothing on Martin Luther King Jr. Day: the market is closed');
+  assert.equal(readQueue(dir, now).length, 0);
+  assert.doesNotMatch(morningBrief(dir, '2027-01-18', 5), /re-rating/, 'the closed day\'s brief only scores past calls');
+  assert.deepEqual(rerateWeekly(dir, '2027-01-19', now).map((s) => s.symbol), ['NVDA'], 'the week\'s first market day re-rates');
+  const brief = morningBrief(dir, '2027-01-19', 5);
+  assert.match(brief, /Monday's re-rating \(on Tuesday: Monday was a New York market holiday\), of the holdings the desk sizes trades to: NVDA \(the desk has no view of it yet\) was put on the waiting list at shallow depth/);
+  assert.match(brief, /1\. NVDA \(a holding re-rated this week \(the desk has no view of it yet\), shallow depth\)/);
+  assert.deepEqual(rerateWeekly(dir, '2027-01-20', new Date('2027-01-20T13:00:00Z')), [], 'once a week: Wednesday re-rates nothing');
+  assert.doesNotMatch(morningBrief(dir, '2027-01-20', 5), /Monday's re-rating/);
 });
 
 test('the routine brief re-rates on a Monday through the desk tool, before the morning switch, and rings no doorbell', async () => {
@@ -186,7 +200,7 @@ test('the routine brief re-rates on a Monday through the desk tool, before the m
     assert.deepEqual(readQueue(dir).map((q) => [q.symbol, q.depth]), [['NVDA', 'shallow']], 'AMD was called yesterday: fresh');
     assert.equal(fs.existsSync(path.join(dir, 'doorbell.json')), false, 'the routine analyses what waits itself');
     const tool = (await client.listTools()).tools.find((t) => t.name === 'routine_brief')!;
-    assert.match(tool.description ?? '', /on a Monday, up to three holdings with no view or one a week old or more go on it at shallow depth/);
+    assert.match(tool.description ?? '', /on a Monday \(the Tuesday after a Monday holiday\), up to three holdings with no view or one a week old or more go on it at shallow depth, once that week/);
   } finally { await client.close(); delete process.env.TRADING_AGENTS_TODAY; }
 });
 

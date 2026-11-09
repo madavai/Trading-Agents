@@ -3,7 +3,7 @@
 // an analysis date and never serves anything dated after it.
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { deskCheck } from '../check/desk-check.js';
+import { deskCheck, type Home } from '../check/desk-check.js';
 import { readSettings } from '../settings.js';
 import { readContactEmail, saveContactEmail } from '../contact.js';
 import { configure, failureText } from '../data/http.js';
@@ -52,7 +52,7 @@ const analysis = z.string().describe('The analysis date, YYYY-MM-DD. Nothing dat
 const READ = { readOnlyHint: true, openWorldHint: true } as const;
 
 /** `root` is the folder the desk works in; `source` is where the project's own source is (the same folder, except in tests). */
-export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetch, source: string = root): McpServer {
+export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetch, source: string = root, home?: Home): McpServer {
   const settings = readSettings(root), a0 = settings.analysis;
   configure({ contact: settings.sources.contact, secEmail: () => readContactEmail(root) });
   if (fetchImpl) configure({ fetch: fetchImpl });
@@ -62,10 +62,10 @@ export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetc
 
   server.registerTool('desk_check', {
     title: 'Desk check',
-    description: 'Check that this computer is ready for the Trading Agents desk: Node, the desk data folder, whether a Robinhood sign-in is saved, whether the desk\'s agents and team are as the project ships them, whether this conversation\'s steps for the team are the ones in this folder, and whether each free data source answers. Read-only; it sends no order and reads no secret.',
+    description: 'Check that this computer is ready for the Trading Agents desk: Node, the desk data folder, whether a Robinhood sign-in is saved, whether the desk\'s agents and team are as the project ships them, whether this conversation\'s steps for the team are the ones in this folder, and whether each free data source answers (naming the one it does not ask). It sends no order and reads no secret; the contact email is shown masked. All it writes is a test file in desk-data, removed at once.',
     inputSchema: { team_version: z.string().max(40).optional().describe('The version of the team\'s steps, exactly as the team\'s own "Check this computer" step gives it; left out when the steps give none') },
     annotations: READ,
-  }, async (a) => text(await deskCheck(root, fetchImpl, source, { updated: fresh.updated(), teamVersion: a.team_version })));
+  }, async (a) => text(await deskCheck(root, fetchImpl, source, { updated: fresh.updated(), teamVersion: a.team_version }, home)));
 
   server.registerTool('reset_team', {
     title: 'Reset the team',
@@ -96,7 +96,7 @@ export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetc
 
   server.registerTool('set_contact_email', {
     title: 'Save the contact email',
-    description: 'Save the person\'s own email as the contact the SEC asks of everyone who reads its filings. Ask the person for it in plain words and pass exactly what they give; never invent, guess or reuse an address. It is kept in this folder\'s desk-data (never committed) and sent to sec.gov alone.',
+    description: 'Save the person\'s own email as the contact the SEC asks of every program that reads its filings. Ask the person for it in plain words and pass exactly what they give; never invent, guess or reuse an address. It is kept in this folder\'s desk-data (never committed) and sent to sec.gov alone.',
     inputSchema: { email: z.string().min(3).max(254).describe('The email address the person gave') },
     annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false },
   }, async (a) => {

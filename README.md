@@ -40,7 +40,7 @@ affiliated with them.
 <a href="https://madavai.github.io/Trading-Agents/inside-the-trading-desk.html#glance">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/glance-dark.webp">
-  <img alt="The desk on one page: public data goes in, thirteen agents turn it into a call, the call is kept on your computer, and you decide on your dashboard, the only part that reaches Robinhood. A guard stands between every agent and your money." src="docs/readme/glance-light.webp">
+  <img alt="The desk on one page: public data goes in, thirteen agents turn it into a call, the call is kept on your computer, and you decide on your dashboard, which reaches Robinhood (as does the desk check's read-only sign-in test, on your yes). A guard stands between every agent and your money." src="docs/readme/glance-light.webp">
 </picture>
 </a>
 
@@ -77,7 +77,7 @@ folder. It cannot reach back into a conversation opened before this warning was 
 <a href="https://madavai.github.io/Trading-Agents/inside-the-trading-desk.html#sources">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/sources-dark.webp">
-  <img alt="Seven sources, all public but one: Yahoo Finance, StockTwits, Reddit, FRED, Polymarket and SEC EDGAR, with no keys, and your own Robinhood account, read only by the dashboard." src="docs/readme/sources-light.webp">
+  <img alt="Seven sources, all public but one: Yahoo Finance, StockTwits, Reddit, FRED, Polymarket and SEC EDGAR, with no keys, and your own Robinhood account, read by the dashboard, and by the desk check's sign-in test when you say yes, which counts what answers and shows no value." src="docs/readme/sources-light.webp">
 </picture>
 </a>
 
@@ -92,10 +92,10 @@ the same public pages its website uses, for personal use, and Yahoo can block or
 that does not answer is reported as unavailable, never as "nothing happened". Market prices may be up to 15 minutes
 late.
 
-**Why your email:** the SEC asks everyone who reads its filings for a contact address, so the desk needs yours before
-its first analysis. Give it to the desk in a chat, or in the field in Get started on the dashboard. It is kept in this
-folder's `desk-data` (which git never commits) and sent to the SEC alone; no other source sees it, and the dashboard
-never shows it back in full (only its first letter and its domain).
+**Why your email:** the SEC asks every program that reads its filings for a contact email (the desk is one), so the desk
+needs yours before its first analysis. Give it to the desk in a chat, or in the field in Get started on the dashboard.
+It is kept in this folder's `desk-data` (which git never commits) and sent to the SEC alone; no other source sees it,
+and the dashboard and the desk check never show it back in full (only its first letter and its domain).
 </details>
 
 ## Who does what: thirteen agents
@@ -166,7 +166,7 @@ the team's "talk" switch shows these messages in the Messages panel; with it off
 <a href="https://madavai.github.io/Trading-Agents/inside-the-trading-desk.html#robinhood">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/robinhood-dark.webp">
-  <img alt="Three narrow doors to Robinhood, used only by the dashboard: one that only reads, one that only asks for Robinhood's dry-run check, and one that places a single limit order on your Confirm." src="docs/readme/robinhood-light.webp">
+  <img alt="Three narrow doors to Robinhood, used by the dashboard: one that only reads, one that only asks for Robinhood's dry-run check, and one that places a single limit order on your Confirm. The desk check's sign-in test, which a chat runs only on your yes, uses the reading door to count what answers." src="docs/readme/robinhood-light.webp">
 </picture>
 </a>
 
@@ -174,14 +174,20 @@ the team's "talk" switch shows these messages in the Messages panel; with it off
 - No agent uses a broker connection. A guard refuses every broker tool, every tool that speaks of trading or moving
   money, Robinhood's site, and the dashboard's own address, whatever an agent was told. No agent, and no one on the
   trading-desk team, has a Robinhood tool or an order tool.
-- Only the dashboard talks to Robinhood, through three narrow doors: one that only reads, one that only asks for
-  Robinhood's dry-run check, and one that places a single limit order. The last is used only when trading is switched
-  on (by you), on a ticket Robinhood checked with no alerts in the last five minutes and unchanged since, after your
-  Confirm naming the exact order, and after every cap is checked again on fresh figures. A ticket sends one order.
+- The desk check's sign-in test (offered by `/desk-check` in a Claude Code chat; the trading-desk team never runs it)
+  reaches Robinhood too, but only when you say yes, and it only reads: Robinhood opens its own sign-in page, and the test
+  reports how many tools its connection offers and how many holdings answer, never their values. It never places an
+  order. Analysis works without it.
+- Apart from that test, only the dashboard talks to Robinhood, through three narrow doors: one that only reads, one that
+  only asks for Robinhood's dry-run check, and one that places a single limit order. The last is used only when trading
+  is switched on (by you), on a ticket Robinhood checked with no alerts in the last five minutes and unchanged since,
+  after your Confirm naming the exact order, and after every cap is checked again on fresh figures. A ticket sends one
+  order.
 - Your caps and guard rails are yours alone. As shipped: $500 an order, 10% of the account in one stock, 30% in one
   sector, 5% in crypto, 3 orders a day; trading switches itself off after a 5% fall in a week (from the week's
-  highest value, with the reason on the page); and a stock bought here is held at least 5 trading days before the desk
-  proposes selling it (your own early sell takes one more press). You change them on the dashboard's "Your account"
+  highest value, with the reason on the page); and a stock bought here is held at least 5 trading days (days New
+  York's market is open: weekends and its holidays do not count) before the desk proposes selling it (your own early
+  sell takes one more press). You change them on the dashboard's "Your account"
   page, beside the trading switch, and they are kept with it in your private folder, where agents are refused, never
   in the project's files. A value out of range falls back to the shipped one, never to a larger one. A sector comes
   from the industry code the company gave the SEC (approximate: the SEC's codes are older than the market's sectors);
@@ -191,9 +197,9 @@ the team's "talk" switch shows these messages in the Messages panel; with it off
 - Robinhood only lets agents trade in its separate Agentic account, which you fund yourself. Keep Robinhood's own
   "trade approvals" on until you trust the desk: then every order also waits for your OK on your phone.
 - Your Robinhood sign-in stays in `~/.trading-agents` on your computer, never in this repository. Agents are refused
-  that folder, and on Windows the dashboard locks it to your own account, so no other account on this computer can
-  open it; the real protection is that agents get no free shell or file access outside this folder without your
-  approval, so **never run this folder with permission checks bypassed**.
+  that folder, and on Windows the dashboard locks it to your own account, so another ordinary account on this computer
+  cannot open it (an administrator still can, as with any file); the real protection is that agents get no free shell or
+  file access outside this folder without your approval, so **never run this folder with permission checks bypassed**.
 - Nothing is ever sold by itself. A stop is a price the desk's trader proposed: the dashboard watches it and tells you
   when the price falls below it, and never places a stop order. A Sell or Underweight on something you hold opens a
   ticket only on your press, with the same caps, Robinhood's check and your Confirm.
@@ -271,15 +277,18 @@ forecast:
   own measure of expected swings (under 15 calm, 15 to 25 normal, over 25 wild). The **rates**: what Polymarket's crowd
   prices for the Federal Reserve's next interest-rate decision, or "unavailable".
 - **Worth a look today**: up to five of the whole market, the eleven sectors and your watchlist, ranked by how many of
-  these fire, then by the size of the move: a move of 3% or more in a day; volume at least twice its usual (its 20-day
-  average); a new 52-week high or low; a close across its 50- or 200-day average; and, for a company or a coin, news
-  about it today. Each comes with its reason in one line, such as "Fell 4.2% on 3.1 times its usual volume, a new 52-week
-  low", and the robot beside it.
+  these fire, then by the size of the move (its foot names the session the moves are from, and when they were read
+  before that session's close was final, says the move is so far, not a close): a move of 3% or more in a day; volume at
+  least twice its usual (its 20-day average); a new 52-week high or low; a close across its 50- or 200-day average; and,
+  for a company or a coin, news about it today. Each comes with its reason in one line, such as "Fell 4.2% on 3.1 times
+  its usual volume, a new 52-week low", and the robot beside it. A name whose news could not be read is listed as such:
+  whether it is in the news today is not known, and it is never called "no news".
 
-Under the list, the switch **"Analyse the top 3 each market morning"** is off as shipped. Switching it on
-puts nothing on the list at once: it starts the next market morning. Then, once each weekday morning (before noon in
-New York), the top three that were not already called today go on the waiting list at shallow depth, and run when
-something is listening; each analysis uses your Claude plan, like a chat. The morning routine reads the same list.
+Under the list, the switch **"Analyse the top 3 each market morning"** is off as shipped. Switching it on puts nothing
+on the list at once: it starts the next market morning. Then, once each market morning (before noon in New York; a
+weekend or one of New York's market holidays is not one), the top three that were not already called today go on the
+waiting list at shallow depth, and run when something is listening; each analysis uses your Claude plan, like a chat.
+The morning routine reads the same list.
 
 ### What you hold: the desk's view, its stop, and sells you confirm
 On "Your account", each holding has a column for the desk's latest view of it and how old that view is, such as
@@ -287,9 +296,9 @@ On "Your account", each holding has a column for the desk's latest view of it an
 Agentic account alone, the one account it may trade in; in your other accounts the view is there for your information.
 
 In the Agentic account the desk takes care of what you hold:
-- **Re-rating.** A view a week old or more is due again. On a Monday the morning routine puts up to three such
-  holdings (those with no view first, then the oldest) on the waiting list at shallow depth, within its limit of five a
-  morning. Meanwhile they show "re-rating".
+- **Re-rating.** A view a week old or more is due again. On a Monday (the Tuesday, when Monday is one of New York's
+  market holidays) the morning routine puts up to three such holdings (those with no view first, then the oldest) on the
+  waiting list at shallow depth, within its limit of five a morning. Meanwhile they show "re-rating".
 - **Its stop.** The desk's trader writes the price under which it would sell to limit a loss. The dashboard watches
   Yahoo Finance's price (up to 15 minutes late) against it. When the price falls below, a notice says so, and the
   holding is marked "below its stop" for as long as it stays there. Nothing is sold: it is a prompt to look, and the
@@ -358,8 +367,10 @@ The trading-desk team has two routines, which Madav's scheduler can start for yo
   over an hour old; with your morning switch on, its top three join the waiting list at shallow depth), then analyses
   what you asked for on the dashboard and your starred watchlist stocks (at most 5 a morning, set in
   `desk-settings.json` under `routines`), and ends with the new calls to decide on and the list worth a look. On a
-  Monday it first puts up to three of your holdings whose view is a week old (or that have none) on the waiting list,
-  to be re-rated at shallow depth. On a weekend it only scores past calls.
+  Monday (the Tuesday, when Monday is a market holiday) it first puts up to three of your holdings whose view is a week
+  old (or that have none) on the waiting list, to be re-rated at shallow depth. On a day New York's market is closed (a
+  weekend or one of its holidays, from the NYSE's published list), it only scores past calls, and lists nothing to
+  analyse.
 - **Evening wrap-up**: scores what is ready and tells you the day's calls, the orders the dashboard sent and what
   Robinhood answered.
 

@@ -3,6 +3,7 @@
 // the page says happened. It opens by itself on the first visit, while the desk has no calls, stays until the person
 // puts it away, and is reopened from the side list. It suggests the whole market and a sector or two, never a stock: the
 // names are the person's own.
+import { maskEmail } from '../contact.js';
 import { RECORD_WEEKS, RECORD_WORDS, type PaperRecord } from '../desk/paper.js';
 import type { QueueItem } from '../desk/queue.js';
 import { tierOf } from './tiers.js';
@@ -45,10 +46,7 @@ export interface GuideFacts {
 }
 
 /** An address as the page may show it: its first letter and its domain, never the whole. */
-export function maskEmail(email: string): string {
-  const at = email.lastIndexOf('@');
-  return at > 0 ? `${email[0]}…${email.slice(at)}` : '';
-}
+export { maskEmail };
 
 export function guideOf(f: GuideFacts): Guide {
   // A pick is a stock or fund the person watches or asked the desk about: the robot works on Start here without the watchlist.
