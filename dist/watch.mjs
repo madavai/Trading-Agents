@@ -617,6 +617,8 @@ var DEBATES = { investment_debate: ["bull", "bear"], risk_debate: ["aggressive",
 var TURNS = new Set(Object.values(DEBATES).flat());
 var folder = (dir2, ticker, date) => path4.join(dir2, "runs", `${safeSymbol(ticker).replace(/\^/g, "IDX_").replace(/=/g, "_EQ_")}_${date}`);
 var runFile = (dir2, ticker, date) => path4.join(folder(dir2, ticker, date), "run.json");
+var FLAG = "[the fact it rested on was corrected: see the fact check]";
+var MARKS = new RegExp(` \\[corrected: was "[\\s\\S]*?"\\]| ${FLAG.replace(/[[\]]/g, "\\$&")}`, "g");
 function lastSaved(dir2, ticker, date) {
   let latest = null;
   for (const file of [runFile(dir2, ticker, date), path4.join(folder(dir2, ticker, date), "complete_report.md")]) {

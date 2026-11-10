@@ -25,6 +25,9 @@ test('lists, tables and rules keep their shape', () => {
   const t = markdown('| Level | Price |\n| --- | --- |\n| Entry | **181.90** |');
   assert.match(t, /<th>Level<\/th><th>Price<\/th>/);
   assert.match(t, /<td>Entry<\/td><td><strong>181\.90<\/strong><\/td>/);
+  // A bar written "\|" stays in its cell: the fact checker's mark in a row keeps the row's old words so.
+  const fixed = markdown('| Signal | Source |\n|---|---|\n| Split 27/73 | StockTwits [corrected: was "\\| Split 54/46 \\| StockTwits \\|"] |');
+  assert.match(fixed, /<tr><td>Split 27\/73<\/td><td>StockTwits \[corrected: was &quot;\| Split 54\/46 \| StockTwits \|&quot;\]<\/td><\/tr>/);
   assert.match(markdown('a\n\n---\n\nb'), /<p>a<\/p><hr><p>b<\/p>/);
   assert.equal(markdown('first line\nsecond line'), '<p>first line second line</p>');
   assert.equal(markdown(''), '');
