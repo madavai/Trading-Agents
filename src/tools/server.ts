@@ -47,6 +47,25 @@ async function answer(what: string, run: () => Promise<string>) {
   }
 }
 
+/** Several questions to one data tool in one call: each answered as it would be alone, in the order asked, one after
+ *  the other (a second question to the same source finds the first one's kept answer), a failed one said to be so
+ *  without holding up the rest. On a model where every call is a step, nine series in one call are one step, not nine. */
+async function answers<T>(items: readonly T[], what: (x: T) => string, run: (x: T) => Promise<string>) {
+  const parts: string[] = [];
+  for (const x of items) parts.push((await answer(what(x), () => run(x))).content[0]!.text);
+  return text(parts.join('\n\n'));
+}
+
+/** The questions one argument holds, split at `sep`, blanks and repeats left out; null when there are more than `most`. */
+export function several(raw: string, sep: string, most: number): string[] | null {
+  const items = [...new Set(raw.split(sep).map((s) => s.trim()).filter(Boolean))];
+  return items.length > most ? null : items;
+}
+const tooMany = (what: string, most: number) => text(`INPUT_ERROR: at most ${most} ${what} in one call. Split them over two calls made together.`);
+/** How many series and topics one call holds: a report's macro section quotes about nine series and five topics. */
+export const MOST_SERIES = 10, MOST_TOPICS = 6;
+const STATEMENT_KINDS = ['income_statement', 'balance_sheet', 'cashflow'] as const;
+
 const symbol = z.string().min(1).max(20).describe('The ticker as the instrument context gives it, e.g. NVDA, 7203.T, BTC-USD');
 const analysis = z.string().describe('The analysis date, YYYY-MM-DD. Nothing dated after it is ever returned.');
 const READ = { readOnlyHint: true, openWorldHint: true } as const;
@@ -193,17 +212,26 @@ export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetc
 
   server.registerTool('get_economic_series', {
     title: 'Economic figures (FRED)',
-    description: 'An economic series from FRED as known by the analysis date: the latest value named by the period it stands for, the change over a year (from the same period a year earlier: quote a yearly rate only from that line), the change over the look-back window and recent values. Names: ' + Object.keys(SERIES).join(', ') + '; or any FRED series id.',
-    inputSchema: { indicator: z.string().describe('A name such as cpi, 10y_treasury, unemployment, or a FRED series id'), analysis_date: analysis, look_back_days: z.number().int().min(30).max(3650).optional().describe('365 when left out') },
+    description: 'Economic series from FRED as known by the analysis date, each with the latest value named by the period it stands for, the change over a year (from the same period a year earlier: quote a yearly rate only from that line), the change over the look-back window and recent values. Ask for every series you need in one call, comma separated, up to ' + MOST_SERIES + '. Names: ' + Object.keys(SERIES).join(', ') + '; or any FRED series id.',
+    inputSchema: { indicator: z.string().describe(`One name or several, comma separated, up to ${MOST_SERIES}, e.g. "cpi, core_pce, unemployment"; a name or a FRED series id`), analysis_date: analysis, look_back_days: z.number().int().min(30).max(3650).optional().describe('365 when left out') },
     annotations: READ,
-  }, async (a) => answer('economic series ' + a.indicator, () => economicSeries(a.indicator, a.analysis_date, a.look_back_days ?? 365)));
+  }, async (a) => {
+    const names = several(a.indicator, ',', MOST_SERIES);
+    if (!names) return tooMany('series', MOST_SERIES);
+    return answers(names, (n) => 'economic series ' + n, (n) => economicSeries(n, a.analysis_date, a.look_back_days ?? 365));
+  });
 
   server.registerTool('get_prediction_markets', {
     title: 'Prediction-market odds',
-    description: 'Live Polymarket odds for forward-looking events matching a topic (e.g. "Fed rate cut", "recession 2026"), with volume and resolution date. Withheld for a past analysis date.',
-    inputSchema: { topic: z.string().min(2).max(80), analysis_date: analysis, limit: z.number().int().min(1).max(10).optional() },
+    description: `Live Polymarket odds for forward-looking events matching a topic (e.g. "Fed rate cut", "recession 2026"), with volume and resolution date. Ask for every topic you need in one call, separated by semicolons, up to ${MOST_TOPICS}. Withheld for a past analysis date.`,
+    inputSchema: { topic: z.string().min(2).max(500).describe(`One topic or several, separated by semicolons, up to ${MOST_TOPICS}, e.g. "Fed rate cut; recession 2027"`), analysis_date: analysis, limit: z.number().int().min(1).max(10).optional().describe('Markets to show for each topic; 6 when left out') },
     annotations: READ,
-  }, async (a) => answer('prediction markets on ' + a.topic, () => predictionMarkets(a.topic, a.analysis_date, a.limit ?? 6)));
+  }, async (a) => {
+    const topics = several(a.topic, ';', MOST_TOPICS);
+    if (!topics) return tooMany('topics', MOST_TOPICS);
+    if (!topics.length || topics.some((t) => t.length < 2 || t.length > 80)) return text('INPUT_ERROR: each topic is 2 to 80 characters. Correct it and call again.');
+    return answers(topics, (t) => 'prediction markets on ' + t, (t) => predictionMarkets(t, a.analysis_date, a.limit ?? 6));
+  });
 
   server.registerTool('get_company_overview', {
     title: 'Company profile and ratios',
@@ -214,14 +242,19 @@ export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetc
 
   server.registerTool('get_financial_statement', {
     title: 'Financial statement',
-    description: 'A balance sheet, income statement or cash flow statement, quarterly or annual, latest periods first, with margins, growth, free cash flow and balance-sheet ratios worked out in rows of their own. For a US filer it is the SEC filing as it stood on the analysis date (a quarter no filing states derived and marked so, per-share figures on the basis of the latest filings across a share split); otherwise Yahoo Finance\'s, for today only.',
+    description: 'A balance sheet, income statement or cash flow statement, quarterly or annual, latest periods first, with margins, growth, free cash flow and balance-sheet ratios worked out in rows of their own; statement "all" gives the three, and frequency "both" each quarterly and annual, in one call. For a US filer it is the SEC filing as it stood on the analysis date (a quarter no filing states derived and marked so, per-share figures on the basis of the latest filings across a share split); otherwise Yahoo Finance\'s, for today only.',
     inputSchema: {
       symbol, analysis_date: analysis,
-      statement: z.enum(['balance_sheet', 'income_statement', 'cashflow']),
-      frequency: z.enum(['quarterly', 'annual']).optional().describe('quarterly when left out'),
+      statement: z.enum(['balance_sheet', 'income_statement', 'cashflow', 'all']).describe('"all" for the three statements in one answer'),
+      frequency: z.enum(['quarterly', 'annual', 'both']).optional().describe('quarterly when left out; "both" for quarterly and annual in one answer'),
     },
     annotations: READ,
-  }, async (a) => answer(`${a.statement.replace('_', ' ')} of ${a.symbol}`, () => financialStatement(a.symbol, a.statement, a.frequency ?? 'quarterly', a.analysis_date)));
+  }, async (a) => {
+    const kinds = a.statement === 'all' ? STATEMENT_KINDS : [a.statement];
+    const freqs = a.frequency === 'both' ? (['quarterly', 'annual'] as const) : [a.frequency ?? 'quarterly'];
+    const asked = kinds.flatMap((kind) => freqs.map((freq) => ({ kind, freq })));
+    return answers(asked, (x) => `${x.kind.replace('_', ' ')} of ${a.symbol}`, (x) => financialStatement(a.symbol, x.kind, x.freq, a.analysis_date));
+  });
 
   server.registerTool('get_insider_transactions', {
     title: 'Insider transactions',

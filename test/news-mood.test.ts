@@ -274,3 +274,28 @@ test('the server offers the news, posts, economic and odds tools', async () => {
   assert.match(r.content[0]!.text, /Consumer price index/);
   await client.close();
 });
+
+// The fact checker re-reads every series and topic a news report quotes: on a model where each call is a step, nine
+// series and five topics were fourteen steps. Now they are two calls, each answer as it would come alone, in order.
+test('several economic series, or several market topics, come in one call, each answered as it would be alone', async () => {
+  const UNRATE = 'observation_date,UNRATE\n2026-07-01,4.2\n2026-08-01,4.3\n';
+  const ODDS = { events: [{ markets: [{ question: 'US recession by end of 2027?', outcomes: '["Yes","No"]', outcomePrices: '["0.28","0.72"]', volumeNum: 22940, endDate: '2099-12-31T00:00:00Z', closed: false, active: true }] }] };
+  const seen: string[] = [];
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  await deskServer(process.cwd(), route([[/fredgraph\.csv\?id=CPIAUCSL/, () => new Response(CPI)], [/fredgraph\.csv\?id=UNRATE/, () => new Response(UNRATE)], [/polymarket/, () => json(ODDS)]], seen)).connect(a);
+  const client = new Client({ name: 'test', version: '0' });
+  await client.connect(b);
+  const call = async (name: string, args: Record<string, unknown>) => ((await client.callTool({ name, arguments: args })) as { content: Array<{ text: string }> }).content[0]!.text;
+  const series = await call('get_economic_series', { indicator: 'cpi, unemployment, cpi, nonsense_x', analysis_date: '2026-10-12' });
+  assert.ok(series.indexOf('FRED series CPIAUCSL') >= 0 && series.indexOf('FRED series CPIAUCSL') < series.indexOf('FRED series UNRATE'), 'in the order asked');
+  assert.equal(series.split('FRED series CPIAUCSL').length - 1, 1, 'a series asked twice is answered once');
+  assert.match(series, /Latest value known by 2026-10-12: 4\.30 \(for August 2026\)/);
+  assert.match(series, /NO_DATA_AVAILABLE: economic series nonsense_x/, 'a series that fails is said to, without holding up the rest');
+  assert.match(await call('get_economic_series', { indicator: 'a, b, c, d, e, f, g, h, i, j, k', analysis_date: '2026-10-12' }), /^INPUT_ERROR: at most 10 series in one call/);
+  const odds = await call('get_prediction_markets', { topic: 'Fed rate cut; recession 2027', analysis_date: '2026-10-12' });
+  assert.match(odds, /## Polymarket: "Fed rate cut"[\s\S]*## Polymarket: "recession 2027"/);
+  assert.equal(seen.filter((u) => /polymarket/.test(u)).length, 2, 'one search for each topic');
+  assert.match(await call('get_prediction_markets', { topic: 'a1; b2; c3; d4; e5; f6; g7', analysis_date: '2026-10-12' }), /^INPUT_ERROR: at most 6 topics in one call/);
+  assert.match(await call('get_prediction_markets', { topic: `Fed rate cut; ${'x'.repeat(81)}`, analysis_date: '2026-10-12' }), /^INPUT_ERROR: each topic is 2 to 80 characters/);
+  await client.close();
+});
