@@ -116,9 +116,9 @@ test('after the fact check a checked figure is quoted with whose it is, and only
 // half the run, and "corrected" social-media counts and odds that had only moved since the analysts read them. It now
 // works in five steps, each one message: one read, every data tool once (nine series, five topics and six statements in
 // three calls), one sum call per report, one correction call per report; and data that moved is not a mistake.
-test('the fact checker works in five steps, each one message, every data tool asked once, and never corrects data that only moved', () => {
+test('the fact checker works in a few short messages, one report at a time, every data tool asked once, never corrects data that only moved and never ends without saving', () => {
   const { text, fields } = front('fact-checker');
-  assert.match(text, /Work in these five steps, in order\. Each step after the reading is one message: make all of its calls together, at once, never one call per message\./);
+  assert.match(text, /Work in these five steps, in order, in about eleven messages\. Make each message's calls together, at once, never one call per message, and keep each message to its own step and, from step 3 on, to one report: a message that tries to check all four reports at once grows too long, and a message too long stops your run before anything is saved\./);
   for (const rule of [
     '1. Read the reports with read_run (sections market, sentiment, news, fundamentals), in one call, and each part of its answer once.',
     '2. Gather the data the reports were written from, in one message, each tool once',
@@ -127,12 +127,18 @@ test('the fact checker works in five steps, each one message, every data tool as
     'get_prediction_markets with every topic they quote in one call',
     'never ask a tool the same question twice',
     'and that its parts are the ones it names (the right quarters, lines or people, none left out or counted twice)',
-    'then work them out in one work_out call for each report, all made together in one message',
+    '3. Check and correct the reports one at a time, in this order: market, sentiment, news, fundamentals. Each report takes two messages: one with its work_out call, then one with its correct_report call (step 4)',
+    'Think about that one report only, never about all four at once.',
+    'Go through each report from top to bottom, every paragraph and table, and check every claim a desk tool can settle',
+    'list every one of them in the report first, however many, then work them all out in that report\'s message (up to 40 sums in one work_out call; two calls in that message when there are more)',
     'Data that moves is not wrong for having moved.',
     'Never correct it to your read; list it as not checked, with the span or time of both reads. Read these sources all the same',
-    '4. Correct each report that holds a wrong or misleading claim with correct_report, one call per report, all of them in one message',
+    '4. Correct a report that holds a wrong or misleading claim with one correct_report call, in the message after its work_out',
+    'the fewest that hold the mistake and appear once in it (a phrase or a sentence, never a whole paragraph or table), and the right words, as short',
     'so never write such a mark yourself',
+    'each cell short: the words that changed, not the passage around them',
     'Say that a claim held only when you checked it against a tool answer you have; one you did not check goes on the list.',
+    'Never end without saving. If the work runs long (more than 25 messages) or a step keeps failing, save at once what you have checked, with the reports or claims you did not reach on the list. Then reply to the lead with one line only',
   ]) assert.ok(text.includes(rule), rule);
   // a partial session's row is still never corrected to newer prices, and an "unavailable" that now answers still is
   assert.match(text, /never correct them to newer ones; check them against the rows before it, the filings and the sums\. .*If a source an analyst found unavailable answers you, correct the "unavailable" with what it says\./s);
