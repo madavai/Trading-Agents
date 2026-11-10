@@ -78,8 +78,10 @@ test("a US filer's insider trades come from its Form 4s at the SEC, only those m
   assert.match(t, /^Insider trades in ACME, from the Form 4 filings with the SEC made public from 2026-07-24 to 2026-10-21 \(2 of 2 filings read, newest first\)/);
   assert.match(t, /bought \(code P\) 1 \(100 shares, about 20,000 USD at their own prices\); sold \(code S\) 1 \(20,369 shares, about 4,461,161 USD at their own prices\); other kinds .* 1\./);
   // The filing's 10b5-1 box is ticked with no footnote saying which trade it covers: a gift is not said to be under a plan.
-  assert.match(t, /- 2026-10-07 \(made public 2026-10-09\) · COXE TENCH \(EVP & Chief Financial Officer\): gave away 500,000 shares, no price · holds 23,671,360 after · indirectly \(By Trust\)$/m);
-  assert.match(t, /- 2026-09-17 \(made public 2026-09-18\) · KRESS COLETTE \(EVP & Chief Financial Officer\): sold 20,369 shares at 219\.0172 · holds 774,971 after$/m);
+  assert.match(t, /- 2026-10-07 \(made public 2026-10-09\) · COXE TENCH \(EVP & Chief Financial Officer\): gave away 500,000 shares, no price · holds 23,671,360 after, indirectly \(By Trust\)$/m);
+  assert.match(t, /- 2026-09-17 \(made public 2026-09-18\) · KRESS COLETTE \(EVP & Chief Financial Officer\): sold 20,369 shares at 219\.0172 · holds 774,971 after, directly$/m);
+  // NVDA run of 9 Nov 2026: a line held directly and one held by a trust were added up and called the CEO's whole holding.
+  assert.match(t, /\n"holds … after" is what the insider holds in that line's own form of ownership \(directly, or through the one trust or company it names\), not all they hold: .* So these figures never add up to an insider's whole holding\.\n/);
   assert.ok(!seen.some((u) => /late\.xml|old\.xml|a8k/.test(u)), 'a filing made public after the day, one from before the window and an 8-K are never read');
   assert.ok(seen.some((u) => /\/gift\.xml$/.test(u)), 'the filing itself, not its formatted page');
   const past = await insiderTransactions('ACME', '2026-09-20');
@@ -107,7 +109,7 @@ test('an amended Form 4 (4/A) takes the place of the filing it corrects: one awa
   const t = await insiderTransactions('ACME', '2026-10-21');
   assert.match(t, /\(3 of 3 filings read, newest first; one is an amended filing, a Form 4\/A, shown in place of the filing it corrects\)/);
   assert.match(t, /sold \(code S\) 1 \(20,369 shares, .*\); other kinds \(awards, option exercises, shares handed back for tax, gifts\) 1\./, 'the award is counted once');
-  assert.match(t, /^- 2026-09-09 \(made public 2026-09-11; corrected 2026-10-13 by an amended filing, a Form 4\/A\) · PARKER NICHOLAS \(EVP & Chief Financial Officer\): was awarded 160,418 shares, no price · holds 160,418 after$/m);
+  assert.match(t, /^- 2026-09-09 \(made public 2026-09-11; corrected 2026-10-13 by an amended filing, a Form 4\/A\) · PARKER NICHOLAS \(EVP & Chief Financial Officer\): was awarded 160,418 shares, no price · holds 160,418 after, directly$/m);
   assert.doesNotMatch(t, /172,507/, 'the figure the amendment corrected is gone');
   assert.deepEqual(t.split('\n').filter((l) => l.startsWith('- ')).map((l) => l.slice(2, 12)), ['2026-09-17', '2026-09-09'], 'the corrected trade sits where it was first made public');
 });

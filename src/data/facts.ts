@@ -43,7 +43,10 @@ export function priceFactsText(sym: string, day: string, s: Series): string {
   const change: Values = close.map((c, i) => (i && close[i - 1] ? (c / close[i - 1]! - 1) * 100 : null));
   // A coin trades every day (Yahoo calls it a cryptocurrency): its month, quarter, half-year and year are counted in days.
   const coin = s.meta.type === 'CRYPTOCURRENCY', sizes = coin ? COIN_WINDOWS : WINDOWS;
-  const windows = sizes.map(([size, words]) => ({ size: Math.min(size, n), words: size <= n ? words : 'all on record', full: size }));
+  const windows = sizes.map(([size, words]) => ({ size: Math.min(size, n), words: size <= n ? words : 'all the desk has', full: size }));
+  // The desk's data starts at its first row: a run, a side or a "lowest of all" reaching back to it may reach further back
+  // in truth, and the agents quoted such a run as its true length ("for 282 straight sessions") or such a low as a record.
+  const dataStart = `the desk's prices start on ${d(0)}`;
   const from = (w: { size: number }) => n - w.size;
   const state = latestState(s, day);
   // A volume the source does not give is left out of every volume fact, never ranked as a zero; with no volume traded on
@@ -61,13 +64,15 @@ export function priceFactsText(sym: string, day: string, s: Series): string {
     `- Analysis date: ${withWeekday(day)}. Latest row: ${d(L)}. Rows after the analysis date are excluded.`,
     `- From the same daily prices as the checked price table (${adjustedWords(s)}) and the same indicators (10 EMA, 50 SMA, 200 SMA, VWMA, RSI, MACD, Bollinger bands, ATR). ${coin ? 'A coin trades every day, so a session here is a calendar day' : 'A session is a trading day'}; every date carries its weekday.`,
     ...volumeNote,
-    `- Windows count back from the latest row, which they include: ${windows.map((w) => `the last ${w.size} sessions${w.size < w.full ? ' (all on record)' : ''} from ${d(from(w))}`).join('; ')}.`,
+    `- Windows count back from the latest row, which they include: ${windows.map((w) => `the last ${w.size} sessions${w.size < w.full ? ' (all the desk has)' : ''} from ${d(from(w))}`).join('; ')}.`,
     '- Directions and sides are judged on figures rounded to the cent, as the tables show them.',
     ...state.lines, '',
     'Quote a fact as it stands here, naming its window ("the lowest RSI of the last 63 sessions"). A run, a first or a last time, a record, a rank, a count of sessions or a crossing that is not here is not known to the desk: leave it out rather than count it by eye.', '',
   ];
 
-  // Runs up to the latest row: how many sessions in a row, from what to what, and what the session before did.
+  // Runs up to the latest row: how many sessions in a row, from what (dated: the value of the session before the run, which
+  // an agent read as the run's first day's) to what, and what the session before did. A run that reaches back to the
+  // first value the desk has is "at least" that long: when it began is not in its data.
   const dir = (v: Values, i: number): Side => (i ? cmp(v[i], v[i - 1]) : null);
   const trend = (name: string, v: Values, up = 'rising', down = 'falling', rose = 'rose', fell = 'fell'): string | null => {
     const now = dir(v, L);
@@ -77,9 +82,15 @@ export function priceFactsText(sym: string, day: string, s: Series): string {
     const len = L - st + 1, word = now > 0 ? up : now < 0 ? down : 'unchanged', before = st >= 2 ? dir(v, st - 1) : null;
     const last20 = Array.from({ length: Math.min(20, n - 1) }, (_, k) => dir(v, L - k)).filter((x) => x !== null);
     const tally = `Over the last ${last20.length} sessions it ${rose} on ${last20.filter((x) => x === 1).length} and ${fell} on ${last20.filter((x) => x === -1).length}${last20.some((x) => x === 0) ? `, unchanged on ${last20.filter((x) => x === 0).length}` : ''}.`;
-    const span = len === 1 ? `on the latest session, ${d(L)}` : `on each of the last ${len} sessions, ${d(st)} to ${d(L)}`;
-    const prior = before === null ? '' : `; on ${d(st - 1)} it ${before > 0 ? rose : before < 0 ? fell : 'was unchanged'}`;
-    return `- ${name}: ${word} ${span}, from ${f2(v[st - 1]!)} to ${f2(v[L]!)}${prior}. ${tally}`;
+    // Nothing to compare the session before the run with: it is the first with a value in the desk's data, or the one
+    // before it has none (a volume the source did not give).
+    const cut = before === null, first = v.findIndex((x) => cent(x) !== null) === st - 1;
+    const span = cut ? `on each of at least the last ${plural(len, 'session')}, ${d(st)} to ${d(L)}`
+      : len === 1 ? `on the latest session, ${d(L)}` : `on each of the last ${len} sessions, ${d(st)} to ${d(L)}`;
+    const prior = !cut ? `; on ${d(st - 1)} it ${before > 0 ? rose : before < 0 ? fell : 'was unchanged'}`
+      : first ? `; ${d(st - 1)} is the first session ${st - 1 ? `with a value in the desk's data (${dataStart})` : "in the desk's data"}, so the run may have begun earlier`
+      : `; ${d(st - 2)} has no value, so the run may have begun earlier`;
+    return `- ${name}: ${word} ${span}, from ${f2(v[st - 1]!)} on ${d(st - 1)} to ${f2(v[L]!)}${prior}. ${tally}`;
   };
   out.push('### Runs up to the latest row', '');
   out.push(...[
@@ -96,10 +107,13 @@ export function priceFactsText(sym: string, day: string, s: Series): string {
     while (st - 1 >= 0 && sd(st - 1) === now) st--;
     const len = L - st + 1, word = now > 0 ? 'above' : now < 0 ? 'below' : 'level with';
     const prev = st - 1 >= 0 ? sd(st - 1) : null;
-    const before = st === 0 ? ` (every ${what} on record)`
-      : prev === null ? `; before ${d(st)} the ${b} had no value yet`
-      : prev === 0 ? `; on ${d(st - 1)} they were level to the cent`
-      : `; the last ${what} ${prev > 0 ? 'above' : 'below'} it was ${d(st - 1)} (${f2(av[st - 1]!)} against ${f2(bv[st - 1]!)})`;
+    // A side held since the first session the desk can compare the two on is held for at least that long: when it began
+    // is not in the desk's data. The agents quoted "282 straight sessions" from "since 2025-09-26; before it the 200 SMA
+    // had no value yet", when the true run was 345.
+    const cut = st === 0 || prev === null;
+    const before = !cut ? (prev === 0 ? `; on ${d(st - 1)} they were level to the cent`
+      : `; the last ${what} ${prev > 0 ? 'above' : 'below'} it was ${d(st - 1)} (${f2(av[st - 1]!)} against ${f2(bv[st - 1]!)})`)
+      : `: ${d(st)} is the first ${what} ${st ? `with both values in the desk's data (${dataStart})` : "in the desk's data"}, so when this began is not known to the desk`;
     const crosses: Array<{ i: number; up: boolean }> = [];
     let last: Side = null;
     for (let i = 0; i < n; i++) {
@@ -108,7 +122,8 @@ export function priceFactsText(sym: string, day: string, s: Series): string {
       if (last !== null && x !== last && i >= year) crosses.push({ i, up: x > 0 });
       last = x;
     }
-    const span = len === 1 ? `on the latest ${what}, ${d(L)}` : `on each of the last ${plural(len, what)}, since ${d(st)}`;
+    const span = cut ? `on each of at least the last ${plural(len, what)}, since ${d(st)}`
+      : len === 1 ? `on the latest ${what}, ${d(L)}` : `on each of the last ${plural(len, what)}, since ${d(st)}`;
     const list = crosses.length
       ? ` Crossings in the last ${L - year + 1} sessions (${crosses.length} in all${crosses.length > CROSSES_SHOWN ? `, the ${CROSSES_SHOWN} latest shown` : ''}, newest first): ${crosses.reverse().slice(0, CROSSES_SHOWN).map((c) => `${c.up ? 'above' : 'below'} on ${d(c.i)}`).join('; ')}.`
       : ` No crossing in the last ${L - year + 1} sessions.`;
@@ -180,9 +195,10 @@ export function priceFactsText(sym: string, day: string, s: Series): string {
     const x = v(L), p = bySign ? 0 : v(L - 1);
     if (cent(x) === null || cent(p) === null || cent(x) === cent(p)) return null;
     const high = x! > p!, j = Array.from({ length: L }, (_, k) => L - 1 - k).find((i) => cent(v(i)) !== null && (high ? v(i)! >= x! : v(i)! <= x!));
-    const valued = Array.from({ length: n }, (_, i) => i).filter((i) => cent(v(i)) !== null).length, what = words[high ? 0 : 1];
+    const valued = Array.from({ length: n }, (_, i) => i).filter((i) => cent(v(i)) !== null), what = words[high ? 0 : 1];
+    // "Of all on record" was read as an all-time record ("record-low MACD"): it is of the desk's data, which starts on a day.
     return j === undefined
-      ? `- ${name} ${show(x!)} on ${d(L)}: the ${what} of all ${plural(valued, 'session')} on record${valued < n ? ' with a value' : ''}.`
+      ? `- ${name} ${show(x!)} on ${d(L)}: the ${what} of all ${plural(valued.length, 'session')} in the desk's data${valued.length < n ? ' with a value' : ''}, from ${d(valued[0]!)}${valued[0] ? ` (${dataStart})` : ''}; older sessions are not in it, so this is not known to be a record of all time.`
       : `- ${name} ${show(x!)} on ${d(L)}: the ${what} since ${d(j)} (${show(v(j)!)}), ${plural(L - j, 'session')} before.`;
   };
   out.push('', '### The latest row against the past', '');

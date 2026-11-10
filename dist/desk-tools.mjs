@@ -37814,7 +37814,8 @@ function priceFactsText(sym2, day3, s) {
   const ema10 = ema(close, 10), sma50 = sma(close, 50), sma200 = sma(close, 200), vw = vwma(bars), rsi14 = rsi(close), atr14 = atr(bars);
   const change3 = close.map((c, i) => i && close[i - 1] ? (c / close[i - 1] - 1) * 100 : null);
   const coin = s.meta.type === "CRYPTOCURRENCY", sizes = coin ? COIN_WINDOWS : WINDOWS;
-  const windows = sizes.map(([size, words3]) => ({ size: Math.min(size, n2), words: size <= n2 ? words3 : "all on record", full: size }));
+  const windows = sizes.map(([size, words3]) => ({ size: Math.min(size, n2), words: size <= n2 ? words3 : "all the desk has", full: size }));
+  const dataStart = `the desk's prices start on ${d(0)}`;
   const from = (w) => n2 - w.size;
   const state = latestState(s, day3);
   const anyVolume = bars.some((b) => b.volume !== null && b.volume > 0), partial2 = state.open && anyVolume && bars[L].volume !== null;
@@ -37828,7 +37829,7 @@ function priceFactsText(sym2, day3, s) {
     `- Analysis date: ${withWeekday(day3)}. Latest row: ${d(L)}. Rows after the analysis date are excluded.`,
     `- From the same daily prices as the checked price table (${adjustedWords(s)}) and the same indicators (10 EMA, 50 SMA, 200 SMA, VWMA, RSI, MACD, Bollinger bands, ATR). ${coin ? "A coin trades every day, so a session here is a calendar day" : "A session is a trading day"}; every date carries its weekday.`,
     ...volumeNote,
-    `- Windows count back from the latest row, which they include: ${windows.map((w) => `the last ${w.size} sessions${w.size < w.full ? " (all on record)" : ""} from ${d(from(w))}`).join("; ")}.`,
+    `- Windows count back from the latest row, which they include: ${windows.map((w) => `the last ${w.size} sessions${w.size < w.full ? " (all the desk has)" : ""} from ${d(from(w))}`).join("; ")}.`,
     "- Directions and sides are judged on figures rounded to the cent, as the tables show them.",
     ...state.lines,
     "",
@@ -37844,9 +37845,10 @@ function priceFactsText(sym2, day3, s) {
     const len = L - st + 1, word = now > 0 ? up2 : now < 0 ? down2 : "unchanged", before = st >= 2 ? dir(v, st - 1) : null;
     const last20 = Array.from({ length: Math.min(20, n2 - 1) }, (_, k) => dir(v, L - k)).filter((x) => x !== null);
     const tally = `Over the last ${last20.length} sessions it ${rose} on ${last20.filter((x) => x === 1).length} and ${fell} on ${last20.filter((x) => x === -1).length}${last20.some((x) => x === 0) ? `, unchanged on ${last20.filter((x) => x === 0).length}` : ""}.`;
-    const span2 = len === 1 ? `on the latest session, ${d(L)}` : `on each of the last ${len} sessions, ${d(st)} to ${d(L)}`;
-    const prior = before === null ? "" : `; on ${d(st - 1)} it ${before > 0 ? rose : before < 0 ? fell : "was unchanged"}`;
-    return `- ${name}: ${word} ${span2}, from ${f22(v[st - 1])} to ${f22(v[L])}${prior}. ${tally}`;
+    const cut = before === null, first = v.findIndex((x) => cent(x) !== null) === st - 1;
+    const span2 = cut ? `on each of at least the last ${plural2(len, "session")}, ${d(st)} to ${d(L)}` : len === 1 ? `on the latest session, ${d(L)}` : `on each of the last ${len} sessions, ${d(st)} to ${d(L)}`;
+    const prior = !cut ? `; on ${d(st - 1)} it ${before > 0 ? rose : before < 0 ? fell : "was unchanged"}` : first ? `; ${d(st - 1)} is the first session ${st - 1 ? `with a value in the desk's data (${dataStart})` : "in the desk's data"}, so the run may have begun earlier` : `; ${d(st - 2)} has no value, so the run may have begun earlier`;
+    return `- ${name}: ${word} ${span2}, from ${f22(v[st - 1])} on ${d(st - 1)} to ${f22(v[L])}${prior}. ${tally}`;
   };
   out.push("### Runs up to the latest row", "");
   out.push(...[
@@ -37868,7 +37870,8 @@ function priceFactsText(sym2, day3, s) {
     while (st - 1 >= 0 && sd(st - 1) === now) st--;
     const len = L - st + 1, word = now > 0 ? "above" : now < 0 ? "below" : "level with";
     const prev = st - 1 >= 0 ? sd(st - 1) : null;
-    const before = st === 0 ? ` (every ${what} on record)` : prev === null ? `; before ${d(st)} the ${b} had no value yet` : prev === 0 ? `; on ${d(st - 1)} they were level to the cent` : `; the last ${what} ${prev > 0 ? "above" : "below"} it was ${d(st - 1)} (${f22(av[st - 1])} against ${f22(bv[st - 1])})`;
+    const cut = st === 0 || prev === null;
+    const before = !cut ? prev === 0 ? `; on ${d(st - 1)} they were level to the cent` : `; the last ${what} ${prev > 0 ? "above" : "below"} it was ${d(st - 1)} (${f22(av[st - 1])} against ${f22(bv[st - 1])})` : `: ${d(st)} is the first ${what} ${st ? `with both values in the desk's data (${dataStart})` : "in the desk's data"}, so when this began is not known to the desk`;
     const crosses = [];
     let last = null;
     for (let i = 0; i < n2; i++) {
@@ -37877,7 +37880,7 @@ function priceFactsText(sym2, day3, s) {
       if (last !== null && x !== last && i >= year) crosses.push({ i, up: x > 0 });
       last = x;
     }
-    const span2 = len === 1 ? `on the latest ${what}, ${d(L)}` : `on each of the last ${plural2(len, what)}, since ${d(st)}`;
+    const span2 = cut ? `on each of at least the last ${plural2(len, what)}, since ${d(st)}` : len === 1 ? `on the latest ${what}, ${d(L)}` : `on each of the last ${plural2(len, what)}, since ${d(st)}`;
     const list2 = crosses.length ? ` Crossings in the last ${L - year + 1} sessions (${crosses.length} in all${crosses.length > CROSSES_SHOWN ? `, the ${CROSSES_SHOWN} latest shown` : ""}, newest first): ${crosses.reverse().slice(0, CROSSES_SHOWN).map((c) => `${c.up ? "above" : "below"} on ${d(c.i)}`).join("; ")}.` : ` No crossing in the last ${L - year + 1} sessions.`;
     return `- ${a} ${word} the ${b} ${span2}${before}.${list2}`;
   };
@@ -37968,8 +37971,8 @@ function priceFactsText(sym2, day3, s) {
     const x = v(L), p = bySign ? 0 : v(L - 1);
     if (cent(x) === null || cent(p) === null || cent(x) === cent(p)) return null;
     const high = x > p, j = Array.from({ length: L }, (_, k) => L - 1 - k).find((i) => cent(v(i)) !== null && (high ? v(i) >= x : v(i) <= x));
-    const valued = Array.from({ length: n2 }, (_, i) => i).filter((i) => cent(v(i)) !== null).length, what = words3[high ? 0 : 1];
-    return j === void 0 ? `- ${name} ${show(x)} on ${d(L)}: the ${what} of all ${plural2(valued, "session")} on record${valued < n2 ? " with a value" : ""}.` : `- ${name} ${show(x)} on ${d(L)}: the ${what} since ${d(j)} (${show(v(j))}), ${plural2(L - j, "session")} before.`;
+    const valued = Array.from({ length: n2 }, (_, i) => i).filter((i) => cent(v(i)) !== null), what = words3[high ? 0 : 1];
+    return j === void 0 ? `- ${name} ${show(x)} on ${d(L)}: the ${what} of all ${plural2(valued.length, "session")} in the desk's data${valued.length < n2 ? " with a value" : ""}, from ${d(valued[0])}${valued[0] ? ` (${dataStart})` : ""}; older sessions are not in it, so this is not known to be a record of all time.` : `- ${name} ${show(x)} on ${d(L)}: the ${what} since ${d(j)} (${show(v(j))}), ${plural2(L - j, "session")} before.`;
   };
   out.push("", "### The latest row against the past", "");
   out.push(...[
@@ -38368,6 +38371,8 @@ var SERIES = {
   germany_10y: ["IRLTLT01DEM156N", "Germany 10-year government bond yield (percent)"],
   eur_usd: ["DEXUSEU", "US dollars per euro"]
 };
+var SHOWN = 40;
+var MAX_MONTHS = 25;
 var isCsv = (text4) => /^\s*(observation_date|DATE)\s*,/i.test(text4);
 function parseCsv(csv) {
   return csv.trim().split(/\r?\n/).slice(1).map((line2) => line2.split(",")).filter((c) => c.length >= 2 && c[1] !== "." && c[1] !== "").map(([d, v]) => ({ date: d.trim(), value: Number(v) })).filter((o) => /^\d{4}-\d{2}-\d{2}$/.test(o.date) && Number.isFinite(o.value));
@@ -38420,6 +38425,16 @@ async function economicSeries(indicator, analysis2, lookBackDays = 365) {
     if (!known) return `${plusMinus(d)} in the series' own units (no percentage change: the desk does not know this series' units)`;
     return from2.value ? `${plusMinus(d)} (${signed(d / Math.abs(from2.value) * 100, 1)}%)` : `${plusMinus(d)} (no percentage change from zero)`;
   };
+  const shown2 = obs.slice(-SHOWN);
+  const whole2 = obs.length > shown2.length ? [(() => {
+    const hi = obs.reduce((a, o) => o.value > a.value ? o : a), lo = obs.reduce((a, o) => o.value < a.value ? o : a);
+    const ends = /* @__PURE__ */ new Map();
+    for (const o of obs) ends.set(o.date.slice(0, 7), o);
+    const all2 = [...ends.entries()], quarters = all2.length > MAX_MONTHS;
+    const kept = quarters ? all2.filter(([m2], i) => Number(m2.slice(5)) % 3 === 0 || i === all2.length - 1) : all2;
+    const month = (m2) => `${(/* @__PURE__ */ new Date(`${m2}-01T00:00:00Z`)).toLocaleString("en-US", { month: "short", timeZone: "UTC" })} ${m2.slice(0, 4)}`;
+    return `- The table below shows only the last ${shown2.length} of the ${obs.length} values in the look-back window, from ${shown2[0].date}; a level that held through it may not have held before it. Over the whole window, from ${first.date}: highest ${fmt2(hi.value)} on ${hi.date}, lowest ${fmt2(lo.value)} on ${lo.date}. The last value in ${quarters ? "March, June, September and December of each year, and in the latest month" : "each month"} (the latest month's so far): ${kept.map(([m2, o]) => `${month(m2)} ${fmt2(o.value)}`).join("; ")}.`;
+  })()] : [];
   const lines = [
     `## ${known?.[1] ?? id} - FRED series ${id}`,
     "",
@@ -38428,10 +38443,11 @@ async function economicSeries(indicator, analysis2, lookBackDays = 365) {
     `- Change over the look-back window, from ${periodOf(first.date, freq)} to ${periodOf(last.date, freq)}: ${changeOf(first)}${first.date !== ago?.date ? " (not a yearly rate)" : ""}`,
     past ? `- A past analysis date: these are the figures as FRED's archive of past releases (ALFRED) held them on ${day3}: only what was published by then, before any later revision.` : "- Values as FRED published them, revisions included.",
     past ? `- Read from FRED's archive at ${readWords(at)}.` : `- Read from FRED at ${readWords(at)} (the desk keeps a read for up to an hour): a figure released after that is not here.`,
+    ...whole2,
     "",
     freq === "monthly" || freq === "quarterly" ? "Date (the first day of the period it stands for) | Value" : "Date | Value",
     "---|---:",
-    ...obs.slice(-40).map((o) => `${o.date} | ${fmt2(o.value)}`)
+    ...shown2.map((o) => `${o.date} | ${fmt2(o.value)}`)
   ];
   if (!known) lines.push("", `Names this desk knows: ${Object.keys(SERIES).join(", ")}.`);
   return lines.join("\n");
@@ -38515,7 +38531,7 @@ var QUARTER = [60, 115];
 var YEAR = [300, 400];
 var YEAR_TO_DATE = [[150, 200, 6], [240, 290, 9]];
 var ANNUAL_FORMS = ["10-K", "20-F", "40-F"];
-var SHOWN = { quarterly: 8, annual: 5 };
+var SHOWN2 = { quarterly: 8, annual: 5 };
 function spanIndex(f, spans) {
   if (!f.start) return 0;
   const days = daysBetween(f.start, f.end);
@@ -38687,7 +38703,7 @@ function filedStatement(usGaap, kind, freq, asOf, basis) {
     for (const end of quarters[n2].keys()) m2.set(end, 0);
     return m2;
   });
-  const ends = [...new Set(chosen.flatMap((m2) => [...m2.keys()]))].sort().reverse().slice(0, SHOWN[freq]);
+  const ends = [...new Set(chosen.flatMap((m2) => [...m2.keys()]))].sort().reverse().slice(0, SHOWN2[freq]);
   const periods = ends.flatMap((end) => [...new Set(chosen.map((m2) => m2.get(end)).filter((i) => i !== void 0))].sort().map((i) => ({ end, i })));
   if (!periods.length) throw new NoData(`no ${freq} ${STATEMENTS[kind].title.toLowerCase()} was filed with the SEC by ${asOf}`);
   const derived2 = /* @__PURE__ */ new Map();
@@ -39003,7 +39019,7 @@ async function secInsiders(symbol4, cik, asOf, days = 90, limit = 25) {
   };
   const buys = market("P"), sales = market("S"), other = trades.length - buys.length - sales.length;
   const when = (t) => !t.corrected ? `made public ${t.filed}` : `made public ${t.filed}${t.filed > from ? "" : ", before these days"}; corrected ${t.corrected} by an amended filing, a Form 4/A${t.filed > from ? "" : ", so not counted above"}`;
-  const lines = all.map((t) => `- ${t.date} (${when(t)}) \xB7 ${t.owner} (${t.role}): ${CODES[t.code] ?? `transaction ${t.code} of`} ${fmt(t.shares, 4)} shares${t.price ? ` at ${fmt(t.price, 4)}` : ", no price"}${t.after !== null ? ` \xB7 holds ${fmt(t.after, 4)} after` : ""}${t.indirect ? ` \xB7 indirectly (${t.indirect})` : ""}${t.plan ? " \xB7 under a 10b5-1 plan" : t.planBox ? " \xB7 its filing's 10b5-1 box is ticked: at least one trade in that filing was under a plan, and the filing does not say which" : ""}`);
+  const lines = all.map((t) => `- ${t.date} (${when(t)}) \xB7 ${t.owner} (${t.role}): ${CODES[t.code] ?? `transaction ${t.code} of`} ${fmt(t.shares, 4)} shares${t.price ? ` at ${fmt(t.price, 4)}` : ", no price"}${t.after !== null ? ` \xB7 holds ${fmt(t.after, 4)} after, ${t.indirect ? `indirectly (${t.indirect})` : "directly"}` : t.indirect ? ` \xB7 indirectly (${t.indirect})` : ""}${t.plan ? " \xB7 under a 10b5-1 plan" : t.planBox ? " \xB7 its filing's 10b5-1 box is ticked: at least one trade in that filing was under a plan, and the filing does not say which" : ""}`);
   const skipped = picked.length - read2.length;
   const missing = [
     failed ? `${failed} of the filings could not be read (${why})` : "",
@@ -39016,6 +39032,9 @@ async function secInsiders(symbol4, cik, asOf, days = 90, limit = 25) {
     "",
     `${scope}: bought (code P) ${total(buys)}; sold (code S) ${total(sales)}; other kinds (awards, option exercises, shares handed back for tax, gifts) ${other}.`,
     "P and S are purchases and sales on the market or in a private deal: a purchase is the insider spending their own money. A sale under a 10b5-1 plan was arranged months ahead. Awards, exercises, tax handbacks and gifts say little about what an insider thinks of the price.",
+    // NVDA run of 9 Nov 2026: an agent added a line held directly to one held by a trust and called it the CEO's whole
+    // holding; his filing listed 273,726,947 more shares in other trusts and companies, with no trade, so not shown here.
+    `"holds \u2026 after" is what the insider holds in that line's own form of ownership (directly, or through the one trust or company it names), not all they hold: a filing can list more shares held in other ways, with no trade, and those are not shown here. So these figures never add up to an insider's whole holding.`,
     "",
     ...lines.length ? lines : [missing.length ? own2.length ? `(the ${own2.length === 1 ? "one filing" : `${own2.length} filings`}${others.length ? " of its insiders" : ""} read ${own2.length === 1 ? "lists" : "list"} no trades in shares, only options or holdings; the others were not read, so nothing is known of their trades)` : "(no filing read is one of its own insiders'; the others were not read, so nothing is known of their trades)" : `(${others.length ? "its insiders' filings" : "these filings"} list no trades in shares, only options or holdings)`]
   ].join("\n");
@@ -39521,7 +39540,7 @@ function yahooTable(j, kind, freq) {
     }
     return { label: STATEMENTS[kind].lines[i][0], unit: name === "DilutedEPS" ? `${unit}/shares` : unit, values };
   });
-  const ends = [...new Set(lines.flatMap((l) => [...l.values.keys()]))].sort().reverse().slice(0, SHOWN[freq]);
+  const ends = [...new Set(lines.flatMap((l) => [...l.values.keys()]))].sort().reverse().slice(0, SHOWN2[freq]);
   if (!ends.length) throw new NoData(`Yahoo Finance has no ${freq} ${STATEMENTS[kind].title.toLowerCase()}`);
   return { columns: ends, rows: lines.map((l) => ({ label: l.label, unit: l.unit, cells: ends.map((e) => l.values.get(e) ?? null) })) };
 }
@@ -41327,7 +41346,7 @@ import path17 from "node:path";
 var MOVE_PCT = 3;
 var VOLUME_TIMES = 2;
 var USUAL_DAYS = 20;
-var SHOWN2 = 5;
+var SHOWN3 = 5;
 var TOP_QUEUED = 3;
 var SCREEN_MS = 60 * 6e4;
 var one = (n2) => (Math.round(n2 * 10) / 10).toFixed(1);
@@ -41371,7 +41390,7 @@ function rank(candidates) {
   return candidates.map((c) => {
     const s = signalsOf(c.bars, c.news);
     return { symbol: c.symbol, signals: s.signals, movePct: s.movePct, why: whyOf2(s.signals), session: c.bars[c.bars.length - 1]?.date ?? "", ...c.live ? { live: true } : {} };
-  }).filter((p) => p.signals.length > 0).sort((a, b) => b.signals.length - a.signals.length || Math.abs(b.movePct ?? 0) - Math.abs(a.movePct ?? 0) || a.symbol.localeCompare(b.symbol)).slice(0, SHOWN2);
+  }).filter((p) => p.signals.length > 0).sort((a, b) => b.signals.length - a.signals.length || Math.abs(b.movePct ?? 0) - Math.abs(a.movePct ?? 0) || a.symbol.localeCompare(b.symbol)).slice(0, SHOWN3);
 }
 async function inTurn(items, width, job) {
   const out = new Array(items.length);

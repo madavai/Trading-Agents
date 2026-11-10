@@ -182,7 +182,7 @@ export async function secInsiders(symbol: string, cik: string, asOf: string, day
   const buys = market('P'), sales = market('S'), other = trades.length - buys.length - sales.length;
   const when = (t: InsiderTrade) => (!t.corrected ? `made public ${t.filed}`
     : `made public ${t.filed}${t.filed > from ? '' : ', before these days'}; corrected ${t.corrected} by an amended filing, a Form 4/A${t.filed > from ? '' : ', so not counted above'}`);
-  const lines = all.map((t) => `- ${t.date} (${when(t)}) · ${t.owner} (${t.role}): ${CODES[t.code] ?? `transaction ${t.code} of`} ${fmt(t.shares, 4)} shares${t.price ? ` at ${fmt(t.price, 4)}` : ', no price'}${t.after !== null ? ` · holds ${fmt(t.after, 4)} after` : ''}${t.indirect ? ` · indirectly (${t.indirect})` : ''}${t.plan ? ' · under a 10b5-1 plan' : t.planBox ? " · its filing's 10b5-1 box is ticked: at least one trade in that filing was under a plan, and the filing does not say which" : ''}`);
+  const lines = all.map((t) => `- ${t.date} (${when(t)}) · ${t.owner} (${t.role}): ${CODES[t.code] ?? `transaction ${t.code} of`} ${fmt(t.shares, 4)} shares${t.price ? ` at ${fmt(t.price, 4)}` : ', no price'}${t.after !== null ? ` · holds ${fmt(t.after, 4)} after, ${t.indirect ? `indirectly (${t.indirect})` : 'directly'}` : t.indirect ? ` · indirectly (${t.indirect})` : ''}${t.plan ? ' · under a 10b5-1 plan' : t.planBox ? " · its filing's 10b5-1 box is ticked: at least one trade in that filing was under a plan, and the filing does not say which" : ''}`);
   // What the counts leave out: filings that could not be read, older ones beyond the newest `limit`, days before the list.
   const skipped = picked.length - read.length;
   const missing = [
@@ -198,6 +198,9 @@ export async function secInsiders(symbol: string, cik: string, asOf: string, day
     '',
     `${scope}: bought (code P) ${total(buys)}; sold (code S) ${total(sales)}; other kinds (awards, option exercises, shares handed back for tax, gifts) ${other}.`,
     'P and S are purchases and sales on the market or in a private deal: a purchase is the insider spending their own money. A sale under a 10b5-1 plan was arranged months ahead. Awards, exercises, tax handbacks and gifts say little about what an insider thinks of the price.',
+    // NVDA run of 9 Nov 2026: an agent added a line held directly to one held by a trust and called it the CEO's whole
+    // holding; his filing listed 273,726,947 more shares in other trusts and companies, with no trade, so not shown here.
+    '"holds … after" is what the insider holds in that line\'s own form of ownership (directly, or through the one trust or company it names), not all they hold: a filing can list more shares held in other ways, with no trade, and those are not shown here. So these figures never add up to an insider\'s whole holding.',
     '', ...(lines.length ? lines : [missing.length
       ? (own.length ? `(the ${own.length === 1 ? 'one filing' : `${own.length} filings`}${others.length ? ' of its insiders' : ''} read ${own.length === 1 ? 'lists' : 'list'} no trades in shares, only options or holdings; the others were not read, so nothing is known of their trades)`
         : '(no filing read is one of its own insiders\'; the others were not read, so nothing is known of their trades)')
