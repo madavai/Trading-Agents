@@ -112,6 +112,33 @@ test('after the fact check a checked figure is quoted with whose it is, and only
   }
 });
 
+// Fact-check speed (10 Nov 2026): in the real NVDA run of 9 Nov the fact check took 97 minutes on Madav's model, about
+// half the run, and "corrected" social-media counts and odds that had only moved since the analysts read them. It now
+// works in five steps, each one message: one read, every data tool once (nine series, five topics and six statements in
+// three calls), one sum call per report, one correction call per report; and data that moved is not a mistake.
+test('the fact checker works in five steps, each one message, every data tool asked once, and never corrects data that only moved', () => {
+  const { text, fields } = front('fact-checker');
+  assert.match(text, /Work in these five steps, in order\. Each step after the reading is one message: make all of its calls together, at once, never one call per message\./);
+  for (const rule of [
+    '1. Read the reports with read_run (sections market, sentiment, news, fundamentals), in one call, and each part of its answer once.',
+    '2. Gather the data the reports were written from, in one message, each tool once',
+    'get_financial_statement with statement "all" and frequency "both"',
+    'get_economic_series with every series the reports quote in one call',
+    'get_prediction_markets with every topic they quote in one call',
+    'never ask a tool the same question twice',
+    'and that its parts are the ones it names (the right quarters, lines or people, none left out or counted twice)',
+    'then work them out in one work_out call for each report, all made together in one message',
+    'Data that moves is not wrong for having moved.',
+    'Never correct it to your read; list it as not checked, with the span or time of both reads. Read these sources all the same',
+    '4. Correct each report that holds a wrong or misleading claim with correct_report, one call per report, all of them in one message',
+    'so never write such a mark yourself',
+    'Say that a claim held only when you checked it against a tool answer you have; one you did not check goes on the list.',
+  ]) assert.ok(text.includes(rule), rule);
+  // a partial session's row is still never corrected to newer prices, and an "unavailable" that now answers still is
+  assert.match(text, /never correct them to newer ones; check them against the rows before it, the filings and the sums\. .*If a source an analyst found unavailable answers you, correct the "unavailable" with what it says\./s);
+  assert.equal(fields.maxTurns, '40');
+});
+
 test('every agent carries the desk\'s rules and saves the section the plan expects', () => {
   for (const agent of src.AGENTS) {
     const { text } = front(agent.file);

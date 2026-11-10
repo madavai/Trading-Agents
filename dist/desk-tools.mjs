@@ -42388,6 +42388,19 @@ async function answer(what, run) {
     return text3(failureText(e, what));
   }
 }
+async function answers(items, what, run) {
+  const parts = [];
+  for (const x of items) parts.push((await answer(what(x), () => run(x))).content[0].text);
+  return text3(parts.join("\n\n"));
+}
+function several(raw, sep, most) {
+  const items = [...new Set(raw.split(sep).map((s) => s.trim()).filter(Boolean))];
+  return items.length > most ? null : items;
+}
+var tooMany = (what, most) => text3(`INPUT_ERROR: at most ${most} ${what} in one call. Split them over two calls made together.`);
+var MOST_SERIES = 10;
+var MOST_TOPICS = 6;
+var STATEMENT_KINDS = ["income_statement", "balance_sheet", "cashflow"];
 var symbol3 = external_exports.string().min(1).max(20).describe("The ticker as the instrument context gives it, e.g. NVDA, 7203.T, BTC-USD");
 var analysis = external_exports.string().describe("The analysis date, YYYY-MM-DD. Nothing dated after it is ever returned.");
 var READ = { readOnlyHint: true, openWorldHint: true };
@@ -42515,16 +42528,25 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root, home) {
   }, async (a) => answer("posts about " + a.symbol, () => socialPosts(a.symbol, a.analysis_date, { lookBackDays: a0.newsLookbackDays, stocktwitsLimit: a0.stocktwitsLimit, subreddits: a0.subreddits, cryptoSubreddits: a0.cryptoSubreddits })));
   server.registerTool("get_economic_series", {
     title: "Economic figures (FRED)",
-    description: "An economic series from FRED as known by the analysis date: the latest value named by the period it stands for, the change over a year (from the same period a year earlier: quote a yearly rate only from that line), the change over the look-back window and recent values. Names: " + Object.keys(SERIES).join(", ") + "; or any FRED series id.",
-    inputSchema: { indicator: external_exports.string().describe("A name such as cpi, 10y_treasury, unemployment, or a FRED series id"), analysis_date: analysis, look_back_days: external_exports.number().int().min(30).max(3650).optional().describe("365 when left out") },
+    description: "Economic series from FRED as known by the analysis date, each with the latest value named by the period it stands for, the change over a year (from the same period a year earlier: quote a yearly rate only from that line), the change over the look-back window and recent values. Ask for every series you need in one call, comma separated, up to " + MOST_SERIES + ". Names: " + Object.keys(SERIES).join(", ") + "; or any FRED series id.",
+    inputSchema: { indicator: external_exports.string().describe(`One name or several, comma separated, up to ${MOST_SERIES}, e.g. "cpi, core_pce, unemployment"; a name or a FRED series id`), analysis_date: analysis, look_back_days: external_exports.number().int().min(30).max(3650).optional().describe("365 when left out") },
     annotations: READ
-  }, async (a) => answer("economic series " + a.indicator, () => economicSeries(a.indicator, a.analysis_date, a.look_back_days ?? 365)));
+  }, async (a) => {
+    const names = several(a.indicator, ",", MOST_SERIES);
+    if (!names) return tooMany("series", MOST_SERIES);
+    return answers(names, (n2) => "economic series " + n2, (n2) => economicSeries(n2, a.analysis_date, a.look_back_days ?? 365));
+  });
   server.registerTool("get_prediction_markets", {
     title: "Prediction-market odds",
-    description: 'Live Polymarket odds for forward-looking events matching a topic (e.g. "Fed rate cut", "recession 2026"), with volume and resolution date. Withheld for a past analysis date.',
-    inputSchema: { topic: external_exports.string().min(2).max(80), analysis_date: analysis, limit: external_exports.number().int().min(1).max(10).optional() },
+    description: `Live Polymarket odds for forward-looking events matching a topic (e.g. "Fed rate cut", "recession 2026"), with volume and resolution date. Ask for every topic you need in one call, separated by semicolons, up to ${MOST_TOPICS}. Withheld for a past analysis date.`,
+    inputSchema: { topic: external_exports.string().min(2).max(500).describe(`One topic or several, separated by semicolons, up to ${MOST_TOPICS}, e.g. "Fed rate cut; recession 2027"`), analysis_date: analysis, limit: external_exports.number().int().min(1).max(10).optional().describe("Markets to show for each topic; 6 when left out") },
     annotations: READ
-  }, async (a) => answer("prediction markets on " + a.topic, () => predictionMarkets(a.topic, a.analysis_date, a.limit ?? 6)));
+  }, async (a) => {
+    const topics = several(a.topic, ";", MOST_TOPICS);
+    if (!topics) return tooMany("topics", MOST_TOPICS);
+    if (!topics.length || topics.some((t) => t.length < 2 || t.length > 80)) return text3("INPUT_ERROR: each topic is 2 to 80 characters. Correct it and call again.");
+    return answers(topics, (t) => "prediction markets on " + t, (t) => predictionMarkets(t, a.analysis_date, a.limit ?? 6));
+  });
   server.registerTool("get_company_overview", {
     title: "Company profile and ratios",
     description: "For a US filer, from its SEC filings as they stood on the analysis date and the checked closing price: its name, industry and sector, fiscal year, shares outstanding, and its valuation worked out from them (market value, last-twelve-months diluted EPS, price to earnings, book value and price to book), each shown with the filed figures it came from, and the dividends per share and yield of the twelve months to the day from the dividends the price source records, each dated; a past analysis date has its own. For a company that does not file with the SEC, Yahoo Finance's profile and ratios for today only, withheld for a past analysis date.",
@@ -42533,15 +42555,20 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root, home) {
   }, async (a) => answer("profile of " + a.symbol, () => companyOverview(a.symbol, a.analysis_date)));
   server.registerTool("get_financial_statement", {
     title: "Financial statement",
-    description: "A balance sheet, income statement or cash flow statement, quarterly or annual, latest periods first, with margins, growth, free cash flow and balance-sheet ratios worked out in rows of their own. For a US filer it is the SEC filing as it stood on the analysis date (a quarter no filing states derived and marked so, per-share figures on the basis of the latest filings across a share split); otherwise Yahoo Finance's, for today only.",
+    description: `A balance sheet, income statement or cash flow statement, quarterly or annual, latest periods first, with margins, growth, free cash flow and balance-sheet ratios worked out in rows of their own; statement "all" gives the three, and frequency "both" each quarterly and annual, in one call. For a US filer it is the SEC filing as it stood on the analysis date (a quarter no filing states derived and marked so, per-share figures on the basis of the latest filings across a share split); otherwise Yahoo Finance's, for today only.`,
     inputSchema: {
       symbol: symbol3,
       analysis_date: analysis,
-      statement: external_exports.enum(["balance_sheet", "income_statement", "cashflow"]),
-      frequency: external_exports.enum(["quarterly", "annual"]).optional().describe("quarterly when left out")
+      statement: external_exports.enum(["balance_sheet", "income_statement", "cashflow", "all"]).describe('"all" for the three statements in one answer'),
+      frequency: external_exports.enum(["quarterly", "annual", "both"]).optional().describe('quarterly when left out; "both" for quarterly and annual in one answer')
     },
     annotations: READ
-  }, async (a) => answer(`${a.statement.replace("_", " ")} of ${a.symbol}`, () => financialStatement(a.symbol, a.statement, a.frequency ?? "quarterly", a.analysis_date)));
+  }, async (a) => {
+    const kinds = a.statement === "all" ? STATEMENT_KINDS : [a.statement];
+    const freqs = a.frequency === "both" ? ["quarterly", "annual"] : [a.frequency ?? "quarterly"];
+    const asked = kinds.flatMap((kind) => freqs.map((freq) => ({ kind, freq })));
+    return answers(asked, (x) => `${x.kind.replace("_", " ")} of ${a.symbol}`, (x) => financialStatement(a.symbol, x.kind, x.freq, a.analysis_date));
+  });
   server.registerTool("get_insider_transactions", {
     title: "Insider transactions",
     description: "Buying and selling by the company's directors, officers and largest owners in the 90 days up to the analysis date, for a US filer from its Form 4 filings with the SEC (only those made public by then, so a past date has its own): who, their role, what kind of trade, shares, price, what they hold after, and whether it was under a pre-arranged plan, with a count of purchases and sales. For a company that does not file with the SEC, Yahoo Finance's for today only, withheld for a past analysis date.",
