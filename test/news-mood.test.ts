@@ -200,6 +200,19 @@ test('FRED: the change over a year is from the same month a year earlier, never 
   assert.match(t, /- Change over the look-back window, from November 2025 to August 2026: \+9\.00 \(\+3\.0%\) \(not a yearly rate\)/);   // 304 -> 313
 });
 
+// NVDA run of 9 Nov 2026 (first run): jobless claims are dated on Saturdays, which fall a day earlier each year, so "the
+// last week on or before the same date" was 53 weeks back: 189,000 against 221,000 (-14.5%) in place of 228,000 (-17.1%).
+test('FRED: a weekly figure is compared with the same week a year earlier, not 53 weeks back', async () => {
+  process.env.TRADING_AGENTS_TODAY = '2026-11-09';
+  const weeks: string[] = [];
+  for (let t = Date.parse('2024-11-02T00:00:00Z'); t <= Date.parse('2026-10-31T00:00:00Z'); t += 7 * 86_400_000) weeks.push(new Date(t).toISOString().slice(0, 10));
+  const claims = (d: string) => (d === '2025-10-25' ? 221000 : d === '2025-11-01' ? 228000 : d === '2026-10-31' ? 189000 : 230000);
+  configure({ fetch: route([[/fredgraph\.csv\?id=ICSA/, () => new Response(`observation_date,ICSA\n${weeks.map((d) => `${d},${claims(d)}`).join('\n')}\n`)]]) });
+  const t = await economicSeries('initial_claims', '2026-11-05', 365);
+  assert.match(t, /- Latest value known by 2026-11-05: 189,000 \(for 2026-10-31\)/);
+  assert.match(t, /- Year over year, from 228,000 for 2025-11-01: -39,000 \(-17\.1%\)/);
+});
+
 test('FRED: the federal funds rate is the daily one, a rate changes by percentage points, and an outage is not "no data"', async () => {
   const seen: string[] = [];
   const days = ['2025-10-08', '2025-10-09', '2026-09-16', '2026-09-17', '2026-10-08', '2026-10-09'], rates = [4.33, 4.33, 3.63, 3.88, 3.88, 3.88];
@@ -211,6 +224,30 @@ test('FRED: the federal funds rate is the daily one, a rate changes by percentag
   assert.match(t, /- Year over year, from 4\.33 for 2025-10-09: -0\.45 percentage points/);
   configure({ fetch: route([[/fredgraph/, () => new Response('<html><body>FRED is down for maintenance</body></html>')]]) });
   await assert.rejects(economicSeries('cpi', '2026-10-12'), (e: Error) => e.name === 'Unavailable' && /something other than its data download/.test(e.message));
+});
+
+// NVDA run of 9 Nov 2026 (second review): the table showed the last 40 days of the Fed's rate, all 3.88 from 2026-09-28,
+// and the news analyst wrote "flat all window ... the Fed has not moved": it had risen from 3.63 on 2026-09-17.
+test('FRED: when the table shows only the latest values, the whole window is summed up, so a move before the table is seen', async () => {
+  process.env.TRADING_AGENTS_TODAY = '2026-11-09';
+  const days: string[] = [];
+  for (let t = Date.parse('2025-11-09T00:00:00Z'); t <= Date.parse('2026-11-06T00:00:00Z'); t += 86_400_000) days.push(new Date(t).toISOString().slice(0, 10));
+  const rate = (d: string) => (d < '2025-12-11' ? 3.88 : d < '2026-09-17' ? 3.64 : 3.88);
+  configure({ fetch: route([[/fredgraph\.csv\?id=DFF/, () => new Response(`observation_date,DFF\n${days.map((d) => `${d},${rate(d)}`).join('\n')}\n`)]]) });
+  const t = await economicSeries('fed_funds_rate', '2026-11-09', 365);
+  assert.match(t, new RegExp(`\\n- The table below shows only the last 40 of the ${days.length} values in the look-back window, from 2026-09-28; a level that held through it may not have held before it\\. Over the whole window, from 2025-11-09: highest 3\\.88 on 2025-11-09, lowest 3\\.64 on 2025-12-11\\. The last value in each month \\(the latest month's so far\\): Nov 2025 3\\.88; Dec 2025 3\\.64; Jan 2026 3\\.64;`));
+  assert.match(t, /; Aug 2026 3\.64; Sep 2026 3\.88; Oct 2026 3\.88; Nov 2026 3\.88\.\n\nDate \| Value\n---\|---:\n2026-09-28 \| 3\.88\n/);
+  // Over three years the months would be too many to read: March, June, September and December, and the latest month.
+  const long: string[] = [];
+  for (let x = Date.parse('2023-11-01T00:00:00Z'); x <= Date.parse('2026-11-06T00:00:00Z'); x += 86_400_000) long.push(new Date(x).toISOString().slice(0, 10));
+  configure({ fetch: route([[/fredgraph\.csv\?id=DFF/, () => new Response(`observation_date,DFF\n${long.map((d) => `${d},${rate(d)}`).join('\n')}\n`)]]) });
+  const years = await economicSeries('fed_funds_rate', '2026-11-09', 1095);
+  assert.match(years, /The last value in March, June, September and December of each year, and in the latest month \(the latest month's so far\): Dec 2023 3\.88; Mar 2024 3\.88;/);
+  assert.match(years, /; Sep 2026 3\.88; Nov 2026 3\.88\.\n/);
+  assert.doesNotMatch(years, /Jan 2024|Oct 2026 3/);
+  // A table that holds the whole window needs no such line.
+  configure({ fetch: route([[/fredgraph\.csv\?id=DFF/, () => new Response(`observation_date,DFF\n${days.slice(-30).map((d) => `${d},${rate(d)}`).join('\n')}\n`)]]) });
+  assert.doesNotMatch(await economicSeries('fed_funds_rate', '2026-11-09', 365), /The table below shows only/);
 });
 
 const POLY = { events: [{ markets: [

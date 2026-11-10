@@ -295,9 +295,9 @@ test('filings-6: the tool says which trades the box covers', async () => {
   });
   const t = await insiderTransactions('ACME', '2026-11-06');
   assert.match(t, /sold \(code S\) 2 \([^)]*; 1 under a pre-arranged 10b5-1 plan; 1 more in a filing whose 10b5-1 box covers at least one of its trades without saying which\)/);
-  assert.match(t, /KRESS \(owner of over 10%\): handed back, for tax or the exercise price, 40,747 shares at 212\.17 · holds 600,000,000 after$/m);
-  assert.match(t, /KRESS \(owner of over 10%\): sold 20,369 shares at 219 · holds 600,000,000 after · under a 10b5-1 plan$/m);
-  assert.match(t, /ROE \(owner of over 10%\): sold 100 shares at 10 · holds 600,000,000 after · its filing's 10b5-1 box is ticked: at least one trade in that filing was under a plan, and the filing does not say which$/m);
+  assert.match(t, /KRESS \(owner of over 10%\): handed back, for tax or the exercise price, 40,747 shares at 212\.17 · holds 600,000,000 after, directly$/m);
+  assert.match(t, /KRESS \(owner of over 10%\): sold 20,369 shares at 219 · holds 600,000,000 after, directly · under a 10b5-1 plan$/m);
+  assert.match(t, /ROE \(owner of over 10%\): sold 100 shares at 10 · holds 600,000,000 after, directly · its filing's 10b5-1 box is ticked: at least one trade in that filing was under a plan, and the filing does not say which$/m);
 });
 
 // ---------- filings-5: economic figures as they were known on a past day ----------

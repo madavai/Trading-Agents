@@ -40,6 +40,8 @@ export const SERIES: Record<string, [id: string, title: string]> = {
 };
 
 export interface Obs { date: string; value: number }
+/** How many values the table shows, and how many months' last values the line above it lists before it lists quarters. */
+const SHOWN = 40, MAX_MONTHS = 25;
 
 /** Whether an answer is FRED's data download: its first line is the header, "observation_date,PCEPILFE" from FRED and
  *  "observation_date,PCEPILFE_20260924" from its archive (ALFRED); "DATE," in its older downloads. */
@@ -69,9 +71,20 @@ export function periodOf(date: string, freq: Frequency): string {
   return date;
 }
 
-/** The observation for the same period a year before `date` (for a daily or weekly series, the last one within ten days before it). */
-function yearBefore(obs: Obs[], date: string): Obs | undefined {
-  const target = `${Number(date.slice(0, 4)) - 1}${date.slice(4)}`, floor = addDays(target.replace(/-02-29$/, '-02-28'), -10);
+/**
+ * The observation for the same period a year before `date`. A weekly series takes the same week a year earlier: the
+ * week dated nearest the same day, within three days either side (a series dated on Saturdays falls a day earlier each
+ * year, so "on or before" would reach 53 weeks back: jobless claims for 2026-10-31 were set against 2025-10-25, not
+ * 2025-11-01, a 14.5% fall in place of 17.1%, NVDA 9 Nov 2026). A daily series takes the last value within ten days
+ * before it; a monthly, quarterly or yearly one the same period.
+ */
+function yearBefore(obs: Obs[], date: string, freq: Frequency): Obs | undefined {
+  const target = `${Number(date.slice(0, 4)) - 1}${date.slice(4)}`, real = target.replace(/-02-29$/, '-02-28');
+  if (freq === 'weekly') {
+    const day = (d: string) => Date.parse(`${d}T00:00:00Z`) / 86_400_000, at = day(real);
+    return obs.filter((o) => Math.abs(day(o.date) - at) <= 3).sort((a, b) => Math.abs(day(a.date) - at) - Math.abs(day(b.date) - at))[0];
+  }
+  const floor = addDays(real, -10);
   return [...obs].reverse().find((o) => o.date <= target && o.date >= floor);
 }
 
@@ -98,7 +111,7 @@ export async function economicSeries(indicator: string, analysis: string, lookBa
   const all = parseCsv(csv).filter((o) => o.date <= day), freq = frequency(all);
   const obs = all.filter((o) => o.date >= addDays(day, -window));
   if (!obs.length) throw new NoData(`FRED has no ${id} values published by ${day} in this window`);
-  const first = obs[0]!, last = obs[obs.length - 1]!, ago = yearBefore(all, last.date);
+  const first = obs[0]!, last = obs[obs.length - 1]!, ago = yearBefore(all, last.date, freq);
   const fmt = (v: number) => (Math.abs(v) >= 1000 ? v.toLocaleString('en-US', { maximumFractionDigits: 1 }) : v.toFixed(2));
   const plusMinus = (v: number) => { const t = fmt(Math.abs(v)); return Number(t.replace(/,/g, '')) === 0 ? t : `${v > 0 ? '+' : '-'}${t}`; };
   // A rate or a spread changes by percentage points; a level or an index changes by a percentage of itself as well. A
@@ -111,6 +124,19 @@ export async function economicSeries(indicator: string, analysis: string, lookBa
     if (!known) return `${plusMinus(d)} in the series' own units (no percentage change: the desk does not know this series' units)`;
     return from.value ? `${plusMinus(d)} (${signed((d / Math.abs(from.value)) * 100, 1)}%)` : `${plusMinus(d)} (no percentage change from zero)`;
   };
+  // The table holds the last 40 values; a daily series has some 250 in a year. What came before the table is summed up,
+  // so a move just before it is not hidden: the news analyst called the Fed's rate "flat all window" from 40 days of
+  // 3.88, eleven days after it rose from 3.63 (NVDA, 9 Nov 2026).
+  const shown = obs.slice(-SHOWN);
+  const whole = obs.length > shown.length ? [(() => {
+    const hi = obs.reduce((a, o) => (o.value > a.value ? o : a)), lo = obs.reduce((a, o) => (o.value < a.value ? o : a));
+    const ends = new Map<string, Obs>();
+    for (const o of obs) ends.set(o.date.slice(0, 7), o);
+    const all = [...ends.entries()], quarters = all.length > MAX_MONTHS;
+    const kept = quarters ? all.filter(([m], i) => Number(m.slice(5)) % 3 === 0 || i === all.length - 1) : all;
+    const month = (m: string) => `${new Date(`${m}-01T00:00:00Z`).toLocaleString('en-US', { month: 'short', timeZone: 'UTC' })} ${m.slice(0, 4)}`;
+    return `- The table below shows only the last ${shown.length} of the ${obs.length} values in the look-back window, from ${shown[0]!.date}; a level that held through it may not have held before it. Over the whole window, from ${first.date}: highest ${fmt(hi.value)} on ${hi.date}, lowest ${fmt(lo.value)} on ${lo.date}. The last value in ${quarters ? 'March, June, September and December of each year, and in the latest month' : 'each month'} (the latest month's so far): ${kept.map(([m, o]) => `${month(m)} ${fmt(o.value)}`).join('; ')}.`;
+  })()] : [];
   const lines = [
     `## ${known?.[1] ?? id} - FRED series ${id}`, '',
     `- Latest value known by ${day}: ${fmt(last.value)} (for ${periodOf(last.date, freq)})`,
@@ -118,7 +144,8 @@ export async function economicSeries(indicator: string, analysis: string, lookBa
     `- Change over the look-back window, from ${periodOf(first.date, freq)} to ${periodOf(last.date, freq)}: ${changeOf(first)}${first.date !== ago?.date ? ' (not a yearly rate)' : ''}`,
     past ? `- A past analysis date: these are the figures as FRED's archive of past releases (ALFRED) held them on ${day}: only what was published by then, before any later revision.` : '- Values as FRED published them, revisions included.',
     past ? `- Read from FRED's archive at ${readWords(at)}.` : `- Read from FRED at ${readWords(at)} (the desk keeps a read for up to an hour): a figure released after that is not here.`,
-    '', freq === 'monthly' || freq === 'quarterly' ? 'Date (the first day of the period it stands for) | Value' : 'Date | Value', '---|---:', ...obs.slice(-40).map((o) => `${o.date} | ${fmt(o.value)}`),
+    ...whole,
+    '', freq === 'monthly' || freq === 'quarterly' ? 'Date (the first day of the period it stands for) | Value' : 'Date | Value', '---|---:', ...shown.map((o) => `${o.date} | ${fmt(o.value)}`),
   ];
   if (!known) lines.push('', `Names this desk knows: ${Object.keys(SERIES).join(', ')}.`);
   return lines.join('\n');

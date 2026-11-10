@@ -25,11 +25,11 @@ test('a date carries its weekday', () => {
 
 test('a run is counted to the latest row, with what the session before it did and a tally of the month', () => {
   const t = priceFactsText('ACME', '2026-10-30', rows('2026-10-30', [10, 11, 12, 13, 12, 11, 10, 9]));
-  assert.equal(line(t, '- Close:'), '- Close: down on each of the last 4 sessions, 2026-10-27 (Tue) to 2026-10-30 (Fri), from 13.00 to 9.00; on 2026-10-26 (Mon) it closed up. Over the last 7 sessions it closed up on 3 and closed down on 4.');
+  assert.equal(line(t, '- Close:'), '- Close: down on each of the last 4 sessions, 2026-10-27 (Tue) to 2026-10-30 (Fri), from 13.00 on 2026-10-26 (Mon) to 9.00; on 2026-10-26 (Mon) it closed up. Over the last 7 sessions it closed up on 3 and closed down on 4.');
   const up = priceFactsText('ACME', '2026-10-30', rows('2026-10-30', [10, 11, 12, 11, 12]));
-  assert.match(line(up, '- Close:'), /^- Close: up on the latest session, 2026-10-30 \(Fri\), from 11\.00 to 12\.00; on 2026-10-29 \(Thu\) it closed down\./);
-  // A window longer than the record is the whole record, and says so.
-  assert.match(t, /the last 8 sessions \(all on record\) from 2026-10-21 \(Wed\)/);
+  assert.match(line(up, '- Close:'), /^- Close: up on the latest session, 2026-10-30 \(Fri\), from 11\.00 on 2026-10-29 \(Thu\) to 12\.00; on 2026-10-29 \(Thu\) it closed down\./);
+  // A window longer than the desk's data is all of it, and says so.
+  assert.match(t, /the last 8 sessions \(all the desk has\) from 2026-10-21 \(Wed\)/);
   assert.match(t, /Quote a fact as it stands here, naming its window/);
 });
 
@@ -49,6 +49,23 @@ test('sides, crossings and counts come from every session, so "the only one" and
   assert.match(line(short, 'Closes below the 200 SMA'), / \| 0 of 101 sessions with a value \| /);
 });
 
+// NVDA run of 9 Nov 2026 (second review): "the 50 SMA has held above the 200 SMA for 282 straight sessions", from a line
+// that said "since 2025-09-26; before 2025-09-26 the 200 SMA had no value yet". The 200 SMA starts 200 sessions into the
+// desk's data, so the true run was longer (345). And "falling 4 sessions (from -1.63 on 2026-11-04)": -1.63 was the
+// value of the session before the run, 2026-11-03, which the line did not date.
+test('a run or a side that reaches back to where the desk\'s data starts is "at least" that long, and a run\'s start value is dated', () => {
+  const closes = Array.from({ length: 300 }, (_, i) => 100 + i * 0.5);
+  const s = rows('2026-10-30', closes, { 250: { volume: null } });
+  const t = priceFactsText('ACME', '2026-10-30', s), D = (i: number) => withWeekday(s.bars[i]!.date);
+  assert.equal(line(t, '- 50 SMA above the 200 SMA'), `- 50 SMA above the 200 SMA on each of at least the last 101 sessions, since ${D(199)}: ${D(199)} is the first session with both values in the desk's data (the desk's prices start on ${D(0)}), so when this began is not known to the desk. No crossing in the last 252 sessions.`);
+  assert.equal(line(t, '- 200 SMA:'), `- 200 SMA: rising on each of at least the last 100 sessions, ${D(200)} to ${D(299)}, from 149.75 on ${D(199)} to 199.75; ${D(199)} is the first session with a value in the desk's data (the desk's prices start on ${D(0)}), so the run may have begun earlier. Over the last 20 sessions it rose on 20 and fell on 0.`);
+  // A gap inside the data (a volume the source did not give) cuts a run too, and says where.
+  assert.match(line(t, '- VWMA:'), new RegExp(`^- VWMA: rising on each of at least the last 35 sessions, ${D(265).replace(/[()]/g, '\\$&')} to .*; ${D(263).replace(/[()]/g, '\\$&')} has no value, so the run may have begun earlier\\.`));
+  // A run from the very first row says so, without naming that day twice.
+  assert.equal(line(t, '- Close:'), `- Close: up on each of at least the last 299 sessions, ${D(1)} to ${D(299)}, from 100.00 on ${D(0)} to 249.50; ${D(0)} is the first session in the desk's data, so the run may have begun earlier. Over the last 20 sessions it closed up on 20 and closed down on 0.`);
+  assert.doesNotMatch(t, /had no value yet|on record/);
+});
+
 test('the highest and lowest of each window are ranked, a tie the latest first, with each move\'s size', () => {
   const closes = [100, 104, 101, 106, 100, 103, 99, 105];
   const t = priceFactsText('ACME', '2026-10-30', rows('2026-10-30', closes, { 2: { volume: 9e6 }, 6: { volume: 9e6 }, 4: { volume: 8e6 } }));
@@ -64,7 +81,7 @@ test('the latest row is set against the past: the lowest since when, the distanc
   assert.equal(line(t, '- Close 41.50'), '- Close 41.50 on 2026-10-30 (Fri): the lowest close since 2026-10-23 (Fri) (40.00), 5 sessions before.');
   assert.equal(line(t, '- Daily move'), '- Daily move -1.19% on 2026-10-30 (Fri): the biggest daily fall since 2026-10-29 (Thu) (-2.33%), 1 session before.');
   const fall = priceFactsText('ACME', '2026-10-30', rows('2026-10-30', [50, 40, 45, 44, 43, 42, 30]));
-  assert.equal(line(fall, '- Close 30.00'), '- Close 30.00 on 2026-10-30 (Fri): the lowest close of all 7 sessions on record.');
+  assert.equal(line(fall, '- Close 30.00'), "- Close 30.00 on 2026-10-30 (Fri): the lowest close of all 7 sessions in the desk's data, from 2026-10-22 (Thu); older sessions are not in it, so this is not known to be a record of all time.");
   assert.match(t, /- 1 session -1\.19% \(from 42\.00 on 2026-10-29 \(Thu\)\); 5 sessions \+3\.75% \(from 40\.00 on 2026-10-23 \(Fri\)\)/);
 });
 
@@ -93,7 +110,7 @@ test('while the latest session is still trading, its volume so far is in no volu
   assert.equal(line(t, '- Volume '), '');
   const done = priceFactsText('ACME', '2026-10-30', s);
   assert.match(line(done, 'Lightest volume'), /^Lightest volume \| 110,000 on 2026-10-30 \(Fri\)/, 'a finished session\'s volume is ranked');
-  assert.match(done, /- Volume 110,000 on 2026-10-30 \(Fri\): the lightest volume of all 300 sessions on record\./);
+  assert.match(done, /- Volume 110,000 on 2026-10-30 \(Fri\): the lightest volume of all 300 sessions in the desk's data, from [^;]+; older sessions are not in it, so this is not known to be a record of all time\./);
   assert.doesNotMatch(done, /is not a finished session/);
 });
 
