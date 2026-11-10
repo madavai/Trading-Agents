@@ -21,7 +21,7 @@ import { byAnother, DEPTHS, finishItem, QueueRefusal, readQueue, ringDoorbell, R
 import { Journal } from '../desk/journal.js';
 import { writeWhole } from '../desk/lock.js';
 import { parseRating, RATINGS } from '../desk/rating.js';
-import { CONTEXT, correctSection, progress, readSections, savedPlan, saveSection, SECTIONS, writeReport } from '../desk/runs.js';
+import { CONTEXT, correctSection, PART_CHARS, progress, readPart, readSections, savedPlan, saveSection, SECTIONS, writeReport } from '../desk/runs.js';
 import { dueSettlements, settleOne } from '../desk/settle.js';
 import { correctLesson, flagLesson, lessonsToRecheck } from '../desk/lessons.js';
 import { failureText, NoData, Unavailable } from '../data/http.js';
@@ -134,12 +134,15 @@ export function registerDeskTools(server: McpServer, root: string): void {
 
   server.registerTool('read_run', {
     title: 'Read a run',
-    description: `Read what the team has written so far for a stock and day. Without sections it lists which sections exist and how many turns each holds. With sections it returns their text; ${DEBATES.join(' and ')} give a whole debate in the order spoken. A section not written yet is said to be missing, never blank. ${CONTEXT.join(' and ')} give what the plan saved with the run: what the person holds (or that none are saved) and the lessons from past calls.`,
-    inputSchema: { symbol, analysis_date: day, sections: z.array(z.enum([...SECTIONS, ...DEBATES, ...CONTEXT])).optional() },
+    description: `Read what the team has written so far for a stock and day. Without sections it lists which sections exist and how many turns each holds. With sections it returns their text; ${DEBATES.join(' and ')} give a whole debate in the order spoken. A section not written yet is said to be missing, never blank. ${CONTEXT.join(' and ')} give what the plan saved with the run: what the person holds (or that none are saved) and the lessons from past calls. Ask for everything you need in one call: a read longer than ${PART_CHARS.toLocaleString('en-US')} characters comes in parts, cut between sections and turns, and its first part says what each part holds; read each part once, with the same sections and part 2, 3 and so on.`,
+    inputSchema: {
+      symbol, analysis_date: day, sections: z.array(z.enum([...SECTIONS, ...DEBATES, ...CONTEXT])).optional(),
+      part: z.number().int().min(1).max(50).optional().describe('Which part of a read that comes in parts; 1 when left out'),
+    },
     annotations: { readOnlyHint: true, openWorldHint: false },
   }, async (a) => act(() => {
     const d = analysisDate(a.analysis_date), w = wsFor(a.symbol, d);
-    if (a.sections?.length) return readSections(w.dir, a.symbol, d, a.sections, () => runContext(root, w, safeSymbol(a.symbol), d));
+    if (a.sections?.length) return readPart(w.dir, a.symbol, d, a.sections, a.part ?? 1, () => runContext(root, w, safeSymbol(a.symbol), d));
     const p = progress(w.dir, a.symbol, d);
     return Object.keys(p).length ? `Written so far for ${safeSymbol(a.symbol)} on ${d}: ${Object.entries(p).map(([k, n]) => `${k} (${n})`).join(', ')}` : `Nothing written yet for ${safeSymbol(a.symbol)} on ${d}.`;
   }));

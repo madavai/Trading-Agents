@@ -38160,8 +38160,9 @@ async function dateAnswer(q, day3) {
   return parts.join("");
 }
 async function workOut(analysis2, sums = [], dates = []) {
-  const day3 = analysisDate(analysis2);
   if (!sums.length && !dates.length) throw new Error("give at least one sum or one date question");
+  if (dates.length && !analysis2) throw new Error("a date question needs the analysis date (analysis_date): nothing after it is ever counted");
+  const day3 = analysis2 ? analysisDate(analysis2) : "";
   const out = [];
   const used = /* @__PURE__ */ new Set();
   if (sums.length) {
@@ -40407,23 +40408,69 @@ function lastSaved(dir, ticker, date5) {
   return latest;
 }
 function readSections(dir, ticker, date5, names, fallback) {
+  return blocksOf(dir, ticker, date5, names, fallback).map((b) => b.text).join("\n\n");
+}
+function blocksOf(dir, ticker, date5, names, fallback) {
   const run = load(dir, ticker, date5), log = run.log;
   let ctx;
-  return names.map((name) => {
+  return names.flatMap((name) => {
     if (CONTEXT.includes(name)) {
       ctx ??= contextOf(run) ?? fallback?.();
       const label2 = CONTEXT_LABELS[name];
-      return ctx ? `## ${label2}
-${ctx[name]}` : `(No ${label2.toLowerCase()} saved with this run: plan it with plan_analysis first. It is not known, not empty.)`;
+      return [{ name: label2, text: ctx ? `## ${label2}
+${ctx[name]}` : `(No ${label2.toLowerCase()} saved with this run: plan it with plan_analysis first. It is not known, not empty.)` }];
     }
     const group = DEBATES[name];
     const entries = group ? log.filter((e) => group.includes(e.section)) : log.filter((e) => e.section === name);
     const label = group ? name.replace("_", " ") : isSection(name) ? LABELS[name] : name;
-    if (!entries.length) return `(No ${label} yet: it is not available, not an empty finding.)`;
-    return `## ${label}
-${entries.map((e) => (group ? `[${LABELS[e.section]}]
-` : "") + e.text).join("\n\n")}`;
-  }).join("\n\n");
+    if (!entries.length) return [{ name: label, text: `(No ${label} yet: it is not available, not an empty finding.)` }];
+    if (!group) return [{ name: label, text: `## ${label}
+${entries.map((e) => e.text).join("\n\n")}` }];
+    const turn = {};
+    return entries.map((e, i) => ({
+      name: `${LABELS[e.section]} turn ${turn[e.section] = (turn[e.section] ?? 0) + 1}`,
+      text: `${i ? "" : `## ${label}
+`}[${LABELS[e.section]}]
+${e.text}`
+    }));
+  });
+}
+var PART_CHARS = 4e4;
+function readParts(dir, ticker, date5, names, fallback) {
+  const pieces = [];
+  for (const b of blocksOf(dir, ticker, date5, names, fallback)) {
+    let rest = b.text, first = true;
+    while (rest.length > PART_CHARS) {
+      const room = PART_CHARS - 200, cut = Math.max(rest.lastIndexOf("\n\n", room), rest.lastIndexOf("\n", room));
+      const at = cut > room / 2 ? cut : room;
+      pieces.push({ name: first ? b.name : `${b.name} (continued)`, text: rest.slice(0, at).trimEnd() });
+      rest = `(${b.name}, continued)
+${rest.slice(at).replace(/^\n+/, "")}`;
+      first = false;
+    }
+    pieces.push({ name: first ? b.name : `${b.name} (continued)`, text: rest });
+  }
+  const parts = [];
+  for (const p of pieces) {
+    const last = parts.at(-1);
+    if (last && last.text.length + 2 + p.text.length <= PART_CHARS) {
+      last.text += `
+
+${p.text}`;
+      last.names.push(p.name);
+    } else parts.push({ text: p.text, names: [p.name] });
+  }
+  return parts;
+}
+function readPart(dir, ticker, date5, names, part = 1, fallback) {
+  const parts = readParts(dir, ticker, date5, names, fallback);
+  if (parts.length <= 1 && part === 1) return parts[0]?.text ?? "";
+  if (part > parts.length) throw new Error(`this read has ${parts.length} part${parts.length === 1 ? "" : "s"}, not ${part}`);
+  const holds = parts.map((p, i) => `part ${i + 1}: ${p.names.join("; ")}`).join(". ");
+  const next = part < parts.length ? `Read the next with the same sections and part ${part + 1}` : "This is the last part";
+  return `(Part ${part} of ${parts.length} of this read, too long for one answer. ${holds}. Read every part once, in order. ${next}.)
+
+${parts[part - 1].text}`;
 }
 function writeReport(dir, ticker, date5, header) {
   const log = load(dir, ticker, date5).log, root = folder(dir, ticker, date5);
@@ -41965,12 +42012,17 @@ function registerDeskTools(server, root) {
   }));
   server.registerTool("read_run", {
     title: "Read a run",
-    description: `Read what the team has written so far for a stock and day. Without sections it lists which sections exist and how many turns each holds. With sections it returns their text; ${DEBATES2.join(" and ")} give a whole debate in the order spoken. A section not written yet is said to be missing, never blank. ${CONTEXT.join(" and ")} give what the plan saved with the run: what the person holds (or that none are saved) and the lessons from past calls.`,
-    inputSchema: { symbol: symbol2, analysis_date: day2, sections: external_exports.array(external_exports.enum([...SECTIONS, ...DEBATES2, ...CONTEXT])).optional() },
+    description: `Read what the team has written so far for a stock and day. Without sections it lists which sections exist and how many turns each holds. With sections it returns their text; ${DEBATES2.join(" and ")} give a whole debate in the order spoken. A section not written yet is said to be missing, never blank. ${CONTEXT.join(" and ")} give what the plan saved with the run: what the person holds (or that none are saved) and the lessons from past calls. Ask for everything you need in one call: a read longer than ${PART_CHARS.toLocaleString("en-US")} characters comes in parts, cut between sections and turns, and its first part says what each part holds; read each part once, with the same sections and part 2, 3 and so on.`,
+    inputSchema: {
+      symbol: symbol2,
+      analysis_date: day2,
+      sections: external_exports.array(external_exports.enum([...SECTIONS, ...DEBATES2, ...CONTEXT])).optional(),
+      part: external_exports.number().int().min(1).max(50).optional().describe("Which part of a read that comes in parts; 1 when left out")
+    },
     annotations: { readOnlyHint: true, openWorldHint: false }
   }, async (a) => act(() => {
     const d = analysisDate(a.analysis_date), w = wsFor(a.symbol, d);
-    if (a.sections?.length) return readSections(w.dir, a.symbol, d, a.sections, () => runContext(root, w, safeSymbol(a.symbol), d));
+    if (a.sections?.length) return readPart(w.dir, a.symbol, d, a.sections, a.part ?? 1, () => runContext(root, w, safeSymbol(a.symbol), d));
     const p = progress(w.dir, a.symbol, d);
     return Object.keys(p).length ? `Written so far for ${safeSymbol(a.symbol)} on ${d}: ${Object.entries(p).map(([k, n2]) => `${k} (${n2})`).join(", ")}` : `Nothing written yet for ${safeSymbol(a.symbol)} on ${d}.`;
   }));
@@ -42332,7 +42384,7 @@ async function answer(what, run) {
     return text3(await run());
   } catch (e) {
     const err = e;
-    if (/YYYY-MM-DD|in the future|not a ticker|not a series name/.test(err.message)) return text3(`INPUT_ERROR: ${err.message}. Correct it and call again.`);
+    if (/YYYY-MM-DD|in the future|not a ticker|not a series name|needs the analysis date/.test(err.message)) return text3(`INPUT_ERROR: ${err.message}. Correct it and call again.`);
     return text3(failureText(e, what));
   }
 }
@@ -42426,9 +42478,9 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root, home) {
   }, async (a) => answer(`price facts of ${a.symbol}`, () => priceFacts(a.symbol, a.analysis_date)));
   server.registerTool("work_out", {
     title: "Work it out",
-    description: "The desk's calculator, for every figure no tool prints: a difference, a percentage, a ratio, a sum or an average, many in one call, each answered with its sum; and the days between dates (calendar days, weekdays and, for a symbol, the sessions it traded), or the weekday of a date. Use it instead of working anything out in your head, and quote the sum it gives.",
+    description: "The desk's calculator, for every figure no tool prints: a difference, a percentage, a ratio, a sum or an average, each answered with its sum; and the days between dates (calendar days, weekdays and, for a symbol, the sessions it traded), or the weekday of a date. Put every sum your work needs in one call, up to 40. Use it instead of working anything out in your head, and quote the sum it gives.",
     inputSchema: {
-      analysis_date: analysis,
+      analysis_date: external_exports.string().optional().describe("The analysis date, YYYY-MM-DD: needed for the date questions, not for sums"),
       sums: external_exports.array(external_exports.object({
         label: external_exports.string().max(120).optional().describe('What the figure is, e.g. "fall on the day"'),
         expression: external_exports.string().min(1).max(400).describe('Numbers without thousands commas, + - * / ^, brackets, % after a number, and change(a, b) (percent change from a to b), share(a, b) (a as a percent of b), abs, sqrt, round(a, d), sum, avg, min, max. E.g. "change(221.97, 212.21)" or "(96221 - 81615) / 81615 * 100"')
