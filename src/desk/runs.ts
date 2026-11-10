@@ -31,7 +31,9 @@ export type ContextName = (typeof CONTEXT)[number];
 export interface RunContext { holdings: string; lessons: string }
 const CONTEXT_LABELS: Record<ContextName, string> = { holdings: 'Holdings', lessons: 'Lessons' };
 
-interface Run { ticker: string; date: string; startedAt: string; plan?: unknown; context?: RunContext & { at: string }; log: Array<{ section: Section; text: string }> }
+/** A correction as it stands in a report: the right words, then the mark that keeps the report's own words beside them. */
+interface Fix { now: string; mark: string }
+interface Run { ticker: string; date: string; startedAt: string; plan?: unknown; context?: RunContext & { at: string }; log: Array<{ section: Section; text: string; fixes?: Fix[] }> }
 
 const folder = (dir: string, ticker: string, date: string) => path.join(dir, 'runs', `${safeSymbol(ticker).replace(/\^/g, 'IDX_').replace(/=/g, '_EQ_')}_${date}`);
 const runFile = (dir: string, ticker: string, date: string) => path.join(folder(dir, ticker, date), 'run.json');
@@ -61,11 +63,30 @@ const contextOf = ({ context: c }: Run): RunContext | undefined =>
 /** The holdings and lessons saved with a run, or undefined for a run planned before the desk kept them. */
 export const savedContext = (dir: string, ticker: string, date: string): RunContext | undefined => contextOf(load(dir, ticker, date));
 
-/** Saves what an agent wrote. A debate turn is added; any other section is replaced. */
+/** Why a fact check's first line does not count its own table, or null when it does (or says no count the desk can
+ *  read: a check written in another language, or one where every claim held). "<w> wrong and <m> misleading claims"
+ *  count the rows of its table of corrections: the NVDA run of 9 Nov 2026 said 1 and 5 over a table of 7. */
+export function factCheckCount(text: string): string | null {
+  const first = text.trim().split('\n')[0] ?? '', said = /\b(\d+|no) wrong and (\d+|no) misleading\b/i.exec(first);
+  if (!said) return null;
+  const n = (x: string) => (/^no$/i.test(x) ? 0 : Number(x)), w = n(said[1]!), m = n(said[2]!);
+  // The table of corrections (Report | What it said | What is right | Source), else the first table.
+  const lines = text.split('\n'), rules = lines.map((l, i) => (i > 0 && /^\s*\|?\s*:?-{2,}/.test(l) && lines[i - 1]!.includes('|') ? i : -1)).filter((i) => i > 0);
+  const rule = rules.find((i) => /what it said|what is right/i.test(lines[i - 1]!)) ?? rules[0] ?? -1;
+  let rows = 0;
+  if (rule > 0) for (let i = rule + 1; i < lines.length && /^\s*\|/.test(lines[i]!); i++) rows++;
+  return w + m === rows ? null
+    : `the first line counts ${w} wrong and ${m} misleading claims, ${w + m} in all, but the table of corrections has ${rows === 1 ? 'one row' : `${rows} rows`}: w and m count its rows, one row a claim. Count them again (each row is wrong or misleading), mend the first line or the table, and save the fact check again`;
+}
+
+/** Saves what an agent wrote. A debate turn is added; any other section is replaced. A fact check whose first line does
+ *  not count its own table is refused, with why: that line is the first thing the person reads of it. */
 export function saveSection(dir: string, ticker: string, date: string, section: Section, text: string): number {
   const t = text.trim();
   if (!t) throw new Error('there is nothing to save: the text is empty');
   if (t.length > MAX_CHARS) throw new Error(`the text is ${t.length} characters; the most one section holds is ${MAX_CHARS}`);
+  const miscount = section === 'fact_check' ? factCheckCount(t) : null;
+  if (miscount) throw new Error(miscount);
   let turns = 0;
   change(dir, ticker, date, (r) => {
     if (!TURNS.has(section)) r.log = r.log.filter((e) => e.section !== section);
@@ -78,13 +99,29 @@ export function saveSection(dir: string, ticker: string, date: string, section: 
 export interface Correction { was: string; now: string; every?: boolean }
 export const REPORTS: readonly Section[] = ['market', 'sentiment', 'news', 'fundamentals'];
 export const FLAG = '[the fact it rested on was corrected: see the fact check]';
-const times = (text: string, words: string) => (words ? text.split(words).length - 1 : 0);
+
+type Span = readonly [number, number];
+/** Where words stand in a text, left to right, never overlapping (as a split finds them). */
+const placesOf = (text: string, words: string): number[] => {
+  const out: number[] = [];
+  for (let i = words ? text.indexOf(words) : -1; i >= 0; i = text.indexOf(words, i + words.length)) out.push(i);
+  return out;
+};
+// The desk's own marks in a report: a correction's old words, and a flagged conclusion's note. Those of a run corrected
+// before the desk kept its corrections are found by their shape.
+const MARKS = new RegExp(` \\[corrected: was "[\\s\\S]*?"\\]| ${FLAG.replace(/[[\]]/g, '\\$&')}`, 'g');
+const within = (s: number, e: number, [a, b]: Span) => s >= a && e <= b;
+const touches = (s: number, e: number, [a, b]: Span) => s < b && e > a;
+const lineAt = (text: string, i: number) => text.slice(text.lastIndexOf('\n', i - 1) + 1, text.indexOf('\n', i) < 0 ? text.length : text.indexOf('\n', i));
 
 /** The fact checker's corrections to an analyst's report, made by the desk word for word: each wrong passage is replaced
  *  where it stands with its old words kept beside it, and a conclusion that rested on one can be flagged. Nothing else
  *  in the report changes, so the checker never writes a report out again (a long report retyped by a model can lose or
  *  change words no one asked it to). Only before the debate begins: after that the reports are already argued from.
- *  Returns one line per correction and flag: done, or why not (a passage not there word for word, or there twice). */
+ *  Each mark keeps the analyst's own words, once: a correction of a correction's new words changes those words and keeps
+ *  its mark; words that run into a mark, or that are only in one, are refused (the NVDA run of 9 Nov 2026 had a mark
+ *  keeping the checker's own words, with another mark inside it). In a table row the mark stays in the row's last cell,
+ *  its bars escaped, so the row keeps its cells. Returns one line per correction and flag: done, or why not. */
 export function correctSection(dir: string, ticker: string, date: string, section: Section, corrections: Correction[], flagAfter: string[] = []): string[] {
   if (!REPORTS.includes(section)) throw new Error(`only an analyst's report can be corrected (${REPORTS.join(', ')}), not ${section}`);
   if (!corrections.length && !flagAfter.length) throw new Error('give at least one correction or one conclusion to flag');
@@ -94,23 +131,61 @@ export function correctSection(dir: string, ticker: string, date: string, sectio
     const entry = r.log.find((e) => e.section === section);
     if (!entry) throw new Error(`this run has no ${section} report to correct`);
     let t = entry.text;
+    const fixes: Fix[] = [...(entry.fixes ?? [])];
+    const marksIn = (): Span[] => [
+      ...[...t.matchAll(MARKS)].map((m): Span => [m.index, m.index + m[0].length]),
+      ...fixes.flatMap((f) => placesOf(t, f.mark).map((p): Span => [p, p + f.mark.length])),
+    ];
     for (const c of corrections) {
-      const now = c.now.trim(), n = times(t, c.was);
-      if (!c.was.trim() || !now || now === c.was.trim()) lines.push(`- not applied: a correction needs the report's exact old words and different new ones (${JSON.stringify(c.was)})`);
-      else if (!n) lines.push(`- not applied: "${c.was}" is not in the ${section} report word for word; copy the words exactly as it has them`);
-      else if (n > 1 && !c.every) lines.push(`- not applied: "${c.was}" is in the ${section} report ${n} times; give more of the words around the one to correct, or set every to correct all ${n}`);
+      const now = c.now.trim();
+      if (!c.was.trim() || !now || now === c.was.trim()) { lines.push(`- not applied: a correction needs the report's exact old words and different new ones (${JSON.stringify(c.was)})`); continue; }
+      const marks = marksIn();
+      const news = fixes.flatMap((f) => placesOf(t, f.now + f.mark).map((p) => ({ span: [p, p + f.now.length] as Span, f })));
+      const found = placesOf(t, c.was).map((s) => ({ s, e: s + c.was.length }));
+      const live = found.filter(({ s, e }) => !marks.some((m) => within(s, e, m)));
+      // Words that end where a mark begins are an earlier correction's new words: changed only as such (below), never
+      // given a second mark, which would keep the checker's words as the analyst's.
+      const clash = live.some(({ s, e }) => {
+        const own = news.find((x) => within(s, e, x.span));
+        return marks.some((m) => touches(s, e, m)) || (!own && t.startsWith(' [corrected: was "', e)) || news.some((x) => touches(s, e, x.span) && !within(s, e, x.span));
+      });
+      if (!live.length) lines.push(found.length ? `- not applied: "${c.was}" is only in the old words a correction keeps beside its new ones ([corrected: was "..."]); those stay as the analyst wrote them`
+        : `- not applied: "${c.was}" is not in the ${section} report word for word; copy the words exactly as it has them`);
+      else if (clash) lines.push(`- not applied: "${c.was}" runs into an earlier correction (its new words or the old words it keeps); correct words outside it, or only within the new words it gave, so that each mark keeps the analyst's own words, once`);
+      else if (live.length > 1 && !c.every) lines.push(`- not applied: "${c.was}" is in the ${section} report ${live.length} times; give more of the words around the one to correct, or set every to correct all ${live.length}`);
       else {
-        t = t.split(c.was).join(`${now} [corrected: was "${c.was}"]`);
-        lines.push(`- corrected${n > 1 ? ` in ${n} places` : ''}: "${c.was}" now reads "${now}"`);
+        let again = 0;
+        for (const { s, e } of [...live].reverse()) {
+          const own = news.find((x) => within(s, e, x.span));
+          if (own) {
+            // A correction of a correction: its new words change, and its mark still keeps the analyst's words.
+            const [a] = own.span, fresh = own.f.now.slice(0, s - a) + now + own.f.now.slice(e - a);
+            t = t.slice(0, a) + fresh + t.slice(a + own.f.now.length);
+            fixes.push({ now: fresh, mark: own.f.mark });
+            again++;
+            continue;
+          }
+          const row = /^[ \t]*\|/.test(lineAt(t, s)), mark = ` [corrected: was "${row ? c.was.replace(/\|/g, '\\|') : c.was}"]`;
+          const cell = row && /\|\s*$/.test(now) ? now.replace(/\s*\|\s*$/, '') : null;
+          t = t.slice(0, s) + (cell === null ? `${now}${mark}` : `${cell}${mark} |`) + t.slice(e);
+          fixes.push({ now: cell ?? now, mark });
+        }
+        const n = live.length;
+        lines.push(`- corrected${n > 1 ? ` in ${n} places` : ''}: "${c.was}" now reads "${now}"${again ? `${n > 1 ? `; ${again} of them` : ''} within an earlier correction's new words, whose mark still keeps the analyst's own words` : ''}`);
       }
     }
     for (const f of flagAfter) {
-      const n = times(t, f);
-      if (n !== 1) lines.push(`- not flagged: "${f}" is in the ${section} report ${n} times, not once; give the exact words that end the conclusion`);
-      else { t = t.split(f).join(`${f} ${FLAG}`); lines.push(`- flagged the conclusion ending "${f}"`); }
+      const marks = marksIn(), live = placesOf(t, f).filter((s) => !marks.some((m) => touches(s, s + f.length, m)));
+      if (live.length !== 1) { lines.push(`- not flagged: "${f}" is in the ${section} report ${live.length} times, not once; give the exact words that end the conclusion`); continue; }
+      // After a correction's mark when the words end a correction's new words, so the two stay together.
+      let p = live[0]! + f.length;
+      for (const m of marks.filter((x) => x[0] === p)) p = Math.max(p, m[1]);
+      t = `${t.slice(0, p)} ${FLAG}${t.slice(p)}`;
+      lines.push(`- flagged the conclusion ending "${f}"`);
     }
     if (t.length > MAX_CHARS) throw new Error(`the corrected report would be ${t.length} characters; the most one section holds is ${MAX_CHARS}`);
     entry.text = t;
+    entry.fixes = fixes;
   });
   return lines;
 }

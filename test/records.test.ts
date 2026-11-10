@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { BACKTEST_HOLDINGS, forgetHoldings, readHoldings, renderHoldings, saveAccountHoldings, saveHoldings } from '../src/desk/holdings.js';
-import { deleteRun, PART_CHARS, progress, readPart, readParts, readSections, savedContext, saveSection, startRun, stepWords, writeReport } from '../src/desk/runs.js';
+import { correctSection, deleteRun, factCheckCount, PART_CHARS, progress, readPart, readParts, readSections, savedContext, saveSection, startRun, stepWords, writeReport } from '../src/desk/runs.js';
 import { saveContactEmail } from '../src/contact.js';
 import { buildPlan, NeedsEmail, renderPlan, runContext, stepsFor } from '../src/desk/plan.js';
 import { workspaceOf } from '../src/desk/workspace.js';
@@ -250,4 +250,53 @@ test('the shipped settings are the ones the code reads', () => {
   assert.deepEqual([s.analysis.debateRounds, s.analysis.riskRounds, s.analysis.outputLanguage, s.analysis.managerModel, s.scoring.holdingPeriodDays, s.scoring.benchmark, s.journal.maxResolvedEntries], [1, 1, 'English', '', 5, '', null]);
   assert.equal(s.scoring.benchmarks['.TWO'], '^TWII');
   assert.equal(s.scoring.benchmarks['.KQ'], '^KQ11');
+});
+
+// NVDA run of 9 Nov 2026 (second review): the fact checker corrected a passage, then corrected its own new words, and the
+// desk kept the checker's words as if they were the analyst's, with a mark inside a mark; a whole-row correction put its
+// mark after the row's last bar, where its own bars broke the table.
+test('a correction keeps the analyst\'s own words once: a correction of a correction changes only its new words', () => {
+  const { dir } = folder(), at = ['NVDA', '2026-10-12'] as const;
+  saveSection(dir, ...at, 'sentiment', [
+    'Tags: 7 Bullish, 6 Bearish, 17 untagged. A 54/46 split among tagged messages is near 50/50 uncertainty on a small sample.',
+    '', '| Signal | Kind | Source |', '|---|---|---|', '| Tag split near 50/50 | Uncertainty | StockTwits (13 tagged) |',
+  ].join('\n'));
+  const text = () => readSections(dir, ...at, ['sentiment']).split('\n').slice(1).join('\n');
+  assert.deepEqual(correctSection(dir, ...at, 'sentiment', [{ was: 'A 54/46 split among tagged messages is near 50/50 uncertainty', now: 'A 27/73 split among tagged messages tilts bearish' }]),
+    ['- corrected: "A 54/46 split among tagged messages is near 50/50 uncertainty" now reads "A 27/73 split among tagged messages tilts bearish"']);
+  // Within the new words: they change, and the one mark still keeps the analyst's words.
+  assert.match(correctSection(dir, ...at, 'sentiment', [{ was: 'tilts bearish', now: 'tilts bearish on a later read' }])[0]!, /^- corrected: "tilts bearish" now reads "tilts bearish on a later read" within an earlier correction's new words, whose mark still keeps the analyst's own words$/);
+  assert.match(text(), /^Tags: 7 Bullish, 6 Bearish, 17 untagged\. A 27\/73 split among tagged messages tilts bearish on a later read \[corrected: was "A 54\/46 split among tagged messages is near 50\/50 uncertainty"\] on a small sample\.\n/);
+  // Words that run from the analyst's into a correction's, into a mark, or that are only in a mark, are refused.
+  const [runs, inMark, intoMark] = correctSection(dir, ...at, 'sentiment', [
+    { was: '17 untagged. A 27/73 split', now: '15 untagged. A 27/73 split' },
+    { was: '54/46', now: '27/73' },
+    { was: 'uncertainty"] on a small', now: 'x' },
+  ]);
+  assert.match(runs!, /^- not applied: "17 untagged\. A 27\/73 split" runs into an earlier correction/);
+  assert.match(inMark!, /^- not applied: "54\/46" is only in the old words a correction keeps beside its new ones/);
+  assert.match(intoMark!, /runs into an earlier correction/);
+  // A whole row: the mark stays in its last cell, its bars escaped, so the row keeps three cells.
+  correctSection(dir, ...at, 'sentiment', [{ was: '| Tag split near 50/50 | Uncertainty | StockTwits (13 tagged) |', now: '| Tag split churning | Uncertainty | StockTwits (15 tagged) |' }]);
+  correctSection(dir, ...at, 'sentiment', [{ was: '15 tagged', now: '15 tagged, a later read' }], ['tilts bearish on a later read']);
+  const t = text();
+  assert.match(t, /\n\| Tag split churning \| Uncertainty \| StockTwits \(15 tagged, a later read\) \[corrected: was "\\| Tag split near 50\/50 \\| Uncertainty \\| StockTwits \(13 tagged\) \\|"\] \|$/);
+  assert.equal(t.match(/\[corrected: was/g)!.length, 2, 'one mark for each passage the analyst wrote');
+  // A flag on words that end a correction's new words goes after its mark.
+  assert.match(t, /tilts bearish on a later read \[corrected: was "[^"]+"\] \[the fact it rested on was corrected: see the fact check\] on a small sample/);
+  // A run corrected before the desk kept its corrections: words ending where a mark begins are that correction's.
+  saveSection(dir, ...at, 'news', 'Apple Yes 75%, +39.9 points [corrected: was "+39.5 points"] this week.');
+  assert.match(correctSection(dir, ...at, 'news', [{ was: '+39.9 points', now: '+39.5 points' }])[0]!, /runs into an earlier correction/);
+});
+
+test('a fact check whose first line does not count its own table is refused, with why', () => {
+  const { dir } = folder(), table = (rows: number) => ['| Report | What it said | What is right | Source |', '|---|---|---|---|', ...Array.from({ length: rows }, (_, i) => `| news | a${i} | b${i} | tool |`)];
+  const check = (w: number, m: number, rows: number) => [`Checked the market and news reports: ${w} wrong and ${m} misleading claims, corrected in place; 1 could not be checked.`, '', '# Corrections made', '', ...table(rows), '', '# Could not be checked', '- one'].join('\n');
+  assert.match(factCheckCount(check(1, 5, 7))!, /^the first line counts 1 wrong and 5 misleading claims, 6 in all, but the table of corrections has 7 rows: w and m count its rows/);
+  assert.equal(factCheckCount(check(2, 5, 7)), null);
+  assert.equal(factCheckCount('Checked the market report: 0 wrong and 0 misleading claims; every claim held, and nothing needed correcting.'), null);
+  assert.equal(factCheckCount('Vérifié : 1 erreur.\n\n| a | b |\n|---|---|\n| x | y |'), null, 'a count the desk cannot read is left to the checker');
+  assert.throws(() => saveSection(dir, 'NVDA', '2026-10-12', 'fact_check', check(1, 5, 7)), /6 in all, but the table of corrections has 7 rows/);
+  assert.equal(saveSection(dir, 'NVDA', '2026-10-12', 'fact_check', check(2, 5, 7)), 1);
+  assert.equal(saveSection(dir, 'NVDA', '2026-10-12', 'market', check(1, 5, 7)), 1, 'only the fact check is counted');
 });
