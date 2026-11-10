@@ -295,6 +295,14 @@ test('the server offers the company tools', async () => {
   for (const n of ['get_company_overview', 'get_financial_statement', 'get_insider_transactions', 'get_fund_profile']) assert.ok(names.includes(n), n);
   const r = await client.callTool({ name: 'get_financial_statement', arguments: { symbol: 'ACME', analysis_date: '2025-09-01', statement: 'balance_sheet' } }) as { content: Array<{ text: string }> };
   assert.match(r.content[0]!.text, /Balance sheet for ACME \(quarterly\), as filed with the SEC on or before 2025-09-01/);
+  // the three statements, quarterly and annual, in one call: one step for the fact checker where six were
+  const all = await client.callTool({ name: 'get_financial_statement', arguments: { symbol: 'ACME', analysis_date: '2025-09-01', statement: 'all', frequency: 'both' } }) as { content: Array<{ text: string }> };
+  const heads = [...all.content[0]!.text.matchAll(/^(Income statement|Balance sheet|Cash flow statement) for ACME \((quarterly|annual)\)/gm)].map((m) => `${m[1]} ${m[2]}`);
+  assert.deepEqual(heads, ['Income statement quarterly', 'Income statement annual', 'Balance sheet quarterly', 'Balance sheet annual', 'Cash flow statement quarterly']);
+  // no annual cash flow statement was filed by then: that one part says so, and the other five still come
+  assert.match(all.content[0]!.text, /\n\nCash flow statement for ACME is withheld for 2025-09-01: no annual cash flow statement was filed with the SEC by 2025-09-01/);
+  const one = await client.callTool({ name: 'get_financial_statement', arguments: { symbol: 'ACME', analysis_date: '2025-09-01', statement: 'income_statement', frequency: 'both' } }) as { content: Array<{ text: string }> };
+  assert.equal([...one.content[0]!.text.matchAll(/^Income statement for ACME \((quarterly|annual)\)/gm)].length, 2);
   const bad = await client.callTool({ name: 'get_insider_transactions', arguments: { symbol: 'BTC-USD', analysis_date: '2026-10-12' } }) as { content: Array<{ text: string }> };
   assert.match(bad.content[0]!.text, /^NO_DATA_AVAILABLE: insider transactions of BTC-USD: BTC-USD is not a company/);
   await client.close();
