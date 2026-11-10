@@ -42,7 +42,7 @@ function noteWhenUpdated(server: McpServer, fresh: Freshness): void {
 async function answer(what: string, run: () => Promise<string>) {
   try { return text(await run()); } catch (e) {
     const err = e as Error;
-    if (/YYYY-MM-DD|in the future|not a ticker|not a series name/.test(err.message)) return text(`INPUT_ERROR: ${err.message}. Correct it and call again.`);
+    if (/YYYY-MM-DD|in the future|not a ticker|not a series name|needs the analysis date/.test(err.message)) return text(`INPUT_ERROR: ${err.message}. Correct it and call again.`);
     return text(failureText(e, what));
   }
 }
@@ -151,9 +151,9 @@ export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetc
 
   server.registerTool('work_out', {
     title: 'Work it out',
-    description: 'The desk\'s calculator, for every figure no tool prints: a difference, a percentage, a ratio, a sum or an average, many in one call, each answered with its sum; and the days between dates (calendar days, weekdays and, for a symbol, the sessions it traded), or the weekday of a date. Use it instead of working anything out in your head, and quote the sum it gives.',
+    description: 'The desk\'s calculator, for every figure no tool prints: a difference, a percentage, a ratio, a sum or an average, each answered with its sum; and the days between dates (calendar days, weekdays and, for a symbol, the sessions it traded), or the weekday of a date. Put every sum your work needs in one call, up to 40. Use it instead of working anything out in your head, and quote the sum it gives.',
     inputSchema: {
-      analysis_date: analysis,
+      analysis_date: z.string().optional().describe('The analysis date, YYYY-MM-DD: needed for the date questions, not for sums'),
       sums: z.array(z.object({
         label: z.string().max(120).optional().describe('What the figure is, e.g. "fall on the day"'),
         expression: z.string().min(1).max(400).describe('Numbers without thousands commas, + - * / ^, brackets, % after a number, and change(a, b) (percent change from a to b), share(a, b) (a as a percent of b), abs, sqrt, round(a, d), sum, avg, min, max. E.g. "change(221.97, 212.21)" or "(96221 - 81615) / 81615 * 100"'),

@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { BACKTEST_HOLDINGS, forgetHoldings, readHoldings, renderHoldings, saveAccountHoldings, saveHoldings } from '../src/desk/holdings.js';
-import { deleteRun, progress, readSections, savedContext, saveSection, startRun, stepWords, writeReport } from '../src/desk/runs.js';
+import { deleteRun, PART_CHARS, progress, readPart, readParts, readSections, savedContext, saveSection, startRun, stepWords, writeReport } from '../src/desk/runs.js';
 import { saveContactEmail } from '../src/contact.js';
 import { buildPlan, NeedsEmail, renderPlan, runContext, stepsFor } from '../src/desk/plan.js';
 import { workspaceOf } from '../src/desk/workspace.js';
@@ -59,6 +59,39 @@ test('a run is saved a step at a time; debates keep their turns in the order spo
   assert.throws(() => saveSection(dir, '../../x', '2026-09-01', 'trader', 'x'), /not a ticker/);
   deleteRun(dir, 'NVDA', '2026-09-01');
   assert.deepEqual(progress(dir, 'NVDA', '2026-09-01'), {});
+});
+
+// Debate speed (9 Nov 2026): replaying the real NVDA run of that day in Claude Code, every debater's one read of the
+// reports and the debate (76,529 characters in round 1, 129,340 in round 3) was too long for one tool answer, so it
+// arrived as a file the agent cannot open: each read its sections again one by one, and the bear of round 3 answered a
+// debate of which it had seen only the first lines.
+test('a read too long for one answer comes in parts, cut between sections and turns, each read once', () => {
+  const { dir } = folder(), d = '2026-10-12';
+  const para = (who: string, n: number) => Array.from({ length: n }, (_, i) => `${who} paragraph ${i}: ${'x'.repeat(390)}`).join('\n\n');
+  for (const s of ['market', 'sentiment', 'news', 'fundamentals'] as const) saveSection(dir, 'NVDA', d, s, para(s, 40));   // about 16,000 each
+  saveSection(dir, 'NVDA', d, 'fact_check', para('check', 15));
+  for (let t = 1; t <= 3; t++) { saveSection(dir, 'NVDA', d, 'bull', `Bull Analyst: ${para(`bull ${t}`, 32)}`); saveSection(dir, 'NVDA', d, 'bear', `Bear Analyst: ${para(`bear ${t}`, 32)}`); }
+  const names = ['market', 'sentiment', 'news', 'fundamentals', 'fact_check', 'investment_debate'];
+  const whole = readSections(dir, 'NVDA', d, names), parts = readParts(dir, 'NVDA', d, names);
+  assert.ok(whole.length > 3 * PART_CHARS, `the test run is long: ${whole.length}`);
+  assert.ok(parts.length >= 4, `${parts.length} parts`);
+  for (const p of parts) assert.ok(p.text.length <= PART_CHARS, `a part of ${p.text.length}`);
+  assert.equal(parts.map((p) => p.text).join('\n\n'), whole, 'the parts are the read itself, in order, nothing lost or repeated');
+  assert.ok(parts.every((p, i) => !i || /^(## |\[)/.test(p.text)), 'each part starts at a section or a turn');
+  assert.deepEqual(parts.flatMap((p) => p.names).slice(0, 7), ['Market Analyst', 'Sentiment Analyst', 'News Analyst', 'Fundamentals Analyst', 'Fact Checker', 'Bull Researcher turn 1', 'Bear Researcher turn 1']);
+  const first = readPart(dir, 'NVDA', d, names);
+  assert.match(first, new RegExp(`^\\(Part 1 of ${parts.length} of this read, too long for one answer\\. part 1: Market Analyst; Sentiment Analyst\\. part 2: .*Read every part once, in order\\. Read the next with the same sections and part 2\\.\\)\\n\\n## Market Analyst\\n`));
+  assert.match(readPart(dir, 'NVDA', d, names, parts.length), /This is the last part\.\)\n\n/);
+  assert.throws(() => readPart(dir, 'NVDA', d, names, parts.length + 1), new RegExp(`this read has ${parts.length} parts, not ${parts.length + 1}`));
+  // a read that fits is answered as before, with no note
+  assert.equal(readPart(dir, 'NVDA', d, ['market']), readSections(dir, 'NVDA', d, ['market']));
+  // one section longer than a part is cut between paragraphs and named as continued
+  saveSection(dir, 'NVDA', d, 'research_plan', para('plan', 145));
+  const plan = readParts(dir, 'NVDA', d, ['research_plan']);
+  assert.ok(plan.length === 2 && plan.every((p) => p.text.length <= PART_CHARS));
+  assert.deepEqual(plan.map((p) => p.names), [['Research Manager'], ['Research Manager (continued)']]);
+  assert.match(plan[1]!.text, /^\(Research Manager, continued\)\nplan paragraph \d+: x/);
+  assert.equal(plan.map((p) => p.text).join('\n').replace('(Research Manager, continued)\n', '\n'), readSections(dir, 'NVDA', d, ['research_plan']));
 });
 
 test('the report puts every written section in the original\'s order', () => {

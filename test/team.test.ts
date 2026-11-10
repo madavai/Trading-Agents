@@ -86,6 +86,32 @@ test('the agents who size or decide read the holdings from the desk, never from 
   }
 });
 
+// Debate speed (9 Nov 2026): the real NVDA run spent 112 minutes on six bull and bear turns, about two steps for every
+// sum in their words. A figure a fact-checked report gives is quoted, not looked up or worked out again; a new one still
+// needs a desk tool, all of a turn's sums go in one call, the price facts are read once, and the run is read in one call.
+test('after the fact check a checked figure is quoted with whose it is, and only a new one goes to a desk tool, all in one call', () => {
+  const after = ['bull-researcher', 'bear-researcher', 'research-manager', 'trader', 'aggressive-risk-analyst', 'conservative-risk-analyst', 'neutral-risk-analyst', 'portfolio-manager'];
+  for (const agent of src.AGENTS) {
+    const { text } = front(agent.file), checked = after.includes(agent.file);
+    assert.equal(text.includes('quote it exactly as the report gives it, with whose it is, and do not look it up or work it out again'), checked, agent.file);
+    if (!checked) continue;
+    assert.match(text, /A desk tool is needed only for a new figure: one of your own, or one from another agent that no report gives \(work it out again with the others, in your one call\)\. A claim section fact_check lists as not checked is the analyst's alone: say so when you lean on it\./, agent.file);
+    assert.match(text, /a mark \[corrected: was "\.\.\."\] is its correction, so use the corrected words/, agent.file);
+  }
+  // the 7 Nov rules stay whole: no number from memory, every sum by the calculator, every streak or record from the price facts
+  for (const rule of ['never from memory and never estimated', 'never do arithmetic in your head', 'come only from get_price_facts, quoted with the window it names; never count them by eye in a table',
+    'work them all out in one call (up to 40); call it again only for one you could not foresee, never once for each figure',
+    'Before you repeat such a claim from another agent, check it there, unless an analyst\'s report the fact checker has already checked gives it; when the tool disagrees, say so and use the tool\'s',
+    'One answer of get_price_facts holds every such fact for its symbol: call it once, never again for each claim',
+    'ask for every section you need in one call and read each part of its answer once, in order; never read a section twice']) assert.ok(src.COMMON.includes(rule), rule);
+  // the debaters and the managers read everything they need in one call, the fact check with it
+  const reads: Array<[string, string]> = [['bull-researcher', 'market, sentiment, news, fundamentals, fact_check and investment_debate'], ['bear-researcher', 'market, sentiment, news, fundamentals, fact_check and investment_debate'],
+    ['research-manager', 'investment_debate, market, sentiment, news, fundamentals and fact_check'], ['neutral-risk-analyst', 'trader, market, sentiment, news, fundamentals, fact_check, holdings, risk_debate']];
+  for (const [file, sections] of reads) {
+    assert.ok(front(file).text.includes(`with read_run (sections ${sections}), in one call`), file);
+  }
+});
+
 test('every agent carries the desk\'s rules and saves the section the plan expects', () => {
   for (const agent of src.AGENTS) {
     const { text } = front(agent.file);

@@ -164,9 +164,12 @@ async function dateAnswer(q: DateQuestion, day: string): Promise<string> {
 }
 
 /** The answers to a batch of sums and date questions, each with its working. */
-export async function workOut(analysis: string, sums: Sum[] = [], dates: DateQuestion[] = []): Promise<string> {
-  const day = analysisDate(analysis);
+/** A sum needs no date, so the analysis date is asked only with the date questions: required for every call, it cost the
+ *  replayed debaters a refused call in most of their turns (9 Nov 2026). Given, it is checked either way. */
+export async function workOut(analysis: string | undefined, sums: Sum[] = [], dates: DateQuestion[] = []): Promise<string> {
   if (!sums.length && !dates.length) throw new Error('give at least one sum or one date question');
+  if (dates.length && !analysis) throw new Error('a date question needs the analysis date (analysis_date): nothing after it is ever counted');
+  const day = analysis ? analysisDate(analysis) : '';
   const out: string[] = [];
   const used = new Set<string>();
   if (sums.length) {

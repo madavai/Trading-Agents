@@ -160,20 +160,73 @@ export function stepWords(dir: string, ticker: string, date: string): string {
  *  the order they were spoken. holdings and lessons give what the plan saved with the run; for a run planned before the
  *  desk kept them, `fallback` draws them up now, so an agent is never left to guess. */
 export function readSections(dir: string, ticker: string, date: string, names: string[], fallback?: () => RunContext): string {
+  return blocksOf(dir, ticker, date, names, fallback).map((b) => b.text).join('\n\n');
+}
+
+/** One piece of a read: a section, or one turn of a debate (the debate's heading goes with its first turn), and what to
+ *  call it when a read comes in parts. Joined with blank lines, the blocks are the read exactly. */
+interface Block { text: string; name: string }
+
+function blocksOf(dir: string, ticker: string, date: string, names: string[], fallback?: () => RunContext): Block[] {
   const run = load(dir, ticker, date), log = run.log;
   let ctx: RunContext | undefined;
-  return names.map((name) => {
+  return names.flatMap((name): Block[] => {
     if ((CONTEXT as readonly string[]).includes(name)) {
       ctx ??= contextOf(run) ?? fallback?.();
       const label = CONTEXT_LABELS[name as ContextName];
-      return ctx ? `## ${label}\n${ctx[name as ContextName]}` : `(No ${label.toLowerCase()} saved with this run: plan it with plan_analysis first. It is not known, not empty.)`;
+      return [{ name: label, text: ctx ? `## ${label}\n${ctx[name as ContextName]}` : `(No ${label.toLowerCase()} saved with this run: plan it with plan_analysis first. It is not known, not empty.)` }];
     }
     const group = DEBATES[name];
     const entries = group ? log.filter((e) => group.includes(e.section)) : log.filter((e) => e.section === name);
     const label = group ? name.replace('_', ' ') : isSection(name) ? LABELS[name] : name;
-    if (!entries.length) return `(No ${label} yet: it is not available, not an empty finding.)`;
-    return `## ${label}\n${entries.map((e) => (group ? `[${LABELS[e.section]}]\n` : '') + e.text).join('\n\n')}`;
-  }).join('\n\n');
+    if (!entries.length) return [{ name: label, text: `(No ${label} yet: it is not available, not an empty finding.)` }];
+    if (!group) return [{ name: label, text: `## ${label}\n${entries.map((e) => e.text).join('\n\n')}` }];
+    const turn: Record<string, number> = {};
+    return entries.map((e, i) => ({
+      name: `${LABELS[e.section]} turn ${(turn[e.section] = (turn[e.section] ?? 0) + 1)}`,
+      text: `${i ? '' : `## ${label}\n`}[${LABELS[e.section]}]\n${e.text}`,
+    }));
+  });
+}
+
+/** The most of a run's text one answer of read_run holds (its note on the parts comes on top). Claude Code hands an agent
+ *  a tool answer of more than about 50,000 characters only as a file, and the desk's agents have no tool to open files:
+ *  before reads came in parts, a debater in the last round of a three-round debate received only the first lines of the
+ *  debate it had to answer, and every debater read its sections again one by one (replay of a real run, 9 Nov 2026). */
+export const PART_CHARS = 40_000;
+
+/** A read in parts of at most PART_CHARS, cut between sections and debate turns (a single one longer than a part is cut
+ *  between paragraphs, its name carried on with "continued"), so every part arrives whole and nothing is read twice. */
+export function readParts(dir: string, ticker: string, date: string, names: string[], fallback?: () => RunContext): Array<{ text: string; names: string[] }> {
+  const pieces: Block[] = [];
+  for (const b of blocksOf(dir, ticker, date, names, fallback)) {
+    let rest = b.text, first = true;
+    while (rest.length > PART_CHARS) {
+      const room = PART_CHARS - 200, cut = Math.max(rest.lastIndexOf('\n\n', room), rest.lastIndexOf('\n', room));
+      const at = cut > room / 2 ? cut : room;
+      pieces.push({ name: first ? b.name : `${b.name} (continued)`, text: rest.slice(0, at).trimEnd() });
+      rest = `(${b.name}, continued)\n${rest.slice(at).replace(/^\n+/, '')}`;
+      first = false;
+    }
+    pieces.push({ name: first ? b.name : `${b.name} (continued)`, text: rest });
+  }
+  const parts: Array<{ text: string; names: string[] }> = [];
+  for (const p of pieces) {
+    const last = parts.at(-1);
+    if (last && last.text.length + 2 + p.text.length <= PART_CHARS) { last.text += `\n\n${p.text}`; last.names.push(p.name); }
+    else parts.push({ text: p.text, names: [p.name] });
+  }
+  return parts;
+}
+
+/** One part of a read (1 when left out), opening with what every part holds when there is more than one. */
+export function readPart(dir: string, ticker: string, date: string, names: string[], part = 1, fallback?: () => RunContext): string {
+  const parts = readParts(dir, ticker, date, names, fallback);
+  if (parts.length <= 1 && part === 1) return parts[0]?.text ?? '';
+  if (part > parts.length) throw new Error(`this read has ${parts.length} part${parts.length === 1 ? '' : 's'}, not ${part}`);
+  const holds = parts.map((p, i) => `part ${i + 1}: ${p.names.join('; ')}`).join('. ');
+  const next = part < parts.length ? `Read the next with the same sections and part ${part + 1}` : 'This is the last part';
+  return `(Part ${part} of ${parts.length} of this read, too long for one answer. ${holds}. Read every part once, in order. ${next}.)\n\n${parts[part - 1]!.text}`;
 }
 
 /** Writes the finished report: one page per section and the whole in complete_report.md. */

@@ -81,6 +81,15 @@ test('the server offers the calculator to the agents', async () => {
   assert.ok((await client.listTools()).tools.some((t) => t.name === 'work_out'));
   const r = await client.callTool({ name: 'work_out', arguments: { analysis_date: '2026-11-06', sums: [{ expression: 'change(100, 103)' }], dates: [{ date: '2026-11-07' }] } }) as { content: Array<{ text: string }> };
   assert.match(r.content[0]!.text, /- change\(100, 103\) = 3\n[\s\S]*- 2026-11-07 is a Saturday\./);
+  // Debate speed (9 Nov 2026): a sum needs no date, and asking for one cost the replayed debaters a refused call in most
+  // turns. Sums alone are worked out without it; a date question still needs it, and says so.
+  const sums = await client.callTool({ name: 'work_out', arguments: { sums: [{ expression: 'change(239.24, 178.67)' }, { expression: '14 / 4' }] } }) as { content: Array<{ text: string }> };
+  assert.match(sums.content[0]!.text, /- change\(239\.24, 178\.67\) = -25\.3177\n- 14 \/ 4 = 3\.5\n/);
+  const date = await client.callTool({ name: 'work_out', arguments: { dates: [{ date: '2026-11-07' }] } }) as { content: Array<{ text: string }> };
+  assert.equal(date.content[0]!.text, 'INPUT_ERROR: a date question needs the analysis date (analysis_date): nothing after it is ever counted. Correct it and call again.');
+  const tool = (await client.listTools()).tools.find((t) => t.name === 'work_out')!;
+  assert.ok(!(tool.inputSchema.required ?? []).includes('analysis_date'));
+  assert.match(tool.description ?? '', /Put every sum your work needs in one call, up to 40\./);
   await client.close();
 });
 
