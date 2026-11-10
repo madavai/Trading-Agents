@@ -37616,8 +37616,8 @@ async function daily(raw, from, to) {
     });
   }
   const s = await cache.get(key).series;
-  const within3 = (b) => b.date >= from && b.date <= to;
-  const bars = s.bars.filter(within3), firstDay = bars[0]?.date ?? "", lastDay = bars.at(-1)?.date ?? "";
+  const within4 = (b) => b.date >= from && b.date <= to;
+  const bars = s.bars.filter(within4), firstDay = bars[0]?.date ?? "", lastDay = bars.at(-1)?.date ?? "";
   return {
     meta: s.meta,
     bars,
@@ -37625,7 +37625,7 @@ async function daily(raw, from, to) {
     missing: (s.missing ?? []).filter((d) => d > firstDay && d < lastDay),
     dividends: (s.dividends ?? []).filter((d) => d.date >= from && d.date <= to),
     unadjusted: (s.unadjusted ?? []).filter((d) => d >= from && d <= to),
-    ...s.traded ? { traded: s.traded.filter(within3) } : {},
+    ...s.traded ? { traded: s.traded.filter(within4) } : {},
     ...s.fetchedAt !== void 0 ? { fetchedAt: s.fetchedAt } : {}
   };
 }
@@ -38217,8 +38217,8 @@ var within2 = (time3, from, to) => {
 var inWindow = (a, from, to) => within2(a.time, from, to);
 var render2 = (list2) => list2.map((a) => `- ${a.time} UTC \xB7 ${a.publisher}: ${a.title}${a.link ? `
   ${a.link}` : ""}`).join("\n");
-function spanOf(times2) {
-  const sorted = [...times2].sort(), a = sorted[0] ?? "", b = sorted.at(-1) ?? "";
+function spanOf(times) {
+  const sorted = [...times].sort(), a = sorted[0] ?? "", b = sorted.at(-1) ?? "";
   return a === b ? `${a} UTC` : `${a} to ${a.slice(0, 10) === b.slice(0, 10) ? b.slice(11) : b} UTC`;
 }
 var reaches = (oldest, from) => oldest !== void 0 && dayOf(oldest) < from;
@@ -38237,10 +38237,10 @@ async function companyNews(raw, analysis2, lookBackDays, limit) {
     const abroad = /\.[A-Z]{1,4}$/.test(sym2) ? " (it carries few articles on listings outside the US)" : "";
     throw new Unavailable(all.length ? `Yahoo Finance's search returned ${all.length} article${all.length === 1 ? "" : "s"} for ${sym2}, none tagged ${sym2}${abroad}` : `Yahoo Finance's search returned no articles for ${sym2}${abroad}`);
   }
-  const within3 = found.filter((a) => inWindow(a, from, day3)).sort((a, b) => b.time.localeCompare(a.time)), list2 = within3.slice(0, limit);
+  const within4 = found.filter((a) => inWindow(a, from, day3)).sort((a, b) => b.time.localeCompare(a.time)), list2 = within4.slice(0, limit);
   if (!list2.length) return gap(found, from, day3, `news about ${sym2}`);
   const how = untagged ? `matched by Yahoo's search for "${sym2}", not tagged: check each is about this company` : `tagged ${sym2}`;
-  const count = newest(list2.length, within3.length, "article"), span2 = spanOf(list2.map((a) => a.time)), oldest = found.map((a) => a.time).sort()[0];
+  const count = newest(list2.length, within4.length, "article"), span2 = spanOf(list2.map((a) => a.time)), oldest = found.map((a) => a.time).sort()[0];
   const head2 = reaches(oldest, from) ? `News about ${sym2}, ${from} to ${day3} (New York days; ${count} ${how}, from ${span2}; headlines only)` : `News about ${sym2} from ${span2} only (${count} ${how}; headlines only). The window asked for is ${from} to ${day3} (New York days), but Yahoo Finance's search returns only its latest articles, and the oldest it returned is from ${oldest} UTC: what came before was not reached, so this says nothing about the news earlier in the window.`;
   return [head2, "", render2(list2)].join("\n");
 }
@@ -38257,7 +38257,7 @@ async function worldNews(analysis2, lookBackDays, limit, queries) {
       all.push(a);
     }
   }
-  const within3 = all.filter((a) => inWindow(a, from, day3)).sort((a, b) => b.time.localeCompare(a.time)), list2 = within3.slice(0, limit);
+  const within4 = all.filter((a) => inWindow(a, from, day3)).sort((a, b) => b.time.localeCompare(a.time)), list2 = within4.slice(0, limit);
   const note = failed ? `
 (${failed} of ${queries.length} searches could not be run: Yahoo Finance did not answer them, or answered without a list of articles.)` : "";
   if (!list2.length) return gap(all, from, day3, "world and economic news") + note;
@@ -38266,7 +38266,7 @@ async function worldNews(analysis2, lookBackDays, limit, queries) {
     return r.status === "fulfilled" && oldest !== void 0 && !reaches(oldest, from) ? [`under ${q} only back to ${oldest} UTC`] : [];
   });
   const past = isHistorical(day3) ? " Search favours recent articles, so a past window may be thin." : "";
-  const count = newest(list2.length, within3.length, "article"), span2 = spanOf(list2.map((a) => a.time));
+  const count = newest(list2.length, within4.length, "article"), span2 = spanOf(list2.map((a) => a.time));
   const head2 = short2.length ? `World and economic news from ${span2} (${count}), from the news filed under ${queries.join(", ")}. The window asked for is ${from} to ${day3} (New York days), but each search returns only its latest articles, and these did not reach back over it: ${short2.join("; ")}. What came before was not reached, so this says nothing about the news earlier in the window.${past}` : `World and economic news, ${from} to ${day3} (${count}, from ${span2}), from the news filed under ${queries.join(", ")}.${past}`;
   return [head2, "", render2(list2)].join("\n") + note;
 }
@@ -40344,10 +40344,22 @@ function saveContext(dir, ticker, date5, ctx) {
   });
 }
 var contextOf = ({ context: c }) => typeof c?.holdings === "string" && typeof c.lessons === "string" ? { holdings: c.holdings, lessons: c.lessons } : void 0;
+function factCheckCount(text4) {
+  const first = text4.trim().split("\n")[0] ?? "", said = /\b(\d+|no) wrong and (\d+|no) misleading\b/i.exec(first);
+  if (!said) return null;
+  const n2 = (x) => /^no$/i.test(x) ? 0 : Number(x), w = n2(said[1]), m2 = n2(said[2]);
+  const lines = text4.split("\n"), rules = lines.map((l, i) => i > 0 && /^\s*\|?\s*:?-{2,}/.test(l) && lines[i - 1].includes("|") ? i : -1).filter((i) => i > 0);
+  const rule = rules.find((i) => /what it said|what is right/i.test(lines[i - 1])) ?? rules[0] ?? -1;
+  let rows = 0;
+  if (rule > 0) for (let i = rule + 1; i < lines.length && /^\s*\|/.test(lines[i]); i++) rows++;
+  return w + m2 === rows ? null : `the first line counts ${w} wrong and ${m2} misleading claims, ${w + m2} in all, but the table of corrections has ${rows === 1 ? "one row" : `${rows} rows`}: w and m count its rows, one row a claim. Count them again (each row is wrong or misleading), mend the first line or the table, and save the fact check again`;
+}
 function saveSection(dir, ticker, date5, section, text4) {
   const t = text4.trim();
   if (!t) throw new Error("there is nothing to save: the text is empty");
   if (t.length > MAX_CHARS) throw new Error(`the text is ${t.length} characters; the most one section holds is ${MAX_CHARS}`);
+  const miscount = section === "fact_check" ? factCheckCount(t) : null;
+  if (miscount) throw new Error(miscount);
   let turns = 0;
   change(dir, ticker, date5, (r) => {
     if (!TURNS.has(section)) r.log = r.log.filter((e) => e.section !== section);
@@ -40358,7 +40370,15 @@ function saveSection(dir, ticker, date5, section, text4) {
 }
 var REPORTS = ["market", "sentiment", "news", "fundamentals"];
 var FLAG = "[the fact it rested on was corrected: see the fact check]";
-var times = (text4, words3) => words3 ? text4.split(words3).length - 1 : 0;
+var placesOf = (text4, words3) => {
+  const out = [];
+  for (let i = words3 ? text4.indexOf(words3) : -1; i >= 0; i = text4.indexOf(words3, i + words3.length)) out.push(i);
+  return out;
+};
+var MARKS = new RegExp(` \\[corrected: was "[\\s\\S]*?"\\]| ${FLAG.replace(/[[\]]/g, "\\$&")}`, "g");
+var within3 = (s, e, [a, b]) => s >= a && e <= b;
+var touches = (s, e, [a, b]) => s < b && e > a;
+var lineAt = (text4, i) => text4.slice(text4.lastIndexOf("\n", i - 1) + 1, text4.indexOf("\n", i) < 0 ? text4.length : text4.indexOf("\n", i));
 function correctSection(dir, ticker, date5, section, corrections, flagAfter = []) {
   if (!REPORTS.includes(section)) throw new Error(`only an analyst's report can be corrected (${REPORTS.join(", ")}), not ${section}`);
   if (!corrections.length && !flagAfter.length) throw new Error("give at least one correction or one conclusion to flag");
@@ -40368,26 +40388,62 @@ function correctSection(dir, ticker, date5, section, corrections, flagAfter = []
     const entry = r.log.find((e) => e.section === section);
     if (!entry) throw new Error(`this run has no ${section} report to correct`);
     let t = entry.text;
+    const fixes = [...entry.fixes ?? []];
+    const marksIn = () => [
+      ...[...t.matchAll(MARKS)].map((m2) => [m2.index, m2.index + m2[0].length]),
+      ...fixes.flatMap((f) => placesOf(t, f.mark).map((p) => [p, p + f.mark.length]))
+    ];
     for (const c of corrections) {
-      const now = c.now.trim(), n2 = times(t, c.was);
-      if (!c.was.trim() || !now || now === c.was.trim()) lines.push(`- not applied: a correction needs the report's exact old words and different new ones (${JSON.stringify(c.was)})`);
-      else if (!n2) lines.push(`- not applied: "${c.was}" is not in the ${section} report word for word; copy the words exactly as it has them`);
-      else if (n2 > 1 && !c.every) lines.push(`- not applied: "${c.was}" is in the ${section} report ${n2} times; give more of the words around the one to correct, or set every to correct all ${n2}`);
+      const now = c.now.trim();
+      if (!c.was.trim() || !now || now === c.was.trim()) {
+        lines.push(`- not applied: a correction needs the report's exact old words and different new ones (${JSON.stringify(c.was)})`);
+        continue;
+      }
+      const marks = marksIn();
+      const news = fixes.flatMap((f) => placesOf(t, f.now + f.mark).map((p) => ({ span: [p, p + f.now.length], f })));
+      const found = placesOf(t, c.was).map((s) => ({ s, e: s + c.was.length }));
+      const live = found.filter(({ s, e }) => !marks.some((m2) => within3(s, e, m2)));
+      const clash = live.some(({ s, e }) => {
+        const own2 = news.find((x) => within3(s, e, x.span));
+        return marks.some((m2) => touches(s, e, m2)) || !own2 && t.startsWith(' [corrected: was "', e) || news.some((x) => touches(s, e, x.span) && !within3(s, e, x.span));
+      });
+      if (!live.length) lines.push(found.length ? `- not applied: "${c.was}" is only in the old words a correction keeps beside its new ones ([corrected: was "..."]); those stay as the analyst wrote them` : `- not applied: "${c.was}" is not in the ${section} report word for word; copy the words exactly as it has them`);
+      else if (clash) lines.push(`- not applied: "${c.was}" runs into an earlier correction (its new words or the old words it keeps); correct words outside it, or only within the new words it gave, so that each mark keeps the analyst's own words, once`);
+      else if (live.length > 1 && !c.every) lines.push(`- not applied: "${c.was}" is in the ${section} report ${live.length} times; give more of the words around the one to correct, or set every to correct all ${live.length}`);
       else {
-        t = t.split(c.was).join(`${now} [corrected: was "${c.was}"]`);
-        lines.push(`- corrected${n2 > 1 ? ` in ${n2} places` : ""}: "${c.was}" now reads "${now}"`);
+        let again = 0;
+        for (const { s, e } of [...live].reverse()) {
+          const own2 = news.find((x) => within3(s, e, x.span));
+          if (own2) {
+            const [a] = own2.span, fresh = own2.f.now.slice(0, s - a) + now + own2.f.now.slice(e - a);
+            t = t.slice(0, a) + fresh + t.slice(a + own2.f.now.length);
+            fixes.push({ now: fresh, mark: own2.f.mark });
+            again++;
+            continue;
+          }
+          const row = /^[ \t]*\|/.test(lineAt(t, s)), mark = ` [corrected: was "${row ? c.was.replace(/\|/g, "\\|") : c.was}"]`;
+          const cell = row && /\|\s*$/.test(now) ? now.replace(/\s*\|\s*$/, "") : null;
+          t = t.slice(0, s) + (cell === null ? `${now}${mark}` : `${cell}${mark} |`) + t.slice(e);
+          fixes.push({ now: cell ?? now, mark });
+        }
+        const n2 = live.length;
+        lines.push(`- corrected${n2 > 1 ? ` in ${n2} places` : ""}: "${c.was}" now reads "${now}"${again ? `${n2 > 1 ? `; ${again} of them` : ""} within an earlier correction's new words, whose mark still keeps the analyst's own words` : ""}`);
       }
     }
     for (const f of flagAfter) {
-      const n2 = times(t, f);
-      if (n2 !== 1) lines.push(`- not flagged: "${f}" is in the ${section} report ${n2} times, not once; give the exact words that end the conclusion`);
-      else {
-        t = t.split(f).join(`${f} ${FLAG}`);
-        lines.push(`- flagged the conclusion ending "${f}"`);
+      const marks = marksIn(), live = placesOf(t, f).filter((s) => !marks.some((m2) => touches(s, s + f.length, m2)));
+      if (live.length !== 1) {
+        lines.push(`- not flagged: "${f}" is in the ${section} report ${live.length} times, not once; give the exact words that end the conclusion`);
+        continue;
       }
+      let p = live[0] + f.length;
+      for (const m2 of marks.filter((x) => x[0] === p)) p = Math.max(p, m2[1]);
+      t = `${t.slice(0, p)} ${FLAG}${t.slice(p)}`;
+      lines.push(`- flagged the conclusion ending "${f}"`);
     }
     if (t.length > MAX_CHARS) throw new Error(`the corrected report would be ${t.length} characters; the most one section holds is ${MAX_CHARS}`);
     entry.text = t;
+    entry.fixes = fixes;
   });
   return lines;
 }
@@ -41338,8 +41394,8 @@ function signalsOf(bars, newsToday = null) {
   if (movePct !== null && Math.abs(movePct) >= MOVE_PCT) signals.push({ kind: "move", words: `${movePct >= 0 ? "rose" : "fell"} ${one(Math.abs(movePct))}%` });
   const usual = bars.slice(Math.max(0, n2 - 1 - USUAL_DAYS), n2 - 1).map((b) => b.volume).filter((v) => v !== null && v > 0);
   if (usual.length >= USUAL_DAYS / 2 && last.volume !== null && last.volume > 0) {
-    const times2 = last.volume / (usual.reduce((a, v) => a + v, 0) / usual.length);
-    if (times2 >= VOLUME_TIMES) signals.push({ kind: "volume", words: `${one(times2)} times its usual volume` });
+    const times = last.volume / (usual.reduce((a, v) => a + v, 0) / usual.length);
+    if (times >= VOLUME_TIMES) signals.push({ kind: "volume", words: `${one(times)} times its usual volume` });
   }
   const yearAgo = addDays(last.date, -365), year = bars.slice(0, n2 - 1).filter((b) => b.date >= yearAgo);
   if (bars[0] && bars[0].date <= addDays(last.date, -350) && year.length) {

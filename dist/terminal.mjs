@@ -21542,6 +21542,8 @@ function load(dir, ticker, date4) {
   }
 }
 var isSection = (s) => SECTIONS.includes(s);
+var FLAG = "[the fact it rested on was corrected: see the fact check]";
+var MARKS = new RegExp(` \\[corrected: was "[\\s\\S]*?"\\]| ${FLAG.replace(/[[\]]/g, "\\$&")}`, "g");
 function progress(dir, ticker, date4) {
   const out = {};
   for (const e of load(dir, ticker, date4).log) out[e.section] = (out[e.section] ?? 0) + 1;

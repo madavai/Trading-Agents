@@ -9,7 +9,9 @@ const inline = (raw: string): string =>
     .replace(/(^|[^*\w])\*([^*\s][^*]*)\*(?![*\w])/g, '$1<em>$2</em>')
     .replace(/(^|[^_\w])_([^_\s][^_]*)_(?![_\w])/g, '$1<em>$2</em>');
 
-const cells = (line: string): string[] => line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim());
+// A bar written "\|" is a bar inside a cell (as in GitHub's tables): the fact checker's mark in a table row keeps the
+// row's old words with their bars written so, and the row keeps its cells.
+const cells = (line: string): string[] => line.trim().replace(/^\|/, '').replace(/(?<!\\)\|$/, '').split(/(?<!\\)\|/).map((c) => c.replace(/\\\|/g, '|').trim());
 const isRule = (line: string): boolean => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(line);
 
 // News and filings the agents quote can carry a line separator (U+2028) or a paragraph separator (U+2029), characters `.`
