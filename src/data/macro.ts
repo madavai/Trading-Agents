@@ -71,9 +71,20 @@ export function periodOf(date: string, freq: Frequency): string {
   return date;
 }
 
-/** The observation for the same period a year before `date` (for a daily or weekly series, the last one within ten days before it). */
-function yearBefore(obs: Obs[], date: string): Obs | undefined {
-  const target = `${Number(date.slice(0, 4)) - 1}${date.slice(4)}`, floor = addDays(target.replace(/-02-29$/, '-02-28'), -10);
+/**
+ * The observation for the same period a year before `date`. A weekly series takes the same week a year earlier: the
+ * week dated nearest the same day, within three days either side (a series dated on Saturdays falls a day earlier each
+ * year, so "on or before" would reach 53 weeks back: jobless claims for 2026-10-31 were set against 2025-10-25, not
+ * 2025-11-01, a 14.5% fall in place of 17.1%, NVDA 9 Nov 2026). A daily series takes the last value within ten days
+ * before it; a monthly, quarterly or yearly one the same period.
+ */
+function yearBefore(obs: Obs[], date: string, freq: Frequency): Obs | undefined {
+  const target = `${Number(date.slice(0, 4)) - 1}${date.slice(4)}`, real = target.replace(/-02-29$/, '-02-28');
+  if (freq === 'weekly') {
+    const day = (d: string) => Date.parse(`${d}T00:00:00Z`) / 86_400_000, at = day(real);
+    return obs.filter((o) => Math.abs(day(o.date) - at) <= 3).sort((a, b) => Math.abs(day(a.date) - at) - Math.abs(day(b.date) - at))[0];
+  }
+  const floor = addDays(real, -10);
   return [...obs].reverse().find((o) => o.date <= target && o.date >= floor);
 }
 
@@ -100,7 +111,7 @@ export async function economicSeries(indicator: string, analysis: string, lookBa
   const all = parseCsv(csv).filter((o) => o.date <= day), freq = frequency(all);
   const obs = all.filter((o) => o.date >= addDays(day, -window));
   if (!obs.length) throw new NoData(`FRED has no ${id} values published by ${day} in this window`);
-  const first = obs[0]!, last = obs[obs.length - 1]!, ago = yearBefore(all, last.date);
+  const first = obs[0]!, last = obs[obs.length - 1]!, ago = yearBefore(all, last.date, freq);
   const fmt = (v: number) => (Math.abs(v) >= 1000 ? v.toLocaleString('en-US', { maximumFractionDigits: 1 }) : v.toFixed(2));
   const plusMinus = (v: number) => { const t = fmt(Math.abs(v)); return Number(t.replace(/,/g, '')) === 0 ? t : `${v > 0 ? '+' : '-'}${t}`; };
   // A rate or a spread changes by percentage points; a level or an index changes by a percentage of itself as well. A

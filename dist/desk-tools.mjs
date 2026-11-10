@@ -38389,8 +38389,13 @@ function periodOf(date5, freq) {
   if (freq === "yearly") return y;
   return date5;
 }
-function yearBefore(obs, date5) {
-  const target = `${Number(date5.slice(0, 4)) - 1}${date5.slice(4)}`, floor = addDays(target.replace(/-02-29$/, "-02-28"), -10);
+function yearBefore(obs, date5, freq) {
+  const target = `${Number(date5.slice(0, 4)) - 1}${date5.slice(4)}`, real = target.replace(/-02-29$/, "-02-28");
+  if (freq === "weekly") {
+    const day3 = (d) => Date.parse(`${d}T00:00:00Z`) / 864e5, at = day3(real);
+    return obs.filter((o) => Math.abs(day3(o.date) - at) <= 3).sort((a, b) => Math.abs(day3(a.date) - at) - Math.abs(day3(b.date) - at))[0];
+  }
+  const floor = addDays(real, -10);
   return [...obs].reverse().find((o) => o.date <= target && o.date >= floor);
 }
 async function economicSeries(indicator, analysis2, lookBackDays = 365) {
@@ -38412,7 +38417,7 @@ async function economicSeries(indicator, analysis2, lookBackDays = 365) {
   const all = parseCsv(csv).filter((o) => o.date <= day3), freq = frequency(all);
   const obs = all.filter((o) => o.date >= addDays(day3, -window2));
   if (!obs.length) throw new NoData(`FRED has no ${id} values published by ${day3} in this window`);
-  const first = obs[0], last = obs[obs.length - 1], ago = yearBefore(all, last.date);
+  const first = obs[0], last = obs[obs.length - 1], ago = yearBefore(all, last.date, freq);
   const fmt2 = (v) => Math.abs(v) >= 1e3 ? v.toLocaleString("en-US", { maximumFractionDigits: 1 }) : v.toFixed(2);
   const plusMinus = (v) => {
     const t = fmt2(Math.abs(v));
