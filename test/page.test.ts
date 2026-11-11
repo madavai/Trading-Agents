@@ -252,11 +252,14 @@ test('page-19: the Overview runs Markets, Start here, the Chart, the stock page,
   for (const id of new Set([...jumps(html), ...[...page.matchAll(/data-to="(sec-[a-z]+)"/g)].map((m) => m[1]!)])) assert.ok(ids.includes(id), `${id} is a heading on the page`);
   assert.deepEqual(want, ids.filter((x) => want.includes(x!)), 'the same order as the page');
   // a press brings the chart into view: asked before charting (which draws the tiles again, so the pressed one is gone), unless all of it is on screen, smoothly unless motion is reduced
-  assert.match(page, /case 'select': \{ const inPage = !!el\.closest\('#page'\); select\(sym\); if \(inPage\) showChart\(\); break; \}/);
+  assert.match(page, /const shows = !!el\.closest\('#page, #sideOpen'\);\n {6}select\(sym\);\n {6}if \(shows\) \{ if \(view !== 'overview'\) showView\('overview'\); showChart\(\); \}/, 'a press on the page or on a side-list star: the Overview first if Your account is showing, then the chart');
   assert.match(page, /if \(at\.top >= page\.top && at\.bottom <= page\.bottom\) return;/);
   assert.match(page, /c\.scrollIntoView\(\{ behavior: matchMedia\('\(prefers-reduced-motion: reduce\)'\)\.matches \? 'auto' : 'smooth', block: 'start' \}\);/);
-  // never from putting back the last stock, from the page opening, from adding a stock, or from the search list: only from a press on a tile or a row
+  // never from putting back the last stock, from the page opening, from adding a stock, or from the search list: only from a press on a tile, a row or a star in the side list
   assert.equal((page.match(/showChart\(\)/g) ?? []).length, 2, 'the definition and the one press');
+  assert.match(page, /<button class="at-li \$\{w\.symbol === S\.symbol \? 'on' : ''\}" data-act="select" data-symbol=/, 'a side-list star presses through the same act');
+  assert.match(fs.readFileSync('src/terminal/ui/index.html', 'utf8'), /<div class="at-list small" id="favs"><\/div>/);
+  assert.ok(fs.readFileSync('src/terminal/ui/index.html', 'utf8').indexOf('id="favs"') < fs.readFileSync('src/terminal/ui/index.html', 'utf8').indexOf('id="sideFolded"'), 'the stars are in the open side list, #sideOpen');
   assert.doesNotMatch(/function select\([\s\S]*?\n\}\n/.exec(page)![0], /showChart/);
   // the tiles, Markets, Worth a look and the watchlist rows all press through the same act
   assert.equal((page.match(/data-act="select"/g) ?? []).length, 5, 'the side list star, a Markets tile, a watchlist row, a Start here tile and a Worth a look tile');

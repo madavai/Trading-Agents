@@ -1368,8 +1368,9 @@ function select(sym: string, chosen = true, name = ''): void {
 }
 
 /** After a press on a tile or a row of the page (Start here, Markets, Worth a look, the watchlist), the chart comes into view
- *  unless all of it is on screen already. Smooth, but not for a person who asked for less motion. Only a press does this: never
- *  the page opening, nor putting back the stock last charted, nor the side list. */
+ *  unless all of it is on screen already. Smooth, but not for a person who asked for less motion. Only a press does this (and one
+ *  on a star in the side list, which first goes back to the Overview from Your account): never the page opening, nor putting
+ *  back the stock last charted. */
 function showChart(): void {
   const c = $('#sec-chart'), page = $('#page').getBoundingClientRect(), at = c.getBoundingClientRect();
   if (at.top >= page.top && at.bottom <= page.bottom) return;
@@ -1505,7 +1506,14 @@ document.addEventListener('click', (e) => {
       life.stopped = true; $<HTMLDialogElement>('#stopDialog').close(); renderSub();
       toast('The dashboard is stopped. Ask the team to open it again any time.');
     }); break;
-    case 'select': { const inPage = !!el.closest('#page'); select(sym); if (inPage) showChart(); break; }   // asked before: charting draws the tiles again, and the pressed one is gone
+    case 'select': {
+      // A press on the page or on a star in the side list shows the chart, from Your account too (which has none: the Overview comes first).
+      // Asked before charting, which draws the tiles again, so the pressed one is gone.
+      const shows = !!el.closest('#page, #sideOpen');
+      select(sym);
+      if (shows) { if (view !== 'overview') showView('overview'); showChart(); }
+      break;
+    }
     case 'guide-open': remember({ guide: 'open' }); showView('overview'); renderGuide(); $('#sec-guide').scrollIntoView({ behavior: 'smooth', block: 'start' }); break;
     case 'guide-away': remember({ guide: 'away' }); renderGuide(); toast('Get started is put away. The side list opens it again any time.'); break;
     case 'gloss-open': openGlossary(); break;

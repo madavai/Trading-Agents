@@ -2200,12 +2200,14 @@
         });
         break;
       case "select": {
-        const inPage = !!el.closest("#page");
+        const shows = !!el.closest("#page, #sideOpen");
         select(sym);
-        if (inPage) showChart();
+        if (shows) {
+          if (view !== "overview") showView("overview");
+          showChart();
+        }
         break;
       }
-      // asked before: charting draws the tiles again, and the pressed one is gone
       case "guide-open":
         remember({ guide: "open" });
         showView("overview");
