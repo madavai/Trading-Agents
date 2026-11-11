@@ -127,7 +127,7 @@ test('filings-1: when the price source\'s record of splits cannot be read, no mu
     [/v8\/finance\/chart\/ACME\?/, () => json(chartJson('ACME', rows))],
   ]) });
   const t = await companyOverview('ACME', '2024-07-01');
-  assert.match(t, /\nMarket value, price to earnings and price to book: unavailable\. The price source's record of share splits could not be read \(.*refused \(HTTP 403\).*\), so the filed figures cannot be put on the share basis of its prices: a split since a figure was filed would put a multiple off by its ratio\.\n/);
+  assert.match(t, /\nMarket value, price to earnings and price to book: unavailable\. The price source's record of share splits could not be read \(.*Yahoo Finance refused the desk's request.*\), so the filed figures cannot be put on the share basis of its prices: a split since a figure was filed would put a multiple off by its ratio\.\n/);
   assert.doesNotMatch(t, /Market value \(derived|Price to earnings \(derived|Price to book \(derived/);
 });
 

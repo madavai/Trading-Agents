@@ -345,7 +345,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "Teams: trading-desk, with the 13 desk agents as its members.",
         "Agents: the 13 desk agents, and trading-desk is not among them.",
         "If Teams shows a sentence saying why trading-desk is not a team, paste that sentence in the note."] },
-    { "id": "A3", "title": "The desk check is green", "tags": [], "changed": "2026-11-09",
+    { "id": "A3", "title": "The desk check is green", "tags": [], "changed": "2026-11-11",
       "about": "The desk check looks at your computer and at the free data sources the agents read, so you know everything is ready before the first analysis. Run it whenever something seems not to work, and in a new conversation after every update of the project: a conversation keeps the desk's tools and the team's steps from when it began.",
       "where": "Madav › Agent Studio › trading-desk › Put to work",
       "do": [
@@ -358,6 +358,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "Under \"This computer\", OK for Node, the desk data folder (writable), the contact email for the SEC (yours, masked: its first letter, then …@ and its domain, never the whole address) and Robinhood (\"a sign-in is saved\", or \"not connected yet (it is for your accounts on the dashboard, and for trading; analysis works without it)\").",
         "A line saying your private folder is locked to your own account and the system (nothing more: it never says that no other account can open it), and \"The desk's agent files in this folder (its thirteen agents, the team's file and its line-up) are as the project ships them\". The team never reads that line as being about this conversation's steps.",
         "Under \"Free data sources\", all eight answer: Yahoo Finance prices and news, StockTwits, Reddit, FRED economic data, Polymarket, SEC EDGAR and SEC company data. Then \"Every source checked here is reachable.\" and \"Not checked here: Yahoo Finance's company data, …\", the one source the check does not ask, with why.",
+        "If this happens (a source does not answer): its line is marked NO and says what happened in plain words, for example \"Reddit: refused the desk's request\", \"turned the desk away for asking too often; it limits how often one computer may ask, so try again in a few minutes\", \"had a fault on its own side and could not answer; try again later\" or \"unreachable (this computer may be offline, or could not look up its address)\". Never a web error code such as \"HTTP 403\" or \"fetch failed\", and the team does not add one.",
         "SPY's checked price table comes back. The team does not test Robinhood here: it points you to Connect on the dashboard's Your account (section D).",
         "The team opens its answer as the check's \"HOW TO SUM UP\" line (just under the title) says. With every line OK it may say that everything the check looked at is ready. With a line marked NO or not checked (--), it opens with that, and nowhere says \"everything is ready\" or \"nothing needs fixing\".",
         "If this happens: the team says first that this conversation began before the desk was updated (the check starts \"DESK UPDATED\", or says \"This conversation's steps for the team (version …) are not the ones in this folder now\"). Start a new conversation with the trading-desk team and check again there. Reset nothing from the old conversation: it would offer no reset, and the desk refuses one from it.",
@@ -546,7 +547,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "\"Market value, price to earnings and price to book: not worked out. TSM files with the SEC as a foreign company (its yearly report is a form 20-F) …\", with the reason, and the report gives TSM no market value or price to earnings of the desk's own.",
         "Never a market value worked out from the ordinary share count and the US price: for TSMC, whose US share stands for five ordinary shares, that would be about five times too high.",
         "Its results dates are \"not known from its filings\": a foreign company files its results on form 6-K, which names no items, so the desk cannot tell them from its other reports. No agent gives TSM a results date."] },
-    { "id": "B24", "title": "Results dates come from the company's own filings, and the next one is \"not known\"", "tags": [], "changed": "2026-11-11",
+    { "id": "B25", "title": "Results dates come from the company's own filings, and the next one is \"not known\"", "tags": [], "changed": "2026-11-11",
       "about": "A company's results day often moves its shares more than any other day of the year. The desk used to have no source for when a company reports, so its agents guessed: NVIDIA's from the day a betting market closes (a day late), and Meta's from the spacing of its past filings (six days early). Now the desk reads the results a company filed with the SEC in the past year (form 8-K, item 2.02): the day and time of each, the first trading day that could react to it (results out after the close trade the next day), and how the shares closed that day. When the next results come out is not in the filings (a company announces it in a press release), so the desk says it is not known instead of guessing.",
       "where": "Dashboard › META's call › Fundamentals report, then the rest of the call",
       "do": [
@@ -692,7 +693,18 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "Each market it quotes has a traded volume in dollars above $0 and a chance for its first answer, such as \"Yes 55%\". A very small one reads \"under 1%\" or \"under $1\", never \"0%\" or \"$0\".",
         "Where some open markets were left out, the desk's own line says so: \"Left out of the … open markets that matched: … with no traded volume …\" or \"… with no price given\". The report does not quote their prices.",
-        "If Polymarket sent back an error, the report calls its odds \"unavailable\", never \"no markets\" or \"the crowd expects nothing\"."] }
+        "If Polymarket sent back an error, the report calls its odds \"unavailable\", never \"no markets\" or \"the crowd expects nothing\"."] },
+    { "id": "B24", "title": "A source that refused the desk, or could not be reached, is said in plain words", "tags": [], "changed": "2026-11-11",
+      "about": "The desk reads free sources on the internet, and any of them can refuse it or be out of reach on a given day: Reddit refused the desk's requests on 10 and 11 Nov 2026, for one. The desk then says so with the source's everyday name and in everyday words, and the agents pass those words on. Before, they passed on a web error code: Meta's run of 10 Nov told you \"Data unavailable this run: Reddit (HTTP 403)\".",
+      "where": "Madav › Agent Studio › trading-desk › Put to work, then Dashboard › the call › Read › Sentiment report",
+      "do": [
+        "Run a new analysis of NVIDIA, if you have not since this update: [[Analyse NVDA shallow]]",
+        "Read the team's last message, where it lists any data that was unavailable.",
+        "Open the call's Sentiment report and find its Reddit part. Then look through the other reports, the debate and the decision for any source called unavailable."],
+      "see": [
+        "While Reddit refuses the desk, the report says so in words such as \"Reddit refused the desk's request\", and may quote Reddit's own words, \"reddit.com: forbidden (reddit.com)\". It calls Reddit unavailable, never a quiet crowd.",
+        "Any other source that failed is named as you know it (Yahoo Finance, the SEC, FRED, StockTwits, Polymarket), with what happened: it refused the desk's request; it turned the desk away for asking too often, so try again in a few minutes; it had a fault on its own side; it did not answer in time; or it could not be reached, with why (for example \"this computer may be offline\").",
+        "Nowhere, in the team's last message, the reports, the debate or the decision, is a source described by a web error code or a web address: no \"HTTP 403\", \"403\", \"429\", \"503\", \"fetch failed\" or \"www.reddit.com\". If you find one, note the sentence: it is a fault."] }
   ] },
   { "id": "C", "name": "The dashboard",
     "sub": "The page on your own computer: markets, charts, watchlist, the desk's calls, the scorecard and a page per company.",
@@ -890,7 +902,7 @@ b, strong { font-weight: var(--weight-semibold); }
     "about": "Robinhood lets AI agents trade only in a separate account it calls Agentic, which you fund yourself. You connect Robinhood on the dashboard yourself, on Robinhood's own sign-in page; agents never touch the connection. This section is about reading your accounts; nothing here can place an order.",
     "before": "A Robinhood account, with its Agentic account opened in the Robinhood app if you want the desk to propose trades. The dashboard open (C1).",
     "tests": [
-    { "id": "D1", "title": "Connect Robinhood", "tags": [], "changed": "2026-11-09",
+    { "id": "D1", "title": "Connect Robinhood", "tags": [], "changed": "2026-11-11",
       "about": "The sign-in is saved in a private folder on your computer, locked to your own account, which agents are refused.",
       "where": "Dashboard › side list › Your account",
       "do": [
@@ -898,7 +910,8 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "\"Connected\": \"The sign-in works and Robinhood answered.\"",
         "\"Robinhood offers N tools: X that only read, Y that order or move money (of these, this page uses only Robinhood's dry run, when you press Review, and the order itself, on your Confirm; no agent ever gets one) and Z others.\"",
-        "It never says that this page never uses them."] },
+        "It never says that this page never uses them.",
+        "If this happens (Robinhood is out of reach, or answers with a failure): \"Not working\", with what happened in plain words, for example \"Robinhood could not be reached (the connection failed)\" or \"Robinhood had a fault on its own side and could not answer, saying …; try again later\", with Robinhood's own words and any account number hidden. Never \"Streamable HTTP error\", \"fetch failed\" or a web error code such as 500."] },
     { "id": "D2", "title": "You choose the accounts", "tags": [], "changed": "2026-10-21",
       "about": "Only the accounts you tick are shown, and only those reach the agents.",
       "where": "Dashboard › Your account › Choose accounts",
@@ -1449,7 +1462,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "Asked again with nothing waiting, the team says nothing is waiting, and that the finished analyses still on the list need no run. Never that you have not asked for any analysis.",
         "With a listener and something waiting, \"Run now\" asks for a run: \"Asked for a run of what is waiting.\"",
         "Asked while another run is analysing a company from the list, the team stops and says so, and asks for no other run; that run carries on with the list when it finishes."] },
-    { "id": "K6", "title": "A stopped run says why, and Retry carries on", "tags": ["Later"], "changed": "2026-11-09",
+    { "id": "K6", "title": "A stopped run says why, and Retry carries on", "tags": ["Later"], "changed": "2026-11-11",
       "about": "When a run stops early (a usage limit, a missing email), the company says why in plain words, and Retry carries on from the step it reached. With the desk's own Claude Code listener it says so at once. With Madav it can say so at once only when Madav's note gives the time its run ended, which it does not yet: until then the company shows \"Being analysed\" until nothing has been saved for it for two hours, and then says exactly that.",
       "where": "Dashboard › Analyses you asked for",
       "do": [
@@ -1458,6 +1471,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "Press \"Retry\" the same day."],
       "see": [
         "With Claude Code, at once: \"Failed\" with the reason in plain words, for example \"Claude Code's weekly usage limit was reached; it resets 6am (America/Chicago). Press Retry after that.\"",
+        "If Claude's service itself failed, the reason says what happened, for example \"Claude's service had a fault on its own side and could not answer: press Retry in a while.\" Never a web error code such as \"(500)\".",
         "With Madav: \"Being analysed\" with the last step it reached, then, two hours after that step, \"Failed\" with \"nothing was saved for this analysis for two hours, so its run has most likely stopped: press Retry. If it was still going, it shows done once its call is recorded\".",
         "What a run cannot do (for example no email saved for the SEC) marks it failed with the reason; it never asks you.",
         "\"<company> is asked for again.\", and on the same day it carries on from the step it stopped at.",

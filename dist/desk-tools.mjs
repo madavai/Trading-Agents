@@ -36712,6 +36712,84 @@ function maskEmail(email3) {
 var WHY_EMAIL = "the SEC asks every program that reads its filings for a contact email";
 var ASK_FOR_EMAIL = "the SEC asks every program that reads its filings for a contact email, and none is saved yet: ask the person for their own email (never invent one) and save it with set_contact_email";
 
+// src/data/failure-words.ts
+var NAMES = [
+  [/(^|\.)yahoo\.com$/, "Yahoo Finance"],
+  [/(^|\.)sec\.gov$/, "the SEC"],
+  [/^alfred\.stlouisfed\.org$/, "FRED's archive (ALFRED)"],
+  [/(^|\.)stlouisfed\.org$/, "FRED"],
+  [/(^|\.)stocktwits\.com$/, "StockTwits"],
+  [/(^|\.)reddit\.com$/, "Reddit"],
+  [/(^|\.)polymarket\.com$/, "Polymarket"],
+  [/(^|\.)robinhood\.com$/, "Robinhood"]
+];
+function sourceName(url2) {
+  let host;
+  try {
+    host = new URL(url2).hostname.toLowerCase();
+  } catch {
+    return url2;
+  }
+  return NAMES.find(([re]) => re.test(host))?.[1] ?? host;
+}
+function refusalWords(status, who = "the desk") {
+  if (status === 429) return { did: `turned ${who} away for asking too often`, then: "; it limits how often one computer may ask, so try again in a few minutes" };
+  if (status >= 500) return { did: "had a fault on its own side and could not answer", then: "; try again later" };
+  if (status === 404 || status === 410) return { did: `has nothing at the address ${who} asked for`, then: "" };
+  return { did: `refused ${who}'s request`, then: "" };
+}
+function unreachableWhy(e) {
+  const err = e;
+  const code = String(err?.cause?.code ?? err?.code ?? "");
+  const said = `${err?.message ?? ""} ${err?.cause?.message ?? ""}`;
+  if (err?.name === "TimeoutError" || err?.cause?.name === "TimeoutError" || /TIMEOUT|ETIMEDOUT/.test(code)) return "no answer in time";
+  if (/ENOTFOUND|EAI_AGAIN/.test(code)) return "this computer may be offline, or could not look up its address";
+  if (/ECONNREFUSED/.test(code)) return "nothing answered at its address";
+  if (/ECONNRESET|EPIPE|UND_ERR_SOCKET|UND_ERR_CLOSED/.test(code) || /other side closed|socket hang up/i.test(said)) return "the connection was cut off";
+  if (/CERT|SSL|TLS|SELF_SIGNED/i.test(code)) return "its security certificate could not be checked";
+  return "the connection failed";
+}
+function unreachableWords(e) {
+  const why = unreachableWhy(e);
+  return why === "no answer in time" ? "did not answer in time" : `could not be reached (${why})`;
+}
+function whatItSaid(body) {
+  const text4 = body.trim();
+  if (!text4) return "";
+  const clean = (s) => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;|&#x27;/g, "'").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim().slice(0, 140);
+  if (/^[[{]/.test(text4)) {
+    try {
+      const v = JSON.parse(text4);
+      const pick2 = (o, depth) => {
+        if (typeof o === "string") return o;
+        if (!o || typeof o !== "object" || depth > 3) return "";
+        if (Array.isArray(o)) {
+          for (const x of o) {
+            const s = pick2(x, depth + 1);
+            if (s) return s;
+          }
+          return "";
+        }
+        const r = o;
+        for (const k of ["message", "description", "error_description", "detail", "error", "errors", "title"]) {
+          const s = pick2(r[k], depth + 1);
+          if (s) return s;
+        }
+        for (const x of Object.values(r)) if (x && typeof x === "object") {
+          const s = pick2(x, depth + 1);
+          if (s) return s;
+        }
+        return "";
+      };
+      return clean(pick2(v, 0));
+    } catch {
+    }
+  }
+  if (/<feed[\s>]/.test(text4)) return clean(/<title[^>]*>([\s\S]*?)<\/title>/i.exec(text4)?.[1]?.replace(/<[^>]*>/g, " ") ?? "");
+  const page = text4.replace(/<\?[\s\S]*?\?>|<!--[\s\S]*?-->|<!DOCTYPE[^>]*>/gi, " ").replace(/<(head|script|style|noscript)[\s>][\s\S]*?<\/\1>/gi, " ").replace(/<[^>]*>/g, " ");
+  return clean(page) || clean(/<title[^>]*>([\s\S]*?)<\/title>/i.exec(text4)?.[1] ?? "");
+}
+
 // src/check/probes.ts
 var SEC_REFUSED_WITH_EMAIL = "the SEC refused even though a contact email was sent, so the email is not what is missing; it sometimes blocks a computer for a few minutes, so try again shortly";
 var SOURCES = [
@@ -36760,15 +36838,16 @@ async function probe(source, userAgent, fetchImpl2 = fetch, timeoutMs = 8e3, ema
     if (!res.ok) {
       await res.body?.cancel().catch(() => {
       });
+      const { did, then } = refusalWords(res.status);
       const why = source.onRefused && (res.status === 403 || res.status === 401) ? `: ${source.onRefused(emailSent)}` : "";
-      return { name: source.name, ok: false, detail: `refused (HTTP ${res.status})${why}` };
+      return { name: source.name, ok: false, detail: `${did}${why}${then}` };
     }
     const body = await head(res);
     return source.looksRight(body) ? { name: source.name, ok: true, detail: `answered in ${ms} ms` } : { name: source.name, ok: false, detail: "answered, but not with the data the desk reads" };
   } catch (e) {
     const err = e;
     if (err.name === "TimeoutError" || err.name === "AbortError") return { name: source.name, ok: false, detail: `unreachable (no answer within ${Math.round(timeoutMs / 1e3)} s)` };
-    return { name: source.name, ok: false, detail: `unreachable (${err.message})` };
+    return { name: source.name, ok: false, detail: `unreachable (${unreachableWhy(err)})` };
   }
 }
 function userAgentFor(url2, contact2, email3) {
@@ -37113,9 +37192,21 @@ import fs7 from "node:fs";
 import path7 from "node:path";
 import { createHash } from "node:crypto";
 var Unavailable = class extends Error {
+  constructor(message, status, noEmail = false) {
+    super(message);
+    this.status = status;
+    this.noEmail = noEmail;
+  }
+  status;
+  noEmail;
   name = "Unavailable";
 };
 var NoData = class extends Error {
+  constructor(message, status) {
+    super(message);
+    this.status = status;
+  }
+  status;
   name = "NoData";
 };
 var fetchImpl = (...a) => fetch(...a);
@@ -37191,7 +37282,13 @@ function pruneCache(dir) {
   } catch {
   }
 }
-var excerpt = (body) => body.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 140);
+function refusal(url2, status, body) {
+  const { did, then } = refusalWords(status), refused = status === 401 || status === 403 || status === 429;
+  const said = status === 403 || status === 429 ? whatItSaid(body) : "";
+  const sec = /(^|\.)sec\.gov$/.test(new URL(url2).hostname), email3 = emailNow().trim() !== "";
+  const note = sec && refused ? email3 ? ", though a contact email was sent with it" : ", and no contact email was sent with it" : "";
+  return new Unavailable(`${sourceName(url2)} ${did}${said ? `, saying "${said}"` : ""}${note}${then}`, status, sec && refused && !email3);
+}
 async function getText(url2, opts = {}) {
   return (await getTextAt(url2, opts)).text;
 }
@@ -37209,7 +37306,7 @@ async function getTextAt(url2, opts = {}) {
         await sleep(800 * (attempt + 1));
         continue;
       }
-      throw new Unavailable(`${host} did not answer (${err.name === "TimeoutError" ? "no answer in time" : err.message})`);
+      throw new Unavailable(`${sourceName(url2)} ${unreachableWords(err)}`);
     }
     if ((res.status === 429 || res.status >= 500) && attempt < 2) {
       await res.body?.cancel().catch(() => {
@@ -37219,12 +37316,8 @@ async function getTextAt(url2, opts = {}) {
       continue;
     }
     const text4 = await res.text();
-    if (res.status === 404) throw new NoData(`${host} has nothing at that address (HTTP 404)`);
-    if (!res.ok) {
-      const sec = /(^|\.)sec\.gov$/.test(new URL(url2).hostname);
-      const said = res.status === 403 || res.status === 429 ? excerpt(text4) : "";
-      throw new Unavailable(`${host} refused (HTTP ${res.status})${said ? `, saying "${said}"` : ""}${res.status === 429 ? "; it is rate-limiting this computer, so try again in a few minutes" : ""}${sec ? emailNow().trim() ? " [a contact email was sent]" : " [no contact email was sent]" : ""}`);
-    }
+    if (res.status === 404) throw new NoData(`${sourceName(url2)} ${refusalWords(404).did}`, 404);
+    if (!res.ok) throw refusal(url2, res.status, text4);
     const at = Date.now();
     if (!opts.usable || opts.usable(text4)) writeCache(url2, text4);
     return { text: text4, at };
@@ -37235,7 +37328,7 @@ async function getCookies(url2) {
   try {
     res = await fetchImpl(url2, { headers: { "User-Agent": userAgentFor(url2, contact, emailNow()) }, redirect: "manual", signal: AbortSignal.timeout(15e3) });
   } catch (e) {
-    throw new Unavailable(`${new URL(url2).host} did not answer (${e.message})`);
+    throw new Unavailable(`${sourceName(url2)} ${unreachableWords(e)}`);
   }
   await res.body?.cancel().catch(() => {
   });
@@ -37256,7 +37349,7 @@ async function getJsonAt(url2, opts = {}) {
     }
   };
   const { text: text4, at } = await getTextAt(url2, { ...opts, usable });
-  if (read2.text !== text4) throw new Unavailable(`${new URL(url2).host} answered with something that is not data`);
+  if (read2.text !== text4) throw new Unavailable(`${sourceName(url2)} answered, but not with the data the desk reads`);
   return { value: read2.value, at };
 }
 function failureText(e, what) {
@@ -38211,7 +38304,7 @@ async function search(q, count) {
   for (const host of HOSTS) {
     try {
       const j = await getJson(`${host}/v1/finance/search?${qs}`);
-      if (!Array.isArray(j.news)) throw new Unavailable(`${new URL(host).host} answered its news search without a list of articles`);
+      if (!Array.isArray(j.news)) throw new Unavailable("Yahoo Finance answered its news search without a list of articles");
       return j.news.filter((n2) => n2.title && n2.providerPublishTime).map((n2) => ({ title: n2.title, publisher: n2.publisher ?? "unknown", link: n2.link ?? "", time: stamp(n2.providerPublishTime), tickers: (n2.relatedTickers ?? []).map((t) => t.toUpperCase()) }));
     } catch (e) {
       last = e;
@@ -38291,7 +38384,7 @@ async function stocktwits(raw, from, to, limit) {
   const j = await getJson(`https://api.stocktwits.com/api/2/streams/symbol/${encodeURIComponent(sym2)}.json`);
   if (!Array.isArray(j.messages)) {
     const said = j.errors?.map((e) => e.message).filter(Boolean).join("; ");
-    throw new Unavailable(`api.stocktwits.com answered without its list of messages${said ? `, saying "${clip(said, 140)}"` : ""}`);
+    throw new Unavailable(`StockTwits answered without its list of messages${said ? `, saying "${clip(said, 140)}"` : ""}`);
   }
   if (!j.messages.length) throw new Unavailable(`the stream for ${sym2} came back with no messages at all, though it serves its latest messages however old they are: an empty stream is a fault, or a symbol no one has posted about`);
   const all = j.messages.filter((m2) => m2.body && m2.created_at).map((m2) => ({ time: m2.created_at.slice(0, 16).replace("T", " "), text: clip(m2.body.replace(/\s+/g, " ").trim(), 280), tag: m2.entities?.sentiment?.basic ?? void 0 }));
@@ -38311,7 +38404,7 @@ async function reddit(raw, from, to, subs) {
   const body = await getText(url2, { headers: { Accept: "application/atom+xml" } });
   if (!/<feed[\s>]/.test(body)) {
     const title = plain(/<title[^>]*>([\s\S]*?)<\/title>/i.exec(body)?.[1] ?? "");
-    throw new Unavailable(`www.reddit.com answered with something that is not its feed of posts${title ? ` (a page titled "${clip(title, 80)}")` : ""}`);
+    throw new Unavailable(`Reddit answered with something that is not its feed of posts${title ? ` (a page titled "${clip(title, 80)}")` : ""}`);
   }
   const all = parseAtom(body);
   return { posts: all.filter((p) => within2(p.time, from, to)), oldest: oldestOf(all), full: all.length >= 100 };
@@ -38477,7 +38570,7 @@ var list = (s) => {
 function eventsOf(j) {
   if (Array.isArray(j.events)) return j.events;
   if (j.error === void 0 && typeof j.pagination === "object" && j.pagination !== null) return [];
-  throw new Unavailable(`gamma-api.polymarket.com answered without its search results${typeof j.error === "string" && j.error ? `, saying "${j.error.slice(0, 140)}"` : ""}`);
+  throw new Unavailable(`Polymarket answered without its search results${typeof j.error === "string" && j.error ? `, saying "${j.error.slice(0, 140)}"` : ""}`);
 }
 function firstPrice(outcomePrices) {
   const s = list(outcomePrices)[0]?.trim();
@@ -38552,14 +38645,14 @@ var HOLIDAYS = {
     ["2028-12-25", "Christmas Day"]
   ]
 };
-var NAMES = new Map(Object.values(HOLIDAYS).flat().map(([day3, name]) => [day3, name]));
+var NAMES2 = new Map(Object.values(HOLIDAYS).flat().map(([day3, name]) => [day3, name]));
 var DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 var dayOfWeek = (day3) => (/* @__PURE__ */ new Date(`${day3}T12:00:00Z`)).getUTCDay();
 var holidaysKnown = (day3) => day3.slice(0, 4) in HOLIDAYS;
 function marketClosed(day3) {
   const w = dayOfWeek(day3);
   if (w === 0 || w === 6) return `a ${DAYS[w]}`;
-  return NAMES.get(day3) ?? null;
+  return NAMES2.get(day3) ?? null;
 }
 var isMarketDay = (day3) => marketClosed(day3) === null;
 var EARLY_CLOSES = /* @__PURE__ */ new Set(["2026-11-27", "2026-12-24", "2027-11-26", "2028-07-03", "2028-11-24"]);
@@ -39147,7 +39240,7 @@ async function secInsiders(symbol4, cik, asOf, days = 90, limit = 25) {
     try {
       if (!/^[\d-]+$/.test(acc) || !/^[\w.-]+\.xml$/i.test(doc)) throw new NoData("its address in the SEC's list is not one the desk can read");
       const xml = await getText(`https://www.sec.gov/Archives/edgar/data/${Number(cik)}/${acc.replaceAll("-", "")}/${doc}`);
-      if (!/<ownershipDocument[\s>]/.test(xml)) throw new Unavailable("www.sec.gov answered with something that is not a Form 4");
+      if (!/<ownershipDocument[\s>]/.test(xml)) throw new Unavailable("the SEC answered with something that is not a Form 4");
       filings2.push(parseFiling(xml, p.form, p.filed));
     } catch (e) {
       failed++;
@@ -39413,9 +39506,9 @@ var session = null;
 function yahooSession() {
   session ??= (async () => {
     const cookie = await getCookies("https://fc.yahoo.com");
-    if (!cookie) throw new Unavailable("Yahoo Finance gave no session cookie");
+    if (!cookie) throw new Unavailable("Yahoo Finance would not let the desk read its company data (it gave no cookie, which it asks for first)");
     const crumb = (await getText(`${HOSTS[1]}/v1/test/getcrumb`, { headers: { Cookie: cookie } })).trim();
-    if (!crumb || crumb.length > 64 || /[\s<]/.test(crumb)) throw new Unavailable("Yahoo Finance gave no session key");
+    if (!crumb || crumb.length > 64 || /[\s<]/.test(crumb)) throw new Unavailable("Yahoo Finance would not let the desk read its company data (it gave no key for the cookie it had given)");
     return { cookie, crumb };
   })();
   session.catch(() => {
@@ -39429,7 +39522,7 @@ async function yahooJson(path24) {
     try {
       return await getJson(`${HOSTS[1]}${path24}&crumb=${encodeURIComponent(s.crumb)}`, { headers: { Cookie: s.cookie } });
     } catch (e) {
-      if (attempt === 0 && /HTTP 401/.test(e.message)) {
+      if (attempt === 0 && e instanceof Unavailable && e.status === 401) {
         session = null;
         continue;
       }
@@ -39804,7 +39897,7 @@ function renderTable(t, head2, note) {
 }
 var reason = (e) => {
   const m2 = e.message;
-  return /sec\.gov refused \(HTTP 403\)/.test(m2) && m2.includes("[no contact email was sent]") ? `${m2}: ${ASK_FOR_EMAIL}` : m2;
+  return e instanceof Unavailable && e.noEmail && e.status === 403 ? `${m2}: ${ASK_FOR_EMAIL}` : m2;
 };
 async function statementBasis(sym2, day3) {
   try {

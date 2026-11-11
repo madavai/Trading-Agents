@@ -23,7 +23,16 @@ test('a source that answers with its data is ready', async () => {
 test('a refusal is reported as a refusal, with what to do for the SEC', async () => {
   const r = await probe(source, 'ua', answer(403, 'Forbidden'));
   assert.equal(r.ok, false);
-  assert.match(r.detail, /refused \(HTTP 403\): the SEC asks every program that reads its filings for a contact email.*set_contact_email/);
+  assert.match(r.detail, /^refused the desk's request: the SEC asks every program that reads its filings for a contact email.*set_contact_email/);
+  assert.doesNotMatch(r.detail, /HTTP|403/, 'the person reads this line as it is: no web error code');
+});
+
+test('every other failed answer is said as what happened, never as its web code', async () => {
+  const words = async (status: number) => (await probe(source, 'ua', answer(status, 'x'))).detail;
+  assert.equal(await words(429), 'turned the desk away for asking too often; it limits how often one computer may ask, so try again in a few minutes');
+  assert.equal(await words(503), 'had a fault on its own side and could not answer; try again later');
+  assert.equal(await words(404), 'has nothing at the address the desk asked for');
+  assert.equal(await words(400), "refused the desk's request");
 });
 
 test('an answer without the expected data is not counted as ready', async () => {
@@ -36,7 +45,9 @@ test('silence and network failures read as unreachable, never as no data', async
   const timeout: typeof fetch = async () => { throw new DOMException('timed out', 'TimeoutError'); };
   assert.match((await probe(source, 'ua', timeout)).detail, /unreachable \(no answer within 8 s\)/);
   const down: typeof fetch = async () => { throw new TypeError('fetch failed'); };
-  assert.match((await probe(source, 'ua', down)).detail, /unreachable \(fetch failed\)/);
+  assert.equal((await probe(source, 'ua', down)).detail, 'unreachable (the connection failed)');
+  const offline: typeof fetch = async () => { throw Object.assign(new TypeError('fetch failed'), { cause: Object.assign(new Error('getaddrinfo ENOTFOUND www.sec.gov'), { code: 'ENOTFOUND' }) }); };
+  assert.equal((await probe(source, 'ua', offline)).detail, 'unreachable (this computer may be offline, or could not look up its address)');
 });
 
 test('every source is asked with the contact as the user agent, and only the SEC sees the email', async () => {
@@ -64,7 +75,7 @@ test('the SEC is told the project name and the email, never a bracketed web addr
 test('when the SEC refuses with the email sent, the check does not claim the email is missing', async () => {
   const sent = await probe(source, 'ua', answer(403, 'Request Rate Threshold Exceeded'), 8000, true);
   assert.equal(sent.ok, false);
-  assert.match(sent.detail, /refused \(HTTP 403\): the SEC refused even though a contact email was sent, so the email is not what is missing/);
+  assert.match(sent.detail, /^refused the desk's request: the SEC refused even though a contact email was sent, so the email is not what is missing/);
   assert.doesNotMatch(sent.detail, /none is saved|set_contact_email/);
   const refusedAll = (await probeAll('c', 'me@mail.com', answer(403, 'no'))).find((r) => r.name === 'SEC EDGAR')!;
   assert.match(refusedAll.detail, /even though a contact email was sent/);

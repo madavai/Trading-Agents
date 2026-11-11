@@ -156,6 +156,7 @@ test('a heavy filer whose latest list does not reach back a year: the older page
   desk(record(recent, { files }), prices('2026-11-10', {}));
   const short = section(await companyOverview('ACME', '2026-11-10'));
   assert.match(short, /^Results releases filed from 2025-11-11 to 2026-11-10, oldest first \(the SEC's older pages of its filings could not be read \(.+\), so releases filed before 2026-06-01 are not listed\):/);
+  assert.doesNotMatch(short, /HTTP \d|\b[45]\d\d\b/, 'why the page could not be read is said in plain words, never as a web error code');
 });
 
 test('a fund, a foreign filer, a company with no release, one that does not file with the SEC and a coin: each says so plainly, never a date', async () => {

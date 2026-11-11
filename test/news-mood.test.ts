@@ -169,8 +169,18 @@ test("StockTwits' latest 30 messages are said to cover only their hours, not the
 test('a source that fails is named unavailable while the other still answers', async () => {
   configure({ fetch: route([[/stocktwits/, () => new Response('blocked', { status: 403 })], [/reddit/, () => new Response(ATOM)]]) });
   const t = await socialPosts('NVDA', '2026-10-10', OPTS);
-  assert.match(t, /StockTwits unavailable: api\.stocktwits\.com refused \(HTTP 403\), saying "blocked"\. This is not a quiet crowd\./);
+  assert.match(t, /StockTwits unavailable: StockTwits refused the desk's request, saying "blocked"\. This is not a quiet crowd\./);
   assert.match(t, /NVDA earnings thread/);
+});
+
+// META run, 10 Nov 2026: the sentiment report, the debate and the lead's message all said "Reddit (HTTP 403)", passed on
+// from this tool's words. Reddit's real refusal of 11 Nov 2026 now reads as what happened, with Reddit's own words.
+test('Reddit refusing the desk is said in plain words the reports can pass on, never as a web code', async () => {
+  const refusal = '<?xml version="1.0" encoding="UTF-8"?><feed xmlns="http://www.w3.org/2005/Atom"><updated>2026-11-11T14:45:13+00:00</updated><id>/r/stocks/search.rss?q=NVDA</id><title>reddit.com: forbidden (reddit.com)</title></feed>';
+  configure({ fetch: route([[/stocktwits/, () => json({ messages: [{ body: 'x', created_at: '2026-10-10T15:00:00Z' }] })], [/reddit/, () => new Response(refusal, { status: 403 })]]) });
+  const t = await socialPosts('NVDA', '2026-10-10', OPTS);
+  assert.match(t, /\nReddit unavailable: Reddit refused the desk's request, saying "reddit\.com: forbidden \(reddit\.com\)"\. This is not a quiet crowd\./);
+  assert.doesNotMatch(t, /HTTP|403|www\.reddit/);
 });
 
 const CPI = 'observation_date,CPIAUCSL\n2026-06-01,320.1\n2026-07-01,320.9\n2026-08-01,321.5\n2026-09-01,.\n';

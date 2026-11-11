@@ -83,7 +83,7 @@ test('insider trades: every filing read gives the 90 days; a sale whose filing g
 test('insider trades: with every Form 4 unreadable the answer is unavailable, never "bought none; sold none"', async () => {
   configure({ fetch: sec(refused) });
   await assert.rejects(insiderTransactions('ACME', '2026-11-06'), (e: Error) => e instanceof Unavailable
-    && /^the SEC lists 4 Form 4 filings of ACME's insiders made public from 2026-08-09 to 2026-11-06, but none of them could be read \(www\.sec\.gov refused \(HTTP 403\), saying "Forbidden".*\), so their trades are not known$/.test(e.message));
+    && /^the SEC lists 4 Form 4 filings of ACME's insiders made public from 2026-08-09 to 2026-11-06, but none of them could be read \(the SEC refused the desk's request, saying "Forbidden".*\), so their trades are not known$/.test(e.message));
   // What the fundamentals analyst reads from the desk's tool.
   const [a, b] = InMemoryTransport.createLinkedPair();
   await deskServer(process.cwd(), sec(refused)).connect(a);
@@ -100,14 +100,14 @@ test('insider trades: with some Form 4s unreadable the counts say they cover onl
   configure({ fetch: sec((doc) => (doc === 'b' || doc === 'd' ? refused() : null)) });
   const t = await insiderTransactions('ACME', '2026-11-06');
   assert.match(t, /\(2 of 4 filings read, newest first; 2 could not be read\)/);
-  assert.match(t, /^Counted from only the 2 of the 4 filings made public from 2026-08-09 to 2026-11-06 that were read \(2 of the filings could not be read \(www\.sec\.gov refused \(HTTP 403\).*\)\)\. These counts are not the whole 90 days: a "none" below is not a fact about the insiders: bought \(code P\) 1 \(100 shares, about 19,000 USD at their own prices\); sold \(code S\) 1 \(1,000 shares, about 200,000 USD at their own prices\)/m);
+  assert.match(t, /^Counted from only the 2 of the 4 filings made public from 2026-08-09 to 2026-11-06 that were read \(2 of the filings could not be read \(the SEC refused the desk's request.*\)\)\. These counts are not the whole 90 days: a "none" below is not a fact about the insiders: bought \(code P\) 1 \(100 shares, about 19,000 USD at their own prices\); sold \(code S\) 1 \(1,000 shares, about 200,000 USD at their own prices\)/m);
   assert.doesNotMatch(t, /^In these 90 days/m);
   // A web page in place of a filing (a notice, a refusal) is a filing not read, not one with no trades.
   configure({ fetch: sec((doc) => (doc === 'c' ? new Response('<html><body>Request Rate Threshold Exceeded</body></html>') : null)) });
   clearSecCache();
   const page = await insiderTransactions('ACME', '2026-11-06');
   assert.match(page, /\(3 of 4 filings read, newest first; 1 could not be read\)/);
-  assert.match(page, /1 of the filings could not be read \(www\.sec\.gov answered with something that is not a Form 4\)/);
+  assert.match(page, /1 of the filings could not be read \(the SEC answered with something that is not a Form 4\)/);
   assert.match(page, /bought \(code P\) none/, 'the purchase was in the page that could not be read');
   assert.match(page, /a "none" below is not a fact about the insiders/);
 });
@@ -130,7 +130,7 @@ const YAHOO: Array<[RegExp, (url: string) => Response]> = [
   [/getcrumb/, () => new Response('crumb123')],
   [/quoteSummary/, () => json({ quoteSummary: { result: [{ insiderTransactions: { transactions: [] } }], error: null } })],
 ];
-const OUTAGE = /^the SEC's list of US filers could not be read \(www\.sec\.gov did not answer \(no answer in time\)\), so whether ACME files with the SEC is not known$/;
+const OUTAGE = /^the SEC's list of US filers could not be read \(the SEC did not answer in time\), so whether ACME files with the SEC is not known$/;
 
 test("the SEC's list of filers unreachable: unavailable, naming the SEC, never Yahoo's empty list or a withheld notice", async () => {
   const seen: string[] = [];
@@ -144,7 +144,7 @@ test("the SEC's list of filers unreachable: unavailable, naming the SEC, never Y
   // The SEC refusing a reader with no contact email asks the person for theirs.
   configure({ fetch: route([[/company_tickers\.json/, refused]]) });
   clearSecCache();
-  await assert.rejects(companyOverview('ACME', '2026-11-06'), (e: Error) => /could not be read \(www\.sec\.gov refused \(HTTP 403\).*\[no contact email was sent\]: .*email/.test(e.message));
+  await assert.rejects(companyOverview('ACME', '2026-11-06'), (e: Error) => /could not be read \(the SEC refused the desk's request.*, and no contact email was sent with it: .*email/.test(e.message));
 });
 
 const FUNDS: [RegExp, (url: string) => Response] = [/company_tickers_mf\.json/, () => json({ fields: ['cik', 'seriesId', 'classId', 'symbol'], data: [[36405, 'S000002839', 'C000092055', 'VOO']] })];
@@ -165,7 +165,7 @@ test('fund holdings: an SEC list that is broken or empty is unavailable, never "
   // The SEC's list of funds unreachable.
   configure({ fetch: route([[/company_tickers_mf\.json/, noAnswer], TICKERS, ...YAHOO], seen) });
   clearSecCache();
-  await assert.rejects(fundProfile('VOO', '2026-11-06'), (e: Error) => e instanceof Unavailable && /^the SEC's list of funds could not be read \(www\.sec\.gov did not answer/.test(e.message));
+  await assert.rejects(fundProfile('VOO', '2026-11-06'), (e: Error) => e instanceof Unavailable && /^the SEC's list of funds could not be read \(the SEC did not answer in time\)$/.test(e.message));
   assert.ok(!seen.some((u) => /yahoo\.com/.test(u)));
   // A company that files with the SEC, and no portfolio report among its filings, is said to be no fund that lists holdings.
   configure({ fetch: route([FUNDS, TICKERS, [/submissions\/CIK0000001234\.json/, () => json({ name: 'ACME CORP', filings: { recent: { form: ['10-K', '10-Q', '8-K'], accessionNumber: ['0000001234-26-000001', '0000001234-26-000002', '0000001234-26-000003'], filingDate: ['2026-03-01', '2026-08-01', '2026-10-01'] } } })]]) });
@@ -190,7 +190,7 @@ const ATOM = '<?xml version="1.0" encoding="UTF-8"?><feed xmlns="http://www.w3.o
 test('StockTwits: an answer with no list of messages, or an empty one, is unavailable, never "no messages in this window"', async () => {
   configure({ fetch: route([[/stocktwits/, () => json({ response: { status: 200 }, errors: [{ message: 'temporarily unavailable' }] })], [/reddit/, () => new Response(ATOM)]]) });
   const broken = await socialPosts('NVDA', '2026-11-06', OPTS);
-  assert.match(broken, /StockTwits unavailable: api\.stocktwits\.com answered without its list of messages, saying "temporarily unavailable"\. This is not a quiet crowd\./);
+  assert.match(broken, /StockTwits unavailable: StockTwits answered without its list of messages, saying "temporarily unavailable"\. This is not a quiet crowd\./);
   assert.doesNotMatch(broken, /No StockTwits messages/);
   assert.match(broken, /NVDA after the selloff/, 'Reddit still answers');
   configure({ fetch: route([[/stocktwits/, () => json({ symbol: { symbol: 'NVDA' }, messages: [] })], [/reddit/, () => new Response(ATOM)]]) });
@@ -202,7 +202,7 @@ test('StockTwits: an answer with no list of messages, or an empty one, is unavai
 test('Reddit: a web page in place of its feed is unavailable; its feed with no posts is an answer', async () => {
   configure({ fetch: route([[/stocktwits/, () => json(TWITS)], [/reddit/, () => new Response('<!doctype html><html><head><title>Reddit - Dive into anything</title></head><body>Please wait for verification.</body></html>')]]) });
   const page = await socialPosts('NVDA', '2026-11-06', OPTS);
-  assert.match(page, /Reddit unavailable: www\.reddit\.com answered with something that is not its feed of posts \(a page titled "Reddit - Dive into anything"\)\. This is not a quiet crowd\./);
+  assert.match(page, /Reddit unavailable: Reddit answered with something that is not its feed of posts \(a page titled "Reddit - Dive into anything"\)\. This is not a quiet crowd\./);
   assert.doesNotMatch(page, /No Reddit posts/);
   configure({ fetch: route([[/stocktwits/, () => json(TWITS)], [/reddit/, () => new Response('<?xml version="1.0" encoding="UTF-8"?><feed xmlns="http://www.w3.org/2005/Atom"><title>search results</title></feed>')]]) });
   assert.match(await socialPosts('NVDA', '2026-11-06', OPTS), /No Reddit posts about NVDA in these communities in this window that the feed still serves\./);
@@ -213,7 +213,7 @@ const market = (question: string, price: string, volume: number | undefined) => 
 
 test("Polymarket: an answer without its search results is unavailable; with nothing matched it says so", async () => {
   configure({ fetch: route([[/polymarket/, () => json({ error: 'internal error' })]]) });
-  await assert.rejects(predictionMarkets('NVIDIA', '2026-11-06', 6, NOW), (e: Error) => e instanceof Unavailable && e.message === 'gamma-api.polymarket.com answered without its search results, saying "internal error"');
+  await assert.rejects(predictionMarkets('NVIDIA', '2026-11-06', 6, NOW), (e: Error) => e instanceof Unavailable && e.message === 'Polymarket answered without its search results, saying "internal error"');
   // Its real answer when nothing matches: the page count alone, no list of events (seen 8 Nov 2026).
   configure({ fetch: route([[/polymarket/, () => json({ pagination: { hasMore: false, totalResults: 0 } })]]) });
   assert.match(await predictionMarkets('NVIDIA', '2026-11-06', 6, NOW), /No open markets matched "NVIDIA"\./);

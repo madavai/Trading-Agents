@@ -104,7 +104,10 @@ test("why Claude Code stopped, in plain words: its usage limit and when it reset
   assert.match(stopReason('Invalid API key · Please run /login')!, /not signed in/);
   assert.match(stopReason('Credit balance is too low')!, /no credit left/);
   assert.match(stopReason('API Error: 529 {"type":"error","error":{"type":"overloaded_error"}}')!, /too busy/);
-  assert.equal(stopReason('API Error: 500 Internal server error'), "Claude's service answered with an error (500): press Retry in a while.");
+  assert.equal(stopReason('API Error: 500 Internal server error'), "Claude's service had a fault on its own side and could not answer: press Retry in a while.");
+  assert.equal(stopReason('API Error: 429 {"type":"error","error":{"type":"rate_limit_error"}}'), "Claude's service turned the run away for asking too often: press Retry in a few minutes.");
+  assert.equal(stopReason('API Error: 400 {"type":"error","error":{"type":"invalid_request_error"}}'), "Claude's service refused the run's request: press Retry in a while.");
+  for (const code of ['400', '429', '500', '503']) assert.doesNotMatch(stopReason(`API Error: ${code} x`)!, /\d{3}|API|HTTP/, 'never a web code on the page');
   assert.equal(stopReason('Analysed NVDA: Hold.'), null, 'nothing known: the listener says so in its own words');
   assert.doesNotMatch(stopReason("You've hit your limit · resets <b>6am</b>")!, /[<>]/, 'nothing but words reaches the page');
 });
