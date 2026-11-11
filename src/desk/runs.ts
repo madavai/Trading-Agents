@@ -119,13 +119,22 @@ const MARKS = new RegExp(` \\[corrected: was "[\\s\\S]*?"\\]| ${FLAG.replace(/[[
 const within = (s: number, e: number, [a, b]: Span) => s >= a && e <= b;
 const touches = (s: number, e: number, [a, b]: Span) => s < b && e > a;
 const lineAt = (text: string, i: number) => text.slice(text.lastIndexOf('\n', i - 1) + 1, text.indexOf('\n', i) < 0 ? text.length : text.indexOf('\n', i));
+const MARK_HEAD = ' [corrected: was "';
+/** The analyst's words a correction's mark keeps, as they stood in the report: in a table row the mark's bars are
+ *  escaped, and a whole cell's correction stands before the row's last bar, so its words are also given without it. */
+const analystsOwn = (mark: string, row: boolean): string[] => {
+  const kept = mark.slice(MARK_HEAD.length, -2);
+  if (!row) return [kept];
+  const plain = kept.replace(/\\\|/g, '|');
+  return [plain, plain.replace(/\s*\|\s*$/, '')];
+};
 
 /** The fact checker's corrections to an analyst's report, made by the desk word for word: each wrong passage is replaced
  *  where it stands with its old words kept beside it, and a conclusion that rested on one can be flagged. Nothing else
  *  in the report changes, so the checker never writes a report out again (a long report retyped by a model can lose or
  *  change words no one asked it to). Only before the debate begins: after that the reports are already argued from.
  *  Each mark keeps the analyst's own words, once: a correction of a correction's new words changes those words and keeps
- *  its mark; words that run into a mark, or that are only in one, are refused (the NVDA run of 9 Nov 2026 had a mark
+ *  its mark, and one that gives the analyst's own words back takes the mark away (it replaced nothing); words that run into a mark, or that are only in one, are refused (the NVDA run of 9 Nov 2026 had a mark
  *  keeping the checker's own words, with another mark inside it). In a table row the mark stays in the row's last cell,
  *  its bars escaped, so the row keeps its cells. Returns one line per correction and flag: done, or why not. */
 export function correctSection(dir: string, ticker: string, date: string, section: Section, corrections: Correction[], flagAfter: string[] = []): string[] {
@@ -160,12 +169,19 @@ export function correctSection(dir: string, ticker: string, date: string, sectio
       else if (clash) lines.push(`- not applied: "${c.was}" runs into an earlier correction (its new words or the old words it keeps); correct words outside it, or only within the new words it gave, so that each mark keeps the analyst's own words, once`);
       else if (live.length > 1 && !c.every) lines.push(`- not applied: "${c.was}" is in the ${section} report ${live.length} times; give more of the words around the one to correct, or set every to correct all ${live.length}`);
       else {
-        let again = 0;
+        let again = 0, back = 0;
         for (const { s, e } of [...live].reverse()) {
           const own = news.find((x) => within(s, e, x.span));
           if (own) {
-            // A correction of a correction: its new words change, and its mark still keeps the analyst's words.
             const [a] = own.span, fresh = own.f.now.slice(0, s - a) + now + own.f.now.slice(e - a);
+            if (analystsOwn(own.f.mark, /^[ \t]*\|/.test(lineAt(t, a))).includes(fresh)) {
+              // Taken back to the analyst's own words (AAPL, 11 Nov 2026: a correction made from a read that had only
+              // moved): the passage reads as the analyst wrote it, and the mark goes, for nothing was replaced.
+              t = t.slice(0, a) + fresh + t.slice(a + own.f.now.length + own.f.mark.length);
+              back++;
+              continue;
+            }
+            // A correction of a correction: its new words change, and its mark still keeps the analyst's words.
             t = t.slice(0, a) + fresh + t.slice(a + own.f.now.length);
             fixes.push({ now: fresh, mark: own.f.mark });
             again++;
@@ -177,7 +193,8 @@ export function correctSection(dir: string, ticker: string, date: string, sectio
           fixes.push({ now: cell ?? now, mark });
         }
         const n = live.length;
-        lines.push(`- corrected${n > 1 ? ` in ${n} places` : ''}: "${c.was}" now reads "${now}"${again ? `${n > 1 ? `; ${again} of them` : ''} within an earlier correction's new words, whose mark still keeps the analyst's own words` : ''}`);
+        if (back === n) lines.push(`- taken back${n > 1 ? ` in ${n} places` : ''}: "${c.was}" now reads "${now}", so the passage is again the analyst's own words and its correction mark is gone; it is no longer a correction, so leave it out of your table`);
+        else lines.push(`- corrected${n > 1 ? ` in ${n} places` : ''}: "${c.was}" now reads "${now}"${again ? `${n > 1 ? `; ${again} of them` : ''} within an earlier correction's new words, whose mark still keeps the analyst's own words` : ''}${back ? `; ${back} of them taken back to the analyst's own words, their marks gone` : ''}`);
       }
     }
     for (const f of flagAfter) {
