@@ -19102,6 +19102,49 @@ var FileAuth = class {
   }
 };
 
+// src/data/symbols.ts
+var FOREX = /* @__PURE__ */ new Set(["USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD", "CNY", "CNH", "HKD", "SGD", "SEK", "NOK", "DKK", "PLN", "MXN", "ZAR", "TRY", "INR", "KRW", "BRL", "RUB", "THB"]);
+var CRYPTO_BASES = /* @__PURE__ */ new Set(["BTC", "ETH", "SOL", "XRP", "ADA", "DOGE", "LTC", "BCH", "DOT", "AVAX", "LINK"]);
+var CRYPTO_QUOTES = ["USDT", "USDC", "USD"];
+var NOT_COINS = /* @__PURE__ */ new Set([...FOREX, "XAU", "XAG", "XPT", "XPD"]);
+var COIN_PAIR = /^([A-Z0-9]{1,15})-(USDT|USDC|USD)$/;
+var SHARE_CLASS = /^([A-Z]{1,5})\.([A-Z])$/;
+var ONE_LETTER_EXCHANGES = /* @__PURE__ */ new Set(["T", "L", "V", "F"]);
+function cryptoBase(raw) {
+  const s = raw.trim().toUpperCase().replace(/\+$/, "");
+  const pair = COIN_PAIR.exec(s);
+  if (pair) return /[A-Z]/.test(pair[1]) && !NOT_COINS.has(pair[1]) ? pair[1] : null;
+  const compact = s.replaceAll("-", "");
+  for (const q of CRYPTO_QUOTES) {
+    if (compact.endsWith(q)) {
+      const base = compact.slice(0, -q.length);
+      return CRYPTO_BASES.has(base) ? base : null;
+    }
+  }
+  return null;
+}
+var yahooClass = (s) => {
+  const m = SHARE_CLASS.exec(s);
+  return m && !ONE_LETTER_EXCHANGES.has(m[2]) ? `${m[1]}-${m[2]}` : s;
+};
+var isCrypto = (raw) => cryptoBase(raw) !== null;
+function deskSymbol(symbol, kind) {
+  const s = symbol.trim().toUpperCase();
+  return kind === "crypto" ? `${cryptoBase(s) ?? s}-USD` : yahooClass(s);
+}
+var brokerSymbol = (symbol) => symbol.replace(/^([A-Z]{1,5})-([A-Z])$/, "$1.$2");
+
+// src/desk/ticket.ts
+var PART_HOURS = "9:30 a.m. to 4 p.m. New York time";
+var MARKET_WHY = `A part-share is a market order: Robinhood takes no limit price for it, so it fills at the market's price at that moment, and Robinhood's check shows only an estimate. It is sent only while the US market is open, ${PART_HOURS}.`;
+var onStep = (n, step) => Number.isFinite(n) && step > 0 && Math.abs(n / step - Math.round(n / step)) < 1e-6;
+function placesOf(step) {
+  const s = step.toString(), e = /e-(\d+)$/.exec(s);
+  if (e) return Number(e[1]) + (s.split("e")[0].split(".")[1] ?? "").length;
+  return (s.split(".")[1] ?? "").length;
+}
+var coinAmount = (n, step = 1e-8) => n.toFixed(Math.min(placesOf(step), 18)).replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+
 // src/robinhood/rules.ts
 var TRADE_WORDS = /order|trade|buy|sell|liquidat|close.?position|transfer|withdraw|deposit|payment/i;
 var isOrderTool = (name) => TRADE_WORDS.test(name);
@@ -19191,11 +19234,19 @@ function equityOrderArgs(accountNumber, o) {
   if (!Number.isInteger(o.quantity) || o.quantity < 1 || !(o.limitPrice > 0)) return null;
   return { ...base, type: "limit", quantity: String(o.quantity), limit_price: o.limitPrice.toFixed(2), time_in_force: o.timeInForce, market_hours: "regular_hours" };
 }
+function cryptoOrderArgs(rhsAccountNumber, o, rules) {
+  if (o.side !== "buy" && o.side !== "sell" || o.market === true || !rhsAccountNumber) return null;
+  const q = o.quantity, p = o.limitPrice;
+  if (!(q > 0) || !onStep(q, rules.quantityStep) || q < rules.minQuantity * (1 - 1e-9) || q > rules.maxQuantity * (1 + 1e-9)) return null;
+  if (!(p > 0) || !onStep(p, rules.priceStep)) return null;
+  return { rhs_account_number: rhsAccountNumber, symbol: o.symbol, side: o.side, type: "limit", quantity: coinAmount(q, rules.quantityStep), limit_price: p.toFixed(Math.max(2, placesOf(rules.priceStep))), time_in_force: "gtc" };
+}
 var oneLine = (s, max) => {
   const t = s.replace(/\s+/g, " ").trim();
   return t.length > max ? `${t.slice(0, max - 3)}...` : t;
 };
-var masked = (s) => oneLine(s, 300).replace(/\b[a-z0-9]*\d{5,}[a-z0-9]*\b/gi, "#####");
+var masked = (s) => hideLong(oneLine(s, 300), 5);
+var hideLong = (s, n) => s.replace(new RegExp(`(?<![\\d.])\\b[a-z0-9]*\\d{${n},}[a-z0-9]*\\b(?!\\.\\d)`, "gi"), "#####");
 var LOOK_FIRST = "Look at the Agentic account's orders in Robinhood's own app before you try again.";
 
 // src/robinhood/reader.ts
@@ -19239,6 +19290,7 @@ var Reader = class {
 
 // src/robinhood/review.ts
 var REVIEW = "review_equity_order";
+var PREVIEW = "preview_crypto_order";
 var obj = (v) => v && typeof v === "object" && !Array.isArray(v) ? v : {};
 var words = (v) => {
   if (typeof v === "string") return v.trim() ? [v.trim()] : [];
@@ -19267,13 +19319,65 @@ function parseReview(answer) {
     for (const [k, v] of Object.entries(o)) {
       if (facts.length >= 24 || ["order_checks", "alerts", "warnings", "customer_approval_required", "account_number", "rhs_account_number"].includes(k)) continue;
       const name = `${prefix}${k.replace(/_/g, " ")}`;
-      if (v === null || typeof v === "string" || typeof v === "number" || typeof v === "boolean") facts.push([name, String(v).replace(/\b[a-z0-9]*\d{7,}[a-z0-9]*\b/gi, "#####").slice(0, 120)]);
+      if (v === null || typeof v === "string" || typeof v === "number" || typeof v === "boolean") facts.push([name, hideLong(String(v), 7).slice(0, 120)]);
       else if (!Array.isArray(v) && depth < 2) walk(obj(v), `${name} \xB7 `, depth + 1);
     }
   };
   walk(d, "", 0);
   return { answered: true, unclear: false, alerts, approvalRequired: typeof d.customer_approval_required === "boolean" ? d.customer_approval_required : null, facts, error: null };
 }
+var factsOf = (d) => {
+  const facts = [];
+  const walk = (o, prefix, depth) => {
+    for (const [k, v] of Object.entries(o)) {
+      if (facts.length >= 24 || ["customer_approval_required", "account_number", "rhs_account_number", "rhc_account_number"].includes(k)) continue;
+      const name = `${prefix}${k.replace(/_/g, " ")}`;
+      if (v === null || typeof v === "string" || typeof v === "number" || typeof v === "boolean") facts.push([name, hideLong(String(v), 7).slice(0, 120)]);
+      else if (!Array.isArray(v) && depth < 2) walk(obj(v), `${name} \xB7 `, depth + 1);
+    }
+  };
+  walk(d, "", 0);
+  return facts;
+};
+var figureOf = (v) => typeof v === "number" && Number.isFinite(v) ? v : typeof v === "string" && /^-?\d+(\.\d+)?$/.test(v.trim()) ? Number(v) : null;
+function parsePreview(answer, o) {
+  if (answer.failed) return { answered: false, unclear: false, alerts: [], approvalRequired: null, facts: [], error: masked(answer.text) };
+  const d = obj(obj(answer.data).data);
+  const same = (x) => x.side === o.side && (() => {
+    const q = figureOf(x.quantity);
+    return q !== null && Math.abs(q - o.quantity) <= 1e-12 + o.quantity * 1e-9;
+  })();
+  const named = same(d) || Object.values(d).some((v) => !Array.isArray(v) && same(obj(v)));
+  const facts = factsOf(d);
+  if (!named) {
+    const said = answer.data === null ? answer.text.trim() : words(d).join(" ");
+    return {
+      answered: false,
+      unclear: true,
+      alerts: [],
+      approvalRequired: null,
+      facts,
+      error: `Robinhood's coin check did not name this order back, so it counts as not checked and cannot be placed.${said ? ` It said: ${masked(said).slice(0, 300)}` : ""}`
+    };
+  }
+  const flagged = Object.entries(d).filter(([k]) => /error|alert|warning|reject|invalid/i.test(k)).flatMap(([, v]) => words(v));
+  const inner = Object.values(d).filter((v) => !Array.isArray(v) && Object.keys(obj(v)).length).flatMap((v) => Object.entries(obj(v)).filter(([k]) => /error|alert|warning|reject|invalid/i.test(k)).flatMap(([, x]) => words(x)));
+  const asked = figureOf(d.requested_quantity);
+  const rounded = d.requested_quantity !== void 0 && d.requested_quantity !== null ? [`Robinhood would round the amount${asked === null ? "" : ` (${coinAmount(asked)} asked)`}: its order tool refuses an amount off the coin's step, so change it`] : [];
+  const alerts = [.../* @__PURE__ */ new Set([...flagged, ...inner, ...rounded])].slice(0, 12).map((x) => x.slice(0, 300));
+  return { answered: true, unclear: false, alerts, approvalRequired: typeof d.customer_approval_required === "boolean" ? d.customer_approval_required : null, facts, error: null };
+}
+var answerOf = (r) => {
+  const text2 = (r.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
+  let data = r.structuredContent ?? null;
+  if (data === null) {
+    try {
+      data = JSON.parse(text2);
+    } catch {
+    }
+  }
+  return { data, text: text2, failed: r.isError === true };
+};
 var Reviewer = class {
   constructor(client, tools) {
     this.client = client;
@@ -19281,59 +19385,18 @@ var Reviewer = class {
   }
   client;
   tools;
-  /** Asks Robinhood to check the order on the Agentic account. Nothing is placed. */
-  async review(account, o) {
+  /** Asks Robinhood to check the order on the Agentic account. Nothing is placed. A coin order needs the account's numeric
+   *  number and the coin's own rules (read from Robinhood's list of coins just before). */
+  async review(account, o, coin) {
     if (!account.agentic) throw new Refused("Only the Agentic account can have an order checked, and this is not it.");
-    if (!this.tools.some((t) => t.name === REVIEW)) throw new Refused("Robinhood's connection no longer offers its order check, so nothing was sent.");
-    const args = equityOrderArgs(account.accountNumber, o);
+    const crypto5 = isCrypto(o.symbol), name = crypto5 ? PREVIEW : REVIEW;
+    if (!this.tools.some((t) => t.name === name)) throw new Refused(`Robinhood's connection no longer offers its ${crypto5 ? "coin " : ""}order check, so nothing was sent.`);
+    const args = crypto5 ? coin && account.rhsAccountNumber ? cryptoOrderArgs(account.rhsAccountNumber, o, coin) : null : equityOrderArgs(account.accountNumber, o);
     if (!args) throw new Refused("That order is not complete, so it was not sent for checking.");
-    const r = await this.client.callTool({ name: REVIEW, arguments: args });
-    const text2 = (r.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
-    let data = r.structuredContent ?? null;
-    if (data === null) {
-      try {
-        data = JSON.parse(text2);
-      } catch {
-      }
-    }
-    return parseReview({ data, text: text2, failed: r.isError === true });
+    const r = answerOf(await this.client.callTool({ name, arguments: args }));
+    return crypto5 ? parsePreview(r, o) : parseReview(r);
   }
 };
-
-// src/data/symbols.ts
-var FOREX = /* @__PURE__ */ new Set(["USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD", "CNY", "CNH", "HKD", "SGD", "SEK", "NOK", "DKK", "PLN", "MXN", "ZAR", "TRY", "INR", "KRW", "BRL", "RUB", "THB"]);
-var CRYPTO_BASES = /* @__PURE__ */ new Set(["BTC", "ETH", "SOL", "XRP", "ADA", "DOGE", "LTC", "BCH", "DOT", "AVAX", "LINK"]);
-var CRYPTO_QUOTES = ["USDT", "USDC", "USD"];
-var NOT_COINS = /* @__PURE__ */ new Set([...FOREX, "XAU", "XAG", "XPT", "XPD"]);
-var COIN_PAIR = /^([A-Z0-9]{1,15})-(USDT|USDC|USD)$/;
-var SHARE_CLASS = /^([A-Z]{1,5})\.([A-Z])$/;
-var ONE_LETTER_EXCHANGES = /* @__PURE__ */ new Set(["T", "L", "V", "F"]);
-function cryptoBase(raw) {
-  const s = raw.trim().toUpperCase().replace(/\+$/, "");
-  const pair = COIN_PAIR.exec(s);
-  if (pair) return /[A-Z]/.test(pair[1]) && !NOT_COINS.has(pair[1]) ? pair[1] : null;
-  const compact = s.replaceAll("-", "");
-  for (const q of CRYPTO_QUOTES) {
-    if (compact.endsWith(q)) {
-      const base = compact.slice(0, -q.length);
-      return CRYPTO_BASES.has(base) ? base : null;
-    }
-  }
-  return null;
-}
-var yahooClass = (s) => {
-  const m = SHARE_CLASS.exec(s);
-  return m && !ONE_LETTER_EXCHANGES.has(m[2]) ? `${m[1]}-${m[2]}` : s;
-};
-function deskSymbol(symbol, kind) {
-  const s = symbol.trim().toUpperCase();
-  return kind === "crypto" ? `${cryptoBase(s) ?? s}-USD` : yahooClass(s);
-}
-var brokerSymbol = (symbol) => symbol.replace(/^([A-Z]{1,5})-([A-Z])$/, "$1.$2");
-
-// src/desk/ticket.ts
-var PART_HOURS = "9:30 a.m. to 4 p.m. New York time";
-var MARKET_WHY = `A part-share is a market order: Robinhood takes no limit price for it, so it fills at the market's price at that moment, and Robinhood's check shows only an estimate. It is sent only while the US market is open, ${PART_HOURS}.`;
 
 // src/data/dates.ts
 var DAY = 864e5;
@@ -19409,6 +19472,7 @@ function regularSession(now) {
 
 // src/robinhood/order.ts
 var PLACE = "place_equity_order";
+var PLACE_COIN = "place_crypto_order";
 var obj2 = (v) => v && typeof v === "object" && !Array.isArray(v) ? v : {};
 var REFUSED = /^(rejected|failed|cancell?ed|expired|voided)$/i;
 function parsePlaced(answer) {
@@ -19423,7 +19487,7 @@ function parsePlaced(answer) {
     for (const [k, v] of Object.entries(o)) {
       if (facts.length >= 24 || ["account_number", "rhs_account_number", "customer_approval_required"].includes(k)) continue;
       const name = `${prefix}${k.replace(/_/g, " ")}`;
-      if (v === null || typeof v === "string" || typeof v === "number" || typeof v === "boolean") facts.push([name, (/(^|_)id$/.test(k) ? String(v) : String(v).replace(/\b[a-z0-9]*\d{7,}[a-z0-9]*\b/gi, "#####")).slice(0, 120)]);
+      if (v === null || typeof v === "string" || typeof v === "number" || typeof v === "boolean") facts.push([name, (/(^|_)id$/.test(k) ? String(v) : hideLong(String(v), 7)).slice(0, 120)]);
       else if (!Array.isArray(v) && depth < 2) walk(obj2(v), `${name} \xB7 `, depth + 1);
     }
   };
@@ -19441,20 +19505,23 @@ var Placer = class {
   client;
   tools;
   /** Refuses, before anything is sent, an order this door would not send: a part-share outside New York's regular
-   *  session among them, which Robinhood would refuse anyway. */
-  ready(account, o, refId, now = /* @__PURE__ */ new Date()) {
+   *  session among them, which Robinhood would refuse anyway. A coin order needs the account's numeric number and the
+   *  coin's own rules, read from Robinhood just before. */
+  ready(account, o, refId, now = /* @__PURE__ */ new Date(), coin) {
     if (!account.agentic) throw new Refused("Only the Agentic account can trade, and this is not it.");
-    if (!this.tools.some((t) => t.name === PLACE)) throw new Refused("Robinhood's connection no longer offers placing a stock order, so nothing was sent.");
-    const args = equityOrderArgs(account.accountNumber, o);
+    const crypto5 = isCrypto(o.symbol);
+    if (!this.tools.some((t) => t.name === (crypto5 ? PLACE_COIN : PLACE))) throw new Refused(`Robinhood's connection no longer offers placing a ${crypto5 ? "coin" : "stock"} order, so nothing was sent.`);
+    const args = crypto5 ? coin && account.rhsAccountNumber ? cryptoOrderArgs(account.rhsAccountNumber, o, coin) : null : equityOrderArgs(account.accountNumber, o);
     if (!args || !/^[0-9a-f-]{36}$/.test(refId)) throw new Refused("That order is not complete, so it was not sent.");
     const session = o.market ? regularSession(now) : null;
     if (session && !session.open) throw new Refused(`A part-share is sent only while the US market is open, ${PART_HOURS}: it opens ${session.opens}. Nothing was sent.`);
     return { ...args, ref_id: refId };
   }
-  /** Places one order on the Agentic account: whole shares at a limit price, or a part-share at the market price in
-   *  regular hours. Call only after the person's Confirm. */
-  async place(account, o, refId, now = /* @__PURE__ */ new Date()) {
-    const r = await this.client.callTool({ name: PLACE, arguments: this.ready(account, o, refId, now) });
+  /** Places one order on the Agentic account: whole shares at a limit price, a part-share at the market price in regular
+   *  hours, or a coin at a limit price. Call only after the person's Confirm. */
+  async place(account, o, refId, now = /* @__PURE__ */ new Date(), coin) {
+    const name = isCrypto(o.symbol) ? PLACE_COIN : PLACE;
+    const r = await this.client.callTool({ name, arguments: this.ready(account, o, refId, now, coin) });
     const text2 = (r.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
     let data = r.structuredContent ?? null;
     if (data === null) {
@@ -19766,10 +19833,41 @@ function parseQuotes(answer) {
   }
   return out;
 }
-var orderOf = (v) => {
+function parseCoinQuotes(answer) {
+  const raw = obj4(answer).data, d = obj4(raw), out = /* @__PURE__ */ new Map();
+  const rows = Array.isArray(raw) ? raw : Array.isArray(d.results) ? d.results : list(d.quotes);
+  for (const v of rows) {
+    const row = obj4(v), inner = obj4(row.quote), q = Object.keys(inner).length ? inner : row;
+    const symbol = text(q.symbol) ?? text(row.symbol), price = figure(q.mark_price) ?? figure(q.mark) ?? figure(q.last_trade_price);
+    if (symbol && price !== null && price > 0) out.set(deskSymbol(symbol, "crypto"), price);
+  }
+  return out;
+}
+var flag = (v) => typeof v === "boolean" ? v : null;
+function parsePairs(answer) {
+  const d = dataOf(answer);
+  const pairs = list(d.results).flatMap((v) => {
+    const p = obj4(v), raw = text(p.symbol);
+    if (!raw) return [];
+    const quantityStep = figure(p.min_order_quantity_increment), priceStep = figure(p.min_order_price_increment), minQuantity = figure(p.min_order_size), maxQuantity = figure(p.max_order_size);
+    const rules = quantityStep !== null && quantityStep > 0 && priceStep !== null && priceStep > 0 && minQuantity !== null && minQuantity >= 0 && maxQuantity !== null && maxQuantity > 0 ? { quantityStep, priceStep, minQuantity, maxQuantity } : null;
+    return [{ id: text(p.id), symbol: deskSymbol(raw, "crypto"), tradable: text(p.tradability) === "tradable", halted: flag(p.halted), displayOnly: flag(p.display_only), marketOnly: flag(p.market_orders_only), rules }];
+  });
+  return { pairs, next: text(d.next) };
+}
+function coinUnusable(symbol, pair) {
+  if (!pair) return `Robinhood does not list ${symbol} among the coins it trades.`;
+  if (pair.halted !== false) return pair.halted ? `Robinhood has halted trading in ${symbol} for now.` : `Robinhood did not say whether trading in ${symbol} is halted, so no coin order is proposed.`;
+  if (!pair.tradable) return `Robinhood marks ${symbol} as not tradable now.`;
+  if (pair.displayOnly !== false) return `Robinhood shows ${symbol} for display only, not to trade.`;
+  if (pair.marketOnly !== false) return `Robinhood takes ${symbol} only as a market order, and the desk's coin tickets are limit orders.`;
+  if (!pair.rules) return `Robinhood gave no order sizes for ${symbol} (its smallest step, least and most), so no coin order can be sized.`;
+  return null;
+}
+var orderOf = (v, symbolOf = (o) => text(o.symbol)?.toUpperCase() ?? null) => {
   const o = obj4(v);
   return {
-    symbol: text(o.symbol)?.toUpperCase() ?? null,
+    symbol: symbolOf(o),
     side: text(o.side),
     type: text(o.type),
     state: text(o.state),
@@ -19780,10 +19878,24 @@ var orderOf = (v) => {
 };
 function parseOrders(answer) {
   const rows = list(dataOf(answer).orders);
-  return { count: rows.length, orders: rows.slice(0, 20).map(orderOf) };
+  return { count: rows.length, orders: rows.slice(0, 20).map((v) => orderOf(v)) };
 }
 function openOrders(answer) {
-  const rows = list(dataOf(answer).orders), all = rows.map(orderOf);
+  const rows = list(dataOf(answer).orders), all = rows.map((v) => orderOf(v));
+  return { all, ...openOf(rows, all) };
+}
+function coinOrders(answer, pairs = /* @__PURE__ */ new Map()) {
+  const d = dataOf(answer), rows = list(d.results ?? d.orders);
+  const symbolOf = (o) => {
+    const s = text(o.symbol);
+    if (s) return deskSymbol(s, "crypto");
+    const id = text(o.currency_pair_id);
+    return id ? pairs.get(id) ?? null : null;
+  };
+  const all = rows.map((v) => orderOf(v, symbolOf));
+  return { all, ...openOf(rows, all), next: text(d.next) };
+}
+function openOf(rows, all) {
   const open2 = [];
   let unread = 0;
   rows.forEach((v, i) => {
@@ -19794,9 +19906,9 @@ function openOrders(answer) {
       unread++;
       return;
     }
-    open2.push({ symbol: o.symbol, side: o.side, quantity: Math.max(0, quantity - filled), price: figure(raw.price) ?? figure(raw.limit_price) });
+    open2.push({ symbol: o.symbol, side: o.side, quantity: Math.max(0, Number((quantity - filled).toFixed(12))), price: figure(raw.price) ?? figure(raw.limit_price), ...o.at ? { at: o.at } : {} });
   });
-  return { all, open: open2.filter((o) => o.quantity > 0), unread };
+  return { open: open2.filter((o) => o.quantity > 0), unread };
 }
 function parseApprovals(setting, approvals) {
   const s = obj4(dataOf(setting).setting);
@@ -19825,19 +19937,36 @@ async function readAccount(reader, account, ids) {
     const q = await read("live prices", "get_equity_quotes", { symbols: symbols.slice(i, i + QUOTES_PER_CALL) });
     for (const [s, v] of parseQuotes(q)) prices.set(s, v);
   }
+  const coinNames = [...new Set(base.filter((h) => h.kind === "crypto").map((h) => deskSymbol(h.symbol, "crypto")))];
+  const coinPrices = coinNames.length ? parseCoinQuotes(await read("live coin prices", "get_crypto_quotes", { symbols: coinNames })) : /* @__PURE__ */ new Map();
   const holdings = base.map((h) => {
-    const price = prices.get(h.symbol) ?? null;
+    const price = (h.kind === "crypto" ? coinPrices.get(deskSymbol(h.symbol, "crypto")) : prices.get(h.symbol)) ?? null;
     return { ...h, price, value: price === null ? null : price * h.quantity, gainPct: price !== null && h.averageCost ? (price / h.averageCost - 1) * 100 : null };
   }).sort((a, b) => (b.value ?? -1) - (a.value ?? -1));
-  let orders = null, approvals = null;
+  let orders = null, approvals = null, coin;
   if (account.agentic) {
     const o = await read("the orders", "get_equity_orders", { account_number: ids.accountNumber });
     orders = o === null ? null : parseOrders(o);
+    if (ids.rhsAccountNumber) {
+      const c = await read("the coin orders", "get_crypto_orders", { rhs_account_number: ids.rhsAccountNumber });
+      const op = c === null ? null : await read("the open coin orders", "get_crypto_orders", { rhs_account_number: ids.rhsAccountNumber, state_group: "open" });
+      const unnamed = [c, op].some((a) => list(dataOf(a).results).some((v) => !text(obj4(v).symbol) && text(obj4(v).currency_pair_id)));
+      const names = unnamed ? new Map(parsePairs(await read("Robinhood's list of coins", "get_currency_pairs", { limit: 100 })).pairs.flatMap((p2) => p2.id ? [[p2.id, p2.symbol]] : [])) : /* @__PURE__ */ new Map();
+      const coinRead = c === null ? null : coinOrders(c, names), openRead = op === null ? null : coinOrders(op, names);
+      const newest = coinRead === null ? [] : [...coinRead.all].sort((a, b) => (b.at ?? "").localeCompare(a.at ?? ""));
+      coin = coinRead === null ? null : {
+        orders: newest.slice(0, 20),
+        count: newest.length,
+        more: coinRead.next !== null,
+        open: openRead === null ? null : openRead.open,
+        openComplete: openRead !== null && openRead.next === null && openRead.unread === 0
+      };
+    }
     const setting = await read("the phone approval setting", "get_trade_approval_setting", { account_number: ids.accountNumber });
     const pending = await read("the approvals waiting", "get_trade_approvals", { account_number: ids.accountNumber });
     approvals = setting === null && pending === null ? null : parseApprovals(setting, pending);
   }
-  return { account, portfolio: p === null ? null : parsePortfolio(p), holdings, unread: crypto5.unread, orders, approvals, problems };
+  return { account, portfolio: p === null ? null : parsePortfolio(p), holdings, unread: crypto5.unread, orders, approvals, problems, ...coin === void 0 ? {} : { coinOrders: coin } };
 }
 
 // src/settings.ts
@@ -20069,6 +20198,38 @@ var Link = class {
   async ticketContext(symbol, now = this.clock()) {
     return this.withReader((r) => this.contextWith(r, symbol, now));
   }
+  /** Coin orders of the Agentic account since a day ago that fall on New York's day `now`, which count towards orders a
+   *  day with its stock orders; null when they could not be read. */
+  async coinOrdersToday(r, rhs, now) {
+    if (!rhs) return 0;
+    let x;
+    try {
+      x = await r.read("get_crypto_orders", { rhs_account_number: rhs, created_at_gte: new Date(now.getTime() - 864e5).toISOString() });
+    } catch (e) {
+      if (e instanceof Refused) return null;
+      throw e;
+    }
+    return x.failed ? null : coinOrders(x.data).all.filter((o) => o.at && marketDay(new Date(o.at)) === marketDay(now)).length;
+  }
+  /** Every page of a list Robinhood gives a page at a time (its `next` mark passed back as `cursor`), up to five pages;
+   *  `complete` false when there were more. */
+  async pages(data, name, args) {
+    const answers = [];
+    let cursor = null;
+    for (let i = 0; i < 5; i++) {
+      const d = await data(name, cursor ? { ...args, cursor } : args);
+      answers.push(d);
+      const next = d?.data?.next;
+      if (typeof next !== "string" || !next.trim()) return { answers, complete: true };
+      cursor = next;
+    }
+    return { answers, complete: false };
+  }
+  /** Robinhood's list of coins and their order rules, every page of it. */
+  async coinPairs(data) {
+    const { answers } = await this.pages(data, "get_currency_pairs", { limit: 100 });
+    return answers.flatMap((a) => parsePairs(a).pairs);
+  }
   async contextWith(r, symbol, now) {
     {
       const a = await r.read("get_accounts");
@@ -20082,11 +20243,12 @@ var Link = class {
       };
       const p = parsePortfolio(await data("get_portfolio", { account_number: ids.accountNumber }));
       this.noteValue(p.total, now);
+      if (isCrypto(symbol)) return this.coinContextWith(r, data, ids, symbol, p, now);
       const all = parsePositions(await data("get_equity_positions", { account_number: ids.accountNumber })), rh = brokerSymbol(symbol);
       const same = (s) => deskSymbol(s, "stock") === deskSymbol(symbol, "stock");
       const held = all.find((x) => same(x.symbol))?.quantity ?? 0;
       const orders = openOrders(await data("get_equity_orders", { account_number: ids.accountNumber }));
-      const ordersToday = orders.all.filter((o) => o.at && marketDay(new Date(o.at)) === marketDay(now)).length;
+      const ordersToday = orders.all.filter((o) => o.at && marketDay(new Date(o.at)) === marketDay(now)).length + (await this.coinOrdersToday(r, ids.rhsAccountNumber, now) ?? 0);
       const wanted = [.../* @__PURE__ */ new Set([rh, ...all.map((x) => x.symbol), ...orders.open.filter((o) => o.side === "buy" && o.price === null).map((o) => o.symbol)])];
       const quotes = /* @__PURE__ */ new Map();
       for (let i = 0; i < wanted.length; i += QUOTES_PER_CALL) for (const [s, v] of parseQuotes(await data("get_equity_quotes", { symbols: wanted.slice(i, i + QUOTES_PER_CALL) }))) quotes.set(s, v);
@@ -20106,6 +20268,71 @@ var Link = class {
         openBuys: orders.open.filter((o) => o.side === "buy").map((o) => ({ symbol: deskSymbol(o.symbol, "stock"), quantity: o.quantity, price: o.price ?? quotes.get(o.symbol) ?? null }))
       };
     }
+  }
+  /** A coin ticket's figures (BTC-USD, ETH-USD), all from Robinhood: whether a crypto account is open, the coin as
+   *  Robinhood trades it (tradable now, not halted, its order rules), the coins held, every open coin order (an open buy
+   *  counts towards the crypto limit and the coin's own cap as if filled, at its own limit price), the orders of the day
+   *  (stocks and coins together), and the coin's live price. Coins trade at any hour, so there is no session. */
+  async coinContextWith(r, data, ids, symbol, p, now) {
+    const base = { symbol, accountValue: p.total, buyingPower: p.buyingPower, held: 0, price: null, ordersToday: 0 };
+    const rhs = ids.rhsAccountNumber;
+    if (!rhs) return { ...base, coin: { rules: null, unusable: "Robinhood gave no crypto number for the Agentic account, so it cannot trade coins here." } };
+    let onboarding;
+    try {
+      onboarding = await r.read("get_crypto_account_onboarding_info");
+    } catch (e) {
+      if (e instanceof Refused) return { ...base, coin: { rules: null, unusable: "Robinhood's connection offers no coin trading, so no coin order is proposed." } };
+      throw e;
+    }
+    const onboarded = onboarding.failed ? null : onboarding.data?.data?.already_onboarded;
+    const pairs = await this.coinPairs(data), pair = pairs.find((x) => x.symbol === symbol);
+    const unusable = onboarded === false ? "Robinhood says no crypto account is open yet: open one in Robinhood's app, then try again." : onboarded !== true ? "Robinhood did not say whether a crypto account is open, so no coin order is proposed." : coinUnusable(symbol, pair);
+    const held = parseCrypto(await data("get_crypto_positions", { rhs_account_number: rhs }));
+    const names = new Map(pairs.flatMap((x) => x.id ? [[x.id, x.symbol]] : []));
+    const openPages = await this.pages(data, "get_crypto_orders", { rhs_account_number: rhs, state_group: "open" });
+    const open2 = [];
+    let unread = openPages.complete ? 0 : 1;
+    for (const a of openPages.answers) {
+      const o = coinOrders(a, names);
+      open2.push(...o.open);
+      unread += o.unread;
+    }
+    const equity = openOrders(await data("get_equity_orders", { account_number: ids.accountNumber }));
+    const coinsToday = await this.coinOrdersToday(r, rhs, now);
+    if (coinsToday === null) throw new Error("Robinhood could not give the coin orders of today");
+    const ordersToday = equity.all.filter((o) => o.at && marketDay(new Date(o.at)) === marketDay(now)).length + coinsToday;
+    const coin = (s) => deskSymbol(s, "crypto");
+    const wanted = [.../* @__PURE__ */ new Set([symbol, ...held.holdings.map((h) => coin(h.symbol)), ...open2.filter((o) => o.side === "buy" && o.price === null).map((o) => o.symbol)])];
+    const quotes = parseCoinQuotes(await data("get_crypto_quotes", { symbols: wanted, rhs_account_number: rhs }));
+    const positions = held.holdings.map((h) => ({ symbol: coin(h.symbol), quantity: h.quantity, price: quotes.get(coin(h.symbol)) ?? null }));
+    const buys = open2.filter((o) => o.side === "buy").map((o) => ({ symbol: o.symbol, quantity: o.quantity, price: o.price ?? quotes.get(o.symbol) ?? null }));
+    const unchecked = [...new Set([...positions, ...buys].filter((x) => x.price === null).map((x) => `Robinhood gave no live price for ${x.symbol}`))];
+    if (held.unread) unchecked.push(`Robinhood listed ${held.unread} coin holding(s) that could not be read`);
+    const openUsd = buys.reduce((n, o) => n + o.quantity * (o.price ?? 0), 0);
+    const mine = (side) => open2.filter((o) => o.symbol === symbol && o.side === side).reduce((n, o) => n + o.quantity, 0);
+    return {
+      ...base,
+      held: positions.find((x) => x.symbol === symbol)?.quantity ?? 0,
+      price: quotes.get(symbol) ?? null,
+      ordersToday,
+      positions,
+      open: { buy: mine("buy"), sell: mine("sell") },
+      unreadOrders: unread,
+      openBuys: buys,
+      cryptoHeldUsd: positions.reduce((n, x) => n + x.quantity * (x.price ?? 0), 0) + openUsd,
+      coin: { rules: pair?.rules ?? null, ...unusable ? { unusable } : {}, openUsd, ...unchecked.length ? { unchecked } : {} }
+    };
+  }
+  /** The coin's own order rules, read from Robinhood just now, or why it cannot be traded now. */
+  async coinRulesOf(r, symbol) {
+    const data = async (name, args) => {
+      const x = await r.read(name, args);
+      if (x.failed) throw new Error(`Robinhood could not give ${name.replace(/^get_|_/g, " ").trim()}`);
+      return x.data;
+    };
+    const pair = (await this.coinPairs(data)).find((x) => x.symbol === symbol), why = coinUnusable(symbol, pair);
+    if (why || !pair?.rules) throw new Refused(`${why ?? `Robinhood gave no order sizes for ${symbol}.`} Nothing was sent.`);
+    return pair.rules;
   }
   /** Whether the person has switched trading on, on the dashboard, and their caps. Kept together beside the sign-in, where
    *  agents are refused: a cap missing or out of range is the shipped one, never a larger one. */
@@ -20182,11 +20409,13 @@ var Link = class {
       if (!now.on) throw new Error(`trading switched itself off: ${now.offBecause?.words ?? "switch it on in Your account first"}`);
       const failed = (await approve(context)).filter((c) => !c.ok);
       if (failed.length) throw new Error(`the order no longer passes on Robinhood's latest figures: ${failed.map((c) => c.words).join("; ")}`);
-      const account = { accountNumber: this.agenticIds().accountNumber, agentic: true }, sent = { ...order, symbol: brokerSymbol(order.symbol) };
-      session.placer.ready(account, sent, refId, at);
+      const ids = this.agenticIds(), account = { accountNumber: ids.accountNumber, rhsAccountNumber: ids.rhsAccountNumber, agentic: true }, sent = { ...order, symbol: brokerSymbol(order.symbol) };
+      if (isCrypto(order.symbol) && (context.coin?.unusable || !context.coin?.rules)) throw new Refused(`${context.coin?.unusable ?? `Robinhood gave no order sizes for ${order.symbol}.`} Nothing was sent.`);
+      const rules = context.coin?.rules ?? void 0;
+      session.placer.ready(account, sent, refId, at, rules);
       sending();
       try {
-        return { placed: await session.placer.place(account, sent, refId, at), context };
+        return { placed: await session.placer.place(account, sent, refId, at, rules), context };
       } catch (e) {
         throw e instanceof Refused ? e : new AnswerLost(oneLine(lostWhy(e), 160));
       }
@@ -20201,7 +20430,8 @@ var Link = class {
       const a = await session.reader.read("get_accounts");
       if (a.failed) throw new Error("Robinhood could not list the accounts");
       this.learn(a.data);
-      return await session.reviewer.review({ accountNumber: this.agenticIds().accountNumber, agentic: true }, { ...order, symbol: brokerSymbol(order.symbol) });
+      const ids = this.agenticIds(), rules = isCrypto(order.symbol) ? await this.coinRulesOf(session.reader, order.symbol) : void 0;
+      return await session.reviewer.review({ accountNumber: ids.accountNumber, rhsAccountNumber: ids.rhsAccountNumber, agentic: true }, { ...order, symbol: brokerSymbol(order.symbol) }, rules);
     } finally {
       await session.close();
     }

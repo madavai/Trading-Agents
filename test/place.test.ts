@@ -15,7 +15,7 @@ import { Sectors } from '../src/desk/sectors.js';
 import { DEFAULT_CAPS, type Caps } from '../src/settings.js';
 import { logOrder, readOrders } from '../src/desk/orders.js';
 import { confirmWords, placedToday, startTerminal, type Assets, type TerminalOptions } from '../src/terminal/server.js';
-import { accountTools, AGENTIC, fakeRobinhood, MAIN, type Fake } from './fake-robinhood.js';
+import { accountTools, AGENTIC, AGENTIC_RHS, fakeRobinhood, MAIN, PAIRS, type Coins, type Fake } from './fake-robinhood.js';
 import { today } from '../src/data/dates.js';
 
 // The call the tickets come from is dated today, so its paper record is always under a week old: a fixed date made the
@@ -63,6 +63,26 @@ test('the placer sends a part-share only as a market order, only while New York\
   await client.close();
 });
 
+test('the placer sends a coin only as a limit order, good till cancelled, on the coin\'s own steps, to the crypto account\'s number, at any hour', async () => {
+  const calls: string[] = [], coin = { placed: [] as Array<Record<string, unknown>> };
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  await accountTools(calls, { coin }).connect(a);
+  const client = new Client({ name: 'test', version: '0' }); await client.connect(b);
+  const p = new Placer(client, (await client.listTools()).tools), me = { accountNumber: AGENTIC, rhsAccountNumber: AGENTIC_RHS, agentic: true };
+  const rules = { quantityStep: 1e-8, priceStep: 0.01, minQuantity: 0.000001, maxQuantity: 20 }, saturday = new Date('2026-11-14T16:00:00Z');
+  const btc = { symbol: 'BTC-USD', side: 'buy' as const, quantity: 0.00123456, limitPrice: 81999.5, timeInForce: 'gtc' as const };
+  await assert.rejects(p.place({ ...me, agentic: false }, btc, UUID, saturday, rules), Refused);
+  await assert.rejects(p.place(me, btc, UUID, saturday), /not complete/, 'without the coin\'s own rules from Robinhood');
+  await assert.rejects(p.place({ ...me, rhsAccountNumber: null }, btc, UUID, saturday, rules), /not complete/, 'without the crypto account\'s number');
+  for (const off of [{ quantity: 0.000000015 }, { quantity: 0.0000005 }, { quantity: 21 }, { limitPrice: 81999.505 }, { market: true as const, dollars: 100 }]) await assert.rejects(p.place(me, { ...btc, ...off }, UUID, saturday, rules), /not complete/, JSON.stringify(off));
+  assert.deepEqual(calls, [], 'nothing off Robinhood\'s rules reached it');
+  const r = await p.place(me, btc, UUID, saturday, rules);
+  assert.deepEqual(coin.placed, [{ rhs_account_number: AGENTIC_RHS, symbol: 'BTC-USD', side: 'buy', type: 'limit', quantity: '0.00123456', limit_price: '81999.50', time_in_force: 'gtc', ref_id: UUID }], 'a Saturday: coins trade at any hour');
+  assert.deepEqual([r.answered, r.orderId, r.state], [true, '7a2d3c4e-0000-4000-8000-00000000c01e', 'unconfirmed']);
+  assert.deepEqual(calls, ['place_crypto_order']);
+  await client.close();
+});
+
 test('Robinhood\'s answer to an order is read into its id, state and approval flag; a refusal keeps its words, without account numbers', () => {
   assert.equal(parsePlaced({ failed: true, text: 'account 5RH88004321 cannot trade', data: null }).error, 'account ##### cannot trade');
   const r = parsePlaced({ failed: false, text: '', data: { data: { order: { id: 'abc', state: 'confirmed' }, customer_approval_required: false, account_number: '5RH88004321' } } });
@@ -74,13 +94,13 @@ test('only three doors call Robinhood, each naming its tools; the agents\' tool 
   const files = (fs.readdirSync('src', { recursive: true }) as string[]).filter((f) => f.endsWith('.ts')).map((f) => f.replace(/\\/g, '/'));
   assert.deepEqual(files.filter((f) => /\.callTool\(/.test(fs.readFileSync(path.join('src', f), 'utf8'))).sort(), ['robinhood/order.ts', 'robinhood/reader.ts', 'robinhood/review.ts']);
   const named = (f: string) => [...new Set(fs.readFileSync(f, 'utf8').match(/\b(?:get|list|place|cancel|review|preview|replace|decline|submit|create)_[a-z_]+/g))];
-  assert.deepEqual(named('src/robinhood/order.ts'), ['place_equity_order']);
-  assert.deepEqual(named('src/robinhood/review.ts'), ['review_equity_order']);
+  assert.deepEqual(named('src/robinhood/order.ts'), ['place_equity_order', 'place_crypto_order']);
+  assert.deepEqual(named('src/robinhood/review.ts'), ['review_equity_order', 'preview_crypto_order']);
   // who can run the order door: a type-only import carries no code
   const importers = files.filter((f) => /^import (?!type )[^;]*from '\.{1,2}\/(?:robinhood\/)?order\.js'/m.test(fs.readFileSync(path.join('src', f), 'utf8')));
   assert.deepEqual(importers.sort(), ['robinhood/connect.ts']);
   const tools = fs.readFileSync('dist/desk-tools.mjs', 'utf8');
-  for (const word of ['place_equity_order', 'review_equity_order', 'cancel_equity_order', '/api/ticket']) assert.ok(!tools.includes(word), `the agents' tool server must not contain ${word}`);
+  for (const word of ['place_equity_order', 'review_equity_order', 'cancel_equity_order', 'place_crypto_order', 'preview_crypto_order', 'cancel_crypto_order', '/api/ticket']) assert.ok(!tools.includes(word), `the agents' tool server must not contain ${word}`);
 });
 
 // ---------- through the dashboard ----------
@@ -92,8 +112,8 @@ const approves = (url: URL) => { void (async () => { const r = await fetch(url, 
 /** A desk with a signed-in, chosen Agentic account. `caps` are set the way the person sets them, beside the switch; the
  *  project's settings file is given wide-open caps, which must never be read. `rh`: Robinhood's live prices by symbol,
  *  and the time the link reads as now (New York's market hours for a part-share). */
-async function desk(caps?: Partial<Caps>, more: Partial<TerminalOptions> = {}, rh: { prices?: Record<string, string>; now?: () => Date } = {}) {
-  const o = { placed: [] as Array<Record<string, unknown>>, reviewed: [] as Array<Record<string, unknown>>, agenticBuyingPower: '2500.00', agenticPositions: [] as unknown[], ...(rh.prices ? { prices: rh.prices } : {}) };
+async function desk(caps?: Partial<Caps>, more: Partial<TerminalOptions> = {}, rh: { prices?: Record<string, string>; now?: () => Date; coin?: Coins } = {}) {
+  const o = { placed: [] as Array<Record<string, unknown>>, reviewed: [] as Array<Record<string, unknown>>, agenticBuyingPower: '2500.00', agenticPositions: [] as unknown[], ...(rh.prices ? { prices: rh.prices } : {}), ...(rh.coin ? { coin: rh.coin } : {}) };
   fake = await fakeRobinhood((calls) => accountTools(calls, o));
   const port = await freePort(), file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ta-pl-')), 'sign-in.json');
   await (await openSession(file, { signIn: true, url: fake.url, port, open: approves })).close();
@@ -198,11 +218,11 @@ test('outside market hours a part-share ticket says when the market opens, and n
   } finally { await term.close(); }
 });
 
-test('the person\'s own order takes the same road: one share to start, stocks only, Robinhood\'s clean check, the switch, their exact Confirm', async () => {
+test('the person\'s own order takes the same road: one share to start, no other coin or index, Robinhood\'s clean check, the switch, their exact Confirm', async () => {
   const { o, dir, term, post, link } = await desk();
   try {
-    assert.match((await post('/api/ticket/own', { symbol: 'BTC-USD', side: 'buy' })).json().error, /stocks and funds only/);
-    assert.match((await post('/api/ticket/own', { symbol: '^GSPC', side: 'buy' })).json().error, /stocks and funds only/);
+    assert.match((await post('/api/ticket/own', { symbol: 'SHIB-USD', side: 'buy' })).json().error, /among coins, the order ticket trades only Bitcoin \(BTC-USD\) and Ether \(ETH-USD\), not SHIB-USD/);
+    assert.match((await post('/api/ticket/own', { symbol: '^GSPC', side: 'buy' })).json().error, /stocks, funds and coins only, not indices/);
     assert.match((await post('/api/ticket/own', { symbol: 'NVDA' })).json().error, /buy or to sell/);
     const sell = (await post('/api/ticket/own', { symbol: 'NVDA', side: 'sell' })).json();
     assert.deepEqual([sell.own, sell.proposal.order], [true, null], 'nothing held to sell, so nothing is proposed');
@@ -222,6 +242,89 @@ test('the person\'s own order takes the same road: one share to start, stocks on
     assert.equal((await post('/api/ticket/place', { id: t.id, confirm: 'Buy 1 NVDA at $182.40' })).status, 409, 'a ticket sends one order');
     const [line] = readOrders(dir);
     assert.deepEqual([line!.own, line!.call, line!.symbol, line!.side, line!.quantity], [true, undefined, 'NVDA', 'buy', 1], 'logged as the person\'s own order, not a call\'s');
+  } finally { await term.close(); }
+});
+
+/** A desk on a Saturday, when no stock market is open, with Bitcoin rated Buy and the pretend Robinhood's coin side. */
+const SATURDAY = new Date('2026-11-14T16:00:00Z');
+async function coinDesk(coin: Coins) {
+  const d = await desk(undefined, {}, { coin, now: () => SATURDAY });
+  new Journal(path.join(d.dir, 'journal.md')).storeDecision('BTC-USD', CALL_DAY, '**Rating**: Buy\n\n**Executive Summary**: Buy.');
+  return d;
+}
+/** An open coin buy as Robinhood might list it, naming its coin only by its id in Robinhood's list of coins. */
+const openBuy = (id: string, quantity: string, price: string) => ({ id, currency_pair_id: 'pair-btc', side: 'buy', type: 'limit', state: 'confirmed', quantity, price, cumulative_quantity: '0', created_at: '2026-11-14T15:00:00Z' });
+
+test('a coin takes the same road at any hour: Bitcoin at a limit price, good till cancelled, on Robinhood\'s own steps, within the crypto limit, checked by Robinhood\'s coin check, confirmed in coins, logged once', async () => {
+  const coin: Coins = { previewed: [], placed: [] };
+  const { dir, term, post, link } = await coinDesk(coin);
+  try {
+    link.setTrading(true);
+    const t = (await post('/api/ticket', { symbol: 'BTC-USD', date: CALL_DAY })).json();
+    // The crypto limit of 5% of the $2,500 account is $125: at Robinhood's $82,000, 0.00152439 BTC on its step of 0.00000001.
+    assert.deepEqual(t.proposal.order, { symbol: 'BTC-USD', side: 'buy', quantity: 0.00152439, limitPrice: 82000, timeInForce: 'gtc' });
+    assert.deepEqual(t.context.coin.rules, { quantityStep: 1e-8, priceStep: 0.01, minQuantity: 0.000001, maxQuantity: 20 });
+    assert.ok(t.checks.every((c: Chip) => c.ok), JSON.stringify(t.checks));
+    assert.ok(t.checks.some((c: Chip) => /^Coins trade at any hour, so this can be sent now/.test(c.words)), 'a Saturday is no bar to a coin');
+    assert.match(t.proposal.why.join(' '), /stays open until it fills or you cancel it in Robinhood's app, for at most 90 days/);
+    assert.equal((await post('/api/ticket/review', { id: t.id, quantity: 0.000000015, limitPrice: 82000 })).status, 400, 'off the coin\'s step: not sent for checking');
+    assert.equal((await post('/api/ticket/review', { id: t.id, quantity: 0.0015, limitPrice: 82000.005 })).status, 400, 'off the price step');
+    assert.equal((await post('/api/ticket/review', { id: t.id, quantity: 0.0016, limitPrice: 82000 })).status, 400, '$131.20 is over the crypto limit of $125');
+    assert.deepEqual(coin.previewed, []);
+    const r = (await post('/api/ticket/review', { id: t.id, quantity: 0.0015, limitPrice: 81000 })).json();
+    assert.equal(r.confirm, 'Buy 0.0015 BTC at $81000.00');
+    assert.equal(r.review.answered, true, JSON.stringify(r.review));
+    const args = { rhs_account_number: AGENTIC_RHS, symbol: 'BTC-USD', side: 'buy', type: 'limit', quantity: '0.0015', limit_price: '81000.00', time_in_force: 'gtc' };
+    assert.deepEqual(coin.previewed, [args]);
+    assert.match((await post('/api/ticket/place', { id: t.id, confirm: 'Buy 0.0015 shares of BTC at $81000.00' })).json().error, /does not name this order/);
+    const ok = await post('/api/ticket/place', { id: t.id, confirm: 'Buy 0.0015 BTC at $81000.00' });
+    assert.equal(ok.status, 200, ok.body);
+    assert.deepEqual(coin.placed!.map((x) => ({ ...x, ref_id: 'x' })), [{ ...args, ref_id: 'x' }]);
+    assert.match(String(coin.placed![0]!.ref_id), /^[0-9a-f-]{36}$/);
+    for (const n of [MAIN, AGENTIC, AGENTIC_RHS]) assert.ok(!ok.body.includes(n));
+    assert.equal((await post('/api/ticket/place', { id: t.id, confirm: 'Buy 0.0015 BTC at $81000.00' })).status, 409, 'a ticket sends one order');
+    const [line] = readOrders(dir);
+    assert.deepEqual([line!.symbol, line!.side, line!.quantity, line!.limitPrice], ['BTC-USD', 'buy', 0.0015, 81000]);
+    assert.equal(confirmWords(line!), 'Buy 0.0015 BTC at $81000.00', 'the log names it as the person confirmed it');
+  } finally { await term.close(); }
+});
+
+test('open coin buys count towards the crypto limit as if filled, and coin orders towards orders a day; a halted coin or no crypto account gets no order; an unclear coin check is never placed', async () => {
+  // One open buy of 0.001 BTC at $75,000 is $75, 3% of the $2,500 account: of the 5% crypto limit, $50 is left.
+  const coin: Coins = { previewed: [], placed: [], orders: [openBuy('o1', '0.001', '75000')], previewAnswer: { ok: true } };
+  const { term, post, link } = await coinDesk(coin);
+  try {
+    link.setTrading(true);
+    const t = (await post('/api/ticket', { symbol: 'BTC-USD', date: CALL_DAY })).json();
+    assert.equal(t.proposal.order.quantity, 0.00060975, '$50 at $82,000, down to the step');
+    assert.equal(t.context.coin.openUsd, 75);
+    assert.match(t.proposal.why.join(' '), /counting \$75\.00 in coin buys not yet filled/);
+    assert.equal(t.context.ordersToday, 1, 'the open coin order was placed today');
+    const stock = (await post('/api/ticket', { symbol: 'NVDA', date: CALL_DAY })).json();
+    assert.equal(stock.context.ordersToday, 1, 'stock and coin orders count together towards orders a day');
+    // Robinhood's coin check answers without naming the order back: not checked, so it cannot be placed.
+    const r = (await post('/api/ticket/review', { id: t.id, quantity: 0.0006, limitPrice: 82000 })).json();
+    assert.deepEqual([r.review.answered, r.review.unclear], [false, true]);
+    assert.match(r.review.error, /did not name this order back, so it counts as not checked and cannot be placed/);
+    assert.notEqual((await post('/api/ticket/place', { id: t.id, confirm: 'Buy 0.0006 BTC at $82000.00' })).status, 200);
+    assert.deepEqual(coin.placed, []);
+    // A second open buy of 3%: $150 waits to fill, over the 5% limit, so a third coin buy is refused.
+    coin.orders!.push(openBuy('o2', '0.001', '75000'));
+    const full = (await post('/api/ticket', { symbol: 'BTC-USD', date: CALL_DAY })).json();
+    assert.equal(full.proposal.order, null, JSON.stringify(full.proposal));
+    const own = (await post('/api/ticket/own', { symbol: 'BTC-USD', side: 'buy' })).json();
+    const tiny = (await post('/api/ticket/check', { id: own.id, quantity: 0.000001, limitPrice: 82000 })).json();
+    assert.ok(tiny.checks.some((c: Chip) => !c.ok && /^Crypto would be 6\.0% of the account, counting \$150\.00 in coin buys not yet filled; your limit is 5%/.test(c.words)), JSON.stringify(tiny.checks));
+    // Robinhood halts Ether: its ticket proposes nothing, and says why.
+    coin.pairs = PAIRS.map((x) => (x.symbol === 'ETH-USD' ? { ...x, halted: true } : x));
+    const eth = (await post('/api/ticket/own', { symbol: 'ETH-USD', side: 'buy' })).json();
+    assert.equal(eth.proposal.order, null);
+    assert.match(eth.proposal.why.join(' '), /Robinhood has halted trading in ETH-USD for now/);
+    coin.onboarded = false;
+    const closed = (await post('/api/ticket/own', { symbol: 'BTC-USD', side: 'buy' })).json();
+    assert.equal(closed.proposal.order, null);
+    assert.match(closed.proposal.why.join(' '), /no crypto account is open yet/);
+    assert.deepEqual(coin.placed, []);
   } finally { await term.close(); }
 });
 

@@ -127,6 +127,6 @@ test('only the reader calls a Robinhood tool: no other file in src does', () => 
   const callers = files.filter((f) => /\.callTool\(/.test(fs.readFileSync(path.join('src', f), 'utf8')));
   assert.deepEqual(callers.sort(), ['robinhood/order.ts', 'robinhood/reader.ts', 'robinhood/review.ts'], "reads go through the reader, Robinhood's order check through the reviewer, an order through the placer (place.test.ts)");
   const review = fs.readFileSync('src/robinhood/review.ts', 'utf8');
-  assert.deepEqual([...new Set(review.match(/\b(?:get|list|place|cancel|review|preview|replace|decline|submit|create)_[a-z_]+/g))], ['review_equity_order'], "the reviewer names one tool: Robinhood's check");
+  assert.deepEqual([...new Set(review.match(/\b(?:get|list|place|cancel|review|preview|replace|decline|submit|create)_[a-z_]+/g))], ['review_equity_order', 'preview_crypto_order'], "the reviewer names two tools: Robinhood's check of a stock order and of a coin order");
   assert.deepEqual(argsOf({ inputSchema: { type: 'object', properties: { side: { enum: ['buy', 'sell'] }, n: { type: 'integer', description: 'How many' } }, required: ['n'] } }).map((a) => [a.name, a.type, a.required]), [['side', 'one of "buy" | "sell"', false], ['n', 'integer', true]]);
 });

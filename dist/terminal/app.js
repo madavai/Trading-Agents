@@ -132,7 +132,7 @@
     index: { group: markets, term: "Index", means: "a list of companies whose prices are averaged into one number, such as the S&P 500. It cannot be bought itself, only through a fund that copies it." },
     sp500: { group: markets, term: "S&P 500", means: "the index of about 500 large US companies, chosen by a committee at S&P, taken together. SPY, the S&P 500 fund, copies it at about a tenth of its number, and is the yardstick the desk measures itself against." },
     sector: { group: markets, term: "Sector", means: "one part of the economy, such as technology or energy. Companies in one sector tend to rise and fall together." },
-    crypto: { group: markets, term: "Crypto", means: "digital coins such as Bitcoin, which swing far more than shares. The desk follows Bitcoin and Ether on paper only." },
+    crypto: { group: markets, term: "Crypto", means: "digital coins such as Bitcoin, which swing far more than shares, at any hour. The desk follows Bitcoin and Ether; you can order them in the Agentic account, at a limit price that stays open until it fills or you cancel it." },
     today: { group: markets, term: "Day's move", means: "the change in price over the latest trading day, from the close before it. When that day was not today, as on a weekend, the page names it (Fri)." },
     volume: { group: markets, term: "Volume", means: "how many shares changed hands in a day. A move on high volume means many people acted on it." },
     average: { group: markets, term: "50- and 200-day average", means: "the average closing price over that many trading days. A price above it is often read as rising lately, below it as falling: a rule of thumb, not a certainty." },
@@ -267,8 +267,8 @@
   var NOTES = {
     /** The Price column of an order: robinhood/account.ts takes `average_price`, else `price`, else `limit_price`. */
     orderPrice: "Robinhood's average price for what has filled, when it gives one; otherwise the price the order is listed at.",
-    coinOnPaper: "Robinhood's agent doorway trades stocks and funds, so a coin never gets an order ticket.",
-    noTicket: "No order ticket: Robinhood's agent doorway trades stocks and funds, and among crypto the desk follows only Bitcoin and Ether on paper.",
+    coinOnPaper: "Among coins, the desk follows and orders only Bitcoin and Ether.",
+    noTicket: "No order ticket: among coins, the desk follows and orders only Bitcoin and Ether; an index cannot be bought (a fund that follows it can).",
     noView: "No view yet: the desk has not analysed it. Ask it to (the robot); in the Agentic account, Monday's morning routine rates it.",
     stopWatch: "A stop is the desk's trader's, watched against Yahoo Finance's price only while this page is open in a browser. With the page closed nothing watches it: the evening wrap-up names any holding whose last close is below its stop, but only when it runs (your routines switched on in Madav, or asked for in a chat). It only reports."
   };
@@ -664,6 +664,22 @@
     return kind === "crypto" ? `${cryptoBase(s) ?? s}-USD` : yahooClass(s);
   }
 
+  // src/desk/ticket.ts
+  var COIN_STEP = 1e6;
+  var PART_HOURS = "9:30 a.m. to 4 p.m. New York time";
+  var MARKET_WHY = `A part-share is a market order: Robinhood takes no limit price for it, so it fills at the market's price at that moment, and Robinhood's check shows only an estimate. It is sent only while the US market is open, ${PART_HOURS}.`;
+  var TICKET_COINS = /* @__PURE__ */ new Set(["BTC-USD", "ETH-USD"]);
+  function placesOf(step) {
+    const s = step.toString(), e = /e-(\d+)$/.exec(s);
+    if (e) return Number(e[1]) + (s.split("e")[0].split(".")[1] ?? "").length;
+    return (s.split(".")[1] ?? "").length;
+  }
+  var coinAmount = (n, step = 1e-8) => n.toFixed(Math.min(placesOf(step), 18)).replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+  var stepsOf = (c) => {
+    const r = c.coin?.rules;
+    return { q: r?.quantityStep ?? 1 / COIN_STEP, p: r?.priceStep ?? 0.01, min: r?.minQuantity ?? 0, max: r?.maxQuantity ?? 1e5 };
+  };
+
   // src/terminal/ui/main.ts
   var RANGES = ["1M", "3M", "6M", "1Y", "5Y"];
   var OVER = { "1M": "the month", "3M": "three months", "6M": "six months", "1Y": "the year", "5Y": "five years" };
@@ -690,6 +706,7 @@
   var isQuote = (q2) => !!q2 && !("error" in q2);
   var isIndex = (sym) => sym.startsWith("^");
   var isStock = (sym) => !!sym && !/[\^=]/.test(sym) && !isCrypto(sym);
+  var tradeable = (sym) => isStock(sym) || TICKET_COINS.has(sym);
   var quoteOf = (sym) => {
     const q2 = S.quotes.get(sym) ?? S.markets.find((m) => m.symbol === sym)?.quote;
     return isQuote(q2) ? q2 : null;
@@ -1075,7 +1092,7 @@
   var sellWords = (c) => {
     if (!c.sell || !c.view) return "";
     const e = c.sell.early;
-    return `The desk rated ${c.desk} ${c.view.rating} ${c.view.ago}; your settings make that "${c.sell.action}".${e ? ` It was bought here on ${dayText(e.boughtOn)}, ${e.heldDays} trading day(s) ago, under your shortest hold of ${e.minHoldDays}: its ticket proposes no sell before then.` : ""}${c.sell.ticket ? " Sell\u2026 opens its ticket: checked against your caps and by Robinhood, and sent only on your Confirm." : " Robinhood's agent doorway trades stocks and funds only: a coin is sold in the Robinhood app, if you decide to."}`;
+    return `The desk rated ${c.desk} ${c.view.rating} ${c.view.ago}; your settings make that "${c.sell.action}".${e ? ` It was bought here on ${dayText(e.boughtOn)}, ${e.heldDays} trading day(s) ago, under your shortest hold of ${e.minHoldDays}: its ticket proposes no sell before then.` : ""}${c.sell.ticket ? " Sell\u2026 opens its ticket: checked against your caps and by Robinhood, and sent only on your Confirm." : " Among coins, the desk orders only Bitcoin and Ether: this one is sold in the Robinhood app, if you decide to."}`;
   };
   var sellButton = (c) => c.sell?.ticket && c.view ? `<button class="at-btn at-press" data-act="decide" data-symbol="${esc(c.desk)}" data-date="${esc(c.view.date)}" title="${esc(`An order ticket from the desk's ${c.view.rating} call: ${c.sell.action}`)}">Sell\u2026</button>` : "";
   function careMarks(c) {
@@ -1099,7 +1116,7 @@
     const rows = items.map((c) => {
       const chips = `${c.below ? '<span class="at-chip danger">below its stop</span>' : ""}${c.sell ? ' <span class="at-chip danger">the desk says sell</span>' : ""}`;
       const words = [c.below ? belowWords(c) : "", c.sell ? sellWords(c) : ""].filter(Boolean).map((w) => `<span>${esc(w)}</span>`).join(" ");
-      const own = c.below && !c.sell && isStock(c.desk) ? `<button class="at-btn at-press" data-act="trade" data-side="sell" data-symbol="${esc(c.desk)}" title="${esc(`Your own sell order for ${c.desk}: one share to start; change the shares before Robinhood checks it`)}">Sell\u2026</button>` : "";
+      const own = c.below && !c.sell && tradeable(c.desk) ? `<button class="at-btn at-press" data-act="trade" data-side="sell" data-symbol="${esc(c.desk)}" title="${esc(isCrypto(c.desk) ? `Your own sell order for ${c.desk}: the smallest amount Robinhood takes to start; change the amount before Robinhood checks it` : `Your own sell order for ${c.desk}: one share to start; change the shares before Robinhood checks it`)}">Sell\u2026</button>` : "";
       return `<tr><td><b>${esc(c.desk)}</b></td><td class="wrap">${chips}</td><td class="wrap">${words}</td><td><span class="at-row">${c.view ? readButton(c.desk, c.view.date, "Read the call") : ""}${sellButton(c)}${own}</span></td></tr>`;
     }).join("");
     $("#careTable").innerHTML = `<thead><tr><th>Holding</th><th>Mark</th><th class="wrap">Why</th><th></th></tr></thead><tbody>${rows}</tbody>`;
@@ -1143,6 +1160,28 @@
     const setting = ap.required ? mark("Phone approval: on", "Robinhood asks you to approve every trade of this account on your phone before it is sent.", "ok") : mark("Phone approval: off", "Robinhood does not ask you to approve this account's trades on your phone: an order you Confirm here is sent at once. You can switch phone approval on in the Robinhood app.", "warn");
     return `${setting}${ap.pending ? mark(`${ap.pending} waiting for your approval`, "Waiting for your OK on your phone.", "accent") : ""}`;
   }
+  var ageWords = (at) => {
+    const d = Math.floor((Date.now() - Date.parse(at)) / 864e5);
+    return !(d >= 1) ? "today" : `${d} ${d === 1 ? "day" : "days"} ago`;
+  };
+  function coinOrdersPart(co, cur) {
+    if (co === void 0) return "";
+    const head = '<div class="at-card-head ta-orders-head"><h3>Coin orders</h3></div>';
+    if (co === null) return `${head}<p class="at-quiet">The coin orders could not be read.</p>`;
+    return `${head}${openCoinLines(co.open, co.openComplete, cur)}${co.count === 0 ? '<p class="at-quiet">No coin orders in this account yet.</p>' : `${ordersTable(co.orders, cur, true)}${co.count > co.orders.length || co.more ? `<p class="at-quiet">The latest ${co.orders.length} of ${co.more ? "more than " : ""}${co.count}.</p>` : ""}`}`;
+  }
+  function coinOrdersOn(sym, co, at) {
+    if (co === void 0) return '<p class="at-quiet">Robinhood gave the Agentic account no crypto account, so it has no coin orders.</p>';
+    if (co === null) return '<p class="at-quiet">The coin orders could not be read.</p>';
+    const open = co.open === null ? null : co.open.filter((o) => o.symbol === sym), mine = co.orders.filter((o) => o.symbol === sym);
+    const rest = co.count > co.orders.length || co.more;
+    return `${openCoinLines(open, co.openComplete, "USD")}${mine.length ? ordersTable(mine, "USD", false) : `<p class="at-quiet">No orders on ${esc(sym)} among the ${co.orders.length} latest coin orders Robinhood listed for the Agentic account at ${esc(at)}${rest ? ", and it listed more" : ""}.</p>`}`;
+  }
+  function openCoinLines(open, complete, cur) {
+    if (open === null) return `<p class="at-honest bad">The coin orders still open could not be read: look in Robinhood's app.</p>`;
+    const lines = open.map((o) => `<p class="at-honest">Still open: ${esc(`${sideWord(o.side)} ${qty(o.quantity)} ${cryptoBase(o.symbol) ?? o.symbol}${o.price === null ? "" : ` at ${money(o.price, cur)}`}`)}${o.at ? `, placed ${esc(dayText(o.at))} (${esc(ageWords(o.at))})` : ""}. Cancel it in Robinhood's app if you no longer want it: it stays open until it fills, for at most 90 days.</p>`).join("");
+    return `${lines}${complete ? "" : `<p class="at-honest bad">Robinhood listed more open coin orders than the dashboard could read: look in Robinhood's app.</p>`}`;
+  }
   function viewCard(v) {
     const a = v.account, cur = v.portfolio?.currency ?? "USD", p = v.portfolio;
     const stocks = v.holdings.filter((h) => h.kind === "stock").length, coins = v.holdings.filter((h) => h.kind === "crypto").length;
@@ -1165,8 +1204,8 @@
     let agentic = "";
     if (a.agentic) {
       const o = v.orders;
-      const orders = o === null ? '<p class="at-quiet">The orders could not be read.</p>' : o.count === 0 ? '<p class="at-quiet">No orders in this account yet.</p>' : `${ordersTable(o.orders, cur, true)}${o.count > o.orders.length ? `<p class="at-quiet">The latest ${o.orders.length} of ${o.count}.</p>` : ""}`;
-      agentic = `<div class="at-card-head ta-orders-head"><h3>Orders in this account</h3><span class="at-card-tail">${approvalChips(v.approvals)}</span></div>${orders}`;
+      const orders = o === null ? '<p class="at-quiet">The orders could not be read.</p>' : o.count === 0 ? `<p class="at-quiet">No ${v.coinOrders === void 0 ? "" : "stock or fund "}orders in this account yet.</p>` : `${ordersTable(o.orders, cur, true)}${o.count > o.orders.length ? `<p class="at-quiet">The latest ${o.orders.length} of ${o.count}.</p>` : ""}`;
+      agentic = `<div class="at-card-head ta-orders-head"><h3>Orders in this account</h3><span class="at-card-tail">${approvalChips(v.approvals)}</span></div>${orders}${coinOrdersPart(v.coinOrders, cur)}`;
     }
     const problems = v.problems.length ? `<p class="at-honest bad">Not read: ${esc(v.problems.join("; "))}. Those figures are left as dashes.</p>` : "";
     const unread = v.unread ? `<p class="at-honest">${v.unread} holding(s) could not be read and are left out.</p>` : "";
@@ -1377,13 +1416,14 @@
     <p class="at-lede">Your own order, not one of the desk's calls: in the Agentic account only, within your caps, after Robinhood's check and your Confirm.</p>` : `<div class="ta-pophead"><h2>${esc(o ? `${o.side === "buy" ? "Buy" : "Sell"} ${c.symbol}` : `No order for ${c.symbol}`)}</h2>${ratingChip(c.rating)}${close}</div>
     <p class="at-lede">The desk rated ${esc(c.symbol)} ${esc(c.rating)} on ${esc(dayText(c.callDate))}: ${esc(t.proposal.action)}. In the Agentic account only.</p>`;
     $("#tkHead").innerHTML = `${head}${t.lost ? `<p class="at-honest bad">${esc(daysInWords(t.lost))}</p>` : ""}
-    <dl class="at-facts ruled at-box"><div><dt>Account value</dt><dd>${money(c.accountValue)}</dd></div><div><dt>Buying power</dt><dd>${money(c.buyingPower)}</dd></div><div><dt>Held now</dt><dd>${esc(String(c.held))} share(s)</dd></div><div><dt>Live price</dt><dd>${money(c.price)}</dd></div><div><dt>Orders today</dt><dd>${c.ordersToday} of ${t.caps.ordersPerDay}</dd></div></dl>
+    <dl class="at-facts ruled at-box"><div><dt>Account value</dt><dd>${money(c.accountValue)}</dd></div><div><dt>Buying power</dt><dd>${money(c.buyingPower)}</dd></div><div><dt>Held now</dt><dd>${esc(isCrypto(c.symbol) ? `${coinAmount(c.held)} ${cryptoBase(c.symbol) ?? c.symbol}` : `${c.held} share(s)`)}</dd></div><div><dt>Live price</dt><dd>${money(c.price)}</dd></div><div><dt>Orders today</dt><dd>${c.ordersToday} of ${t.caps.ordersPerDay}</dd></div></dl>
     ${t.proposal.why.map((w) => `<p class="at-quiet">${esc(w)}</p>`).join("")}`;
     $("#tkFields").innerHTML = o ? ticketFields(o.side) : "";
     renderTicketDyn();
   }
   var sixPlaces = (n) => Math.floor(n * 1e6 + 1e-6) / 1e6;
   function partEstimate() {
+    if (T.open && isCrypto(T.open.context.symbol)) return coinEstimate();
     const price = T.open?.context.price, side = T.open?.proposal.order?.side;
     if (!price || !(price > 0)) return "Robinhood gave no live price to estimate it with.";
     if (side === "buy") return T.dollars > 0 ? `About ${sixPlaces(T.dollars / price)} of a share at the live price of ${money(price)}. Robinhood works out the exact part when it fills.` : "";
@@ -1391,6 +1431,7 @@
   }
   function ticketFields(side) {
     const t = T.open;
+    if (isCrypto(t.context.symbol)) return coinFields(side);
     const kinds = [[false, "Whole shares at your price"], [true, "A part-share at the market price"]].map(([m, w]) => `<button class="at-seg-b${T.market === m ? " on" : ""}" role="radio" aria-checked="${T.market === m}" data-act="tk-kind" data-kind="${m ? "market" : "limit"}">${w}</button>`).join("");
     const seg = `<div class="at-row"><div class="at-seg" role="radiogroup" aria-label="Whole shares or a part-share">${kinds}</div></div>`;
     if (!T.market) {
@@ -1402,6 +1443,19 @@
     const field = side === "buy" ? `<label class="at-field"><span class="at-field-l">Dollar amount, $ (at least $1.00)</span><input class="at-input at-box" id="tkDollars" type="text" inputmode="decimal" value="${T.dollars.toFixed(2)}"></label>` : `<label class="at-field"><span class="at-field-l">Shares to sell, to six decimal places</span><input class="at-input at-box" id="tkQty" type="number" min="0.000001" step="0.000001" inputmode="decimal" value="${T.quantity}"></label>`;
     return `${seg}<div class="at-row">${field}</div><p class="at-quiet" id="tkEstimate">${esc(partEstimate())}</p>
     ${t.proposal.order?.market ? "" : `<p class="at-honest">A ${term("partShare", "part-share")} is a ${term("marketOrder", "market order")}: it fills at the market's price at that moment, not a price you set, and Robinhood's check shows only an estimate. It is sent only while the US market is open, 9:30 a.m. to 4 p.m. New York time.</p>`}`;
+  }
+  function coinEstimate() {
+    const price = T.open?.context.price;
+    if (!(T.quantity > 0) || !(T.limit > 0)) return "";
+    return `About ${money(T.quantity * T.limit)} at your limit price${price && price > 0 ? `, ${money(T.quantity * price)} at Robinhood's live price of ${money(price)}` : ""}. Robinhood's check shows its fees.`;
+  }
+  function coinFields(side) {
+    const t = T.open, s = stepsOf(t.context), base = cryptoBase(t.context.symbol) ?? t.context.symbol;
+    const bounds = s.min > 0 ? ` (from ${coinAmount(s.min, s.q)} to ${coinAmount(s.max, s.q)}, in steps of ${coinAmount(s.q, s.q)})` : "";
+    return `<div class="at-row">
+      <label class="at-field"><span class="at-field-l">${esc(`Amount of ${base} ${side === "buy" ? "to buy" : "to sell"}${bounds}`)}</span><input class="at-input at-box" id="tkQty" type="number" min="${coinAmount(s.min || s.q, s.q)}" step="${coinAmount(s.q, s.q)}" inputmode="decimal" value="${coinAmount(T.quantity, s.q)}"></label>
+      <label class="at-field"><span class="at-field-l">${term("limitOrder", "Limit price")}, $ \xB7 good till cancelled, for at most 90 days</span><input class="at-input at-box" id="tkLimit" type="text" inputmode="decimal" value="${T.limit.toFixed(Math.max(2, placesOf(s.p)))}"></label></div>
+    <p class="at-quiet" id="tkEstimate">${esc(coinEstimate())}</p>`;
   }
   function ticketKind(market) {
     const t = T.open, o = t?.proposal.order;
@@ -1603,7 +1657,7 @@
     }
     const c = latestCall(sym);
     const ask2 = isOpen(sym) ? openChip(sym) : `<button class="at-btn at-press" data-act="analyse" data-symbol="${esc(sym)}"><svg class="g"><use href="#i-bot"/></svg><span>${c ? "Analyse again" : "Ask the desk to analyse"}</span></button>`;
-    const trade = isStock(sym) ? `<button class="at-btn at-press" data-act="trade" data-symbol="${esc(sym)}" title="Your own order for ${esc(sym)}, in the Agentic account"><svg class="g"><use href="#i-trade"/></svg><span>Trade\u2026</span></button>` : "";
+    const trade = tradeable(sym) ? `<button class="at-btn at-press" data-act="trade" data-symbol="${esc(sym)}" title="Your own order for ${esc(sym)}, in the Agentic account"><svg class="g"><use href="#i-trade"/></svg><span>Trade\u2026</span></button>` : "";
     el.innerHTML = ask2 + trade;
   }
   async function loadHistory() {
@@ -1721,14 +1775,14 @@
     const mine = (ag?.orders?.orders ?? []).filter((o) => deskSymbol(o.symbol ?? "", "stock") === sym);
     const count = ag?.orders?.count ?? 0, shown = ag?.orders?.orders.length ?? 0, rest = count - shown, at = A.snapshot ? when(A.snapshot.at) : "";
     const restWords = rest === 1 ? "the other one is not read here" : `the other ${rest} are not read here`;
-    const orders = !A.snapshot ? '<p class="at-quiet">Read your accounts to see your orders on it.</p>' : !ag ? '<p class="at-quiet">Show your Agentic account to see its orders.</p>' : ag.orders === null ? '<p class="at-quiet">The orders could not be read.</p>' : isCrypto(sym) ? `<p class="at-quiet">The dashboard reads the Agentic account's stock and fund orders only, so a coin's orders are not shown here.</p>` : mine.length ? `${ordersTable(mine, "USD", false)}${rest > 0 ? `<p class="at-quiet">Read from ${shown} of the ${count} orders Robinhood listed at ${esc(at)}: ${restWords}.</p>` : ""}` : !count ? `<p class="at-quiet">Robinhood listed no orders for the Agentic account at ${esc(at)}.</p>` : rest > 0 ? `<p class="at-quiet">No orders on ${esc(sym)} among the ${shown} the dashboard reads of the ${count} orders Robinhood listed for the Agentic account at ${esc(at)}: ${restWords}, so ${rest === 1 ? "it" : "one of them"} may be.</p>` : `<p class="at-quiet">No orders on ${esc(sym)} among the ${count === 1 ? "one order" : `${count} orders`} Robinhood listed for the Agentic account at ${esc(at)}.</p>`;
-    const trade = isStock(sym) ? `<div class="at-row">${["buy", "sell"].map((s) => `<button class="at-btn at-press" data-act="trade" data-side="${s}" data-symbol="${esc(sym)}"><svg class="g"><use href="#${s === "buy" ? "i-up" : "i-down"}"/></svg><span>${s === "buy" ? "Buy" : "Sell"} ${esc(sym)}\u2026</span></button>`).join("")}</div>` : "";
+    const orders = !A.snapshot ? '<p class="at-quiet">Read your accounts to see your orders on it.</p>' : !ag ? '<p class="at-quiet">Show your Agentic account to see its orders.</p>' : isCrypto(sym) ? coinOrdersOn(sym, ag.coinOrders, at) : ag.orders === null ? '<p class="at-quiet">The orders could not be read.</p>' : mine.length ? `${ordersTable(mine, "USD", false)}${rest > 0 ? `<p class="at-quiet">Read from ${shown} of the ${count} orders Robinhood listed at ${esc(at)}: ${restWords}.</p>` : ""}` : !count ? `<p class="at-quiet">Robinhood listed no orders for the Agentic account at ${esc(at)}.</p>` : rest > 0 ? `<p class="at-quiet">No orders on ${esc(sym)} among the ${shown} the dashboard reads of the ${count} orders Robinhood listed for the Agentic account at ${esc(at)}: ${restWords}, so ${rest === 1 ? "it" : "one of them"} may be.</p>` : `<p class="at-quiet">No orders on ${esc(sym)} among the ${count === 1 ? "one order" : `${count} orders`} Robinhood listed for the Agentic account at ${esc(at)}.</p>`;
+    const trade = tradeable(sym) ? `<div class="at-row">${["buy", "sell"].map((s) => `<button class="at-btn at-press" data-act="trade" data-side="${s}" data-symbol="${esc(sym)}"><svg class="g"><use href="#${s === "buy" ? "i-up" : "i-down"}"/></svg><span>${s === "buy" ? "Buy" : "Sell"} ${esc(sym)}\u2026</span></button>`).join("")}</div>` : "";
     $("#stockBody").innerHTML = `<div class="ta-col">
       <div class="at-card at-box"><div class="at-card-head"><h3>What you hold</h3></div>${held}${trade}</div>
       <div class="at-card at-box"><div class="at-card-head"><h3>Your orders on it</h3></div>${orders}</div>
     </div>
     <div class="at-card at-box"><div class="at-card-head"><h3>The desk's calls on it</h3></div>${latest ? `<p class="at-lede">${esc(latest.summary)}</p>` : ""}${list}</div>`;
-    $("#stockActions").innerHTML = `${isOpen(sym) ? openChip(sym) : `<button class="at-btn at-press" data-act="analyse" data-symbol="${esc(sym)}"><svg class="g"><use href="#i-bot"/></svg><span>Ask the desk to analyse</span></button>`}${isStock(sym) ? `<button class="at-btn at-press" data-act="trade" data-symbol="${esc(sym)}"><svg class="g"><use href="#i-trade"/></svg><span>Trade\u2026</span></button>` : ""}${latest ? decideButton(latest) : ""}`;
+    $("#stockActions").innerHTML = `${isOpen(sym) ? openChip(sym) : `<button class="at-btn at-press" data-act="analyse" data-symbol="${esc(sym)}"><svg class="g"><use href="#i-bot"/></svg><span>Ask the desk to analyse</span></button>`}${tradeable(sym) ? `<button class="at-btn at-press" data-act="trade" data-symbol="${esc(sym)}"><svg class="g"><use href="#i-trade"/></svg><span>Trade\u2026</span></button>` : ""}${latest ? decideButton(latest) : ""}`;
   }
   function renderWatch() {
     const tiers = S.desk?.watchTiers ?? [], folded = new Set(P.folded ?? []);
@@ -2002,7 +2056,7 @@
         <span class="at-kicker">The portfolio manager's rating</span>
         <span class="at-verdict ${verdictClass(rating)}">${esc(rating)}</span>
         <p class="at-lede">${esc(meta?.summary ?? plain(c.decision).slice(0, 320))}</p>
-        <div class="at-row">${meta ? resultChip(meta) + decideButton(meta) : ""}${isStock(symbol) ? `<button class="at-btn at-press" data-act="trade" data-symbol="${esc(symbol)}"><svg class="g"><use href="#i-trade"/></svg><span>Trade\u2026</span></button>` : ""}</div>
+        <div class="at-row">${meta ? resultChip(meta) + decideButton(meta) : ""}${tradeable(symbol) ? `<button class="at-btn at-press" data-act="trade" data-symbol="${esc(symbol)}"><svg class="g"><use href="#i-trade"/></svg><span>Trade\u2026</span></button>` : ""}</div>
       </div>
       <div class="ta-callhero-side"><span class="ta-spark-tall" id="callSpark"></span><p class="at-quiet" id="callSince">Reading the price since the call.</p></div>
     </div>
@@ -2193,7 +2247,7 @@
     const { choices } = depthChoices(S.desk?.analyses ?? { depth: "shallow" }), chosen = choices.find((c) => c.depth === ASK.depth) ?? choices[0];
     const reads = coin ? "the price, the news and the mood (a coin has no accounts to read)" : "the price, the news, the mood and the accounts (for a fund: what it holds, and its yearly cost where the desk reads it, which for a US fund it does not)";
     $("#askDialog").innerHTML = `<h2 id="askTitle">Analyse ${esc(it?.name ? `${it.name} (${ASK.symbol})` : ASK.symbol)}</h2>
-    <p class="at-lede">The desk's thirteen agents read ${reads}, check the facts, argue both sides, and record a call you can read and decide on. It never places an order${coin ? `: ${it?.paper === false ? "among crypto, the desk follows only Bitcoin and Ether on paper" : "a coin is followed on paper only"}` : ""}.</p>
+    <p class="at-lede">The desk's thirteen agents read ${reads}, check the facts, argue both sides, and record a call you can read and decide on. It never places an order${coin && it?.ticket === false ? ": among coins, the desk follows and orders only Bitcoin and Ether" : ""}.</p>
     <div class="at-seg" role="radiogroup" aria-label="How deep">${choices.map((c) => `<button class="at-seg-b${c === chosen ? " on" : ""}" role="radio" aria-checked="${c === chosen}" data-act="ask-depth" data-depth="${c.depth ?? ""}">${esc(c.label)}</button>`).join("")}</div>
     <p class="at-quiet">${term("depth")} \xB7 ${esc(chosen.means)}</p>
     <p class="at-honest">${l ? `It runs by itself: ${esc(l.listener)} is listening.` : `Nothing is listening on this computer yet, so it waits until a run starts: see ${STATUS_LINK}.`}</p>

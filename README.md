@@ -192,12 +192,15 @@ the team's "talk" switch shows these messages in the Messages panel; with it off
 - Apart from that test, only the dashboard talks to Robinhood, through three narrow doors: one that only reads, one that
   only asks for Robinhood's dry-run check, and one that places a single order: whole shares at your limit price, or,
   when one share costs more than the order may spend, a part-share at the market price, sent only while the US market
-  is open (Robinhood takes a part-share no other way). The last door is used only when trading
+  is open (Robinhood takes a part-share no other way); or, for Bitcoin and Ether only, a coin limit order, an amount in
+  coins on Robinhood's own step for the coin, good till cancelled for at most 90 days, at any hour (a coin you cancel in
+  Robinhood's app: the dashboard never cancels an order). The last door is used only when trading
   is switched on (by you), on a ticket Robinhood checked with no alerts in the last five minutes and unchanged since,
   after your Confirm naming the exact order, and after every cap is checked again on fresh figures. A ticket sends one
   order.
 - Your caps and guard rails are yours alone. As shipped: $500 an order, 10% of the account in one stock, 30% in one
-  sector, 5% in crypto, 3 orders a day; trading switches itself off after a 5% fall in a week (from the week's
+  sector, 5% in crypto (coin buys not yet filled count as if filled), 3 orders a day (stock and coin orders together);
+  trading switches itself off after a 5% fall in a week (from the week's
   highest value, with the reason on the page); and a stock bought here is held at least 5 trading days (days New
   York's market is open: weekends and its holidays do not count) before the desk proposes selling it (your own early
   sell takes one more press). You change them on the dashboard's "Your account"
@@ -278,8 +281,8 @@ is grouped from the broadest down:
   gone.
 - **Sectors**: the sector funds you watch.
 - **Single names**: companies, and funds the desk does not count among the broad ones.
-- **Crypto**: Bitcoin and Ether. They are followed on paper only: a coin never opens an order ticket, and its calls say
-  "on paper only" where a stock's say Decide….
+- **Crypto**: Bitcoin and Ether. Their calls say Decide…, as a stock's do, and Trade… opens a coin ticket of your own (see
+  "Coins: Bitcoin and Ether" below). Any other coin opens no ticket.
 
 Each sector tile is three lines, the same on every tile. The first is its plain name. The second has a badge with its code (shaded by
 what Yahoo Finance says it is: blue for a fund, teal for a company, amber for a coin, plain for anything else) and the day's
@@ -329,8 +332,8 @@ In the Agentic account the desk takes care of what you hold:
   decision is yours.
 - **"The desk says sell".** When the latest call on a holding is Sell or Underweight, it is marked so, with a Sell…
   button. It opens that call's ticket: everything held for a Sell, half for an Underweight (as your settings say), only
-  after your shortest hold, with your caps, Robinhood's dry run and your Confirm. A coin is never sold from here:
-  Robinhood's agent doorway trades stocks and funds.
+  after your shortest hold, with your caps, Robinhood's dry run and your Confirm. Bitcoin and Ether are sold the same
+  way, as a coin limit order; any other coin is sold in Robinhood's app, if you decide to.
 
 When a holding is below its stop or the desk says to sell it, it also shows at the top of the desk, under "What you hold
 needs a look", with the reason and what you can do. Outside the dashboard only the evening wrap-up says it, when it
@@ -351,10 +354,21 @@ The paper record never shows a total that leaves a stock out, and never values a
 the closing prices of a stock it needs cannot be read from Yahoo Finance, it says so plainly, names the stock, shows no
 total, chart or positions, and tries again a minute later.
 
-Bitcoin and Ether are followed on paper only: Robinhood's agent doorway trades stocks and funds, so a crypto call never
-opens a ticket. On paper they are bought in fractions (to six decimal places, at least $1), sized to fit what your crypto
-limit leaves, and filled at the next day's close, weekends included, since crypto trades every day. Other coins and
-indices are analysed but not followed on paper.
+Bitcoin and Ether are followed on paper as stocks are. On paper they are bought in fractions (to six decimal places, at
+least $1), sized to fit what your crypto limit leaves, and filled at the next day's close, weekends included, since
+crypto trades every day. Other coins and indices are analysed but not followed on paper.
+
+### Coins: Bitcoin and Ether
+Among coins, the desk orders Bitcoin and Ether only, each checked live against Robinhood's own list of coins when a
+ticket opens: a coin Robinhood has halted, marks not tradable or shows for display only, or an Agentic account with no
+crypto account, gets no order, with Robinhood's reason. A coin ticket is always a limit order: you type the amount in
+coins (on Robinhood's own step for that coin, between its smallest and largest order) and the price, and see the dollar
+value beside them. Robinhood keeps a coin limit order "good till cancelled", for at most 90 days, and coins trade at any
+hour, weekends too, so a coin order can be sent whenever you press Confirm. Every cap applies, plus your crypto limit
+(5% of the account as shipped), checked when the ticket opens and again just before sending; a coin buy that has not
+filled yet counts towards it, and towards the coin's own cap, as if it had. Robinhood's coin check comes first, and an
+answer that does not name your order back counts as not checked, so nothing is placed. An open coin order stays open
+until it fills or you cancel it in Robinhood's app: Your account lists each one still open with the day it was placed.
 
 ### Analyses that run by themselves
 Press the robot beside any stock, choose how deep (shallow, medium or deep; your settings' depth is chosen first) and

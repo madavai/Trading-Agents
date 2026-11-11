@@ -120,7 +120,29 @@ test('page-12: the stock page says which of the Agentic account\'s orders it rea
   assert.match(page, /`the other \$\{rest\} are not read here`/);
   assert.match(page, /Read from \$\{shown\} of the \$\{count\} orders Robinhood listed at \$\{esc\(at\)\}: \$\{restWords\}/, 'and under the orders it shows');
   assert.doesNotMatch(page, /the latest \$\{shown\}/);
-  assert.match(page, /The dashboard reads the Agentic account's stock and fund orders only, so a coin's orders are not shown here\./);
+  // A coin's page shows its own coin orders, read apart from the stock and fund orders: the ones still open first.
+  assert.doesNotMatch(page, /a coin's orders are not shown here/);
+  assert.match(page, /: isCrypto\(sym\) \? coinOrdersOn\(sym, ag\.coinOrders, at\)\n {4}: ag\.orders === null/, 'before the stock orders, whose read does not touch a coin\'s');
+  assert.match(page, /No orders on \$\{esc\(sym\)\} among the \$\{co\.orders\.length\} latest coin orders Robinhood listed for the Agentic account at \$\{esc\(at\)\}\$\{rest \? ', and it listed more' : ''\}\./);
+});
+
+test('coins on the page: Trade… for Bitcoin and Ether only, a ticket in coins on Robinhood\'s steps, good till cancelled, and every open coin order with its age and how to cancel it', () => {
+  assert.match(page, /const tradeable = \(sym: string\) => isStock\(sym\) \|\| TICKET_COINS\.has\(sym\);/);
+  assert.doesNotMatch(page, /isStock\((sym|symbol|c\.desk)\) \? `<(button|div)/, 'every Trade… and Sell… asks tradeable, not isStock');
+  // the ticket: an amount in coins, its own step and bounds, a limit price good till cancelled, the dollar value beside it
+  assert.match(page, /if \(isCrypto\(t\.context\.symbol\)\) return coinFields\(side\);/);
+  assert.match(page, /Amount of \$\{base\} \$\{side === 'buy' \? 'to buy' : 'to sell'\}\$\{bounds\}/);
+  assert.match(page, /step="\$\{coinAmount\(s\.q, s\.q\)\}"/, 'the field steps by Robinhood\'s own step for the coin');
+  assert.match(page, /Limit price'\)\}, \$ · good till cancelled, for at most 90 days/);
+  assert.match(page, /`About \$\{money\(T\.quantity \* T\.limit\)\} at your limit price/);
+  assert.match(page, /isCrypto\(c\.symbol\) \? `\$\{coinAmount\(c\.held\)\} \$\{cryptoBase\(c\.symbol\) \?\? c\.symbol\}` : `\$\{c\.held\} share\(s\)`/, 'held now in coins, never shares');
+  // the account page: each open coin order, the day it was placed and how long ago, and that only the person cancels it
+  assert.match(page, /\$\{orders\}\$\{coinOrdersPart\(v\.coinOrders, cur\)\}/);
+  assert.match(page, /Still open: \$\{esc\(`\$\{sideWord\(o\.side\)\}/);
+  assert.match(page, /, placed \$\{esc\(dayText\(o\.at\)\)\} \(\$\{esc\(ageWords\(o\.at\)\)\}\)/);
+  assert.match(page, /Cancel it in Robinhood's app if you no longer want it: it stays open until it fills, for at most 90 days\./);
+  assert.match(page, /The coin orders still open could not be read: look in Robinhood\\'s app\./);
+  assert.match(page, /Robinhood listed more open coin orders than the dashboard could read: look in Robinhood\\'s app\./);
 });
 
 test('page-15: the page saves only the choices that changed, so an older tab cannot undo another tab\'s', () => {
@@ -392,7 +414,7 @@ test('page-17 (dashboard tour, 11 Nov 2026): the Accounts section keeps only sta
   // The agents' holdings: said only when the read was not whole.
   assert.match(page, /A\.snapshot && A\.shared === false \? '<p class="at-honest">Some holdings could not be read, so the agents were not given this read: they keep the last complete one\.<\/p>'/);
   // Both tables of orders (an account's, a stock's) are one function: Robinhood's raw word is never the cell, and orders still open come first.
-  assert.equal([...page.matchAll(/ordersTable\(/g)].length, 3, 'defined once, used for the account card and the stock page');
+  assert.equal([...page.matchAll(/ordersTable\(/g)].length, 5, 'defined once, used for the account card, its coin orders, the stock page and a coin\'s page');
   assert.doesNotMatch(page, /esc\(x\.state \?\? '—'\)/, "Robinhood's raw state word is not what the table shows");
   assert.match(page, /\[\.\.\.orders\]\.sort\(\(a, b\) => Number\(open\(b\)\) - Number\(open\(a\)\)\)/);
   assert.match(page, /<th class="num" title="\$\{esc\(NOTES\.orderPrice\)\}">Price<\/th>/, 'the Price heading says which price it is');

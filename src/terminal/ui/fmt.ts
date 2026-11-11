@@ -130,8 +130,8 @@ export const orderStateWhy = (o: OrderState): string => (o.raw
 export const NOTES = {
   /** The Price column of an order: robinhood/account.ts takes `average_price`, else `price`, else `limit_price`. */
   orderPrice: "Robinhood's average price for what has filled, when it gives one; otherwise the price the order is listed at.",
-  coinOnPaper: "Robinhood's agent doorway trades stocks and funds, so a coin never gets an order ticket.",
-  noTicket: 'No order ticket: Robinhood\'s agent doorway trades stocks and funds, and among crypto the desk follows only Bitcoin and Ether on paper.',
+  coinOnPaper: "Among coins, the desk follows and orders only Bitcoin and Ether.",
+  noTicket: 'No order ticket: among coins, the desk follows and orders only Bitcoin and Ether; an index cannot be bought (a fund that follows it can).',
   noView: "No view yet: the desk has not analysed it. Ask it to (the robot); in the Agentic account, Monday's morning routine rates it.",
   stopWatch: "A stop is the desk's trader's, watched against Yahoo Finance's price only while this page is open in a browser. With the page closed nothing watches it: the evening wrap-up names any holding whose last close is below its stop, but only when it runs (your routines switched on in Madav, or asked for in a chat). It only reports.",
 } as const;

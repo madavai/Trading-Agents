@@ -423,7 +423,7 @@ test('Sectors is in the page\'s state: the eleven sector funds, each with the de
   assert.equal(s.startHere[0].items.find((i: any) => i.symbol === 'XLK').call, null, 'no call yet: none, never made up');
   assert.deepEqual(s.watchTiers.map((t: any) => [t.tier, t.items.map((i: any) => i.symbol)]), [['market', ['SPY']], ['sectors', ['XLE']], ['names', ['NVDA']], ['crypto', ['BTC-USD']]]);
   const coin = s.calls.find((c: any) => c.ticker === 'BTC-USD');
-  assert.deepEqual([coin.ticket, coin.paper], [false, true], 'a call on a coin offers no order ticket: it is followed on paper');
+  assert.deepEqual([coin.ticket, coin.paper], [true, true], 'a call on Bitcoin offers an order ticket, and is followed on paper too');
   assert.deepEqual(s.calls.filter((c: any) => c.ticker === 'XLE').map((c: any) => c.ticket), [true]);
 });
 

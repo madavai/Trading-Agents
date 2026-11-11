@@ -28,7 +28,7 @@ export const GLOSSARY = {
   index: { group: markets, term: 'Index', means: "a list of companies whose prices are averaged into one number, such as the S&P 500. It cannot be bought itself, only through a fund that copies it." },
   sp500: { group: markets, term: 'S&P 500', means: 'the index of about 500 large US companies, chosen by a committee at S&P, taken together. SPY, the S&P 500 fund, copies it at about a tenth of its number, and is the yardstick the desk measures itself against.' },
   sector: { group: markets, term: 'Sector', means: 'one part of the economy, such as technology or energy. Companies in one sector tend to rise and fall together.' },
-  crypto: { group: markets, term: 'Crypto', means: 'digital coins such as Bitcoin, which swing far more than shares. The desk follows Bitcoin and Ether on paper only.' },
+  crypto: { group: markets, term: 'Crypto', means: 'digital coins such as Bitcoin, which swing far more than shares, at any hour. The desk follows Bitcoin and Ether; you can order them in the Agentic account, at a limit price that stays open until it fills or you cancel it.' },
   today: { group: markets, term: "Day's move", means: "the change in price over the latest trading day, from the close before it. When that day was not today, as on a weekend, the page names it (Fri)." },
   volume: { group: markets, term: 'Volume', means: 'how many shares changed hands in a day. A move on high volume means many people acted on it.' },
   average: { group: markets, term: '50- and 200-day average', means: 'the average closing price over that many trading days. A price above it is often read as rising lately, below it as falling: a rule of thumb, not a certainty.' },

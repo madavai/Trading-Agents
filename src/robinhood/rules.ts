@@ -2,7 +2,7 @@
 // reads with the "read" kind; of the "order" kind the dashboard calls only Robinhood's dry run (review.ts) and the order
 // itself (order.ts), each on the person's own press; the rest are counted and shown, never called. No agent gets any.
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
-import type { Order } from '../desk/ticket.js';
+import { coinAmount, onStep, placesOf, type CoinRules, type Order } from '../desk/ticket.js';
 
 /** A tool whose name speaks of trading or moving money - orders (reviews included), trades, buying, selling,
  *  transfers. The same rule as TRADE_WORDS in .claude/hooks/guard.mjs (a test keeps them in step). */
@@ -123,10 +123,27 @@ export function equityOrderArgs(accountNumber: string, o: Order): Record<string,
   return { ...base, type: 'limit', quantity: String(o.quantity), limit_price: o.limitPrice.toFixed(2), time_in_force: o.timeInForce, market_hours: 'regular_hours' };
 }
 
+/** What Robinhood's coin check and coin order are sent for one of the desk's coin orders, by Robinhood's own rules for
+ *  those two tools (`discover --full`, 11 Nov 2026), or null for an order the desk does not send. The desk sends a coin
+ *  only as a limit order, which Robinhood keeps "good till canceled" (for at most 90 days), on the account's numeric
+ *  number (rhs_account_number, never the crypto account's own): an amount in coins that is a whole number of the coin's
+ *  step and within its least and most (Robinhood rejects any other, never resizing it), at a price on the coin's price step. */
+export function cryptoOrderArgs(rhsAccountNumber: string, o: Order, rules: CoinRules): Record<string, string> | null {
+  if ((o.side !== 'buy' && o.side !== 'sell') || o.market === true || !rhsAccountNumber) return null;
+  const q = o.quantity, p = o.limitPrice;
+  if (!(q > 0) || !onStep(q, rules.quantityStep) || q < rules.minQuantity * (1 - 1e-9) || q > rules.maxQuantity * (1 + 1e-9)) return null;
+  if (!(p > 0) || !onStep(p, rules.priceStep)) return null;
+  return { rhs_account_number: rhsAccountNumber, symbol: o.symbol, side: o.side, type: 'limit', quantity: coinAmount(q, rules.quantityStep), limit_price: p.toFixed(Math.max(2, placesOf(rules.priceStep))), time_in_force: 'gtc' };
+}
+
 /** Words on one line, cut to a length. */
 export const oneLine = (s: string, max: number): string => { const t = s.replace(/\s+/g, ' ').trim(); return t.length > max ? `${t.slice(0, max - 3)}...` : t; };
 /** A failure's words, short, with any word holding a long run of digits hidden whole (an account number, which can mix
- *  letters and digits). Dates and prices, with shorter runs, are left as they are. */
-export const masked = (s: string): string => oneLine(s, 300).replace(/\b[a-z0-9]*\d{5,}[a-z0-9]*\b/gi, '#####');
+ *  letters and digits). Dates and prices, with shorter runs, are left as they are, and so is a number with a decimal
+ *  point, whatever its length: a coin's price or amount (82000.00, 0.00150001), never an account number. */
+export const masked = (s: string): string => hideLong(oneLine(s, 300), 5);
+/** Every word holding a run of at least `n` digits, hidden whole (an account or order number), except in a number with a
+ *  decimal point (a price or a coin amount). */
+export const hideLong = (s: string, n: number): string => s.replace(new RegExp(`(?<![\\d.])\\b[a-z0-9]*\\d{${n},}[a-z0-9]*\\b(?!\\.\\d)`, 'gi'), '#####');
 /** What the person is told to do when it is not clear whether an order went through: never to send it again blind. */
 export const LOOK_FIRST = "Look at the Agentic account's orders in Robinhood's own app before you try again.";
