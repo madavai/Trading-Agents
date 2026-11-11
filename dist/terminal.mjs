@@ -7550,6 +7550,21 @@ function writeWhole(file4, text2) {
   }
 }
 
+// src/data/dates.ts
+var DAY = 864e5;
+var marketDay = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+var nyClock = (ms) => {
+  const f = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(ms));
+  const v = (t2) => f.find((x) => x.type === t2)?.value ?? "";
+  return `${v("year")}-${v("month")}-${v("day")} ${v("hour")}:${v("minute")}`;
+};
+function today(now) {
+  if (!now && process.env.TRADING_AGENTS_TODAY) return process.env.TRADING_AGENTS_TODAY;
+  return marketDay(now ?? /* @__PURE__ */ new Date());
+}
+var addDays = (date4, days) => new Date(Date.parse(`${date4}T00:00:00Z`) + days * DAY).toISOString().slice(0, 10);
+var daysBetween = (from, to) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY);
+
 // src/data/http.ts
 var Unavailable = class extends Error {
   constructor(message, status, noEmail = false) {
@@ -7602,9 +7617,16 @@ async function pace(host) {
   await turn;
 }
 var MINUTE = 6e4;
+var DAY_MS = 24 * 60 * MINUTE;
+var KEPT_DAYS = 30;
 function keepFor(url2) {
   const u = new URL(url2);
-  if (/(^|\.)sec\.gov$/.test(u.hostname)) return /^\/submissions\//.test(u.pathname) ? 60 * MINUTE : 24 * 60 * MINUTE;
+  if (/(^|\.)sec\.gov$/.test(u.hostname)) {
+    if (/^\/Archives\/edgar\/data\//.test(u.pathname)) return KEPT_DAYS * DAY_MS;
+    return /^\/submissions\//.test(u.pathname) ? 60 * MINUTE : DAY_MS;
+  }
+  const vintage = u.searchParams.get("vintage_date");
+  if (/(^|\.)alfred\.stlouisfed\.org$/.test(u.hostname) && vintage && /^\d{4}-\d{2}-\d{2}$/.test(vintage) && vintage < today()) return KEPT_DAYS * DAY_MS;
   return /fred/.test(u.hostname) ? 60 * MINUTE : 5 * MINUTE;
 }
 var keyOf = (url2) => {
@@ -7633,7 +7655,7 @@ function pruneCache(dir) {
   try {
     for (const f of fs3.readdirSync(dir)) {
       const file4 = path3.join(dir, f);
-      if (Date.now() - fs3.statSync(file4).mtimeMs > 3 * 24 * 60 * MINUTE) fs3.rmSync(file4, { force: true });
+      if (Date.now() - fs3.statSync(file4).mtimeMs > KEPT_DAYS * DAY_MS) fs3.rmSync(file4, { force: true });
     }
   } catch {
   }
@@ -7701,21 +7723,6 @@ import fs18 from "node:fs";
 import http2 from "node:http";
 import path18 from "node:path";
 import { fileURLToPath } from "node:url";
-
-// src/data/dates.ts
-var DAY = 864e5;
-var marketDay = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
-var nyClock = (ms) => {
-  const f = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(ms));
-  const v = (t2) => f.find((x) => x.type === t2)?.value ?? "";
-  return `${v("year")}-${v("month")}-${v("day")} ${v("hour")}:${v("minute")}`;
-};
-function today(now) {
-  if (!now && process.env.TRADING_AGENTS_TODAY) return process.env.TRADING_AGENTS_TODAY;
-  return marketDay(now ?? /* @__PURE__ */ new Date());
-}
-var addDays = (date4, days) => new Date(Date.parse(`${date4}T00:00:00Z`) + days * DAY).toISOString().slice(0, 10);
-var daysBetween = (from, to) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY);
 
 // src/data/delay.ts
 var US_EXCHANGES = ["NMS", "NGM", "NCM", "NYQ", "PCX", "ASE", "BTS"];
@@ -8872,6 +8879,7 @@ var DEFAULTS = {
     riskRounds: 1,
     analysts: [...ANALYSTS],
     managerModel: "",
+    buildOnEarlierDays: 30,
     newsLookbackDays: 7,
     companyNewsLimit: 20,
     worldNewsLimit: 10,
@@ -8958,6 +8966,7 @@ function readSettings(root2) {
       outputLanguage: languageName(a.outputLanguage),
       debateRounds: int(a.debateRounds, 1, 5, 1),
       riskRounds: int(a.riskRounds, 1, 5, 1),
+      buildOnEarlierDays: int(a.buildOnEarlierDays, 0, 30, DEFAULTS.analysis.buildOnEarlierDays),
       analysts: analysts.length ? analysts : [...ANALYSTS],
       worldNewsSearches: searchesOf(a.worldNewsSearches),
       managerModel: typeof a.managerModel === "string" && /^[\w.\-[\]]{0,60}$/.test(a.managerModel.trim()) ? a.managerModel.trim() : ""
@@ -21447,6 +21456,7 @@ function yardstickWords(ticker, r) {
   const why = basisWords(ticker, r);
   return `${yardstickName(r.yardstick)}${why ? ` (${why})` : ""}`;
 }
+var checkWords = (ticker, r) => `${checkName(r)} ${againstWords(ticker, r)}, over the ${windowWords(r)} after the call`;
 var againstWords = (ticker, r) => ownReturn(r) ? `on its own return (${basisWords(ticker, r)})` : `against ${yardstickWords(ticker, r)}`;
 var WHEN_SCORED = "A call is scored when a scoring runs after its window (/settle, an analysis or a routine), not by itself.";
 
@@ -21693,16 +21703,18 @@ Its check before then: ${e.lessonCheck}` : ""}`, earlier: e.earlier, first: e.fi
    *  over and against (its own rules, or for a call recorded before the desk kept them, the rules it was made under, from
    *  `scoring`): a short first check, not the call's own time horizon. */
   pastContext(ticker, o = {}) {
-    const { sameLimit = 5, otherLimit = 3 } = o;
-    let settled2 = this.load().filter((e) => !e.pending);
+    const { sameLimit = 5, otherLimit = 3, unscoredLimit = 2 } = o;
+    const all = this.load();
+    let settled2 = all.filter((e) => !e.pending);
     if (o.asOf) settled2 = settled2.filter((e) => e.resolved && e.resolved <= o.asOf);
+    const unscored = o.unscoredBefore && !o.asOf ? all.filter((e) => e.pending && e.ticker === ticker && e.date < o.unscoredBefore).sort((a, b) => b.date.localeCompare(a.date)).slice(0, unscoredLimit) : [];
     const same = [], other = [];
     for (const e of settled2.reverse()) {
       if (e.ticker !== ticker && withheld(e)) continue;
       if (e.ticker === ticker ? same.length < sameLimit : other.length < otherLimit) (e.ticker === ticker ? same : other).push(e);
       if (same.length >= sameLimit && other.length >= otherLimit) break;
     }
-    if (!same.length && !other.length) return "";
+    if (!same.length && !other.length && !unscored.length) return "";
     const over = (e) => {
       const r = e.rules ?? (o.scoring ? legacyRules(e.ticker, o.scoring, e.holding) : null);
       return r ? `${checkName(r)}: ${ownReturn(r) ? `on its own return (${r.yardstick} is its own yardstick or copies the same index), so its alpha is its return,` : `against ${r.yardstick}`} over the ${windowWords(r)} after the call, not the call's own time horizon` : `over ${e.holding ?? "n/a"}`;
@@ -21717,7 +21729,13 @@ ${e.reflection}`] : []
     ].join("\n\n");
     const short = (e) => `${head(e)}${e.reflection && LESSON_NOTE[e.lesson] ? ` (lesson ${LESSON_NOTE[e.lesson](e)})` : ""}
 ${e.reflection || e.decision.slice(0, 300) + (e.decision.length > 300 ? "..." : "")}`;
+    const notYet = (e) => {
+      const r = e.rules ?? (o.scoring ? legacyRules(e.ticker, o.scoring, e.holding) : null);
+      return [`[${e.date} | ${e.ticker} | ${e.rating} | not scored yet: it has no result, and is scored${r ? ` by ${checkWords(e.ticker, r)}` : ""} once a scoring runs after that window]`, `DECISION:
+${e.decision}`].join("\n\n");
+    };
     const parts = [];
+    if (unscored.length) parts.push(`The desk's latest calls on ${ticker} not scored yet (latest first; the call's own view on its day, not how it turned out):`, ...unscored.map(notYet));
     if (same.length) parts.push(`Past analyses of ${ticker} (latest recorded first):`, ...same.map(full));
     if (other.length) parts.push("Recent cross-ticker lessons:", ...other.map(short));
     return parts.join("\n\n");
@@ -21734,8 +21752,16 @@ import path11 from "node:path";
 var SECTIONS = ["market", "sentiment", "news", "fundamentals", "fact_check", "bull", "bear", "research_plan", "trader", "aggressive", "conservative", "neutral", "decision"];
 var DEBATES = { investment_debate: ["bull", "bear"], risk_debate: ["aggressive", "conservative", "neutral"] };
 var TURNS = new Set(Object.values(DEBATES).flat());
-var folder = (dir, ticker, date4) => path11.join(dir, "runs", `${safeSymbol(ticker).replace(/\^/g, "IDX_").replace(/=/g, "_EQ_")}_${date4}`);
+var folderName = (ticker) => safeSymbol(ticker).replace(/\^/g, "IDX_").replace(/=/g, "_EQ_");
+var folder = (dir, ticker, date4) => path11.join(dir, "runs", `${folderName(ticker)}_${date4}`);
 var runFile = (dir, ticker, date4) => path11.join(folder(dir, ticker, date4), "run.json");
+function builtOnOf(plan) {
+  const b = plan?.builtOn;
+  if (!b || typeof b.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(b.date) || !Array.isArray(b.analysts)) return void 0;
+  const analysts = b.analysts.filter((a) => typeof a === "string" && REPORTS.includes(a));
+  return analysts.length ? { date: b.date, analysts } : void 0;
+}
+var dayWords = (date4) => (/* @__PURE__ */ new Date(`${date4}T12:00:00Z`)).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 function load(dir, ticker, date4) {
   try {
     return JSON.parse(fs12.readFileSync(runFile(dir, ticker, date4), "utf8"));
@@ -21744,6 +21770,7 @@ function load(dir, ticker, date4) {
   }
 }
 var isSection = (s) => SECTIONS.includes(s);
+var REPORTS = ["market", "sentiment", "news", "fundamentals"];
 var FLAG = "[the fact it rested on was corrected: see the fact check]";
 var MARKS = new RegExp(` \\[corrected: was "[\\s\\S]*?"\\]| ${FLAG.replace(/[[\]]/g, "\\$&")}`, "g");
 function progress(dir, ticker, date4) {
@@ -21770,12 +21797,13 @@ function stepWords(dir, ticker, date4) {
   if (!next) return "recording the call";
   const analysts = steps.filter((s) => ["market", "sentiment", "news", "fundamentals"].includes(s.section));
   const of = (n) => Number.isInteger(n) ? ` of ${n}` : "";
+  const base2 = builtOnOf(plan);
   switch (next.section) {
     case "market":
     case "sentiment":
     case "news":
     case "fundamentals":
-      return `analysts reading: ${analysts.filter((s) => (done[s.section] ?? 0) >= 1).length} of ${analysts.length} done`;
+      return `analysts reading${base2 ? ` what changed since ${dayWords(base2.date)}` : ""}: ${analysts.filter((s) => (done[s.section] ?? 0) >= 1).length} of ${analysts.length} done`;
     case "fact_check":
       return "the fact checker is checking the reports";
     case "bull":
@@ -22511,7 +22539,7 @@ var stamp = (file4) => {
   }
 };
 var MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-var dayWords = (iso2) => {
+var dayWords2 = (iso2) => {
   const [y, m, d] = iso2.split("-");
   return `${Number(d)} ${MON[Number(m) - 1]} ${y}`;
 };
@@ -22544,7 +22572,7 @@ function scoringNote(entries, s) {
   const closed = ny ? "New York's market was closed (a weekend or a New York holiday)" : "its market was closed";
   const same = (r, std) => r.days === std.days && r.unit === std.unit && r.yardstick === std.yardstick && (r.basis === std.basis || ownReturn(r));
   const otherwise = entries.map((e) => ({ e, ...rulesOfEntry(e, s) })).filter(({ e, r, older }) => older || !same(r, isCrypto(e.ticker) ? coin : stock));
-  const listed2 = otherwise.slice(0, 6).map(({ e, r, older }) => `${e.ticker} (${dayWords(e.date)}): ${againstWords(e.ticker, r)}, over the ${windowWords(r)} after the call${older ? `, as ${OLDER}` : ""}`);
+  const listed2 = otherwise.slice(0, 6).map(({ e, r, older }) => `${e.ticker} (${dayWords2(e.date)}): ${againstWords(e.ticker, r)}, over the ${windowWords(r)} after the call${older ? `, as ${OLDER}` : ""}`);
   return [
     `Each call is scored once, ${name} against a named yardstick, not over the call's own time horizon (its decision states that).`,
     `A US stock or fund: against ${yardstickWords("", stock)}, over the ${windowWords(stock)} after the call.`,
@@ -22617,7 +22645,8 @@ function stateOf(root2, day2) {
 function callOf(root2, ticker, date4) {
   const dir = deskDataDir(root2), e = new Journal(path15.join(dir, "journal.md")).load().find((x) => x.ticker === ticker && x.date === date4);
   if (!e) return null;
-  return { decision: e.decision, sections: sectionsOf(dir, ticker, date4), hasReport: hasReport(dir, ticker, date4) };
+  const base2 = builtOnOf(savedPlan(dir, ticker, date4));
+  return { decision: e.decision, sections: sectionsOf(dir, ticker, date4), hasReport: hasReport(dir, ticker, date4), ...base2 ? { builtOn: base2.date } : {} };
 }
 
 // src/terminal/quotes.ts
@@ -22960,13 +22989,13 @@ var MEANING = {
   rates: "What prediction markets price for the Federal Reserve's next interest-rate decision, not a forecast of ours. Lower rates tend to help share prices; higher rates tend to weigh on them."
 };
 var whole2 = (n) => n.toLocaleString("en-US", { maximumFractionDigits: 0 });
-var dayWords2 = (iso2) => {
+var dayWords3 = (iso2) => {
   const [y, m, d] = iso2.split("-");
   return `${Number(d)} ${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][Number(m) - 1]} ${y}`;
 };
 var unavailable = (key, name, why) => ({ key, name, state: null, tone: "", words: `Unavailable: ${why}.`, meaning: MEANING[key] });
 var newYorkTime = (at) => at.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" });
-var figureWords = (name, figure2, day2, live) => !live ? `${name} closed at ${figure2} on ${dayWords2(day2)}` : live.unsure ? `${name}'s latest figure on ${dayWords2(day2)}, read at ${newYorkTime(live.at)} New York time, is ${figure2} (Yahoo Finance did not say whether that session had ended)` : live.ended ? `${name} was at ${figure2} when read at ${newYorkTime(live.at)} New York time on ${dayWords2(day2)}, before that session's close was final (not a close)` : `${name} is at ${figure2} at ${newYorkTime(live.at)} New York time on ${dayWords2(day2)}, still trading (not a close)`;
+var figureWords = (name, figure2, day2, live) => !live ? `${name} closed at ${figure2} on ${dayWords3(day2)}` : live.unsure ? `${name}'s latest figure on ${dayWords3(day2)}, read at ${newYorkTime(live.at)} New York time, is ${figure2} (Yahoo Finance did not say whether that session had ended)` : live.ended ? `${name} was at ${figure2} when read at ${newYorkTime(live.at)} New York time on ${dayWords3(day2)}, before that session's close was final (not a close)` : `${name} is at ${figure2} at ${newYorkTime(live.at)} New York time on ${dayWords3(day2)}, still trading (not a close)`;
 function liveOf(s, day2, now) {
   const last = s.bars.at(-1), session = s.meta.session;
   if (!last) return null;
@@ -23004,7 +23033,7 @@ function ratesOf(events, now = /* @__PURE__ */ new Date()) {
   if (!next || !top) return unavailable("rates", "Rates", "Polymarket has no open market on the Federal Reserve's next decision");
   const [state, tone] = top.way === "cut" ? ["A cut", "ok"] : top.way === "rise" ? ["A rise", "warn"] : ["No change", ""];
   const pct = (p) => `${Math.round(p * 100)}%`, second = odds[1] && odds[1].p >= 0.1 ? ` and ${odds[1].words} at ${pct(odds[1].p)}` : "";
-  return { key: "rates", name: "Rates", state, tone, words: `For the Federal Reserve's next decision, by ${dayWords2(marketDay(new Date(next.endDate)))}, Polymarket's crowd puts ${top.words} at ${pct(top.p)}${second}.`, meaning: MEANING.rates };
+  return { key: "rates", name: "Rates", state, tone, words: `For the Federal Reserve's next decision, by ${dayWords3(marketDay(new Date(next.endDate)))}, Polymarket's crowd puts ${top.words} at ${pct(top.p)}${second}.`, meaning: MEANING.rates };
 }
 async function weatherNow(day2, now = /* @__PURE__ */ new Date()) {
   const [trend, mood, rates] = await Promise.all([

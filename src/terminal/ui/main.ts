@@ -1402,6 +1402,9 @@ async function openCall(symbol: string, date: string): Promise<void> {
   const stages = STAGES.map((s) => ({ ...s, keys: s.keys.filter((k) => c.sections[k]?.length) })).filter((s) => s.keys.length);
   // Its name beside the ticker when it is known, else the ticker once, in the title.
   const named = nameOf(symbol), of = `the desk's call of ${dayText(date)}`;
+  // A call whose analysts built on the desk's earlier full run says so, with that call to open when the journal has it.
+  const base = c.builtOn, baseCall = base ? S.desk?.calls.find((x) => x.ticker === symbol && x.date === base) : undefined;
+  const builtOn = base ? `<div class="at-row ta-builton"><span class="at-quiet">Built on the analysis of ${esc(dayText(base))}. Its analysts wrote what changed since then, and what they carried from it is marked with that day.</span>${baseCall ? readButton(symbol, base, 'Read that analysis') : ''}</div>` : '';
   dlg.innerHTML = `<div class="ta-pophead"><div class="ta-pop-id"><h2>${esc(symbol)}</h2><span class="at-quiet">${esc(named !== symbol ? `${named} · ${of}` : of[0]!.toUpperCase() + of.slice(1))}</span></div><button class="icon-btn" data-act="close-dialog" aria-label="Close"><svg class="g"><use href="#i-x"/></svg></button></div>
     <div class="ta-callhero ${verdictClass(rating)}">
       <div class="ta-callhero-main">
@@ -1413,11 +1416,13 @@ async function openCall(symbol: string, date: string): Promise<void> {
       <div class="ta-callhero-side"><span class="ta-spark-tall" id="callSpark"></span><p class="at-quiet" id="callSince">Reading the price since the call.</p></div>
     </div>
     ${facts ? `<dl class="at-facts row ta-callfacts">${facts}</dl>` : ''}
+    ${builtOn}
     ${stepCard('decision', [c.decision], true)}
     ${stages.map((s) => `<p class="at-kicker ta-stage">${esc(s.name)}</p><div class="ta-steps">${s.keys.map((k) => stepCard(k, c.sections[k]!)).join('')}</div>`).join('')}
     ${extra.length ? `<p class="at-kicker ta-stage">More</p><div class="ta-steps">${extra.map((k) => stepCard(k, c.sections[k]!)).join('')}</div>` : ''}
     <p class="at-honest">This is the team's reasoning as it wrote it. It is not investment advice.</p>`;
-  dlg.showModal();
+  if (!dlg.open) dlg.showModal();   // "Read that analysis" opens another call in the same window
+  dlg.scrollTop = 0;
   void sinceCall(symbol, date);
 }
 

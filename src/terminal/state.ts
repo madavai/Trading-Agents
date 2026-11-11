@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { readContactEmail } from '../contact.js';
 import { Journal, type Entry } from '../desk/journal.js';
-import { hasReport, sectionsOf, stepWords } from '../desk/runs.js';
+import { builtOnOf, hasReport, savedPlan, sectionsOf, stepWords } from '../desk/runs.js';
 import { alphaOf, renderSummary, summarize, worked, type Summary } from '../desk/backtest.js';
 import { depthOfRounds, readListener, readQueue, type AtOnce, type Depth, type QueueItem } from '../desk/queue.js';
 import { followed, lateWhy, readPaperStart, recordOf, RECORD_WEEKS, RECORD_WORDS, type PaperCall, type PaperRecord } from '../desk/paper.js';
@@ -202,9 +202,11 @@ export function stateOf(root: string, day: string): DeskState {
   };
 }
 
-/** One call in full: the portfolio manager's decision and the work behind it, as the team wrote it. */
-export function callOf(root: string, ticker: string, date: string): { decision: string; sections: Record<string, string[]>; hasReport: boolean } | null {
+/** One call in full: the portfolio manager's decision and the work behind it, as the team wrote it, and the day of the
+ *  desk's earlier full run its analysts built on (`builtOn`), when they did. */
+export function callOf(root: string, ticker: string, date: string): { decision: string; sections: Record<string, string[]>; hasReport: boolean; builtOn?: string } | null {
   const dir = deskDataDir(root), e = new Journal(path.join(dir, 'journal.md')).load().find((x) => x.ticker === ticker && x.date === date);
   if (!e) return null;
-  return { decision: e.decision, sections: sectionsOf(dir, ticker, date), hasReport: hasReport(dir, ticker, date) };
+  const base = builtOnOf(savedPlan(dir, ticker, date));
+  return { decision: e.decision, sections: sectionsOf(dir, ticker, date), hasReport: hasReport(dir, ticker, date), ...(base ? { builtOn: base.date } : {}) };
 }

@@ -977,8 +977,9 @@ details[open] > .at-input.at-select { border-color: var(--accent); }
 .ta-callhero-side .ta-spark-tall { display: block; }
 .ta-callhero-side b { color: var(--text); font-weight: var(--weight-medium); }
 @media (max-width: 760px) { .ta-callhero { grid-template-columns: minmax(0, 1fr); } }
-.ta-callfacts { padding-inline: var(--space-1); }
+.ta-callfacts, .ta-builton { padding-inline: var(--space-1); }
 .ta-callfacts dd { max-width: calc(var(--card-min) * 1.4); }
+.ta-builton > .at-quiet { flex: 1 1 18rem; min-width: 0; }
 .ta-stage { margin-top: var(--space-2); }
 .ta-steps { display: flex; flex-direction: column; gap: var(--space-2); }
 .ta-step { overflow: hidden; }
@@ -994,7 +995,7 @@ details[open] > .at-input.at-select { border-color: var(--accent); }
 .ta-step > .md { padding: var(--card-padding); }
 .ta-two.ta-even > .at-card > .at-row:last-child { margin-top: auto; }
 /* in a pop-up taller than the window, its parts keep their height and the pop-up scrolls */
-.ta-step, .ta-steps, .ta-callhero, .ta-callfacts, .ta-stage { flex-shrink: 0; }
+.ta-step, .ta-steps, .ta-callhero, .ta-callfacts, .ta-builton, .ta-stage { flex-shrink: 0; }
 
 /* finding a stock: the matches drop down under the search box, over the page */
 .ta-find { position: relative; display: flex; flex: 1 1 var(--card-min); min-width: 0; }

@@ -10,6 +10,7 @@
       "news",
       "fundamentals"
     ],
+    "buildOnEarlierDays": 30,
     "newsLookbackDays": 7,
     "companyNewsLimit": 20,
     "worldNewsLimit": 10,

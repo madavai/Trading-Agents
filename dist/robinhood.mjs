@@ -19853,6 +19853,7 @@ var DEFAULTS = {
     riskRounds: 1,
     analysts: [...ANALYSTS],
     managerModel: "",
+    buildOnEarlierDays: 30,
     newsLookbackDays: 7,
     companyNewsLimit: 20,
     worldNewsLimit: 10,
