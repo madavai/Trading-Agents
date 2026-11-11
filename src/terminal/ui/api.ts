@@ -77,7 +77,8 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
     try { localStorage.removeItem(KEPT); } catch { /* nothing kept */ }
     document.dispatchEvent(new Event(KEY_LOST));
   }
-  if (!res.ok) throw new ApiError(res.status, data.error ?? `the desk answered ${res.status}`);
+  // The desk's own words when it gives them; a failure it gives no words for is said plainly, never as its web code.
+  if (!res.ok) throw new ApiError(res.status, data.error ?? 'The desk could not do this just now and gave no reason. Try again in a moment.');
   return data as T;
 }
 

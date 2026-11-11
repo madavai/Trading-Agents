@@ -16,7 +16,7 @@ const list = (s: string | undefined): string[] => { try { const v = JSON.parse(s
 export function eventsOf<E>(j: SearchJson<E>): E[] {
   if (Array.isArray(j.events)) return j.events;
   if (j.error === undefined && typeof j.pagination === 'object' && j.pagination !== null) return [];
-  throw new Unavailable(`gamma-api.polymarket.com answered without its search results${typeof j.error === 'string' && j.error ? `, saying "${j.error.slice(0, 140)}"` : ''}`);
+  throw new Unavailable(`Polymarket answered without its search results${typeof j.error === 'string' && j.error ? `, saying "${j.error.slice(0, 140)}"` : ''}`);
 }
 
 /** The first outcome's price, a chance from 0 to 1, or null when it is blank or not a price (never read as 0%). */

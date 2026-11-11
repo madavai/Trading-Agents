@@ -37,9 +37,9 @@ let session: Promise<{ cookie: string; crumb: string }> | null = null;
 function yahooSession(): Promise<{ cookie: string; crumb: string }> {
   session ??= (async () => {
     const cookie = await getCookies('https://fc.yahoo.com');
-    if (!cookie) throw new Unavailable('Yahoo Finance gave no session cookie');
+    if (!cookie) throw new Unavailable('Yahoo Finance would not let the desk read its company data (it gave no cookie, which it asks for first)');
     const crumb = (await getText(`${HOSTS[1]}/v1/test/getcrumb`, { headers: { Cookie: cookie } })).trim();
-    if (!crumb || crumb.length > 64 || /[\s<]/.test(crumb)) throw new Unavailable('Yahoo Finance gave no session key');
+    if (!crumb || crumb.length > 64 || /[\s<]/.test(crumb)) throw new Unavailable('Yahoo Finance would not let the desk read its company data (it gave no key for the cookie it had given)');
     return { cookie, crumb };
   })();
   session.catch(() => { session = null; });
@@ -55,7 +55,7 @@ async function yahooJson<T>(path: string): Promise<T> {
     try {
       return await getJson<T>(`${HOSTS[1]}${path}&crumb=${encodeURIComponent(s.crumb)}`, { headers: { Cookie: s.cookie } });
     } catch (e) {
-      if (attempt === 0 && /HTTP 401/.test((e as Error).message)) { session = null; continue; }
+      if (attempt === 0 && e instanceof Unavailable && e.status === 401) { session = null; continue; }
       throw e;
     }
   }
@@ -458,7 +458,7 @@ export function renderTable(t: Table, head: string, note: string): string {
 }
 
 // A refusal by the SEC asks for the email only when none was sent; if one was, the SEC's own words are the diagnosis.
-const reason = (e: unknown) => { const m = (e as Error).message; return /sec\.gov refused \(HTTP 403\)/.test(m) && m.includes('[no contact email was sent]') ? `${m}: ${ASK_FOR_EMAIL}` : m; };
+const reason = (e: unknown) => { const m = (e as Error).message; return e instanceof Unavailable && e.noEmail && e.status === 403 ? `${m}: ${ASK_FOR_EMAIL}` : m; };
 
 /** The share basis for a US company's per-share figures in its income statement: the prices' (so they meet the price an
  *  agent reads), or none with a note saying why they stay on the basis of its latest filings. A foreign company's stay as

@@ -2,6 +2,7 @@
 // can reach before the desk relies on them. A source that cannot be reached is reported as such, never as "no data".
 // What it does not ask is named (`NOT_PROBED`), so "reachable" is said only of what was asked.
 import { ASK_FOR_EMAIL } from '../contact.js';
+import { refusalWords, unreachableWhy } from '../data/failure-words.js';
 
 export interface Source {
   name: string;
@@ -60,8 +61,10 @@ export async function probe(source: Source, userAgent: string, fetchImpl: Fetch 
     const ms = Date.now() - started;
     if (!res.ok) {
       await res.body?.cancel().catch(() => {});
+      // In plain words, never the web's code for it ("HTTP 403"): the person reads this line as it is.
+      const { did, then } = refusalWords(res.status);
       const why = source.onRefused && (res.status === 403 || res.status === 401) ? `: ${source.onRefused(emailSent)}` : '';
-      return { name: source.name, ok: false, detail: `refused (HTTP ${res.status})${why}` };
+      return { name: source.name, ok: false, detail: `${did}${why}${then}` };
     }
     const body = await head(res);
     return source.looksRight(body)
@@ -70,7 +73,7 @@ export async function probe(source: Source, userAgent: string, fetchImpl: Fetch 
   } catch (e) {
     const err = e as Error;
     if (err.name === 'TimeoutError' || err.name === 'AbortError') return { name: source.name, ok: false, detail: `unreachable (no answer within ${Math.round(timeoutMs / 1000)} s)` };
-    return { name: source.name, ok: false, detail: `unreachable (${err.message})` };
+    return { name: source.name, ok: false, detail: `unreachable (${unreachableWhy(err)})` };
   }
 }
 

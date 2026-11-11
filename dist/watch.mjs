@@ -48,8 +48,10 @@ function stopReason(output) {
     if (/not logged in|\/login\b|invalid api key|oauth token (has )?expired|authentication_error/i.test(line)) return "Claude Code is not signed in on this computer: open Claude Code, sign in, then press Retry.";
     if (/credit balance is too low/i.test(line)) return "Claude Code's account has no credit left: add some, then press Retry.";
     if (/overloaded|\b529\b/i.test(line)) return "Claude's service was too busy to answer: press Retry in a few minutes.";
-    const api = /API Error:?\s*(\d{3})/i.exec(line)?.[1];
-    if (api) return `Claude's service answered with an error (${api}): press Retry in a while.`;
+    const api = Number(/API Error:?\s*(\d{3})/i.exec(line)?.[1] ?? 0);
+    if (api === 429) return "Claude's service turned the run away for asking too often: press Retry in a few minutes.";
+    if (api >= 500) return "Claude's service had a fault on its own side and could not answer: press Retry in a while.";
+    if (api >= 400) return "Claude's service refused the run's request: press Retry in a while.";
   }
   return null;
 }
