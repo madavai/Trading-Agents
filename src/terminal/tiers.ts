@@ -4,6 +4,7 @@
 // shows the eleven sector funds; the watchlist, which holds everything else the person follows, is grouped by tier.
 import { isCrypto } from '../data/symbols.js';
 import { followed } from '../desk/paper.js';
+import { TICKET_COINS } from '../desk/ticket.js';
 import { MARKET_FUNDS, SECTOR_FUNDS } from '../desk/sectors.js';
 import type { WatchItem } from './store.js';
 
@@ -15,7 +16,7 @@ export const TIER_WORDS: Readonly<Record<Tier, { name: string; meaning: string }
   market: { name: 'The whole market', meaning: 'Funds that each follow a broad index, from 30 companies (the Dow Jones) or 100 (the Nasdaq 100) to thousands, or bonds: broader than one sector or one company.' },
   sectors: { name: 'Sectors', meaning: 'The eleven parts of the economy, such as technology or energy, one fund each: side by side, they show which parts are rising.' },
   names: { name: 'Single names', meaning: 'One company each, or a narrower fund: each can swing far more than the whole market.' },
-  crypto: { name: 'Crypto', meaning: 'Coins such as Bitcoin, which swing far more than shares: the desk follows Bitcoin and Ether on paper only, never with an order, and no other coin.' },
+  crypto: { name: 'Crypto', meaning: 'Coins such as Bitcoin, which swing far more than shares, at any hour: the desk follows Bitcoin and Ether, and you can order them in your Agentic account; no other coin.' },
 };
 
 /** The four broad funds an older version put in everyone's "whole market" row: the S&P 500, the Nasdaq 100, the whole world and
@@ -53,9 +54,10 @@ export const PLAIN: Readonly<Record<string, { name: string; meaning: string }>> 
   'ETH-USD': { name: 'Ether', meaning: 'the coin of the Ethereum network, the second largest' },
 };
 
-/** Whether an order ticket can open for it: Robinhood's agent doorway trades stocks and funds, never crypto or an index,
- *  a future or a currency (the dashboard's server refuses those at every ticket door too). */
-export const ticketable = (symbol: string): boolean => !isCrypto(symbol) && !/[\^=]/.test(symbol);
+/** Whether an order ticket can open for it: a stock or a fund, or among coins Bitcoin and Ether (each checked live against
+ *  Robinhood's list of coins when the ticket opens); never another coin, an index, a future or a currency (the dashboard's
+ *  server refuses those at every ticket door too). */
+export const ticketable = (symbol: string): boolean => (!isCrypto(symbol) || TICKET_COINS.has(symbol)) && !/[\^=]/.test(symbol);
 
 /** The tier a symbol belongs to: crypto, a sector fund, the whole market (a broad fund the desk lists in desk/sectors.ts, or an
  *  index), else a single name (one company, or a narrower fund). */
@@ -83,7 +85,7 @@ export interface TierItem {
   call: { rating: string; date: string } | null;
   /** Followed on paper: a stock, a fund, Bitcoin or Ether. */
   paper: boolean;
-  /** Can open an order ticket: Robinhood's agent doorway trades stocks and funds, never crypto or an index. */
+  /** Can open an order ticket: a stock or a fund, or Bitcoin or Ether; never another coin or an index. */
   ticket: boolean;
 }
 export interface TierView { tier: Tier; name: string; meaning: string; items: TierItem[] }

@@ -134,8 +134,11 @@ Each was the owner's, or agreed with them. Change one only on their word.
   5-trading-day shortest hold before the desk proposes a sell. A full position is 10% of the account.
 - Paper before money: every call is followed on paper against the S&P 500; switching trading on with under four weeks
   of record shows the record and asks one more press ("four weeks", said one way everywhere).
-- Crypto (Bitcoin and Ether) is followed on paper only. Robinhood's agent doorway trades stocks and funds, so every
-  ticket door refuses crypto and indices before Robinhood is asked anything.
+- Crypto: Bitcoin and Ether are followed on paper and, since the coins pull request (Nov 2026), can be ordered: limit
+  orders only, in coins on Robinhood's own steps, good till cancelled (at most 90 days), at any hour, within a 5% crypto
+  limit that counts coin buys not yet filled. Every ticket door refuses any other coin and every index before Robinhood
+  is asked anything. The real shapes of Robinhood's coin check, coin quotes and coin orders were not seen when it was
+  built: the desk reads them strictly, so an unclear coin check counts as not checked and cannot be placed.
 - Out of scope until the desk has a long record: options, futures, currencies; notices outside the dashboard (phone,
   email).
 - Nothing here is investment advice; the desk proposes research and the person decides.

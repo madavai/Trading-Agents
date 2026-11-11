@@ -69,7 +69,7 @@ week or one nervous morning cannot undo the rest.
 |---|---|---|
 | Most of the account in one sector, after a buy | 30%, the sector taken from the company's own profile; a whole-market fund counts as no sector, a sector fund counts towards its sector | One industry's bad news cannot sink the account |
 | A stock whose sector is not known | Counted as a sector of its own, and the check says so | Honest, and it never blocks you for missing data |
-| Most of the account in crypto | 5%; for now on paper only, since Robinhood's agent doorway trades stocks only | Crypto swings far more than stocks |
+| Most of the account in crypto | 5%, counting coin buys not yet filled as if filled (paper only until Nov 2026; since then Bitcoin and Ether can be ordered, as limit orders) | Crypto swings far more than stocks |
 | The weekly loss limit | Trading switches itself off when the Agentic account falls 5% below its highest value of the last seven days; a large withdrawal can trip it too, and you switch it back on | A bad week cannot become a bad month while you are away; a false alarm costs one press |
 | The shortest hold | 5 trading days (the desk's scoring window) before the desk proposes selling a stock it bought; your own Sell still works, after a second press saying when you bought it | Stops a call being flipped the next morning, without locking you in |
 | Where they live, who changes them | Beside the trading switch and caps, in your private folder, changed only on the dashboard; unreadable values fall back to these, never larger | No agent can loosen them |
@@ -101,7 +101,7 @@ first two, with funds analysed for what they are.
 | The whole-market tier | SPY (S&P 500), QQQ (Nasdaq 100), VT (the whole world), BND (US bonds); you can change the list | Four funds cover most of what a beginner needs |
 | The sector tier | The eleven S&P sector funds: XLK technology, XLF financials, XLV health care, XLE energy, XLI industrials, XLY consumer discretionary, XLP consumer staples, XLU utilities, XLB materials, XLRE real estate, XLC communication | One widely traded fund per sector, easy to compare |
 | How a fund is analysed | No new agent: the fundamentals analyst reads the fund's profile instead of company accounts (top holdings, yearly cost, size), and says "unavailable" for what a source does not give | Twelve agents stay twelve; a fund's accounts are its holdings and costs |
-| Crypto | Bitcoin and Ether to start, on paper within the 5% cap, never sent to Robinhood while its agent doorway trades stocks only | Lets you learn how the desk reads crypto without risk |
+| Crypto | Bitcoin and Ether to start, on paper within the 5% cap; since Nov 2026 also as Robinhood coin limit orders on the person's Confirm, within the same cap | Lets you learn how the desk reads crypto with little at risk |
 | Where the tiers sit | A "Start here" section first on the page; single names after it | The layout itself points a beginner to broad, cheaper risk |
 
 **What was to be built:** the desk knowing a fund when it sees one, and a desk tool for a fund's profile; the

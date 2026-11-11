@@ -11,7 +11,8 @@ import { deskDataDir } from '../paths.js';
 import { type Journal } from './journal.js';
 import { journalIn, workspaceOf, type Workspace } from './workspace.js';
 import { BACKTEST_HOLDINGS, readHoldings, renderHoldings } from './holdings.js';
-import { deleteRun, progress, saveContext, savedPlan, startRun, type RunContext, type Section } from './runs.js';
+import { builtOnOf, deleteRun, hasReport, progress, runDates, saveContext, savedPlan, startRun, type BuiltOn, type RunContext, type Section } from './runs.js';
+import { addDays } from '../data/dates.js';
 import { DEPTHS, readQueue } from './queue.js';
 import { againstWords, checkName, rulesFor, windowWords, type Rules } from './scoring.js';
 
@@ -24,9 +25,12 @@ export interface Plan {
   benchmark: string; holdingDays: number; steps: Step[]; notes: string[];
   /** The window and yardstick the call is scored by; a plan saved before the desk kept them has none. */
   window?: Rules;
+  /** The desk's earlier full run this one builds on, and the analysts who write what changed since it; none for a full run. */
+  builtOn?: BuiltOn;
 }
 
-export interface PlanRequest { symbol: string; analysisDate: string; analysts?: string[]; debateRounds?: number; riskRounds?: number; language?: string; restart?: boolean }
+/** `full`: a full run, even when the desk has a recent full run of the stock to build on (the person asked for one). */
+export interface PlanRequest { symbol: string; analysisDate: string; analysts?: string[]; debateRounds?: number; riskRounds?: number; language?: string; restart?: boolean; full?: boolean }
 
 const ANALYST_SECTION: Record<Analyst, Section> = { market: 'market', sentiment: 'sentiment', news: 'news', fundamentals: 'fundamentals' };
 
@@ -51,18 +55,43 @@ export function stepsFor(analysts: Analyst[], debateRounds: number, riskRounds: 
   return steps;
 }
 
+/** Whether a run builds on an earlier one, and why not when it does not. Only today's own analyses do, never a backtest
+ *  or a past day (a backtest measures the whole desk, and a past day must not lean on a run made after it). The run built
+ *  on is the stock's latest full run (never one that built on another: a chain grows and cannot be checked) from the
+ *  `days` before this one, finished (its report written), fact-checked, and in the same language. An analyst it has no
+ *  report of writes in full; when it has none of this run's analysts, the run is full. */
+export function earlierRunFor(dir: string, o: { symbol: string; day: string; analysts: Analyst[]; language: string; days: number; sweep: boolean; full?: boolean }): { builtOn?: BuiltOn; why: string } {
+  if (o.full) return { why: 'a full run was asked for' };
+  if (o.sweep) return { why: 'a backtest analyses every day in full' };
+  if (isHistorical(o.day)) return { why: 'a past day is analysed in full' };
+  if (o.days <= 0) return { why: "the desk's settings make every analysis a full run (buildOnEarlierDays 0)" };
+  const from = addDays(o.day, -o.days);
+  for (const date of runDates(dir, o.symbol)) {
+    if (date >= o.day) continue;
+    if (date < from) break;
+    const plan = savedPlan(dir, o.symbol, date) as Partial<Plan> | undefined, done = progress(dir, o.symbol, date);
+    if (!plan || builtOnOf(plan) || !hasReport(dir, o.symbol, date) || !done.decision || !done.fact_check || plan.language !== o.language) continue;
+    const analysts = o.analysts.filter((a) => (done[ANALYST_SECTION[a]] ?? 0) > 0).map((a) => ANALYST_SECTION[a]);
+    if (analysts.length) return { builtOn: { date, analysts }, why: '' };
+  }
+  return { why: `the desk has no full, finished and fact-checked run of ${o.symbol} in ${o.language} from the ${o.days} days before ${o.day}` };
+}
+
 /** What the decision agents work from besides the reports, drawn up as the plan gives it: the person's holdings (in a
  *  backtest, none: what they hold now was not known on the days it tests) and the lessons from past calls. */
 export function runContext(root: string, ws: Workspace, symbol: string, day: string): RunContext {
   const scoring = readSettings(root).scoring;
-  const lessons = journalOf(root, ws).pastContext(symbol, isHistorical(day) ? { asOf: day, scoring } : { scoring });
+  // An analysis of today also sees the desk's own latest calls on the stock that are not scored yet; a past day does not
+  // (a call made after it), nor does a backtest's day, which is always a past one.
+  const lessons = journalOf(root, ws).pastContext(symbol, isHistorical(day) ? { asOf: day, scoring } : { scoring, unscoredBefore: day });
   return {
     holdings: ws.sweep ? BACKTEST_HOLDINGS : renderHoldings(readHoldings(deskDataDir(root)), symbol),
     lessons: lessons ? `Lessons from past calls:\n${lessons}` : 'Lessons from past calls: none yet (no earlier call has been settled).',
   };
 }
 
-export function buildPlan(root: string, req: PlanRequest, ws: Workspace = workspaceOf(root)): RunContext & { plan: Plan; resumed: boolean } {
+/** `fullWhy`: why the run is full, for the plan's line (empty when it builds on an earlier run). */
+export function buildPlan(root: string, req: PlanRequest, ws: Workspace = workspaceOf(root)): RunContext & { plan: Plan; resumed: boolean; fullWhy: string } {
   if (!readContactEmail(root)) throw new NeedsEmail(ASK_FOR_EMAIL);
   const s = readSettings(root), dir = ws.dir;
   const symbol = safeSymbol(req.symbol), day = analysisDate(req.analysisDate), notes: string[] = [];
@@ -112,9 +141,12 @@ export function buildPlan(root: string, req: PlanRequest, ws: Workspace = worksp
     language = req.language !== undefined ? languageName(req.language) : s.analysis.outputLanguage;
   }
 
-  // A run resumed keeps the window and yardstick it was planned with, like its steps.
+  // A run resumed keeps the window and yardstick it was planned with, like its steps, and builds on what it was planned to
+  // (a run planned full stays full): its analysts may have written already.
   const window = resumed && saved?.window ? saved.window : rulesFor(symbol, s.scoring);
-  const plan: Plan = { symbol, analysisDate: day, kind, analysts, debateRounds, riskRounds, language, managerModel: s.analysis.managerModel, benchmark: window.yardstick, holdingDays: window.days, window, steps: [], notes };
+  const earlier = resumed ? { builtOn: builtOnOf(saved), why: 'it began as a full run, and a run resumes as it was planned' }
+    : earlierRunFor(dir, { symbol, day, analysts, language, days: s.analysis.buildOnEarlierDays, sweep: !!ws.sweep, full: req.full });
+  const plan: Plan = { symbol, analysisDate: day, kind, analysts, debateRounds, riskRounds, language, managerModel: s.analysis.managerModel, benchmark: window.yardstick, holdingDays: window.days, window, steps: [], notes, ...(earlier.builtOn ? { builtOn: earlier.builtOn } : {}) };
   let steps = stepsFor(analysts, debateRounds, riskRounds);
   // A run whose debate began before the desk had its fact checker goes on without one: its reports are already argued from.
   if (resumed && !done.fact_check && (done.bull ?? 0) > 0) {
@@ -126,7 +158,15 @@ export function buildPlan(root: string, req: PlanRequest, ws: Workspace = worksp
   // Saved with the run each time it is planned, so the agents read them from the desk, never from the lead's copy.
   const ctx = runContext(root, ws, symbol, day);
   saveContext(dir, symbol, day, ctx);
-  return { plan, ...ctx, resumed };
+  return { plan, ...ctx, resumed, fullWhy: earlier.why };
+}
+
+/** The plan's line on what the run builds on: the earlier full run and who writes what changed since it, or why it is full. */
+export function builtOnWords(p: Pick<Plan, 'analysisDate' | 'analysts' | 'builtOn'>, fullWhy: string): string {
+  const b = p.builtOn;
+  if (!b) return `Builds on: nothing, a full run (${fullWhy}).`;
+  const full = p.analysts.filter((a) => !b.analysts.includes(ANALYST_SECTION[a]));
+  return `Builds on: the desk's full run of ${b.date}. ${b.analysts.join(', ')} write what changed since then, each reading their own report of that day with read_earlier_run first${full.length ? `; ${full.join(', ')} write${full.length === 1 ? 's' : ''} in full (that run has no such report)` : ''}. The fact checker checks what they carry from it. The debate, the trader, the risk voices and the decision work from today's reports, as in every run.`;
 }
 
 /** What the call will be scored over and against, for the plan and the report's head: its first check, not its horizon. */
@@ -134,7 +174,7 @@ export const scoredWords = (p: Pick<Plan, 'symbol' | 'window' | 'holdingDays' | 
   ? `${checkName(p.window)} ${againstWords(p.symbol, p.window)}, over the ${windowWords(p.window)} after the call, once a scoring runs after them. It is not the call's own time horizon.`
   : `after ${p.holdingDays} trading days against ${p.benchmark}`;
 
-export function renderPlan({ plan: p, holdings, lessons, resumed }: ReturnType<typeof buildPlan>): string {
+export function renderPlan({ plan: p, holdings, lessons, resumed, fullWhy }: ReturnType<typeof buildPlan>): string {
   const next = p.steps.find((x) => !x.done);
   const step = (x: Step) => `${x.section}${x.turn > 1 || p.steps.filter((y) => y.section === x.section).length > 1 ? ` (turn ${x.turn})` : ''}`;
   return [
@@ -145,6 +185,7 @@ export function renderPlan({ plan: p, holdings, lessons, resumed }: ReturnType<t
     `Report language: ${p.language}${p.language.toLowerCase() === 'english' ? '' : ' (the labelled lines **Rating**, **Action**, **Recommendation** keep their English words)'}`,
     `Manager model: ${p.managerModel || 'the same as everyone else'}`,
     `Scored: ${scoredWords(p)}`,
+    builtOnWords(p, fullWhy),
     ...(p.notes.length ? ['', ...p.notes.map((n) => `Note: ${n}`)] : []),
     '', `Steps${resumed ? ' (resuming)' : ''}: ${p.steps.map((x) => `${x.done ? '[done] ' : ''}${step(x)}`).join(' -> ')}`,
     next ? `Next step: ${step(next)}` : 'Every step is done: write the report and record the decision.',

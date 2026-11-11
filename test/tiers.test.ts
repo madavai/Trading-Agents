@@ -38,8 +38,8 @@ test('Sectors: the eleven sector funds and nothing else, each with the latest ca
     if (/S&P 500|Nasdaq|Dow|Russell/.test(p.name)) assert.match(p.name, / fund$/, `${sym}: a fund named after its index says it is a fund`);
   }
   assert.deepEqual([item('XLY').name, item('NVDA').name], ['Consumer discretionary', undefined], 'a company is named as the market names it');
-  assert.deepEqual(['SPY', 'XLE', 'NVDA', 'BTC-USD', 'DOGE-USD'].map((s) => [item(s).ticket, item(s).paper]), [[true, true], [true, true], [true, true], [false, true], [false, false]],
-    'a coin never opens a ticket; paper follows Bitcoin and Ether only');
+  assert.deepEqual(['SPY', 'XLE', 'NVDA', 'BTC-USD', 'DOGE-USD'].map((s) => [item(s).ticket, item(s).paper]), [[true, true], [true, true], [true, true], [true, true], [false, false]],
+    'among coins, Bitcoin and Ether alone open a ticket, and paper follows them only');
   assert.deepEqual(tiers.map((t) => [t.tier, t.name, t.items.map((i) => i.symbol)]), [
     ['market', 'The whole market', ['SPY']], ['sectors', 'Sectors', ['XLE']], ['names', 'Single names', ['NVDA', 'AAPL']], ['crypto', 'Crypto', ['BTC-USD', 'DOGE-USD']],
   ], 'the watchlist by tier, in its own order, with every name on it (none is left for "more")');

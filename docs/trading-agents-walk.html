@@ -459,14 +459,14 @@ b, strong { font-weight: var(--weight-semibold); }
         "Pick two figures in NVDA's market report (a price, an indicator) and compare them with the chart or Yahoo Finance."],
       "see": [
         "They match the data. Anything that could not be fetched says \"unavailable\", never a made-up figure."] },
-    { "id": "B5", "title": "A crypto asset", "tags": [], "changed": "2026-11-09",
-      "about": "The desk analyses Bitcoin and other coins too. A coin has no company accounts, so the fundamentals analyst sits it out, and coins are followed on paper only (section L).",
+    { "id": "B5", "title": "A crypto asset", "tags": [], "changed": "2026-11-11",
+      "about": "The desk analyses Bitcoin and other coins too. A coin has no company accounts, so the fundamentals analyst sits it out. Bitcoin and Ether are followed on paper (section L) and can be ordered (E11); other coins are analysed only.",
       "where": "Madav › Agent Studio › trading-desk › Put to work, then the dashboard",
       "do": [
         "Ask the team: [[Analyse BTC-USD shallow]]"],
       "see": [
         "The plan says BTC-USD is a crypto asset, so there is no fundamentals analyst: it has no company accounts.",
-        "It records a call. On the dashboard that call shows \"on paper only\" where NVDA's shows Decide….",
+        "It records a call. On the dashboard that call shows Decide…, as NVDA's does (E11).",
         "The team says the call will be scored as a first-week check against SPY over the 7 calendar days after the call (the desk's settings name no yardstick for coins), not the call's own time horizon, once a scoring runs after them.",
         "Any coin Yahoo Finance lists in dollars is a coin to the desk, not only the best known: SHIB-USD is planned as a crypto asset too, never as a stock."] },
     { "id": "B6", "title": "Asking from the dashboard", "tags": [], "changed": "2026-11-11",
@@ -675,7 +675,8 @@ b, strong { font-weight: var(--weight-semibold); }
         "No mark stands beside the very words it keeps: a correction the fact checker took back reads again as the analyst wrote it, with no [corrected: was \"...\"] at all, and is no row of its table.",
         "A corrected row of a report's table keeps its columns: the mark sits inside the row's last cell, and no cell is split by the bars of the old words.",
         "A claim the fact checker corrects is corrected everywhere the report makes it, its table of key points included.",
-        "Only the four reports carry [corrected: was \"...\"] marks. No debate turn, plan, trader's proposal, risk turn or decision has one: those quote the corrected words without the mark, and an agent that changes its own words just writes the right ones."] },
+        "Only the four reports carry [corrected: was \"...\"] marks. No debate turn, plan, trader's proposal, risk turn or decision has one: those quote the corrected words without the mark, and an agent that changes its own words just writes the right ones.",
+        "In an analysis that builds on an earlier one (B27), the fact checker also checks what was carried over: a point under Still holds that changes what the earlier report said, has no day beside it, or carries a price or another figure that moves, is corrected like any other claim."] },
     { "id": "B22", "title": "The debate quotes the checked reports instead of working them out again", "tags": ["Later"], "changed": "2026-11-11",
       "about": "Once the fact checker has checked the four reports, their figures are settled. The bull, the bear and everyone after them used to look figures up and work them out again anyway, often one sum at a time, and the debate crawled: in a real NVIDIA run on 9 Nov 2026 the six bull and bear turns took 112 minutes. Now a figure a checked report gives is quoted as the report gives it, with whose it is. Only a new figure goes to the desk's calculator or its price facts, and all of a turn's sums go in one go. In a Claude Code chat, a long read now comes in parts, so the last speakers of a debate see all of it.",
       "where": "Madav › Agent Studio › trading-desk › Put to work, then Dashboard › The desk's calls › the call › Read",
@@ -723,7 +724,46 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "While Reddit refuses the desk, the report says so in words such as \"Reddit refused the desk's request\", and may quote Reddit's own words, \"reddit.com: forbidden (reddit.com)\". It calls Reddit unavailable, never a quiet crowd.",
         "Any other source that failed is named as you know it (Yahoo Finance, the SEC, FRED, StockTwits, Polymarket), with what happened: it refused the desk's request; it turned the desk away for asking too often, so try again in a few minutes; it had a fault on its own side; it did not answer in time; or it could not be reached, with why (for example \"this computer may be offline\").",
-        "Nowhere, in the team's last message, the reports, the debate or the decision, is a source described by a web error code or a web address: no \"HTTP 403\", \"403\", \"429\", \"503\", \"fetch failed\" or \"www.reddit.com\". If you find one, note the sentence: it is a fault."] }
+        "Nowhere, in the team's last message, the reports, the debate or the decision, is a source described by a web error code or a web address: no \"HTTP 403\", \"403\", \"429\", \"503\", \"fetch failed\" or \"www.reddit.com\". If you find one, note the sentence: it is a fault."] },
+    { "id": "B27", "title": "A new analysis of a stock builds on the desk's last one", "tags": [], "changed": "2026-11-11",
+      "about": "When the desk has analysed a stock in the last 30 days, a new analysis of it no longer starts from nothing. Each analyst first reads its own report from that earlier run and writes only what changed since: today's key figures, what is new, and the earlier points that still hold, each with that day beside it. A figure that moves with the market (a price, an indicator, a ratio, odds, a count of posts) is always read again today, never carried over. The fact checker checks what was carried over against the earlier run, and the debate, the trader, the risk voices and the decision are done in full, as always. It saves time in the analysts' and the fact checker's work; how much, the first real re-runs will show.",
+      "where": "Madav › Agent Studio › trading-desk › Put to work, then Dashboard › The desk's calls › NVDA › Read",
+      "do": [
+        "Make sure the desk has a full analysis of NVIDIA from an earlier day in the last 30 days (B1). If it has none, run one today with [[Analyse NVDA shallow]] and do this test on another day.",
+        "Run a new analysis of NVIDIA: [[Analyse NVDA shallow]]",
+        "Read what the team tells you before it starts. On the dashboard, watch NVIDIA's line under Analysis status while the analysts work, and note when \"the fact checker is checking the reports\" starts.",
+        "When it is done, open the new NVDA call (\"Read\"), then its four reports under \"Gathering the facts\"."],
+      "see": [
+        "Before it starts, the team tells you which earlier analysis it builds on: the day of the desk's last full analysis of NVIDIA.",
+        "While the analysts work, NVIDIA's line under Analysis status says \"analysts reading what changed since 10 Nov 2026: 1 of 4 done\", with that analysis's day.",
+        "On the call's page, under the price target, the time horizon and how it scored: \"Built on the analysis of 10 Nov 2026. Its analysts wrote what changed since then, and what they carried from it is marked with that day.\", with a \"Read that analysis\" button that opens the earlier call.",
+        "Each of the four reports starts with a line naming that day, such as \"What changed since 2026-11-10\", then three parts: Today, Changed since that day, and Still holds from that day. Its table of key points marks each row Today, Changed or Still holds.",
+        "Every point under Still holds ends with that day in brackets. None of them is a price, a level, an indicator, a ratio, odds, a count of posts or headlines, or a mood: those come only under Today, from today's data.",
+        "Nowhere in the call (the reports, the debate, the plan or the decision) is a figure from the earlier analysis given as today's. If you find one, note the sentence: it is a fault.",
+        "The earlier call is still there, with its own reports unchanged.",
+        "In the note, write how long the analysts took (from the start to \"the fact checker is checking the reports\") and the whole analysis took: the first re-runs show how much time this saves."] },
+    { "id": "B28", "title": "The desk sees its own latest calls on a stock before they are scored", "tags": [], "changed": "2026-11-11",
+      "about": "A call is scored about a week after it is made (its first-week check against SPY). Until then the desk's next analysis of the same stock did not see it at all: two days after a Buy, the team could rate the stock again without knowing it had just said Buy. Now the portfolio manager sees the desk's latest two calls on that stock that are not scored yet, each marked \"not scored yet\", with what it rated and why. It gets no result for them, because there is none yet, and none is guessed.",
+      "where": "Madav › Agent Studio › trading-desk › Put to work, then Dashboard › The desk's calls › NVDA › Read › Portfolio manager's decision",
+      "do": [
+        "Make sure the desk has a call on NVIDIA from the last few days that is not scored yet: on its page, \"Scored\" says \"not yet\".",
+        "Run a new analysis of NVIDIA: [[Analyse NVDA shallow]]",
+        "Open the new call and read the portfolio manager's decision."],
+      "see": [
+        "Where the decision mentions the desk's earlier call, it gives that call's day and rating, for example \"the desk's Hold of 10 Nov 2026\", and says it is not scored yet.",
+        "No agent gives that earlier call a result: no return, no alpha, no \"it worked\" or \"it did not work\". If one does, note the sentence: it is a fault.",
+        "Optional: an analysis of a past day, such as [[Analyse NVDA 2026-11-03 shallow]], never mentions a call the desk made after that day."] },
+    { "id": "B29", "title": "After 30 days, or when you ask, an analysis is done in full", "tags": ["Optional"], "changed": "2026-11-11",
+      "about": "An analysis builds on an earlier one (B27) only when the desk's last full analysis of the stock is at most 30 days old, finished, fact-checked and in the same report language. Otherwise, and whenever you ask for a full analysis, the four analysts write their full reports as before. An analysis of a past day and a backtest are always full, since a past day must not lean on an analysis made after it. The 30 days are a setting, buildOnEarlierDays in the desk's settings file (desk-settings.json): 0 makes every analysis full.",
+      "where": "Madav › Agent Studio › trading-desk › Put to work, then Dashboard › The desk's calls › the call › Read",
+      "do": [
+        "Ask for a full analysis of a stock the desk analysed in the last 30 days: [[Analyse NVDA shallow, as a full analysis]]",
+        "Read what the team tells you before it starts, then open the new call on the dashboard.",
+        "Optional: analyse a stock the desk has not analysed in the last 30 days, for example [[Analyse COST shallow]]."],
+      "see": [
+        "Before it starts, the team says it is a full analysis and why: you asked for one, or the desk has no full analysis of that stock from the 30 days before.",
+        "The call's page has no \"Built on the analysis of …\" line, and no report starts with \"What changed since\".",
+        "A later analysis of the same stock builds on this full one, never on an analysis that itself built on another."] }
   ] },
   { "id": "C", "name": "The dashboard",
     "sub": "The page on your own computer: markets, charts, watchlist, the desk's calls, the scorecard and a page per company.",
@@ -789,12 +829,13 @@ b, strong { font-weight: var(--weight-semibold); }
         "The box names the day, then Open, High, Low, Close and Volume. Close carries the move from the close the day before, never from that day's own open; pointing at it says \"From the close of 5 Nov 2026\". The first bar drawn has no move. Volume is short and exact, for example \"46K\" or \"43M\".",
         "At 5Y each bar is five trading days: the box names them (\"2 Nov to 6 Nov 2026\"), with the first day's open, the last day's close, the move from the close before them and the five days' volume together.",
         "For the 10-year yield the move is in points (\"+0.02 points\") and Volume says \"not given\"."] },
-    { "id": "C6", "title": "Reading a call and its reasoning", "tags": [], "changed": "2026-11-09",
+    { "id": "C6", "title": "Reading a call and its reasoning", "tags": [], "changed": "2026-11-11",
       "about": "Every call keeps the team's full reasoning, so you can see why it rated NVIDIA the way it did, in the order the team worked.",
       "where": "Dashboard › The desk's calls › NVDA › Read",
       "do": [
         "Open the NVDA call (\"Read\").",
         "If the journal has a call older than six months, or one on SPY, open it too.",
+        "If the journal has a call whose analysis built on an earlier one (B27), open it too.",
         "Press inside the window where nothing is written: its margin, and the gap between two reports. Then press the shaded page outside it."],
       "see": [
         "The window's title is \"NVDA\", with \"NVIDIA Corporation · the desk's call of 6 Nov 2026\" (its own date) beside it. A call on a stock whose name the page has not read (one not on your watchlist, say) shows its ticker alone, with \"The desk's call of …\" beside it, never the name of the stock charted behind it.",
@@ -802,6 +843,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "How it scored names the call's own window and yardstick, and that it is not the time horizon just above it: \"Scored: not yet: a first-week check against SPY over the 5 trading days after the call, not the call's own time horizon, once a scoring runs after them.\", or for a scored call \"alpha -12.1% against SPY over the 5 trading days after the call: the call did not work. It is a first-week check, not the call's own time horizon.\", \"…: the call worked\", or for a Hold \"…: a Hold claims no direction\". A coin's says \"the 7 calendar days\".",
         "A call on SPY itself (or on VOO or IVV, which copy the same index) is scored on its own return, since against SPY its alpha would always be about zero: \"Scored: its return +1.1% on its own return over the 5 trading days after the call: the call worked. It is a first-week check, not the call's own time horizon.\"",
         "The line under the rating gives the close on or before the call's day, the price now and the change \"since the call\", however old the call: a call from last year reads its close too, never \"No close on or before the call to compare with.\"",
+        "A call whose analysis built on an earlier one shows, under how it scored: \"Built on the analysis of 10 Nov 2026. Its analysts wrote what changed since then, and what they carried from it is marked with that day.\" Its \"Read that analysis\" opens that earlier call in the same window. A full analysis shows no such line.",
         "Then \"Gathering the facts\", \"The research debate\", \"The trade\" and \"The risk debate\", each readable.",
         "Each report's line previews its first sentence, never a heading alone: round 1's fact check reads \"Instrument confirmed: …\", not just \"Data note and verification.\"",
         "At the foot: \"This is the team's reasoning as it wrote it. It is not investment advice.\"",
@@ -1047,7 +1089,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "The same table in both places (When, Order, Quantity, Price, State): orders still open first, then the rest in the order Robinhood listed them.",
         "Each state is one of the words in D12 to D18, in amber (still open), green (filled) or red (done without a fill).",
         "Pointing at a state says Robinhood's own word, for example \"Robinhood's word: “confirmed”. The desk counts it as still open: only filled, cancelled, rejected, failed, expired and voided orders are done.\"",
-        "Under every price there is a small word that says which price it is, on each row: \"filled\" (Robinhood's average price for what has filled), \"limit\" (the limit price the order was set at) or \"listed\" (a price Robinhood lists without saying whether it is a limit). A price that is a dash has no word. The same words are in both places.",
+        "Under every price there is a small word that says which price it is, on each row: \"filled\" (Robinhood's average price for what has filled), \"limit\" (the limit price the order was set at) or \"listed\" (a price Robinhood lists without saying whether it is a limit). A price that is a dash has no word. The same words are in every table of orders: the account's, a coin's and a stock's page.",
         "Pointing at that word says it in full, for example \"The limit price the order was set at: the most a buy pays, the least a sell takes. Robinhood gave no price for a fill.\" Pointing at \"Price\" says \"Each price says which it is: “filled” is Robinhood's average price for what has filled, “limit” is the limit price the order was set at, and “listed” is a price Robinhood lists without saying whether it is a limit.\""] },
     { "id": "D12", "title": "A waiting order reads Pending", "tags": ["Optional"], "changed": "2026-11-11",
       "about": "An order Robinhood has taken but not yet filled (waiting for your approval on your phone, or for its limit price) is still open. It reads Pending, never a word that reads as finished.",
@@ -1167,14 +1209,14 @@ b, strong { font-weight: var(--weight-semibold); }
         "\"Your own order: one whole share to start, at Robinhood's live price of $…. Change the shares and the limit price below.\"",
         "The same checks and \"Review with Robinhood\" as a call's ticket. The desk's log records it as yours.",
         "On a stock whose one share costs more than your cap (META, at about $650, over $500): \"Your own order: one share of META costs $…, more than your cap of $500.00 an order, so it starts as a part-share of $1.00 at the market price. Change the dollar amount below.\""] },
-    { "id": "E8", "title": "Crypto and indices never open a ticket", "tags": [], "changed": "2026-11-11",
-      "about": "Robinhood's agent doorway trades stocks and funds only. Coins are followed on paper (section L); an index such as the S&P 500 itself cannot be bought at all (a fund that follows it, such as SPY, can).",
+    { "id": "E8", "title": "Other coins and indices never open a ticket", "tags": [], "changed": "2026-11-11",
+      "about": "Among coins, the desk orders Bitcoin and Ether only (E11). Any other coin opens no ticket, and an index such as the S&P 500 itself cannot be bought at all (a fund that follows it, such as SPY, can).",
       "where": "Dashboard › the watchlist, the chart and the desk's calls",
       "do": [
-        "Add Bitcoin to your watchlist, look at its row and at its call (B5). Then chart [[^GSPC]] (the S&P 500 index)."],
+        "Add Bitcoin to your watchlist and look at its call (B5). Then add [[DOGE-USD]] to your watchlist and point at its row's \"no order ticket\". Then chart [[^GSPC]] (the S&P 500 index)."],
       "see": [
-        "Bitcoin and Ether show \"on paper only\" in their call, where NVDA shows Decide…; other coins show \"no order ticket\". Pointing at that chip says the same in full.",
-        "No \"Trade…\", \"Buy…\" or \"Sell…\" for a coin or an index, and no robot for an index. An index's call bar says \"The desk analyses stocks, not indices.\""] },
+        "Bitcoin's call shows Decide…, as NVDA's does. Dogecoin's row in the watchlist says \"no order ticket\", and pointing at it says \"No order ticket: among coins, the desk follows and orders only Bitcoin and Ether; an index cannot be bought (a fund that follows it can).\"",
+        "No \"Trade…\", \"Buy…\" or \"Sell…\" for another coin or an index, and no robot for an index. An index's call bar says \"The desk analyses stocks, not indices.\""] },
     { "id": "E9", "title": "A part-share when one share costs too much", "tags": [], "changed": "2026-11-11",
       "about": "When one share costs more than the order may spend (META at about $650 against the $500 cap, or a small account's Overweight), the ticket buys a part of one share instead: a dollar amount, which Robinhood takes only as a market order (at the market's price at that moment) and only while the US market is open. Whenever a whole share fits, the ticket stays whole shares at your own limit price.",
       "where": "Dashboard › The desk's calls › a Buy or Overweight call on a stock whose one share costs more than the order may spend (META, say) › Decide…",
@@ -1196,7 +1238,29 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "The shares and limit price give way to the Dollar amount box (the same money as the shares were), with the market-order line under it.",
         "At 0.50 a red check: \"A part-share is bought as a dollar amount in dollars and cents, at least $1.00\". At 100: \"$100.00 of NVDA, about 0.… of a share at Robinhood's live price\", and the estimate line changes as you type.",
-        "Back on whole shares, the shares (at least one) and the live price as the limit return, with the limit price's own check."] }
+        "Back on whole shares, the shares (at least one) and the live price as the limit return, with the limit price's own check."] },
+    { "id": "E11", "title": "A ticket for Bitcoin", "tags": [], "changed": "2026-11-11",
+      "about": "Among coins, the desk orders Bitcoin and Ether, each checked live against Robinhood's own list of coins. A coin ticket is always a limit order: an amount in coins, on Robinhood's own step for that coin, at a price you set, good till cancelled for at most 90 days. It can be sent at any hour, weekends too. Your crypto limit (5% of the account as shipped) counts coin buys not yet filled as if they had filled.",
+      "where": "Dashboard › The desk's calls › a Buy call on BTC-USD (B5) › Decide…",
+      "do": [
+        "Open the ticket and read the lines under the figures, the two fields and \"Your checks\".",
+        "Type an amount with one digit too many after the point (for example 0.000000015), then put the amount back and type a limit price with three decimals."],
+      "see": [
+        "\"Held now\" in coins (for example \"0 BTC\"), never shares.",
+        "\"Your crypto limit of 5% of the account leaves $…, so at most that.\", then \"$… ÷ $…, rounded down to BTC-USD's step of 0.00000001 BTC: 0.00… BTC.\" (the step is Robinhood's own for the coin), and \"A coin order is a limit order: it fills at your price or better, at any hour, and stays open until it fills or you cancel it in Robinhood's app, for at most 90 days. Coin prices can move fast, at night and at weekends too.\"",
+        "Two fields: \"Amount of BTC to buy (from … to …, in steps of …)\", with Robinhood's smallest and largest order and its step for Bitcoin, and \"Limit price, $ · good till cancelled, for at most 90 days\". Under them: \"About $… at your limit price, $… at Robinhood's live price of $…. Robinhood's check shows its fees.\", which changes as you type.",
+        "Checks include \"Coins trade at any hour, so this can be sent now; it stays open until it fills or you cancel it in Robinhood's app, for at most 90 days\" and \"Crypto would be …% of the account; your limit is 5%\".",
+        "Off the step, a red check: \"The amount must be in steps of 0.00000001 BTC, from … to … BTC (Robinhood's rules for BTC-USD)\". A price with three decimals: \"The limit price must be above zero, in dollars and cents\". Either way \"Review with Robinhood\" is greyed out."] },
+    { "id": "E12", "title": "Your own coin order, and what stops one", "tags": [], "changed": "2026-11-11",
+      "about": "\"Trade…\" on Bitcoin or Ether opens a coin ticket of your own, starting at the smallest amount worth a dollar or more. When Robinhood has halted the coin, marks it not tradable or shows it for display only, or the Agentic account has no crypto account, nothing is proposed and the ticket says why in plain words.",
+      "where": "Dashboard › chart ETH-USD › Trade…",
+      "do": [
+        "Press \"Trade…\" and switch between Buy and Sell.",
+        "If Robinhood ever halts Ether, or your Agentic account has no crypto account, open the ticket again."],
+      "see": [
+        "\"Your own order: 0.000… ETH to start, about $1.… at Robinhood's live price of $…. Change the amount and the limit price below.\"",
+        "On Sell with no Ether held: \"The Agentic account holds no ETH-USD to sell.\" and nothing proposed.",
+        "A halted coin: \"Robinhood has halted trading in ETH-USD for now.\" No crypto account: \"Robinhood says no crypto account is open yet: open one in Robinhood's app, then try again.\" No order either way."] }
   ] },
   { "id": "F", "name": "Placing a real order",
     "sub": "Optional, real money. One share, during market hours, with Robinhood's phone approval on.",
@@ -1289,7 +1353,28 @@ b, strong { font-weight: var(--weight-semibold); }
         "Robinhood's check, with its estimate.",
         "The button names the order by its money: \"Confirm: Buy $5.00 of <stock> at the market price\".",
         "\"Robinhood took it\", as in F3. Once it fills, Your account shows the part of a share held, at the price Robinhood filled it at.",
-        "The evening wrap-up lists it as \"Buy $5.00 of <stock> at the market price (a part-share)\"."] }
+        "The evening wrap-up lists it as \"Buy $5.00 of <stock> at the market price (a part-share)\"."] },
+    { "id": "F11", "title": "Place a coin order", "tags": ["Real money","Optional"], "changed": "2026-11-11",
+      "about": "A coin order is placed as a stock order is, after Robinhood's coin check and your Confirm, but at any hour, weekends too. It stays open until it fills or you cancel it in Robinhood's app, for at most 90 days: the dashboard never cancels an order. Keep it small.",
+      "where": "Dashboard › chart BTC-USD › Trade… (Buy)",
+      "do": [
+        "With trading on, type a small amount (worth a few dollars) and a limit price a little below the live price, press \"Review with Robinhood\", then \"Place order…\".",
+        "Read the button, then press it. If Robinhood asks, approve or decline on your phone (F4)."],
+      "see": [
+        "Robinhood's coin check, with its estimated cost and fees in its own words. If its answer does not name your order back, the box says \"Robinhood's coin check did not name this order back, so it counts as not checked and cannot be placed.\" and there is no Place button.",
+        "The button names the order in coins, never shares: \"Confirm: Buy 0.0000… BTC at $…\".",
+        "\"Robinhood took it\", as in F3. The order shows under Your account › Coin orders (F12), and counts towards your orders a day together with stock orders."] },
+    { "id": "F12", "title": "An open coin order waits until you cancel it", "tags": ["Real money","Optional"], "changed": "2026-11-11",
+      "about": "A coin limit order that has not filled stays open, for up to 90 days. Until it fills it counts towards your crypto limit and the coin's own cap as if bought, so tickets opened later cannot go past them. The dashboard never cancels an order: you do that in Robinhood's app.",
+      "where": "Dashboard › Your account › the Agentic account › Coin orders",
+      "do": [
+        "After F11, while the order has not filled, press \"Refresh from Robinhood\" and read Coin orders.",
+        "Open a new Bitcoin ticket (Trade…) and read \"Your checks\".",
+        "If you no longer want the order, cancel it in Robinhood's app, then press \"Refresh from Robinhood\"."],
+      "see": [
+        "\"Still open: Buy 0.0000… BTC at $…, placed <day> (today, or N days ago). Cancel it in Robinhood's app if you no longer want it: it stays open until it fills, for at most 90 days.\" Under it, the latest coin orders, each state in plain words (D11). BTC-USD's own page lists the same open order under \"Your orders on it\".",
+        "The new ticket counts it: \"Crypto would be …% of the account, counting $… in coin buys not yet filled; your limit is 5%\", and \"BTC-USD would be …% of the account, counting 0.0000… BTC in orders not yet filled; your cap is 10%\".",
+        "Once you cancel it in Robinhood's app, the \"Still open\" line goes and the order reads Cancelled (D15)."] }
   ] },
   { "id": "G", "name": "Routines",
     "sub": "The morning routine and the evening wrap-up, by hand or from Madav's Routines, where the project ships them switched off.",
@@ -1776,8 +1861,8 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "\"The paper record is worked out again with the new starting money.\"",
         "50 is refused: \"the paper money is a whole number of dollars from $100 to $10,000,000\"."] },
-    { "id": "L4", "title": "Bitcoin and Ether on paper", "tags": [], "changed": "2026-11-09",
-      "about": "Coins can never be ordered through the desk, but Bitcoin and Ether are followed on paper so you see how their calls do.",
+    { "id": "L4", "title": "Bitcoin and Ether on paper", "tags": [], "changed": "2026-11-11",
+      "about": "Bitcoin and Ether are followed on paper, as stocks are, so you see how their calls do; you can also order them (E11). No other coin is followed.",
       "where": "Dashboard › the watchlist and The desk's calls",
       "do": [
         "Watch [[BTC-USD]] and point at its call's paper badge (B5).",

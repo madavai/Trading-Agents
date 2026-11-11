@@ -31,7 +31,7 @@ import path from 'node:path';
 import { REVIEW, RATINGS, parseRating } from './rating.js';
 import { withLock, writeWhole } from './lock.js';
 import { signedPct as pct, unsignZero } from '../numbers.js';
-import { checkName, legacyRules, ownReturn, windowWords, type Basis, type Rules, type Scoring } from './scoring.js';
+import { checkName, checkWords, legacyRules, ownReturn, windowWords, type Basis, type Rules, type Scoring } from './scoring.js';
 
 /** How a settled call's lesson was written: see the file's head. "unmarked" is the old way; "none" a call not settled. */
 export type LessonState = 'none' | 'unmarked' | 'prices' | 'no-prices' | 'corrected' | 'unreliable' | 'flagged';
@@ -286,17 +286,23 @@ export class Journal {
    *  is not counted among the other stocks' lessons, since it brings none. Each call's header names what it was scored
    *  over and against (its own rules, or for a call recorded before the desk kept them, the rules it was made under, from
    *  `scoring`): a short first check, not the call's own time horizon. */
-  pastContext(ticker: string, o: { asOf?: string; sameLimit?: number; otherLimit?: number; scoring?: Scoring } = {}): string {
-    const { sameLimit = 5, otherLimit = 3 } = o;
-    let settled = this.load().filter((e) => !e.pending);
+  pastContext(ticker: string, o: { asOf?: string; sameLimit?: number; otherLimit?: number; scoring?: Scoring; unscoredBefore?: string; unscoredLimit?: number } = {}): string {
+    const { sameLimit = 5, otherLimit = 3, unscoredLimit = 2 } = o;
+    const all = this.load();
+    let settled = all.filter((e) => !e.pending);
     if (o.asOf) settled = settled.filter((e) => e.resolved && e.resolved <= o.asOf!);
+    // The desk's own latest calls on this stock that are not scored yet, made before this analysis's day: only for an
+    // analysis of today (`unscoredBefore`), never with `asOf` (a past day must not see a call made after it).
+    const unscored = o.unscoredBefore && !o.asOf
+      ? all.filter((e) => e.pending && e.ticker === ticker && e.date < o.unscoredBefore!).sort((a, b) => b.date.localeCompare(a.date)).slice(0, unscoredLimit)
+      : [];
     const same: Entry[] = [], other: Entry[] = [];
     for (const e of settled.reverse()) {
       if (e.ticker !== ticker && withheld(e)) continue;
       if (e.ticker === ticker ? same.length < sameLimit : other.length < otherLimit) (e.ticker === ticker ? same : other).push(e);
       if (same.length >= sameLimit && other.length >= otherLimit) break;
     }
-    if (!same.length && !other.length) return '';
+    if (!same.length && !other.length && !unscored.length) return '';
     const over = (e: Entry): string => {
       const r = e.rules ?? (o.scoring ? legacyRules(e.ticker, o.scoring, e.holding) : null);
       return r ? `${checkName(r)}: ${ownReturn(r) ? `on its own return (${r.yardstick} is its own yardstick or copies the same index), so its alpha is its return,` : `against ${r.yardstick}`} over the ${windowWords(r)} after the call, not the call's own time horizon` : `over ${e.holding ?? 'n/a'}`;
@@ -305,7 +311,13 @@ export class Journal {
     const full = (e: Entry) => [head(e), `DECISION:\n${e.decision}`,
       ...(e.lesson === 'unreliable' || e.lesson === 'flagged' ? [`REFLECTION: ${LESSON_NOTE[e.lesson](e)}`] : e.reflection ? [`REFLECTION${LESSON_NOTE[e.lesson] ? ` (${LESSON_NOTE[e.lesson]!(e)})` : ''}:\n${e.reflection}`] : [])].join('\n\n');
     const short = (e: Entry) => `${head(e)}${e.reflection && LESSON_NOTE[e.lesson] ? ` (lesson ${LESSON_NOTE[e.lesson]!(e)})` : ''}\n${e.reflection || e.decision.slice(0, 300) + (e.decision.length > 300 ? '...' : '')}`;
+    // A call not scored yet has no result: none is given, nor any guess at one. Its rules say how it will be scored.
+    const notYet = (e: Entry) => {
+      const r = e.rules ?? (o.scoring ? legacyRules(e.ticker, o.scoring, e.holding) : null);
+      return [`[${e.date} | ${e.ticker} | ${e.rating} | not scored yet: it has no result, and is scored${r ? ` by ${checkWords(e.ticker, r)}` : ''} once a scoring runs after that window]`, `DECISION:\n${e.decision}`].join('\n\n');
+    };
     const parts: string[] = [];
+    if (unscored.length) parts.push(`The desk's latest calls on ${ticker} not scored yet (latest first; the call's own view on its day, not how it turned out):`, ...unscored.map(notYet));
     if (same.length) parts.push(`Past analyses of ${ticker} (latest recorded first):`, ...same.map(full));
     if (other.length) parts.push('Recent cross-ticker lessons:', ...other.map(short));
     return parts.join('\n\n');

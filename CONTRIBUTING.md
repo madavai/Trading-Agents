@@ -16,8 +16,10 @@ built, which decisions stand, every document, and what is pending.
   `tradingDaysBetween`). A year not in the list has only its weekends closed and the routine brief says so;
   `test/holidays.test.ts` fails once next year is missing.
 - `src/data/` - the free sources, each held to the analysis date, official ones first. `http.ts` keeps answers on disk
-  (`keepFor`: a day for SEC documents and figures, an hour for a filer's list of filings and for FRED, five minutes for
-  the rest) and says when each was read (`getTextAt`, `getJsonAt`, `readWords`); an answer asked for as data that is
+  for `KEPT_DAYS` (30, `pruneCache`), but serves one again only within `keepFor`: 30 days for what cannot change once
+  out (a document filed in the SEC's archive, FRED's figures as they stood on a past day, ALFRED's `vintage_date`), a
+  day for the SEC's other figures, an hour for a filer's list of filings and for FRED's latest, five minutes for the
+  rest (prices, news, posts, odds; past price rows too, since later dividends and splits adjust them). It says when each was read (`getTextAt`, `getJsonAt`, `readWords`); an answer asked for as data that is
   not data (a web page) is never kept (`usable`). `yahoo.ts` keeps a price series in memory for five minutes from when
   the source was read (`fetchedAt`, so a disk copy does not start them again), dates each row in the exchange's own time
   zone (`exchangeTimezoneName`, so a row stamped at its midnight keeps its day across a summer-time change), gives a
@@ -150,7 +152,8 @@ built, which decisions stand, every document, and what is pending.
   or corrected already is rewritten only after `flag_lesson`, on the person's confirmed word: it is withheld at once
   and listed again with what they said. A call whose rows cannot be had is marked unreliable by the desk, never
   guessed. `pastContext` tells the analyses how each lesson was written and withholds an unreliable or flagged one
-  (`WITHHELD`). A re-check keeps its own notes beside the journal (`lesson-check.json`, in `loop-notes.ts`, forgotten
+  (`WITHHELD`). For an analysis of today it also gives the desk's latest two calls on the stock that are not scored
+  yet (`unscoredBefore`), marked "not scored yet" with how they will be scored and no result; a past day never sees them. A re-check keeps its own notes beside the journal (`lesson-check.json`, in `loop-notes.ts`, forgotten
   `NOTES_IDLE_MS`, an hour, after its last step) so it cannot go round: a lesson `correct_lesson` refused
   `REFUSALS_TO_LEAVE` (two) times answers LEFT and is named, not shown, in later listings (a flag clears that); sent
   again after that with no lesson saved since, it answers STOP; the same lessons listed again with nothing saved since
@@ -194,7 +197,14 @@ built, which decisions stand, every document, and what is pending.
   planned, `saveContext` keeps the holdings and the lessons the plan drew up (`runContext` in `plan.ts`; in a backtest no
   holdings, since today's were not known on the days tested), and `read_run` serves them as sections `holdings` and
   `lessons`. The trader, the risk voices and the portfolio manager read them from there, never from the lead's request,
-  which a lead can leave out unseen.
+  which a lead can leave out unseen. An analysis of today builds on the desk's latest full run of the stock (`builtOn`
+  in its plan, chosen by `earlierRunFor` in `plan.ts`): finished, fact-checked, in the same report language, from the
+  `analysis.buildOnEarlierDays` days before (30; 0 makes every run full), and never itself built on another. A
+  backtest, a past day, a run asked for in full (`plan_analysis` `full`) and a run resumed as full stay full. Its
+  analysts read their own report of that day first (`read_earlier_run`; the fact checker reads them all as `read_run`
+  section `earlier`), under a head that gives every figure its day, and `saveSection` refuses their report unless its
+  first line names that day. The debate and everything after it work from today's reports as always. Each saved step
+  keeps when it was saved (`at`, `stepTimes`), so a run's step times can be compared from its own record.
 - `src/desk/queue.ts` - the analyses asked for on the dashboard, and the contract with whatever runs the agents. Three
   files in `desk-data`, each read field by field as data from another program:
   - `queue.json`: `[{ symbol, requestedAt, depth?: "shallow"|"medium"|"deep", state: "waiting"|"running"|"done"|"failed",
@@ -258,10 +268,12 @@ built, which decisions stand, every document, and what is pending.
   `/api/weather` keeps it an hour. Neither ever forecasts, and a figure that cannot be had leaves its line unavailable.
 - `src/desk/ticket.ts` - the order ticket: sizing from the person's settings and every cap check, on real figures only,
   the guard rails included (`sector`, `cryptoHeldUsd`, `boughtOn`/`heldDays` in its context; a `Check` with `ask`
-  passes but needs the person's "Sell anyway", which the server requires at Review and Place). Crypto is sized here for
-  the paper book only: in fractions to six decimal places, at least $1, within what the crypto limit leaves, and with
-  the crypto limit in place of a sector's. The dashboard's server refuses crypto and indices (`tradable`) when a ticket
-  opens and again at Review and Place, before Robinhood is asked anything.
+  passes but needs the person's "Sell anyway", which the server requires at Review and Place). A coin is sized as a
+  limit order, good till cancelled, with the crypto limit in place of a sector's: on a real ticket (`coin` in its
+  context) on Robinhood's own steps and bounds for the coin (`CoinRules`, from `get_currency_pairs`), counting coin buys
+  not yet filled (`coin.openUsd`) as if filled; on paper in fractions to six decimal places, at least $1. The dashboard's
+  server refuses any coin but `TICKET_COINS` (Bitcoin, Ether) and every index (`tradable`) when a ticket opens and again
+  at Review and Place, before Robinhood is asked anything.
 - `src/desk/sectors.ts` - a symbol's sector for the sector limit: the S&P sector funds and the whole-market funds by
   table, else the SEC (`data/company.ts` `profileSector`: a fund if in the SEC's funds list, else the sector of its
   industry code), an unknown one counted on its own; looked up

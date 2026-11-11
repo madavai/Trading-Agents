@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { safeSymbol } from '../data/symbols.js';
+import { daysBetween } from '../data/dates.js';
 import { withLock, writeWhole } from './lock.js';
 
 export const SECTIONS = ['market', 'sentiment', 'news', 'fundamentals', 'fact_check', 'bull', 'bear', 'research_plan', 'trader', 'aggressive', 'conservative', 'neutral', 'decision'] as const;
@@ -33,10 +34,36 @@ const CONTEXT_LABELS: Record<ContextName, string> = { holdings: 'Holdings', less
 
 /** A correction as it stands in a report: the right words, then the mark that keeps the report's own words beside them. */
 interface Fix { now: string; mark: string }
-interface Run { ticker: string; date: string; startedAt: string; plan?: unknown; context?: RunContext & { at: string }; log: Array<{ section: Section; text: string; fixes?: Fix[] }> }
+/** `at`: when the step was saved (ISO, UTC), so the time each step took can be read from the run itself, whatever program
+ *  ran the agents. A step saved before the desk kept it has none. */
+interface Run { ticker: string; date: string; startedAt: string; plan?: unknown; context?: RunContext & { at: string }; log: Array<{ section: Section; text: string; fixes?: Fix[]; at?: string }> }
 
-const folder = (dir: string, ticker: string, date: string) => path.join(dir, 'runs', `${safeSymbol(ticker).replace(/\^/g, 'IDX_').replace(/=/g, '_EQ_')}_${date}`);
+/** The earlier full run a run builds on, as its plan keeps it: that run's date, and the analysts who write what changed
+ *  since it (an analyst that run did not have writes in full). */
+export interface BuiltOn { date: string; analysts: Section[] }
+
+const folderName = (ticker: string) => safeSymbol(ticker).replace(/\^/g, 'IDX_').replace(/=/g, '_EQ_');
+const folder = (dir: string, ticker: string, date: string) => path.join(dir, 'runs', `${folderName(ticker)}_${date}`);
 const runFile = (dir: string, ticker: string, date: string) => path.join(folder(dir, ticker, date), 'run.json');
+
+/** The days the desk has a run of this stock for, newest first. */
+export function runDates(dir: string, ticker: string): string[] {
+  const head = `${folderName(ticker)}_`;
+  let names: string[] = [];
+  try { names = fs.readdirSync(path.join(dir, 'runs')); } catch { /* no runs yet */ }
+  return names.filter((n) => n.startsWith(head) && /^\d{4}-\d{2}-\d{2}$/.test(n.slice(head.length))).map((n) => n.slice(head.length)).sort().reverse();
+}
+
+/** What a run's plan says it builds on, or undefined for a full run (and a run planned before the desk built on any). */
+export function builtOnOf(plan: unknown): BuiltOn | undefined {
+  const b = (plan as { builtOn?: { date?: unknown; analysts?: unknown } } | undefined)?.builtOn;
+  if (!b || typeof b.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(b.date) || !Array.isArray(b.analysts)) return undefined;
+  const analysts = b.analysts.filter((a): a is Section => typeof a === 'string' && REPORTS.includes(a as Section));
+  return analysts.length ? { date: b.date, analysts } : undefined;
+}
+
+/** A day as a person reads it on the page: "10 Nov 2026". */
+export const dayWords = (date: string): string => new Date(`${date}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 
 function load(dir: string, ticker: string, date: string): Run {
   try { return JSON.parse(fs.readFileSync(runFile(dir, ticker, date), 'utf8')) as Run; } catch { return { ticker: safeSymbol(ticker), date, startedAt: new Date().toISOString(), log: [] }; }
@@ -95,11 +122,24 @@ export function saveSection(dir: string, ticker: string, date: string, section: 
   if (miscount) throw new Error(miscount);
   let turns = 0;
   change(dir, ticker, date, (r) => {
+    const base = builtOnOf(r.plan);
+    if (base?.analysts.includes(section) && !firstLine(t).includes(base.date)) throw new Error(sinceRefusal(base.date));
     if (!TURNS.has(section)) r.log = r.log.filter((e) => e.section !== section);
-    r.log.push({ section, text: t });
+    r.log.push({ section, text: t, at: new Date().toISOString() });
     turns = r.log.filter((e) => e.section === section).length;
   });
   return turns;
+}
+
+const firstLine = (text: string): string => text.trim().split('\n')[0] ?? '';
+/** Why an analyst's report in a run that builds on an earlier one is refused: its first line does not say what it builds
+ *  on. The date alone is looked for, so a report in any language passes. */
+const sinceRefusal = (date: string): string => `this run builds on the desk's full run of ${date}, so your report says what changed since then, and its first line names that day, for example "What changed since ${date}" (in the report language, the date written ${date}), so a reader knows the earlier points are as of that day. Mend the first line and save again`;
+
+/** When each step of a run was saved, in the order saved: a debate turn each time. Steps saved before the desk kept the
+ *  time are left out. */
+export function stepTimes(dir: string, ticker: string, date: string): Array<{ section: Section; at: string }> {
+  return load(dir, ticker, date).log.filter((e): e is typeof e & { at: string } => typeof e.at === 'string').map((e) => ({ section: e.section, at: e.at }));
 }
 
 export interface Correction { was: string; now: string; every?: boolean }
@@ -242,9 +282,10 @@ export function stepWords(dir: string, ticker: string, date: string): string {
   if (!next) return 'recording the call';
   const analysts = steps.filter((s) => ['market', 'sentiment', 'news', 'fundamentals'].includes(s.section));
   const of = (n: unknown) => (Number.isInteger(n) ? ` of ${n as number}` : '');
+  const base = builtOnOf(plan);
   switch (next.section) {
     case 'market': case 'sentiment': case 'news': case 'fundamentals':
-      return `analysts reading: ${analysts.filter((s) => (done[s.section] ?? 0) >= 1).length} of ${analysts.length} done`;
+      return `analysts reading${base ? ` what changed since ${dayWords(base.date)}` : ''}: ${analysts.filter((s) => (done[s.section] ?? 0) >= 1).length} of ${analysts.length} done`;
     case 'fact_check': return 'the fact checker is checking the reports';
     case 'bull': case 'bear': return `debate round ${next.turn}${of(plan?.debateRounds)}`;
     case 'research_plan': return 'the research manager is weighing the debate';
@@ -265,10 +306,31 @@ export function readSections(dir: string, ticker: string, date: string, names: s
  *  call it when a read comes in parts. Joined with blank lines, the blocks are the read exactly. */
 interface Block { text: string; name: string }
 
+/** The section of read_run that gives the earlier full run's reports this run builds on (the fact checker reads it). */
+export const EARLIER = 'earlier';
+
+/** The earlier full run's reports a run builds on, under a head the desk writes, so every figure in them keeps its day:
+ *  every one of them (`only` left out), or one analyst's own (read_earlier_run). Each is that run's report as its fact
+ *  checker corrected it. */
+function earlierBlocks(dir: string, ticker: string, date: string, run: Run, only?: Section): Block[] {
+  const base = builtOnOf(run.plan);
+  if (!base) return [{ name: 'Earlier run', text: only ? 'This run does not build on an earlier one: write your full report, as your instructions say.' : '(This run does not build on an earlier run: every report in it is a full report of its own.)' }];
+  const wanted = only ? [only] : base.analysts;
+  if (only && !base.analysts.includes(only)) return [{ name: 'Earlier run', text: `This run builds on the desk's full run of ${base.date}, but not for the ${LABELS[only]}: write your full report, as your instructions say.` }];
+  const earlier = load(dir, ticker, base.date).log, days = daysBetween(base.date, date);
+  const head = `## From the desk's full run of ${base.date} (${days === 1 ? 'one day' : `${days} days`} before ${date})\nThis run builds on it. ${only ? 'Below is your report' : 'Below are the analysts\' reports'} from that run, as its fact checker corrected ${only ? 'it' : 'them'}. Every figure ${only ? 'in it' : 'in them'} is as of ${base.date}, not today: give one only with that date beside it, never as today's.`;
+  return wanted.map((s, i) => {
+    const text = earlier.filter((e) => e.section === s).map((e) => e.text).join('\n\n');
+    return { name: `${LABELS[s]} of ${base.date}`, text: `${i ? '' : `${head}\n\n`}### ${LABELS[s]}, as of ${base.date}\n${text || `(That run has no ${LABELS[s]} report.)`}` };
+  });
+}
+
 function blocksOf(dir: string, ticker: string, date: string, names: string[], fallback?: () => RunContext): Block[] {
   const run = load(dir, ticker, date), log = run.log;
   let ctx: RunContext | undefined;
   return names.flatMap((name): Block[] => {
+    if (name === EARLIER) return earlierBlocks(dir, ticker, date, run);
+    if (name.startsWith(`${EARLIER}:`) && isSection(name.slice(EARLIER.length + 1))) return earlierBlocks(dir, ticker, date, run, name.slice(EARLIER.length + 1) as Section);
     if ((CONTEXT as readonly string[]).includes(name)) {
       ctx ??= contextOf(run) ?? fallback?.();
       const label = CONTEXT_LABELS[name as ContextName];

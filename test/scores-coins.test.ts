@@ -55,7 +55,7 @@ test('any coin Yahoo spells as a dollar pair is a coin: scored over 7 calendar d
   assert.equal(normalizeSymbol('BTCUSD'), 'BTC-USD', 'the compact spelling still works for the coins the list knows');
   assert.deepEqual(rulesFor('XLM-USD', S), { days: 7, unit: 'calendar', yardstick: 'SPY', basis: 'coin' });
   assert.equal(followed('BNB-USD'), false, 'among coins, paper follows Bitcoin and Ether only');
-  assert.equal(ticketable('SHIB-USD'), false, "Robinhood's agent doorway trades stocks and funds only");
+  assert.equal(ticketable('SHIB-USD'), false, 'among coins, the desk orders Bitcoin and Ether only');
   const b = paperBook([{ ticker: 'XLM-USD', date: '2026-09-01', rating: 'Buy' }], { 'XLM-USD': closesOn([['2026-09-01', 0.1], ['2026-09-02', 0.1]]), SPY: closesOn([['2026-09-01', 500], ['2026-09-02', 500]]) }, { startUsd: 10_000, trading: T, caps: C, today: '2026-09-02' });
   assert.deepEqual([b.trades[0]!.status, b.trades[0]!.why], ['skipped', 'Among crypto, paper follows Bitcoin and Ether for now.']);
 });

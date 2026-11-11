@@ -26,9 +26,11 @@ your own order gets no way around any of it, and the desk's log records it as yo
 Nothing is ever sold by itself. The stop the desk's trader proposes is only watched: when the price falls below it, the
 dashboard says so and marks the holding, and never places a stop order. A Sell or Underweight on a holding only marks it.
 
-Crypto and indices never reach Robinhood: Robinhood's agent doorway trades stocks and funds, so the dashboard refuses a
-ticket for a coin or an index when it opens and again before Robinhood checks or places it. Bitcoin and Ether calls are
-followed on paper only.
+Among coins, only Bitcoin and Ether can reach Robinhood, and only as a limit order in coins on Robinhood's own steps for
+the coin, good till cancelled, after its coin check and your Confirm; each is checked against Robinhood's list of coins
+(tradable now, not halted) and your crypto limit, when the ticket opens and again before it is checked or placed. A
+coin buy not yet filled counts towards your caps as if filled. Any other coin, and every index, is refused at every
+ticket door before Robinhood is asked anything. The dashboard never cancels an order; you cancel in Robinhood's app.
 
 A ticket sends at most one order, with Robinhood's own protection against a repeat. Keep Robinhood's phone approval on
 until you trust the desk: then Robinhood also asks you on your phone before the order reaches the market.

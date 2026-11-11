@@ -7550,6 +7550,21 @@ function writeWhole(file4, text2) {
   }
 }
 
+// src/data/dates.ts
+var DAY = 864e5;
+var marketDay = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+var nyClock = (ms) => {
+  const f = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(ms));
+  const v = (t2) => f.find((x) => x.type === t2)?.value ?? "";
+  return `${v("year")}-${v("month")}-${v("day")} ${v("hour")}:${v("minute")}`;
+};
+function today(now) {
+  if (!now && process.env.TRADING_AGENTS_TODAY) return process.env.TRADING_AGENTS_TODAY;
+  return marketDay(now ?? /* @__PURE__ */ new Date());
+}
+var addDays = (date4, days) => new Date(Date.parse(`${date4}T00:00:00Z`) + days * DAY).toISOString().slice(0, 10);
+var daysBetween = (from, to) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY);
+
 // src/data/http.ts
 var Unavailable = class extends Error {
   constructor(message, status, noEmail = false) {
@@ -7602,9 +7617,16 @@ async function pace(host) {
   await turn;
 }
 var MINUTE = 6e4;
+var DAY_MS = 24 * 60 * MINUTE;
+var KEPT_DAYS = 30;
 function keepFor(url2) {
   const u = new URL(url2);
-  if (/(^|\.)sec\.gov$/.test(u.hostname)) return /^\/submissions\//.test(u.pathname) ? 60 * MINUTE : 24 * 60 * MINUTE;
+  if (/(^|\.)sec\.gov$/.test(u.hostname)) {
+    if (/^\/Archives\/edgar\/data\//.test(u.pathname)) return KEPT_DAYS * DAY_MS;
+    return /^\/submissions\//.test(u.pathname) ? 60 * MINUTE : DAY_MS;
+  }
+  const vintage = u.searchParams.get("vintage_date");
+  if (/(^|\.)alfred\.stlouisfed\.org$/.test(u.hostname) && vintage && /^\d{4}-\d{2}-\d{2}$/.test(vintage) && vintage < today()) return KEPT_DAYS * DAY_MS;
   return /fred/.test(u.hostname) ? 60 * MINUTE : 5 * MINUTE;
 }
 var keyOf = (url2) => {
@@ -7633,7 +7655,7 @@ function pruneCache(dir) {
   try {
     for (const f of fs3.readdirSync(dir)) {
       const file4 = path3.join(dir, f);
-      if (Date.now() - fs3.statSync(file4).mtimeMs > 3 * 24 * 60 * MINUTE) fs3.rmSync(file4, { force: true });
+      if (Date.now() - fs3.statSync(file4).mtimeMs > KEPT_DAYS * DAY_MS) fs3.rmSync(file4, { force: true });
     }
   } catch {
   }
@@ -7701,21 +7723,6 @@ import fs18 from "node:fs";
 import http2 from "node:http";
 import path18 from "node:path";
 import { fileURLToPath } from "node:url";
-
-// src/data/dates.ts
-var DAY = 864e5;
-var marketDay = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
-var nyClock = (ms) => {
-  const f = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(ms));
-  const v = (t2) => f.find((x) => x.type === t2)?.value ?? "";
-  return `${v("year")}-${v("month")}-${v("day")} ${v("hour")}:${v("minute")}`;
-};
-function today(now) {
-  if (!now && process.env.TRADING_AGENTS_TODAY) return process.env.TRADING_AGENTS_TODAY;
-  return marketDay(now ?? /* @__PURE__ */ new Date());
-}
-var addDays = (date4, days) => new Date(Date.parse(`${date4}T00:00:00Z`) + days * DAY).toISOString().slice(0, 10);
-var daysBetween = (from, to) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY);
 
 // src/data/delay.ts
 var US_EXCHANGES = ["NMS", "NGM", "NCM", "NYQ", "PCX", "ASE", "BTS"];
@@ -8177,6 +8184,24 @@ var downToStep = (n) => Math.floor(n * COIN_STEP + 1e-6) / COIN_STEP;
 var inSteps = (n) => Number.isFinite(n) && Math.abs(n * COIN_STEP - Math.round(n * COIN_STEP)) < 1e-6;
 var units = (n, coin) => coin ? `${n} unit(s)` : `${n} share(s)`;
 var MARKET_WHY = `A part-share is a market order: Robinhood takes no limit price for it, so it fills at the market's price at that moment, and Robinhood's check shows only an estimate. It is sent only while the US market is open, ${PART_HOURS}.`;
+var TICKET_COINS = /* @__PURE__ */ new Set(["BTC-USD", "ETH-USD"]);
+var COIN_WHY = "A coin order is a limit order: it fills at your price or better, at any hour, and stays open until it fills or you cancel it in Robinhood's app, for at most 90 days. Coin prices can move fast, at night and at weekends too.";
+var onStep = (n, step) => Number.isFinite(n) && step > 0 && Math.abs(n / step - Math.round(n / step)) < 1e-6;
+function placesOf(step) {
+  const s = step.toString(), e = /e-(\d+)$/.exec(s);
+  if (e) return Number(e[1]) + (s.split("e")[0].split(".")[1] ?? "").length;
+  return (s.split(".")[1] ?? "").length;
+}
+var coinAmount = (n, step = 1e-8) => n.toFixed(Math.min(placesOf(step), 18)).replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+var toStep = (n, step, way) => {
+  const k = way === "down" ? Math.floor(n / step + 1e-9) : way === "up" ? Math.ceil(n / step - 1e-9) : Math.round(n / step);
+  return Number((k * step).toFixed(Math.min(placesOf(step), 18)));
+};
+var stepsOf = (c) => {
+  const r = c.coin?.rules;
+  return { q: r?.quantityStep ?? 1 / COIN_STEP, p: r?.priceStep ?? 0.01, min: r?.minQuantity ?? 0, max: r?.maxQuantity ?? 1e5 };
+};
+var coinWords = (n, symbol, step) => `${coinAmount(n, step ?? 1e-8)} ${cryptoBase(symbol) ?? symbol}`;
 var early = (c, caps) => c.heldDays !== void 0 && c.heldDays < caps.minHoldDays;
 var money = (n) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 var cents = (n) => Math.round(n * 100) / 100;
@@ -8187,17 +8212,19 @@ function propose(c, t2, caps) {
   const action = actionOf(c.rating, t2), why = [], coin = isCrypto(c.symbol);
   const none = (reason) => ({ action, order: null, why: [...why, reason] });
   if (action === "no order") return none(`The desk rated ${c.symbol} ${c.rating}: your settings place no order for that rating.`);
+  if (coin && c.coin?.unusable) return none(c.coin.unusable);
   if (c.price === null || c.price <= 0) return none(`Robinhood gave no live price for ${c.symbol}, so no order can be sized.`);
-  const limitPrice = cents(c.price), limitWhy = `Limit price: Robinhood's live price, ${money(limitPrice)}. You can change it.`;
+  const s = stepsOf(c), real = coin && c.coin !== void 0;
+  const limitPrice = coin ? toStep(c.price, s.p, "near") : cents(c.price), limitWhy = `Limit price: Robinhood's live price, ${money(limitPrice)}. You can change it.`;
   if (action === "sell half of what is held" || action === "sell everything held") {
     if (c.held <= 0) return none(`The desk rated ${c.symbol} ${c.rating}, but the Agentic account holds none to sell.`);
     if (early(c, caps)) return none(`${c.symbol} was bought here on ${c.boughtOn}, ${c.heldDays} trading day(s) ago: your shortest hold is ${caps.minHoldDays}, so the desk proposes no sell yet.`);
     const all = action === "sell everything held";
     if (coin) {
-      const quantity2 = all ? c.held : downToStep(c.held / 2);
-      if (quantity2 <= 0) return none(`${units(c.held, true)} of ${c.symbol} are held; half of that is less than the smallest step of 0.000001.`);
-      why.push(limitWhy, `${all ? "Everything held" : "Half of what is held"}: ${quantity2} of ${units(c.held, true)}.`);
-      return { action, order: { symbol: c.symbol, side: "sell", quantity: quantity2, limitPrice, timeInForce: t2.orderDefaults.timeInForce }, why };
+      const quantity2 = toStep(all ? c.held : c.held / 2, s.q, "down");
+      if (quantity2 <= 0 || quantity2 < s.min * (1 - 1e-9)) return none(`${coinWords(c.held, c.symbol, s.q)} is held; ${all ? "that" : "half of that"} is less than the smallest order Robinhood takes for it, ${coinWords(Math.max(s.min, s.q), c.symbol, s.q)}.`);
+      why.push(limitWhy, `${all ? "Everything held" : "Half of what is held"}: ${coinWords(quantity2, c.symbol, s.q)} of ${coinWords(c.held, c.symbol, s.q)}.`, ...real ? [COIN_WHY] : []);
+      return { action, order: { symbol: c.symbol, side: "sell", quantity: Math.min(quantity2, s.max), limitPrice, timeInForce: "gtc" }, why };
     }
     const whole3 = Math.floor(all ? c.held : c.held / 2);
     if (all ? !Number.isInteger(c.held) : whole3 < 1) {
@@ -8225,17 +8252,24 @@ function propose(c, t2, caps) {
     why.push(`Buying power is ${money(c.buyingPower)}, so at most that.`);
   }
   if (coin) {
+    if (c.coin?.unchecked?.length) return none(`Your crypto limit cannot be checked: ${c.coin.unchecked.join("; ")}.`);
     const room = Math.max(0, Math.floor((c.accountValue * caps.cryptoPercent / 100 - (c.cryptoHeldUsd ?? 0)) * 100) / 100);
     if (amount > room) {
+      const open4 = c.coin?.openUsd ?? 0, held = cents(Math.max(0, (c.cryptoHeldUsd ?? 0) - open4));
       amount = room;
-      why.push(`Your crypto limit of ${caps.cryptoPercent}% of the account leaves ${money(room)}, so at most that.`);
+      why.push(`Your crypto limit of ${caps.cryptoPercent}% of the account leaves ${money(room)}${open4 ? `, counting ${held > 0 ? `${money(held)} held and ` : ""}${money(cents(open4))} in coin buys not yet filled` : ""}, so at most that.`);
     }
     if (amount < MIN_COIN_USD) return none(`${money(amount)} is under ${money(MIN_COIN_USD)}, the smallest crypto order.`);
-    const quantity2 = downToStep(amount / limitPrice);
-    if (quantity2 <= 0) return none(`${money(amount)} buys no ${c.symbol} at ${money(limitPrice)}.`);
+    let quantity2 = toStep(amount / limitPrice, s.q, "down");
+    if (quantity2 <= 0 || quantity2 < s.min * (1 - 1e-9)) return none(`${money(amount)} buys ${coinWords(quantity2, c.symbol, s.q)} at ${money(limitPrice)}, less than the smallest order Robinhood takes for it, ${coinWords(Math.max(s.min, s.q), c.symbol, s.q)}.`);
     why.unshift(limitWhy);
-    why.push(`${money(amount)} \xF7 ${money(limitPrice)}, rounded down to six decimal places: ${units(quantity2, true)}.`);
-    return { action, order: { symbol: c.symbol, side: "buy", quantity: quantity2, limitPrice, timeInForce: t2.orderDefaults.timeInForce }, why };
+    why.push(`${money(amount)} \xF7 ${money(limitPrice)}, rounded down to ${real ? `${c.symbol}'s step of ${coinWords(s.q, c.symbol, s.q)}` : "six decimal places"}: ${coinWords(quantity2, c.symbol, s.q)}.`);
+    if (quantity2 > s.max) {
+      quantity2 = toStep(s.max, s.q, "down");
+      why.push(`The most Robinhood takes in one order is ${coinWords(s.max, c.symbol, s.q)}, so that.`);
+    }
+    if (real) why.push(COIN_WHY);
+    return { action, order: { symbol: c.symbol, side: "buy", quantity: quantity2, limitPrice, timeInForce: "gtc" }, why };
   }
   if (amount < limitPrice) {
     const dollars = Math.floor(amount * 100 + 1e-6) / 100;
@@ -8252,8 +8286,19 @@ function propose(c, t2, caps) {
 function proposeOwn(c, side, t2, caps) {
   const action = side === "buy" ? "your own buy" : "your own sell";
   const none = (reason) => ({ action, order: null, why: [reason] });
+  if (isCrypto(c.symbol) && c.coin?.unusable) return none(c.coin.unusable);
   if (c.price === null || c.price <= 0) return none(`Robinhood gave no live price for ${c.symbol}, so no order can be priced.`);
   if (side === "sell" && c.held <= 0) return none(`The Agentic account holds no ${c.symbol} to sell.`);
+  if (isCrypto(c.symbol)) {
+    const s = stepsOf(c), price = toStep(c.price, s.p, "near");
+    let q = Math.max(s.min, toStep(MIN_COIN_USD / price, s.q, "up"));
+    if (side === "sell" && q > c.held) q = toStep(c.held, s.q, "down");
+    if (!(q > 0) || q < s.min * (1 - 1e-9)) return none(`The Agentic account holds ${coinWords(c.held, c.symbol, s.q)}, less than the smallest order Robinhood takes for it, ${coinWords(Math.max(s.min, s.q), c.symbol, s.q)}.`);
+    const why2 = [`Your own order: ${coinWords(q, c.symbol, s.q)} to start, about ${money(cents(q * price))} at Robinhood's live price of ${money(price)}. Change the amount and the limit price below.`];
+    if (side === "sell") why2.push(`The Agentic account holds ${coinWords(c.held, c.symbol, s.q)}.`);
+    if (c.coin) why2.push(COIN_WHY);
+    return { action, order: { symbol: c.symbol, side, quantity: q, limitPrice: price, timeInForce: "gtc" }, why: why2 };
+  }
   const limitPrice = cents(c.price);
   if (side === "sell" && c.held < 1) {
     return { action, order: marketSell(c.symbol, downToStep(c.held), limitPrice), why: [`Your own order: the Agentic account holds ${c.held} of a share of ${c.symbol}, so it sells all of it, a part-share at the market price.`, MARKET_WHY] };
@@ -8296,17 +8341,21 @@ function check(o, c, t2, caps) {
     } else add(false, `Robinhood gave no live price for ${o.symbol} to estimate the order with`);
     if (c.session) add(c.session.open, c.session.open ? "The US market is open, so a part-share can be sent now" : `A part-share is sent only while the US market is open, ${PART_HOURS}: it opens ${c.session.opens}`);
   } else {
+    const s = stepsOf(c);
     if (coin) {
-      const ok = inSteps(o.quantity) && o.quantity > 0 && o.quantity <= 1e5;
-      add(ok, ok ? `${units(o.quantity, true)} of ${o.symbol}` : "The quantity must be above zero, to at most six decimal places");
+      if (c.coin?.unusable) add(false, c.coin.unusable.replace(/\.$/, ""));
+      const ok = o.quantity > 0 && onStep(o.quantity, s.q) && o.quantity >= s.min * (1 - 1e-9) && o.quantity <= s.max * (1 + 1e-9);
+      const base2 = cryptoBase(o.symbol) ?? o.symbol;
+      add(ok, ok ? coinWords(o.quantity, o.symbol, s.q) : c.coin?.rules ? `The amount must be in steps of ${coinAmount(s.q, s.q)} ${base2}, from ${coinAmount(Math.max(s.min, s.q), s.q)} to ${coinAmount(s.max, s.q)} ${base2} (Robinhood's rules for ${o.symbol})` : "The quantity must be above zero, to at most six decimal places");
     } else add(Number.isInteger(o.quantity) && o.quantity >= 1 && o.quantity <= 1e5, Number.isInteger(o.quantity) && o.quantity >= 1 ? `${o.quantity} whole share(s)` : "The quantity must be a whole number of shares, at least one (or choose a part-share at the market price)");
-    const priceOk = Number.isFinite(o.limitPrice) && o.limitPrice > 0 && cents(o.limitPrice) === o.limitPrice;
-    add(priceOk, priceOk ? `Limit price ${money(o.limitPrice)}` : "The limit price must be above zero, in dollars and cents");
+    const priceOk = Number.isFinite(o.limitPrice) && o.limitPrice > 0 && (coin ? onStep(o.limitPrice, s.p) : cents(o.limitPrice) === o.limitPrice);
+    add(priceOk, priceOk ? `Limit price ${money(o.limitPrice)}` : coin && s.p !== 0.01 ? `The limit price must be above zero, in steps of $${coinAmount(s.p, s.p)}` : "The limit price must be above zero, in dollars and cents");
     if (!out.every((x) => x.ok)) return out;
     if (c.price !== null && c.price > 0) {
       const off = Math.abs(o.limitPrice / c.price - 1) * 100;
       add(off <= 10, off <= 10 ? `${off.toFixed(1)}% from Robinhood's live price` : `${off.toFixed(1)}% from Robinhood's live price of ${money(c.price)}: more than 10% away, which looks like a typing slip`);
     } else add(false, `Robinhood gave no live price for ${o.symbol} to check the limit against`);
+    if (coin && c.coin) add(true, "Coins trade at any hour, so this can be sent now; it stays open until it fills or you cancel it in Robinhood's app, for at most 90 days");
   }
   const per = market && c.price !== null && c.price > 0 ? c.price : o.limitPrice;
   const cost = cents(market && o.side === "buy" ? o.dollars : o.quantity * per);
@@ -8315,13 +8364,17 @@ function check(o, c, t2, caps) {
     if (c.buyingPower === null) add(false, "Robinhood gave no buying power for the Agentic account");
     else add(cost <= c.buyingPower, cost <= c.buyingPower ? `Buying power ${money(c.buyingPower)} covers it` : `Buying power is ${money(c.buyingPower)}: not enough`);
     if (c.accountValue === null || c.accountValue <= 0) add(false, "Robinhood gave no total value for the Agentic account to check your per-stock cap");
-    else if (c.unreadOrders) add(false, `Robinhood listed ${c.unreadOrders} order(s) whose stock, side, size or state could not be read, so your per-stock and sector caps cannot be checked`);
+    else if (c.unreadOrders) add(false, coin ? "Robinhood listed open coin orders that could not all be read, so your per-coin and crypto caps cannot be checked" : `Robinhood listed ${c.unreadOrders} order(s) whose stock, side, size or state could not be read, so your per-stock and sector caps cannot be checked`);
     else {
       const waiting = c.open?.buy ?? 0, after = ((c.held + waiting) * per + cost) / c.accountValue * 100;
-      add(after <= caps.perStockPercent, `${o.symbol} would be ${after.toFixed(1)}% of the account${waiting ? `, counting ${waiting} share(s) in orders not yet filled` : ""}; your cap is ${caps.perStockPercent}%`);
+      add(after <= caps.perStockPercent, `${o.symbol} would be ${after.toFixed(1)}% of the account${waiting ? `, counting ${coin ? coinWords(waiting, o.symbol) : `${waiting} share(s)`} in orders not yet filled` : ""}; your cap is ${caps.perStockPercent}%`);
       if (coin) {
-        const inCrypto = ((c.cryptoHeldUsd ?? 0) + cost) / c.accountValue * 100;
-        add(inCrypto <= caps.cryptoPercent + 1e-9, `Crypto would be ${inCrypto.toFixed(1)}% of the account; your limit is ${caps.cryptoPercent}%`);
+        if (c.coin?.unchecked?.length) add(false, `Crypto cannot be checked against your limit of ${caps.cryptoPercent}%: ${c.coin.unchecked.join("; ")}`);
+        else {
+          const inCrypto = ((c.cryptoHeldUsd ?? 0) + cost) / c.accountValue * 100;
+          const open4 = c.coin?.openUsd ?? 0, held = cents(Math.max(0, (c.cryptoHeldUsd ?? 0) - open4));
+          add(inCrypto <= caps.cryptoPercent + 1e-9, `Crypto would be ${inCrypto.toFixed(1)}% of the account${open4 ? `, counting ${held > 0 ? `${money(held)} held and ` : ""}${money(cents(open4))} in coin buys not yet filled` : ""}; your limit is ${caps.cryptoPercent}%`);
+        }
       } else {
         const s = c.sector ?? { name: `own:${o.symbol}`, label: "not known, so counted as a sector of its own", heldUsd: c.held * per };
         const named = s.label === "" ? "Its sector" : `Sector ${s.label}`;
@@ -8335,8 +8388,9 @@ function check(o, c, t2, caps) {
     }
   } else {
     const promised = c.open?.sell ?? 0, free = c.held - promised;
-    if (promised) add(o.quantity <= free + 1e-9, o.quantity <= free + 1e-9 ? `Selling ${o.quantity} of the ${c.held} held, ${promised} more already in sell orders not yet filled` : `Only ${Math.max(0, free)} of the ${c.held} held can be sold: ${promised} are in sell orders not yet filled`);
-    else add(o.quantity <= c.held + 1e-9, o.quantity <= c.held + 1e-9 ? `Selling ${o.quantity} of the ${c.held} held` : `Only ${units(c.held, coin)} are held in the Agentic account`);
+    const n = (x) => coin ? coinAmount(x) : String(x);
+    if (promised) add(o.quantity <= free + 1e-9, o.quantity <= free + 1e-9 ? `Selling ${n(o.quantity)} of the ${n(c.held)} held, ${n(promised)} more already in sell orders not yet filled` : `Only ${n(Math.max(0, free))} of the ${n(c.held)} held can be sold: ${n(promised)} are in sell orders not yet filled`);
+    else add(o.quantity <= c.held + 1e-9, o.quantity <= c.held + 1e-9 ? `Selling ${n(o.quantity)} of the ${n(c.held)} held` : coin ? `Only ${coinWords(c.held, o.symbol)} is held in the Agentic account` : `Only ${units(c.held, false)} are held in the Agentic account`);
     if (early(c, caps)) out.push({ ok: true, ask: true, words: `${o.symbol} was bought here on ${c.boughtOn}, ${c.heldDays} trading day(s) ago, under your shortest hold of ${caps.minHoldDays}: selling it now takes one more press` });
   }
   add(c.ordersToday < caps.ordersPerDay, `${c.ordersToday} of your ${caps.ordersPerDay} orders a day used`);
@@ -8782,13 +8836,44 @@ function parseQuotes(answer) {
   }
   return out;
 }
-var orderOf = (v) => {
+function parseCoinQuotes(answer) {
+  const raw = obj(answer).data, d = obj(raw), out = /* @__PURE__ */ new Map();
+  const rows = Array.isArray(raw) ? raw : Array.isArray(d.results) ? d.results : list(d.quotes);
+  for (const v of rows) {
+    const row = obj(v), inner = obj(row.quote), q = Object.keys(inner).length ? inner : row;
+    const symbol = text(q.symbol) ?? text(row.symbol), price = figure(q.mark_price) ?? figure(q.mark) ?? figure(q.last_trade_price);
+    if (symbol && price !== null && price > 0) out.set(deskSymbol(symbol, "crypto"), price);
+  }
+  return out;
+}
+var flag = (v) => typeof v === "boolean" ? v : null;
+function parsePairs(answer) {
+  const d = dataOf(answer);
+  const pairs = list(d.results).flatMap((v) => {
+    const p = obj(v), raw = text(p.symbol);
+    if (!raw) return [];
+    const quantityStep = figure(p.min_order_quantity_increment), priceStep = figure(p.min_order_price_increment), minQuantity = figure(p.min_order_size), maxQuantity = figure(p.max_order_size);
+    const rules = quantityStep !== null && quantityStep > 0 && priceStep !== null && priceStep > 0 && minQuantity !== null && minQuantity >= 0 && maxQuantity !== null && maxQuantity > 0 ? { quantityStep, priceStep, minQuantity, maxQuantity } : null;
+    return [{ id: text(p.id), symbol: deskSymbol(raw, "crypto"), tradable: text(p.tradability) === "tradable", halted: flag(p.halted), displayOnly: flag(p.display_only), marketOnly: flag(p.market_orders_only), rules }];
+  });
+  return { pairs, next: text(d.next) };
+}
+function coinUnusable(symbol, pair) {
+  if (!pair) return `Robinhood does not list ${symbol} among the coins it trades.`;
+  if (pair.halted !== false) return pair.halted ? `Robinhood has halted trading in ${symbol} for now.` : `Robinhood did not say whether trading in ${symbol} is halted, so no coin order is proposed.`;
+  if (!pair.tradable) return `Robinhood marks ${symbol} as not tradable now.`;
+  if (pair.displayOnly !== false) return `Robinhood shows ${symbol} for display only, not to trade.`;
+  if (pair.marketOnly !== false) return `Robinhood takes ${symbol} only as a market order, and the desk's coin tickets are limit orders.`;
+  if (!pair.rules) return `Robinhood gave no order sizes for ${symbol} (its smallest step, least and most), so no coin order can be sized.`;
+  return null;
+}
+var orderOf = (v, symbolOf = (o) => text(o.symbol)?.toUpperCase() ?? null) => {
   const o = obj(v), type = text(o.type);
   const filled = figure(o.average_price), limit = figure(o.limit_price), listed2 = figure(o.price);
   const price = filled ?? listed2 ?? limit;
   const priceIs = price === null ? null : filled !== null ? "filled" : (listed2 !== null ? type?.toLowerCase() === "limit" : limit !== null) ? "limit" : "listed";
   return {
-    symbol: text(o.symbol)?.toUpperCase() ?? null,
+    symbol: symbolOf(o),
     side: text(o.side),
     type,
     state: text(o.state),
@@ -8800,10 +8885,24 @@ var orderOf = (v) => {
 };
 function parseOrders(answer) {
   const rows = list(dataOf(answer).orders);
-  return { count: rows.length, orders: rows.slice(0, 20).map(orderOf) };
+  return { count: rows.length, orders: rows.slice(0, 20).map((v) => orderOf(v)) };
 }
 function openOrders(answer) {
-  const rows = list(dataOf(answer).orders), all = rows.map(orderOf);
+  const rows = list(dataOf(answer).orders), all = rows.map((v) => orderOf(v));
+  return { all, ...openOf(rows, all) };
+}
+function coinOrders(answer, pairs = /* @__PURE__ */ new Map()) {
+  const d = dataOf(answer), rows = list(d.results ?? d.orders);
+  const symbolOf = (o) => {
+    const s = text(o.symbol);
+    if (s) return deskSymbol(s, "crypto");
+    const id = text(o.currency_pair_id);
+    return id ? pairs.get(id) ?? null : null;
+  };
+  const all = rows.map((v) => orderOf(v, symbolOf));
+  return { all, ...openOf(rows, all), next: text(d.next) };
+}
+function openOf(rows, all) {
   const open4 = [];
   let unread = 0;
   rows.forEach((v, i) => {
@@ -8814,9 +8913,9 @@ function openOrders(answer) {
       unread++;
       return;
     }
-    open4.push({ symbol: o.symbol, side: o.side, quantity: Math.max(0, quantity - filled), price: figure(raw.price) ?? figure(raw.limit_price) });
+    open4.push({ symbol: o.symbol, side: o.side, quantity: Math.max(0, Number((quantity - filled).toFixed(12))), price: figure(raw.price) ?? figure(raw.limit_price), ...o.at ? { at: o.at } : {} });
   });
-  return { all, open: open4.filter((o) => o.quantity > 0), unread };
+  return { open: open4.filter((o) => o.quantity > 0), unread };
 }
 function parseApprovals(setting, approvals) {
   const s = obj(dataOf(setting).setting);
@@ -8845,19 +8944,36 @@ async function readAccount(reader, account, ids) {
     const q = await read2("live prices", "get_equity_quotes", { symbols: symbols.slice(i, i + QUOTES_PER_CALL) });
     for (const [s, v] of parseQuotes(q)) prices.set(s, v);
   }
+  const coinNames = [...new Set(base2.filter((h) => h.kind === "crypto").map((h) => deskSymbol(h.symbol, "crypto")))];
+  const coinPrices = coinNames.length ? parseCoinQuotes(await read2("live coin prices", "get_crypto_quotes", { symbols: coinNames })) : /* @__PURE__ */ new Map();
   const holdings = base2.map((h) => {
-    const price = prices.get(h.symbol) ?? null;
+    const price = (h.kind === "crypto" ? coinPrices.get(deskSymbol(h.symbol, "crypto")) : prices.get(h.symbol)) ?? null;
     return { ...h, price, value: price === null ? null : price * h.quantity, gainPct: price !== null && h.averageCost ? (price / h.averageCost - 1) * 100 : null };
   }).sort((a, b) => (b.value ?? -1) - (a.value ?? -1));
-  let orders = null, approvals = null;
+  let orders = null, approvals = null, coin;
   if (account.agentic) {
     const o = await read2("the orders", "get_equity_orders", { account_number: ids.accountNumber });
     orders = o === null ? null : parseOrders(o);
+    if (ids.rhsAccountNumber) {
+      const c = await read2("the coin orders", "get_crypto_orders", { rhs_account_number: ids.rhsAccountNumber });
+      const op = c === null ? null : await read2("the open coin orders", "get_crypto_orders", { rhs_account_number: ids.rhsAccountNumber, state_group: "open" });
+      const unnamed = [c, op].some((a) => list(dataOf(a).results).some((v) => !text(obj(v).symbol) && text(obj(v).currency_pair_id)));
+      const names = unnamed ? new Map(parsePairs(await read2("Robinhood's list of coins", "get_currency_pairs", { limit: 100 })).pairs.flatMap((p2) => p2.id ? [[p2.id, p2.symbol]] : [])) : /* @__PURE__ */ new Map();
+      const coinRead = c === null ? null : coinOrders(c, names), openRead = op === null ? null : coinOrders(op, names);
+      const newest = coinRead === null ? [] : [...coinRead.all].sort((a, b) => (b.at ?? "").localeCompare(a.at ?? ""));
+      coin = coinRead === null ? null : {
+        orders: newest.slice(0, 20),
+        count: newest.length,
+        more: coinRead.next !== null,
+        open: openRead === null ? null : openRead.open,
+        openComplete: openRead !== null && openRead.next === null && openRead.unread === 0
+      };
+    }
     const setting = await read2("the phone approval setting", "get_trade_approval_setting", { account_number: ids.accountNumber });
     const pending = await read2("the approvals waiting", "get_trade_approvals", { account_number: ids.accountNumber });
     approvals = setting === null && pending === null ? null : parseApprovals(setting, pending);
   }
-  return { account, portfolio: p === null ? null : parsePortfolio(p), holdings, unread: crypto7.unread, orders, approvals, problems };
+  return { account, portfolio: p === null ? null : parsePortfolio(p), holdings, unread: crypto7.unread, orders, approvals, problems, ...coin === void 0 ? {} : { coinOrders: coin } };
 }
 
 // src/settings.ts
@@ -8876,6 +8992,7 @@ var DEFAULTS = {
     riskRounds: 1,
     analysts: [...ANALYSTS],
     managerModel: "",
+    buildOnEarlierDays: 30,
     newsLookbackDays: 7,
     companyNewsLimit: 20,
     worldNewsLimit: 10,
@@ -8962,6 +9079,7 @@ function readSettings(root2) {
       outputLanguage: languageName(a.outputLanguage),
       debateRounds: int(a.debateRounds, 1, 5, 1),
       riskRounds: int(a.riskRounds, 1, 5, 1),
+      buildOnEarlierDays: int(a.buildOnEarlierDays, 0, 30, DEFAULTS.analysis.buildOnEarlierDays),
       analysts: analysts.length ? analysts : [...ANALYSTS],
       worldNewsSearches: searchesOf(a.worldNewsSearches),
       managerModel: typeof a.managerModel === "string" && /^[\w.\-[\]]{0,60}$/.test(a.managerModel.trim()) ? a.managerModel.trim() : ""
@@ -20683,11 +20801,19 @@ function equityOrderArgs(accountNumber, o) {
   if (!Number.isInteger(o.quantity) || o.quantity < 1 || !(o.limitPrice > 0)) return null;
   return { ...base2, type: "limit", quantity: String(o.quantity), limit_price: o.limitPrice.toFixed(2), time_in_force: o.timeInForce, market_hours: "regular_hours" };
 }
+function cryptoOrderArgs(rhsAccountNumber, o, rules) {
+  if (o.side !== "buy" && o.side !== "sell" || o.market === true || !rhsAccountNumber) return null;
+  const q = o.quantity, p = o.limitPrice;
+  if (!(q > 0) || !onStep(q, rules.quantityStep) || q < rules.minQuantity * (1 - 1e-9) || q > rules.maxQuantity * (1 + 1e-9)) return null;
+  if (!(p > 0) || !onStep(p, rules.priceStep)) return null;
+  return { rhs_account_number: rhsAccountNumber, symbol: o.symbol, side: o.side, type: "limit", quantity: coinAmount(q, rules.quantityStep), limit_price: p.toFixed(Math.max(2, placesOf(rules.priceStep))), time_in_force: "gtc" };
+}
 var oneLine = (s, max) => {
   const t2 = s.replace(/\s+/g, " ").trim();
   return t2.length > max ? `${t2.slice(0, max - 3)}...` : t2;
 };
-var masked = (s) => oneLine(s, 300).replace(/\b[a-z0-9]*\d{5,}[a-z0-9]*\b/gi, "#####");
+var masked = (s) => hideLong(oneLine(s, 300), 5);
+var hideLong = (s, n) => s.replace(new RegExp(`(?<![\\d.])\\b[a-z0-9]*\\d{${n},}[a-z0-9]*\\b(?!\\.\\d)`, "gi"), "#####");
 var LOOK_FIRST = "Look at the Agentic account's orders in Robinhood's own app before you try again.";
 
 // src/robinhood/reader.ts
@@ -20731,6 +20857,7 @@ var Reader = class {
 
 // src/robinhood/review.ts
 var REVIEW = "review_equity_order";
+var PREVIEW = "preview_crypto_order";
 var obj2 = (v) => v && typeof v === "object" && !Array.isArray(v) ? v : {};
 var words = (v) => {
   if (typeof v === "string") return v.trim() ? [v.trim()] : [];
@@ -20759,13 +20886,65 @@ function parseReview(answer) {
     for (const [k, v] of Object.entries(o)) {
       if (facts.length >= 24 || ["order_checks", "alerts", "warnings", "customer_approval_required", "account_number", "rhs_account_number"].includes(k)) continue;
       const name = `${prefix}${k.replace(/_/g, " ")}`;
-      if (v === null || typeof v === "string" || typeof v === "number" || typeof v === "boolean") facts.push([name, String(v).replace(/\b[a-z0-9]*\d{7,}[a-z0-9]*\b/gi, "#####").slice(0, 120)]);
+      if (v === null || typeof v === "string" || typeof v === "number" || typeof v === "boolean") facts.push([name, hideLong(String(v), 7).slice(0, 120)]);
       else if (!Array.isArray(v) && depth < 2) walk(obj2(v), `${name} \xB7 `, depth + 1);
     }
   };
   walk(d, "", 0);
   return { answered: true, unclear: false, alerts, approvalRequired: typeof d.customer_approval_required === "boolean" ? d.customer_approval_required : null, facts, error: null };
 }
+var factsOf = (d) => {
+  const facts = [];
+  const walk = (o, prefix, depth) => {
+    for (const [k, v] of Object.entries(o)) {
+      if (facts.length >= 24 || ["customer_approval_required", "account_number", "rhs_account_number", "rhc_account_number"].includes(k)) continue;
+      const name = `${prefix}${k.replace(/_/g, " ")}`;
+      if (v === null || typeof v === "string" || typeof v === "number" || typeof v === "boolean") facts.push([name, hideLong(String(v), 7).slice(0, 120)]);
+      else if (!Array.isArray(v) && depth < 2) walk(obj2(v), `${name} \xB7 `, depth + 1);
+    }
+  };
+  walk(d, "", 0);
+  return facts;
+};
+var figureOf = (v) => typeof v === "number" && Number.isFinite(v) ? v : typeof v === "string" && /^-?\d+(\.\d+)?$/.test(v.trim()) ? Number(v) : null;
+function parsePreview(answer, o) {
+  if (answer.failed) return { answered: false, unclear: false, alerts: [], approvalRequired: null, facts: [], error: masked(answer.text) };
+  const d = obj2(obj2(answer.data).data);
+  const same = (x) => x.side === o.side && (() => {
+    const q = figureOf(x.quantity);
+    return q !== null && Math.abs(q - o.quantity) <= 1e-12 + o.quantity * 1e-9;
+  })();
+  const named = same(d) || Object.values(d).some((v) => !Array.isArray(v) && same(obj2(v)));
+  const facts = factsOf(d);
+  if (!named) {
+    const said = answer.data === null ? answer.text.trim() : words(d).join(" ");
+    return {
+      answered: false,
+      unclear: true,
+      alerts: [],
+      approvalRequired: null,
+      facts,
+      error: `Robinhood's coin check did not name this order back, so it counts as not checked and cannot be placed.${said ? ` It said: ${masked(said).slice(0, 300)}` : ""}`
+    };
+  }
+  const flagged = Object.entries(d).filter(([k]) => /error|alert|warning|reject|invalid/i.test(k)).flatMap(([, v]) => words(v));
+  const inner = Object.values(d).filter((v) => !Array.isArray(v) && Object.keys(obj2(v)).length).flatMap((v) => Object.entries(obj2(v)).filter(([k]) => /error|alert|warning|reject|invalid/i.test(k)).flatMap(([, x]) => words(x)));
+  const asked = figureOf(d.requested_quantity);
+  const rounded = d.requested_quantity !== void 0 && d.requested_quantity !== null ? [`Robinhood would round the amount${asked === null ? "" : ` (${coinAmount(asked)} asked)`}: its order tool refuses an amount off the coin's step, so change it`] : [];
+  const alerts = [.../* @__PURE__ */ new Set([...flagged, ...inner, ...rounded])].slice(0, 12).map((x) => x.slice(0, 300));
+  return { answered: true, unclear: false, alerts, approvalRequired: typeof d.customer_approval_required === "boolean" ? d.customer_approval_required : null, facts, error: null };
+}
+var answerOf = (r) => {
+  const text2 = (r.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
+  let data = r.structuredContent ?? null;
+  if (data === null) {
+    try {
+      data = JSON.parse(text2);
+    } catch {
+    }
+  }
+  return { data, text: text2, failed: r.isError === true };
+};
 var Reviewer = class {
   constructor(client, tools) {
     this.client = client;
@@ -20773,27 +20952,22 @@ var Reviewer = class {
   }
   client;
   tools;
-  /** Asks Robinhood to check the order on the Agentic account. Nothing is placed. */
-  async review(account, o) {
+  /** Asks Robinhood to check the order on the Agentic account. Nothing is placed. A coin order needs the account's numeric
+   *  number and the coin's own rules (read from Robinhood's list of coins just before). */
+  async review(account, o, coin) {
     if (!account.agentic) throw new Refused("Only the Agentic account can have an order checked, and this is not it.");
-    if (!this.tools.some((t2) => t2.name === REVIEW)) throw new Refused("Robinhood's connection no longer offers its order check, so nothing was sent.");
-    const args = equityOrderArgs(account.accountNumber, o);
+    const crypto7 = isCrypto(o.symbol), name = crypto7 ? PREVIEW : REVIEW;
+    if (!this.tools.some((t2) => t2.name === name)) throw new Refused(`Robinhood's connection no longer offers its ${crypto7 ? "coin " : ""}order check, so nothing was sent.`);
+    const args = crypto7 ? coin && account.rhsAccountNumber ? cryptoOrderArgs(account.rhsAccountNumber, o, coin) : null : equityOrderArgs(account.accountNumber, o);
     if (!args) throw new Refused("That order is not complete, so it was not sent for checking.");
-    const r = await this.client.callTool({ name: REVIEW, arguments: args });
-    const text2 = (r.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
-    let data = r.structuredContent ?? null;
-    if (data === null) {
-      try {
-        data = JSON.parse(text2);
-      } catch {
-      }
-    }
-    return parseReview({ data, text: text2, failed: r.isError === true });
+    const r = answerOf(await this.client.callTool({ name, arguments: args }));
+    return crypto7 ? parsePreview(r, o) : parseReview(r);
   }
 };
 
 // src/robinhood/order.ts
 var PLACE = "place_equity_order";
+var PLACE_COIN = "place_crypto_order";
 var obj3 = (v) => v && typeof v === "object" && !Array.isArray(v) ? v : {};
 var REFUSED = /^(rejected|failed|cancell?ed|expired|voided)$/i;
 function parsePlaced(answer) {
@@ -20808,7 +20982,7 @@ function parsePlaced(answer) {
     for (const [k, v] of Object.entries(o)) {
       if (facts.length >= 24 || ["account_number", "rhs_account_number", "customer_approval_required"].includes(k)) continue;
       const name = `${prefix}${k.replace(/_/g, " ")}`;
-      if (v === null || typeof v === "string" || typeof v === "number" || typeof v === "boolean") facts.push([name, (/(^|_)id$/.test(k) ? String(v) : String(v).replace(/\b[a-z0-9]*\d{7,}[a-z0-9]*\b/gi, "#####")).slice(0, 120)]);
+      if (v === null || typeof v === "string" || typeof v === "number" || typeof v === "boolean") facts.push([name, (/(^|_)id$/.test(k) ? String(v) : hideLong(String(v), 7)).slice(0, 120)]);
       else if (!Array.isArray(v) && depth < 2) walk(obj3(v), `${name} \xB7 `, depth + 1);
     }
   };
@@ -20826,20 +21000,23 @@ var Placer = class {
   client;
   tools;
   /** Refuses, before anything is sent, an order this door would not send: a part-share outside New York's regular
-   *  session among them, which Robinhood would refuse anyway. */
-  ready(account, o, refId, now = /* @__PURE__ */ new Date()) {
+   *  session among them, which Robinhood would refuse anyway. A coin order needs the account's numeric number and the
+   *  coin's own rules, read from Robinhood just before. */
+  ready(account, o, refId, now = /* @__PURE__ */ new Date(), coin) {
     if (!account.agentic) throw new Refused("Only the Agentic account can trade, and this is not it.");
-    if (!this.tools.some((t2) => t2.name === PLACE)) throw new Refused("Robinhood's connection no longer offers placing a stock order, so nothing was sent.");
-    const args = equityOrderArgs(account.accountNumber, o);
+    const crypto7 = isCrypto(o.symbol);
+    if (!this.tools.some((t2) => t2.name === (crypto7 ? PLACE_COIN : PLACE))) throw new Refused(`Robinhood's connection no longer offers placing a ${crypto7 ? "coin" : "stock"} order, so nothing was sent.`);
+    const args = crypto7 ? coin && account.rhsAccountNumber ? cryptoOrderArgs(account.rhsAccountNumber, o, coin) : null : equityOrderArgs(account.accountNumber, o);
     if (!args || !/^[0-9a-f-]{36}$/.test(refId)) throw new Refused("That order is not complete, so it was not sent.");
     const session = o.market ? regularSession(now) : null;
     if (session && !session.open) throw new Refused(`A part-share is sent only while the US market is open, ${PART_HOURS}: it opens ${session.opens}. Nothing was sent.`);
     return { ...args, ref_id: refId };
   }
-  /** Places one order on the Agentic account: whole shares at a limit price, or a part-share at the market price in
-   *  regular hours. Call only after the person's Confirm. */
-  async place(account, o, refId, now = /* @__PURE__ */ new Date()) {
-    const r = await this.client.callTool({ name: PLACE, arguments: this.ready(account, o, refId, now) });
+  /** Places one order on the Agentic account: whole shares at a limit price, a part-share at the market price in regular
+   *  hours, or a coin at a limit price. Call only after the person's Confirm. */
+  async place(account, o, refId, now = /* @__PURE__ */ new Date(), coin) {
+    const name = isCrypto(o.symbol) ? PLACE_COIN : PLACE;
+    const r = await this.client.callTool({ name, arguments: this.ready(account, o, refId, now, coin) });
     const text2 = (r.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
     let data = r.structuredContent ?? null;
     if (data === null) {
@@ -21082,6 +21259,38 @@ var Link = class {
   async ticketContext(symbol, now = this.clock()) {
     return this.withReader((r) => this.contextWith(r, symbol, now));
   }
+  /** Coin orders of the Agentic account since a day ago that fall on New York's day `now`, which count towards orders a
+   *  day with its stock orders; null when they could not be read. */
+  async coinOrdersToday(r, rhs, now) {
+    if (!rhs) return 0;
+    let x;
+    try {
+      x = await r.read("get_crypto_orders", { rhs_account_number: rhs, created_at_gte: new Date(now.getTime() - 864e5).toISOString() });
+    } catch (e) {
+      if (e instanceof Refused) return null;
+      throw e;
+    }
+    return x.failed ? null : coinOrders(x.data).all.filter((o) => o.at && marketDay(new Date(o.at)) === marketDay(now)).length;
+  }
+  /** Every page of a list Robinhood gives a page at a time (its `next` mark passed back as `cursor`), up to five pages;
+   *  `complete` false when there were more. */
+  async pages(data, name, args) {
+    const answers = [];
+    let cursor = null;
+    for (let i = 0; i < 5; i++) {
+      const d = await data(name, cursor ? { ...args, cursor } : args);
+      answers.push(d);
+      const next = d?.data?.next;
+      if (typeof next !== "string" || !next.trim()) return { answers, complete: true };
+      cursor = next;
+    }
+    return { answers, complete: false };
+  }
+  /** Robinhood's list of coins and their order rules, every page of it. */
+  async coinPairs(data) {
+    const { answers } = await this.pages(data, "get_currency_pairs", { limit: 100 });
+    return answers.flatMap((a) => parsePairs(a).pairs);
+  }
   async contextWith(r, symbol, now) {
     {
       const a = await r.read("get_accounts");
@@ -21095,11 +21304,12 @@ var Link = class {
       };
       const p = parsePortfolio(await data("get_portfolio", { account_number: ids.accountNumber }));
       this.noteValue(p.total, now);
+      if (isCrypto(symbol)) return this.coinContextWith(r, data, ids, symbol, p, now);
       const all = parsePositions(await data("get_equity_positions", { account_number: ids.accountNumber })), rh = brokerSymbol(symbol);
       const same = (s) => deskSymbol(s, "stock") === deskSymbol(symbol, "stock");
       const held = all.find((x) => same(x.symbol))?.quantity ?? 0;
       const orders = openOrders(await data("get_equity_orders", { account_number: ids.accountNumber }));
-      const ordersToday = orders.all.filter((o) => o.at && marketDay(new Date(o.at)) === marketDay(now)).length;
+      const ordersToday = orders.all.filter((o) => o.at && marketDay(new Date(o.at)) === marketDay(now)).length + (await this.coinOrdersToday(r, ids.rhsAccountNumber, now) ?? 0);
       const wanted2 = [.../* @__PURE__ */ new Set([rh, ...all.map((x) => x.symbol), ...orders.open.filter((o) => o.side === "buy" && o.price === null).map((o) => o.symbol)])];
       const quotes = /* @__PURE__ */ new Map();
       for (let i = 0; i < wanted2.length; i += QUOTES_PER_CALL) for (const [s, v] of parseQuotes(await data("get_equity_quotes", { symbols: wanted2.slice(i, i + QUOTES_PER_CALL) }))) quotes.set(s, v);
@@ -21119,6 +21329,71 @@ var Link = class {
         openBuys: orders.open.filter((o) => o.side === "buy").map((o) => ({ symbol: deskSymbol(o.symbol, "stock"), quantity: o.quantity, price: o.price ?? quotes.get(o.symbol) ?? null }))
       };
     }
+  }
+  /** A coin ticket's figures (BTC-USD, ETH-USD), all from Robinhood: whether a crypto account is open, the coin as
+   *  Robinhood trades it (tradable now, not halted, its order rules), the coins held, every open coin order (an open buy
+   *  counts towards the crypto limit and the coin's own cap as if filled, at its own limit price), the orders of the day
+   *  (stocks and coins together), and the coin's live price. Coins trade at any hour, so there is no session. */
+  async coinContextWith(r, data, ids, symbol, p, now) {
+    const base2 = { symbol, accountValue: p.total, buyingPower: p.buyingPower, held: 0, price: null, ordersToday: 0 };
+    const rhs = ids.rhsAccountNumber;
+    if (!rhs) return { ...base2, coin: { rules: null, unusable: "Robinhood gave no crypto number for the Agentic account, so it cannot trade coins here." } };
+    let onboarding;
+    try {
+      onboarding = await r.read("get_crypto_account_onboarding_info");
+    } catch (e) {
+      if (e instanceof Refused) return { ...base2, coin: { rules: null, unusable: "Robinhood's connection offers no coin trading, so no coin order is proposed." } };
+      throw e;
+    }
+    const onboarded = onboarding.failed ? null : onboarding.data?.data?.already_onboarded;
+    const pairs = await this.coinPairs(data), pair = pairs.find((x) => x.symbol === symbol);
+    const unusable = onboarded === false ? "Robinhood says no crypto account is open yet: open one in Robinhood's app, then try again." : onboarded !== true ? "Robinhood did not say whether a crypto account is open, so no coin order is proposed." : coinUnusable(symbol, pair);
+    const held = parseCrypto(await data("get_crypto_positions", { rhs_account_number: rhs }));
+    const names = new Map(pairs.flatMap((x) => x.id ? [[x.id, x.symbol]] : []));
+    const openPages = await this.pages(data, "get_crypto_orders", { rhs_account_number: rhs, state_group: "open" });
+    const open4 = [];
+    let unread = openPages.complete ? 0 : 1;
+    for (const a of openPages.answers) {
+      const o = coinOrders(a, names);
+      open4.push(...o.open);
+      unread += o.unread;
+    }
+    const equity = openOrders(await data("get_equity_orders", { account_number: ids.accountNumber }));
+    const coinsToday = await this.coinOrdersToday(r, rhs, now);
+    if (coinsToday === null) throw new Error("Robinhood could not give the coin orders of today");
+    const ordersToday = equity.all.filter((o) => o.at && marketDay(new Date(o.at)) === marketDay(now)).length + coinsToday;
+    const coin = (s) => deskSymbol(s, "crypto");
+    const wanted2 = [.../* @__PURE__ */ new Set([symbol, ...held.holdings.map((h) => coin(h.symbol)), ...open4.filter((o) => o.side === "buy" && o.price === null).map((o) => o.symbol)])];
+    const quotes = parseCoinQuotes(await data("get_crypto_quotes", { symbols: wanted2, rhs_account_number: rhs }));
+    const positions = held.holdings.map((h) => ({ symbol: coin(h.symbol), quantity: h.quantity, price: quotes.get(coin(h.symbol)) ?? null }));
+    const buys = open4.filter((o) => o.side === "buy").map((o) => ({ symbol: o.symbol, quantity: o.quantity, price: o.price ?? quotes.get(o.symbol) ?? null }));
+    const unchecked = [...new Set([...positions, ...buys].filter((x) => x.price === null).map((x) => `Robinhood gave no live price for ${x.symbol}`))];
+    if (held.unread) unchecked.push(`Robinhood listed ${held.unread} coin holding(s) that could not be read`);
+    const openUsd = buys.reduce((n, o) => n + o.quantity * (o.price ?? 0), 0);
+    const mine = (side) => open4.filter((o) => o.symbol === symbol && o.side === side).reduce((n, o) => n + o.quantity, 0);
+    return {
+      ...base2,
+      held: positions.find((x) => x.symbol === symbol)?.quantity ?? 0,
+      price: quotes.get(symbol) ?? null,
+      ordersToday,
+      positions,
+      open: { buy: mine("buy"), sell: mine("sell") },
+      unreadOrders: unread,
+      openBuys: buys,
+      cryptoHeldUsd: positions.reduce((n, x) => n + x.quantity * (x.price ?? 0), 0) + openUsd,
+      coin: { rules: pair?.rules ?? null, ...unusable ? { unusable } : {}, openUsd, ...unchecked.length ? { unchecked } : {} }
+    };
+  }
+  /** The coin's own order rules, read from Robinhood just now, or why it cannot be traded now. */
+  async coinRulesOf(r, symbol) {
+    const data = async (name, args) => {
+      const x = await r.read(name, args);
+      if (x.failed) throw new Error(`Robinhood could not give ${name.replace(/^get_|_/g, " ").trim()}`);
+      return x.data;
+    };
+    const pair = (await this.coinPairs(data)).find((x) => x.symbol === symbol), why = coinUnusable(symbol, pair);
+    if (why || !pair?.rules) throw new Refused(`${why ?? `Robinhood gave no order sizes for ${symbol}.`} Nothing was sent.`);
+    return pair.rules;
   }
   /** Whether the person has switched trading on, on the dashboard, and their caps. Kept together beside the sign-in, where
    *  agents are refused: a cap missing or out of range is the shipped one, never a larger one. */
@@ -21195,11 +21470,13 @@ var Link = class {
       if (!now.on) throw new Error(`trading switched itself off: ${now.offBecause?.words ?? "switch it on in Your account first"}`);
       const failed = (await approve(context)).filter((c) => !c.ok);
       if (failed.length) throw new Error(`the order no longer passes on Robinhood's latest figures: ${failed.map((c) => c.words).join("; ")}`);
-      const account = { accountNumber: this.agenticIds().accountNumber, agentic: true }, sent = { ...order, symbol: brokerSymbol(order.symbol) };
-      session.placer.ready(account, sent, refId, at);
+      const ids = this.agenticIds(), account = { accountNumber: ids.accountNumber, rhsAccountNumber: ids.rhsAccountNumber, agentic: true }, sent = { ...order, symbol: brokerSymbol(order.symbol) };
+      if (isCrypto(order.symbol) && (context.coin?.unusable || !context.coin?.rules)) throw new Refused(`${context.coin?.unusable ?? `Robinhood gave no order sizes for ${order.symbol}.`} Nothing was sent.`);
+      const rules = context.coin?.rules ?? void 0;
+      session.placer.ready(account, sent, refId, at, rules);
       sending();
       try {
-        return { placed: await session.placer.place(account, sent, refId, at), context };
+        return { placed: await session.placer.place(account, sent, refId, at, rules), context };
       } catch (e) {
         throw e instanceof Refused ? e : new AnswerLost(oneLine(lostWhy(e), 160));
       }
@@ -21214,7 +21491,8 @@ var Link = class {
       const a = await session.reader.read("get_accounts");
       if (a.failed) throw new Error("Robinhood could not list the accounts");
       this.learn(a.data);
-      return await session.reviewer.review({ accountNumber: this.agenticIds().accountNumber, agentic: true }, { ...order, symbol: brokerSymbol(order.symbol) });
+      const ids = this.agenticIds(), rules = isCrypto(order.symbol) ? await this.coinRulesOf(session.reader, order.symbol) : void 0;
+      return await session.reviewer.review({ accountNumber: ids.accountNumber, rhsAccountNumber: ids.rhsAccountNumber, agentic: true }, { ...order, symbol: brokerSymbol(order.symbol) }, rules);
     } finally {
       await session.close();
     }
@@ -21451,6 +21729,7 @@ function yardstickWords(ticker, r) {
   const why = basisWords(ticker, r);
   return `${yardstickName(r.yardstick)}${why ? ` (${why})` : ""}`;
 }
+var checkWords = (ticker, r) => `${checkName(r)} ${againstWords(ticker, r)}, over the ${windowWords(r)} after the call`;
 var againstWords = (ticker, r) => ownReturn(r) ? `on its own return (${basisWords(ticker, r)})` : `against ${yardstickWords(ticker, r)}`;
 var WHEN_SCORED = "A call is scored when a scoring runs after its window (/settle, an analysis or a routine), not by itself.";
 
@@ -21697,16 +21976,18 @@ Its check before then: ${e.lessonCheck}` : ""}`, earlier: e.earlier, first: e.fi
    *  over and against (its own rules, or for a call recorded before the desk kept them, the rules it was made under, from
    *  `scoring`): a short first check, not the call's own time horizon. */
   pastContext(ticker, o = {}) {
-    const { sameLimit = 5, otherLimit = 3 } = o;
-    let settled2 = this.load().filter((e) => !e.pending);
+    const { sameLimit = 5, otherLimit = 3, unscoredLimit = 2 } = o;
+    const all = this.load();
+    let settled2 = all.filter((e) => !e.pending);
     if (o.asOf) settled2 = settled2.filter((e) => e.resolved && e.resolved <= o.asOf);
+    const unscored = o.unscoredBefore && !o.asOf ? all.filter((e) => e.pending && e.ticker === ticker && e.date < o.unscoredBefore).sort((a, b) => b.date.localeCompare(a.date)).slice(0, unscoredLimit) : [];
     const same = [], other = [];
     for (const e of settled2.reverse()) {
       if (e.ticker !== ticker && withheld(e)) continue;
       if (e.ticker === ticker ? same.length < sameLimit : other.length < otherLimit) (e.ticker === ticker ? same : other).push(e);
       if (same.length >= sameLimit && other.length >= otherLimit) break;
     }
-    if (!same.length && !other.length) return "";
+    if (!same.length && !other.length && !unscored.length) return "";
     const over = (e) => {
       const r = e.rules ?? (o.scoring ? legacyRules(e.ticker, o.scoring, e.holding) : null);
       return r ? `${checkName(r)}: ${ownReturn(r) ? `on its own return (${r.yardstick} is its own yardstick or copies the same index), so its alpha is its return,` : `against ${r.yardstick}`} over the ${windowWords(r)} after the call, not the call's own time horizon` : `over ${e.holding ?? "n/a"}`;
@@ -21721,7 +22002,13 @@ ${e.reflection}`] : []
     ].join("\n\n");
     const short = (e) => `${head(e)}${e.reflection && LESSON_NOTE[e.lesson] ? ` (lesson ${LESSON_NOTE[e.lesson](e)})` : ""}
 ${e.reflection || e.decision.slice(0, 300) + (e.decision.length > 300 ? "..." : "")}`;
+    const notYet = (e) => {
+      const r = e.rules ?? (o.scoring ? legacyRules(e.ticker, o.scoring, e.holding) : null);
+      return [`[${e.date} | ${e.ticker} | ${e.rating} | not scored yet: it has no result, and is scored${r ? ` by ${checkWords(e.ticker, r)}` : ""} once a scoring runs after that window]`, `DECISION:
+${e.decision}`].join("\n\n");
+    };
     const parts = [];
+    if (unscored.length) parts.push(`The desk's latest calls on ${ticker} not scored yet (latest first; the call's own view on its day, not how it turned out):`, ...unscored.map(notYet));
     if (same.length) parts.push(`Past analyses of ${ticker} (latest recorded first):`, ...same.map(full));
     if (other.length) parts.push("Recent cross-ticker lessons:", ...other.map(short));
     return parts.join("\n\n");
@@ -21738,8 +22025,16 @@ import path11 from "node:path";
 var SECTIONS = ["market", "sentiment", "news", "fundamentals", "fact_check", "bull", "bear", "research_plan", "trader", "aggressive", "conservative", "neutral", "decision"];
 var DEBATES = { investment_debate: ["bull", "bear"], risk_debate: ["aggressive", "conservative", "neutral"] };
 var TURNS = new Set(Object.values(DEBATES).flat());
-var folder = (dir, ticker, date4) => path11.join(dir, "runs", `${safeSymbol(ticker).replace(/\^/g, "IDX_").replace(/=/g, "_EQ_")}_${date4}`);
+var folderName = (ticker) => safeSymbol(ticker).replace(/\^/g, "IDX_").replace(/=/g, "_EQ_");
+var folder = (dir, ticker, date4) => path11.join(dir, "runs", `${folderName(ticker)}_${date4}`);
 var runFile = (dir, ticker, date4) => path11.join(folder(dir, ticker, date4), "run.json");
+function builtOnOf(plan) {
+  const b = plan?.builtOn;
+  if (!b || typeof b.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(b.date) || !Array.isArray(b.analysts)) return void 0;
+  const analysts = b.analysts.filter((a) => typeof a === "string" && REPORTS.includes(a));
+  return analysts.length ? { date: b.date, analysts } : void 0;
+}
+var dayWords = (date4) => (/* @__PURE__ */ new Date(`${date4}T12:00:00Z`)).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 function load(dir, ticker, date4) {
   try {
     return JSON.parse(fs12.readFileSync(runFile(dir, ticker, date4), "utf8"));
@@ -21748,6 +22043,7 @@ function load(dir, ticker, date4) {
   }
 }
 var isSection = (s) => SECTIONS.includes(s);
+var REPORTS = ["market", "sentiment", "news", "fundamentals"];
 var FLAG = "[the fact it rested on was corrected: see the fact check]";
 var MARKS = new RegExp(` \\[corrected: was "[\\s\\S]*?"\\]| ${FLAG.replace(/[[\]]/g, "\\$&")}`, "g");
 function progress(dir, ticker, date4) {
@@ -21774,12 +22070,13 @@ function stepWords(dir, ticker, date4) {
   if (!next) return "recording the call";
   const analysts = steps.filter((s) => ["market", "sentiment", "news", "fundamentals"].includes(s.section));
   const of = (n) => Number.isInteger(n) ? ` of ${n}` : "";
+  const base2 = builtOnOf(plan);
   switch (next.section) {
     case "market":
     case "sentiment":
     case "news":
     case "fundamentals":
-      return `analysts reading: ${analysts.filter((s) => (done[s.section] ?? 0) >= 1).length} of ${analysts.length} done`;
+      return `analysts reading${base2 ? ` what changed since ${dayWords(base2.date)}` : ""}: ${analysts.filter((s) => (done[s.section] ?? 0) >= 1).length} of ${analysts.length} done`;
     case "fact_check":
       return "the fact checker is checking the reports";
     case "bull":
@@ -22294,7 +22591,7 @@ var TIER_WORDS = {
   market: { name: "The whole market", meaning: "Funds that each follow a broad index, from 30 companies (the Dow Jones) or 100 (the Nasdaq 100) to thousands, or bonds: broader than one sector or one company." },
   sectors: { name: "Sectors", meaning: "The eleven parts of the economy, such as technology or energy, one fund each: side by side, they show which parts are rising." },
   names: { name: "Single names", meaning: "One company each, or a narrower fund: each can swing far more than the whole market." },
-  crypto: { name: "Crypto", meaning: "Coins such as Bitcoin, which swing far more than shares: the desk follows Bitcoin and Ether on paper only, never with an order, and no other coin." }
+  crypto: { name: "Crypto", meaning: "Coins such as Bitcoin, which swing far more than shares, at any hour: the desk follows Bitcoin and Ether, and you can order them in your Agentic account; no other coin." }
 };
 var SHIPPED_MARKET = ["SPY", "QQQ", "VT", "BND"];
 var sp500 = { name: "S&P 500 fund", meaning: "copies the S&P 500 index: about 500 large US companies, chosen by S&P" };
@@ -22331,7 +22628,7 @@ var PLAIN = {
   "BTC-USD": { name: "Bitcoin", meaning: "the first and largest coin" },
   "ETH-USD": { name: "Ether", meaning: "the coin of the Ethereum network, the second largest" }
 };
-var ticketable = (symbol) => !isCrypto(symbol) && !/[\^=]/.test(symbol);
+var ticketable = (symbol) => (!isCrypto(symbol) || TICKET_COINS.has(symbol)) && !/[\^=]/.test(symbol);
 function tierOf(symbol) {
   if (isCrypto(symbol)) return "crypto";
   if (SECTOR_FUNDS[symbol]) return "sectors";
@@ -22503,7 +22800,7 @@ var stamp = (file4) => {
   }
 };
 var MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-var dayWords = (iso2) => {
+var dayWords2 = (iso2) => {
   const [y, m, d] = iso2.split("-");
   return `${Number(d)} ${MON[Number(m) - 1]} ${y}`;
 };
@@ -22536,7 +22833,7 @@ function scoringNote(entries, s) {
   const closed = ny ? "New York's market was closed (a weekend or a New York holiday)" : "its market was closed";
   const same = (r, std) => r.days === std.days && r.unit === std.unit && r.yardstick === std.yardstick && (r.basis === std.basis || ownReturn(r));
   const otherwise = entries.map((e) => ({ e, ...rulesOfEntry(e, s) })).filter(({ e, r, older }) => older || !same(r, isCrypto(e.ticker) ? coin : stock));
-  const listed2 = otherwise.slice(0, 6).map(({ e, r, older }) => `${e.ticker} (${dayWords(e.date)}): ${againstWords(e.ticker, r)}, over the ${windowWords(r)} after the call${older ? `, as ${OLDER}` : ""}`);
+  const listed2 = otherwise.slice(0, 6).map(({ e, r, older }) => `${e.ticker} (${dayWords2(e.date)}): ${againstWords(e.ticker, r)}, over the ${windowWords(r)} after the call${older ? `, as ${OLDER}` : ""}`);
   return [
     `Each call is scored once, ${name} against a named yardstick, not over the call's own time horizon (its decision states that).`,
     `A US stock or fund: against ${yardstickWords("", stock)}, over the ${windowWords(stock)} after the call.`,
@@ -22608,7 +22905,8 @@ function stateOf(root2, day2) {
 function callOf(root2, ticker, date4) {
   const dir = deskDataDir(root2), e = new Journal(path15.join(dir, "journal.md")).load().find((x) => x.ticker === ticker && x.date === date4);
   if (!e) return null;
-  return { decision: e.decision, sections: sectionsOf(dir, ticker, date4), hasReport: hasReport(dir, ticker, date4) };
+  const base2 = builtOnOf(savedPlan(dir, ticker, date4));
+  return { decision: e.decision, sections: sectionsOf(dir, ticker, date4), hasReport: hasReport(dir, ticker, date4), ...base2 ? { builtOn: base2.date } : {} };
 }
 
 // src/terminal/quotes.ts
@@ -22951,13 +23249,13 @@ var MEANING = {
   rates: "What prediction markets price for the Federal Reserve's next interest-rate decision, not a forecast of ours. Lower rates tend to help share prices; higher rates tend to weigh on them."
 };
 var whole2 = (n) => n.toLocaleString("en-US", { maximumFractionDigits: 0 });
-var dayWords2 = (iso2) => {
+var dayWords3 = (iso2) => {
   const [y, m, d] = iso2.split("-");
   return `${Number(d)} ${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][Number(m) - 1]} ${y}`;
 };
 var unavailable = (key, name, why) => ({ key, name, state: null, tone: "", words: `Unavailable: ${why}.`, meaning: MEANING[key] });
 var newYorkTime = (at) => at.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" });
-var figureWords = (name, figure2, day2, live) => !live ? `${name} closed at ${figure2} on ${dayWords2(day2)}` : live.unsure ? `${name}'s latest figure on ${dayWords2(day2)}, read at ${newYorkTime(live.at)} New York time, is ${figure2} (Yahoo Finance did not say whether that session had ended)` : live.ended ? `${name} was at ${figure2} when read at ${newYorkTime(live.at)} New York time on ${dayWords2(day2)}, before that session's close was final (not a close)` : `${name} is at ${figure2} at ${newYorkTime(live.at)} New York time on ${dayWords2(day2)}, still trading (not a close)`;
+var figureWords = (name, figure2, day2, live) => !live ? `${name} closed at ${figure2} on ${dayWords3(day2)}` : live.unsure ? `${name}'s latest figure on ${dayWords3(day2)}, read at ${newYorkTime(live.at)} New York time, is ${figure2} (Yahoo Finance did not say whether that session had ended)` : live.ended ? `${name} was at ${figure2} when read at ${newYorkTime(live.at)} New York time on ${dayWords3(day2)}, before that session's close was final (not a close)` : `${name} is at ${figure2} at ${newYorkTime(live.at)} New York time on ${dayWords3(day2)}, still trading (not a close)`;
 function liveOf(s, day2, now) {
   const last = s.bars.at(-1), session = s.meta.session;
   if (!last) return null;
@@ -22995,7 +23293,7 @@ function ratesOf(events, now = /* @__PURE__ */ new Date()) {
   if (!next || !top) return unavailable("rates", "Rates", "Polymarket has no open market on the Federal Reserve's next decision");
   const [state, tone] = top.way === "cut" ? ["A cut", "ok"] : top.way === "rise" ? ["A rise", "warn"] : ["No change", ""];
   const pct = (p) => `${Math.round(p * 100)}%`, second = odds[1] && odds[1].p >= 0.1 ? ` and ${odds[1].words} at ${pct(odds[1].p)}` : "";
-  return { key: "rates", name: "Rates", state, tone, words: `For the Federal Reserve's next decision, by ${dayWords2(marketDay(new Date(next.endDate)))}, Polymarket's crowd puts ${top.words} at ${pct(top.p)}${second}.`, meaning: MEANING.rates };
+  return { key: "rates", name: "Rates", state, tone, words: `For the Federal Reserve's next decision, by ${dayWords3(marketDay(new Date(next.endDate)))}, Polymarket's crowd puts ${top.words} at ${pct(top.p)}${second}.`, meaning: MEANING.rates };
 }
 async function weatherNow(day2, now = /* @__PURE__ */ new Date()) {
   const [trend, mood, rates] = await Promise.all([
@@ -23049,6 +23347,7 @@ var REVIEW_MS = 5 * 6e4;
 var confirmWords = (o) => {
   const side = o.side === "buy" ? "Buy" : "Sell";
   if (o.market) return o.side === "buy" && typeof o.dollars === "number" ? `${side} $${o.dollars.toFixed(2)} of ${o.symbol} at the market price` : `${side} ${o.quantity} ${o.symbol} at the market price`;
+  if (isCrypto(o.symbol)) return `${side} ${coinAmount(o.quantity)} ${cryptoBase(o.symbol) ?? o.symbol} at $${o.limitPrice.toFixed(2)}`;
   return `${side} ${o.quantity} ${o.symbol} at $${o.limitPrice.toFixed(2)}`;
 };
 var SECURITY = {
@@ -23066,8 +23365,8 @@ var Refused2 = class extends Error {
   status;
 };
 function tradable(symbol) {
-  if (isCrypto(symbol)) throw new Refused2(400, `Robinhood's agent doorway trades stocks and funds only: ${symbol} is crypto, which the desk follows on paper`);
-  if (/[\^=]/.test(symbol)) throw new Refused2(400, "the order ticket trades stocks and funds only, not indices, futures or currencies");
+  if (isCrypto(symbol) && !TICKET_COINS.has(symbol)) throw new Refused2(400, `among coins, the order ticket trades only Bitcoin (BTC-USD) and Ether (ETH-USD), not ${symbol}`);
+  if (/[\^=]/.test(symbol)) throw new Refused2(400, "the order ticket trades stocks, funds and coins only, not indices, futures or currencies");
 }
 function fingerprint(files) {
   const h = crypto6.createHash("sha256");
@@ -23186,6 +23485,10 @@ async function startTerminal(opts) {
     return { ...c, ordersToday: Math.max(c.ordersToday, placedToday(dir, /* @__PURE__ */ new Date())), sector: sectors.context(c.symbol, positions), ...bought ? bought : {} };
   };
   const limited = async (c) => {
+    if (isCrypto(c.symbol)) {
+      const bought = lastBuy(dir, c.symbol, /* @__PURE__ */ new Date());
+      return { ...c, ordersToday: Math.max(c.ordersToday, placedToday(dir, /* @__PURE__ */ new Date())), ...bought ? bought : {} };
+    }
     await sectors.warm([c.symbol, ...(c.positions ?? []).map((p) => p.symbol), ...(c.openBuys ?? []).map((p) => p.symbol)]);
     return limitedNow(c);
   };
@@ -23236,7 +23539,7 @@ async function startTerminal(opts) {
     }
   };
   const refusalOf = (e, nothingSent = false) => {
-    const m = e instanceof Error ? e.message : "", own2 = /not one of your Robinhood accounts|show your Agentic account|not the Agentic account|not complete, so it was not sent|no longer passes on Robinhood's latest figures|trading is switched off|trading switched itself off/.test(m);
+    const m = e instanceof Error ? e.message : "", own2 = /not one of your Robinhood accounts|show your Agentic account|not the Agentic account|not complete, so it was not sent|no longer passes on Robinhood's latest figures|trading is switched off|trading switched itself off|Nothing was sent\.$/.test(m);
     return new Refused2(own2 ? 400 : 502, own2 ? m : `${plainFailure(e)}${nothingSent ? " Nothing was sent." : ""}`);
   };
   const askRobinhood = async (job) => {

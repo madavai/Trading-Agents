@@ -19,7 +19,7 @@ import type { PaperBook, PaperRecord, PaperTrade } from '../../desk/paper.js';
 export type PaperView = PaperBook & { record: PaperRecord };
 export type { PaperTrade };
 import type { LinkInfo, Snapshot, TradingState } from '../../robinhood/link.js';
-import type { Account, AccountView, Holding, Order } from '../../robinhood/account.js';
+import type { Account, AccountView, Holding, OpenOrder, Order } from '../../robinhood/account.js';
 import type { Check, Proposal, TicketContext } from '../../desk/ticket.js';
 import type { Review } from '../../robinhood/review.js';
 import type { Placed } from '../../robinhood/order.js';
@@ -40,9 +40,10 @@ export interface TicketOpen { id: string; own: boolean; context: TicketContext; 
 export interface TicketFigures { quantity: number; limitPrice: number; market?: true; dollars?: number }
 
 export type { Check, Proposal, Review, TicketContext };
-export type { DeskState, History, QuoteResult, WatchItem, QueueView, ListenerView, Depth, LinkInfo, Snapshot, Account, AccountView, Holding, Order };
+export type { DeskState, History, QuoteResult, WatchItem, QueueView, ListenerView, Depth, LinkInfo, Snapshot, Account, AccountView, Holding, OpenOrder, Order };
 export interface Market { symbol: string; name: string; unit?: '%'; quote: QuoteResult }
-export interface CallDetail { decision: string; sections: Record<string, string[]>; hasReport: boolean }
+/** `builtOn`: the day of the desk's earlier full run this call's analysts built on, when they did. */
+export interface CallDetail { decision: string; sections: Record<string, string[]>; hasReport: boolean; builtOn?: string }
 
 const KEPT = 'ta.key';
 let key = '';

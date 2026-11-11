@@ -1,17 +1,19 @@
-// The third door to Robinhood, the one that can place an order. It names one tool (place_equity_order, on the Agentic
-// account: a limit order of whole shares, or a part-share at the market price in regular hours) and nothing else; a test
-// checks that, and that the agents' tool server holds no trace of it. It is reached only from the dashboard's server,
-// after the person's own Confirm on a ticket that Robinhood checked with no alerts, with trading switched on by the
-// person, and after every cap has been checked again on figures read from Robinhood just before. Robinhood's own ref_id
-// makes a repeated send of the same ticket place nothing twice.
+// The third door to Robinhood, the one that can place an order. It names two tools and nothing else, both on the Agentic
+// account: place_equity_order (a limit order of whole shares, or a part-share at the market price in regular hours) and
+// place_crypto_order (a coin as a limit order in coins, at any hour); a test checks that, and that the agents' tool server
+// holds no trace of either. It is reached only from the dashboard's server, after the person's own Confirm on a ticket that
+// Robinhood checked with no alerts, with trading switched on by the person, and after every cap has been checked again on
+// figures read from Robinhood just before. Robinhood's own ref_id makes a repeated send of the same ticket place nothing
+// twice.
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
-import { PART_HOURS, type Order } from '../desk/ticket.js';
+import { PART_HOURS, type CoinRules, type Order } from '../desk/ticket.js';
 import { regularSession } from '../data/holidays.js';
+import { isCrypto } from '../data/symbols.js';
 import { Refused } from './reader.js';
-import { equityOrderArgs, LOOK_FIRST, masked } from './rules.js';
+import { cryptoOrderArgs, equityOrderArgs, hideLong, LOOK_FIRST, masked } from './rules.js';
 
-const PLACE = 'place_equity_order';
+const PLACE = 'place_equity_order', PLACE_COIN = 'place_crypto_order';
 
 export interface Placed {
   /** Robinhood took the order: it gave the order's id, and a state that is not a refusal (it may still wait for the
@@ -48,7 +50,7 @@ export function parsePlaced(answer: { data: unknown; text: string; failed: boole
     for (const [k, v] of Object.entries(o)) {
       if (facts.length >= 24 || ['account_number', 'rhs_account_number', 'customer_approval_required'].includes(k)) continue;
       const name = `${prefix}${k.replace(/_/g, ' ')}`;
-      if (v === null || typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') facts.push([name, (/(^|_)id$/.test(k) ? String(v) : String(v).replace(/\b[a-z0-9]*\d{7,}[a-z0-9]*\b/gi, '#####')).slice(0, 120)]);   // an order's own id is shown whole
+      if (v === null || typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') facts.push([name, (/(^|_)id$/.test(k) ? String(v) : hideLong(String(v), 7)).slice(0, 120)]);   // an order's own id is shown whole
       else if (!Array.isArray(v) && depth < 2) walk(obj(v), `${name} · `, depth + 1);
     }
   };
@@ -63,21 +65,24 @@ export class Placer {
   constructor(private readonly client: Pick<Client, 'callTool'>, private readonly tools: Tool[]) {}
 
   /** Refuses, before anything is sent, an order this door would not send: a part-share outside New York's regular
-   *  session among them, which Robinhood would refuse anyway. */
-  ready(account: { accountNumber: string; agentic: boolean }, o: Order, refId: string, now: Date = new Date()): Record<string, string> {
+   *  session among them, which Robinhood would refuse anyway. A coin order needs the account's numeric number and the
+   *  coin's own rules, read from Robinhood just before. */
+  ready(account: { accountNumber: string; rhsAccountNumber?: string | null; agentic: boolean }, o: Order, refId: string, now: Date = new Date(), coin?: CoinRules): Record<string, string> {
     if (!account.agentic) throw new Refused('Only the Agentic account can trade, and this is not it.');
-    if (!this.tools.some((t) => t.name === PLACE)) throw new Refused("Robinhood's connection no longer offers placing a stock order, so nothing was sent.");
-    const args = equityOrderArgs(account.accountNumber, o);
+    const crypto = isCrypto(o.symbol);
+    if (!this.tools.some((t) => t.name === (crypto ? PLACE_COIN : PLACE))) throw new Refused(`Robinhood's connection no longer offers placing a ${crypto ? 'coin' : 'stock'} order, so nothing was sent.`);
+    const args = crypto ? (coin && account.rhsAccountNumber ? cryptoOrderArgs(account.rhsAccountNumber, o, coin) : null) : equityOrderArgs(account.accountNumber, o);
     if (!args || !/^[0-9a-f-]{36}$/.test(refId)) throw new Refused('That order is not complete, so it was not sent.');
     const session = o.market ? regularSession(now) : null;
     if (session && !session.open) throw new Refused(`A part-share is sent only while the US market is open, ${PART_HOURS}: it opens ${session.opens}. Nothing was sent.`);
     return { ...args, ref_id: refId };
   }
 
-  /** Places one order on the Agentic account: whole shares at a limit price, or a part-share at the market price in
-   *  regular hours. Call only after the person's Confirm. */
-  async place(account: { accountNumber: string; agentic: boolean }, o: Order, refId: string, now: Date = new Date()): Promise<Placed> {
-    const r = await this.client.callTool({ name: PLACE, arguments: this.ready(account, o, refId, now) }) as { content?: Array<{ type: string; text?: string }>; structuredContent?: unknown; isError?: boolean };
+  /** Places one order on the Agentic account: whole shares at a limit price, a part-share at the market price in regular
+   *  hours, or a coin at a limit price. Call only after the person's Confirm. */
+  async place(account: { accountNumber: string; rhsAccountNumber?: string | null; agentic: boolean }, o: Order, refId: string, now: Date = new Date(), coin?: CoinRules): Promise<Placed> {
+    const name = isCrypto(o.symbol) ? PLACE_COIN : PLACE;
+    const r = await this.client.callTool({ name, arguments: this.ready(account, o, refId, now, coin) }) as { content?: Array<{ type: string; text?: string }>; structuredContent?: unknown; isError?: boolean };
     const text = (r.content ?? []).filter((c) => c.type === 'text').map((c) => c.text ?? '').join('\n');
     let data: unknown = r.structuredContent ?? null;
     if (data === null) { try { data = JSON.parse(text) as unknown; } catch { /* words only */ } }
