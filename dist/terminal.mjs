@@ -7705,6 +7705,11 @@ import { fileURLToPath } from "node:url";
 // src/data/dates.ts
 var DAY = 864e5;
 var marketDay = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+var nyClock = (ms) => {
+  const f = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(ms));
+  const v = (t2) => f.find((x) => x.type === t2)?.value ?? "";
+  return `${v("year")}-${v("month")}-${v("day")} ${v("hour")}:${v("minute")}`;
+};
 function today(now) {
   if (!now && process.env.TRADING_AGENTS_TODAY) return process.env.TRADING_AGENTS_TODAY;
   return marketDay(now ?? /* @__PURE__ */ new Date());
@@ -8140,6 +8145,8 @@ function marketClosed(day2) {
   return NAMES2.get(day2) ?? null;
 }
 var isMarketDay = (day2) => marketClosed(day2) === null;
+var EARLY_CLOSES = /* @__PURE__ */ new Set(["2026-11-27", "2026-12-24", "2027-11-26", "2028-07-03", "2028-11-24"]);
+var closeOf = (day2) => EARLY_CLOSES.has(day2) ? "13:00" : "16:00";
 function nextMarketDay(day2) {
   let d = addDays(day2, 1);
   while (!isMarketDay(d)) d = addDays(d, 1);
@@ -8328,12 +8335,6 @@ var cents2 = (n) => Math.round(n * 100) / 100;
 var PAPER_CRYPTO = /* @__PURE__ */ new Set(["BTC-USD", "ETH-USD"]);
 var followed = (ticker) => !/[\^=]/.test(ticker) && (!isCrypto(ticker) || PAPER_CRYPTO.has(ticker));
 var notFollowed = (ticker) => isCrypto(ticker) ? "Among crypto, paper follows Bitcoin and Ether for now." : "An index, a future or a currency cannot be bought: paper follows stocks, funds, Bitcoin and Ether.";
-var EARLY_CLOSES = /* @__PURE__ */ new Set(["2026-11-27", "2026-12-24", "2027-11-26", "2028-07-03", "2028-11-24"]);
-var nyClock = (ms) => {
-  const f = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(ms));
-  const v = (t2) => f.find((x) => x.type === t2)?.value ?? "";
-  return `${v("year")}-${v("month")}-${v("day")} ${v("hour")}:${v("minute")}`;
-};
 function lateWhy(c) {
   const at = c.recorded ? Date.parse(c.recorded) : NaN;
   if (!Number.isFinite(at)) return null;
@@ -8342,7 +8343,7 @@ function lateWhy(c) {
     return at < closes ? null : `Recorded on ${new Date(at).toISOString().slice(0, 10)}, after the close of ${fill2} it would have filled at: paper follows a call only from when it was made, so an analysis dated in the past is not followed.`;
   }
   const fill = nextMarketDay(c.date), seen = nyClock(at);
-  return seen < `${fill} ${EARLY_CLOSES.has(fill) ? "13:00" : "16:00"}` ? null : `Recorded on ${seen.slice(0, 10)}, after the close of ${fill} it would have filled at: paper follows a call only from when it was made, so an analysis dated in the past is not followed.`;
+  return seen < `${fill} ${closeOf(fill)}` ? null : `Recorded on ${seen.slice(0, 10)}, after the close of ${fill} it would have filled at: paper follows a call only from when it was made, so an analysis dated in the past is not followed.`;
 }
 function recordOf(calls, today2) {
   const mine = calls.filter((c) => followed(c.ticker) && !lateWhy(c) && c.date <= today2);
@@ -22029,7 +22030,7 @@ async function fundTickers() {
 // src/data/company.ts
 function companySymbol(raw) {
   const sym2 = normalizeSymbol(raw);
-  if (cryptoBase(raw) || /[\^=]/.test(sym2)) throw new NoData(`${sym2} is not a company: a crypto asset, index, future or currency pair has no company accounts`);
+  if (cryptoBase(raw) || /[\^=]/.test(sym2)) throw new NoData(`${sym2} is not a company: a crypto asset, index, future or currency pair has no company accounts and no results releases or results dates`);
   return sym2;
 }
 async function profileSector(raw) {

@@ -44,6 +44,13 @@ export function marketClosed(day: string): string | null {
 /** A weekday New York's market is open: not a weekend, and not one of its holidays. */
 export const isMarketDay = (day: string): boolean => marketClosed(day) === null;
 
+/** New York's early closes (1:00 p.m.), as the NYSE lists them with its holidays: the day after Thanksgiving, and
+ *  Christmas Eve or the day before Independence Day when it lists one. */
+export const EARLY_CLOSES: ReadonlySet<string> = new Set(['2026-11-27', '2026-12-24', '2027-11-26', '2028-07-03', '2028-11-24']);
+
+/** When New York's regular session closes on a market day, on its own clock: "16:00", or "13:00" on an early close. */
+export const closeOf = (day: string): string => (EARLY_CLOSES.has(day) ? '13:00' : '16:00');
+
 /** The market day after `day`. */
 export function nextMarketDay(day: string): string {
   let d = addDays(day, 1);

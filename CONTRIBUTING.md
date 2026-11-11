@@ -32,7 +32,12 @@ built, which decisions stand, every document, and what is pending.
   months no filing states, `sharesOutstanding` from the cover page, or `averageDilutedShares` from the accounts when
   the cover page gives no single count, as for a filer with two classes of shares, and said so; `insiders.ts`: each
   Form 4 read from its own XML, an amended one (4/A) put in place of the same insiders' filing of the day it names,
-  `amended`),
+  `amended`; `results.ts`: the results releases, form 8-K with item 2.02, filed in the year to the analysis date, from
+  the SEC's list of filings and its older pages when the list does not reach back that far, each with the first session
+  that could trade it (`firstSession`: the price table's sessions, New York's calendar outside them, 1 p.m. on an early
+  close; a filing of the results alone dated before it was filed is put on that day) and that session's close, worked
+  out from the closes as shown; the next results date is said to be not known, since a company announces it in a press
+  release, not a filing),
   the valuation worked out with the checked close; Yahoo Finance only for a company that does not file with the SEC,
   today only (Yahoo refuses its company data to the desk's honest name, so this is mostly unavailable). The desk never
   calls itself a browser. `fundProfile` (tool `get_fund_profile`) is a fund's in their place, from `nport.ts`: the latest

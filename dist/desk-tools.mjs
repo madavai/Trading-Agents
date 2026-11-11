@@ -12007,12 +12007,12 @@ var $ZodPipe = /* @__PURE__ */ $constructor("$ZodPipe", (inst, def) => {
     return handlePipeResult(left, def.out, ctx);
   };
 });
-function handlePipeResult(left, next, ctx) {
+function handlePipeResult(left, next2, ctx) {
   if (left.issues.some((iss) => iss.code !== "unrecognized_keys")) {
     left.aborted = true;
     return left;
   }
-  return next._zod.run({ value: left.value, issues: left.issues }, ctx);
+  return next2._zod.run({ value: left.value, issues: left.issues }, ctx);
 }
 var $ZodCodec = /* @__PURE__ */ $constructor("$ZodCodec", (inst, def) => {
   $ZodType.init(inst, def);
@@ -37503,6 +37503,11 @@ function compute(name, bars) {
 // src/data/dates.ts
 var DAY = 864e5;
 var marketDay = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+var nyClock = (ms) => {
+  const f = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(ms));
+  const v = (t) => f.find((x) => x.type === t)?.value ?? "";
+  return `${v("year")}-${v("month")}-${v("day")} ${v("hour")}:${v("minute")}`;
+};
 function today(now) {
   if (!now && process.env.TRADING_AGENTS_TODAY) return process.env.TRADING_AGENTS_TODAY;
   return marketDay(now ?? /* @__PURE__ */ new Date());
@@ -38032,17 +38037,17 @@ function priceFactsText(sym2, day3, s) {
     const latest = Array.from({ length: L - year + 1 }, (_, k) => L - k).find((i) => t(i) === true);
     out.push(`${name} | ${cells2.join(" | ")} | ${latest === void 0 ? "\u2013" : d(latest)}`);
   }
-  const pct2 = (i) => `${signed(change3[i], 2)}%`;
+  const pct3 = (i) => `${signed(change3[i], 2)}%`;
   const extremes = [
     ["Highest closes", (i) => close[i], 1, (i) => f22(close[i])],
     ["Lowest closes", (i) => close[i], -1, (i) => f22(close[i])],
     ["Highest intraday highs", (i) => bars[i].high, 1, (i) => f22(bars[i].high)],
     ["Lowest intraday lows", (i) => bars[i].low, -1, (i) => f22(bars[i].low)],
-    ["Biggest daily rises", (i) => change3[i], 1, (i) => `${pct2(i)} (${signed(close[i] - close[i - 1], 2)})`, (i) => (change3[i] ?? 0) > 0],
-    ["Biggest daily falls", (i) => change3[i], -1, (i) => `${pct2(i)} (${signed(close[i] - close[i - 1], 2)})`, (i) => (change3[i] ?? 0) < 0],
-    ["Heaviest volume", volumeOf2, 1, (i) => `${vol2(volumeOf2(i))}${change3[i] === null ? "" : ` (close ${pct2(i)})`}`],
-    ["Heaviest volume on a down close", volumeOf2, 1, (i) => `${vol2(volumeOf2(i))} (close ${pct2(i)})`, (i) => down(i) === true],
-    ["Heaviest volume on an up close", volumeOf2, 1, (i) => `${vol2(volumeOf2(i))} (close ${pct2(i)})`, (i) => up(i) === true],
+    ["Biggest daily rises", (i) => change3[i], 1, (i) => `${pct3(i)} (${signed(close[i] - close[i - 1], 2)})`, (i) => (change3[i] ?? 0) > 0],
+    ["Biggest daily falls", (i) => change3[i], -1, (i) => `${pct3(i)} (${signed(close[i] - close[i - 1], 2)})`, (i) => (change3[i] ?? 0) < 0],
+    ["Heaviest volume", volumeOf2, 1, (i) => `${vol2(volumeOf2(i))}${change3[i] === null ? "" : ` (close ${pct3(i)})`}`],
+    ["Heaviest volume on a down close", volumeOf2, 1, (i) => `${vol2(volumeOf2(i))} (close ${pct3(i)})`, (i) => down(i) === true],
+    ["Heaviest volume on an up close", volumeOf2, 1, (i) => `${vol2(volumeOf2(i))} (close ${pct3(i)})`, (i) => up(i) === true],
     ["Lightest volume", volumeOf2, -1, (i) => vol2(volumeOf2(i))],
     ["Highest RSI", (i) => rsi14[i], 1, (i) => f22(rsi14[i])],
     ["Lowest RSI", (i) => rsi14[i], -1, (i) => f22(rsi14[i])],
@@ -38601,6 +38606,71 @@ No open market that matched "${topic}" has a traded price to show.${note}`;
   }).join("\n") + note;
 }
 
+// src/data/holidays.ts
+var HOLIDAYS = {
+  2026: [
+    ["2026-01-01", "New Year's Day"],
+    ["2026-01-19", "Martin Luther King, Jr. Day"],
+    ["2026-02-16", "Washington's Birthday"],
+    ["2026-04-03", "Good Friday"],
+    ["2026-05-25", "Memorial Day"],
+    ["2026-06-19", "Juneteenth"],
+    ["2026-07-03", "Independence Day (observed)"],
+    ["2026-09-07", "Labor Day"],
+    ["2026-11-26", "Thanksgiving Day"],
+    ["2026-12-25", "Christmas Day"]
+  ],
+  2027: [
+    ["2027-01-01", "New Year's Day"],
+    ["2027-01-18", "Martin Luther King, Jr. Day"],
+    ["2027-02-15", "Washington's Birthday"],
+    ["2027-03-26", "Good Friday"],
+    ["2027-05-31", "Memorial Day"],
+    ["2027-06-18", "Juneteenth (observed)"],
+    ["2027-07-05", "Independence Day (observed)"],
+    ["2027-09-06", "Labor Day"],
+    ["2027-11-25", "Thanksgiving Day"],
+    ["2027-12-24", "Christmas Day (observed)"]
+  ],
+  // 1 Jan 2028 is a Saturday: the NYSE keeps no New Year's Day holiday that year.
+  2028: [
+    ["2028-01-17", "Martin Luther King, Jr. Day"],
+    ["2028-02-21", "Washington's Birthday"],
+    ["2028-04-14", "Good Friday"],
+    ["2028-05-29", "Memorial Day"],
+    ["2028-06-19", "Juneteenth"],
+    ["2028-07-04", "Independence Day"],
+    ["2028-09-04", "Labor Day"],
+    ["2028-11-23", "Thanksgiving Day"],
+    ["2028-12-25", "Christmas Day"]
+  ]
+};
+var NAMES2 = new Map(Object.values(HOLIDAYS).flat().map(([day3, name]) => [day3, name]));
+var DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+var dayOfWeek = (day3) => (/* @__PURE__ */ new Date(`${day3}T12:00:00Z`)).getUTCDay();
+var holidaysKnown = (day3) => day3.slice(0, 4) in HOLIDAYS;
+function marketClosed(day3) {
+  const w = dayOfWeek(day3);
+  if (w === 0 || w === 6) return `a ${DAYS[w]}`;
+  return NAMES2.get(day3) ?? null;
+}
+var isMarketDay = (day3) => marketClosed(day3) === null;
+var EARLY_CLOSES = /* @__PURE__ */ new Set(["2026-11-27", "2026-12-24", "2027-11-26", "2028-07-03", "2028-11-24"]);
+var closeOf = (day3) => EARLY_CLOSES.has(day3) ? "13:00" : "16:00";
+function nextMarketDay(day3) {
+  let d = addDays(day3, 1);
+  while (!isMarketDay(d)) d = addDays(d, 1);
+  return d;
+}
+function firstMarketDayOfWeek(day3) {
+  const monday = addDays(day3, -((dayOfWeek(day3) + 6) % 7));
+  for (let i = 0; i < 5; i++) {
+    const d = addDays(monday, i);
+    if (isMarketDay(d)) return d;
+  }
+  return null;
+}
+
 // src/data/sec.ts
 var STATEMENTS = {
   balance_sheet: { title: "Balance sheet", lines: [
@@ -38879,6 +38949,10 @@ function annualFormIn(facts, day3) {
   return best ? /^(10-K|20-F|40-F)/.exec(best.form)[1] : null;
 }
 var submissions = (cik) => cached2(`https://data.sec.gov/submissions/CIK${cik}.json`, 3e4);
+function submissionsPage(name) {
+  if (!/^CIK\d{10}-submissions-\d{3}\.json$/.test(name)) return Promise.reject(new NoData(`the SEC's record names a page of older filings the desk cannot read ("${name}")`));
+  return cached2(`https://data.sec.gov/submissions/${name}`, 3e4);
+}
 function sectorOfSic(raw) {
   const c = Number(raw);
   if (!Number.isInteger(c) || c < 100) return null;
@@ -38919,6 +38993,11 @@ function sectorOfSic(raw) {
   if (in_(8200, 8299)) return "Consumer Defensive";
   if (in_(7600, 8999)) return "Industrials";
   return null;
+}
+async function fundTickers() {
+  const t = await cached2("https://www.sec.gov/files/company_tickers_mf.json", 3e4);
+  const at = t.fields?.indexOf("symbol") ?? 3;
+  return new Set((t.data ?? []).map((r) => String(r[at] ?? "").toUpperCase()).filter(Boolean));
 }
 async function fundOf(symbol4) {
   const t = await cached2("https://www.sec.gov/files/company_tickers_mf.json", 3e4);
@@ -38983,6 +39062,76 @@ function sharesOutstanding(list2, asOf) {
   if (!top) return null;
   const same = known.filter((f) => f.filed === top.filed && f.end === top.end && (f.accn ?? "") === (top.accn ?? ""));
   return { shares: same.reduce((a, f) => a + f.val, 0), end: top.end, filed: top.filed };
+}
+
+// src/data/results.ts
+function releasesIn(lists, from, day3) {
+  const seen = /* @__PURE__ */ new Map();
+  for (const l of lists) {
+    (l.form ?? []).forEach((form, i) => {
+      const filed = l.filingDate?.[i] ?? "", items = (l.items?.[i] ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      if (form !== "8-K" || !items.includes("2.02") || filed < from || filed > day3) return;
+      const at = Date.parse(l.acceptanceDateTime?.[i] ?? ""), key = l.accessionNumber?.[i] ?? `${filed}|${i}`, dated = l.reportDate?.[i];
+      if (!seen.has(key)) seen.set(key, { filed, accepted: Number.isFinite(at) ? at : null, items, ...dated && /^\d{4}-\d{2}-\d{2}$/.test(dated) ? { dated } : {} });
+    });
+  }
+  return [...seen.values()].sort((a, b) => a.filed.localeCompare(b.filed) || (a.accepted ?? 0) - (b.accepted ?? 0));
+}
+async function filingsFrom(s, from, day3) {
+  const recent = s.filings?.recent ?? {}, oldest = recent.filingDate?.at(-1);
+  if (!oldest || oldest <= from) return { lists: [recent] };
+  const pages = (s.filings?.files ?? []).filter((p) => p.name && (p.filingTo ?? "9999") >= from && (p.filingFrom ?? "") <= day3);
+  try {
+    return { lists: [recent, ...await Promise.all(pages.map((p) => submissionsPage(p.name)))] };
+  } catch (e) {
+    return { lists: [recent], short: `the SEC's older pages of its filings could not be read (${e.message}), so releases filed before ${oldest} are not listed` };
+  }
+}
+var hadSession = (day3, dates) => dates.length > 0 && day3 >= dates[0] && day3 <= dates.at(-1) ? dates.includes(day3) : isMarketDay(day3);
+var sessionAfter = (day3, dates) => dates.find((d) => d > day3) ?? nextMarketDay(day3);
+function firstSession(accepted, dates) {
+  const [day3, time3] = nyClock(accepted).split(" ");
+  const open3 = hadSession(day3, dates);
+  if (open3 && time3 < "09:30") return { day: day3, time: time3, when: "before the open", session: day3 };
+  if (open3 && time3 < closeOf(day3)) return { day: day3, time: time3, when: "during the session", session: day3 };
+  if (open3) return { day: day3, time: time3, when: "after the close", session: sessionAfter(day3, dates) };
+  return { day: day3, time: time3, when: `on a day with no session (${marketClosed(day3) ?? "none in the price table"})`, session: sessionAfter(day3, dates) };
+}
+var pct = (n2) => Math.abs(n2).toFixed(2);
+var cents = (n2) => Math.round(n2 * 100) / 100;
+var price = (n2) => n2.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function releaseLine(r, bars, open3, day3) {
+  if (r.accepted === null) return `- ${r.filed}: the SEC's list gives no time for it, so the first session that could trade on it is not worked out`;
+  const dates = bars.map((b2) => b2.date), s = firstSession(r.accepted, dates);
+  let head2 = `- ${r.filed}, accepted at ${s.time} New York time${s.day !== r.filed ? ` on ${s.day}` : ""}, ${s.when}`, session2 = s.session, note = "";
+  if (r.dated && r.dated < s.day) {
+    if (r.items.every((i) => i === "2.02" || i === "9.01")) {
+      if (hadSession(r.dated, dates)) return `${head2}; the filing dates the release ${r.dated}, a market day, without its time: first traded ${r.dated} or the session after, so how it closed is not worked out`;
+      head2 += `; the filing dates the release ${r.dated} (${marketClosed(r.dated) ?? "a day with no session in the price table"}), before it was filed`;
+      session2 = sessionAfter(r.dated, dates);
+    } else note = `. Its filing also reports another event, dated ${r.dated}, so it does not date the release itself: this is the first session after the filing, and the release may have come out before it`;
+  }
+  if (session2 > day3) return `${head2}: first session ${session2}, after the analysis date${note}`;
+  const at = dates.indexOf(session2), bar = bars[at], before = bars[at - 1];
+  if (!bar && (!bars.length || session2 > dates.at(-1))) return `${head2}: first session ${session2}, which the price table read here does not reach yet${note}`;
+  if (!bar || !before) return `${head2}: first traded ${session2} (the price table read here has no ${bar ? "session before it" : "row for it"}, so how it closed is not worked out)${note}`;
+  if (open3 && at === bars.length - 1) return `${head2}: first traded ${session2}, a session still trading: no close yet${note}`;
+  const a = cents(before.close), b = cents(bar.close), change3 = (b / a - 1) * 100;
+  const moved = Math.abs(change3) < 5e-3 ? "closed unchanged" : `closed ${pct(change3)}% ${change3 > 0 ? "higher" : "lower"}`;
+  return `${head2}: first traded ${session2}, which ${moved} (${price(a)} on ${before.date} to ${price(b)} on ${bar.date})${note}`;
+}
+var next = (spacing) => `Next results date: not known. The desk reads no date for it: a company announces when it will report in a press release, which it does not file with the SEC, and the desk has no other source for it. Do not work one out from the spacing of ${spacing}, and do not take one from a prediction market's closing date (when the market stops trading) or from a news article.`;
+async function resultsLines(sym2, s, day3, bars, open3, kind) {
+  if (kind.fund) return [`Results releases: none. ${sym2} is a fund, and a fund has no results releases or results dates: what it holds, which get_fund_profile reads, is its fundamentals.`];
+  if (kind.foreign) return [`Results releases: not known from its filings. ${sym2} files with the SEC as a foreign company (its yearly report is a form ${kind.foreign}), and such a company files its results on form 6-K, which names no items, so the desk cannot tell its results from its other reports. ${next("its filings")}`];
+  const from = addDays(day3, -364), { lists, short: short2 } = await filingsFrom(s, from, day3), releases = releasesIn(lists, from, day3);
+  const why = short2 ? ` (${short2})` : "";
+  if (!releases.length) return [`Results releases: none filed from ${from} to ${day3} (form 8-K, item 2.02)${why}. A company may publish its results only in its quarterly and yearly reports (forms 10-Q and 10-K), which get_financial_statement reads; the days those were filed are not results dates. ${next("its filings")}`];
+  return [
+    `Results releases filed from ${from} to ${day3}, oldest first${why}: each is a form 8-K with item 2.02 ("Results of Operations and Financial Condition"), under which a US company files its results release. Each gives the minute the SEC accepted the filing (a company may send the release out before it files it; when that was on an earlier day, the filing gives that day), the first session that could trade on it (a release after the close trades the next market day), and how that session closed against the one before, from the checked price table (whose closes are lowered by any dividend paid since, so a little below the prices traded then for a company that pays one):`,
+    ...releases.map((r) => releaseLine(r, bars, open3, day3)),
+    next("the dates above or its other filings")
+  ];
 }
 
 // src/data/insiders.ts
@@ -39268,7 +39417,7 @@ var country = (code) => {
     return code;
   }
 };
-var pct = (n2) => `${n2.toFixed(2)}%`;
+var pct2 = (n2) => `${n2.toFixed(2)}%`;
 var signed2 = (n2) => `${signed(n2, 2)}%`;
 function shares(list2, key) {
   const m2 = /* @__PURE__ */ new Map();
@@ -39280,7 +39429,7 @@ function shares(list2, key) {
 }
 function renderReport(sym2, day3, r, topN = 10) {
   const lines = [
-    `Fund profile for ${sym2}, from its portfolio report to the SEC (form N-PORT, filed ${r.filed}): what it held on ${r.asOf}, ${daysBetween(r.asOf, day3)} days before ${day3}. Funds make each quarter's last month public about two months later, so this is the latest anyone could read by ${day3}. A fund has no company accounts or insider trades of its own: what it holds and what it costs are its fundamentals.`,
+    `Fund profile for ${sym2}, from its portfolio report to the SEC (form N-PORT, filed ${r.filed}): what it held on ${r.asOf}, ${daysBetween(r.asOf, day3)} days before ${day3}. Funds make each quarter's last month public about two months later, so this is the latest anyone could read by ${day3}. A fund has no company accounts, insider trades or results releases of its own, so no results dates: what it holds and what it costs are its fundamentals.`,
     "",
     `Name: ${r.series}`,
     ...r.registrant && r.registrant.toLowerCase() !== r.series.toLowerCase() ? [`Filed by: ${r.registrant}`] : [],
@@ -39288,13 +39437,13 @@ function renderReport(sym2, day3, r, topN = 10) {
     // theirs together, and the report does not split it.
     `Net assets (its size): ${Math.round(r.netAssets).toLocaleString("en-US")} USD on ${r.asOf}${(r.classes ?? 1) > 1 ? `, for the whole fund: all its ${r.classes} share classes together, of which ${sym2} is one; the report does not give ${sym2}'s own part` : ""}`,
     `Holdings: ${r.holdings.length.toLocaleString("en-US")} lines`,
-    `Held in: ${shares(r.holdings, (h) => ASSETS[h.asset] ?? h.asset).map(([k, p]) => `${k} ${pct(p)}`).join(", ") || "not given"}`,
-    `Issued by: ${shares(r.holdings, (h) => ISSUERS[h.issuer] ?? h.issuer).map(([k, p]) => `${k} ${pct(p)}`).join(", ") || "not given"}`
+    `Held in: ${shares(r.holdings, (h) => ASSETS[h.asset] ?? h.asset).map(([k, p]) => `${k} ${pct2(p)}`).join(", ") || "not given"}`,
+    `Issued by: ${shares(r.holdings, (h) => ISSUERS[h.issuer] ?? h.issuer).map(([k, p]) => `${k} ${pct2(p)}`).join(", ") || "not given"}`
   ];
   const where = shares(r.holdings, (h) => country(h.country));
   if (where.length) {
     const of = (k) => where.find(([c]) => c === k)?.[1] ?? 0, us = of("United States"), none = of(NO_COUNTRY), total = where.reduce((a, [, p]) => a + p, 0);
-    lines.push(`Countries: ${where.slice(0, 5).map(([k, p]) => `${k} ${pct(p)}`).join(", ")}${where.length > 5 ? `, and ${where.length - 5} more` : ""} (outside the US together: ${pct(total - us - none)}${none ? `; no country given for ${pct(none)}` : ""})`);
+    lines.push(`Countries: ${where.slice(0, 5).map(([k, p]) => `${k} ${pct2(p)}`).join(", ")}${where.length > 5 ? `, and ${where.length - 5} more` : ""} (outside the US together: ${pct2(total - us - none)}${none ? `; no country given for ${pct2(none)}` : ""})`);
   }
   const bonds = r.holdings.filter((h) => h.maturity && h.pct > 0);
   const weight = bonds.reduce((a, h) => a + h.pct, 0);
@@ -39302,7 +39451,7 @@ function renderReport(sym2, day3, r, topN = 10) {
     const years = bonds.reduce((a, h) => a + h.pct * Math.max(0, daysBetween(r.asOf, h.maturity)) / 365.25, 0) / weight;
     const paying = bonds.filter((h) => h.coupon !== null), w2 = paying.reduce((a, h) => a + h.pct, 0);
     const coupon = w2 ? paying.reduce((a, h) => a + h.pct * h.coupon, 0) / w2 : null;
-    lines.push(`Bonds (${pct(weight)} of the fund): on average ${years.toFixed(1)} years to repayment${coupon !== null ? ` and ${coupon.toFixed(2)}% yearly interest` : ""}, weighted by value (worked out here from each bond's maturity and rate)`);
+    lines.push(`Bonds (${pct2(weight)} of the fund): on average ${years.toFixed(1)} years to repayment${coupon !== null ? ` and ${coupon.toFixed(2)}% yearly interest` : ""}, weighted by value (worked out here from each bond's maturity and rate)`);
   }
   const derivs = r.holdings.filter((h) => h.derivative);
   if (derivs.length) {
@@ -39316,7 +39465,7 @@ function renderReport(sym2, day3, r, topN = 10) {
     const tied = refs.length ? `, tied to: ${refs.slice(0, 5).join(", ")}${refs.length > 5 ? `, and ${refs.length - 5} more` : ""}` : "";
     const usd = derivs.filter((h) => h.derivative.notional !== null && h.derivative.currency === "USD"), left = derivs.length - usd.length;
     const sum = usd.reduce((a, h) => a + h.derivative.notional, 0), abs = usd.reduce((a, h) => a + Math.abs(h.derivative.notional), 0);
-    const whole2 = (n2) => Math.round(n2).toLocaleString("en-US"), share = (n2) => r.netAssets > 0 ? pct(n2 / r.netAssets * 100) : "its net assets are not above zero";
+    const whole2 = (n2) => Math.round(n2).toLocaleString("en-US"), share = (n2) => r.netAssets > 0 ? pct2(n2 / r.netAssets * 100) : "its net assets are not above zero";
     const sums = !usd.length ? "The report gives none of their notional amounts in US dollars, so the exposure they give is not known here." : `As the report gives them, their notional amounts add up to ${whole2(sum)} USD (${share(sum)} of its net assets); counted without their signs, ${whole2(abs)} USD (${share(abs)}).${left ? ` ${left === 1 ? "One more gives" : `${left} more give`} no notional amount in US dollars and ${left === 1 ? "is" : "are"} not in these sums.` : ""} Added up here from the report's figures; whether each is long or short is not worked out.`;
     lines.push(`Derivatives: ${derivs.length === 1 ? "1 line" : `${derivs.length} lines`} (${kindWords})${tied}. The shares above count a derivative only at its value (its gain or loss so far), not at the exposure it gives, which is its notional amount. ${sums}`);
   }
@@ -39333,8 +39482,8 @@ function renderReport(sym2, day3, r, topN = 10) {
     const together = top.reduce((a, [, p]) => a + p, 0);
     lines.push(
       "",
-      `Top ${top.length} holdings, by issuer (${pct(together)} of the fund together; an issuer's several lines, such as two classes of shares or many bonds, added up):`,
-      ...top.map(([k, p, n2]) => `- ${k}${n2 > 1 ? ` (${n2.toLocaleString("en-US")} lines)` : ""}: ${pct(p)}`)
+      `Top ${top.length} holdings, by issuer (${pct2(together)} of the fund together; an issuer's several lines, such as two classes of shares or many bonds, added up):`,
+      ...top.map(([k, p, n2]) => `- ${k}${n2 > 1 ? ` (${n2.toLocaleString("en-US")} lines)` : ""}: ${pct2(p)}`)
     );
   }
   return lines.join("\n");
@@ -39350,7 +39499,7 @@ async function filer(sym2) {
 }
 function companySymbol(raw) {
   const sym2 = normalizeSymbol(raw);
-  if (cryptoBase(raw) || /[\^=]/.test(sym2)) throw new NoData(`${sym2} is not a company: a crypto asset, index, future or currency pair has no company accounts`);
+  if (cryptoBase(raw) || /[\^=]/.test(sym2)) throw new NoData(`${sym2} is not a company: a crypto asset, index, future or currency pair has no company accounts and no results releases or results dates`);
   return sym2;
 }
 var session = null;
@@ -39447,12 +39596,13 @@ async function secOverview(sym2, cik, day3) {
   const foreign = foreignForm(s, facts.facts, day3);
   const basis = foreign ? { splits: filingSplits(epsFacts, day3) } : await shareBasis(sym2, epsFacts);
   const priced = !foreign && basis.why === void 0;
-  let close = null, paid = [];
+  let close = null, paid = [], bars = [];
   try {
     const h = await history(sym2, day3), bar = h.bars.at(-1), state = latestState(h, day3), traded = h.traded?.at(-1);
-    const row = traded?.date === bar.date ? traded : bar, cents = (n2) => Math.round(n2 * 100) / 100;
-    close = { date: row.date, close: cents(row.close), table: cents(bar.close), currency: h.meta.currency, open: state.open, label: state.open ? state.label : "Close" };
+    const row = traded?.date === bar.date ? traded : bar, cents2 = (n2) => Math.round(n2 * 100) / 100;
+    close = { date: row.date, close: cents2(row.close), table: cents2(bar.close), currency: h.meta.currency, open: state.open, label: state.open ? state.label : "Close" };
     paid = h.dividends ?? [];
+    bars = h.bars;
   } catch {
   }
   const usd = !close?.currency || close.currency === "USD", px = close?.open ? "latest price" : "close", past = isHistorical(day3);
@@ -39507,12 +39657,17 @@ async function secOverview(sym2, cik, day3) {
   } else if (dps) lines.push(`Dividends per share, the last twelve months filed (derived from ${dps.parts}): ${fixed(dps.value, 4)} USD. Dividends since the last filed period are not in the filings, and the prices that record them could not be read`);
   else lines.push("Dividends per share: not among its filed figures (many companies pay none)");
   lines.push("Unavailable from official free sources: forward estimates (forward P/E, PEG), analysts' price targets and beta.");
+  const fund = await fundTickers().then((t) => t.has(sym2), () => false);
+  lines.push("", ...await resultsLines(sym2, s, day3, bars, close?.open ?? false, { foreign, fund }));
   return [`Company profile and valuation for ${sym2}, from its SEC filings as they stood on ${day3} and the desk's checked ${close?.open ? "latest price (not a close)" : "closing price"}, with the dividends its price source records. Every multiple is derived here from those filed figures and that price, and shows what it came from; nothing is an estimate.`, "", ...lines].join("\n");
 }
+var NO_RESULTS = (sym2) => `Results releases and the next results date: not known. The desk reads them from a company's SEC filings, and ${sym2} does not file with the SEC; do not work them out from anything else.`;
 async function companyOverview(raw, analysis2) {
   const day3 = analysisDate(analysis2), sym2 = companySymbol(raw), cik = await filer(sym2);
   if (cik) return secOverview(sym2, cik, day3);
-  if (isHistorical(day3)) return `Company profile and ratios for ${sym2} are withheld for ${day3}: Yahoo Finance serves them only as they stand today. Market value, multiples, the 52-week range and the past year's income move with today's price, and even the name, sector and industry are today's; they would put later knowledge into an analysis of ${day3}. Use get_financial_statement, which serves a US filer's accounts as filed by then.`;
+  if (isHistorical(day3)) return `Company profile and ratios for ${sym2} are withheld for ${day3}: Yahoo Finance serves them only as they stand today. Market value, multiples, the 52-week range and the past year's income move with today's price, and even the name, sector and industry are today's; they would put later knowledge into an analysis of ${day3}. Use get_financial_statement, which serves a US filer's accounts as filed by then.
+
+${NO_RESULTS(sym2)}`;
   const r = await summary(sym2, "price,summaryProfile,summaryDetail,defaultKeyStatistics,financialData");
   const p = r.price ?? {}, d = r.summaryDetail ?? {}, k = r.defaultKeyStatistics ?? {}, f = r.financialData ?? {};
   const quote = p.currency, main = quote ? MAIN_UNIT[quote] ?? quote : void 0, reported = f.financialCurrency;
@@ -39549,7 +39704,7 @@ async function companyOverview(raw, analysis2) {
   ];
   const lines = fields.filter(([, v]) => v !== null && v !== void 0 && v !== "").map(([l, v]) => `${l}: ${v}`);
   if (!lines.length) throw new NoData(`Yahoo Finance has no profile or ratios for ${sym2}`);
-  return [`Company profile and ratios for ${sym2}, from Yahoo Finance as they stand today (${day3}). TTM is the last twelve months; a field Yahoo does not give is left out.`, "", ...lines].join("\n");
+  return [`Company profile and ratios for ${sym2}, from Yahoo Finance as they stand today (${day3}). TTM is the last twelve months; a field Yahoo does not give is left out.`, "", ...lines, "", NO_RESULTS(sym2)].join("\n");
 }
 async function insiderTransactions(raw, analysis2, limit = 30) {
   const day3 = analysisDate(analysis2), sym2 = companySymbol(raw), cik = await filer(sym2);
@@ -39618,7 +39773,7 @@ async function fundProfile(raw, analysis2, topN = 10) {
   } else lines.push("", "Top holdings: unavailable (Yahoo Finance does not give them)");
   const sectors = (t.sectorWeightings ?? []).flatMap((w) => Object.entries(w)).filter(([, v]) => has(v) && v.raw > 0).sort((a, b) => b[1].raw - a[1].raw);
   if (sectors.length) lines.push("", `By sector: ${sectors.map(([n2, v]) => `${FUND_SECTORS[n2] ?? n2.replace(/_/g, " ")} ${percent(v)}`).join(", ")}`);
-  return [`Fund profile for ${sym2}, from Yahoo Finance as it stands today (${day3}). A fund has no company accounts or insider trades of its own: what it holds and what it costs to own are its fundamentals.`, "", ...lines].join("\n");
+  return [`Fund profile for ${sym2}, from Yahoo Finance as it stands today (${day3}). A fund has no company accounts, insider trades or results releases of its own, so no results dates: what it holds and what it costs to own are its fundamentals.`, "", ...lines].join("\n");
 }
 var YAHOO_LINES = {
   balance_sheet: ["TotalAssets", "CurrentAssets", "CashAndCashEquivalents", "TotalLiabilitiesNetMinorityInterest", "CurrentLiabilities", "StockholdersEquity"],
@@ -39785,69 +39940,6 @@ async function financialStatement(raw, kind, freq, analysis2) {
 import { randomUUID } from "node:crypto";
 import fs18 from "node:fs";
 import path21 from "node:path";
-
-// src/data/holidays.ts
-var HOLIDAYS = {
-  2026: [
-    ["2026-01-01", "New Year's Day"],
-    ["2026-01-19", "Martin Luther King, Jr. Day"],
-    ["2026-02-16", "Washington's Birthday"],
-    ["2026-04-03", "Good Friday"],
-    ["2026-05-25", "Memorial Day"],
-    ["2026-06-19", "Juneteenth"],
-    ["2026-07-03", "Independence Day (observed)"],
-    ["2026-09-07", "Labor Day"],
-    ["2026-11-26", "Thanksgiving Day"],
-    ["2026-12-25", "Christmas Day"]
-  ],
-  2027: [
-    ["2027-01-01", "New Year's Day"],
-    ["2027-01-18", "Martin Luther King, Jr. Day"],
-    ["2027-02-15", "Washington's Birthday"],
-    ["2027-03-26", "Good Friday"],
-    ["2027-05-31", "Memorial Day"],
-    ["2027-06-18", "Juneteenth (observed)"],
-    ["2027-07-05", "Independence Day (observed)"],
-    ["2027-09-06", "Labor Day"],
-    ["2027-11-25", "Thanksgiving Day"],
-    ["2027-12-24", "Christmas Day (observed)"]
-  ],
-  // 1 Jan 2028 is a Saturday: the NYSE keeps no New Year's Day holiday that year.
-  2028: [
-    ["2028-01-17", "Martin Luther King, Jr. Day"],
-    ["2028-02-21", "Washington's Birthday"],
-    ["2028-04-14", "Good Friday"],
-    ["2028-05-29", "Memorial Day"],
-    ["2028-06-19", "Juneteenth"],
-    ["2028-07-04", "Independence Day"],
-    ["2028-09-04", "Labor Day"],
-    ["2028-11-23", "Thanksgiving Day"],
-    ["2028-12-25", "Christmas Day"]
-  ]
-};
-var NAMES2 = new Map(Object.values(HOLIDAYS).flat().map(([day3, name]) => [day3, name]));
-var DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-var dayOfWeek = (day3) => (/* @__PURE__ */ new Date(`${day3}T12:00:00Z`)).getUTCDay();
-var holidaysKnown = (day3) => day3.slice(0, 4) in HOLIDAYS;
-function marketClosed(day3) {
-  const w = dayOfWeek(day3);
-  if (w === 0 || w === 6) return `a ${DAYS[w]}`;
-  return NAMES2.get(day3) ?? null;
-}
-var isMarketDay = (day3) => marketClosed(day3) === null;
-function nextMarketDay(day3) {
-  let d = addDays(day3, 1);
-  while (!isMarketDay(d)) d = addDays(d, 1);
-  return d;
-}
-function firstMarketDayOfWeek(day3) {
-  const monday = addDays(day3, -((dayOfWeek(day3) + 6) % 7));
-  for (let i = 0; i < 5; i++) {
-    const d = addDays(monday, i);
-    if (isMarketDay(d)) return d;
-  }
-  return null;
-}
 
 // src/desk/holdings.ts
 import fs8 from "node:fs";
@@ -40644,8 +40736,8 @@ function readPart(dir, ticker, date5, names, part = 1, fallback) {
   if (parts.length <= 1 && part === 1) return parts[0]?.text ?? "";
   if (part > parts.length) throw new Error(`this read has ${parts.length} part${parts.length === 1 ? "" : "s"}, not ${part}`);
   const holds = parts.map((p, i) => `part ${i + 1}: ${p.names.join("; ")}`).join(". ");
-  const next = part < parts.length ? `Read the next with the same sections and part ${part + 1}` : "This is the last part";
-  return `(Part ${part} of ${parts.length} of this read, too long for one answer. ${holds}. Read every part once, in order. ${next}.)
+  const next2 = part < parts.length ? `Read the next with the same sections and part ${part + 1}` : "This is the last part";
+  return `(Part ${part} of ${parts.length} of this read, too long for one answer. ${holds}. Read every part once, in order. ${next2}.)
 
 ${parts[part - 1].text}`;
 }
@@ -40804,13 +40896,13 @@ function enqueue(dir, raw, at, depth, now = /* @__PURE__ */ new Date()) {
     const was = list2.find((i) => i.symbol === symbol4);
     if (was?.state === "running") return { list: list2, result: list2 };
     if (was?.state === "waiting") {
-      const next2 = list2.map((i) => i === was ? { ...i, ...depth ? { depth } : {} } : i);
-      return { list: next2, result: next2 };
+      const next3 = list2.map((i) => i === was ? { ...i, ...depth ? { depth } : {} } : i);
+      return { list: next3, result: next3 };
     }
     const rest = list2.filter((i) => i !== was);
     if (rest.filter(open2).length >= MAX_OPEN) throw new QueueRefusal("FULL", `${MAX_OPEN} analyses are already waiting: let them run first`);
-    const next = [...rest, { symbol: symbol4, requestedAt: at, state: "waiting", ...depth ? { depth } : {} }];
-    return { list: next, result: next };
+    const next2 = [...rest, { symbol: symbol4, requestedAt: at, state: "waiting", ...depth ? { depth } : {} }];
+    return { list: next2, result: next2 };
   });
 }
 var byAnother = (i, by) => !by || i.runner !== by.runner;
@@ -40976,7 +41068,7 @@ function buildPlan(root, req, ws = workspaceOf(root)) {
 }
 var scoredWords = (p) => p.window ? `${checkName(p.window)} ${againstWords(p.symbol, p.window)}, over the ${windowWords(p.window)} after the call, once a scoring runs after them. It is not the call's own time horizon.` : `after ${p.holdingDays} trading days against ${p.benchmark}`;
 function renderPlan({ plan: p, holdings, lessons, resumed }) {
-  const next = p.steps.find((x) => !x.done);
+  const next2 = p.steps.find((x) => !x.done);
   const step = (x) => `${x.section}${x.turn > 1 || p.steps.filter((y) => y.section === x.section).length > 1 ? ` (turn ${x.turn})` : ""}`;
   return [
     `Analysis plan for ${p.symbol} on ${p.analysisDate}${isHistorical(p.analysisDate) ? " (a past day: use only what was known by then)" : ""}`,
@@ -40989,7 +41081,7 @@ function renderPlan({ plan: p, holdings, lessons, resumed }) {
     ...p.notes.length ? ["", ...p.notes.map((n2) => `Note: ${n2}`)] : [],
     "",
     `Steps${resumed ? " (resuming)" : ""}: ${p.steps.map((x) => `${x.done ? "[done] " : ""}${step(x)}`).join(" -> ")}`,
-    next ? `Next step: ${step(next)}` : "Every step is done: write the report and record the decision.",
+    next2 ? `Next step: ${step(next2)}` : "Every step is done: write the report and record the decision.",
     "",
     "Saved with this run: the holdings and the lessons below. The trader, the risk voices and the portfolio manager read them from the desk themselves (read_run, sections holdings and lessons): do not copy them into their requests.",
     "",
@@ -41552,10 +41644,10 @@ function rank(candidates) {
 }
 async function inTurn(items, width, job) {
   const out = new Array(items.length);
-  let next = 0;
+  let next2 = 0;
   await Promise.all(Array.from({ length: Math.min(width, items.length) }, async () => {
-    while (next < items.length) {
-      const i = next++;
+    while (next2 < items.length) {
+      const i = next2++;
       out[i] = await job(items[i]);
     }
   }));
@@ -41681,7 +41773,7 @@ function stopIn(dir, ticker, date5) {
     return null;
   }
 }
-async function stopsAtClose(dir, today2, closeOf) {
+async function stopsAtClose(dir, today2, closeOf2) {
   const held = readHoldings(dir);
   if (!held) return { state: "unknown" };
   if (held.source === "robinhood" && !held.accounts?.some((a) => a.tradable)) return { state: "no-agentic" };
@@ -41692,7 +41784,7 @@ async function stopsAtClose(dir, today2, closeOf) {
     const view = viewOf(calls, symbol4, today2), level = view ? stopIn(dir, symbol4, view.date)?.level ?? null : null;
     if (!view || level === null) continue;
     try {
-      stops.push({ symbol: symbol4, level, called: view.date, close: await closeOf(symbol4) });
+      stops.push({ symbol: symbol4, level, called: view.date, close: await closeOf2(symbol4) });
     } catch (e) {
       stops.push({ symbol: symbol4, level, called: view.date, close: null, why: e.message });
     }
@@ -41864,12 +41956,12 @@ function rerateLines(dir, today2, m2, max) {
   return out;
 }
 function closedBrief(dir, today2, why, clock2) {
-  const waiting = readQueue(dir).filter((q) => q.state === "waiting").map((q) => q.symbol), next = nextMarketDay(today2);
-  const lines = [`MORNING ROUTINE for ${weekday2(today2)} ${today2}.`, ...clockLines(today2, clock2), `New York's market is closed today (${why}): score past calls (step 1), then stop. Analyse nothing in this routine today; the next market day is ${weekday2(next)} ${next}.`];
+  const waiting = readQueue(dir).filter((q) => q.state === "waiting").map((q) => q.symbol), next2 = nextMarketDay(today2);
+  const lines = [`MORNING ROUTINE for ${weekday2(today2)} ${today2}.`, ...clockLines(today2, clock2), `New York's market is closed today (${why}): score past calls (step 1), then stop. Analyse nothing in this routine today; the next market day is ${weekday2(next2)} ${next2}.`];
   lines.push("", `1. Score past calls first: list_settlements, then record_outcome with a lesson for each READY call (the /settle playbook). ${LEFT_CALLS}`);
   lines.push("", "2. Analyse nothing today: the market is closed.");
   if (waiting.length) lines.push(`   Left on the dashboard's waiting list: ${waiting.join(", ")}. Do not start them from this routine.`);
-  lines.push("", `3. Finish with a short plain list: what was scored, and that the market is closed today (${why}), so nothing was analysed; the next market day is ${weekday2(next)} ${next}. Not investment advice.`);
+  lines.push("", `3. Finish with a short plain list: what was scored, and that the market is closed today (${why}), so nothing was analysed; the next market day is ${weekday2(next2)} ${next2}. Not investment advice.`);
   lines.push("", "No one may be watching: do not wait for an answer. If a step needs the person (for example no contact email is saved), skip what depends on it and say so at the end.");
   return lines.join("\n");
 }
@@ -42726,7 +42818,7 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root, home) {
   });
   server.registerTool("get_company_overview", {
     title: "Company profile and ratios",
-    description: "For a US filer, from its SEC filings as they stood on the analysis date and the checked closing price: its name, industry and sector, fiscal year, shares outstanding, and its valuation worked out from them (market value, last-twelve-months diluted EPS, price to earnings, book value and price to book), each shown with the filed figures it came from, and the dividends per share and yield of the twelve months to the day from the dividends the price source records, each dated; a past analysis date has its own. For a company that does not file with the SEC, Yahoo Finance's profile and ratios for today only, withheld for a past analysis date.",
+    description: "For a US filer, from its SEC filings as they stood on the analysis date and the checked closing price: its name, industry and sector, fiscal year, shares outstanding, and its valuation worked out from them (market value, last-twelve-months diluted EPS, price to earnings, book value and price to book), each shown with the filed figures it came from, and the dividends per share and yield of the twelve months to the day from the dividends the price source records, each dated; a past analysis date has its own. Also its results dates: the results releases it filed in the year to the analysis date (form 8-K, item 2.02), each with the minute the SEC accepted it, the first session that could trade on it and how that session closed; the next results date is said to be not known (a company announces it in a press release, not a filing). A fund and a crypto asset have no results releases. For a company that does not file with the SEC, Yahoo Finance's profile and ratios for today only, withheld for a past analysis date, and no results dates.",
     inputSchema: { symbol: symbol3, analysis_date: analysis },
     annotations: READ
   }, async (a) => answer("profile of " + a.symbol, () => companyOverview(a.symbol, a.analysis_date)));

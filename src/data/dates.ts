@@ -7,6 +7,13 @@ const DAY = 86_400_000;
 /** New York's calendar day of a moment, YYYY-MM-DD: the market's own day. */
 export const marketDay = (d: Date): string => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
 
+/** A moment as New York's clock shows it: "2026-11-09 15:04". */
+export const nyClock = (ms: number): string => {
+  const f = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(ms));
+  const v = (t: string) => f.find((x) => x.type === t)?.value ?? '';
+  return `${v('year')}-${v('month')}-${v('day')} ${v('hour')}:${v('minute')}`;
+};
+
 /** Today, as the desk counts days (New York's), or the day of `now`. TRADING_AGENTS_TODAY sets today, for the tests. */
 export function today(now?: Date): string {
   if (!now && process.env.TRADING_AGENTS_TODAY) return process.env.TRADING_AGENTS_TODAY;

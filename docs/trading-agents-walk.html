@@ -470,7 +470,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "Ask the team about a company it has not analysed today, for example Microsoft: [[Analyse MSFT medium]]"],
       "see": [
         "Three rounds of the bull and bear debate and of the risk debate. It takes longer and uses more model time."] },
-    { "id": "B8", "title": "A fund is read for what it holds", "tags": [], "changed": "2026-11-09",
+    { "id": "B8", "title": "A fund is read for what it holds", "tags": [], "changed": "2026-11-11",
       "about": "A fund such as SPY (the S&P 500 in one ticker) has no company accounts. For a fund the desk reads what it holds instead, from the report every US fund files with the SEC each quarter (form N-PORT), a few months after the day it speaks for.",
       "where": "Madav › Agent Studio › trading-desk › Put to work, then the call's Fundamentals report",
       "do": [
@@ -485,7 +485,8 @@ b, strong { font-weight: var(--weight-semibold); }
         "For BND, its size is said to be the whole fund's: \"for the whole fund: all its 6 share classes together, of which BND is one; the report does not give BND's own part\" (BND is one class of a larger Vanguard fund). A fund with one class, such as XLK, gives its size alone.",
         "For SQQQ, a \"Derivatives:\" line: 10 or so swaps and a future tied to the Nasdaq-100, whose notional amounts (the exposure they give) add up to about three times the fund's net assets, and that \"the shares above count a derivative only at its value\". The report never reads SQQQ as a fund of cash.",
         "The yearly cost (the expense ratio) is \"unavailable\": the desk does not read it, and the report says the fund's prospectus states it. Never a made-up figure.",
-        "If the SEC could not be reached, or sent back an empty or broken list of the fund's reports, the report says the fund profile was \"unavailable\" and names the SEC. It never says SPY is \"not a fund\" or \"a company or a trust\" because of that."] },
+        "If the SEC could not be reached, or sent back an empty or broken list of the fund's reports, the report says the fund profile was \"unavailable\" and names the SEC. It never says SPY is \"not a fund\" or \"a company or a trust\" because of that.",
+        "The profile says a fund has no results releases, so no results dates. No agent gives SPY a results day."] },
     { "id": "B9", "title": "NVIDIA's valuation and insider trades, from the SEC", "tags": [], "changed": "2026-11-10",
       "about": "Insider trades are shares bought or sold by a company's own directors and officers, reported to the SEC on Form 4. When every filing was read, they are a fact, so \"none\" is an answer, not a gap. When some filings could not be read, the desk says how many and that the counts are not the whole picture. When an insider corrects a filing, the correction (a Form 4/A) takes the old filing's place, so no trade is counted twice. The desk reads the SEC's list of a company's filings again after an hour, and says when it read it, so a filing made since is never hidden behind an old read.",
       "where": "Dashboard › NVDA's call › Fundamentals report",
@@ -535,7 +536,7 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "\"Shares outstanding: no single count on a cover page filed by then …\", then \"In its place, the weighted average diluted shares from its accounts for …\", with the dates and the number.",
         "A market value and a price to book worked out from it (\"average diluted shares × close\"), not \"unavailable\"."] },
-    { "id": "B21", "title": "A foreign company is not valued from the wrong shares", "tags": ["Optional"], "changed": "2026-11-09",
+    { "id": "B21", "title": "A foreign company is not valued from the wrong shares", "tags": ["Optional"], "changed": "2026-11-11",
       "about": "A foreign company listed in the US, such as TSMC, files a yearly report with the SEC on form 20-F. The share count and earnings per share in it are of its ordinary shares at home, while its US price is for a depositary share (ADS), which can stand for several of them. The SEC's figures do not say how many, so the desk works out no market value or multiple from them, and says why.",
       "where": "Madav › Agent Studio › trading-desk › Put to work, then Dashboard › TSM's call › Fundamentals report",
       "do": [
@@ -544,7 +545,22 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "\"Shares outstanding: … ordinary shares\", from its cover page.",
         "\"Market value, price to earnings and price to book: not worked out. TSM files with the SEC as a foreign company (its yearly report is a form 20-F) …\", with the reason, and the report gives TSM no market value or price to earnings of the desk's own.",
-        "Never a market value worked out from the ordinary share count and the US price: for TSMC, whose US share stands for five ordinary shares, that would be about five times too high."] },
+        "Never a market value worked out from the ordinary share count and the US price: for TSMC, whose US share stands for five ordinary shares, that would be about five times too high.",
+        "Its results dates are \"not known from its filings\": a foreign company files its results on form 6-K, which names no items, so the desk cannot tell them from its other reports. No agent gives TSM a results date."] },
+    { "id": "B25", "title": "Results dates come from the company's own filings, and the next one is \"not known\"", "tags": [], "changed": "2026-11-11",
+      "about": "A company's results day often moves its shares more than any other day of the year. The desk used to have no source for when a company reports, so its agents guessed: NVIDIA's from the day a betting market closes (a day late), and Meta's from the spacing of its past filings (six days early). Now the desk reads the results a company filed with the SEC in the past year (form 8-K, item 2.02): the day and time of each, the first trading day that could react to it (results out after the close trade the next day), and how the shares closed that day. When the next results come out is not in the filings (a company announces it in a press release), so the desk says it is not known instead of guessing.",
+      "where": "Dashboard › META's call › Fundamentals report, then the rest of the call",
+      "do": [
+        "Run a new analysis of Meta, if you have not since this update: [[Analyse META shallow]]",
+        "Open its Fundamentals report and find Meta's results releases.",
+        "Read the rest of the call (the debate, the plan, the risk debate and the decision) for any date of Meta's next results."],
+      "see": [
+        "The report lists Meta's results of the past year, each with when it was filed and the first day that traded on it. For an analysis of 10 or 11 Nov 2026: filed 2026-01-28 at 16:04 New York time, after the close, first traded 2026-01-29, which closed 10.40% higher; 2026-04-29, 8.55% lower on 2026-04-30; 2026-07-29, 7.96% lower on 2026-07-30; 2026-10-21, 6.98% lower on 2026-10-22.",
+        "The 2026-10-21 one adds that its filing also reports another event (of 2026-10-19), so it does not date the release itself.",
+        "\"the next results date is not known\". No agent gives a date for Meta's next results, and none works one out from the spacing of the past ones (never \"near 2027-01-22\").",
+        "No agent treats a results day as a rare day: a move like those four is never priced as a 1-in-252 chance.",
+        "Optional, for NVIDIA ([[Analyse NVDA shallow]]): no date is taken from a Polymarket market's closing date; NVIDIA's next results date is \"not known\" too (NVIDIA announced 17 Nov 2026 in a press release, which the desk does not read).",
+        "If an agent gives a next results date anyway, that is a fault: note the agent and its words."] },
     { "id": "B12", "title": "World news arrives", "tags": [], "changed": "2026-11-06",
       "about": "The news analyst reads the world's news as well as the company's: the stories Yahoo Finance files under the stock market, interest rates, oil, gold and the euro, where central banks, the economy and world events are reported.",
       "where": "Dashboard › any call made after this update › News report",

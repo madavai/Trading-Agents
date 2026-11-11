@@ -23,8 +23,8 @@
 // add up to what they are, never a figure with a long tail of float noise.
 import fs from 'node:fs';
 import path from 'node:path';
-import { addDays, daysBetween } from '../data/dates.js';
-import { nextMarketDay } from '../data/holidays.js';
+import { addDays, daysBetween, nyClock } from '../data/dates.js';
+import { closeOf, nextMarketDay } from '../data/holidays.js';
 import { isCrypto } from '../data/symbols.js';
 import { writeWhole } from './lock.js';
 import { listed } from './agent-files.js';
@@ -93,15 +93,6 @@ const notFollowed = (ticker: string): string => (isCrypto(ticker)
   ? 'Among crypto, paper follows Bitcoin and Ether for now.'
   : 'An index, a future or a currency cannot be bought: paper follows stocks, funds, Bitcoin and Ether.');
 
-/** New York's early closes (1:00 p.m.), as data/holidays.ts names them: the day after Thanksgiving, and Christmas Eve or
- *  the day before Independence Day when the NYSE lists one. */
-const EARLY_CLOSES: ReadonlySet<string> = new Set(['2026-11-27', '2026-12-24', '2027-11-26', '2028-07-03', '2028-11-24']);
-/** An instant as New York's clock shows it: "2026-11-09 15:04". */
-const nyClock = (ms: number): string => {
-  const f = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(ms));
-  const v = (t: string) => f.find((x) => x.type === t)?.value ?? '';
-  return `${v('year')}-${v('month')}-${v('day')} ${v('hour')}:${v('minute')}`;
-};
 /** Why paper does not follow a call recorded after the close it would have filled at, or null when it follows it (or the
  *  call was recorded before the desk kept its time). A stock fills at the close of the market day after its call (4 p.m.
  *  New York time, 1 p.m. on an early close); a coin at the close of the day after its call (midnight UTC). */
@@ -113,7 +104,7 @@ export function lateWhy(c: PaperCall): string | null {
     return at < closes ? null : `Recorded on ${new Date(at).toISOString().slice(0, 10)}, after the close of ${fill} it would have filled at: paper follows a call only from when it was made, so an analysis dated in the past is not followed.`;
   }
   const fill = nextMarketDay(c.date), seen = nyClock(at);
-  return seen < `${fill} ${EARLY_CLOSES.has(fill) ? '13:00' : '16:00'}` ? null
+  return seen < `${fill} ${closeOf(fill)}` ? null
     : `Recorded on ${seen.slice(0, 10)}, after the close of ${fill} it would have filled at: paper follows a call only from when it was made, so an analysis dated in the past is not followed.`;
 }
 

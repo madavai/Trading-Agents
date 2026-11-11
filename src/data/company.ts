@@ -8,7 +8,8 @@
 import { addDays, analysisDate, daysBetween, isHistorical, today } from './dates.js';
 import { getCookies, getJson, getText, NoData, Unavailable } from './http.js';
 import { cryptoBase, normalizeSymbol } from './symbols.js';
-import { history, HOSTS } from './yahoo.js';
+import { history, HOSTS, type Bar } from './yahoo.js';
+import { resultsLines } from './results.js';
 import { annualFormIn, averageDilutedShares, cikFor, companyFacts, filingSplits, firstTagPerPeriod, fundTickers, latestBalance, rebase, sectorOfSic, secStatement, sharesOutstanding, SHOWN, splitList, STATEMENTS, submissions, trailingYear, type Fact, type Facts, type Frequency, type Split, type Statement, type Submissions, type Table } from './sec.js';
 import { secInsiders } from './insiders.js';
 import { latestReport, renderReport } from './nport.js';
@@ -27,7 +28,7 @@ async function filer(sym: string): Promise<string | null> {
 /** The symbol of a company; a crypto asset, an index, a future or a currency pair has no company accounts. */
 function companySymbol(raw: string): string {
   const sym = normalizeSymbol(raw);
-  if (cryptoBase(raw) || /[\^=]/.test(sym)) throw new NoData(`${sym} is not a company: a crypto asset, index, future or currency pair has no company accounts`);
+  if (cryptoBase(raw) || /[\^=]/.test(sym)) throw new NoData(`${sym} is not a company: a crypto asset, index, future or currency pair has no company accounts and no results releases or results dates`);
   return sym;
 }
 
@@ -183,7 +184,7 @@ async function secOverview(sym: string, cik: string, day: string): Promise<strin
   const basis: { splits: Split[]; why?: string } = foreign ? { splits: filingSplits(epsFacts, day) } : await shareBasis(sym, epsFacts);
   const priced = !foreign && basis.why === undefined;
 
-  let close: { date: string; close: number; table: number; currency?: string; open: boolean; label: string } | null = null, paid: Array<{ date: string; amount: number }> = [];
+  let close: { date: string; close: number; table: number; currency?: string; open: boolean; label: string } | null = null, paid: Array<{ date: string; amount: number }> = [], bars: Bar[] = [];
   // The close in cents, so a product like the market value carries no rounding noise: the price it traded at (adjusted
   // for later splits only, as every price the source gives); the price table's row for a past day is also lowered by the
   // dividends paid since. While its session is still trading (or was when it was read) it is the latest price, and every
@@ -192,7 +193,7 @@ async function secOverview(sym: string, cik: string, day: string): Promise<strin
     const h = await history(sym, day), bar = h.bars.at(-1)!, state = latestState(h, day), traded = h.traded?.at(-1);
     const row = traded?.date === bar.date ? traded : bar, cents = (n: number) => Math.round(n * 100) / 100;
     close = { date: row.date, close: cents(row.close), table: cents(bar.close), currency: h.meta.currency, open: state.open, label: state.open ? state.label : 'Close' };
-    paid = h.dividends ?? [];
+    paid = h.dividends ?? []; bars = h.bars;
   } catch { /* no price: the multiples are unavailable */ }
   const usd = !close?.currency || close.currency === 'USD', px = close?.open ? 'latest price' : 'close', past = isHistorical(day);
   if (close) {
@@ -252,13 +253,20 @@ async function secOverview(sym: string, cik: string, day: string): Promise<strin
   } else if (dps) lines.push(`Dividends per share, the last twelve months filed (derived from ${dps.parts}): ${fixed(dps.value, 4)} USD. Dividends since the last filed period are not in the filings, and the prices that record them could not be read`);
   else lines.push('Dividends per share: not among its filed figures (many companies pay none)');
   lines.push('Unavailable from official free sources: forward estimates (forward P/E, PEG), analysts\' price targets and beta.');
+  // Whether it is a fund, from the SEC's list of funds; a list that cannot be read leaves it a company here (the fund's
+  // own tool says what it is).
+  const fund = await fundTickers().then((t) => t.has(sym), () => false);
+  lines.push('', ...await resultsLines(sym, s, day, bars, close?.open ?? false, { foreign, fund }));
   return [`Company profile and valuation for ${sym}, from its SEC filings as they stood on ${day} and the desk's checked ${close?.open ? 'latest price (not a close)' : 'closing price'}, with the dividends its price source records. Every multiple is derived here from those filed figures and that price, and shows what it came from; nothing is an estimate.`, '', ...lines].join('\n');
 }
+
+/** Results dates for a company that does not file with the SEC: none the desk can read. */
+const NO_RESULTS = (sym: string) => `Results releases and the next results date: not known. The desk reads them from a company's SEC filings, and ${sym} does not file with the SEC; do not work them out from anything else.`;
 
 export async function companyOverview(raw: string, analysis: string): Promise<string> {
   const day = analysisDate(analysis), sym = companySymbol(raw), cik = await filer(sym);
   if (cik) return secOverview(sym, cik, day);
-  if (isHistorical(day)) return `Company profile and ratios for ${sym} are withheld for ${day}: Yahoo Finance serves them only as they stand today. Market value, multiples, the 52-week range and the past year's income move with today's price, and even the name, sector and industry are today's; they would put later knowledge into an analysis of ${day}. Use get_financial_statement, which serves a US filer's accounts as filed by then.`;
+  if (isHistorical(day)) return `Company profile and ratios for ${sym} are withheld for ${day}: Yahoo Finance serves them only as they stand today. Market value, multiples, the 52-week range and the past year's income move with today's price, and even the name, sector and industry are today's; they would put later knowledge into an analysis of ${day}. Use get_financial_statement, which serves a US filer's accounts as filed by then.\n\n${NO_RESULTS(sym)}`;
   const r = await summary(sym, 'price,summaryProfile,summaryDetail,defaultKeyStatistics,financialData');
   const p = r.price ?? {}, d = r.summaryDetail ?? {}, k = r.defaultKeyStatistics ?? {}, f = r.financialData ?? {};
   // Three currencies: prices in the quote currency (which can be pence), market value and per-share figures in its main
@@ -281,7 +289,7 @@ export async function companyOverview(raw: string, analysis: string): Promise<st
   ];
   const lines = fields.filter(([, v]) => v !== null && v !== undefined && v !== '').map(([l, v]) => `${l}: ${v}`);
   if (!lines.length) throw new NoData(`Yahoo Finance has no profile or ratios for ${sym}`);
-  return [`Company profile and ratios for ${sym}, from Yahoo Finance as they stand today (${day}). TTM is the last twelve months; a field Yahoo does not give is left out.`, '', ...lines].join('\n');
+  return [`Company profile and ratios for ${sym}, from Yahoo Finance as they stand today (${day}). TTM is the last twelve months; a field Yahoo does not give is left out.`, '', ...lines, '', NO_RESULTS(sym)].join('\n');
 }
 
 export async function insiderTransactions(raw: string, analysis: string, limit = 30): Promise<string> {
@@ -348,7 +356,7 @@ export async function fundProfile(raw: string, analysis: string, topN = 10): Pro
   if (sectors.length) lines.push('', `By sector: ${sectors.map(([n, v]) => `${FUND_SECTORS[n] ?? n.replace(/_/g, ' ')} ${percent(v)}`).join(', ')}`);
   // Yahoo's averages for a fund's stocks (equityHoldings) are left out: its "price to earnings" comes as about 0.03 for a
   // fund whose stocks trade near 32 times earnings, a figure that would mislead rather than inform.
-  return [`Fund profile for ${sym}, from Yahoo Finance as it stands today (${day}). A fund has no company accounts or insider trades of its own: what it holds and what it costs to own are its fundamentals.`, '', ...lines].join('\n');
+  return [`Fund profile for ${sym}, from Yahoo Finance as it stands today (${day}). A fund has no company accounts, insider trades or results releases of its own, so no results dates: what it holds and what it costs to own are its fundamentals.`, '', ...lines].join('\n');
 }
 
 // Yahoo's names for the statement lines, in the order of the SEC table's lines, so both sources read alike.

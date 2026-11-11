@@ -365,12 +365,21 @@ export function annualFormIn(facts: { 'us-gaap'?: Facts; dei?: Facts } | undefin
 }
 
 // ---------- a filer's own record: its name, industry code and filings ----------
+/** A list of filings as the SEC gives it, one column per field, newest first. `acceptanceDateTime` is the moment the SEC
+ *  accepted each one (in UTC), `items` the 8-K items it reports ("2.02,9.01"). */
+export interface Filings { accessionNumber?: string[]; filingDate?: string[]; reportDate?: string[]; acceptanceDateTime?: string[]; form?: string[]; items?: string[]; primaryDocument?: string[] }
 export interface Submissions {
   name?: string; sic?: string; sicDescription?: string; fiscalYearEnd?: string;
-  filings?: { recent?: { accessionNumber?: string[]; filingDate?: string[]; reportDate?: string[]; form?: string[]; primaryDocument?: string[] } };
+  /** `recent`: its latest filings (a year's or a thousand, whichever is more); `files`: the pages that list older ones. */
+  filings?: { recent?: Filings; files?: Array<{ name?: string; filingFrom?: string; filingTo?: string }> };
 }
 /** The filer's record at the SEC: name, industry code, fiscal year end and its latest thousand filings. */
 export const submissions = (cik: string) => cached<Submissions>(`https://data.sec.gov/submissions/CIK${cik}.json`, 30_000);
+/** One of the pages that list a filer's older filings, by the name its record gives it ("CIK0001045810-submissions-001.json"). */
+export function submissionsPage(name: string): Promise<Filings> {
+  if (!/^CIK\d{10}-submissions-\d{3}\.json$/.test(name)) return Promise.reject(new NoData(`the SEC's record names a page of older filings the desk cannot read ("${name}")`));
+  return cached<Filings>(`https://data.sec.gov/submissions/${name}`, 30_000);
+}
 
 /** The eleven sectors (by the names Yahoo Finance and the S&P sector funds use) an SEC industry code (SIC) falls in. The
  *  SEC's codes are older and coarser than the market's sectors, so this is approximate: a search engine files as "computer
