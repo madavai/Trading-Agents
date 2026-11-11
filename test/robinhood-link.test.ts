@@ -77,7 +77,7 @@ test('the link tells the dashboard where Robinhood stands: none, waiting, connec
   assert.equal(connected.checkedAt, '2026-10-12T15:00:00.000Z');
   // audit 1 A4.19: the page does use two of the order tools (the dry run and the order on Confirm), so it says which.
   // 11 Nov 2026 (dashboard tour): "tools" is explained, "others" say what they are, and the sentence is short.
-  assert.equal(connected.message, "Robinhood offers 8 tools (things a program can ask it to do): 3 that only read, 3 that order or move money and 2 that do something else. This page uses only reading tools, plus two of the order ones, each only when you press Review (Robinhood's check, which places nothing) or Confirm (the order). No agent gets an order tool.");
+  assert.equal(connected.message, "Robinhood offers 8 tools (things a program can ask it to do): 3 that only read, 3 that order or move money and 2 others, which this page never uses. This page uses only reading tools, plus two of the order ones, each only when you press Review (Robinhood's check, which places nothing) or Confirm (the order). No agent gets an order tool.");
   assert.doesNotMatch(connected.message, /never uses them/);
   assert.equal(opened.length, 1);
   assert.deepEqual(fake.calls, []);

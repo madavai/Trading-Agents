@@ -8,7 +8,7 @@ import crypto from 'node:crypto';
 import type { Reader } from './reader.js';
 import { isDone } from './states.js';
 
-const obj =(v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {});
+const obj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {});
 const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 const text = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null);
 /** A figure as Robinhood sends it (text that is a number), or null. */

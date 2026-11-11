@@ -359,8 +359,9 @@ function renderToday(): void {
   else if (!views.length) accounts = kpi({ tone: '', icon: 'i-wallet', name: 'Your accounts', value: '—', line: A.chosen.length ? 'Open them to read them from Robinhood' : 'Choose the accounts to show', act: { act: 'view', view: 'account' } });
   else {
     const totals = views.map((v) => v.portfolio?.total ?? null), whole = totals.every((t) => t !== null);
-    const sum = totals.reduce<number>((a, t) => a + (t ?? 0), 0), g = gainOf(views.flatMap((v) => v.holdings)), gain = g ? g.value - g.cost : null;
-    const gainWords = g && gain !== null ? `<span class="${gain >= 0 ? 'ta-up' : 'ta-down'}">${signedMoney(gain)} (${pct((gain / g.cost) * 100)})</span> since bought` : 'gain since bought not known';
+    const held = views.flatMap((v) => v.holdings), sum = totals.reduce<number>((a, t) => a + (t ?? 0), 0), g = gainOf(held), gain = g ? g.value - g.cost : null;
+    // As the account's own "Since bought" tile says it (viewCard): with nothing held there is nothing to gain or lose; "not known" only when a holding lacks its cost.
+    const gainWords = g && gain !== null ? `<span class="${gain >= 0 ? 'ta-up' : 'ta-down'}">${signedMoney(gain)} (${pct((gain / g.cost) * 100)})</span> since bought` : held.length ? 'gain since bought not known' : 'nothing held';
     accounts = kpi({ tone: gain === null ? 'accent' : gain >= 0 ? 'ok' : 'bad', icon: 'i-wallet', name: `Your ${views.length} account${views.length === 1 ? '' : 's'}`, value: whole ? money(sum) : '—', line: gainWords, act: { act: 'view', view: 'account' } });
   }
   // the Agentic account: what the desk may spend, on the person's Confirm

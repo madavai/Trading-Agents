@@ -208,3 +208,10 @@ test('page-17 (dashboard tour, 11 Nov 2026): the Accounts section keeps only sta
   // The lines that appear only when something failed stay.
   for (const kept of ['The orders could not be read.', 'Not read: ', 'holding(s) could not be read and are left out.']) assert.ok(page.includes(kept), kept);
 });
+
+test('page-18 (dashboard tour, 11 Nov 2026): the Overview\'s first tile says "nothing held" when the accounts hold nothing, and "not known" only when a holding lacks its cost, as the account page\'s own tile does', () => {
+  // Before: gainOf() is null for no holdings, and the tile said "gain since bought not known" of an account that holds nothing.
+  assert.match(page, /const held = views\.flatMap\(\(v\) => v\.holdings\)/);
+  assert.match(page, / since bought` : held\.length \? 'gain since bought not known' : 'nothing held';/);
+  assert.match(page, /: v\.holdings\.length \? 'a holding lacks its cost' : 'nothing held'/, 'the account page\'s own tile says the same two cases');
+});
