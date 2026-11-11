@@ -4,7 +4,7 @@
 // (Decide…) or the person's own (Trade…) - and is placed only on their Confirm, with trading switched on by them.
 import { api, ApiError, claimKey, hasKey, KEY_LOST, type CallDetail, type DeskState, type Depth, type History, type LinkInfo, type Market, type Match, type Prefs, type Caps, type PaperView, type PaperTrade, type QueueView, type QuoteResult, type Account, type AccountView, type Holding, type Order, type Recent, type Snapshot, type TicketOpen, type Check, type Review, type Placed, type Trading, type Tier, type TierItem, type TierView, type Worth, type Screen, type Weather, type WeatherLine, type HoldingCare } from './api.js';
 import { heroChart, paperChart, sparkline } from './chart.js';
-import { againstOver, averageOf, barOn, chipDay, dayText, esc, labelled, money, moveDayOf, notHorizon, NOTES, num, nyDay, opening, ownReturnLine, pct, plain, points, priceDayWords, qty, rangeFor, ratingMeaning, ratingTone, resultOf, scoreWords, SECTION_NAMES, shortDay, tone, weekDay, when, yardstickWhy } from './fmt.js';
+import { againstOver, averageOf, barOn, chipDay, dayText, esc, labelled, money, moveDayOf, notHorizon, NOTES, num, nyDay, opening, orderState, orderStateWhy, ownReturnLine, pct, plain, points, priceDayWords, qty, rangeFor, ratingMeaning, ratingTone, resultOf, scoreWords, SECTION_NAMES, shortDay, tone, weekDay, when, yardstickWhy } from './fmt.js';
 import { DELAY_SENTENCE, DELAY_SHORT, LATE } from '../../data/delay.js';
 import { GLOSSARY, glossaryGroups, isTerm, means, type TermKey } from './glossary.js';
 import { markdown } from './md.js';
@@ -359,8 +359,9 @@ function renderToday(): void {
   else if (!views.length) accounts = kpi({ tone: '', icon: 'i-wallet', name: 'Your accounts', value: '—', line: A.chosen.length ? 'Open them to read them from Robinhood' : 'Choose the accounts to show', act: { act: 'view', view: 'account' } });
   else {
     const totals = views.map((v) => v.portfolio?.total ?? null), whole = totals.every((t) => t !== null);
-    const sum = totals.reduce<number>((a, t) => a + (t ?? 0), 0), g = gainOf(views.flatMap((v) => v.holdings)), gain = g ? g.value - g.cost : null;
-    const gainWords = g && gain !== null ? `<span class="${gain >= 0 ? 'ta-up' : 'ta-down'}">${signedMoney(gain)} (${pct((gain / g.cost) * 100)})</span> since bought` : 'gain since bought not known';
+    const held = views.flatMap((v) => v.holdings), sum = totals.reduce<number>((a, t) => a + (t ?? 0), 0), g = gainOf(held), gain = g ? g.value - g.cost : null;
+    // As the account's own "Since bought" tile says it (viewCard): with nothing held there is nothing to gain or lose; "not known" only when a holding lacks its cost.
+    const gainWords = g && gain !== null ? `<span class="${gain >= 0 ? 'ta-up' : 'ta-down'}">${signedMoney(gain)} (${pct((gain / g.cost) * 100)})</span> since bought` : held.length ? 'gain since bought not known' : 'nothing held';
     accounts = kpi({ tone: gain === null ? 'accent' : gain >= 0 ? 'ok' : 'bad', icon: 'i-wallet', name: `Your ${views.length} account${views.length === 1 ? '' : 's'}`, value: whole ? money(sum) : '—', line: gainWords, act: { act: 'view', view: 'account' } });
   }
   // the Agentic account: what the desk may spend, on the person's Confirm
@@ -468,7 +469,30 @@ async function loadCare(): Promise<void> {
   renderCare(); renderViews(); renderStock();
 }
 
-function viewCard(v: AccountView, at: string): string {
+/** The table of orders, in an account's card and on a stock's page: when, what, how many, at what price, and where each
+ *  one stands in plain words (fmt.ts orderState, with Robinhood's own word on hover). Orders still open come first, then
+ *  the rest as Robinhood listed them. */
+function ordersTable(orders: readonly Order[], cur: string, symbols: boolean): string {
+  const open = (x: Order) => orderState(x.side, x.state).open;
+  const row = (x: Order): string => {
+    const s = orderState(x.side, x.state);
+    return `<tr><td>${esc(x.at ? dayText(x.at) : '—')}</td><td>${esc(symbols ? `${sideWord(x.side)} ${x.symbol ?? ''}`.trim() : sideWord(x.side))}${x.type ? ` <small class="at-quiet">${esc(x.type)}</small>` : ''}</td><td class="num">${qty(x.quantity)}</td><td class="num">${money(x.price, cur)}</td><td>${s.raw ? `<span class="at-chip ${s.tone}" title="${esc(orderStateWhy(s))}">${esc(s.words)}</span>` : '—'}</td></tr>`;
+  };
+  return `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>When</th><th>Order</th><th class="num">Quantity</th><th class="num" title="${esc(NOTES.orderPrice)}">Price</th><th>State</th></tr></thead><tbody>${[...orders].sort((a, b) => Number(open(b)) - Number(open(a))).map(row).join('')}</tbody></table></div>`;
+}
+
+/** The Agentic account's phone approval as status: whether Robinhood asks for the person's OK on their phone before an
+ *  order is sent, and how many wait for it. Off is marked, since an order confirmed here is then sent at once. */
+function approvalChips(ap: AccountView['approvals']): string {
+  const mark = (words: string, why: string, kind = '') => `<span class="at-chip ${kind}" title="${esc(why)}">${esc(words)}</span>`;   // not `chip(`: that name is the glossary's word-pointer
+  if (!ap || ap.required === null) return mark('Phone approval: not read', "Robinhood's phone approval setting could not be read.");
+  const setting = ap.required
+    ? mark('Phone approval: on', 'Robinhood asks you to approve every trade of this account on your phone before it is sent.', 'ok')
+    : mark('Phone approval: off', "Robinhood does not ask you to approve this account's trades on your phone: an order you Confirm here is sent at once. You can switch phone approval on in the Robinhood app.", 'warn');
+  return `${setting}${ap.pending ? mark(`${ap.pending} waiting for your approval`, 'Waiting for your OK on your phone.', 'accent') : ''}`;
+}
+
+function viewCard(v: AccountView): string {
   const a = v.account, cur = v.portfolio?.currency ?? 'USD', p = v.portfolio;
   const stocks = v.holdings.filter((h) => h.kind === 'stock').length, coins = v.holdings.filter((h) => h.kind === 'crypto').length;
   const role = a.agentic ? `<span class="at-chip accent" title="${esc(means('agentic'))}">Agentic · the desk may trade here, only on your Confirm</span>` : '<span class="at-chip">View only · the desk never trades here</span>';
@@ -486,24 +510,19 @@ function viewCard(v: AccountView, at: string): string {
     ? `<p class="at-quiet">The desk's view is its latest call on each holding. ${esc(NOTES.stopWatch)} Nothing is ever sold by itself: Sell… opens a ticket that Robinhood checks and you confirm.</p>`
     : "<p class=\"at-quiet\">The desk's view is shown for your information: it proposes orders for the Agentic account alone.</p>";
   const table = v.holdings.length
-    ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>Holding</th><th class="num">Quantity</th><th class="num">Average cost</th><th class="num">Price now</th><th class="num">Value</th><th>Share of the account</th><th class="num">Since bought</th><th class="wrap">The desk's view</th></tr></thead><tbody>${rows}</tbody></table></div>${care}`
-    : '<p class="at-quiet">Nothing is held in this account.</p>';
+    ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>Holding</th><th class="num">Quantity</th><th class="num">Average cost</th><th class="num">Price now</th><th class="num">Value</th><th>Share of the account</th><th class="num">Since bought</th><th class="wrap">The desk's view</th></tr></thead><tbody>${rows}</tbody></table></div>${care}` : '';
   let agentic = '';
   if (a.agentic) {
-    const ap = v.approvals;
-    const phone = ap === null ? "Robinhood's phone approval setting could not be read."
-      : `${ap.required === null ? "Robinhood's phone approval setting could not be read" : ap.required ? 'Robinhood asks you to approve every trade on your phone' : 'Robinhood does not ask you to approve trades on your phone'}${ap.pending ? ` · ${ap.pending} waiting for your approval now` : ''}.`;
     const o = v.orders;
     const orders = o === null ? '<p class="at-quiet">The orders could not be read.</p>'
       : o.count === 0 ? '<p class="at-quiet">No orders in this account yet.</p>'
-      : `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>When</th><th>Order</th><th class="num">Quantity</th><th class="num">Price</th><th>State</th></tr></thead><tbody>${o.orders.map((x: Order) => `<tr><td>${esc(x.at ? dayText(x.at) : '—')}</td><td>${esc(`${sideWord(x.side)} ${x.symbol ?? ''}`.trim())}${x.type ? ` <small class="at-quiet">${esc(x.type)}</small>` : ''}</td><td class="num">${qty(x.quantity)}</td><td class="num">${money(x.price, cur)}</td><td>${esc(x.state ?? '—')}</td></tr>`).join('')}</tbody></table></div>${o.count > o.orders.length ? `<p class="at-quiet">The latest ${o.orders.length} of ${o.count}.</p>` : ''}`;
-    agentic = `<div class="at-card-head"><h3>Orders in this account</h3></div>${orders}<p class="at-honest">${esc(phone)} Keep it on until you trust the desk.</p>`;
+      : `${ordersTable(o.orders, cur, true)}${o.count > o.orders.length ? `<p class="at-quiet">The latest ${o.orders.length} of ${o.count}.</p>` : ''}`;
+    agentic = `<div class="at-card-head ta-orders-head"><h3>Orders in this account</h3><span class="at-card-tail">${approvalChips(v.approvals)}</span></div>${orders}`;
   }
   const problems = v.problems.length ? `<p class="at-honest bad">Not read: ${esc(v.problems.join('; '))}. Those figures are left as dashes.</p>` : '';
   const unread = v.unread ? `<p class="at-honest">${v.unread} holding(s) could not be read and are left out.</p>` : '';
   return `<div class="at-card at-box"><div class="at-card-head"><h3>${esc(a.label)}</h3><span class="at-chip">•••• ${esc(a.last4)}</span>${role}</div>
-    ${tiles}${table}${unread}${agentic}${problems}
-    <p class="at-quiet">From Robinhood at ${esc(when(at))}; holdings valued at Robinhood's live prices.</p></div>`;
+    ${tiles}${table}${unread}${agentic}${problems}</div>`;
 }
 
 function renderViews(): void {
@@ -521,9 +540,11 @@ function renderViews(): void {
     el.innerHTML = `<div class="at-card at-box"><div class="at-card-head"><h3>Your accounts</h3></div><p class="at-lede">Choose which of your Robinhood accounts to show here.</p><div class="at-row">${rhButton('acc-pick', 'Choose accounts', { primary: true })}</div></div>`;
     return;
   }
-  const head = `<div class="at-row">${rhButton('acc-refresh', A.reading ? 'Reading from Robinhood…' : 'Refresh from Robinhood', { primary: !A.snapshot })}${rhButton('acc-pick', 'Change accounts')}</div>`;
-  const body = A.snapshot ? A.snapshot.views.map((v) => viewCard(v, A.snapshot!.at)).join('') : `<p class="at-quiet">${A.reading ? 'Reading your accounts from Robinhood.' : 'Press Refresh to read your accounts from Robinhood.'}</p>`;
-  const shared = A.snapshot && A.shared !== null ? `<p class="at-honest">${A.shared ? "The desk's agents now see these holdings when they analyse a stock: the Agentic account as the one they may size a trade to, the others as view-only context." : 'Some holdings could not be read, so the agents were not given this read: they keep the last complete one.'}</p>` : '';
+  // How fresh the figures are is part of their status: the time of the last read, small, beside the button that reads again.
+  const head = `<div class="at-row">${rhButton('acc-refresh', A.reading ? 'Reading from Robinhood…' : 'Refresh from Robinhood', { primary: !A.snapshot })}${rhButton('acc-pick', 'Change accounts')}${A.snapshot ? `<span class="at-quiet">Read at ${esc(when(A.snapshot.at))}</span>` : ''}</div>`;
+  const body = A.snapshot ? A.snapshot.views.map(viewCard).join('') : `<p class="at-quiet">${A.reading ? 'Reading your accounts from Robinhood.' : 'Press Refresh to read your accounts from Robinhood.'}</p>`;
+  // Said only when something is wrong: when every holding was read the agents are given them without a word about it.
+  const shared = A.snapshot && A.shared === false ? '<p class="at-honest">Some holdings could not be read, so the agents were not given this read: they keep the last complete one.</p>' : '';
   el.innerHTML = head + body + shared;
 }
 
@@ -571,29 +592,44 @@ function tradingBlock(): string {
   return signedIn() ? switchBlock() + capsBlock() : '';
 }
 
-/** The person's caps and guard rails, kept beside the switch: shown as chips, and changed in fields on their press. */
+/** What the caps apply to, said once: both views of the caps carry it. Each cap is checked on a ticket opened from this
+ *  page (desk/ticket.ts check, again in link.ts placeChecked), never on a trade made in the Robinhood app. */
+const CAPS_SCOPE = 'These limits apply to orders you place from this page, not to trades you make in the Robinhood app.';
+
+/** The person's caps and guard rails, kept beside the switch: shown as chips, and changed in fields on their press. Both
+ *  views stand in the same four rows, by what a limit is for: a buy, a buy or a sell, a sell, the whole account (desk/ticket.ts
+ *  check: the order, stock, sector and crypto limits are checked on a buy, the orders a day on both, the shortest hold on a sell). */
 const CAPS = { editing: false };
+const capRow = (name: string, body: string, note = ''): string => `<div class="ta-cap"><dt>${name}</dt><dd>${body}${note ? `<p class="at-quiet">${esc(note)}</p>` : ''}</dd></div>`;
 function capsBlock(): string {
   const c = TR.state?.caps;
   if (!c) return '';
-  if (CAPS.editing) return `<div class="at-card-head"><h3>Your caps</h3></div>
-    <p class="at-lede">The most an order may cost, the most of the account one stock or one sector may be after a buy, the most in crypto, the most orders in a day, the fall in a week after which trading switches itself off, and the shortest hold, in trading days, of a stock bought here. Every ticket is checked against them, and again just before an order is sent. They are kept beside the trading switch, where agents are refused.</p>
-    <div class="at-row">
-      <label class="at-field"><span class="at-field-l">An order at most, $</span><input class="at-input at-box" id="capOrder" type="text" inputmode="decimal" value="${c.perOrderUsd}"></label>
-      <label class="at-field"><span class="at-field-l">One stock, % of the account</span><input class="at-input at-box" id="capStock" type="text" inputmode="decimal" value="${c.perStockPercent}"></label>
-      <label class="at-field"><span class="at-field-l">One sector, % of the account</span><input class="at-input at-box" id="capSector" type="text" inputmode="decimal" value="${c.perSectorPercent}"></label>
-      <label class="at-field"><span class="at-field-l">Crypto, % of the account</span><input class="at-input at-box" id="capCrypto" type="text" inputmode="decimal" value="${c.cryptoPercent}"></label></div>
-    <div class="at-row">
-      <label class="at-field"><span class="at-field-l">Orders a day</span><input class="at-input at-box" id="capDay" type="number" min="1" max="50" step="1" inputmode="numeric" value="${c.ordersPerDay}"></label>
-      <label class="at-field"><span class="at-field-l">Switch off after a fall in a week of, %</span><input class="at-input at-box" id="capWeek" type="text" inputmode="decimal" value="${c.weeklyLossPercent}"></label>
-      <label class="at-field"><span class="at-field-l">Shortest hold, trading days</span><input class="at-input at-box" id="capHold" type="number" min="0" max="60" step="1" inputmode="numeric" value="${c.minHoldDays}"></label></div>
+  if (CAPS.editing) {
+    const field = (id: string, label: string, value: number, whole?: [number, number]) =>
+      `<label class="at-field"><span class="at-field-l">${esc(label)}</span><input class="at-input at-box" id="${id}" ${whole ? `type="number" min="${whole[0]}" max="${whole[1]}" step="1" inputmode="numeric"` : 'type="text" inputmode="decimal"'} value="${value}"></label>`;
+    const fields = (...xs: string[]) => `<div class="ta-capfields">${xs.join('')}</div>`;
+    return `<div class="at-card-head ta-caps-head"><h3>Your caps</h3></div>
+    <p class="at-lede">${CAPS_SCOPE} Every ticket is checked against them, and again just before it is sent; a failed check stops the order. Only you can change them, and the agents are blocked from where they are kept.</p>
+    <dl class="ta-caps">
+      ${capRow('Buys', fields(field('capOrder', 'An order at most, $', c.perOrderUsd), field('capStock', 'One stock, % of the account', c.perStockPercent), field('capSector', 'One sector, % of the account', c.perSectorPercent), field('capCrypto', 'Crypto, % of the account', c.cryptoPercent)), 'The crypto limit only sizes the paper record: orders here are for stocks and funds, never coins.')}
+      ${capRow('Buys and sells', fields(field('capDay', 'Orders a day', c.ordersPerDay, [1, 50])))}
+      ${capRow('Sells', fields(field('capHold', 'Shortest hold, trading days', c.minHoldDays, [0, 60])), 'The desk proposes no sale sooner than this, and a sale of your own takes one more press (Sell anyway).')}
+      ${capRow('The account', fields(field('capWeek', 'Switch off after a fall in a week of, %', c.weeklyLossPercent)), 'Checked each time the dashboard reads the account.')}
+    </dl>
     <div class="at-row">${rhButton('caps-save', 'Save the caps', { primary: true })}${rhButton('caps-cancel', 'Cancel')}</div>`;
+  }
   const chip = (k: TermKey, words: string, more = '') => `<span class="at-chip" title="${esc(`${means(k)}${more}`)}">${esc(words)}</span>`;
+  const chips = (...xs: string[]) => `<div class="at-row">${xs.join('')}</div>`;
   // Each chip points at its own meaning: the most in one stock is a cap, not the size of a position (both 10% as shipped).
   // A whole-market fund counts in no sector (desk/sectors.ts MARKET_FUNDS), QQQ included, so the sector chip says so.
-  return `<div class="at-card-head"><h3>Your ${term('cap', 'caps')}</h3></div>
-    <div class="at-row">${chip('cap', `${money(c.perOrderUsd)} an order at most`)}${chip('cap', `${c.perStockPercent}% of the account in one stock`)}${chip('cap', `${c.ordersPerDay} ${c.ordersPerDay === 1 ? 'order' : 'orders'} a day`)}</div>
-    <div class="at-row">${chip('sector', `one sector at most ${c.perSectorPercent}%`, ' For this limit a whole-market fund, such as SPY or the Nasdaq 100 fund QQQ, counts in no sector, though QQQ is mostly technology.')}${chip('crypto', `crypto at most ${c.cryptoPercent}%`)}${chip('weeklyLoss', `switches itself off after a ${c.weeklyLossPercent}% fall in a week`)}${chip('shortestHold', `a stock bought here is held at least ${c.minHoldDays} trading ${c.minHoldDays === 1 ? 'day' : 'days'}`)}</div>
+  return `<div class="at-card-head ta-caps-head"><h3>Your ${term('cap', 'caps')}</h3></div>
+    <p class="at-quiet">${CAPS_SCOPE}</p>
+    <dl class="ta-caps">
+      ${capRow('Buys', chips(chip('cap', `${money(c.perOrderUsd)} an order at most`), chip('cap', `${c.perStockPercent}% of the account in one stock`), chip('sector', `one sector at most ${c.perSectorPercent}%`, ' For this limit a whole-market fund, such as SPY or the Nasdaq 100 fund QQQ, counts in no sector, though QQQ is mostly technology.'), chip('crypto', `crypto at most ${c.cryptoPercent}%`)))}
+      ${capRow('Buys and sells', chips(chip('cap', `${c.ordersPerDay} ${c.ordersPerDay === 1 ? 'order' : 'orders'} a day`)))}
+      ${capRow('Sells', chips(chip('shortestHold', `a stock bought here is held at least ${c.minHoldDays} trading ${c.minHoldDays === 1 ? 'day' : 'days'}`)))}
+      ${capRow('The account', chips(chip('weeklyLoss', `switches itself off after a ${c.weeklyLossPercent}% fall in a week`)))}
+    </dl>
     <div class="at-row">${rhButton('caps-edit', 'Change the caps…')}</div>`;
 }
 
@@ -963,7 +999,7 @@ function renderStock(): void {
     : !ag ? '<p class="at-quiet">Show your Agentic account to see its orders.</p>'
     : ag.orders === null ? '<p class="at-quiet">The orders could not be read.</p>'
     : isCrypto(sym) ? "<p class=\"at-quiet\">The dashboard reads the Agentic account's stock and fund orders only, so a coin's orders are not shown here.</p>"
-    : mine.length ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>When</th><th>Order</th><th class="num">Quantity</th><th class="num">Price</th><th>State</th></tr></thead><tbody>${mine.map((x) => `<tr><td>${esc(x.at ? dayText(x.at) : '—')}</td><td>${esc(sideWord(x.side))}${x.type ? ` <small class="at-quiet">${esc(x.type)}</small>` : ''}</td><td class="num">${qty(x.quantity)}</td><td class="num">${money(x.price)}</td><td>${esc(x.state ?? '—')}</td></tr>`).join('')}</tbody></table></div>${rest > 0 ? `<p class="at-quiet">Read from ${shown} of the ${count} orders Robinhood listed at ${esc(at)}: ${restWords}.</p>` : ''}`
+    : mine.length ? `${ordersTable(mine, 'USD', false)}${rest > 0 ? `<p class="at-quiet">Read from ${shown} of the ${count} orders Robinhood listed at ${esc(at)}: ${restWords}.</p>` : ''}`
     : !count ? `<p class="at-quiet">Robinhood listed no orders for the Agentic account at ${esc(at)}.</p>`
     : rest > 0 ? `<p class="at-quiet">No orders on ${esc(sym)} among the ${shown} the dashboard reads of the ${count} orders Robinhood listed for the Agentic account at ${esc(at)}: ${restWords}, so ${rest === 1 ? 'it' : 'one of them'} may be.</p>`
     : `<p class="at-quiet">No orders on ${esc(sym)} among the ${count === 1 ? 'one order' : `${count} orders`} Robinhood listed for the Agentic account at ${esc(at)}.</p>`;

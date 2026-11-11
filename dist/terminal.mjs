@@ -8637,6 +8637,19 @@ import path8 from "node:path";
 
 // src/robinhood/account.ts
 import crypto from "node:crypto";
+
+// src/robinhood/states.ts
+var DONE_GROUPS = {
+  filled: ["filled"],
+  cancelled: ["cancelled", "canceled", "voided"],
+  expired: ["expired"],
+  rejected: ["rejected", "failed"]
+};
+var DONE = new RegExp(`^(${Object.values(DONE_GROUPS).flat().join("|")})$`, "i");
+var isDone = (state) => DONE.test(state);
+var DONE_WORDS = Object.values(DONE_GROUPS).flat();
+
+// src/robinhood/account.ts
 var obj = (v) => v && typeof v === "object" && !Array.isArray(v) ? v : {};
 var list = (v) => Array.isArray(v) ? v : [];
 var text = (v) => typeof v === "string" && v.trim() ? v.trim() : null;
@@ -8718,14 +8731,13 @@ function parseOrders(answer) {
   const rows = list(dataOf(answer).orders);
   return { count: rows.length, orders: rows.slice(0, 20).map(orderOf) };
 }
-var DONE = /^(filled|cancell?ed|rejected|failed|expired|voided)$/i;
 function openOrders(answer) {
   const rows = list(dataOf(answer).orders), all = rows.map(orderOf);
   const open4 = [];
   let unread = 0;
   rows.forEach((v, i) => {
     const o = all[i], raw = obj(v);
-    if (o.state && DONE.test(o.state)) return;
+    if (o.state && isDone(o.state)) return;
     const quantity = figure(raw.quantity), filled = figure(raw.cumulative_quantity) ?? 0;
     if (!o.state || !o.symbol || o.side !== "buy" && o.side !== "sell" || quantity === null) {
       unread++;
@@ -21172,8 +21184,9 @@ var Link = class {
       state: "connected",
       checkedAt: this.now(),
       tools: { read: k.read.length, order: k.order.length, other: k.other.length },
-      // Of the order tools, the page calls two (review.ts, order.ts), and only on the person's own press; no agent gets any.
-      message: `Robinhood offers ${total} ${total === 1 ? "tool" : "tools"}: ${k.read.length} that only read, ${k.order.length} that order or move money (of these, this page uses only Robinhood's dry run, when you press Review, and the order itself, on your Confirm; no agent ever gets one) and ${k.other.length} others.`
+      // Of the order tools, the page calls two (review.ts, order.ts), and only on the person's own press; of the others, none
+      // (reader.ts refuses all but reads); no agent gets an order tool. The counts are Robinhood's own list, sorted by rules.ts.
+      message: `Robinhood offers ${total} ${total === 1 ? "tool" : "tools"} (things a program can ask it to do): ${k.read.length} that only read, ${k.order.length} that order or move money and ${k.other.length} others, which this page never uses. This page uses only reading tools, plus two of the order ones, each only when you press Review (Robinhood's check, which places nothing) or Confirm (the order). No agent gets an order tool.`
     };
   }
   bad(e) {

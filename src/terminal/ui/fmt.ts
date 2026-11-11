@@ -1,6 +1,7 @@
 // How numbers and words are written on the page. A number that is missing is a dash, never a zero.
 import { GLOSSARY, isTerm, means } from './glossary.js';
 import { LATE, type PriceMarket } from '../../data/delay.js';
+import { isDone, stateGroup } from '../../robinhood/states.js';
 
 const MINUS = '−';
 
@@ -98,8 +99,37 @@ export function ownReturnLine(own: Record<string, { count: number; worked: numbe
   return `Left out of the table: ${calls(n)} on the yardstick itself or a fund that copies the same index, scored on ${n === 1 ? 'its' : 'their'} own return rather than against it. ${parts.join('; ')}.`;
 }
 
+/** An order's state in the owner's words, for the tables of orders (11 Nov 2026). Robinhood gives a word (queued,
+ *  confirmed, filled...); the groups come from one place, robinhood/states.ts, which the desk counts open orders with too
+ *  (filled, cancelled, rejected, failed, expired and voided are done, every other state is open), so the label and the caps'
+ *  open-order count always agree. Still open: "Pending" (queued, unconfirmed, confirmed) and "Partly filled", both amber.
+ *  Done: "Success: Buy" or "Success: Sell" in green (a filled order); "Cancelled" (also voided), "Expired" and "Rejected"
+ *  (also failed) in red. An open state whose word the desk has not met is Robinhood's own word, plain, never a guess; no
+ *  state at all is a dash. `raw` is Robinhood's word, for the hover. */
+export interface OrderState { words: string; tone: '' | 'ok' | 'warn' | 'danger'; open: boolean; raw: string }
+export function orderState(side: string | null, state: string | null): OrderState {
+  const raw = (state ?? '').trim(), group = stateGroup(raw), open = !!raw && !isDone(raw);
+  const as = (words: string, tone: OrderState['tone'] = ''): OrderState => ({ words, tone, open, raw });
+  switch (group) {
+    case null: return as('—');
+    case 'filled': return as(side === 'buy' ? 'Success: Buy' : side === 'sell' ? 'Success: Sell' : 'Success', 'ok');
+    case 'cancelled': return as('Cancelled', 'danger');
+    case 'expired': return as('Expired', 'danger');
+    case 'rejected': return as('Rejected', 'danger');
+    case 'partly': return as('Partly filled', 'warn');
+    case 'pending': return as('Pending', 'warn');
+    default: return as(raw);
+  }
+}
+/** What hovering over an order's state says: Robinhood's own word, and how the desk reads it. */
+export const orderStateWhy = (o: OrderState): string => (o.raw
+  ? `Robinhood's word: “${o.raw}”.${o.open ? ' The desk counts it as still open: only filled, cancelled, rejected, failed, expired and voided orders are done.' : ''}`
+  : 'Robinhood gave no state for this order.');
+
 /** Why a mark is there, each in one plain line. The trading words themselves are in the glossary (glossary.ts). */
 export const NOTES = {
+  /** The Price column of an order: robinhood/account.ts takes `average_price`, else `price`, else `limit_price`. */
+  orderPrice: "Robinhood's average price for what has filled, when it gives one; otherwise the price the order is listed at.",
   coinOnPaper: "Robinhood's agent doorway trades stocks and funds, so a coin never gets an order ticket.",
   noTicket: 'No order ticket: Robinhood\'s agent doorway trades stocks and funds, and among crypto the desk follows only Bitcoin and Ether on paper.',
   noView: "No view yet: the desk has not analysed it. Ask it to (the robot); in the Agentic account, Monday's morning routine rates it.",
