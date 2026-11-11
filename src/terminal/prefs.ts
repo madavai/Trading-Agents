@@ -1,6 +1,6 @@
 // What the dashboard remembers between visits, so the person finds it as they left it: the face, the side list, the page
-// they were on, the stock on the chart with its range and lines, the stocks they looked at last, their whole-market funds,
-// which tiers of the watchlist they folded away, and whether "Get started" is open. It is kept in one small file in desk-data on this computer, so it
+// they were on, the stock on the chart with its range and lines, the stocks they looked at last, which tiers of the
+// watchlist they folded away, and whether "Get started" is open. It is kept in one small file in desk-data on this computer, so it
 // outlives a restart, another browser and another port. Nothing about an order is ever kept here: every ticket starts
 // afresh, with Robinhood's check and the person's Confirm.
 import fs from 'node:fs';
@@ -8,7 +8,8 @@ import path from 'node:path';
 import { safeSymbol } from '../data/symbols.js';
 import { withLock, writeWhole } from '../desk/lock.js';
 import { isAtOnce, type AtOnce } from '../desk/queue.js';
-import { cleanMarket, isShipped, SHIPPED_MARKET, TIERS, type Tier } from './tiers.js';
+import { addWatch, MAX_WATCH, readWatchlist } from './store.js';
+import { SHIPPED_MARKET, TIERS, type Tier } from './tiers.js';
 
 export interface Recent { symbol: string; name: string }
 export interface Prefs {
@@ -16,10 +17,12 @@ export interface Prefs {
   symbol?: string; range?: '1M' | '3M' | '6M' | '1Y' | '5Y'; kind?: 'area' | 'candles';
   layers?: { ma50: boolean; ma200: boolean; vol: boolean };
   recent?: Recent[];
-  /** The person's whole-market funds, when they changed the shipped four (tiers.ts SHIPPED_MARKET). Set only by the row's own
-   *  save on "Start here" (a fund from the search list, a ✕ on a tile, the four put back), once each fund's price is
-   *  checked, never by the page's other choices. */
+  /** What an older version kept apart as "the whole market" row (when the person had changed its four shipped funds). It is no
+   *  longer shown or set by anything: it is read only by moveMarketToWatchlist, which puts each fund on the watchlist and
+   *  takes this away; what is left here is a fund that did not fit (the watchlist was full). */
   market?: string[];
+  /** The older whole-market row has been put on the watchlist (moveMarketToWatchlist, once). Set only by that move. */
+  marketMoved?: boolean;
   /** The tiers of the watchlist folded away. */
   folded?: Tier[];
   /** "Analyse the top three each market morning" is on (off as shipped): the top three of "Worth a look today" go on the
@@ -67,7 +70,8 @@ export function cleanPrefs(raw: unknown): Prefs {
     out.recent = recent;
   }
   // An `autorun` an older version saved ("Run automatically with Claude Code") is not read: nothing starts a run any more.
-  const market = cleanMarket(r.market); if (market) out.market = market;
+  if (Array.isArray(r.market)) out.market = [...new Set((r.market as unknown[]).map(sym).filter((s): s is string => !!s))].slice(0, MAX_WATCH);
+  if (r.marketMoved === true) out.marketMoved = true;
   if (Array.isArray(r.folded)) out.folded = TIERS.filter((t) => (r.folded as unknown[]).includes(t));
   if (typeof r.morning === 'boolean') out.morning = r.morning;
   if (typeof r.morningFrom === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.morningFrom)) out.morningFrom = r.morningFrom;
@@ -95,10 +99,22 @@ export function savePrefs(dir: string, change: unknown, drop: ReadonlyArray<keyo
   });
 }
 
-/** The person's whole-market funds: their own list, else the shipped four. */
-export const marketOf = (dir: string): string[] => readPrefs(dir).market ?? [...SHIPPED_MARKET];
-
-/** Keeps the person's whole-market funds (already checked); the shipped four are kept as no list at all, so a later
- *  version's four reach them. */
-export const saveMarket = (dir: string, list: readonly string[]): string[] =>
-  (isShipped(list) ? savePrefs(dir, {}, ['market']) : savePrefs(dir, { market: list })).market ?? [...SHIPPED_MARKET];
+/** Puts the funds an older version showed in "the whole market" row on the person's watchlist, once, so nothing they chose is
+ *  lost when the row goes: their own list, else (when they never changed it) the shipped four. Each goes in the row's order,
+ *  after what is already watched, and a fund already watched stays where it is, with its star. The watchlist holds
+ *  MAX_WATCH: a fund that does not fit stays in `market` to be moved when there is room, and the move is not marked done.
+ *  Safe to run again and again (the desk runs it when the dashboard starts and before a routine's look): once done it reads
+ *  one small file and changes nothing. Returns the funds it put on the watchlist. */
+export function moveMarketToWatchlist(dir: string, onDay: string): string[] {
+  const kept = readPrefs(dir);
+  if (kept.marketMoved === true && kept.market === undefined) return [];
+  const pending = kept.market ?? [...SHIPPED_MARKET];
+  const have = new Set(readWatchlist(dir).map((w) => w.symbol)), moved: string[] = [], left: string[] = [];
+  for (const symbol of pending) {
+    if (have.has(symbol)) continue;
+    if (have.size >= MAX_WATCH) { left.push(symbol); continue; }
+    try { addWatch(dir, symbol, onDay); have.add(symbol); moved.push(symbol); } catch { /* not a ticker: nothing to keep */ }
+  }
+  if (left.length) savePrefs(dir, { market: left }); else savePrefs(dir, { marketMoved: true }, ['market']);
+  return moved;
+}

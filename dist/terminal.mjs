@@ -22293,8 +22293,6 @@ var TIER_WORDS = {
   crypto: { name: "Crypto", meaning: "Coins such as Bitcoin, which swing far more than shares: the desk follows Bitcoin and Ether on paper only, never with an order, and no other coin." }
 };
 var SHIPPED_MARKET = ["SPY", "QQQ", "VT", "BND"];
-var MAX_MARKET = 8;
-var START_NAMES = 12;
 var sp500 = { name: "S&P 500 fund", meaning: "copies the S&P 500 index: about 500 large US companies, chosen by S&P" };
 var us = { name: "The whole US market", meaning: "nearly every US company, large and small" };
 var bonds = { name: "US bonds", meaning: "loans to the US government and to companies: steadier than shares, and they pay interest" };
@@ -22329,43 +22327,21 @@ var PLAIN = {
   "BTC-USD": { name: "Bitcoin", meaning: "the first and largest coin" },
   "ETH-USD": { name: "Ether", meaning: "the coin of the Ethereum network, the second largest" }
 };
-function marketSymbol(raw) {
-  if (typeof raw !== "string") throw new Error("a ticker is a word, such as SPY");
-  const s = safeSymbol(raw);
-  if (isCrypto(s)) throw new Error(`${s} is crypto, which has a tier of its own`);
-  if (/[\^=]/.test(s)) throw new Error(`${s} is an index, a future or a currency, which cannot be held: choose a fund that follows it, such as SPY`);
-  if (SECTOR_FUNDS[s]) throw new Error(`${s} is a sector fund, already among the sectors`);
-  return s;
-}
-function cleanMarket(raw) {
-  if (!Array.isArray(raw)) return void 0;
-  const out = [];
-  for (const v of raw) {
-    if (out.length >= MAX_MARKET) break;
-    try {
-      const s = marketSymbol(v);
-      if (!out.includes(s)) out.push(s);
-    } catch {
-    }
-  }
-  return out;
-}
 var ticketable = (symbol) => !isCrypto(symbol) && !/[\^=]/.test(symbol);
-var isShipped = (list3) => list3.length === SHIPPED_MARKET.length && list3.every((s, i) => s === SHIPPED_MARKET[i]);
-function tierOf(symbol, market = SHIPPED_MARKET) {
+function tierOf(symbol) {
   if (isCrypto(symbol)) return "crypto";
   if (SECTOR_FUNDS[symbol]) return "sectors";
-  if (symbol.startsWith("^") || MARKET_FUNDS.has(symbol) || market.includes(symbol)) return "market";
+  if (symbol.startsWith("^") || MARKET_FUNDS.has(symbol)) return "market";
   return "names";
 }
-function screenUniverse(watchlist, market) {
-  const symbols = [.../* @__PURE__ */ new Set([...market, ...Object.keys(SECTOR_FUNDS), ...watchlist.map((w) => w.symbol)])];
+function screenUniverse(watchlist) {
+  const symbols = [.../* @__PURE__ */ new Set([...Object.keys(SECTOR_FUNDS), ...watchlist.map((w) => w.symbol)])];
   return { symbols, news: new Set(watchlist.map((w) => w.symbol).filter((s) => {
-    const t2 = tierOf(s, market);
+    const t2 = tierOf(s);
     return t2 === "names" || t2 === "crypto";
   })) };
 }
-function tiersOf(watchlist, market, calls) {
+function tiersOf(watchlist, calls) {
   const latest = /* @__PURE__ */ new Map();
   for (const c of calls) {
     const was = latest.get(c.ticker);
@@ -22384,14 +22360,10 @@ function tiersOf(watchlist, market, calls) {
       ticket: ticketable(symbol)
     };
   };
-  const view = (tier, symbols, more = 0) => ({ tier, ...TIER_WORDS[tier], items: symbols.map(item), ...more > 0 ? { more } : {} });
-  const of = (t2) => watchlist.filter((w) => tierOf(w.symbol, market) === t2).map((w) => w.symbol);
-  const own2 = (t2) => {
-    const list3 = watchlist.filter((w) => tierOf(w.symbol, market) === t2).sort((a, b) => Number(b.favourite) - Number(a.favourite)).map((w) => w.symbol);
-    return view(t2, list3.slice(0, START_NAMES), list3.length - START_NAMES);
-  };
+  const view = (tier, symbols) => ({ tier, ...TIER_WORDS[tier], items: symbols.map(item) });
+  const of = (t2) => watchlist.filter((w) => tierOf(w.symbol) === t2).map((w) => w.symbol);
   return {
-    startHere: [view("market", market), view("sectors", Object.keys(SECTOR_FUNDS)), own2("names"), ...of("crypto").length ? [own2("crypto")] : []],
+    startHere: [view("sectors", Object.keys(SECTOR_FUNDS))],
     watch: TIERS.map((t2) => view(t2, of(t2))).filter((v) => v.items.length > 0)
   };
 }
@@ -22435,8 +22407,8 @@ function cleanPrefs(raw) {
     }
     out.recent = recent;
   }
-  const market = cleanMarket(r.market);
-  if (market) out.market = market;
+  if (Array.isArray(r.market)) out.market = [...new Set(r.market.map(sym).filter((s) => !!s))].slice(0, MAX_WATCH);
+  if (r.marketMoved === true) out.marketMoved = true;
   if (Array.isArray(r.folded)) out.folded = TIERS.filter((t2) => r.folded.includes(t2));
   if (typeof r.morning === "boolean") out.morning = r.morning;
   if (typeof r.morningFrom === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.morningFrom)) out.morningFrom = r.morningFrom;
@@ -22464,14 +22436,34 @@ function savePrefs(dir, change3, drop = []) {
     return next;
   });
 }
-var marketOf = (dir) => readPrefs(dir).market ?? [...SHIPPED_MARKET];
-var saveMarket = (dir, list3) => (isShipped(list3) ? savePrefs(dir, {}, ["market"]) : savePrefs(dir, { market: list3 })).market ?? [...SHIPPED_MARKET];
+function moveMarketToWatchlist(dir, onDay) {
+  const kept = readPrefs(dir);
+  if (kept.marketMoved === true && kept.market === void 0) return [];
+  const pending = kept.market ?? [...SHIPPED_MARKET];
+  const have = new Set(readWatchlist(dir).map((w) => w.symbol)), moved = [], left = [];
+  for (const symbol of pending) {
+    if (have.has(symbol)) continue;
+    if (have.size >= MAX_WATCH) {
+      left.push(symbol);
+      continue;
+    }
+    try {
+      addWatch(dir, symbol, onDay);
+      have.add(symbol);
+      moved.push(symbol);
+    } catch {
+    }
+  }
+  if (left.length) savePrefs(dir, { market: left });
+  else savePrefs(dir, { marketMoved: true }, ["market"]);
+  return moved;
+}
 
 // src/terminal/guide.ts
 var NAMES_TO_PICK = 3;
 function guideOf(f) {
   const picked = /* @__PURE__ */ new Set([...f.watchlist.map((w) => w.symbol), ...f.queue.map((q) => q.symbol), ...f.calls.map((c) => c.ticker)]);
-  const tiers = [...picked].filter((s) => !s.startsWith("^")).map((s) => tierOf(s, f.market));
+  const tiers = [...picked].filter((s) => !s.startsWith("^")).map((s) => tierOf(s));
   const names = tiers.filter((t2) => t2 === "names").length, market = tiers.includes("market"), sector = tiers.includes("sectors");
   const asked = (/* @__PURE__ */ new Set([...f.queue.map((q) => q.symbol), ...f.calls.map((c) => c.ticker)])).size;
   const automatic = f.listener ?? "";
@@ -22489,10 +22481,6 @@ function guideOf(f) {
 }
 
 // src/terminal/state.ts
-var marketView = (dir) => {
-  const symbols = marketOf(dir);
-  return { symbols, asShipped: isShipped(symbols), shipped: [...SHIPPED_MARKET], max: MAX_MARKET };
-};
 var plainText = (s) => s.replace(/\*\*([^*]+)\*\*/g, "$1").replace(/(^|\s)[*_]([^*_\n]+)[*_](?=\s|[.,;:!?]|$)/g, "$1$2").replace(/`([^`]+)`/g, "$1").replace(/^\s{0,3}#{1,6}\s*/gm, "").replace(/^\s*(?:[-*+]|\d+\.)\s+/gm, "").replace(/\|/g, " ").replace(/\s+/g, " ").trim();
 function summaryOf(decision) {
   const text2 = decision.replace(/\r\n/g, "\n");
@@ -22563,7 +22551,7 @@ function versionOf(root2) {
   } catch {
   }
   const p = readPrefs(dir);
-  const timely = `${listenerOf(dir) ? "L" : "n"}${readQueue(dir).map((i) => i.state[0]).join("")}|${p.market?.join(",") ?? "shipped"}|${p.guide ?? ""}${p.readCall ? "r" : ""}${p.atOnce ?? 1}|${today()}`;
+  const timely = `${listenerOf(dir) ? "L" : "n"}${readQueue(dir).map((i) => i.state[0]).join("")}|${p.guide ?? ""}${p.readCall ? "r" : ""}${p.atOnce ?? 1}|${today()}`;
   return [stamp(path15.join(dir, "journal.md")), stamp(path15.join(dir, "watchlist.json")), stamp(path15.join(dir, "queue.json")), latest, stamp(path15.join(dir, "contact.json")), stamp(path15.join(dir, "listener.json")), stamp(path15.join(dir, "paper.json")), timely].join("-");
 }
 function queueOf(dir, now = /* @__PURE__ */ new Date()) {
@@ -22593,11 +22581,11 @@ function stateOf(root2, day2) {
     ...scoredBy(e, s.scoring),
     noun: nounOf(e.ticker)
   })).reverse().sort((a, b) => b.date.localeCompare(a.date));
-  const summary = summarize(entries), watchlist = readWatchlist(dir), market = marketView(dir);
-  const { startHere, watch } = tiersOf(watchlist, market.symbols, calls);
+  const summary = summarize(entries), watchlist = readWatchlist(dir);
+  const { startHere, watch } = tiersOf(watchlist, calls);
   const queue2 = queueOf(dir), listener = listenerOf(dir), prefs = readPrefs(dir), email2 = readContactEmail(root2);
   const record2 = recordOf(entries.map(paperCallOf), day2);
-  const guide = guideOf({ email: email2, watchlist, market: market.symbols, queue: queue2, calls, listener: listener?.listener ?? null, readCall: !!prefs.readCall, record: record2, ...prefs.guide ? { pref: prefs.guide } : {} });
+  const guide = guideOf({ email: email2, watchlist, queue: queue2, calls, listener: listener?.listener ?? null, readCall: !!prefs.readCall, record: record2, ...prefs.guide ? { pref: prefs.guide } : {} });
   return {
     version: versionOf(root2),
     today: day2,
@@ -22606,7 +22594,6 @@ function stateOf(root2, day2) {
     calls,
     startHere,
     watchTiers: watch,
-    market,
     guide,
     record: { summary, text: renderSummary(summary), benchmarkNote: scoringNote(entries, s.scoring) },
     desk: { emailSaved: !!email2, tradingEnabled: false, holdingDays: s.scoring.holdingPeriodDays, benchmark: resolveBenchmark("SPY", s.scoring), scoring: scoringShort(s.scoring) },
@@ -23205,7 +23192,7 @@ async function startTerminal(opts) {
   let screening = null;
   const clock2 = opts.now ?? (() => /* @__PURE__ */ new Date());
   const screenNow = async (day2) => {
-    const { symbols, news } = screenUniverse(readWatchlist(dir), marketOf(dir));
+    const { symbols, news } = screenUniverse(readWatchlist(dir));
     screening ??= screenToday(dir, symbols, news, day2, clock2()).finally(() => {
       screening = null;
     });
@@ -23353,6 +23340,7 @@ async function startTerminal(opts) {
     }
     if (p === "/api/prefs" && method === "POST") {
       delete b.market;
+      delete b.marketMoved;
       delete b.morning;
       delete b.morningFrom;
       delete b.readCall;
@@ -23372,22 +23360,6 @@ async function startTerminal(opts) {
       const was = readPrefs(dir), from = b.on ? was.morning === true && was.morningFrom ? was.morningFrom : nextMarketDay(day2) : void 0;
       savePrefs(dir, b.on ? { morning: true, morningFrom: from } : { morning: false }, b.on ? [] : ["morningFrom"]);
       return json(res, 200, { morning: { on: b.on, top: TOP_QUEUED, from }, queued: [] });
-    }
-    if (p === "/api/tiers/market" && method === "POST") {
-      if (!Array.isArray(b.symbols) || b.symbols.length > MAX_MARKET) throw new Refused2(400, `choose up to ${MAX_MARKET} funds for the whole market`);
-      const list3 = [];
-      for (const v of b.symbols) {
-        let s;
-        try {
-          s = marketSymbol(v);
-        } catch (e) {
-          throw new Refused2(400, e.message);
-        }
-        if (!list3.includes(s)) list3.push(s);
-      }
-      for (const q of await Promise.all(list3.map(quote))) if ("error" in q && q.error === "no-data") throw new Refused2(422, q.message);
-      saveMarket(dir, list3);
-      return json(res, 200, { market: marketView(dir) });
     }
     if (p === "/api/paper" && method === "POST") {
       try {
@@ -23589,6 +23561,10 @@ async function startTerminal(opts) {
   };
   try {
     retireOldListener();
+  } catch {
+  }
+  try {
+    moveMarketToWatchlist(dir, today(clock2()));
   } catch {
   }
   const keeper = setInterval(() => {

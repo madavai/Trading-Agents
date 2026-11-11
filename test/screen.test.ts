@@ -125,8 +125,8 @@ test('the screen is worked out at most once an hour and kept, so the dashboard a
   assert.equal(readScreen(dir)!.queued, undefined, 'a new day queues afresh');
   fs.writeFileSync(path.join(dir, 'screen.json'), 'not json');
   assert.equal(readScreen(dir), null);
-  const u = screenUniverse([{ symbol: 'NVDA', favourite: true, addedOn: 'x' }, { symbol: 'SPY', favourite: false, addedOn: 'x' }, { symbol: 'BTC-USD', favourite: false, addedOn: 'x' }], ['VT']);
-  assert.deepEqual([u.symbols.length, u.symbols.slice(0, 2), [...u.news]], [15, ['VT', 'XLK'], ['NVDA', 'BTC-USD']], 'the whole market, the eleven sectors and the watchlist; news for companies and coins only');
+  const u = screenUniverse([{ symbol: 'NVDA', favourite: true, addedOn: 'x' }, { symbol: 'SPY', favourite: false, addedOn: 'x' }, { symbol: 'BTC-USD', favourite: false, addedOn: 'x' }]);
+  assert.deepEqual([u.symbols.length, u.symbols.slice(0, 2), [...u.news]], [14, ['XLK', 'XLF'], ['NVDA', 'BTC-USD']], 'the eleven sectors, then the watchlist (SPY, a fund, is on it); news for companies and coins only');
 });
 
 test('the morning switch: on a weekday, once, the top three not called today nor already asked for go on the waiting list at shallow depth', () => {
