@@ -84,9 +84,11 @@ test('the evening reports today\'s calls and the orders the dashboard sent, with
   logOrder(dir, sent('2026-10-19T14:05:00Z', 'NVDA', true));
   logOrder(dir, sent('2026-10-19T15:00:00Z', 'AMD', null, false));
   logOrder(dir, sent('2026-10-16T14:00:00Z', 'TSLA', false));                       // another day
+  logOrder(dir, { ...sent('2026-10-19T16:00:00Z', 'META', true), quantity: 0.770594, limitPrice: 648.85, market: true, dollars: 500 });   // a part-share
   fs.appendFileSync(path.join(dir, 'orders.jsonl'), 'not json\n');
-  assert.equal(placedToday(dir, now), 2);
-  assert.deepEqual(ordersOn(dir, now).map((o) => o.symbol), ['NVDA', 'AMD']);
+  assert.equal(placedToday(dir, now), 3);
+  assert.deepEqual(ordersOn(dir, now).map((o) => o.symbol), ['NVDA', 'AMD', 'META']);
+  assert.match(eveningBrief(dir, '2026-10-19', now), /- Buy \$500\.00 of META at the market price \(a part-share\), 16:00 UTC/, 'a part-share is named by its dollar amount, never by a limit it did not have');
   const brief = eveningBrief(dir, '2026-10-19', now);
   assert.match(brief, /^EVENING WRAP-UP for Monday 2026-10-19\./);
   assert.match(brief, /1\. Score what is ready: .*\(the \/settle playbook\)\. A call record_outcome answers LEFT or STOP for stays pending: do not send it again now, go on, and name it at the end with the reason it gave\./);

@@ -84,6 +84,22 @@ test('paper takes no order the real ticket would refuse: your caps, the orders a
   assert.equal(book([]).returnPct, null);
 });
 
+test('a call whose share costs more than the order may spend fills a part of one on paper, said as an approximation: META of 21 Oct', () => {
+  // META's closes on 22 and 23 Oct 2026, as the desk's price tool gave them; SPY's are round test figures.
+  const c: Closes = { META: rows(['2026-10-22', 648.85], ['2026-10-23', 642.62]), SPY: rows(['2026-10-21', 500], ['2026-10-22', 505], ['2026-10-23', 510]) };
+  const b = paperBook([{ ticker: 'META', date: '2026-10-21', rating: 'Overweight' }], c, { startUsd: 10_000, trading: T, caps: C, today: '2026-10-23' });
+  const t = b.trades[0]!;
+  assert.deepEqual([t.status, t.side, t.quantity, t.price, t.fillDate], ['filled', 'buy', 0.770594, 648.85, '2026-10-22'], 'half a position, $500, the cap too: $500 of a $648.85 share');
+  assert.equal(t.why, 'Bought 0.770594 at the close of 2026-10-22: a part-share, which a real ticket buys at the market price; on paper it fills at that close, an approximation.');
+  assert.deepEqual([b.cash, b.positions.map((p) => [p.ticker, p.quantity, p.price])], [9_500, [['META', 0.770594, 642.62]]]);
+  assert.ok(Math.abs(b.value! - (9_500 + 0.770594 * 642.62)) < 0.01, `${b.value}: the part-share is valued at its own close`);
+  // A whole share that fits is still bought whole.
+  const whole = paperBook([{ ticker: 'META', date: '2026-10-21', rating: 'Overweight' }], c, { startUsd: 10_000, trading: T, caps: { ...C, perOrderUsd: 1_000, perStockPercent: 20 }, today: '2026-10-23' });
+  assert.deepEqual([whole.trades[0]!.quantity, whole.trades[0]!.why], [0.770594, t.why], 'half a position is still $500 of the $10,000: under one share');
+  const full = paperBook([{ ticker: 'META', date: '2026-10-21', rating: 'Buy' }], c, { startUsd: 10_000, trading: T, caps: { ...C, perOrderUsd: 1_000, perStockPercent: 20 }, today: '2026-10-23' });
+  assert.deepEqual([full.trades[0]!.quantity, full.trades[0]!.why], [1, 'Bought 1 at the close of 2026-10-22.'], 'a full position of $1,000 buys one whole share at a limit price');
+});
+
 test('Bitcoin and Ether are followed on paper in fractions, within the crypto limit, on every day of the week; other coins and indices are not', () => {
   const c: Closes = {
     ...closes,

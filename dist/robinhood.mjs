@@ -7015,7 +7015,7 @@ var require_formats = __commonJS({
       return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
     }
     var DATE = /^(\d\d\d\d)-(\d\d)-(\d\d)$/;
-    var DAYS = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    var DAYS2 = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
     function date4(str) {
       const matches = DATE.exec(str);
       if (!matches)
@@ -7023,7 +7023,7 @@ var require_formats = __commonJS({
       const year = +matches[1];
       const month = +matches[2];
       const day = +matches[3];
-      return month >= 1 && month <= 12 && day >= 1 && day <= (month === 2 && isLeapYear(year) ? 29 : DAYS[month]);
+      return month >= 1 && month <= 12 && day >= 1 && day <= (month === 2 && isLeapYear(year) ? 29 : DAYS2[month]);
     }
     function compareDate(d1, d2) {
       if (!(d1 && d2))
@@ -19176,6 +19176,21 @@ function shapeLines(value, words2 = false) {
   const d = describe2([value], words2, 0);
   return [`answer: ${d.head}`, ...d.body];
 }
+var inSixPlaces = (n) => Number.isFinite(n) && Math.abs(n * 1e6 - Math.round(n * 1e6)) < 1e-6;
+function equityOrderArgs(accountNumber, o) {
+  if (o.side !== "buy" && o.side !== "sell") return null;
+  const base = { account_number: accountNumber, symbol: o.symbol, side: o.side };
+  if (o.market === true) {
+    const regular = { type: "market", time_in_force: "gfd", market_hours: "regular_hours" };
+    if (o.side === "buy") {
+      const d = o.dollars;
+      return typeof d === "number" && Number.isFinite(d) && d >= 1 && Math.round(d * 100) / 100 === d ? { ...base, ...regular, dollar_amount: d.toFixed(2) } : null;
+    }
+    return o.quantity > 0 && inSixPlaces(o.quantity) ? { ...base, ...regular, quantity: o.quantity.toFixed(6).replace(/\.?0+$/, "") } : null;
+  }
+  if (!Number.isInteger(o.quantity) || o.quantity < 1 || !(o.limitPrice > 0)) return null;
+  return { ...base, type: "limit", quantity: String(o.quantity), limit_price: o.limitPrice.toFixed(2), time_in_force: o.timeInForce, market_hours: "regular_hours" };
+}
 var oneLine = (s, max) => {
   const t = s.replace(/\s+/g, " ").trim();
   return t.length > max ? `${t.slice(0, max - 3)}...` : t;
@@ -19270,17 +19285,9 @@ var Reviewer = class {
   async review(account, o) {
     if (!account.agentic) throw new Refused("Only the Agentic account can have an order checked, and this is not it.");
     if (!this.tools.some((t) => t.name === REVIEW)) throw new Refused("Robinhood's connection no longer offers its order check, so nothing was sent.");
-    if (!Number.isInteger(o.quantity) || o.quantity < 1 || !(o.limitPrice > 0) || o.side !== "buy" && o.side !== "sell") throw new Refused("That order is not complete, so it was not sent for checking.");
-    const r = await this.client.callTool({ name: REVIEW, arguments: {
-      account_number: account.accountNumber,
-      symbol: o.symbol,
-      side: o.side,
-      type: "limit",
-      quantity: String(o.quantity),
-      limit_price: o.limitPrice.toFixed(2),
-      time_in_force: o.timeInForce,
-      market_hours: "regular_hours"
-    } });
+    const args = equityOrderArgs(account.accountNumber, o);
+    if (!args) throw new Refused("That order is not complete, so it was not sent for checking.");
+    const r = await this.client.callTool({ name: REVIEW, arguments: args });
     const text2 = (r.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
     let data = r.structuredContent ?? null;
     if (data === null) {
@@ -19292,6 +19299,113 @@ var Reviewer = class {
     return parseReview({ data, text: text2, failed: r.isError === true });
   }
 };
+
+// src/data/symbols.ts
+var FOREX = /* @__PURE__ */ new Set(["USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD", "CNY", "CNH", "HKD", "SGD", "SEK", "NOK", "DKK", "PLN", "MXN", "ZAR", "TRY", "INR", "KRW", "BRL", "RUB", "THB"]);
+var CRYPTO_BASES = /* @__PURE__ */ new Set(["BTC", "ETH", "SOL", "XRP", "ADA", "DOGE", "LTC", "BCH", "DOT", "AVAX", "LINK"]);
+var CRYPTO_QUOTES = ["USDT", "USDC", "USD"];
+var NOT_COINS = /* @__PURE__ */ new Set([...FOREX, "XAU", "XAG", "XPT", "XPD"]);
+var COIN_PAIR = /^([A-Z0-9]{1,15})-(USDT|USDC|USD)$/;
+var SHARE_CLASS = /^([A-Z]{1,5})\.([A-Z])$/;
+var ONE_LETTER_EXCHANGES = /* @__PURE__ */ new Set(["T", "L", "V", "F"]);
+function cryptoBase(raw) {
+  const s = raw.trim().toUpperCase().replace(/\+$/, "");
+  const pair = COIN_PAIR.exec(s);
+  if (pair) return /[A-Z]/.test(pair[1]) && !NOT_COINS.has(pair[1]) ? pair[1] : null;
+  const compact = s.replaceAll("-", "");
+  for (const q of CRYPTO_QUOTES) {
+    if (compact.endsWith(q)) {
+      const base = compact.slice(0, -q.length);
+      return CRYPTO_BASES.has(base) ? base : null;
+    }
+  }
+  return null;
+}
+var yahooClass = (s) => {
+  const m = SHARE_CLASS.exec(s);
+  return m && !ONE_LETTER_EXCHANGES.has(m[2]) ? `${m[1]}-${m[2]}` : s;
+};
+function deskSymbol(symbol, kind) {
+  const s = symbol.trim().toUpperCase();
+  return kind === "crypto" ? `${cryptoBase(s) ?? s}-USD` : yahooClass(s);
+}
+var brokerSymbol = (symbol) => symbol.replace(/^([A-Z]{1,5})-([A-Z])$/, "$1.$2");
+
+// src/desk/ticket.ts
+var PART_HOURS = "9:30 a.m. to 4 p.m. New York time";
+var MARKET_WHY = `A part-share is a market order: Robinhood takes no limit price for it, so it fills at the market's price at that moment, and Robinhood's check shows only an estimate. It is sent only while the US market is open, ${PART_HOURS}.`;
+
+// src/data/dates.ts
+var DAY = 864e5;
+var marketDay = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+var nyClock = (ms) => {
+  const f = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(ms));
+  const v = (t) => f.find((x) => x.type === t)?.value ?? "";
+  return `${v("year")}-${v("month")}-${v("day")} ${v("hour")}:${v("minute")}`;
+};
+var addDays = (date4, days) => new Date(Date.parse(`${date4}T00:00:00Z`) + days * DAY).toISOString().slice(0, 10);
+
+// src/data/holidays.ts
+var HOLIDAYS = {
+  2026: [
+    ["2026-01-01", "New Year's Day"],
+    ["2026-01-19", "Martin Luther King, Jr. Day"],
+    ["2026-02-16", "Washington's Birthday"],
+    ["2026-04-03", "Good Friday"],
+    ["2026-05-25", "Memorial Day"],
+    ["2026-06-19", "Juneteenth"],
+    ["2026-07-03", "Independence Day (observed)"],
+    ["2026-09-07", "Labor Day"],
+    ["2026-11-26", "Thanksgiving Day"],
+    ["2026-12-25", "Christmas Day"]
+  ],
+  2027: [
+    ["2027-01-01", "New Year's Day"],
+    ["2027-01-18", "Martin Luther King, Jr. Day"],
+    ["2027-02-15", "Washington's Birthday"],
+    ["2027-03-26", "Good Friday"],
+    ["2027-05-31", "Memorial Day"],
+    ["2027-06-18", "Juneteenth (observed)"],
+    ["2027-07-05", "Independence Day (observed)"],
+    ["2027-09-06", "Labor Day"],
+    ["2027-11-25", "Thanksgiving Day"],
+    ["2027-12-24", "Christmas Day (observed)"]
+  ],
+  // 1 Jan 2028 is a Saturday: the NYSE keeps no New Year's Day holiday that year.
+  2028: [
+    ["2028-01-17", "Martin Luther King, Jr. Day"],
+    ["2028-02-21", "Washington's Birthday"],
+    ["2028-04-14", "Good Friday"],
+    ["2028-05-29", "Memorial Day"],
+    ["2028-06-19", "Juneteenth"],
+    ["2028-07-04", "Independence Day"],
+    ["2028-09-04", "Labor Day"],
+    ["2028-11-23", "Thanksgiving Day"],
+    ["2028-12-25", "Christmas Day"]
+  ]
+};
+var NAMES = new Map(Object.values(HOLIDAYS).flat().map(([day, name]) => [day, name]));
+var DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+var dayOfWeek = (day) => (/* @__PURE__ */ new Date(`${day}T12:00:00Z`)).getUTCDay();
+function marketClosed(day) {
+  const w = dayOfWeek(day);
+  if (w === 0 || w === 6) return `a ${DAYS[w]}`;
+  return NAMES.get(day) ?? null;
+}
+var isMarketDay = (day) => marketClosed(day) === null;
+var EARLY_CLOSES = /* @__PURE__ */ new Set(["2026-11-27", "2026-12-24", "2027-11-26", "2028-07-03", "2028-11-24"]);
+var closeOf = (day) => EARLY_CLOSES.has(day) ? "13:00" : "16:00";
+function nextMarketDay(day) {
+  let d = addDays(day, 1);
+  while (!isMarketDay(d)) d = addDays(d, 1);
+  return d;
+}
+function regularSession(now) {
+  const [day, hm] = nyClock(now.getTime()).split(" ");
+  if (isMarketDay(day) && hm >= "09:30" && hm < closeOf(day)) return { open: true, opens: "" };
+  const next = isMarketDay(day) && hm < "09:30" ? day : nextMarketDay(day);
+  return { open: false, opens: `${next === day ? "today" : `${DAYS[dayOfWeek(next)]} ${next}`} at 9:30 a.m. New York time` };
+}
 
 // src/robinhood/order.ts
 var PLACE = "place_equity_order";
@@ -19326,26 +19440,21 @@ var Placer = class {
   }
   client;
   tools;
-  /** Refuses, before anything is sent, an order this door would not send. */
-  ready(account, o, refId) {
+  /** Refuses, before anything is sent, an order this door would not send: a part-share outside New York's regular
+   *  session among them, which Robinhood would refuse anyway. */
+  ready(account, o, refId, now = /* @__PURE__ */ new Date()) {
     if (!account.agentic) throw new Refused("Only the Agentic account can trade, and this is not it.");
     if (!this.tools.some((t) => t.name === PLACE)) throw new Refused("Robinhood's connection no longer offers placing a stock order, so nothing was sent.");
-    if (!Number.isInteger(o.quantity) || o.quantity < 1 || !(o.limitPrice > 0) || o.side !== "buy" && o.side !== "sell" || !/^[0-9a-f-]{36}$/.test(refId)) throw new Refused("That order is not complete, so it was not sent.");
+    const args = equityOrderArgs(account.accountNumber, o);
+    if (!args || !/^[0-9a-f-]{36}$/.test(refId)) throw new Refused("That order is not complete, so it was not sent.");
+    const session = o.market ? regularSession(now) : null;
+    if (session && !session.open) throw new Refused(`A part-share is sent only while the US market is open, ${PART_HOURS}: it opens ${session.opens}. Nothing was sent.`);
+    return { ...args, ref_id: refId };
   }
-  /** Places one limit order of whole shares on the Agentic account. Call only after the person's Confirm. */
-  async place(account, o, refId) {
-    this.ready(account, o, refId);
-    const r = await this.client.callTool({ name: PLACE, arguments: {
-      account_number: account.accountNumber,
-      symbol: o.symbol,
-      side: o.side,
-      type: "limit",
-      quantity: String(o.quantity),
-      limit_price: o.limitPrice.toFixed(2),
-      time_in_force: o.timeInForce,
-      market_hours: "regular_hours",
-      ref_id: refId
-    } });
+  /** Places one order on the Agentic account: whole shares at a limit price, or a part-share at the market price in
+   *  regular hours. Call only after the person's Confirm. */
+  async place(account, o, refId, now = /* @__PURE__ */ new Date()) {
+    const r = await this.client.callTool({ name: PLACE, arguments: this.ready(account, o, refId, now) });
     const text2 = (r.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
     let data = r.structuredContent ?? null;
     if (data === null) {
@@ -19731,40 +19840,6 @@ async function readAccount(reader, account, ids) {
   return { account, portfolio: p === null ? null : parsePortfolio(p), holdings, unread: crypto5.unread, orders, approvals, problems };
 }
 
-// src/data/dates.ts
-var marketDay = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
-
-// src/data/symbols.ts
-var FOREX = /* @__PURE__ */ new Set(["USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD", "CNY", "CNH", "HKD", "SGD", "SEK", "NOK", "DKK", "PLN", "MXN", "ZAR", "TRY", "INR", "KRW", "BRL", "RUB", "THB"]);
-var CRYPTO_BASES = /* @__PURE__ */ new Set(["BTC", "ETH", "SOL", "XRP", "ADA", "DOGE", "LTC", "BCH", "DOT", "AVAX", "LINK"]);
-var CRYPTO_QUOTES = ["USDT", "USDC", "USD"];
-var NOT_COINS = /* @__PURE__ */ new Set([...FOREX, "XAU", "XAG", "XPT", "XPD"]);
-var COIN_PAIR = /^([A-Z0-9]{1,15})-(USDT|USDC|USD)$/;
-var SHARE_CLASS = /^([A-Z]{1,5})\.([A-Z])$/;
-var ONE_LETTER_EXCHANGES = /* @__PURE__ */ new Set(["T", "L", "V", "F"]);
-function cryptoBase(raw) {
-  const s = raw.trim().toUpperCase().replace(/\+$/, "");
-  const pair = COIN_PAIR.exec(s);
-  if (pair) return /[A-Z]/.test(pair[1]) && !NOT_COINS.has(pair[1]) ? pair[1] : null;
-  const compact = s.replaceAll("-", "");
-  for (const q of CRYPTO_QUOTES) {
-    if (compact.endsWith(q)) {
-      const base = compact.slice(0, -q.length);
-      return CRYPTO_BASES.has(base) ? base : null;
-    }
-  }
-  return null;
-}
-var yahooClass = (s) => {
-  const m = SHARE_CLASS.exec(s);
-  return m && !ONE_LETTER_EXCHANGES.has(m[2]) ? `${m[1]}-${m[2]}` : s;
-};
-function deskSymbol(symbol, kind) {
-  const s = symbol.trim().toUpperCase();
-  return kind === "crypto" ? `${cryptoBase(s) ?? s}-USD` : yahooClass(s);
-}
-var brokerSymbol = (symbol) => symbol.replace(/^([A-Z]{1,5})-([A-Z])$/, "$1.$2");
-
 // src/settings.ts
 var ANALYSTS = ["market", "sentiment", "news", "fundamentals"];
 var DEFAULT_CAPS = { perOrderUsd: 500, perStockPercent: 10, ordersPerDay: 3, perSectorPercent: 30, cryptoPercent: 5, weeklyLossPercent: 5, minHoldDays: 5 };
@@ -19988,8 +20063,9 @@ var Link = class {
   }
   /** The real figures a ticket for one stock is sized and checked on: the Agentic account's value, buying power and
    *  holding of the stock, Robinhood's live price, how many orders the account has had today (New York's day), and its
-   *  orders still open, which count towards the caps as if they were filled. */
-  async ticketContext(symbol, now = /* @__PURE__ */ new Date()) {
+   *  orders still open, which count towards the caps as if they were filled; and whether New York's regular session is
+   *  open, the only time a part-share can be sent. */
+  async ticketContext(symbol, now = this.clock()) {
     return this.withReader((r) => this.contextWith(r, symbol, now));
   }
   async contextWith(r, symbol, now) {
@@ -20022,6 +20098,7 @@ var Link = class {
         held,
         price,
         ordersToday,
+        session: regularSession(now),
         positions: all.map((x) => ({ symbol: deskSymbol(x.symbol, "stock"), quantity: x.quantity, price: quotes.get(x.symbol) ?? null })),
         open: { buy: mine("buy"), sell: mine("sell") },
         unreadOrders: orders.unread,
@@ -20099,16 +20176,16 @@ var Link = class {
     if (!this.trading().on) throw new Error("trading is switched off: switch it on in Your account first");
     const session = await openSession(this.file, { ...this.opts, signIn: false });
     try {
-      const context = await this.contextWith(session.reader, order.symbol, /* @__PURE__ */ new Date());
+      const at = this.clock(), context = await this.contextWith(session.reader, order.symbol, at);
       const now = this.trading();
       if (!now.on) throw new Error(`trading switched itself off: ${now.offBecause?.words ?? "switch it on in Your account first"}`);
       const failed = (await approve(context)).filter((c) => !c.ok);
       if (failed.length) throw new Error(`the order no longer passes on Robinhood's latest figures: ${failed.map((c) => c.words).join("; ")}`);
       const account = { accountNumber: this.agenticIds().accountNumber, agentic: true }, sent = { ...order, symbol: brokerSymbol(order.symbol) };
-      session.placer.ready(account, sent, refId);
+      session.placer.ready(account, sent, refId, at);
       sending();
       try {
-        return { placed: await session.placer.place(account, sent, refId), context };
+        return { placed: await session.placer.place(account, sent, refId, at), context };
       } catch (e) {
         throw e instanceof Refused ? e : new AnswerLost(oneLine(lostWhy(e), 160));
       }
@@ -20153,7 +20230,8 @@ var Link = class {
     })();
     return this.refreshing;
   }
-  now = () => (this.opts.now?.() ?? /* @__PURE__ */ new Date()).toISOString();
+  clock = () => this.opts.now?.() ?? /* @__PURE__ */ new Date();
+  now = () => this.clock().toISOString();
   saved = () => !!readSaved(this.file).tokens;
   info() {
     if (this.signing) return { state: "waiting", message: "Waiting for you to finish signing in on Robinhood's page. This waits up to five minutes.", checkedAt: null, tools: null };

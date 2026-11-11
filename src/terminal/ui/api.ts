@@ -33,7 +33,8 @@ export type Trading = TradingState;
 export type { Placed };
 /** An open ticket; own: the person's own order for a stock they chose, not one of the desk's calls. */
 /** lost: an order of this stock sent from here in the last week got no clear answer from Robinhood, in plain words. */
-export interface TicketOpen { id: string; own: boolean; context: TicketContext; proposal: Proposal; checks: Check[]; caps: Caps; lost: string | null }
+/** limitTif: how long a limit order of whole shares stays open, in the person's settings (a part-share is good for the day). */
+export interface TicketOpen { id: string; own: boolean; context: TicketContext; proposal: Proposal; checks: Check[]; caps: Caps; lost: string | null; limitTif: 'gfd' | 'gtc' }
 /** What the person set on a ticket: whole shares at their limit price, or a part-share at the market price (a buy as a
  *  dollar amount, a sell as shares). */
 export interface TicketFigures { quantity: number; limitPrice: number; market?: true; dollars?: number }

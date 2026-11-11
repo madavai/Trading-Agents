@@ -458,7 +458,7 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
       const trading = readSettings(root).trading, { caps } = robinhood.trading();
       const context: TicketContext = await limited({ ...(await askRobinhood(() => robinhood.ticketContext(symbol))), rating: call.rating, callDate: call.date });
       const t = opened(false, context, propose(context, trading, caps), trading, caps);
-      return json(res, 200, { id: t.id, own: false, context, proposal: t.proposal, checks: t.checks, caps, lost: lostWords(symbol) });
+      return json(res, 200, { id: t.id, own: false, context, proposal: t.proposal, checks: t.checks, caps, lost: lostWords(symbol), limitTif: trading.orderDefaults.timeInForce });
     }
     // The person's own order: a stock they chose and a side, not one of the desk's calls. It starts at one share and then
     // takes exactly the road a call's ticket takes: the same checks, Robinhood's dry run, the switch and their Confirm.
@@ -471,7 +471,7 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
       const trading = readSettings(root).trading, { caps } = robinhood.trading();
       const context: TicketContext = await limited({ ...(await askRobinhood(() => robinhood.ticketContext(symbol))), rating: '', callDate: '' });
       const t = opened(true, context, proposeOwn(context, side, trading, caps), trading, caps);
-      return json(res, 200, { id: t.id, own: true, context, proposal: t.proposal, checks: t.checks, caps, lost: lostWords(symbol) });
+      return json(res, 200, { id: t.id, own: true, context, proposal: t.proposal, checks: t.checks, caps, lost: lostWords(symbol), limitTif: trading.orderDefaults.timeInForce });
     }
     if (p === '/api/ticket/check' && method === 'POST') {
       const t = ticketOf(b.id);

@@ -358,7 +358,8 @@ test('page-7: a cap typed with a decimal comma is read as a decimal, and a figur
   for (const typed of ['', '1,2,3', '2,5.5', '1,5000', 'five', '1.2.3', ',5']) assert.ok(Number.isNaN(typedNumber(typed)), typed);
   const page = fs.readFileSync('src/terminal/ui/main.ts', 'utf8');
   assert.doesNotMatch(page, /replace\(\/\[\$,%\\s\]\/g, ''\)/, 'no field drops a comma as if it were always a thousands comma');
-  assert.match(page, /typedNumber\(\$<HTMLInputElement>\('#tkLimit'\)\.value\)/, 'the ticket\'s limit price is read the same way');
+  assert.match(page, /typedNumber\(field\('#tkLimit'\)\)/, 'the ticket\'s limit price is read the same way');
+  assert.match(page, /typedNumber\(field\('#tkDollars'\)\)/, 'and a part-share\'s dollar amount');
 });
 
 test('page-10: a review that comes back after the figures were changed is not shown as the check of the new figures', () => {
@@ -366,8 +367,13 @@ test('page-10: a review that comes back after the figures were changed is not sh
   assert.equal(sameFigures({ id: 'a', quantity: 1, limit: 182.4 }, { id: 'a', quantity: 2, limit: 182.4 }), false);
   assert.equal(sameFigures({ id: 'a', quantity: 1, limit: 182.4 }, { id: 'a', quantity: 1, limit: 182.5 }), false);
   assert.equal(sameFigures({ id: 'a', quantity: 1, limit: 182.4 }, { id: 'b', quantity: 1, limit: 182.4 }), false);
+  // A part-share: switching kind, or changing the dollar amount, is a change of figures too.
+  assert.equal(sameFigures({ id: 'a', quantity: 1, limit: 182.4 }, { id: 'a', quantity: 1, limit: 182.4, market: true }), false);
+  assert.equal(sameFigures({ id: 'a', quantity: 0.5, limit: 182.4, market: true, dollars: 91.2 }, { id: 'a', quantity: 0.5, limit: 182.4, market: true, dollars: 91.3 }), false);
+  assert.equal(sameFigures({ id: 'a', quantity: 0.5, limit: 182.4, market: true, dollars: 91.2 }, { id: 'a', quantity: 0.5, limit: 182.4, market: true, dollars: 91.2 }), true);
   const page = fs.readFileSync('src/terminal/ui/main.ts', 'utf8'), at = page.indexOf('async function reviewTicket(');
-  assert.match(page.slice(at, page.indexOf('\n}\n', at)), /if \(!sameFigures\(asked, \{ id: T\.open\?\.id[^)]*\)\) return;/);
+  assert.match(page.slice(at, page.indexOf('\n}\n', at)), /const asked = askedNow\(\);[\s\S]*if \(!sameFigures\(asked, askedNow\(\)\)\) return;/);
+  assert.match(page, /const askedNow = \(\): Asked => \(\{ id: T\.open\?\.id, quantity: T\.quantity, limit: T\.limit, market: T\.market, \.\.\.\(T\.market \? \{ dollars: T\.dollars \} : \{\}\) \}\);/, 'the figures compared are the ticket\'s own, kind and dollar amount included');
 });
 
 test('server-8: Stop waits while an order is being sent, as Restart does', async () => {
