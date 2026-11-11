@@ -44,8 +44,28 @@ export function spanOf(times: readonly string[]): string {
 /** Whether a source's sample reaches back over the whole window: its oldest item is from before the window's first day. */
 export const reaches = (oldest: string | undefined, from: string): boolean => oldest !== undefined && dayOf(oldest) < from;
 
-/** "the newest 20 of 39" when the limit cut the list, else the count alone. */
-const newest = (shown: number, of: number, noun: string) => (of > shown ? `the newest ${shown} of ${of} ${noun}s` : `${shown} ${noun}${shown === 1 ? '' : 's'}`);
+/** Up to `limit` of a window's articles (newest first), spread over the New York days they fall on: each day's newest,
+ *  a day at a time from the latest, then each day's next, so a busy last day cannot crowd out the rest of the window.
+ *  (AAPL, 11 Nov 2026: the newest 10 world-news articles were all of that morning, and the 29 of 4 to 10 Nov the
+ *  searches had found were not shown.) Returned newest first. */
+export function spread(list: readonly Article[], limit: number): Article[] {
+  const days = new Map<string, Article[]>();
+  for (const a of list) { const d = dayOf(a.time); days.set(d, [...(days.get(d) ?? []), a]); }
+  const out: Article[] = [];
+  for (let k = 0; out.length < Math.min(limit, list.length); k++) {
+    for (const day of days.values()) if (day[k] && out.length < limit) out.push(day[k]!);
+  }
+  return out.sort((a, b) => b.time.localeCompare(a.time));
+}
+
+/** How many are shown of the window's, and how they were chosen: the count alone when all are shown; "the newest 20 of
+ *  39" when those shown are the newest; else "20 of 39", spread over the days. */
+function shownOf(list: readonly Article[], all: readonly Article[], noun: string): [count: string, chosen: string] {
+  if (list.length >= all.length) return [`${list.length} ${noun}${list.length === 1 ? '' : 's'}`, ''];
+  const newest = new Set(all.slice(0, list.length));
+  return list.every((a) => newest.has(a)) ? [`the newest ${list.length} of ${all.length} ${noun}s`, '']
+    : [`${list.length} of ${all.length} ${noun}s`, ", spread over the days they fall on, each day's newest first"];
+}
 
 /** What to say when no article falls in the window: a window the sample does not reach, or an empty sample. */
 function gap(found: Article[], from: string, to: string, subject: string): string {
@@ -65,13 +85,14 @@ export async function companyNews(raw: string, analysis: string, lookBackDays: n
     const abroad = /\.[A-Z]{1,4}$/.test(sym) ? ' (it carries few articles on listings outside the US)' : '';
     throw new Unavailable(all.length ? `Yahoo Finance's search returned ${all.length} article${all.length === 1 ? '' : 's'} for ${sym}, none tagged ${sym}${abroad}` : `Yahoo Finance's search returned no articles for ${sym}${abroad}`);
   }
-  const within = found.filter((a) => inWindow(a, from, day)).sort((a, b) => b.time.localeCompare(a.time)), list = within.slice(0, limit);
+  const within = found.filter((a) => inWindow(a, from, day)).sort((a, b) => b.time.localeCompare(a.time)), list = spread(within, limit);
   if (!list.length) return gap(found, from, day, `news about ${sym}`);
   const how = untagged ? `matched by Yahoo's search for "${sym}", not tagged: check each is about this company` : `tagged ${sym}`;
-  const count = newest(list.length, within.length, 'article'), span = spanOf(list.map((a) => a.time)), oldest = found.map((a) => a.time).sort()[0];
+  const [shown, chosen] = shownOf(list, within, 'article'), count = `${shown} ${how}${chosen}`;
+  const span = spanOf(list.map((a) => a.time)), oldest = found.map((a) => a.time).sort()[0];
   const head = reaches(oldest, from)
-    ? `News about ${sym}, ${from} to ${day} (New York days; ${count} ${how}, from ${span}; headlines only)`
-    : `News about ${sym} from ${span} only (${count} ${how}; headlines only). The window asked for is ${from} to ${day} (New York days), but Yahoo Finance's search returns only its latest articles, and the oldest it returned is from ${oldest} UTC: what came before was not reached, so this says nothing about the news earlier in the window.`;
+    ? `News about ${sym}, ${from} to ${day} (New York days; ${count}, from ${span}; headlines only)`
+    : `News about ${sym} from ${span} only (${count}; headlines only). The window asked for is ${from} to ${day} (New York days), but Yahoo Finance's search returns only its latest articles, and the oldest it returned is from ${oldest} UTC: what came before was not reached, so this says nothing about the news earlier in the window.`;
   return [head, '', render(list)].join('\n');
 }
 
@@ -82,18 +103,19 @@ export async function worldNews(analysis: string, lookBackDays: number, limit: n
   if (failed === queries.length) throw (results[0] as PromiseRejectedResult).reason;
   const seen = new Set<string>(), all: Article[] = [];
   for (const r of results) if (r.status === 'fulfilled') for (const a of r.value) { const k = a.link || a.title; if (!seen.has(k)) { seen.add(k); all.push(a); } }
-  const within = all.filter((a) => inWindow(a, from, day)).sort((a, b) => b.time.localeCompare(a.time)), list = within.slice(0, limit);
+  const within = all.filter((a) => inWindow(a, from, day)).sort((a, b) => b.time.localeCompare(a.time)), list = spread(within, limit);
   const note = failed ? `\n(${failed} of ${queries.length} searches could not be run: Yahoo Finance did not answer them, or answered without a list of articles.)` : '';
   if (!list.length) return gap(all, from, day, 'world and economic news') + note;
   // Each search returns only its latest articles: a busy one covers hours, a quiet one days.
-  const short = queries.flatMap((q, i) => {
-    const r = results[i]!, oldest = r.status === 'fulfilled' ? r.value.map((a) => a.time).sort()[0] : undefined;
-    return r.status === 'fulfilled' && oldest !== undefined && !reaches(oldest, from) ? [`under ${q} only back to ${oldest} UTC`] : [];
-  });
+  const oldestOf = (i: number) => { const r = results[i]!; return r.status === 'fulfilled' ? r.value.map((a) => a.time).sort()[0] : undefined; };
+  const short = queries.flatMap((q, i) => { const o = oldestOf(i); return o !== undefined && !reaches(o, from) ? [`under ${q} only back to ${o} UTC`] : []; });
+  const reached = queries.filter((_, i) => { const o = oldestOf(i); return o !== undefined && reaches(o, from); });
   const past = isHistorical(day) ? ' Search favours recent articles, so a past window may be thin.' : '';
-  const count = newest(list.length, within.length, 'article'), span = spanOf(list.map((a) => a.time));
-  const head = short.length
-    ? `World and economic news from ${span} (${count}), from the news filed under ${queries.join(', ')}. The window asked for is ${from} to ${day} (New York days), but each search returns only its latest articles, and these did not reach back over it: ${short.join('; ')}. What came before was not reached, so this says nothing about the news earlier in the window.${past}`
-    : `World and economic news, ${from} to ${day} (${count}, from ${span}), from the news filed under ${queries.join(', ')}.${past}`;
+  const [shown, chosen] = shownOf(list, within, 'article'), count = shown + chosen, span = spanOf(list.map((a) => a.time)), under = queries.join(', ');
+  // A search that reached back is never said to have reached nothing (AAPL, 11 Nov 2026: the head said nothing earlier
+  // in the window was reached, though the searches under ^TNX and EURUSD=X had read back over all of it).
+  const head = !short.length ? `World and economic news, ${from} to ${day} (${count}, from ${span}), from the news filed under ${under}.${past}`
+    : reached.length ? `World and economic news, ${from} to ${day} (New York days; ${count}, from ${span}), from the news filed under ${under}. Each search returns only its latest articles: those under ${reached.join(', ')} reached back over the whole window, and these did not: ${short.join('; ')}, so what was filed there before then was not reached.${past}`
+    : `World and economic news from ${span} (${count}), from the news filed under ${under}. The window asked for is ${from} to ${day} (New York days), but each search returns only its latest articles, and these did not reach back over it: ${short.join('; ')}. What came before was not reached, so this says nothing about the news earlier in the window.${past}`;
   return [head, '', render(list)].join('\n') + note;
 }

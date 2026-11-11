@@ -88,8 +88,42 @@ test('world news names each search that did not reach back over the window', asy
     { title: 'Euro steady', publisher: 'Reuters', link: 'https://x/fx2', providerPublishTime: at('2026-11-03T12:00:00Z'), relatedTickers: ['EURUSD=X'] },
   ] })]]) });
   const t = await worldNews('2026-11-06', 7, 10, ['^GSPC', 'EURUSD=X']);
-  assert.match(t, /^World and economic news from 2026-11-06 21:30 to 23:00 UTC \(the newest 10 of 11 articles\), from the news filed under \^GSPC, EURUSD=X\. The window asked for is 2026-10-30 to 2026-11-06 \(New York days\), but each search returns only its latest articles, and these did not reach back over it: under \^GSPC only back to 2026-11-06 21:30 UTC\. What came before/);
-  assert.doesNotMatch(t, /under EURUSD=X only/, 'a search that reached before the window is not named');
+  assert.match(t, /^World and economic news, 2026-10-30 to 2026-11-06 \(New York days; 10 of 11 articles, spread over the days they fall on, each day's newest first, from 2026-11-03 12:00 to 2026-11-06 23:00 UTC\), from the news filed under \^GSPC, EURUSD=X\. Each search returns only its latest articles: those under EURUSD=X reached back over the whole window, and these did not: under \^GSPC only back to 2026-11-06 21:30 UTC, so what was filed there before then was not reached\.\n/);
+  assert.doesNotMatch(t, /under EURUSD=X only/, 'a search that reached before the window is not named as short');
+  assert.match(t, /Euro steady/, 'the earlier day it reached is shown');
+});
+
+// AAPL run of 11 Nov 2026: the searches held 39 articles of the window, 29 of them from 4 to 10 Nov, but only the newest
+// 10 were shown, all of that morning, and the head said what came before was not reached. So the news analyst said the
+// driver of 5 Nov was not named, though the desk had read that week's news.
+test('world news shows the window\'s days, not only its busiest last hours, and says which searches reached back', async () => {
+  process.env.TRADING_AGENTS_TODAY = '2026-11-11';
+  const story = (title: string, iso: string) => ({ title, publisher: 'Reuters', link: `https://x/${encodeURIComponent(title)}`, providerPublishTime: at(iso) });
+  const busy = { news: Array.from({ length: 12 }, (_, i) => story(`Stocks live ${i}`, new Date(Date.parse('2026-11-11T15:33:00Z') - i * 5 * 60_000).toISOString())) };
+  const yields = { news: [story('Yields ease after jobs data', '2026-11-10T12:00:00Z'), story('Treasuries rally', '2026-11-09T12:00:00Z'),
+    story('Bond market quiet', '2026-11-06T12:00:00Z'), story('Midterm results move yields', '2026-11-04T12:00:00Z'), story('Older yields story', '2026-10-30T12:00:00Z')] };
+  const euro = { news: [story('Euro falls to 18-month low', '2026-11-11T15:07:00Z'), story('Hot CPI lifts dollar', '2026-11-10T18:00:00Z'),
+    story('Euro dips on Fed talk', '2026-11-05T12:00:00Z'), story('Older euro story', '2026-10-28T12:00:00Z')] };
+  configure({ fetch: route([[/q=%5EGSPC/, () => json(busy)], [/q=%5ETNX/, () => json(yields)], [/q=EURUSD/, () => json(euro)]]) });
+  const t = await worldNews('2026-11-11', 7, 10, ['^GSPC', '^TNX', 'EURUSD=X']);
+  assert.equal(t.split('\n')[0], 'World and economic news, 2026-11-04 to 2026-11-11 (New York days; 10 of 19 articles, spread over the days they fall on, each day\'s newest first, from 2026-11-04 12:00 to 2026-11-11 15:33 UTC), from the news filed under ^GSPC, ^TNX, EURUSD=X. Each search returns only its latest articles: those under ^TNX, EURUSD=X reached back over the whole window, and these did not: under ^GSPC only back to 2026-11-11 14:38 UTC, so what was filed there before then was not reached.');
+  for (const day of ['2026-11-04', '2026-11-05', '2026-11-06', '2026-11-09', '2026-11-10']) assert.match(t, new RegExp(`^- ${day} `, 'm'), `${day} is shown`);
+  assert.equal(t.match(/^- 2026-11-11 /gm)?.length, 4, 'the last day gives way to the days before it, its newest first');
+  assert.match(t, /Stocks live 0\n/);
+  assert.doesNotMatch(t, /Older (yields|euro) story/, 'still only the window');
+  assert.doesNotMatch(t, /says nothing about the news earlier/, 'never when some of it was read');
+  // When the newest articles are all the window holds that fit, they are still said to be the newest.
+  configure({ fetch: route([[/q=%5EGSPC/, () => json(busy)], [/finance\/search/, () => json({ news: [] })]]) });
+  assert.match(await worldNews('2026-11-11', 7, 10, ['^GSPC', '^TNX']), /^World and economic news from 2026-11-11 14:48 to 15:33 UTC \(the newest 10 of 12 articles\), .* What came before was not reached, so this says nothing about the news earlier in the window\./);
+});
+
+test('company news is spread over the days it reached, each day\'s newest first', async () => {
+  process.env.TRADING_AGENTS_TODAY = '2026-11-11';
+  // AAPL, 11 Nov 2026: 36 articles from 10 Nov 16:03 UTC; the newest 20 began at 02:03 UTC on the 11th.
+  configure({ fetch: route([[/finance\/search/, () => json(run(36, '2026-11-11T15:21:00Z', 40))]]) });
+  const t = await companyNews('NVDA', '2026-11-11', 7, 20);
+  assert.match(t, /^News about NVDA from 2026-11-10 \d\d:\d\d to 2026-11-11 15:21 UTC only \(20 of 36 articles tagged NVDA, spread over the days they fall on, each day's newest first; headlines only\)\. The window asked for is 2026-11-04 to 2026-11-11 \(New York days\), but Yahoo Finance's search returns only its latest articles, and the oldest it returned is from 2026-11-10 \d\d:\d\d UTC: what came before was not reached/);
+  assert.match(t, /^- 2026-11-10 2/m, 'the 10th, a New York day of its own, is shown');
 });
 
 test('world news merges the standing searches without repeats', async () => {

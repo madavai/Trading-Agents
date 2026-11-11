@@ -12344,11 +12344,11 @@ function isRecursive(inst, stack, resolve) {
         result = answer2;
     }
   };
-  const shape = (sh, spread) => {
+  const shape = (sh, spread2) => {
     let answer2 = NONE;
     for (const key of Reflect.ownKeys(sh)) {
       const desc = Object.getOwnPropertyDescriptor(sh, key);
-      if (spread && !desc.enumerable)
+      if (spread2 && !desc.enumerable)
         continue;
       const child = desc.get ? ASSUMED : desc.value?._zod ? isRecursive(desc.value, stack, resolve) : NONE;
       if (child > answer2)
@@ -38325,7 +38325,23 @@ function spanOf(times) {
   return a === b ? `${a} UTC` : `${a} to ${a.slice(0, 10) === b.slice(0, 10) ? b.slice(11) : b} UTC`;
 }
 var reaches = (oldest, from) => oldest !== void 0 && dayOf(oldest) < from;
-var newest = (shown2, of, noun) => of > shown2 ? `the newest ${shown2} of ${of} ${noun}s` : `${shown2} ${noun}${shown2 === 1 ? "" : "s"}`;
+function spread(list2, limit) {
+  const days = /* @__PURE__ */ new Map();
+  for (const a of list2) {
+    const d = dayOf(a.time);
+    days.set(d, [...days.get(d) ?? [], a]);
+  }
+  const out = [];
+  for (let k = 0; out.length < Math.min(limit, list2.length); k++) {
+    for (const day3 of days.values()) if (day3[k] && out.length < limit) out.push(day3[k]);
+  }
+  return out.sort((a, b) => b.time.localeCompare(a.time));
+}
+function shownOf(list2, all, noun) {
+  if (list2.length >= all.length) return [`${list2.length} ${noun}${list2.length === 1 ? "" : "s"}`, ""];
+  const newest = new Set(all.slice(0, list2.length));
+  return list2.every((a) => newest.has(a)) ? [`the newest ${list2.length} of ${all.length} ${noun}s`, ""] : [`${list2.length} of ${all.length} ${noun}s`, ", spread over the days they fall on, each day's newest first"];
+}
 function gap(found, from, to, subject) {
   const oldest = found.map((a) => dayOf(a.time)).sort()[0];
   if (oldest && oldest > to) return `Unavailable for ${from} to ${to}: Yahoo Finance's search serves only recent articles (the oldest it returned is from ${oldest}), so this is not an absence of ${subject}.`;
@@ -38340,11 +38356,12 @@ async function companyNews(raw, analysis2, lookBackDays, limit) {
     const abroad = /\.[A-Z]{1,4}$/.test(sym2) ? " (it carries few articles on listings outside the US)" : "";
     throw new Unavailable(all.length ? `Yahoo Finance's search returned ${all.length} article${all.length === 1 ? "" : "s"} for ${sym2}, none tagged ${sym2}${abroad}` : `Yahoo Finance's search returned no articles for ${sym2}${abroad}`);
   }
-  const within4 = found.filter((a) => inWindow(a, from, day3)).sort((a, b) => b.time.localeCompare(a.time)), list2 = within4.slice(0, limit);
+  const within4 = found.filter((a) => inWindow(a, from, day3)).sort((a, b) => b.time.localeCompare(a.time)), list2 = spread(within4, limit);
   if (!list2.length) return gap(found, from, day3, `news about ${sym2}`);
   const how = untagged ? `matched by Yahoo's search for "${sym2}", not tagged: check each is about this company` : `tagged ${sym2}`;
-  const count = newest(list2.length, within4.length, "article"), span2 = spanOf(list2.map((a) => a.time)), oldest = found.map((a) => a.time).sort()[0];
-  const head2 = reaches(oldest, from) ? `News about ${sym2}, ${from} to ${day3} (New York days; ${count} ${how}, from ${span2}; headlines only)` : `News about ${sym2} from ${span2} only (${count} ${how}; headlines only). The window asked for is ${from} to ${day3} (New York days), but Yahoo Finance's search returns only its latest articles, and the oldest it returned is from ${oldest} UTC: what came before was not reached, so this says nothing about the news earlier in the window.`;
+  const [shown2, chosen] = shownOf(list2, within4, "article"), count = `${shown2} ${how}${chosen}`;
+  const span2 = spanOf(list2.map((a) => a.time)), oldest = found.map((a) => a.time).sort()[0];
+  const head2 = reaches(oldest, from) ? `News about ${sym2}, ${from} to ${day3} (New York days; ${count}, from ${span2}; headlines only)` : `News about ${sym2} from ${span2} only (${count}; headlines only). The window asked for is ${from} to ${day3} (New York days), but Yahoo Finance's search returns only its latest articles, and the oldest it returned is from ${oldest} UTC: what came before was not reached, so this says nothing about the news earlier in the window.`;
   return [head2, "", render2(list2)].join("\n");
 }
 async function worldNews(analysis2, lookBackDays, limit, queries) {
@@ -38360,17 +38377,25 @@ async function worldNews(analysis2, lookBackDays, limit, queries) {
       all.push(a);
     }
   }
-  const within4 = all.filter((a) => inWindow(a, from, day3)).sort((a, b) => b.time.localeCompare(a.time)), list2 = within4.slice(0, limit);
+  const within4 = all.filter((a) => inWindow(a, from, day3)).sort((a, b) => b.time.localeCompare(a.time)), list2 = spread(within4, limit);
   const note = failed ? `
 (${failed} of ${queries.length} searches could not be run: Yahoo Finance did not answer them, or answered without a list of articles.)` : "";
   if (!list2.length) return gap(all, from, day3, "world and economic news") + note;
+  const oldestOf2 = (i) => {
+    const r = results[i];
+    return r.status === "fulfilled" ? r.value.map((a) => a.time).sort()[0] : void 0;
+  };
   const short2 = queries.flatMap((q, i) => {
-    const r = results[i], oldest = r.status === "fulfilled" ? r.value.map((a) => a.time).sort()[0] : void 0;
-    return r.status === "fulfilled" && oldest !== void 0 && !reaches(oldest, from) ? [`under ${q} only back to ${oldest} UTC`] : [];
+    const o = oldestOf2(i);
+    return o !== void 0 && !reaches(o, from) ? [`under ${q} only back to ${o} UTC`] : [];
+  });
+  const reached = queries.filter((_, i) => {
+    const o = oldestOf2(i);
+    return o !== void 0 && reaches(o, from);
   });
   const past = isHistorical(day3) ? " Search favours recent articles, so a past window may be thin." : "";
-  const count = newest(list2.length, within4.length, "article"), span2 = spanOf(list2.map((a) => a.time));
-  const head2 = short2.length ? `World and economic news from ${span2} (${count}), from the news filed under ${queries.join(", ")}. The window asked for is ${from} to ${day3} (New York days), but each search returns only its latest articles, and these did not reach back over it: ${short2.join("; ")}. What came before was not reached, so this says nothing about the news earlier in the window.${past}` : `World and economic news, ${from} to ${day3} (${count}, from ${span2}), from the news filed under ${queries.join(", ")}.${past}`;
+  const [shown2, chosen] = shownOf(list2, within4, "article"), count = shown2 + chosen, span2 = spanOf(list2.map((a) => a.time)), under = queries.join(", ");
+  const head2 = !short2.length ? `World and economic news, ${from} to ${day3} (${count}, from ${span2}), from the news filed under ${under}.${past}` : reached.length ? `World and economic news, ${from} to ${day3} (New York days; ${count}, from ${span2}), from the news filed under ${under}. Each search returns only its latest articles: those under ${reached.join(", ")} reached back over the whole window, and these did not: ${short2.join("; ")}, so what was filed there before then was not reached.${past}` : `World and economic news from ${span2} (${count}), from the news filed under ${under}. The window asked for is ${from} to ${day3} (New York days), but each search returns only its latest articles, and these did not reach back over it: ${short2.join("; ")}. What came before was not reached, so this says nothing about the news earlier in the window.${past}`;
   return [head2, "", render2(list2)].join("\n") + note;
 }
 
@@ -42792,13 +42817,13 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root, home) {
   const days = external_exports.number().int().min(1).max(30).optional().describe("Calendar days before the analysis date; " + a0.newsLookbackDays + " when left out");
   server.registerTool("get_company_news", {
     title: "Company news",
-    description: "Headlines about the instrument from Yahoo Finance, with publisher and time, over the days before the analysis date. Search returns a recent sample: an empty or unreachable window is said to be so, never no news.",
+    description: "Headlines about the instrument from Yahoo Finance, with publisher and time, over the days before the analysis date. Search returns a recent sample: an empty or unreachable window is said to be so, never no news. When the window holds more than it shows, they are spread over its days, each day's newest first, and it says so.",
     inputSchema: { symbol: symbol3, analysis_date: analysis, look_back_days: days },
     annotations: READ
   }, async (a) => answer("news about " + a.symbol, () => companyNews(a.symbol, a.analysis_date, a.look_back_days ?? a0.newsLookbackDays, a0.companyNewsLimit)));
   server.registerTool("get_world_news", {
     title: "World and economic news",
-    description: "Market-wide headlines over the days before the analysis date: the news Yahoo Finance files under the US stock market, the 10-year Treasury yield, oil, gold and the euro (the settings' world-news symbols), where central banks, the economy, geopolitics and commodities are reported.",
+    description: "Market-wide headlines over the days before the analysis date: the news Yahoo Finance files under the US stock market, the 10-year Treasury yield, oil, gold and the euro (the settings' world-news symbols), where central banks, the economy, geopolitics and commodities are reported. When the window holds more than it shows, they are spread over its days, each day's newest first; it names each search that did not reach back over the window.",
     inputSchema: { analysis_date: analysis, look_back_days: days },
     annotations: READ
   }, async (a) => answer("world news", () => worldNews(a.analysis_date, a.look_back_days ?? a0.newsLookbackDays, a0.worldNewsLimit, a0.worldNewsSearches)));

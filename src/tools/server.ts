@@ -191,14 +191,14 @@ export function deskServer(root: string = process.cwd(), fetchImpl?: typeof fetc
 
   server.registerTool('get_company_news', {
     title: 'Company news',
-    description: 'Headlines about the instrument from Yahoo Finance, with publisher and time, over the days before the analysis date. Search returns a recent sample: an empty or unreachable window is said to be so, never no news.',
+    description: 'Headlines about the instrument from Yahoo Finance, with publisher and time, over the days before the analysis date. Search returns a recent sample: an empty or unreachable window is said to be so, never no news. When the window holds more than it shows, they are spread over its days, each day\'s newest first, and it says so.',
     inputSchema: { symbol, analysis_date: analysis, look_back_days: days },
     annotations: READ,
   }, async (a) => answer('news about ' + a.symbol, () => companyNews(a.symbol, a.analysis_date, a.look_back_days ?? a0.newsLookbackDays, a0.companyNewsLimit)));
 
   server.registerTool('get_world_news', {
     title: 'World and economic news',
-    description: 'Market-wide headlines over the days before the analysis date: the news Yahoo Finance files under the US stock market, the 10-year Treasury yield, oil, gold and the euro (the settings\' world-news symbols), where central banks, the economy, geopolitics and commodities are reported.',
+    description: 'Market-wide headlines over the days before the analysis date: the news Yahoo Finance files under the US stock market, the 10-year Treasury yield, oil, gold and the euro (the settings\' world-news symbols), where central banks, the economy, geopolitics and commodities are reported. When the window holds more than it shows, they are spread over its days, each day\'s newest first; it names each search that did not reach back over the window.',
     inputSchema: { analysis_date: analysis, look_back_days: days },
     annotations: READ,
   }, async (a) => answer('world news', () => worldNews(a.analysis_date, a.look_back_days ?? a0.newsLookbackDays, a0.worldNewsLimit, a0.worldNewsSearches)));
