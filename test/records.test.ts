@@ -317,6 +317,40 @@ test('a correction keeps the analyst\'s own words once: a correction of a correc
   assert.match(correctSection(dir, ...at, 'news', [{ was: '+39.9 points', now: '+39.5 points' }])[0]!, /runs into an earlier correction/);
 });
 
+// AAPL run of 11 Nov 2026: the fact checker corrected three passages of the market report from reads that had only moved,
+// then took each back by correcting its new words to the analyst's own. The desk kept all three marks, so the report read
+// "344.65 to 344.51 [corrected: was "... 344.65 to 344.51"]": a mark beside the very words it says were replaced.
+test('a correction taken back to the analyst\'s own words takes its mark away', () => {
+  const { dir } = folder(), at = ['AAPL', '2026-11-11'] as const;
+  const first = [
+    'One wrinkle: the VWMA fell on the latest session, 344.65 to 344.51. The price is only 1.13 below the upper band, with the day\'s high so far (354.44) having touched fractionally beyond it.',
+    '', '| Signal | Reading |', '|---|---|', '| VWMA | 344.51, below the price |',
+  ].join('\n');
+  saveSection(dir, ...at, 'market', first);
+  const text = () => readSections(dir, ...at, ['market']).split('\n').slice(1).join('\n');
+  correctSection(dir, ...at, 'market', [
+    { was: 'the VWMA fell on the latest session, 344.65 to 344.51', now: 'the VWMA fell on the latest session, 344.65 to 344.52' },
+    { was: 'only 1.13 below the upper band, with the day\'s high so far (354.44) having touched fractionally beyond it', now: 'only 1.13 below the upper band' },
+    { was: '| 344.51, below the price |', now: '| 344.52, below the price |' },
+  ]);
+  assert.equal(text().match(/\[corrected: was/g)!.length, 3);
+  // Each taken back: the analyst's words again, and no mark. A clause the first correction dropped comes back whole.
+  assert.deepEqual(correctSection(dir, ...at, 'market', [
+    { was: '344.65 to 344.52', now: '344.65 to 344.51' },
+    { was: 'only 1.13 below the upper band', now: 'only 1.13 below the upper band, with the day\'s high so far (354.44) having touched fractionally beyond it' },
+    { was: '344.52, below the price', now: '344.51, below the price' },
+  ]), [
+    '- taken back: "344.65 to 344.52" now reads "344.65 to 344.51", so the passage is again the analyst\'s own words and its correction mark is gone; it is no longer a correction, so leave it out of your table',
+    '- taken back: "only 1.13 below the upper band" now reads "only 1.13 below the upper band, with the day\'s high so far (354.44) having touched fractionally beyond it", so the passage is again the analyst\'s own words and its correction mark is gone; it is no longer a correction, so leave it out of your table',
+    '- taken back: "344.52, below the price" now reads "344.51, below the price", so the passage is again the analyst\'s own words and its correction mark is gone; it is no longer a correction, so leave it out of your table',
+  ]);
+  assert.equal(text(), first, 'the report reads exactly as the analyst saved it');
+  // A taken-back passage can be corrected afresh, with one new mark that keeps the analyst's words.
+  correctSection(dir, ...at, 'market', [{ was: 'the VWMA fell on the latest session, 344.65 to 344.51', now: 'the VWMA fell on the latest session, 344.65 to 344.50' }]);
+  assert.match(text(), /344\.65 to 344\.50 \[corrected: was "the VWMA fell on the latest session, 344\.65 to 344\.51"\]\. The price/);
+  assert.equal(text().match(/\[corrected: was/g)!.length, 1);
+});
+
 test('a fact check whose first line does not count its own table is refused, with why', () => {
   const { dir } = folder(), table = (rows: number) => ['| Report | What it said | What is right | Source |', '|---|---|---|---|', ...Array.from({ length: rows }, (_, i) => `| news | a${i} | b${i} | tool |`)];
   const check = (w: number, m: number, rows: number) => [`Checked the market and news reports: ${w} wrong and ${m} misleading claims, corrected in place; 1 could not be checked.`, '', '# Corrections made', '', ...table(rows), '', '# Could not be checked', '- one'].join('\n');
