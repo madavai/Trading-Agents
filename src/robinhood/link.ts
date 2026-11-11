@@ -305,8 +305,9 @@ export class Link {
   private good(reader: Reader): Last {
     const k = reader.byKind(), total = reader.tools.length;
     return { state: 'connected', checkedAt: this.now(), tools: { read: k.read.length, order: k.order.length, other: k.other.length },
-      // Of the order tools, the page calls two (review.ts, order.ts), and only on the person's own press; no agent gets any.
-      message: `Robinhood offers ${total} ${total === 1 ? 'tool' : 'tools'}: ${k.read.length} that only read, ${k.order.length} that order or move money (of these, this page uses only Robinhood's dry run, when you press Review, and the order itself, on your Confirm; no agent ever gets one) and ${k.other.length} others.` };
+      // Of the order tools, the page calls two (review.ts, order.ts), and only on the person's own press; of the others, none
+      // (reader.ts refuses all but reads); no agent gets an order tool. The counts are Robinhood's own list, sorted by rules.ts.
+      message: `Robinhood offers ${total} ${total === 1 ? 'tool' : 'tools'} (things a program can ask it to do): ${k.read.length} that only read, ${k.order.length} that order or move money and ${k.other.length} others, which this page never uses. This page uses only reading tools, plus two of the order ones, each only when you press Review (Robinhood's check, which places nothing) or Confirm (the order). No agent gets an order tool.` };
   }
 
   private bad(e: unknown): Last {

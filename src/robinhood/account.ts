@@ -6,6 +6,7 @@
 // who knows the number and the recipe.
 import crypto from 'node:crypto';
 import type { Reader } from './reader.js';
+import { isDone } from './states.js';
 
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {});
 const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
@@ -100,8 +101,6 @@ export function parseOrders(answer: unknown): { orders: Order[]; count: number }
   return { count: rows.length, orders: rows.slice(0, 20).map(orderOf) };
 }
 
-/** A state Robinhood gives an order that is done: filled, or never to be filled. Any other state is still open. */
-const DONE = /^(filled|cancell?ed|rejected|failed|expired|voided)$/i;
 /** An order still open at Robinhood (queued, confirmed, partly filled...): what it still waits to buy or sell, at its own
  *  price. A filled part is already among the holdings, so only the rest counts. */
 export interface OpenOrder { symbol: string; side: 'buy' | 'sell'; quantity: number; price: number | null }
@@ -113,7 +112,7 @@ export function openOrders(answer: unknown): { all: Order[]; open: OpenOrder[]; 
   let unread = 0;
   rows.forEach((v, i) => {
     const o = all[i]!, raw = obj(v);
-    if (o.state && DONE.test(o.state)) return;
+    if (o.state && isDone(o.state)) return;   // done: filled, or never to be filled (states.ts, which the page words the states with too)
     const quantity = figure(raw.quantity), filled = figure(raw.cumulative_quantity) ?? 0;
     if (!o.state || !o.symbol || (o.side !== 'buy' && o.side !== 'sell') || quantity === null) { unread++; return; }
     open.push({ symbol: o.symbol, side: o.side, quantity: Math.max(0, quantity - filled), price: figure(raw.price) ?? figure(raw.limit_price) });

@@ -162,7 +162,7 @@ test('server-11: the Analyse box offers the settings\' own rounds first and asks
   assert.match(fs.readFileSync('src/terminal/ui/api.ts', 'utf8'), /enqueue: \(symbol: string, depth\?: Depth\) => call<\{ queue: QueueView\[\] \}>\('POST', '\/api\/queue', depth \? \{ symbol, depth \} : \{ symbol \}\)/, 'no depth sent at all for the settings');
 });
 
-test('page-16: The whole market is changed only from the search box and the tiles: no typed list, no Change… button, and no word that points at them', () => {
+test('page-19: The whole market is changed only from the search box and the tiles: no typed list, no Change… button, and no word that points at them', () => {
   // Before: "Change…" opened a field for up to eight tickers typed with commas and no suggestions, beside the search box at the top.
   for (const gone of [/mkInput/, /mk-edit/, /mk-cancel/, /mk-save/, /marketEditor/, /separated by commas/, /Press Change… to add/, /MK\.editing/, /Choose the broad funds this tier shows/]) assert.doesNotMatch(page, gone, String(gone));
   assert.match(page, /market: 'The whole market is empty\. Search a fund in the box at the top, such as SPY, and press Show in The whole market\.',/);
@@ -183,7 +183,7 @@ test('page-16: The whole market is changed only from the search box and the tile
   assert.match(page, /data-act="paper-edit">Change…/);
 });
 
-test('page-17: a fund in the search list gets "Add to watchlist" and "Show in The whole market"; one in the row, or a full row, says so; Shift+Enter does what the button does', () => {
+test('page-20: a fund in the search list gets "Add to watchlist" and "Show in The whole market"; one in the row, or a full row, says so; Shift+Enter does what the button does', () => {
   assert.match(page, /import \{ marketOffer, type MarketOffer \} from '\.\/marketpick\.js';/);
   assert.match(page, /return marketOffer\(r, d\.market\.symbols, new Set\(d\.startHere\.find\(\(t\) => t\.tier === 'sectors'\)\?\.items\.map\(\(i\) => i\.symbol\)\), d\.market\.max\);/);
   assert.match(page, /const add = watched \? '' : `<button type="button" class="at-btn at-press" data-act="find-pick" data-i="\$\{i\}">Add to watchlist<\/button>`;/);
@@ -204,7 +204,7 @@ test('page-17: a fund in the search list gets "Add to watchlist" and "Show in Th
   assert.match(css, /@media \(max-width: 640px\) \{ \.ta-opt \{ grid-template-columns: calc\(var\(--unit\) \* 18\) minmax\(0, 1fr\); \} \.ta-opt-tags \{ display: none; \} \}/);
 });
 
-test('page-18: a Start here tile is three lines, the same on every tile (name; code and move; rating and presses), with a letter badge, what leaves it is said when it is pointed at, and a badge is shaded only by the kind Yahoo gives', () => {
+test('page-21: a Start here tile is three lines, the same on every tile (name; code and move; rating and presses), with a letter badge, what leaves it is said when it is pointed at, and a badge is shaded only by the kind Yahoo gives', () => {
   // the badge: the House's logo box holding letters, no picture, so nothing is fetched from outside (the page's policy allows images from this computer only)
   assert.match(page, /const badge = \(sym: string, kind: Kind\): string => `<span class="at-logo-box sm ta-badge\$\{kind \? ` \$\{kind\}` : ''\}"><span class="at-logo fallback">\$\{esc\(badgeLetters\(sym\)\)\}<\/span><\/span>`;/);
   assert.doesNotMatch(page, /<img\b/, 'no picture from anywhere');
@@ -244,7 +244,7 @@ test('page-18: a Start here tile is three lines, the same on every tile (name; c
   assert.doesNotMatch(css, /\.ta-tier-tile[^{}]*:hover[^{}]*\{[^}]*display/, 'nothing is shown only on a hover');
 });
 
-test('page-19: the Overview runs Markets, Start here, the Chart, the stock page, the watchlist, Analyses and the calls, and the side list and rail follow it; a press on the page brings the chart into view, and nothing else does', () => {
+test('page-22: the Overview runs Markets, Start here, the Chart, the stock page, the watchlist, Analyses and the calls, and the side list and rail follow it; a press on the page brings the chart into view, and nothing else does', () => {
   const html = fs.readFileSync('src/terminal/ui/index.html', 'utf8');
   const overview = html.slice(html.indexOf('id="view-overview"'), html.indexOf('id="view-today"'));
   const ids = [...overview.matchAll(/<section class="at-section[^"]*" id="(sec-[a-z]+)"/g)].map((m) => m[1]);
@@ -271,7 +271,7 @@ test('page-19: the Overview runs Markets, Start here, the Chart, the stock page,
   assert.equal((page.match(/data-act="select"/g) ?? []).length, 5, 'the side list star, a Markets tile, a watchlist row, a Start here tile and a Worth a look tile');
 });
 
-test("page-20: Today's market is a page of its own, opened from the side list and the rail like Your account, remembered, and fed by the one hourly refresh whichever page shows", () => {
+test("page-23: Today's market is a page of its own, opened from the side list and the rail like Your account, remembered, and fed by the one hourly refresh whichever page shows", () => {
   const html = fs.readFileSync('src/terminal/ui/index.html', 'utf8');
   const today = html.slice(html.indexOf('id="view-today"'), html.indexOf('id="view-account"'));
   // the page: its heading and subtitle, the two cards as they were, and a way back; hidden until opened
@@ -309,7 +309,7 @@ test("page-20: Today's market is a page of its own, opened from the side list an
   assert.doesNotMatch(page, /case 'view':[^\n]*loadMorning/, 'opening the page asks for nothing again');
 });
 
-test('page-21: "How the desk is doing" is a page of its own with both cards, opened from the side list and the rail, remembered, saying in words that it runs by itself, and loading as it did', () => {
+test('page-24: "How the desk is doing" is a page of its own with both cards, opened from the side list and the rail, remembered, saying in words that it runs by itself, and loading as it did', () => {
   const html = fs.readFileSync('src/terminal/ui/index.html', 'utf8');
   const score = html.slice(html.indexOf('id="view-score"'), html.indexOf('id="view-account"'));
   // the page: its heading (the scorecard's dotted word kept), a subtitle written by the page from what the desk holds, the counts, the paper money control, a way back
@@ -347,7 +347,7 @@ test('page-21: "How the desk is doing" is a page of its own with both cards, ope
   assert.doesNotMatch(page, /case 'view':[^\n]*(loadPaper|api\.paper)/);
 });
 
-test('page-22: the section that shows where each analysis stands is called "Analysis status" on the page, in the side list and the rail, in every sentence that points at it, and in the docs', () => {
+test('page-25: the section that shows where each analysis stands is called "Analysis status" on the page, in the side list and the rail, in every sentence that points at it, and in the docs', () => {
   const html = fs.readFileSync('src/terminal/ui/index.html', 'utf8');
   assert.match(html, /<h2>Analysis status<\/h2><p id="analysesSub">Reading the desk's waiting list\.<\/p>/, 'the heading changes; its subtitle and contents do not');
   assert.match(html, /<button class="at-li" data-act="goto" data-to="sec-analyses">.*<span class="at-li-t">Analysis status<\/span><\/button>/);
@@ -359,4 +359,58 @@ test('page-22: the section that shows where each analysis stands is called "Anal
   // no file says the old name any more (the walk and the guide included), and "Analyses that run by themselves" is another thing and stays
   for (const f of ['src/terminal/ui/index.html', 'src/terminal/ui/main.ts', 'README.md', 'docs/trading-agents-walk.html', 'docs/inside-the-trading-desk.html']) assert.doesNotMatch(fs.readFileSync(f, 'utf8'), /Analyses you asked for/, f);
   assert.match(fs.readFileSync('README.md', 'utf8'), /The stock joins \*\*Analysis status\*\*, where each one shows where it stands/);
+});
+
+test('page-16 (dashboard tour, 11 Nov 2026): the account page keeps its rows apart, its cards at their own height, and its caps in four rows in both views', () => {
+  const css = fs.readFileSync('src/terminal/ui/dashboard.css', 'utf8'), html = fs.readFileSync('src/terminal/ui/index.html', 'utf8');
+  // The side list's account block: every row is marked while the account page is open, and marked rows touched.
+  assert.match(css, /#sideAccount > \.at-li \+ \.at-li \{ margin-top: var\(--space-1\); \}/, 'a small space between the account block\'s rows');
+  // The Robinhood and Trading cards were stretched to one height, with Check again and Disconnect pushed to the foot of the taller card.
+  const pair = /<div class="([^"]*)">\s*<div class="at-card at-box" id="accountCard">/.exec(html);
+  assert.ok(pair, 'the two account cards stand in one row');
+  assert.doesNotMatch(pair[1]!, /ta-even/, 'each card is as tall as its own words');
+  // The caps: what they apply to, said once and in both views; four rows by what a limit is for; the seven fields of one size.
+  assert.match(page, /const CAPS_SCOPE = 'These limits apply to orders you place from this page, not to trades you make in the Robinhood app\.';/);
+  assert.equal([...page.matchAll(/\$\{CAPS_SCOPE\}/g)].length, 2, 'the chips view and the edit view both say it');
+  for (const row of ['Buys', 'Buys and sells', 'Sells', 'The account']) assert.equal([...page.matchAll(new RegExp(`capRow\\('${row}'`, 'g'))].length, 2, `${row}: a row in the chips view and in the edit view`);
+  for (const id of ['capOrder', 'capStock', 'capSector', 'capCrypto', 'capDay', 'capHold', 'capWeek']) assert.match(page, new RegExp(`field\\('${id}'`), `${id} is a field of the edit view`);
+  assert.match(css, /\.ta-capfields \{ display: grid; grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/, 'fields of one width, two to a line');
+  assert.match(css, /\.ta-capfields > \.at-field \{ justify-content: flex-end; \}/, 'a label that wraps grows upwards, so the fields stay level');
+  // The short words: the old paragraph ("kept beside the trading switch, where agents are refused") is gone, and no folder is named.
+  assert.doesNotMatch(page, /where agents are refused|The most an order may cost/);
+  assert.match(page, /Every ticket is checked against them, and again just before it is sent; a failed check stops the order\. Only you can change them, and the agents are blocked from where they are kept\./);
+  assert.doesNotMatch(page, /trading-agents|private folder/i, 'the page never names the private folder');
+});
+
+test('page-17 (dashboard tour, 11 Nov 2026): the Accounts section keeps only status: no explaining lines, the phone approval as a chip, one read time, and orders in plain words', () => {
+  const html = fs.readFileSync('src/terminal/ui/index.html', 'utf8');
+  // The owner marked these as unnecessary: each is gone, and nothing but a failure keeps a line under an account.
+  for (const gone of ['The accounts you chose to show', 'Nothing is held in this account', 'Keep it on until you trust the desk', "holdings valued at Robinhood's live prices", 'now see these holdings when they analyse a stock', 'is kept on this computer only and is never shown on this page']) {
+    assert.ok(!page.includes(gone) && !html.includes(gone), `"${gone}" is gone`);
+  }
+  assert.match(html, /<h2>Accounts<\/h2><\/div><\/div>/, 'the Accounts heading has no line under it');
+  // The phone approval is a status chip, marked when it is off; a pending approval is a chip of its own.
+  assert.match(page, /mark\('Phone approval: not read', "Robinhood's phone approval setting could not be read\."\)/);
+  assert.match(page, /mark\('Phone approval: on', .*'ok'\)/);
+  assert.match(page, /mark\('Phone approval: off', .*You can switch phone approval on in the Robinhood app\.", 'warn'\)/);
+  assert.match(page, /mark\(`\$\{ap\.pending\} waiting for your approval`/);
+  // How fresh the figures are: one read time, small, beside the Refresh button, never one more line in each card.
+  assert.match(page, /<span class="at-quiet">Read at \$\{esc\(when\(A\.snapshot\.at\)\)\}<\/span>/);
+  assert.match(page, /A\.snapshot\.views\.map\(viewCard\)/);
+  // The agents' holdings: said only when the read was not whole.
+  assert.match(page, /A\.snapshot && A\.shared === false \? '<p class="at-honest">Some holdings could not be read, so the agents were not given this read: they keep the last complete one\.<\/p>'/);
+  // Both tables of orders (an account's, a stock's) are one function: Robinhood's raw word is never the cell, and orders still open come first.
+  assert.equal([...page.matchAll(/ordersTable\(/g)].length, 3, 'defined once, used for the account card and the stock page');
+  assert.doesNotMatch(page, /esc\(x\.state \?\? '—'\)/, "Robinhood's raw state word is not what the table shows");
+  assert.match(page, /\[\.\.\.orders\]\.sort\(\(a, b\) => Number\(open\(b\)\) - Number\(open\(a\)\)\)/);
+  assert.match(page, /<th class="num" title="\$\{esc\(NOTES\.orderPrice\)\}">Price<\/th>/, 'the Price heading says which price it is');
+  // The lines that appear only when something failed stay.
+  for (const kept of ['The orders could not be read.', 'Not read: ', 'holding(s) could not be read and are left out.']) assert.ok(page.includes(kept), kept);
+});
+
+test('page-18 (dashboard tour, 11 Nov 2026): the Overview\'s first tile says "nothing held" when the accounts hold nothing, and "not known" only when a holding lacks its cost, as the account page\'s own tile does', () => {
+  // Before: gainOf() is null for no holdings, and the tile said "gain since bought not known" of an account that holds nothing.
+  assert.match(page, /const held = views\.flatMap\(\(v\) => v\.holdings\)/);
+  assert.match(page, / since bought` : held\.length \? 'gain since bought not known' : 'nothing held';/);
+  assert.match(page, /: v\.holdings\.length \? 'a holding lacks its cost' : 'nothing held'/, 'the account page\'s own tile says the same two cases');
 });
