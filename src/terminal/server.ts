@@ -34,11 +34,11 @@ import type { Placed } from '../robinhood/order.js';
 import { Journal } from '../desk/journal.js';
 import { CAP_RANGE_WORDS, capsFrom, readSettings, type Caps } from '../settings.js';
 import { VERSION } from '../version.js';
-import { callOf, listenerOf, marketView, queueOf, stateOf, versionOf } from './state.js';
+import { callOf, listenerOf, queueOf, stateOf, versionOf } from './state.js';
 import { clearQuotes, history, isRange, MARKETS, quote } from './quotes.js';
 import { findSymbols, QUERY } from './search.js';
-import { marketOf, readPrefs, saveMarket, savePrefs } from './prefs.js';
-import { marketSymbol, MAX_MARKET, screenUniverse, ticketable } from './tiers.js';
+import { moveMarketToWatchlist, readPrefs, savePrefs } from './prefs.js';
+import { screenUniverse, ticketable } from './tiers.js';
 import { addWatch, readWatchlist, removeWatch, setFavourite } from './store.js';
 import { nextMarketDay, queueTop, readScreen, SCREEN_MS, screenToday, switchDue, TOP_QUEUED, type Screen } from '../desk/screen.js';
 import { weatherNow, type Weather } from '../desk/weather.js';
@@ -252,7 +252,7 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
   let screening: Promise<Screen> | null = null;
   const clock = opts.now ?? (() => new Date());
   const screenNow = async (day: string) => {
-    const { symbols, news } = screenUniverse(readWatchlist(dir), marketOf(dir));
+    const { symbols, news } = screenUniverse(readWatchlist(dir));
     screening ??= screenToday(dir, symbols, news, day, clock()).finally(() => { screening = null; });
     const worked = await screening, prefs = readPrefs(dir), on = prefs.morning === true;
     const queued = on ? queueTop(dir, worked, day, true, clock(), prefs.morningFrom) : [];
@@ -382,7 +382,7 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
       ringDoorbell(dir, 'press');
       return json(res, 200, { queue: queueOf(dir) });
     }
-    if (p === '/api/prefs' && method === 'POST') { delete b.market; delete b.morning; delete b.morningFrom; delete b.readCall; return json(res, 200, savePrefs(dir, b)); }   // only their own switches set autorun and morning, only the whole-market row's own save the whole market, only a call served readCall
+    if (p === '/api/prefs' && method === 'POST') { delete b.market; delete b.marketMoved; delete b.morning; delete b.morningFrom; delete b.readCall; return json(res, 200, savePrefs(dir, b)); }   // only the morning switch sets morning, only the desk's own move (prefs.ts moveMarketToWatchlist) the old whole-market list and its mark, only a call served readCall
     // The contact email the SEC asks for, from the field in "Get started": checked, kept in the desk's records like the
     // desk tool set_contact_email keeps it, sent to sec.gov alone, and never shown back in full.
     if (p === '/api/contact' && method === 'POST') {
@@ -398,20 +398,6 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
       const was = readPrefs(dir), from = b.on ? (was.morning === true && was.morningFrom ? was.morningFrom : nextMarketDay(day)) : undefined;
       savePrefs(dir, b.on ? { morning: true, morningFrom: from } : { morning: false }, b.on ? [] : ['morningFrom']);
       return json(res, 200, { morning: { on: b.on, top: TOP_QUEUED, from }, queued: [] });
-    }
-    // The whole-market funds on "Start here": the person's own list, each a fund or a stock Yahoo has a price for, checked
-    // before it is kept. The shipped four put back are kept as no list, so a later version's four reach the person.
-    if (p === '/api/tiers/market' && method === 'POST') {
-      if (!Array.isArray(b.symbols) || b.symbols.length > MAX_MARKET) throw new Refused(400, `choose up to ${MAX_MARKET} funds for the whole market`);
-      const list: string[] = [];
-      for (const v of b.symbols as unknown[]) {
-        let s: string;
-        try { s = marketSymbol(v); } catch (e) { throw new Refused(400, (e as Error).message); }
-        if (!list.includes(s)) list.push(s);
-      }
-      for (const q of await Promise.all(list.map(quote))) if ('error' in q && q.error === 'no-data') throw new Refused(422, q.message);
-      saveMarket(dir, list);
-      return json(res, 200, { market: marketView(dir) });
     }
     if (p === '/api/paper' && method === 'POST') {
       try { savePaperStart(dir, b.startUsd); } catch (e) { throw new Refused(400, (e as Error).message); }
@@ -591,6 +577,10 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
   // program file is gone too, so it also stops when it next looks at its own code.) Madav's note, under Madav's own name, is left.
   const retireOldListener = (): void => { if (listenerOf(dir)?.listener === RETIRED_LISTENER) removeListener(dir); };
   try { retireOldListener(); } catch { /* tried again at the next look */ }
+
+  // An older version showed "the whole market" row apart from the watchlist. Its funds go on the watchlist, once, so nothing
+  // the person chose is lost with the row (prefs.ts moveMarketToWatchlist). Tried again at the next start if it failed.
+  try { moveMarketToWatchlist(dir, today(clock())); } catch { /* tried again at the next start */ }
 
   // While it runs, the dashboard keeps the person's morning switch itself, with or without a page open. "Analyse the top
   // three each market morning" on: on a market morning, until the top three went on the list that day, it works out the

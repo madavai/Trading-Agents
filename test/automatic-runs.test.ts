@@ -268,7 +268,7 @@ test('server-10: a screen whose names could not be read does not use up the morn
 
 test('server-9: "runs by itself" is said only while something listens', () => {
   const record = { since: null, weeks: 0, calls: 0 } as unknown as Parameters<typeof guideOf>[0]['record'];
-  const g = guideOf({ email: '', watchlist: [], market: [], queue: [{ symbol: 'NVDA' }], calls: [], listener: null, readCall: false, record });
+  const g = guideOf({ email: '', watchlist: [], queue: [{ symbol: 'NVDA' }], calls: [], listener: null, readCall: false, record });
   assert.equal(g.analyse.automatic, '', 'nothing listens now');
 });
 

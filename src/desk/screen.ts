@@ -1,4 +1,4 @@
-// "Worth a look today": a cheap pass over the whole market, the sector funds and the person's own names that says, from
+// "Worth a look today": a cheap pass over the sector funds and the person's watchlist (the funds, stocks and coins they follow) that says, from
 // figures alone (the prices traded, as the dashboard's chart shows them), which moved in a way worth reading about: a
 // day's move of 3% or more, volume at least twice its usual,
 // a new 52-week high or low, a close across its 50- or 200-day average, and, for a single name or a coin, news about it

@@ -244,8 +244,8 @@ reading your first calls, which ticks when you open one on the page. The ticks a
 never from what the page says happened:
 1. **Give the desk your email for the SEC**, once, in the field there (or in a chat). It ticks when the email is saved.
 2. **Pick three to five companies you know, plus the whole market and one or two sectors you understand.** Search your
-   companies at the top and press Add to watchlist; on Start here, press + on a whole-market fund and on a sector or
-   two. It ticks with three of your own names, a whole-market fund and a sector fund watched (or asked about). The desk
+   companies and a whole-market fund such as SPY at the top and press Add to watchlist; in Sectors, press + on a sector
+   or two. It ticks with three of your own names, a whole-market fund and a sector fund watched (or asked about). The desk
    suggests no company: the names are yours.
 3. **Ask the desk to analyse them, shallow, and switch on running automatically.** One press asks for every pick it has
    not called yet, at shallow depth; running automatically is Madav's "Run automatically" routine. It ticks when
@@ -263,27 +263,28 @@ the ratings, alpha, index, fund, sector, cap, limit order, stop, paper, depth an
 you point at that word anywhere on the dashboard (a dotted line marks such a word, and every rating explains itself),
 so a word means the same thing everywhere.
 
-### Start here: the whole market first
-After the markets row, the dashboard shows the world in tiers, broadest first, because the broadest risk is the steadiest:
-- **The whole market**: as shipped, four funds: SPY (the S&P 500 fund), QQQ (the Nasdaq 100 fund), VT (the whole world) and BND
-  (US bonds). Choose your own, up to eight: search a fund in the box at the top and press "Show in The whole market"
-  under it (only a fund the row can take gets that button, never a sector fund, a coin, an index or a single company),
-  and take one out with the ✕ on its tile. Each is checked with Yahoo Finance before it is kept, and "Put back" brings
-  the four back.
-- **Sectors**: the eleven S&P sector funds, from XLK (technology) to XLC (communication), each named in plain words with
-  what it holds.
-- **Single names**: the companies on your watchlist, starred first (twelve here at most; the rest are in the watchlist).
-- **Crypto**: Bitcoin and Ether when you watch them. They are followed on paper only: a coin never opens an order
-  ticket, and its calls say "on paper only" where a stock's say Decide….
+### Sectors: the eleven parts of the economy
+After the markets row, the dashboard shows the eleven S&P sector funds, from XLK (technology) to XLC (communication), each
+named in plain words with what it holds, side by side: they show which parts of the economy are rising. Everything else you
+follow is on your watchlist, which you add to from the search box at the top (the one place you type a ticker), and which
+is grouped from the broadest down:
+- **The whole market**: broad funds such as SPY (the S&P 500 fund), QQQ (the Nasdaq 100 fund), VT (the whole world) and BND
+  (US bonds). A version before this one showed a row of these apart from the watchlist; when it starts, the dashboard
+  puts the funds that were in your row on your watchlist, once (the four above if you never changed it), and the row is
+  gone.
+- **Sectors**: the sector funds you watch.
+- **Single names**: companies, and funds the desk does not count among the broad ones.
+- **Crypto**: Bitcoin and Ether. They are followed on paper only: a coin never opens an order ticket, and its calls say
+  "on paper only" where a stock's say Decide….
 
-Each tile is three lines, the same on every tile. The first is its plain name. The second has a badge with its code (shaded by
+Each sector tile is three lines, the same on every tile. The first is its plain name. The second has a badge with its code (shaded by
 what Yahoo Finance says it is: blue for a fund, teal for a company, amber for a coin, plain for anything else) and the day's
 move (with the day named, such as Fri, when it was not today; a dash when Yahoo Finance gave none). The third has the desk's
 latest rating or "no call", then the robot, which asks the desk to analyse a fund as readily as a stock (for a fund it reads what it holds, from
 its reports to the SEC), and + to add it to your watchlist. Point at a tile for its full name, what it holds, and the desk's
-latest call with its day; press it to chart it. Every trading word has its meaning beside it: under each tier, at the
-foot of the section, and on each rating and dotted word when you point at it. The watchlist further down is grouped the
-same way; press a tier's name to fold it away, and the dashboard remembers which you folded.
+latest call with its day; press it to chart it. Every trading word has its meaning beside it: at the foot of the section,
+and on each rating and dotted word when you point at it. The watchlist further down is grouped as above; press a tier's
+name to fold it away, and the dashboard remembers which you folded.
 
 ### Today's market: the market weather, and what is worth a look
 On a page of its own, opened from "Today's market" in the side list (it refreshes all day, so it is not named for the morning), two cards are worked out from figures, at most once an hour, and never from a model or a

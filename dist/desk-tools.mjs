@@ -37912,7 +37912,7 @@ function priceFactsText(sym2, day3, s) {
   const d = (i) => withWeekday(bars[i].date);
   const close = bars.map((b) => b.close), m2 = macd(close), bb = bollinger(close);
   const ema10 = ema(close, 10), sma50 = sma(close, 50), sma200 = sma(close, 200), vw = vwma(bars), rsi14 = rsi(close), atr14 = atr(bars);
-  const change3 = close.map((c, i) => i && close[i - 1] ? (c / close[i - 1] - 1) * 100 : null);
+  const change4 = close.map((c, i) => i && close[i - 1] ? (c / close[i - 1] - 1) * 100 : null);
   const coin = s.meta.type === "CRYPTOCURRENCY", sizes = coin ? COIN_WINDOWS : WINDOWS;
   const windows = sizes.map(([size, words3]) => ({ size: Math.min(size, n2), words: size <= n2 ? words3 : "all the desk has", full: size }));
   const dataStart = `the desk's prices start on ${d(0)}`;
@@ -38024,8 +38024,8 @@ function priceFactsText(sym2, day3, s) {
     ["RSI below 50", level(rsi14, (x) => x < 50)],
     ["MACD below its signal", over((i) => m2.macd[i], m2.signal, -1)],
     ["MACD below zero", level(m2.macd, (x) => x < 0)],
-    ["Days up 3% or more", level(change3, (x) => x >= 3)],
-    ["Days down 3% or more", level(change3, (x) => x <= -3)]
+    ["Days up 3% or more", level(change4, (x) => x >= 3)],
+    ["Days down 3% or more", level(change4, (x) => x <= -3)]
   ];
   out.push("", "### How often, in each window", "", `Fact | ${windows.map((w) => `Last ${w.size} sessions`).join(" | ")} | Latest in the last year`, `---|${windows.map(() => "---").join("|")}|---`);
   for (const [name, t] of counts) {
@@ -38037,15 +38037,15 @@ function priceFactsText(sym2, day3, s) {
     const latest = Array.from({ length: L - year + 1 }, (_, k) => L - k).find((i) => t(i) === true);
     out.push(`${name} | ${cells2.join(" | ")} | ${latest === void 0 ? "\u2013" : d(latest)}`);
   }
-  const pct3 = (i) => `${signed(change3[i], 2)}%`;
+  const pct3 = (i) => `${signed(change4[i], 2)}%`;
   const extremes = [
     ["Highest closes", (i) => close[i], 1, (i) => f22(close[i])],
     ["Lowest closes", (i) => close[i], -1, (i) => f22(close[i])],
     ["Highest intraday highs", (i) => bars[i].high, 1, (i) => f22(bars[i].high)],
     ["Lowest intraday lows", (i) => bars[i].low, -1, (i) => f22(bars[i].low)],
-    ["Biggest daily rises", (i) => change3[i], 1, (i) => `${pct3(i)} (${signed(close[i] - close[i - 1], 2)})`, (i) => (change3[i] ?? 0) > 0],
-    ["Biggest daily falls", (i) => change3[i], -1, (i) => `${pct3(i)} (${signed(close[i] - close[i - 1], 2)})`, (i) => (change3[i] ?? 0) < 0],
-    ["Heaviest volume", volumeOf2, 1, (i) => `${vol2(volumeOf2(i))}${change3[i] === null ? "" : ` (close ${pct3(i)})`}`],
+    ["Biggest daily rises", (i) => change4[i], 1, (i) => `${pct3(i)} (${signed(close[i] - close[i - 1], 2)})`, (i) => (change4[i] ?? 0) > 0],
+    ["Biggest daily falls", (i) => change4[i], -1, (i) => `${pct3(i)} (${signed(close[i] - close[i - 1], 2)})`, (i) => (change4[i] ?? 0) < 0],
+    ["Heaviest volume", volumeOf2, 1, (i) => `${vol2(volumeOf2(i))}${change4[i] === null ? "" : ` (close ${pct3(i)})`}`],
     ["Heaviest volume on a down close", volumeOf2, 1, (i) => `${vol2(volumeOf2(i))} (close ${pct3(i)})`, (i) => down(i) === true],
     ["Heaviest volume on an up close", volumeOf2, 1, (i) => `${vol2(volumeOf2(i))} (close ${pct3(i)})`, (i) => up(i) === true],
     ["Lightest volume", volumeOf2, -1, (i) => vol2(volumeOf2(i))],
@@ -38078,7 +38078,7 @@ function priceFactsText(sym2, day3, s) {
   out.push(...[
     since("Close", ["highest close", "lowest close"], (i) => close[i], f22),
     since("Volume", ["heaviest volume", "lightest volume"], volumeOf2, vol2),
-    since("Daily move", ["biggest daily rise", "biggest daily fall"], (i) => change3[i], (x) => `${signed(x, 2)}%`, true),
+    since("Daily move", ["biggest daily rise", "biggest daily fall"], (i) => change4[i], (x) => `${signed(x, 2)}%`, true),
     since("RSI", ["highest RSI", "lowest RSI"], (i) => rsi14[i], f22),
     since("MACD", ["highest MACD", "lowest MACD"], (i) => m2.macd[i], f22),
     since("MACD histogram", ["highest MACD histogram", "lowest MACD histogram"], (i) => m2.hist[i], f22)
@@ -39175,8 +39175,8 @@ function releaseLine(r, bars, open3, day3) {
   if (!bar && (!bars.length || session2 > dates.at(-1))) return `${head2}: first session ${session2}, which the price table read here does not reach yet${note}`;
   if (!bar || !before) return `${head2}: first traded ${session2} (the price table read here has no ${bar ? "session before it" : "row for it"}, so how it closed is not worked out)${note}`;
   if (open3 && at === bars.length - 1) return `${head2}: first traded ${session2}, a session still trading: no close yet${note}`;
-  const a = cents(before.close), b = cents(bar.close), change3 = (b / a - 1) * 100;
-  const moved = Math.abs(change3) < 5e-3 ? "closed unchanged" : `closed ${pct(change3)}% ${change3 > 0 ? "higher" : "lower"}`;
+  const a = cents(before.close), b = cents(bar.close), change4 = (b / a - 1) * 100;
+  const moved = Math.abs(change4) < 5e-3 ? "closed unchanged" : `closed ${pct(change4)}% ${change4 > 0 ? "higher" : "lower"}`;
   return `${head2}: first traded ${session2}, which ${moved} (${price(a)} on ${before.date} to ${price(b)} on ${bar.date})${note}`;
 }
 var next = (spacing) => `Next results date: not known. The desk reads no date for it: a company announces when it will report in a press release, which it does not file with the SEC, and the desk has no other source for it. Do not work one out from the spacing of ${spacing}, and do not take one from a prediction market's closing date (when the market stops trading) or from a news article.`;
@@ -40445,13 +40445,13 @@ ${keep(reflection)}`;
   }
   /** Rewrites the lesson of one settled entry and nothing else; `change` gets the entry and returns its new tag mark and
    *  lesson part, or null to leave it. False when there is no such settled entry or `change` left it. */
-  relesson(ticker, date5, change3) {
+  relesson(ticker, date5, change4) {
     return withLock(this.file, () => {
       let done = false;
       const out = this.blocks().map((block) => {
         const e = parse3(block);
         if (done || !e || e.pending || e.date !== date5 || e.ticker !== ticker) return block;
-        const c = change3(e);
+        const c = change4(e);
         if (!c) return block;
         done = true;
         return withLesson(block, c.mark, c.part);
@@ -41192,9 +41192,9 @@ async function windowRows(ticker, o) {
   bars.forEach((b, i) => {
     if (b.date < o.entry || b.date > o.exit) return;
     const entry = b.date === o.entry, before = bars[i - 1];
-    const change3 = entry ? "left out" : before ? signedPct(b.close / before.close - 1, 2) : "N/A";
+    const change4 = entry ? "left out" : before ? signedPct(b.close / before.close - 1, 2) : "N/A";
     if (!entry) after.push({ date: b.date, high: b.high, low: b.low, close: b.close, ...tradedOn.has(b.date) ? { t: tradedOn.get(b.date) } : {} });
-    rows.push(`${entry ? "entry" : after.length} | ${b.date} | ${f23(b.open)} | ${f23(b.high)} | ${f23(b.low)} | ${f23(b.close)} | ${change3} | ${vol(b.volume)} | ${f23(rsi2[i])} | ${f23(macdh[i])} | ${f23(ema10[i])} | ${f23(sma50[i])} | ${f23(benchClose(b.date))}${differ ? asTraded(b) : ""}`);
+    rows.push(`${entry ? "entry" : after.length} | ${b.date} | ${f23(b.open)} | ${f23(b.high)} | ${f23(b.low)} | ${f23(b.close)} | ${change4} | ${vol(b.volume)} | ${f23(rsi2[i])} | ${f23(macdh[i])} | ${f23(ema10[i])} | ${f23(sma50[i])} | ${f23(benchClose(b.date))}${differ ? asTraded(b) : ""}`);
   });
   const most = (list2, pick2, top) => list2.reduce((a, r) => (top ? pick2(r) > pick2(a) : pick2(r) < pick2(a)) ? r : a);
   const glance = after.length ? [`IN SESSIONS 1 TO ${after.length} (the entry row left out): highest close ${f23(most(after, (r) => r.close, true).close)} on ${most(after, (r) => r.close, true).date}; lowest close ${f23(most(after, (r) => r.close, false).close)} on ${most(after, (r) => r.close, false).date}; highest high ${f23(most(after, (r) => r.high, true).high)} on ${most(after, (r) => r.high, true).date}; lowest low ${f23(most(after, (r) => r.low, false).low)} on ${most(after, (r) => r.low, false).date}.`] : [];
@@ -41658,6 +41658,7 @@ var ordersOn = (dir, now) => readOrders(dir).filter((o) => marketDay(new Date(o.
 // src/terminal/store.ts
 import fs14 from "node:fs";
 import path16 from "node:path";
+var MAX_WATCH = 50;
 var read = (file5, ok) => {
   try {
     const v = JSON.parse(fs14.readFileSync(file5, "utf8"));
@@ -41666,9 +41667,25 @@ var read = (file5, ok) => {
     return [];
   }
 };
+function change3(file5, edit, ok) {
+  fs14.mkdirSync(path16.dirname(file5), { recursive: true });
+  return withLock(file5, () => {
+    const next2 = edit(read(file5, ok));
+    writeWhole(file5, JSON.stringify(next2, null, 2) + "\n");
+    return next2;
+  });
+}
 var isWatch = (v) => !!v && typeof v.symbol === "string" && typeof v.favourite === "boolean";
 var watchFile = (dir) => path16.join(dir, "watchlist.json");
 var readWatchlist = (dir) => read(watchFile(dir), isWatch);
+function addWatch(dir, raw, onDay) {
+  const symbol4 = safeSymbol(raw);
+  return change3(watchFile(dir), (list2) => {
+    if (list2.some((w) => w.symbol === symbol4)) return list2;
+    if (list2.length >= MAX_WATCH) throw new Error(`the watchlist holds ${MAX_WATCH} stocks: remove one first`);
+    return [...list2, { symbol: symbol4, favourite: false, addedOn: onDay }];
+  }, isWatch);
+}
 
 // src/desk/screen.ts
 import fs15 from "node:fs";
@@ -42162,38 +42179,16 @@ var MARKET_FUNDS = /* @__PURE__ */ new Set(["SPY", "VOO", "IVV", "VTI", "ITOT", 
 // src/terminal/tiers.ts
 var TIERS = ["market", "sectors", "names", "crypto"];
 var SHIPPED_MARKET = ["SPY", "QQQ", "VT", "BND"];
-var MAX_MARKET = 8;
-function marketSymbol(raw) {
-  if (typeof raw !== "string") throw new Error("a ticker is a word, such as SPY");
-  const s = safeSymbol(raw);
-  if (isCrypto(s)) throw new Error(`${s} is crypto, which has a tier of its own`);
-  if (/[\^=]/.test(s)) throw new Error(`${s} is an index, a future or a currency, which cannot be held: choose a fund that follows it, such as SPY`);
-  if (SECTOR_FUNDS[s]) throw new Error(`${s} is a sector fund, already among the sectors`);
-  return s;
-}
-function cleanMarket(raw) {
-  if (!Array.isArray(raw)) return void 0;
-  const out = [];
-  for (const v of raw) {
-    if (out.length >= MAX_MARKET) break;
-    try {
-      const s = marketSymbol(v);
-      if (!out.includes(s)) out.push(s);
-    } catch {
-    }
-  }
-  return out;
-}
-function tierOf(symbol4, market = SHIPPED_MARKET) {
+function tierOf(symbol4) {
   if (isCrypto(symbol4)) return "crypto";
   if (SECTOR_FUNDS[symbol4]) return "sectors";
-  if (symbol4.startsWith("^") || MARKET_FUNDS.has(symbol4) || market.includes(symbol4)) return "market";
+  if (symbol4.startsWith("^") || MARKET_FUNDS.has(symbol4)) return "market";
   return "names";
 }
-function screenUniverse(watchlist, market) {
-  const symbols = [.../* @__PURE__ */ new Set([...market, ...Object.keys(SECTOR_FUNDS), ...watchlist.map((w) => w.symbol)])];
+function screenUniverse(watchlist) {
+  const symbols = [.../* @__PURE__ */ new Set([...Object.keys(SECTOR_FUNDS), ...watchlist.map((w) => w.symbol)])];
   return { symbols, news: new Set(watchlist.map((w) => w.symbol).filter((s) => {
-    const t = tierOf(s, market);
+    const t = tierOf(s);
     return t === "names" || t === "crypto";
   })) };
 }
@@ -42237,8 +42232,8 @@ function cleanPrefs(raw) {
     }
     out.recent = recent;
   }
-  const market = cleanMarket(r.market);
-  if (market) out.market = market;
+  if (Array.isArray(r.market)) out.market = [...new Set(r.market.map(sym).filter((s) => !!s))].slice(0, MAX_WATCH);
+  if (r.marketMoved === true) out.marketMoved = true;
   if (Array.isArray(r.folded)) out.folded = TIERS.filter((t) => r.folded.includes(t));
   if (typeof r.morning === "boolean") out.morning = r.morning;
   if (typeof r.morningFrom === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.morningFrom)) out.morningFrom = r.morningFrom;
@@ -42255,7 +42250,38 @@ function readPrefs(dir) {
     return {};
   }
 }
-var marketOf = (dir) => readPrefs(dir).market ?? [...SHIPPED_MARKET];
+function savePrefs(dir, change4, drop = []) {
+  const file5 = prefsFile(dir);
+  fs17.mkdirSync(dir, { recursive: true });
+  return withLock(file5, () => {
+    const next2 = cleanPrefs({ ...readPrefs(dir), ...cleanPrefs(change4) });
+    for (const k of drop) delete next2[k];
+    writeWhole(file5, JSON.stringify(next2, null, 2) + "\n");
+    return next2;
+  });
+}
+function moveMarketToWatchlist(dir, onDay) {
+  const kept = readPrefs(dir);
+  if (kept.marketMoved === true && kept.market === void 0) return [];
+  const pending = kept.market ?? [...SHIPPED_MARKET];
+  const have = new Set(readWatchlist(dir).map((w) => w.symbol)), moved = [], left = [];
+  for (const symbol4 of pending) {
+    if (have.has(symbol4)) continue;
+    if (have.size >= MAX_WATCH) {
+      left.push(symbol4);
+      continue;
+    }
+    try {
+      addWatch(dir, symbol4, onDay);
+      have.add(symbol4);
+      moved.push(symbol4);
+    } catch {
+    }
+  }
+  if (left.length) savePrefs(dir, { market: left });
+  else savePrefs(dir, { marketMoved: true }, ["market"]);
+  return moved;
+}
 
 // src/tools/desk.ts
 var text2 = (t) => ({ content: [{ type: "text", text: t }] });
@@ -42537,7 +42563,11 @@ ${renderSummary(summarize(entries))}`;
       } catch {
       }
       try {
-        const { symbols, news } = screenUniverse(readWatchlist(dir), marketOf(dir));
+        try {
+          moveMarketToWatchlist(dir, day3);
+        } catch {
+        }
+        const { symbols, news } = screenUniverse(readWatchlist(dir));
         const worked2 = await screenToday(dir, symbols, news, day3);
         if (on) queueTop(dir, worked2, day3, false, /* @__PURE__ */ new Date(), readPrefs(dir).morningFrom);
         look = { screen: readScreen(dir) ?? worked2, on };

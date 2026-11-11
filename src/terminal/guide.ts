@@ -32,7 +32,7 @@ export interface Guide {
 
 export interface GuideFacts {
   email: string;
-  watchlist: readonly WatchItem[]; market: readonly string[];
+  watchlist: readonly WatchItem[];
   queue: ReadonlyArray<Pick<QueueItem, 'symbol'>>;
   /** The journal's calls. */
   calls: ReadonlyArray<{ ticker: string; date: string; rating: string }>;
@@ -49,9 +49,9 @@ export interface GuideFacts {
 export { maskEmail };
 
 export function guideOf(f: GuideFacts): Guide {
-  // A pick is a stock or fund the person watches or asked the desk about: the robot works on Start here without the watchlist.
+  // A pick is a stock or fund the person watches or asked the desk about: the robot on a sector tile works without the watchlist.
   const picked = new Set([...f.watchlist.map((w) => w.symbol), ...f.queue.map((q) => q.symbol), ...f.calls.map((c) => c.ticker)]);
-  const tiers = [...picked].filter((s) => !s.startsWith('^')).map((s) => tierOf(s, f.market));
+  const tiers = [...picked].filter((s) => !s.startsWith('^')).map((s) => tierOf(s));
   const names = tiers.filter((t) => t === 'names').length, market = tiers.includes('market'), sector = tiers.includes('sectors');
   const asked = new Set([...f.queue.map((q) => q.symbol), ...f.calls.map((c) => c.ticker)]).size;
   // Only what listens now (its fresh note): a run by itself needs something listening.

@@ -164,12 +164,14 @@ built, which decisions stand, every document, and what is pending.
   again with a fresh link from `/api/claim/new`; strict CSP),
   `quotes.ts` (Yahoo prices; each quote carries what Yahoo calls it, `quoteKind`: company, fund or coin, and none for an index,
   a currency, a future or no word, which the page's letter badges are shaded by), `search.ts` (Yahoo's matches for what is typed), `prefs.ts` (what the page remembers, in
-  `desk-data/dashboard.json`, each value checked; the whole-market funds only through `/api/tiers/market`, which checks
-  each one's price first), `tiers.ts` (the world in tiers for "Start here" and the watchlist: the whole market, the
-  sector funds, single names and crypto, with every fund's and tier's name and meaning in plain words; the page draws
-  what it is sent and holds no tier rules of its own, bar one: which search matches may be offered "Show in The whole
-  market", `ui/marketpick.ts`, which a test holds to `marketSymbol`, whose check still decides when the row is saved; the
-  row is changed only from the search box at the top and the ✕ on a tile, never from a typed list), `guide.ts` ("Get started", the first month in five steps:
+  `desk-data/dashboard.json`, each value checked; `moveMarketToWatchlist` is the one-time move of an older version's
+  "whole market" row onto the watchlist, run when the dashboard starts and before a routine's look at the market, and the
+  page can set neither the old list nor the mark that it was moved), `tiers.ts` (the world in tiers for the "Sectors" section
+  and the watchlist: the sector funds are all the section shows, sent as `startHere`, the section's old name; the watchlist
+  is grouped into the whole market, the sector funds, single names and crypto by `tierOf`, by the desk's own list of broad
+  funds in `desk/sectors.ts`, with every fund's and tier's name and meaning in plain words; the page draws what it is sent
+  and holds no tier rules of its own; `screenUniverse` is what "Worth a look" scans: the sector funds and the watchlist),
+  `guide.ts` ("Get started", the first month in five steps:
   `guideOf` ticks each from the desk's own records, the contact email, the watchlist, the waiting list and its listener,
   the journal, `prefs.ts` `readCall` (noted by `/api/call`, never by the page) and the paper record against
   `paper.ts` `RECORD_WEEKS`, said everywhere as `RECORD_WORDS`; it opens by itself while the desk has no calls and the
