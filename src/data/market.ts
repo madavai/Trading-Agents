@@ -50,6 +50,12 @@ export const clock = (ms: number, zone = 'UTC'): string => {
  *  figures are taken as final only 30 minutes later than a US close's: 45 minutes after its close. */
 export const SETTLE_MS = 15 * 60_000;
 export const SETTLE_OTHER_MS = 45 * 60_000;
+/** How long after a session ends its open, high, low and volume may still be revised at the source, though its close is
+ *  final. On 10 Nov 2026 Yahoo gave META's open as 637.98 just after the close, as 637.25 an hour later (and the fact
+ *  checker "corrected" the market report to it), and as 637.98 again the next day, as Nasdaq does; its volume, read as
+ *  12,886,996, became 13,001,700. On 9 Nov NVIDIA's volume, open and high moved an hour after the close. Until the next
+ *  morning (16 hours after a US close: 08:00 New York time), those four figures are said to be as first reported. */
+export const REVISE_MS = 16 * 60 * 60_000;
 /** The margin for a series, by the market its prices are from (when the answer says). */
 export const settleMs = (meta: Pick<Series['meta'], 'market'>): number => (meta.market === 'other' ? SETTLE_OTHER_MS : SETTLE_MS);
 
@@ -81,8 +87,9 @@ export function latestState(s: Series, upTo: string, now = Date.now()): LatestSt
     const settle = settleMs(s.meta);
     if (read < session.end + settle) {
       const at = clock(read, zone);
-      return said({ open: true, label: `Latest price (read at ${at}, not the close)`, inline: `latest price as read at ${at}` }, [`- **The latest row, ${last.date}, was read at ${at}, ${read < session.end ? 'while its session was still trading' : 'just after its session ended'} (it ended at ${clock(session.end, zone)}, and its figures are taken as final ${settle / 60_000} minutes after). Its "close" is the latest price as read then, not the close; its high, low, volume and every indicator on it may still change. Call it the latest price as read at ${at}, never the close, and do not treat a level as broken or held on this row alone.**`]);
+      return said({ open: true, label: `Latest price (read at ${at}, not the close)`, inline: `latest price as read at ${at}` }, [`- **The latest row, ${last.date}, was read at ${at}, ${read < session.end ? 'while its session was still trading' : 'just after its session ended'} (it ended at ${clock(session.end, zone)}, and its close is taken as final ${settle / 60_000} minutes after). Its "close" is the latest price as read then, not the close; its high, low, volume and every indicator on it may still change. Call it the latest price as read at ${at}, never the close, and do not treat a level as broken or held on this row alone.**`]);
     }
+    if (read < session.end + REVISE_MS) return said(final, [`- The latest row, ${last.date}, is a finished session: its close is final. Its open, high, low and volume are as the source first reported them, and the source can still revise them for some hours after the close: a read of them that differs from another one is not a correction of it.`]);
     return said(final, [`- The latest row, ${last.date}, is a finished session: its figures are final.`]);
   }
   if (session && session.date > last.date && session.date <= upTo) {

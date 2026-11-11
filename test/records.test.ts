@@ -13,6 +13,13 @@ import { enqueue, finishItem, startItem } from '../src/desk/queue.js';
 import { languageName, readSettings } from '../src/settings.js';
 
 const folder = () => { const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ta-r-')); fs.copyFileSync('desk-settings.json', path.join(root, 'desk-settings.json')); return { root, dir: path.join(root, 'desk-data') }; };
+/** A report as a run corrected before the desk kept its corrections has it: the checker wrote the whole report again, mark
+ *  and all (saving such a text is refused now, so it is written to the run's file as those runs were). */
+const writeLegacy = (dir: string, ticker: string, date: string, section: string, text: string) => {
+  const file = path.join(dir, 'runs', `${ticker}_${date}`, 'run.json'), run = JSON.parse(fs.readFileSync(file, 'utf8'));
+  run.log = run.log.map((e: { section: string }) => (e.section === section ? { section, text } : e));
+  fs.writeFileSync(file, JSON.stringify(run));
+};
 beforeEach(() => { process.env.TRADING_AGENTS_TODAY = '2026-10-12'; });
 
 test('holdings keep three states apart: a position, a flat book, and not knowing', () => {
@@ -59,6 +66,24 @@ test('a run is saved a step at a time; debates keep their turns in the order spo
   assert.throws(() => saveSection(dir, '../../x', '2026-09-01', 'trader', 'x'), /not a ticker/);
   deleteRun(dir, 'NVDA', '2026-09-01');
   assert.deepEqual(progress(dir, 'NVDA', '2026-09-01'), {});
+});
+
+// The META run of 10 Nov 2026: bull turn 2 wrote "777.59 on 2026-09-22 [corrected: was "2026-09-24"]" itself. The date it
+// "corrected" was right (777.59 closed on Thursday 2026-09-24), and the mark read as the fact checker's. Only the desk
+// writes such a mark, through correct_report, in an analyst's report; a saved text that has one is refused, with why.
+test('no agent writes the desk\'s correction mark itself: a text that has one is refused, and nothing is saved', () => {
+  const { dir } = folder();
+  const own = 'Bull Analyst: the market\'s verdict — 777.59 on 2026-09-22 [corrected: was "2026-09-24"], the 10-Q.';
+  for (const section of ['bull', 'aggressive', 'research_plan', 'decision', 'market'] as const) {
+    assert.throws(() => saveSection(dir, 'META', '2026-11-10', section, own), /only the desk writes those, when the fact checker corrects an analyst's report[\s\S]*without the mark/, section);
+  }
+  assert.throws(() => saveSection(dir, 'META', '2026-11-10', 'bear', 'Bear: so it falls. [the fact it rested on was corrected: see the fact check]'), /only the desk writes those/);
+  assert.deepEqual(progress(dir, 'META', '2026-11-10'), {});
+  assert.equal(saveSection(dir, 'META', '2026-11-10', 'bull', 'Bull Analyst: 777.59 on 2026-09-24, the market report\'s high (I said 2026-09-22 in my notes; it is 2026-09-24).'), 1);
+  // The desk's own correction still writes its mark in a report.
+  saveSection(dir, 'META', '2026-11-11', 'market', 'Low 635.50, close 641.39.');
+  assert.deepEqual(correctSection(dir, 'META', '2026-11-11', 'market', [{ was: 'Low 635.50', now: 'Low 635.40' }]), ['- corrected: "Low 635.50" now reads "Low 635.40"']);
+  assert.match(readSections(dir, 'META', '2026-11-11', ['market']), /Low 635\.40 \[corrected: was "Low 635\.50"\], close 641\.39\./);
 });
 
 // Debate speed (9 Nov 2026): replaying the real NVDA run of that day in Claude Code, every debater's one read of the
@@ -148,7 +173,9 @@ test('a run that stopped is resumed as it was planned, from its next step', () =
   assert.match(checking, /Next step: fact_check/);
   assert.equal(stepWords(dir, 'NVDA', '2026-10-12'), 'the fact checker is checking the reports');
   // its correction replaces the analyst's report in place, and its own section is the list of corrections
-  saveSection(dir, 'NVDA', '2026-10-12', 'market', 'M2 [corrected: was "M1"]');
+  assert.deepEqual(correctSection(dir, 'NVDA', '2026-10-12', 'market', [{ was: 'M', now: 'M2' }]), ['- corrected: "M" now reads "M2"']);
+  assert.match(readSections(dir, 'NVDA', '2026-10-12', ['market']), /M2 \[corrected: was "M"\]/);
+  writeLegacy(dir, 'NVDA', '2026-10-12', 'market', 'M2 [corrected: was "M1"]');
   saveSection(dir, 'NVDA', '2026-10-12', 'fact_check', 'Checked 1 claim in market: 1 wrong, corrected in place.');
   assert.equal(progress(dir, 'NVDA', '2026-10-12').market, 1);
   assert.match(readSections(dir, 'NVDA', '2026-10-12', ['market', 'fact_check']), /M2 \[corrected: was "M1"\][\s\S]*Checked 1 claim/);
@@ -285,7 +312,8 @@ test('a correction keeps the analyst\'s own words once: a correction of a correc
   // A flag on words that end a correction's new words goes after its mark.
   assert.match(t, /tilts bearish on a later read \[corrected: was "[^"]+"\] \[the fact it rested on was corrected: see the fact check\] on a small sample/);
   // A run corrected before the desk kept its corrections: words ending where a mark begins are that correction's.
-  saveSection(dir, ...at, 'news', 'Apple Yes 75%, +39.9 points [corrected: was "+39.5 points"] this week.');
+  saveSection(dir, ...at, 'news', 'Apple Yes 75%, +39.5 points this week.');
+  writeLegacy(dir, ...at, 'news', 'Apple Yes 75%, +39.9 points [corrected: was "+39.5 points"] this week.');
   assert.match(correctSection(dir, ...at, 'news', [{ was: '+39.9 points', now: '+39.5 points' }])[0]!, /runs into an earlier correction/);
 });
 

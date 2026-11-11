@@ -7965,6 +7965,7 @@ var clock = (ms, zone = "UTC") => {
 };
 var SETTLE_MS = 15 * 6e4;
 var SETTLE_OTHER_MS = 45 * 6e4;
+var REVISE_MS = 16 * 60 * 6e4;
 var settleMs = (meta2) => meta2.market === "other" ? SETTLE_OTHER_MS : SETTLE_MS;
 function gapLines(s) {
   const days = s.missing ?? [];
@@ -7982,8 +7983,9 @@ function latestState(s, upTo, now = Date.now()) {
     const settle2 = settleMs(s.meta);
     if (read2 < session.end + settle2) {
       const at = clock(read2, zone);
-      return said({ open: true, label: `Latest price (read at ${at}, not the close)`, inline: `latest price as read at ${at}` }, [`- **The latest row, ${last.date}, was read at ${at}, ${read2 < session.end ? "while its session was still trading" : "just after its session ended"} (it ended at ${clock(session.end, zone)}, and its figures are taken as final ${settle2 / 6e4} minutes after). Its "close" is the latest price as read then, not the close; its high, low, volume and every indicator on it may still change. Call it the latest price as read at ${at}, never the close, and do not treat a level as broken or held on this row alone.**`]);
+      return said({ open: true, label: `Latest price (read at ${at}, not the close)`, inline: `latest price as read at ${at}` }, [`- **The latest row, ${last.date}, was read at ${at}, ${read2 < session.end ? "while its session was still trading" : "just after its session ended"} (it ended at ${clock(session.end, zone)}, and its close is taken as final ${settle2 / 6e4} minutes after). Its "close" is the latest price as read then, not the close; its high, low, volume and every indicator on it may still change. Call it the latest price as read at ${at}, never the close, and do not treat a level as broken or held on this row alone.**`]);
     }
+    if (read2 < session.end + REVISE_MS) return said(final, [`- The latest row, ${last.date}, is a finished session: its close is final. Its open, high, low and volume are as the source first reported them, and the source can still revise them for some hours after the close: a read of them that differs from another one is not a correction of it.`]);
     return said(final, [`- The latest row, ${last.date}, is a finished session: its figures are final.`]);
   }
   if (session && session.date > last.date && session.date <= upTo) {

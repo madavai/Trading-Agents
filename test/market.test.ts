@@ -240,7 +240,28 @@ test('a day is taken as final 15 minutes after a US close, and 45 minutes after 
   assert.equal(row('us', 20).label, 'Close', 'a US close read 20 minutes after is final');
   const early = row('other', 20);
   assert.deepEqual([early.open, early.label], [true, 'Latest price (read at 16:50 Europe/London time, not the close)']);
-  assert.match(early.lines[0]!, /just after its session ended \(it ended at 16:30 Europe\/London time, and its figures are taken as final 45 minutes after\)/);
+  assert.match(early.lines[0]!, /just after its session ended \(it ended at 16:30 Europe\/London time, and its close is taken as final 45 minutes after\)/);
   assert.equal(row('other', 44).open, true);
-  assert.deepEqual([row('other', 45).open, row('other', 45).lines], [false, ['- The latest row, 2026-10-12, is a finished session: its figures are final.']]);
+  assert.deepEqual([row('other', 45).open, row('other', 45).label], [false, 'Close']);
+  assert.match(row('other', 45).lines[0]!, /^- The latest row, 2026-10-12, is a finished session: its close is final\. Its open, high, low and volume are as the source first reported them/);
+});
+
+// The META run of 10 Nov 2026: Yahoo gave the day's open as 637.98 just after the close, 637.25 an hour later and 637.98
+// again the next day (Nasdaq: 637.98), and its volume grew from 12,886,996 to 13,001,700. The tools said "its figures are
+// final", so the fact checker "corrected" the market report's right 637.98 to 637.25. Until the next morning only the
+// close is final; the open, high, low and volume are as first reported, and a different read of them is no correction.
+test('a US day\'s close is final 15 minutes after it; its open, high, low and volume only from the next morning', () => {
+  const end = Date.parse('2026-11-10T21:00:00Z');   // 16:00 New York time
+  const read = (afterMin: number) => latestState({
+    meta: { symbol: 'META', timezone: 'America/New_York', market: 'us', session: { date: '2026-11-10', start: end - 6.5 * 3_600_000, end } },
+    bars: [{ date: '2026-11-10', open: 637.98, high: 647.28, low: 635.5, close: 641.39, volume: 12_886_996 }], fetchedAt: end + afterMin * 60_000,
+  }, '2026-11-10', end + 17 * 3_600_000);
+  for (const min of [16, 70, 15 * 60]) {
+    const s = read(min);
+    assert.deepEqual([s.open, s.label], [false, 'Close'], `read ${min} minutes after the close: the close is final`);
+    assert.equal(s.lines.length, 1);
+    assert.match(s.lines[0]!, /^- The latest row, 2026-11-10, is a finished session: its close is final\. Its open, high, low and volume are as the source first reported them, and the source can still revise them for some hours after the close: a read of them that differs from another one is not a correction of it\.$/);
+    assert.doesNotMatch(s.lines[0]!, /its figures are final/);
+  }
+  assert.deepEqual(read(16 * 60).lines, ['- The latest row, 2026-11-10, is a finished session: its figures are final.'], 'read the next morning, 08:00 New York time: all final');
 });

@@ -37674,6 +37674,7 @@ var clock = (ms, zone = "UTC") => {
 };
 var SETTLE_MS = 15 * 6e4;
 var SETTLE_OTHER_MS = 45 * 6e4;
+var REVISE_MS = 16 * 60 * 6e4;
 var settleMs = (meta3) => meta3.market === "other" ? SETTLE_OTHER_MS : SETTLE_MS;
 function gapLines(s) {
   const days = s.missing ?? [];
@@ -37691,8 +37692,9 @@ function latestState(s, upTo, now = Date.now()) {
     const settle2 = settleMs(s.meta);
     if (read2 < session2.end + settle2) {
       const at = clock(read2, zone);
-      return said({ open: true, label: `Latest price (read at ${at}, not the close)`, inline: `latest price as read at ${at}` }, [`- **The latest row, ${last.date}, was read at ${at}, ${read2 < session2.end ? "while its session was still trading" : "just after its session ended"} (it ended at ${clock(session2.end, zone)}, and its figures are taken as final ${settle2 / 6e4} minutes after). Its "close" is the latest price as read then, not the close; its high, low, volume and every indicator on it may still change. Call it the latest price as read at ${at}, never the close, and do not treat a level as broken or held on this row alone.**`]);
+      return said({ open: true, label: `Latest price (read at ${at}, not the close)`, inline: `latest price as read at ${at}` }, [`- **The latest row, ${last.date}, was read at ${at}, ${read2 < session2.end ? "while its session was still trading" : "just after its session ended"} (it ended at ${clock(session2.end, zone)}, and its close is taken as final ${settle2 / 6e4} minutes after). Its "close" is the latest price as read then, not the close; its high, low, volume and every indicator on it may still change. Call it the latest price as read at ${at}, never the close, and do not treat a level as broken or held on this row alone.**`]);
     }
+    if (read2 < session2.end + REVISE_MS) return said(final, [`- The latest row, ${last.date}, is a finished session: its close is final. Its open, high, low and volume are as the source first reported them, and the source can still revise them for some hours after the close: a read of them that differs from another one is not a correction of it.`]);
     return said(final, [`- The latest row, ${last.date}, is a finished session: its figures are final.`]);
   }
   if (session2 && session2.date > last.date && session2.date <= upTo) {
@@ -40378,10 +40380,12 @@ function factCheckCount(text4) {
   if (rule > 0) for (let i = rule + 1; i < lines.length && /^\s*\|/.test(lines[i]); i++) rows++;
   return w + m2 === rows ? null : `the first line counts ${w} wrong and ${m2} misleading claims, ${w + m2} in all, but the table of corrections has ${rows === 1 ? "one row" : `${rows} rows`}: w and m count its rows, one row a claim. Count them again (each row is wrong or misleading), mend the first line or the table, and save the fact check again`;
 }
+var OWN_MARK = /\[corrected: was\b|\[the fact it rested on was corrected\b/i;
 function saveSection(dir, ticker, date5, section, text4) {
   const t = text4.trim();
   if (!t) throw new Error("there is nothing to save: the text is empty");
   if (t.length > MAX_CHARS) throw new Error(`the text is ${t.length} characters; the most one section holds is ${MAX_CHARS}`);
+  if (OWN_MARK.test(t)) throw new Error(`the text has a mark [corrected: was "..."] (or the note that a conclusion's fact was corrected): only the desk writes those, when the fact checker corrects an analyst's report, so a reader takes them as its. Quote a corrected figure by its corrected words alone, without the mark; and if your own earlier words were wrong, write the right words plainly and say in words what changed. Then save again`);
   const miscount = section === "fact_check" ? factCheckCount(t) : null;
   if (miscount) throw new Error(miscount);
   let turns = 0;

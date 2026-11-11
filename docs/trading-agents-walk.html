@@ -322,7 +322,7 @@ b, strong { font-weight: var(--weight-semibold); }
 <script type="application/json" id="walk">
 {
  "version": "0.9.0",
- "updated": "2026-11-10",
+ "updated": "2026-11-11",
  "sections": [
   { "id": "A", "name": "Getting started in Agent Studio",
     "sub": "The project is cloned, the team is where Madav reads it, and the desk check is green.",
@@ -564,8 +564,8 @@ b, strong { font-weight: var(--weight-semibold); }
         "The evening's own news and posts are there: the reports do not say StockTwits had no messages.",
         "If a report calls a few hours' sample \"this week's\" news or mood, that is a fault: note the sentence.",
         "If StockTwits or Reddit sent back an error or an empty answer, the Sentiment report calls that source \"unavailable\", never a quiet crowd or a calm mood. If no source gave anything to read, its first line is \"Overall Sentiment: Unavailable (Score: none)\", never \"Neutral\"."] },
-    { "id": "B13", "title": "The day's prices are called what they are", "tags": [], "changed": "2026-11-09",
-      "about": "During trading hours a stock's latest price is still moving. A day's figures are not final the moment the market closes, so the desk takes them as final only when it read them 15 minutes or more after the close (45 minutes for a market whose delay it has not checked, such as an index, gold or a stock outside the US), and it keeps a read of the prices for five minutes at most from when the source was read, so a long analysis never works from an old one. For a while after a day ends the source may not have filled that day in yet, and now and then it lists a day with no prices at all. The desk says which, and when it read the prices, so the reports never call a moving price \"the close\", never doubt a final one, and never say a day that traded had no trading.",
+    { "id": "B13", "title": "The day's prices are called what they are", "tags": [], "changed": "2026-11-11",
+      "about": "During trading hours a stock's latest price is still moving. A day's close is not final the moment the market closes, so the desk takes it as final only when it read it 15 minutes or more after the close (45 minutes for a market whose delay it has not checked, such as an index, gold or a stock outside the US). The day's opening price, high, low and volume can still change for some hours after that: on 10 Nov 2026 the source gave Meta's opening price as 637.98, then 637.25 an hour after the close, then 637.98 again the next day, and the fact checker \"corrected\" the right figure to the passing one. So until the next morning the desk says those four figures are as first reported. It keeps a read of the prices for five minutes at most from when the source was read, so a long analysis never works from an old one. For a while after a day ends the source may not have filled that day in yet, and now and then it lists a day with no prices at all. The desk says which, and when it read the prices, so the reports never call a moving price \"the close\", never doubt a final one, and never say a day that traded had no trading.",
       "where": "Dashboard › any call made after this update › Market report",
       "do": [
         "Run an analysis of NVIDIA during US trading hours (9:30 to 16:00 New York time) and open its Market report.",
@@ -574,6 +574,7 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "The daytime report calls the day's figure \"the latest price\" (the session is still trading, or the price \"as read at\" a time it names), not \"the close\", and treats no level as broken on that day alone.",
         "The evening report uses the day's close as final, without \"may be partial\" or \"if the market is still open\". An analysis that read the prices between 16:00 and 16:15 calls the day's figure the latest price as read then, not the close.",
+        "Asked in the evening, [[Show me the checked price table for NVDA]] says the day \"is a finished session: its close is final\", and that its open, high, low and volume are \"as the source first reported them\". Asked again after 8:00 the next morning New York time, it says that day's figures are final.",
         "If a report says a day's prices are \"not available\" from the source (yet), it names the last day it used and does not claim the day had no trading.",
         "A day whose volume the source did not give is \"not given\" in the price table, never 0.",
         "If a report or the team asks for the prices of a day the source has not filled in yet, the desk says \"No prices yet for NVDA from <day> to <day>: the source lists a session on <day>, but its prices are not filled in yet\", never \"No trading rows\".",
@@ -624,7 +625,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "When one agent quotes another, the words are there in the other agent's own text.",
         "The calculator refuses \"45,123,456\" inside avg: it reads as a number written with a thousands comma, so it says to write numbers without them and to put a space after each comma between numbers. It never gives an average of the pieces. round(1.255, 2) is 1.26 and round(-2.5) is -3, a half rounded away from zero.",
         "Before the open it says NVDA's session today has not opened yet (it opens at 09:30 America/New_York time), never that NVDA did not trade."] },
-    { "id": "B19", "title": "A fact checker corrects the reports before the debate", "tags": [], "changed": "2026-11-10",
+    { "id": "B19", "title": "A fact checker corrects the reports before the debate", "tags": [], "changed": "2026-11-11",
       "about": "Even with the desk's own facts and calculator, an analyst can still slip: a figure copied wrong, a date a day off, a \"first time since\" that is not. A fact checker now reads the four reports once they are saved, checks every claim the desk's tools can settle against those same tools, and corrects a wrong one in place, keeping the old words beside it, so the bull and the bear never argue from a mistake. It adds one step to every analysis.",
       "where": "Dashboard › The desk's calls › any call made after this update › Read › Gathering the facts",
       "do": [
@@ -637,7 +638,8 @@ b, strong { font-weight: var(--weight-semibold); }
         "The numbers in its first line match its table: \"1 wrong and 5 misleading claims\" means six rows, never seven.",
         "Each [corrected: was \"...\"] holds the analyst's own words, once. A mark never holds another mark, and no passage has two marks side by side.",
         "A corrected row of a report's table keeps its columns: the mark sits inside the row's last cell, and no cell is split by the bars of the old words.",
-        "A claim the fact checker corrects is corrected everywhere the report makes it, its table of key points included."] },
+        "A claim the fact checker corrects is corrected everywhere the report makes it, its table of key points included.",
+        "Only the four reports carry [corrected: was \"...\"] marks. No debate turn, plan, trader's proposal, risk turn or decision has one: those quote the corrected words without the mark, and an agent that changes its own words just writes the right ones."] },
     { "id": "B22", "title": "The debate quotes the checked reports instead of working them out again", "tags": ["Later"], "changed": "2026-11-09",
       "about": "Once the fact checker has checked the four reports, their figures are settled. The bull, the bear and everyone after them used to look figures up and work them out again anyway, often one sum at a time, and the debate crawled: in a real NVIDIA run on 9 Nov 2026 the six bull and bear turns took 112 minutes. Now a figure a checked report gives is quoted as the report gives it, with whose it is. Only a new figure goes to the desk's calculator or its price facts, and all of a turn's sums go in one go. In a Claude Code chat, a long read now comes in parts, so the last speakers of a debate see all of it.",
       "where": "Madav › Agent Studio › trading-desk › Put to work, then Dashboard › The desk's calls › the call › Read",
@@ -651,7 +653,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "A figure no report gives still shows its sum, for example \"share(7.91, 178.67) = 4.4272%\". A streak, a record or a count of sessions still names its window.",
         "A claim the fact check lists as not checked is said to be the analyst's alone when the debate leans on it.",
         "In a Claude Code chat ([[/analyse NVDA medium]]), the bear's last turn answers the bull's last turn, and no agent says a text was too large to read."] },
-    { "id": "B23", "title": "The fact check is done in a few short steps, on its first try, and does not correct what only moved", "tags": ["Later"], "changed": "2026-11-10",
+    { "id": "B23", "title": "The fact check is done in a few short steps, on its first try, and does not correct what only moved", "tags": ["Later"], "changed": "2026-11-11",
       "about": "The fact checker reads the four reports and checks them against the desk's own data before the debate. In a real NVIDIA run on 9 Nov 2026 it took 97 minutes, about half the run. Its first try stopped with nothing saved, because one of its answers grew too long, and it had to be started again. The desk's tools answered one economic figure, one betting-market topic or one account table at a time, so the news and company reports alone needed about twenty requests; and it \"corrected\" social-media counts and betting odds that had only moved since the analysts read them. Now it works in a few short steps: it reads the reports, gathers the data in one go, then checks and corrects one report at a time, and saves. One request brings every economic figure, every market topic or all the accounts. A count or odds that only moved is listed as not checkable, never corrected, and the fact checker always saves what it has checked.",
       "where": "Madav › Agent Studio › trading-desk › Put to work, then Dashboard › The desk's calls › the call › Read › Gathering the facts",
       "do": [
@@ -662,6 +664,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "The fact check takes clearly less than the 97 minutes of the 9 Nov run, and the fact checker takes far fewer steps than on 9 Nov (43 in the first run; 31 and then 52 in the second, which needed two tries).",
         "In Madav's chat the fact checker finishes on its first try: no \"failed\" line for it and no second start.",
         "A StockTwits or Reddit count, or a betting market's odds or volume, that differs in the fact checker's own read is listed under what could not be checked, with when each read was made. It is not corrected in the sentiment or news report.",
+        "In an evening analysis, the day's opening price, high, low or volume that differs in the fact checker's read is listed under what could not be checked, with both figures, and is not corrected in the market report. A wrong close is still corrected.",
         "Each correction shows the right words once, with one [corrected: was \"...\"] beside them, never a mark inside a mark.",
         "The card still starts \"Checked the\", counts the wrong and misleading claims and those that could not be checked, and its table says where each right figure comes from."] },
     { "id": "B20", "title": "Prediction-market odds come only from markets that traded", "tags": [], "changed": "2026-11-08",

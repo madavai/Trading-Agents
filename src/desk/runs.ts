@@ -79,12 +79,18 @@ export function factCheckCount(text: string): string | null {
     : `the first line counts ${w} wrong and ${m} misleading claims, ${w + m} in all, but the table of corrections has ${rows === 1 ? 'one row' : `${rows} rows`}: w and m count its rows, one row a claim. Count them again (each row is wrong or misleading), mend the first line or the table, and save the fact check again`;
 }
 
+/** The desk's own marks, as an agent might write them: only correct_report makes them, only in the analysts' reports. */
+const OWN_MARK = /\[corrected: was\b|\[the fact it rested on was corrected\b/i;
+
 /** Saves what an agent wrote. A debate turn is added; any other section is replaced. A fact check whose first line does
- *  not count its own table is refused, with why: that line is the first thing the person reads of it. */
+ *  not count its own table is refused, with why: that line is the first thing the person reads of it. So is a text that
+ *  writes the desk's own correction mark: the META run of 10 Nov 2026 had a bull turn with "777.59 on 2026-09-22
+ *  [corrected: was "2026-09-24"]", the bull's own change, of a right date to a wrong one, which read as the fact checker's. */
 export function saveSection(dir: string, ticker: string, date: string, section: Section, text: string): number {
   const t = text.trim();
   if (!t) throw new Error('there is nothing to save: the text is empty');
   if (t.length > MAX_CHARS) throw new Error(`the text is ${t.length} characters; the most one section holds is ${MAX_CHARS}`);
+  if (OWN_MARK.test(t)) throw new Error('the text has a mark [corrected: was "..."] (or the note that a conclusion\'s fact was corrected): only the desk writes those, when the fact checker corrects an analyst\'s report, so a reader takes them as its. Quote a corrected figure by its corrected words alone, without the mark; and if your own earlier words were wrong, write the right words plainly and say in words what changed. Then save again');
   const miscount = section === 'fact_check' ? factCheckCount(t) : null;
   if (miscount) throw new Error(miscount);
   let turns = 0;
