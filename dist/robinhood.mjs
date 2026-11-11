@@ -870,12 +870,12 @@ var require_codegen = __commonJS({
       }
       // `for-in` statement.
       // With option `ownProperties` replaced with a `for-of` loop for object keys
-      forIn(nameOrPrefix, obj4, forBody, varKind = this.opts.es5 ? scope_1.varKinds.var : scope_1.varKinds.const) {
+      forIn(nameOrPrefix, obj5, forBody, varKind = this.opts.es5 ? scope_1.varKinds.var : scope_1.varKinds.const) {
         if (this.opts.ownProperties) {
-          return this.forOf(nameOrPrefix, (0, code_1._)`Object.keys(${obj4})`, forBody);
+          return this.forOf(nameOrPrefix, (0, code_1._)`Object.keys(${obj5})`, forBody);
         }
         const name = this._scope.toName(nameOrPrefix);
-        return this._for(new ForIter("in", varKind, name, obj4), () => forBody(name));
+        return this._for(new ForIter("in", varKind, name, obj5), () => forBody(name));
       }
       // end `for` loop
       endFor() {
@@ -2695,11 +2695,11 @@ var require_validate = __commonJS({
         if (!this.allErrors)
           this.gen.if(cond);
       }
-      setParams(obj4, assign) {
+      setParams(obj5, assign) {
         if (assign)
-          Object.assign(this.params, obj4);
+          Object.assign(this.params, obj5);
         else
-          this.params = obj4;
+          this.params = obj5;
       }
       block$data(valid, codeBlock, $dataValid = codegen_1.nil) {
         this.gen.block(() => {
@@ -7015,7 +7015,7 @@ var require_formats = __commonJS({
       return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
     }
     var DATE = /^(\d\d\d\d)-(\d\d)-(\d\d)$/;
-    var DAYS = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    var DAYS2 = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
     function date4(str) {
       const matches = DATE.exec(str);
       if (!matches)
@@ -7023,7 +7023,7 @@ var require_formats = __commonJS({
       const year = +matches[1];
       const month = +matches[2];
       const day = +matches[3];
-      return month >= 1 && month <= 12 && day >= 1 && day <= (month === 2 && isLeapYear(year) ? 29 : DAYS[month]);
+      return month >= 1 && month <= 12 && day >= 1 && day <= (month === 2 && isLeapYear(year) ? 29 : DAYS2[month]);
     }
     function compareDate(d1, d2) {
       if (!(d1 && d2))
@@ -7268,12 +7268,12 @@ var require_content_type = __commonJS({
     var TYPE_REGEXP = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+\/[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
     exports.format = format;
     exports.parse = parse3;
-    function format(obj4) {
-      if (!obj4 || typeof obj4 !== "object") {
+    function format(obj5) {
+      if (!obj5 || typeof obj5 !== "object") {
         throw new TypeError("argument obj is required");
       }
-      var parameters = obj4.parameters;
-      var type = obj4.type;
+      var parameters = obj5.parameters;
+      var type = obj5.type;
       if (!type || !TYPE_REGEXP.test(type)) {
         throw new TypeError("invalid type");
       }
@@ -7304,7 +7304,7 @@ var require_content_type = __commonJS({
       if (!TYPE_REGEXP.test(type)) {
         throw new TypeError("invalid media type");
       }
-      var obj4 = new ContentType(type.toLowerCase());
+      var obj5 = new ContentType(type.toLowerCase());
       if (index !== -1) {
         var key;
         var match;
@@ -7323,20 +7323,20 @@ var require_content_type = __commonJS({
               value = value.replace(QESC_REGEXP, "$1");
             }
           }
-          obj4.parameters[key] = value;
+          obj5.parameters[key] = value;
         }
         if (index !== header.length) {
           throw new TypeError("invalid parameter format");
         }
       }
-      return obj4;
+      return obj5;
     }
-    function getcontenttype(obj4) {
+    function getcontenttype(obj5) {
       var header;
-      if (typeof obj4.getHeader === "function") {
-        header = obj4.getHeader("content-type");
-      } else if (typeof obj4.headers === "object") {
-        header = obj4.headers && obj4.headers["content-type"];
+      if (typeof obj5.getHeader === "function") {
+        header = obj5.getHeader("content-type");
+      } else if (typeof obj5.headers === "object") {
+        header = obj5.headers && obj5.headers["content-type"];
       }
       if (typeof header !== "string") {
         throw new TypeError("content-type header is missing from object");
@@ -7538,8 +7538,8 @@ function defineLazy(object3, key, getter) {
     configurable: true
   });
 }
-function objectClone(obj4) {
-  return Object.create(Object.getPrototypeOf(obj4), Object.getOwnPropertyDescriptors(obj4));
+function objectClone(obj5) {
+  return Object.create(Object.getPrototypeOf(obj5), Object.getOwnPropertyDescriptors(obj5));
 }
 function assignProp(target, prop, value) {
   Object.defineProperty(target, prop, {
@@ -7610,10 +7610,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj4, path4) {
+function getElementAtPath(obj5, path4) {
   if (!path4)
-    return obj4;
-  return path4.reduce((acc, key) => acc?.[key], obj4);
+    return obj5;
+  return path4.reduce((acc, key) => acc?.[key], obj5);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -8049,9 +8049,9 @@ function parsedType(data) {
       if (Array.isArray(data)) {
         return "array";
       }
-      const obj4 = data;
-      if (obj4 && Object.getPrototypeOf(obj4) !== Object.prototype && "constructor" in obj4 && obj4.constructor) {
-        return obj4.constructor.name;
+      const obj5 = data;
+      if (obj5 && Object.getPrototypeOf(obj5) !== Object.prototype && "constructor" in obj5 && obj5.constructor) {
+        return obj5.constructor.name;
       }
     }
   }
@@ -8069,8 +8069,8 @@ function issue(...args) {
   }
   return { ...iss };
 }
-function cleanEnum(obj4) {
-  return Object.entries(obj4).filter(([k, _]) => {
+function cleanEnum(obj5) {
+  return Object.entries(obj5).filter(([k, _]) => {
     return Number.isNaN(Number.parseInt(k, 10));
   }).map((el) => el[1]);
 }
@@ -8394,15 +8394,15 @@ var $ZodError = $constructor("$ZodError", initializer);
 var $ZodRealError = $constructor("$ZodError", initializer, void 0, {
   Parent: Error
 });
-function node(obj4, key, make) {
-  if (!Object.prototype.hasOwnProperty.call(obj4, key)) {
+function node(obj5, key, make) {
+  if (!Object.prototype.hasOwnProperty.call(obj5, key)) {
     if (key === "__proto__") {
-      Object.defineProperty(obj4, key, { value: make(), writable: true, enumerable: true, configurable: true });
+      Object.defineProperty(obj5, key, { value: make(), writable: true, enumerable: true, configurable: true });
     } else {
-      obj4[key] = make();
+      obj5[key] = make();
     }
   }
-  return obj4[key];
+  return obj5[key];
 }
 function flattenError(error2, mapper = (issue2) => issue2.message) {
   const fieldErrors = {};
@@ -16845,15 +16845,15 @@ function applyElicitationDefaults(schema, data) {
   if (!schema || data === null || typeof data !== "object")
     return;
   if (schema.type === "object" && schema.properties && typeof schema.properties === "object") {
-    const obj4 = data;
+    const obj5 = data;
     const props = schema.properties;
     for (const key of Object.keys(props)) {
       const propSchema = props[key];
-      if (obj4[key] === void 0 && Object.prototype.hasOwnProperty.call(propSchema, "default")) {
-        obj4[key] = propSchema.default;
+      if (obj5[key] === void 0 && Object.prototype.hasOwnProperty.call(propSchema, "default")) {
+        obj5[key] = propSchema.default;
       }
-      if (obj4[key] !== void 0) {
-        applyElicitationDefaults(propSchema, obj4[key]);
+      if (obj5[key] !== void 0) {
+        applyElicitationDefaults(propSchema, obj5[key]);
       }
     }
   }
@@ -19121,10 +19121,10 @@ function typeOf(s) {
   if (Array.isArray(s.type)) return s.type.join(" or ");
   return s.type ?? "any";
 }
-function argsOf(tool) {
+function argsOf(tool, noteMax = 160) {
   const schema = tool.inputSchema;
   const required2 = new Set(schema.required ?? []);
-  return Object.entries(schema.properties ?? {}).map(([name, s]) => ({ name, type: typeOf(s), required: required2.has(name), note: (s.description ?? "").replace(/\s+/g, " ").slice(0, 160) }));
+  return Object.entries(schema.properties ?? {}).map(([name, s]) => ({ name, type: typeOf(s), required: required2.has(name), note: (s.description ?? "").replace(/\s+/g, " ").trim().slice(0, noteMax) }));
 }
 var labelOf = (v) => {
   if (v === null) return "null";
@@ -19175,6 +19175,21 @@ function describe2(values, words2, depth) {
 function shapeLines(value, words2 = false) {
   const d = describe2([value], words2, 0);
   return [`answer: ${d.head}`, ...d.body];
+}
+var inSixPlaces = (n) => Number.isFinite(n) && Math.abs(n * 1e6 - Math.round(n * 1e6)) < 1e-6;
+function equityOrderArgs(accountNumber, o) {
+  if (o.side !== "buy" && o.side !== "sell") return null;
+  const base = { account_number: accountNumber, symbol: o.symbol, side: o.side };
+  if (o.market === true) {
+    const regular = { type: "market", time_in_force: "gfd", market_hours: "regular_hours" };
+    if (o.side === "buy") {
+      const d = o.dollars;
+      return typeof d === "number" && Number.isFinite(d) && d >= 1 && Math.round(d * 100) / 100 === d ? { ...base, ...regular, dollar_amount: d.toFixed(2) } : null;
+    }
+    return o.quantity > 0 && inSixPlaces(o.quantity) ? { ...base, ...regular, quantity: o.quantity.toFixed(6).replace(/\.?0+$/, "") } : null;
+  }
+  if (!Number.isInteger(o.quantity) || o.quantity < 1 || !(o.limitPrice > 0)) return null;
+  return { ...base, type: "limit", quantity: String(o.quantity), limit_price: o.limitPrice.toFixed(2), time_in_force: o.timeInForce, market_hours: "regular_hours" };
 }
 var oneLine = (s, max) => {
   const t = s.replace(/\s+/g, " ").trim();
@@ -19270,17 +19285,9 @@ var Reviewer = class {
   async review(account, o) {
     if (!account.agentic) throw new Refused("Only the Agentic account can have an order checked, and this is not it.");
     if (!this.tools.some((t) => t.name === REVIEW)) throw new Refused("Robinhood's connection no longer offers its order check, so nothing was sent.");
-    if (!Number.isInteger(o.quantity) || o.quantity < 1 || !(o.limitPrice > 0) || o.side !== "buy" && o.side !== "sell") throw new Refused("That order is not complete, so it was not sent for checking.");
-    const r = await this.client.callTool({ name: REVIEW, arguments: {
-      account_number: account.accountNumber,
-      symbol: o.symbol,
-      side: o.side,
-      type: "limit",
-      quantity: String(o.quantity),
-      limit_price: o.limitPrice.toFixed(2),
-      time_in_force: o.timeInForce,
-      market_hours: "regular_hours"
-    } });
+    const args = equityOrderArgs(account.accountNumber, o);
+    if (!args) throw new Refused("That order is not complete, so it was not sent for checking.");
+    const r = await this.client.callTool({ name: REVIEW, arguments: args });
     const text2 = (r.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
     let data = r.structuredContent ?? null;
     if (data === null) {
@@ -19292,6 +19299,113 @@ var Reviewer = class {
     return parseReview({ data, text: text2, failed: r.isError === true });
   }
 };
+
+// src/data/symbols.ts
+var FOREX = /* @__PURE__ */ new Set(["USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD", "CNY", "CNH", "HKD", "SGD", "SEK", "NOK", "DKK", "PLN", "MXN", "ZAR", "TRY", "INR", "KRW", "BRL", "RUB", "THB"]);
+var CRYPTO_BASES = /* @__PURE__ */ new Set(["BTC", "ETH", "SOL", "XRP", "ADA", "DOGE", "LTC", "BCH", "DOT", "AVAX", "LINK"]);
+var CRYPTO_QUOTES = ["USDT", "USDC", "USD"];
+var NOT_COINS = /* @__PURE__ */ new Set([...FOREX, "XAU", "XAG", "XPT", "XPD"]);
+var COIN_PAIR = /^([A-Z0-9]{1,15})-(USDT|USDC|USD)$/;
+var SHARE_CLASS = /^([A-Z]{1,5})\.([A-Z])$/;
+var ONE_LETTER_EXCHANGES = /* @__PURE__ */ new Set(["T", "L", "V", "F"]);
+function cryptoBase(raw) {
+  const s = raw.trim().toUpperCase().replace(/\+$/, "");
+  const pair = COIN_PAIR.exec(s);
+  if (pair) return /[A-Z]/.test(pair[1]) && !NOT_COINS.has(pair[1]) ? pair[1] : null;
+  const compact = s.replaceAll("-", "");
+  for (const q of CRYPTO_QUOTES) {
+    if (compact.endsWith(q)) {
+      const base = compact.slice(0, -q.length);
+      return CRYPTO_BASES.has(base) ? base : null;
+    }
+  }
+  return null;
+}
+var yahooClass = (s) => {
+  const m = SHARE_CLASS.exec(s);
+  return m && !ONE_LETTER_EXCHANGES.has(m[2]) ? `${m[1]}-${m[2]}` : s;
+};
+function deskSymbol(symbol, kind) {
+  const s = symbol.trim().toUpperCase();
+  return kind === "crypto" ? `${cryptoBase(s) ?? s}-USD` : yahooClass(s);
+}
+var brokerSymbol = (symbol) => symbol.replace(/^([A-Z]{1,5})-([A-Z])$/, "$1.$2");
+
+// src/desk/ticket.ts
+var PART_HOURS = "9:30 a.m. to 4 p.m. New York time";
+var MARKET_WHY = `A part-share is a market order: Robinhood takes no limit price for it, so it fills at the market's price at that moment, and Robinhood's check shows only an estimate. It is sent only while the US market is open, ${PART_HOURS}.`;
+
+// src/data/dates.ts
+var DAY = 864e5;
+var marketDay = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+var nyClock = (ms) => {
+  const f = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(ms));
+  const v = (t) => f.find((x) => x.type === t)?.value ?? "";
+  return `${v("year")}-${v("month")}-${v("day")} ${v("hour")}:${v("minute")}`;
+};
+var addDays = (date4, days) => new Date(Date.parse(`${date4}T00:00:00Z`) + days * DAY).toISOString().slice(0, 10);
+
+// src/data/holidays.ts
+var HOLIDAYS = {
+  2026: [
+    ["2026-01-01", "New Year's Day"],
+    ["2026-01-19", "Martin Luther King, Jr. Day"],
+    ["2026-02-16", "Washington's Birthday"],
+    ["2026-04-03", "Good Friday"],
+    ["2026-05-25", "Memorial Day"],
+    ["2026-06-19", "Juneteenth"],
+    ["2026-07-03", "Independence Day (observed)"],
+    ["2026-09-07", "Labor Day"],
+    ["2026-11-26", "Thanksgiving Day"],
+    ["2026-12-25", "Christmas Day"]
+  ],
+  2027: [
+    ["2027-01-01", "New Year's Day"],
+    ["2027-01-18", "Martin Luther King, Jr. Day"],
+    ["2027-02-15", "Washington's Birthday"],
+    ["2027-03-26", "Good Friday"],
+    ["2027-05-31", "Memorial Day"],
+    ["2027-06-18", "Juneteenth (observed)"],
+    ["2027-07-05", "Independence Day (observed)"],
+    ["2027-09-06", "Labor Day"],
+    ["2027-11-25", "Thanksgiving Day"],
+    ["2027-12-24", "Christmas Day (observed)"]
+  ],
+  // 1 Jan 2028 is a Saturday: the NYSE keeps no New Year's Day holiday that year.
+  2028: [
+    ["2028-01-17", "Martin Luther King, Jr. Day"],
+    ["2028-02-21", "Washington's Birthday"],
+    ["2028-04-14", "Good Friday"],
+    ["2028-05-29", "Memorial Day"],
+    ["2028-06-19", "Juneteenth"],
+    ["2028-07-04", "Independence Day"],
+    ["2028-09-04", "Labor Day"],
+    ["2028-11-23", "Thanksgiving Day"],
+    ["2028-12-25", "Christmas Day"]
+  ]
+};
+var NAMES = new Map(Object.values(HOLIDAYS).flat().map(([day, name]) => [day, name]));
+var DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+var dayOfWeek = (day) => (/* @__PURE__ */ new Date(`${day}T12:00:00Z`)).getUTCDay();
+function marketClosed(day) {
+  const w = dayOfWeek(day);
+  if (w === 0 || w === 6) return `a ${DAYS[w]}`;
+  return NAMES.get(day) ?? null;
+}
+var isMarketDay = (day) => marketClosed(day) === null;
+var EARLY_CLOSES = /* @__PURE__ */ new Set(["2026-11-27", "2026-12-24", "2027-11-26", "2028-07-03", "2028-11-24"]);
+var closeOf = (day) => EARLY_CLOSES.has(day) ? "13:00" : "16:00";
+function nextMarketDay(day) {
+  let d = addDays(day, 1);
+  while (!isMarketDay(d)) d = addDays(d, 1);
+  return d;
+}
+function regularSession(now) {
+  const [day, hm] = nyClock(now.getTime()).split(" ");
+  if (isMarketDay(day) && hm >= "09:30" && hm < closeOf(day)) return { open: true, opens: "" };
+  const next = isMarketDay(day) && hm < "09:30" ? day : nextMarketDay(day);
+  return { open: false, opens: `${next === day ? "today" : `${DAYS[dayOfWeek(next)]} ${next}`} at 9:30 a.m. New York time` };
+}
 
 // src/robinhood/order.ts
 var PLACE = "place_equity_order";
@@ -19326,26 +19440,21 @@ var Placer = class {
   }
   client;
   tools;
-  /** Refuses, before anything is sent, an order this door would not send. */
-  ready(account, o, refId) {
+  /** Refuses, before anything is sent, an order this door would not send: a part-share outside New York's regular
+   *  session among them, which Robinhood would refuse anyway. */
+  ready(account, o, refId, now = /* @__PURE__ */ new Date()) {
     if (!account.agentic) throw new Refused("Only the Agentic account can trade, and this is not it.");
     if (!this.tools.some((t) => t.name === PLACE)) throw new Refused("Robinhood's connection no longer offers placing a stock order, so nothing was sent.");
-    if (!Number.isInteger(o.quantity) || o.quantity < 1 || !(o.limitPrice > 0) || o.side !== "buy" && o.side !== "sell" || !/^[0-9a-f-]{36}$/.test(refId)) throw new Refused("That order is not complete, so it was not sent.");
+    const args = equityOrderArgs(account.accountNumber, o);
+    if (!args || !/^[0-9a-f-]{36}$/.test(refId)) throw new Refused("That order is not complete, so it was not sent.");
+    const session = o.market ? regularSession(now) : null;
+    if (session && !session.open) throw new Refused(`A part-share is sent only while the US market is open, ${PART_HOURS}: it opens ${session.opens}. Nothing was sent.`);
+    return { ...args, ref_id: refId };
   }
-  /** Places one limit order of whole shares on the Agentic account. Call only after the person's Confirm. */
-  async place(account, o, refId) {
-    this.ready(account, o, refId);
-    const r = await this.client.callTool({ name: PLACE, arguments: {
-      account_number: account.accountNumber,
-      symbol: o.symbol,
-      side: o.side,
-      type: "limit",
-      quantity: String(o.quantity),
-      limit_price: o.limitPrice.toFixed(2),
-      time_in_force: o.timeInForce,
-      market_hours: "regular_hours",
-      ref_id: refId
-    } });
+  /** Places one order on the Agentic account: whole shares at a limit price, or a part-share at the market price in
+   *  regular hours. Call only after the person's Confirm. */
+  async place(account, o, refId, now = /* @__PURE__ */ new Date()) {
+    const r = await this.client.callTool({ name: PLACE, arguments: this.ready(account, o, refId, now) });
     const text2 = (r.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
     let data = r.structuredContent ?? null;
     if (data === null) {
@@ -19531,8 +19640,42 @@ async function discover(reader, opts = {}) {
   out.push("", "Nothing was ordered, changed or cancelled. No value from your account is shown above: only the names and kinds of what Robinhood answers.");
   return out;
 }
+function discoverFull(reader) {
+  const { order } = reader.byKind(), out = [];
+  out.push(`The ${order.length} tools that order, review or move money, in Robinhood's full words. None of them is called here.`);
+  for (const t of order) {
+    const lines = (t.description ?? "").split(/\r?\n/).map((l) => l.trimEnd()).filter((l, i, all) => l !== "" || i > 0 && all[i - 1] !== "");
+    out.push("", `* ${t.name}`, "  says:", ...lines.length ? lines.map((l) => `    ${l}`) : ["    (no description)"], "  takes:");
+    const args = argsOf(t, Infinity);
+    out.push(...args.length ? args.map((a) => `    - ${a.name} (${a.type}${a.required ? ", required" : ""})${a.note ? `: ${a.note}` : ""}`) : ["    nothing"]);
+    out.push(`  labelled read-only by Robinhood: ${t.annotations?.readOnlyHint === true ? "yes" : "no"}`);
+  }
+  out.push("", "Nothing was called, ordered, changed or cancelled.");
+  return out;
+}
+var obj3 = (v) => v && typeof v === "object" && !Array.isArray(v) ? v : {};
+var ACCOUNT_ARGS = ["account_number", "rhs_account_number"];
+async function withAgentic(reader, args) {
+  const asked = ACCOUNT_ARGS.filter((k) => args[k] === "agentic");
+  if (!asked.length) return args;
+  const r = await reader.read("get_accounts");
+  const d = obj3(r.data), all = obj3(d.data).accounts ?? d.accounts;
+  const agentic = (Array.isArray(all) ? all : []).map(obj3).filter((a) => a.agentic_allowed === true);
+  if (r.failed || agentic.length !== 1) throw new Refused(r.failed ? `Robinhood did not list the accounts: ${masked(r.text)}` : `Robinhood listed ${agentic.length} accounts that agents may trade, not one, so "agentic" cannot stand for an account.`);
+  const out = { ...args };
+  for (const k of asked) {
+    const n = agentic[0][k];
+    if (typeof n !== "string" || !n.trim()) throw new Refused(`Robinhood gave no ${k} for the Agentic account.`);
+    out[k] = n.trim();
+  }
+  return out;
+}
+function argsFromWords(reader, name, pairs) {
+  const tool = reader.tools.find((t) => t.name === name), types = new Map((tool ? argsOf(tool) : []).map((a) => [a.name, a.type]));
+  return Object.fromEntries(Object.entries(pairs).map(([k, v]) => [k, /\barray\b|^list of\b/.test(types.get(k) ?? "") ? v.split("+").map((x) => x.trim()).filter(Boolean) : v]));
+}
 async function shapeOfRead(reader, name, args, opts = {}) {
-  const r = await reader.read(name, args);
+  const r = await reader.read(name, await withAgentic(reader, args));
   if (r.failed) return [`Robinhood reported an error: ${masked(r.text)}`];
   if (r.data === null) return [`answered with plain text (${r.text.length} characters), not data`];
   return shapeLines(r.data, opts.words === true);
@@ -19558,7 +19701,7 @@ var isDone = (state) => DONE.test(state);
 var DONE_WORDS = Object.values(DONE_GROUPS).flat();
 
 // src/robinhood/account.ts
-var obj3 = (v) => v && typeof v === "object" && !Array.isArray(v) ? v : {};
+var obj4 = (v) => v && typeof v === "object" && !Array.isArray(v) ? v : {};
 var list = (v) => Array.isArray(v) ? v : [];
 var text = (v) => typeof v === "string" && v.trim() ? v.trim() : null;
 var figure = (v) => {
@@ -19566,13 +19709,13 @@ var figure = (v) => {
   if (typeof v !== "string" || !/^-?\d+(\.\d+)?$/.test(v.trim())) return null;
   return Number(v.trim());
 };
-var dataOf = (answer) => obj3(obj3(answer).data);
+var dataOf = (answer) => obj4(obj4(answer).data);
 var keyOf = (accountNumber, secret) => crypto3.createHmac("sha256", secret).update(accountNumber).digest("hex").slice(0, 16);
 var TYPE_WORDS = { individual: "Individual", ira_traditional: "Traditional IRA", ira_roth: "Roth IRA", joint: "Joint", custodial: "Custodial" };
 var titleOf = (raw) => TYPE_WORDS[raw] ?? raw.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 function parseAccounts(answer, secret) {
   return list(dataOf(answer).accounts).flatMap((v) => {
-    const a = obj3(v), number4 = text(a.account_number);
+    const a = obj4(v), number4 = text(a.account_number);
     if (!number4) return [];
     const kind = text(a.brokerage_account_type) ?? text(a.type);
     const key = keyOf(number4, secret), agentic = a.agentic_allowed === true;
@@ -19597,20 +19740,20 @@ function parsePortfolio(answer) {
     crypto: figure(d.crypto_value),
     options: figure(d.options_value),
     cash: figure(d.cash),
-    buyingPower: figure(obj3(d.buying_power).buying_power),
+    buyingPower: figure(obj4(d.buying_power).buying_power),
     currency: text(d.currency) ?? "USD"
   };
 }
 function parsePositions(answer) {
   return list(dataOf(answer).positions).flatMap((v) => {
-    const p = obj3(v), symbol = text(p.symbol), quantity = figure(p.quantity);
+    const p = obj4(v), symbol = text(p.symbol), quantity = figure(p.quantity);
     return symbol && quantity !== null && quantity !== 0 ? [{ symbol: symbol.toUpperCase(), quantity, averageCost: figure(p.average_buy_price) }] : [];
   });
 }
 function parseCrypto(answer) {
   const rows = list(dataOf(answer).results);
   const holdings = rows.flatMap((v) => {
-    const p = obj3(v), symbol = text(p.symbol) ?? text(obj3(p.currency).code) ?? text(p.asset_code), quantity = figure(p.quantity) ?? figure(p.quantity_available);
+    const p = obj4(v), symbol = text(p.symbol) ?? text(obj4(p.currency).code) ?? text(p.asset_code), quantity = figure(p.quantity) ?? figure(p.quantity_available);
     return symbol && quantity !== null && quantity !== 0 ? [{ symbol: symbol.toUpperCase(), quantity, averageCost: figure(p.average_cost) ?? figure(p.average_buy_price) }] : [];
   });
   return { holdings, unread: rows.length - holdings.length };
@@ -19618,13 +19761,13 @@ function parseCrypto(answer) {
 function parseQuotes(answer) {
   const out = /* @__PURE__ */ new Map();
   for (const v of list(dataOf(answer).results)) {
-    const q = obj3(obj3(v).quote), symbol = text(q.symbol), price = figure(q.last_trade_price);
+    const q = obj4(obj4(v).quote), symbol = text(q.symbol), price = figure(q.last_trade_price);
     if (symbol && price !== null) out.set(symbol.toUpperCase(), price);
   }
   return out;
 }
 var orderOf = (v) => {
-  const o = obj3(v);
+  const o = obj4(v);
   return {
     symbol: text(o.symbol)?.toUpperCase() ?? null,
     side: text(o.side),
@@ -19644,7 +19787,7 @@ function openOrders(answer) {
   const open2 = [];
   let unread = 0;
   rows.forEach((v, i) => {
-    const o = all[i], raw = obj3(v);
+    const o = all[i], raw = obj4(v);
     if (o.state && isDone(o.state)) return;
     const quantity = figure(raw.quantity), filled = figure(raw.cumulative_quantity) ?? 0;
     if (!o.state || !o.symbol || o.side !== "buy" && o.side !== "sell" || quantity === null) {
@@ -19656,7 +19799,7 @@ function openOrders(answer) {
   return { all, open: open2.filter((o) => o.quantity > 0), unread };
 }
 function parseApprovals(setting, approvals) {
-  const s = obj3(dataOf(setting).setting);
+  const s = obj4(dataOf(setting).setting);
   return { required: typeof s.human_must_approve_trades === "boolean" ? s.human_must_approve_trades : null, pending: list(dataOf(approvals).approvals).length };
 }
 var QUOTES_PER_CALL = 20;
@@ -19696,40 +19839,6 @@ async function readAccount(reader, account, ids) {
   }
   return { account, portfolio: p === null ? null : parsePortfolio(p), holdings, unread: crypto5.unread, orders, approvals, problems };
 }
-
-// src/data/dates.ts
-var marketDay = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
-
-// src/data/symbols.ts
-var FOREX = /* @__PURE__ */ new Set(["USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD", "CNY", "CNH", "HKD", "SGD", "SEK", "NOK", "DKK", "PLN", "MXN", "ZAR", "TRY", "INR", "KRW", "BRL", "RUB", "THB"]);
-var CRYPTO_BASES = /* @__PURE__ */ new Set(["BTC", "ETH", "SOL", "XRP", "ADA", "DOGE", "LTC", "BCH", "DOT", "AVAX", "LINK"]);
-var CRYPTO_QUOTES = ["USDT", "USDC", "USD"];
-var NOT_COINS = /* @__PURE__ */ new Set([...FOREX, "XAU", "XAG", "XPT", "XPD"]);
-var COIN_PAIR = /^([A-Z0-9]{1,15})-(USDT|USDC|USD)$/;
-var SHARE_CLASS = /^([A-Z]{1,5})\.([A-Z])$/;
-var ONE_LETTER_EXCHANGES = /* @__PURE__ */ new Set(["T", "L", "V", "F"]);
-function cryptoBase(raw) {
-  const s = raw.trim().toUpperCase().replace(/\+$/, "");
-  const pair = COIN_PAIR.exec(s);
-  if (pair) return /[A-Z]/.test(pair[1]) && !NOT_COINS.has(pair[1]) ? pair[1] : null;
-  const compact = s.replaceAll("-", "");
-  for (const q of CRYPTO_QUOTES) {
-    if (compact.endsWith(q)) {
-      const base = compact.slice(0, -q.length);
-      return CRYPTO_BASES.has(base) ? base : null;
-    }
-  }
-  return null;
-}
-var yahooClass = (s) => {
-  const m = SHARE_CLASS.exec(s);
-  return m && !ONE_LETTER_EXCHANGES.has(m[2]) ? `${m[1]}-${m[2]}` : s;
-};
-function deskSymbol(symbol, kind) {
-  const s = symbol.trim().toUpperCase();
-  return kind === "crypto" ? `${cryptoBase(s) ?? s}-USD` : yahooClass(s);
-}
-var brokerSymbol = (symbol) => symbol.replace(/^([A-Z]{1,5})-([A-Z])$/, "$1.$2");
 
 // src/settings.ts
 var ANALYSTS = ["market", "sentiment", "news", "fundamentals"];
@@ -19954,8 +20063,9 @@ var Link = class {
   }
   /** The real figures a ticket for one stock is sized and checked on: the Agentic account's value, buying power and
    *  holding of the stock, Robinhood's live price, how many orders the account has had today (New York's day), and its
-   *  orders still open, which count towards the caps as if they were filled. */
-  async ticketContext(symbol, now = /* @__PURE__ */ new Date()) {
+   *  orders still open, which count towards the caps as if they were filled; and whether New York's regular session is
+   *  open, the only time a part-share can be sent. */
+  async ticketContext(symbol, now = this.clock()) {
     return this.withReader((r) => this.contextWith(r, symbol, now));
   }
   async contextWith(r, symbol, now) {
@@ -19988,6 +20098,7 @@ var Link = class {
         held,
         price,
         ordersToday,
+        session: regularSession(now),
         positions: all.map((x) => ({ symbol: deskSymbol(x.symbol, "stock"), quantity: x.quantity, price: quotes.get(x.symbol) ?? null })),
         open: { buy: mine("buy"), sell: mine("sell") },
         unreadOrders: orders.unread,
@@ -20065,16 +20176,16 @@ var Link = class {
     if (!this.trading().on) throw new Error("trading is switched off: switch it on in Your account first");
     const session = await openSession(this.file, { ...this.opts, signIn: false });
     try {
-      const context = await this.contextWith(session.reader, order.symbol, /* @__PURE__ */ new Date());
+      const at = this.clock(), context = await this.contextWith(session.reader, order.symbol, at);
       const now = this.trading();
       if (!now.on) throw new Error(`trading switched itself off: ${now.offBecause?.words ?? "switch it on in Your account first"}`);
       const failed = (await approve(context)).filter((c) => !c.ok);
       if (failed.length) throw new Error(`the order no longer passes on Robinhood's latest figures: ${failed.map((c) => c.words).join("; ")}`);
       const account = { accountNumber: this.agenticIds().accountNumber, agentic: true }, sent = { ...order, symbol: brokerSymbol(order.symbol) };
-      session.placer.ready(account, sent, refId);
+      session.placer.ready(account, sent, refId, at);
       sending();
       try {
-        return { placed: await session.placer.place(account, sent, refId), context };
+        return { placed: await session.placer.place(account, sent, refId, at), context };
       } catch (e) {
         throw e instanceof Refused ? e : new AnswerLost(oneLine(lostWhy(e), 160));
       }
@@ -20119,7 +20230,8 @@ var Link = class {
     })();
     return this.refreshing;
   }
-  now = () => (this.opts.now?.() ?? /* @__PURE__ */ new Date()).toISOString();
+  clock = () => this.opts.now?.() ?? /* @__PURE__ */ new Date();
+  now = () => this.clock().toISOString();
   saved = () => !!readSaved(this.file).tokens;
   info() {
     if (this.signing) return { state: "waiting", message: "Waiting for you to finish signing in on Robinhood's page. This waits up to five minutes.", checkedAt: null, tools: null };
@@ -20200,7 +20312,7 @@ var Link = class {
 // src/robinhood/cli.ts
 var say = (words2) => console.log(words2);
 async function main(args) {
-  const words2 = args.includes("--words"), [command, ...rest] = args.filter((a) => a !== "--words");
+  const words2 = args.includes("--words"), full = args.includes("--full"), [command, ...rest] = args.filter((a) => a !== "--words" && a !== "--full");
   const file = robinhoodFile();
   if (command === "status") {
     say(fs4.existsSync(file) ? `A Robinhood sign-in is saved (last refreshed ${fs4.statSync(file).mtime.toISOString().slice(0, 16).replace("T", " ")} UTC).` : "No Robinhood sign-in is saved yet.");
@@ -20212,25 +20324,38 @@ async function main(args) {
     return 0;
   }
   if (command === "discover" || command === "shape") {
-    let json = {};
+    let json = {}, pairs = null;
     if (command === "shape") {
       if (!rest[0]) {
-        say(`Use: node dist/robinhood.mjs shape TOOL '{"argument": "value"}'`);
+        say(`Use: node dist/robinhood.mjs shape TOOL account_number=agentic symbols=META (or '{"argument": "value"}'). "agentic" stands for the Agentic account; a list is written META+NVDA.`);
         return 2;
       }
-      try {
-        const v = JSON.parse(rest[1] ?? "{}");
-        if (!v || typeof v !== "object" || Array.isArray(v)) throw new Error("not an object");
-        json = v;
-      } catch {
-        say(`The arguments must be a JSON object, for example '{"account_number": "123"}'.`);
-        return 2;
+      if (rest.length > 1 && !rest[1].trim().startsWith("{")) {
+        pairs = {};
+        for (const w of rest.slice(1)) {
+          const at = w.indexOf("=");
+          if (at < 1) {
+            say(`"${w}" is not name=value, for example account_number=agentic.`);
+            return 2;
+          }
+          pairs[w.slice(0, at)] = w.slice(at + 1);
+        }
+      } else {
+        try {
+          const v = JSON.parse(rest[1] ?? "{}");
+          if (!v || typeof v !== "object" || Array.isArray(v)) throw new Error("not an object");
+          json = v;
+        } catch {
+          say("The arguments must be name=value words (account_number=agentic symbols=META) or a JSON object.");
+          return 2;
+        }
       }
     }
     try {
       const session = await openSession(file, { signIn: true, say });
       try {
-        for (const l of command === "discover" ? await discover(session.reader, { words: words2 }) : await shapeOfRead(session.reader, rest[0], json, { words: words2 })) say(l);
+        const lines = command === "shape" ? await shapeOfRead(session.reader, rest[0], pairs ? argsFromWords(session.reader, rest[0], pairs) : json, { words: words2 }) : full ? discoverFull(session.reader) : await discover(session.reader, { words: words2 });
+        for (const l of lines) say(l);
       } finally {
         await session.close();
       }
@@ -20242,7 +20367,7 @@ async function main(args) {
     }
   }
   if (command !== "connect") {
-    say("Use: node dist/robinhood.mjs connect | status | forget | discover | shape TOOL [JSON]");
+    say("Use: node dist/robinhood.mjs connect | status | forget | discover [--full] | shape TOOL [JSON]");
     return 2;
   }
   try {

@@ -2,6 +2,7 @@
 // reads with the "read" kind; of the "order" kind the dashboard calls only Robinhood's dry run (review.ts) and the order
 // itself (order.ts), each on the person's own press; the rest are counted and shown, never called. No agent gets any.
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+import type { Order } from '../desk/ticket.js';
 
 /** A tool whose name speaks of trading or moving money - orders (reviews included), trades, buying, selling,
  *  transfers. The same rule as TRADE_WORDS in .claude/hooks/guard.mjs (a test keeps them in step). */
@@ -41,10 +42,11 @@ function typeOf(s: Schema | undefined): string {
 }
 
 /** The arguments a tool takes, from its own description of them (names and types: no values). */
-export function argsOf(tool: Pick<Tool, 'inputSchema'>): ArgLine[] {
+/** Each argument a tool takes. `noteMax`: how much of Robinhood's note on it to keep (Infinity: all of it). */
+export function argsOf(tool: Pick<Tool, 'inputSchema'>, noteMax = 160): ArgLine[] {
   const schema = tool.inputSchema as { properties?: Record<string, Schema>; required?: string[] };
   const required = new Set(schema.required ?? []);
-  return Object.entries(schema.properties ?? {}).map(([name, s]) => ({ name, type: typeOf(s), required: required.has(name), note: (s.description ?? '').replace(/\s+/g, ' ').slice(0, 160) }));
+  return Object.entries(schema.properties ?? {}).map(([name, s]) => ({ name, type: typeOf(s), required: required.has(name), note: (s.description ?? '').replace(/\s+/g, ' ').trim().slice(0, noteMax) }));
 }
 
 const labelOf = (v: unknown): string => {
@@ -97,6 +99,28 @@ function describe(values: unknown[], words: boolean, depth: number): { head: str
 export function shapeLines(value: unknown, words = false): string[] {
   const d = describe([value], words, 0);
   return [`answer: ${d.head}`, ...d.body];
+}
+
+const inSixPlaces = (n: number): boolean => Number.isFinite(n) && Math.abs(n * 1e6 - Math.round(n * 1e6)) < 1e-6;
+
+/** What Robinhood's stock order check and stock order are sent for one of the desk's orders, by Robinhood's own rules for
+ *  those two tools (`discover --full`, 11 Nov 2026), or null for an order the desk does not send. A limit order is whole
+ *  shares at a price in dollars and cents. A part-share is a market order in regular hours, good for the day: a buy as a
+ *  dollar amount (Robinhood works out the shares from its last trade price), a sell as shares to at most six decimal
+ *  places. No limit price goes with a market order. */
+export function equityOrderArgs(accountNumber: string, o: Order): Record<string, string> | null {
+  if (o.side !== 'buy' && o.side !== 'sell') return null;
+  const base = { account_number: accountNumber, symbol: o.symbol, side: o.side };
+  if (o.market === true) {
+    const regular = { type: 'market', time_in_force: 'gfd', market_hours: 'regular_hours' };
+    if (o.side === 'buy') {
+      const d = o.dollars;
+      return typeof d === 'number' && Number.isFinite(d) && d >= 1 && Math.round(d * 100) / 100 === d ? { ...base, ...regular, dollar_amount: d.toFixed(2) } : null;
+    }
+    return o.quantity > 0 && inSixPlaces(o.quantity) ? { ...base, ...regular, quantity: o.quantity.toFixed(6).replace(/\.?0+$/, '') } : null;
+  }
+  if (!Number.isInteger(o.quantity) || o.quantity < 1 || !(o.limitPrice > 0)) return null;
+  return { ...base, type: 'limit', quantity: String(o.quantity), limit_price: o.limitPrice.toFixed(2), time_in_force: o.timeInForce, market_hours: 'regular_hours' };
 }
 
 /** Words on one line, cut to a length. */

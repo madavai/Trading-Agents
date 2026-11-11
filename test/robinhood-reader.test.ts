@@ -6,8 +6,8 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { Reader, Refused } from '../src/robinhood/reader.js';
 import { argsOf, kindOf, masked, shapeLines } from '../src/robinhood/rules.js';
-import { discover, shapeOfRead } from '../src/robinhood/discover.js';
-import { ACCOUNT, BUYING_POWER, HELD, fakeTools } from './fake-robinhood.js';
+import { argsFromWords, discover, discoverFull, shapeOfRead, withAgentic } from '../src/robinhood/discover.js';
+import { ACCOUNT, AGENTIC, AGENTIC_CASH, AGENTIC_RHS, BUYING_POWER, HELD, accountTools, fakeTools } from './fake-robinhood.js';
 
 async function connected(calls: string[]) {
   const [a, b] = InMemoryTransport.createLinkedPair();
@@ -81,6 +81,19 @@ test('discover lists every tool with its arguments and the shape of the safe rea
   await close();
 });
 
+test('discover --full gives the whole words of the order tools only, and calls nothing at all', async () => {
+  const calls: string[] = [], { reader, close } = await connected(calls);
+  const out = discoverFull(reader).join('\n');
+  assert.match(out, /The 3 tools that order, review or move money, in Robinhood's full words/);
+  for (const name of ['place_equity_order', 'review_equity_order']) assert.ok(out.includes(`* ${name}`), name);
+  for (const name of ['get_accounts', 'get_equity_positions', 'set_account_nickname']) assert.ok(!out.includes(`* ${name}`), `${name} is not an order tool`);
+  assert.match(out, /takes:\n {4}- /, 'each argument on a line of its own');
+  assert.match(out, /Nothing was called, ordered, changed or cancelled/);
+  for (const value of [ACCOUNT, BUYING_POWER, HELD]) assert.ok(!out.includes(value), `${value} leaked into discover --full`);
+  assert.deepEqual(calls, [], 'no tool was called');
+  await close();
+});
+
 test('shape asks one read tool with the arguments the person gave, refuses an order tool, and hides long numbers in a failure', async () => {
   const calls: string[] = [], { reader, close } = await connected(calls);
   assert.deepEqual(await shapeOfRead(reader, 'get_account_activity', { account_number: ACCOUNT }), ['answer: object', '  activity: list of 0']);
@@ -89,6 +102,23 @@ test('shape asks one read tool with the arguments the person gave, refuses an or
   assert.equal(masked(`no account 123456789 and   ${'x'.repeat(400)}`).length <= 300, true);
   assert.match(masked('account 123456789 not found'), /account ##### not found/);
   await close();
+});
+
+test('shape takes "agentic" for the Agentic account, never printing its number, and name=value words with lists split at +', async () => {
+  const calls: string[] = [], [a, b] = InMemoryTransport.createLinkedPair();
+  await accountTools(calls).connect(a);
+  const client = new Client({ name: 'test', version: '0' });
+  await client.connect(b);
+  const reader = new Reader(client, (await client.listTools()).tools);
+  const out = (await shapeOfRead(reader, 'get_portfolio', { account_number: 'agentic' }, { words: true })).join('\n');
+  assert.match(out, /total_value: text that is a number/);
+  for (const value of [AGENTIC, AGENTIC_RHS, AGENTIC_CASH]) assert.ok(!out.includes(value), `${value} leaked into shape`);
+  assert.deepEqual(calls, ['get_accounts', 'get_portfolio'], 'the accounts are read to find the Agentic one, then the tool asked');
+  assert.deepEqual(await withAgentic(reader, { rhs_account_number: 'agentic', symbol: 'BTC' }), { rhs_account_number: AGENTIC_RHS, symbol: 'BTC' });
+  assert.deepEqual(await withAgentic(reader, { account_number: 'ACC1' }), { account_number: 'ACC1' }, 'any other value is left as it is');
+  assert.deepEqual(argsFromWords(reader, 'get_equity_quotes', { symbols: 'META+NVDA' }), { symbols: ['META', 'NVDA'] }, 'a list argument is split at +');
+  assert.deepEqual(argsFromWords(reader, 'get_portfolio', { account_number: 'agentic' }), { account_number: 'agentic' });
+  await client.close();
 });
 
 test('only the reader calls a Robinhood tool: no other file in src does', () => {

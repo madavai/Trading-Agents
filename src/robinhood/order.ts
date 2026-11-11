@@ -1,13 +1,15 @@
-// The third door to Robinhood, the one that can place an order. It names one tool (place_equity_order, a limit order of
-// whole shares on the Agentic account) and nothing else; a test checks that, and that the agents' tool server holds no
-// trace of it. It is reached only from the dashboard's server, after the person's own Confirm on a ticket that Robinhood
-// checked with no alerts, with trading switched on by the person, and after every cap has been checked again on figures
-// read from Robinhood just before. Robinhood's own ref_id makes a repeated send of the same ticket place nothing twice.
+// The third door to Robinhood, the one that can place an order. It names one tool (place_equity_order, on the Agentic
+// account: a limit order of whole shares, or a part-share at the market price in regular hours) and nothing else; a test
+// checks that, and that the agents' tool server holds no trace of it. It is reached only from the dashboard's server,
+// after the person's own Confirm on a ticket that Robinhood checked with no alerts, with trading switched on by the
+// person, and after every cap has been checked again on figures read from Robinhood just before. Robinhood's own ref_id
+// makes a repeated send of the same ticket place nothing twice.
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
-import type { Order } from '../desk/ticket.js';
+import { PART_HOURS, type Order } from '../desk/ticket.js';
+import { regularSession } from '../data/holidays.js';
 import { Refused } from './reader.js';
-import { LOOK_FIRST, masked } from './rules.js';
+import { equityOrderArgs, LOOK_FIRST, masked } from './rules.js';
 
 const PLACE = 'place_equity_order';
 
@@ -60,20 +62,22 @@ export function parsePlaced(answer: { data: unknown; text: string; failed: boole
 export class Placer {
   constructor(private readonly client: Pick<Client, 'callTool'>, private readonly tools: Tool[]) {}
 
-  /** Refuses, before anything is sent, an order this door would not send. */
-  ready(account: { accountNumber: string; agentic: boolean }, o: Order, refId: string): void {
+  /** Refuses, before anything is sent, an order this door would not send: a part-share outside New York's regular
+   *  session among them, which Robinhood would refuse anyway. */
+  ready(account: { accountNumber: string; agentic: boolean }, o: Order, refId: string, now: Date = new Date()): Record<string, string> {
     if (!account.agentic) throw new Refused('Only the Agentic account can trade, and this is not it.');
     if (!this.tools.some((t) => t.name === PLACE)) throw new Refused("Robinhood's connection no longer offers placing a stock order, so nothing was sent.");
-    if (!Number.isInteger(o.quantity) || o.quantity < 1 || !(o.limitPrice > 0) || (o.side !== 'buy' && o.side !== 'sell') || !/^[0-9a-f-]{36}$/.test(refId)) throw new Refused('That order is not complete, so it was not sent.');
+    const args = equityOrderArgs(account.accountNumber, o);
+    if (!args || !/^[0-9a-f-]{36}$/.test(refId)) throw new Refused('That order is not complete, so it was not sent.');
+    const session = o.market ? regularSession(now) : null;
+    if (session && !session.open) throw new Refused(`A part-share is sent only while the US market is open, ${PART_HOURS}: it opens ${session.opens}. Nothing was sent.`);
+    return { ...args, ref_id: refId };
   }
 
-  /** Places one limit order of whole shares on the Agentic account. Call only after the person's Confirm. */
-  async place(account: { accountNumber: string; agentic: boolean }, o: Order, refId: string): Promise<Placed> {
-    this.ready(account, o, refId);
-    const r = await this.client.callTool({ name: PLACE, arguments: {
-      account_number: account.accountNumber, symbol: o.symbol, side: o.side, type: 'limit', quantity: String(o.quantity),
-      limit_price: o.limitPrice.toFixed(2), time_in_force: o.timeInForce, market_hours: 'regular_hours', ref_id: refId,
-    } }) as { content?: Array<{ type: string; text?: string }>; structuredContent?: unknown; isError?: boolean };
+  /** Places one order on the Agentic account: whole shares at a limit price, or a part-share at the market price in
+   *  regular hours. Call only after the person's Confirm. */
+  async place(account: { accountNumber: string; agentic: boolean }, o: Order, refId: string, now: Date = new Date()): Promise<Placed> {
+    const r = await this.client.callTool({ name: PLACE, arguments: this.ready(account, o, refId, now) }) as { content?: Array<{ type: string; text?: string }>; structuredContent?: unknown; isError?: boolean };
     const text = (r.content ?? []).filter((c) => c.type === 'text').map((c) => c.text ?? '').join('\n');
     let data: unknown = r.structuredContent ?? null;
     if (data === null) { try { data = JSON.parse(text) as unknown; } catch { /* words only */ } }

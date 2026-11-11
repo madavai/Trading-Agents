@@ -59,7 +59,8 @@ built, which decisions stand, every document, and what is pending.
   person's caps (`trading.json`, beside the sign-in, never in `desk-settings.json`) and the last read of the accounts;
   `review.ts` is the only other door: Robinhood's own
   order check (`review_equity_order`) and nothing else, for the Agentic account only; `order.ts` is the third and last:
-  one limit order (`place_equity_order`), reached only from the dashboard's server after the person's Confirm, with
+  one order (`place_equity_order`): whole shares at a limit price, or a part-share at the market price in regular hours,
+  both shaped by `rules.ts` `equityOrderArgs` (which the check door uses too), reached only from the dashboard's server after the person's Confirm, with
   trading switched on (kept beside the sign-in) and every cap checked again on fresh figures; `account.ts` reads Robinhood's answers into figures (a dash, never a zero, for what it
   did not give); `states.ts` is the one list of an order's states (done: filled, cancelled, rejected, failed, expired,
   voided; open: every other), which `account.ts` counts open orders with for the caps and the page words the orders by

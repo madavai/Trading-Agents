@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { openOrders, parseAccounts, parsePortfolio, parsePositions, parseQuotes, QUOTES_PER_CALL, readAccount, sortAccounts, type Account, type AccountIds, type AccountView } from './account.js';
 import { marketDay } from '../data/dates.js';
+import { regularSession } from '../data/holidays.js';
 import { brokerSymbol, deskSymbol } from '../data/symbols.js';
 import type { Check, Order, TicketContext } from '../desk/ticket.js';
 import { writePrivate } from '../private.js';
@@ -146,8 +147,9 @@ export class Link {
 
   /** The real figures a ticket for one stock is sized and checked on: the Agentic account's value, buying power and
    *  holding of the stock, Robinhood's live price, how many orders the account has had today (New York's day), and its
-   *  orders still open, which count towards the caps as if they were filled. */
-  async ticketContext(symbol: string, now: Date = new Date()): Promise<Omit<TicketContext, 'rating' | 'callDate'>> {
+   *  orders still open, which count towards the caps as if they were filled; and whether New York's regular session is
+   *  open, the only time a part-share can be sent. */
+  async ticketContext(symbol: string, now: Date = this.clock()): Promise<Omit<TicketContext, 'rating' | 'callDate'>> {
     return this.withReader((r) => this.contextWith(r, symbol, now));
   }
 
@@ -173,7 +175,7 @@ export class Link {
       for (let i = 0; i < wanted.length; i += QUOTES_PER_CALL) for (const [s, v] of parseQuotes(await data('get_equity_quotes', { symbols: wanted.slice(i, i + QUOTES_PER_CALL) }))) quotes.set(s, v);
       const price = quotes.get(rh) ?? null;
       const mine = (side: 'buy' | 'sell') => orders.open.filter((o) => same(o.symbol) && o.side === side).reduce((n, o) => n + o.quantity, 0);
-      return { symbol, accountValue: p.total, buyingPower: p.buyingPower, held, price, ordersToday, positions: all.map((x) => ({ symbol: deskSymbol(x.symbol, 'stock'), quantity: x.quantity, price: quotes.get(x.symbol) ?? null })),
+      return { symbol, accountValue: p.total, buyingPower: p.buyingPower, held, price, ordersToday, session: regularSession(now), positions: all.map((x) => ({ symbol: deskSymbol(x.symbol, 'stock'), quantity: x.quantity, price: quotes.get(x.symbol) ?? null })),
         open: { buy: mine('buy'), sell: mine('sell') }, unreadOrders: orders.unread,
         openBuys: orders.open.filter((o) => o.side === 'buy').map((o) => ({ symbol: deskSymbol(o.symbol, 'stock'), quantity: o.quantity, price: o.price ?? quotes.get(o.symbol) ?? null })) };
     }
@@ -243,16 +245,16 @@ export class Link {
     if (!this.trading().on) throw new Error('trading is switched off: switch it on in Your account first');
     const session = await openSession(this.file, { ...this.opts, signIn: false });
     try {
-      const context = await this.contextWith(session.reader, order.symbol, new Date());
+      const at = this.clock(), context = await this.contextWith(session.reader, order.symbol, at);
       // Reading the account just now may have tripped the weekly loss limit: then nothing is sent.
       const now = this.trading();
       if (!now.on) throw new Error(`trading switched itself off: ${now.offBecause?.words ?? 'switch it on in Your account first'}`);
       const failed = (await approve(context)).filter((c) => !c.ok);
       if (failed.length) throw new Error(`the order no longer passes on Robinhood's latest figures: ${failed.map((c) => c.words).join('; ')}`);
       const account = { accountNumber: this.agenticIds().accountNumber, agentic: true }, sent = { ...order, symbol: brokerSymbol(order.symbol) };
-      session.placer.ready(account, sent, refId);   // what this door would refuse is refused before anything is logged or sent
+      session.placer.ready(account, sent, refId, at);   // what this door would refuse is refused before anything is logged or sent
       sending();
-      try { return { placed: await session.placer.place(account, sent, refId), context }; }
+      try { return { placed: await session.placer.place(account, sent, refId, at), context }; }
       catch (e) { throw e instanceof Refused ? e : new AnswerLost(oneLine(lostWhy(e), 160)); }
     } finally { await session.close().catch(() => undefined); }   // closing the session afterwards never hides the answer
   }
@@ -291,7 +293,8 @@ export class Link {
     return this.refreshing;
   }
 
-  private now = (): string => (this.opts.now?.() ?? new Date()).toISOString();
+  private clock = (): Date => this.opts.now?.() ?? new Date();
+  private now = (): string => this.clock().toISOString();
   private saved = (): boolean => !!readSaved(this.file).tokens;
 
   info(): LinkInfo {

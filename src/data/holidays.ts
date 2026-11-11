@@ -3,7 +3,7 @@
 // years ahead; a test fails once the year after this one is missing, so the list is renewed before it runs out. A year
 // not in the list is said to be unknown wherever the desk relies on it, and its weekdays are taken as market days.
 // The early closes (1:00 p.m. on the day after Thanksgiving, on 24 Dec 2026 and on 3 Jul 2028) are market days.
-import { addDays } from './dates.js';
+import { addDays, nyClock } from './dates.js';
 
 export const HOLIDAYS: Readonly<Record<string, ReadonlyArray<readonly [string, string]>>> = {
   2026: [
@@ -56,6 +56,15 @@ export function nextMarketDay(day: string): string {
   let d = addDays(day, 1);
   while (!isMarketDay(d)) d = addDays(d, 1);
   return d;
+}
+
+/** Whether New York's regular session (9:30 a.m. to its close) is open at `now` and, when it is not, when it opens next,
+ *  in words: "today at 9:30 a.m. New York time", or "Monday 2026-11-16 at 9:30 a.m. New York time". */
+export function regularSession(now: Date): { open: boolean; opens: string } {
+  const [day, hm] = nyClock(now.getTime()).split(' ') as [string, string];
+  if (isMarketDay(day) && hm >= '09:30' && hm < closeOf(day)) return { open: true, opens: '' };
+  const next = isMarketDay(day) && hm < '09:30' ? day : nextMarketDay(day);
+  return { open: false, opens: `${next === day ? 'today' : `${DAYS[dayOfWeek(next)]} ${next}`} at 9:30 a.m. New York time` };
 }
 
 /** The first market day of `day`'s week (Monday to Friday), or null when the market is closed all week. */

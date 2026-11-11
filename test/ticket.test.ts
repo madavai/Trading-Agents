@@ -6,7 +6,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { check, passes, propose, proposeOwn, type Order, type TicketContext } from '../src/desk/ticket.js';
+import { check, edit, passes, propose, proposeOwn, type Order, type TicketContext } from '../src/desk/ticket.js';
+import { equityOrderArgs } from '../src/robinhood/rules.js';
 import { capsFrom, capsOf, DEFAULT_CAPS, DEFAULTS, readSettings, tradingOf } from '../src/settings.js';
 import { Sectors } from '../src/desk/sectors.js';
 import { parseReview, Reviewer } from '../src/robinhood/review.js';
@@ -72,7 +73,7 @@ test('the guard rails on a ticket: one sector, crypto, and the shortest hold, ea
   assert.match(propose({ ...big, symbol: 'BTC-USD', price: 82_000, cryptoHeldUsd: 499.5 }, T, C).why.at(-1)!, /\$0\.50 is under \$1\.00, the smallest crypto order/);
   assert.equal(propose({ ...big, symbol: 'BTC-USD', price: 82_000, held: 0.003658, rating: 'Underweight' }, T, C).order?.quantity, 0.001829, 'half of what is held, to six decimal places');
   assert.equal(passes(check({ ...buy, symbol: 'BTC-USD', quantity: 0.0000001 }, { ...big, symbol: 'BTC-USD' }, T, C)), false, 'no finer than six decimal places');
-  assert.equal(passes(check({ ...buy, quantity: 0.5 }, big, T, C)), false, 'a stock is still bought in whole shares');
+  assert.equal(passes(check({ ...buy, quantity: 0.5 }, big, T, C)), false, 'a limit order of a stock is still whole shares: a part of one is a market order');
   const sell: Order = { ...buy, side: 'sell', quantity: 1 };
   const young = { ...big, held: 2, boughtOn: '2026-10-13', heldDays: 2 };
   const early = check(sell, young, T, C);
@@ -86,15 +87,21 @@ test('the guard rails on a ticket: one sector, crypto, and the shortest hold, ea
 });
 
 test('the person\'s own ticket starts at one whole share at the live price, sells only what is held, and is held to every check', () => {
-  const own = (o: Partial<TicketContext>, side: 'buy' | 'sell') => proposeOwn(ctx({ rating: '', callDate: '', ...o }), side, T);
+  const own = (o: Partial<TicketContext>, side: 'buy' | 'sell', caps = C) => proposeOwn(ctx({ rating: '', callDate: '', ...o }), side, T, caps);
   const buy = own({}, 'buy');
   assert.equal(buy.action, 'your own buy');
   assert.deepEqual(buy.order, { symbol: 'NVDA', side: 'buy', quantity: 1, limitPrice: 182.4, timeInForce: 'gfd' });
   assert.match(buy.why[0]!, /^Your own order: one whole share to start, at Robinhood's live price of \$182\.40\./);
   assert.equal(own({ price: null }, 'buy').order, null, 'no live price, no order');
   assert.match(own({}, 'sell').why[0]!, /holds no NVDA to sell/);
-  assert.equal(own({ held: 0.4 }, 'sell').order, null, 'the desk\'s tickets sell whole shares only');
-  assert.match(own({ held: 0.4 }, 'sell').why.join(' '), /the desk's tickets sell whole shares only/, 'said as the desk\'s own choice, not as a rule of limit orders (audit 1 A5.3)');
+  // Less than one share held: it sells all of it, as a part-share at the market price, the only way Robinhood takes one.
+  assert.deepEqual(own({ held: 0.4 }, 'sell').order, { symbol: 'NVDA', side: 'sell', quantity: 0.4, limitPrice: 182.4, timeInForce: 'gfd', market: true });
+  assert.match(own({ held: 0.4 }, 'sell').why.join(' '), /holds 0\.4 of a share of NVDA, so it sells all of it, a part-share at the market price\. A part-share is a market order/);
+  // One share dearer than the cap or the buying power: it starts as the smallest part-share, which the person changes.
+  const dear = own({ symbol: 'META', price: 648.85 }, 'buy');
+  assert.deepEqual(dear.order, { symbol: 'META', side: 'buy', quantity: 0.001541, limitPrice: 648.85, timeInForce: 'gfd', market: true, dollars: 1 });
+  assert.match(dear.why[0]!, /^Your own order: one share of META costs \$648\.85, more than your cap of \$500\.00 an order, so it starts as a part-share of \$1\.00 at the market price\./);
+  assert.match(own({ symbol: 'META', price: 648.85, buyingPower: 300 }, 'buy', { ...C, perOrderUsd: 1000 }).why[0]!, /more than the buying power of \$300\.00/);
   const sell = own({ held: 3 }, 'sell');
   assert.deepEqual([sell.action, sell.order?.side, sell.order?.quantity], ['your own sell', 'sell', 1]);
   // the same checks as a call's ticket: a person's own order is no way around the caps
@@ -105,7 +112,7 @@ test('the person\'s own ticket starts at one whole share at the live price, sell
   assert.equal(passes(check(buy.order!, ctx({ ordersToday: 3 }), T, C)), false, 'three orders a day');
 });
 
-test('a buy is sized from the account, then held to the caps and buying power, in whole shares', () => {
+test('a buy is sized from the account, then held to the caps and buying power, in whole shares when one fits', () => {
   const full = propose(ctx(), T, C);
   assert.deepEqual(full.order, { symbol: 'NVDA', side: 'buy', quantity: 1, limitPrice: 182.4, timeInForce: 'gfd' });   // 10% of $2,500 is $250: one share at $182.40
   assert.match(full.why.join(' '), /A full position: 10% of the account's \$2,500\.00 is \$250\.00\..*\$250\.00 ÷ \$182\.40, rounded down: 1 share/);
@@ -113,19 +120,74 @@ test('a buy is sized from the account, then held to the caps and buying power, i
   assert.match(propose(ctx({ accountValue: 20_000 }), T, C).why.join(' '), /Your cap of \$500\.00 an order makes it \$500\.00/);
   assert.equal(propose(ctx({ accountValue: 20_000, buyingPower: 200 }), T, C).order?.quantity, 1);
   const half = propose(ctx({ rating: 'Overweight' }), T, C);
-  assert.equal(half.order, null, '5% of $2,500 is $125, less than one share');
-  assert.match(half.why.at(-1)!, /buys less than one share at \$182\.40/);
+  assert.deepEqual(half.order, { symbol: 'NVDA', side: 'buy', quantity: 0.685307, limitPrice: 182.4, timeInForce: 'gfd', market: true, dollars: 125 }, '5% of $2,500 is $125, less than one share: a part of one');
+  assert.match(half.why.join(' '), /One share costs \$182\.40, more than \$125\.00, so a part of a share: \$125\.00 of NVDA, about 0\.685307 of a share at Robinhood's live price\. A part-share is a market order/);
+  assert.doesNotMatch(half.why.join(' '), /Limit price/, 'a part-share has no limit price');
   assert.equal(propose(ctx({ price: null }), T, C).order, null);
   assert.match(propose(ctx({ accountValue: null }), T, C).why.at(-1)!, /no total value/);
   assert.match(propose(ctx({ rating: 'Hold' }), T, C).why[0]!, /place no order for that rating/);
   assert.equal(propose(ctx({ rating: 'Needs review' }), T, C).order, null);
 });
 
-test('a sell is what is held, halved or whole, never more, in whole shares', () => {
+test('a sell is what is held, halved or whole, never more: whole shares when they do the job, else a part-share', () => {
   assert.equal(propose(ctx({ rating: 'Sell' }), T, C).order, null, 'nothing held, nothing to sell');
-  assert.deepEqual(propose(ctx({ rating: 'Sell', held: 7.5 }), T, C).order, { symbol: 'NVDA', side: 'sell', quantity: 7, limitPrice: 182.4, timeInForce: 'gfd' });
-  assert.equal(propose(ctx({ rating: 'Underweight', held: 7 }), T, C).order?.quantity, 3);
-  assert.equal(propose(ctx({ rating: 'Underweight', held: 1 }), T, C).order, null);
+  assert.deepEqual(propose(ctx({ rating: 'Sell', held: 7 }), T, C).order, { symbol: 'NVDA', side: 'sell', quantity: 7, limitPrice: 182.4, timeInForce: 'gfd' }, 'everything held, in whole shares at a limit price');
+  const all = propose(ctx({ rating: 'Sell', held: 7.5 }), T, C);
+  assert.deepEqual(all.order, { symbol: 'NVDA', side: 'sell', quantity: 7.5, limitPrice: 182.4, timeInForce: 'gfd', market: true }, 'everything held, the part of a share included: a market order');
+  assert.match(all.why.join(' '), /Everything held: 7\.5 share\(s\), a part of a share included, so a part-share sold at the market price, about \$1,368\.00 now/);
+  assert.equal(propose(ctx({ rating: 'Underweight', held: 7 }), T, C).order?.quantity, 3, 'half of seven, in whole shares');
+  assert.deepEqual(propose(ctx({ rating: 'Underweight', held: 1 }), T, C).order, { symbol: 'NVDA', side: 'sell', quantity: 0.5, limitPrice: 182.4, timeInForce: 'gfd', market: true }, 'half of one share: a part-share');
+  assert.equal(propose(ctx({ rating: 'Underweight', held: 0.770594, symbol: 'META', price: 648.85 }), T, C).order?.quantity, 0.385297, 'half of a part-share, to six decimal places');
+  assert.match(propose(ctx({ rating: 'Underweight', held: 0.004, price: 182.4 }), T, C).why.at(-1)!, /worth about \$0\.36, under \$1\.00, the smallest part-share order/);
+});
+
+test('a share dearer than the order may spend is bought in part, at the market price: the desk\'s META call of 21 Oct', () => {
+  // Paper's $10,000: an Overweight is half a position, 5%, $500, and the cap is $500; META closed at $648.85 on 22 Oct.
+  const meta = ctx({ symbol: 'META', rating: 'Overweight', accountValue: 10_000, buyingPower: 10_000, price: 648.85 });
+  const p = propose(meta, T, C);
+  assert.deepEqual(p.order, { symbol: 'META', side: 'buy', quantity: 0.770594, limitPrice: 648.85, timeInForce: 'gfd', market: true, dollars: 500 });
+  assert.equal(passes(check(p.order!, meta, T, C)), true);
+  const words = check(p.order!, meta, T, C).map((x) => x.words);
+  assert.deepEqual(words.slice(0, 2), ['$500.00 of META, about 0.770594 of a share at Robinhood\'s live price', "A market order: it fills at the market's price at that moment, about $648.85 a share now; Robinhood's check shows only an estimate"]);
+  assert.ok(words.includes('$500.00 is within your cap of $500.00 an order'), 'the cap is checked on the dollar amount, which a market buy fixes');
+  assert.ok(!words.some((w) => /from Robinhood's live price/.test(w)), 'no limit price, so no check of one');
+  // A whole share that fits keeps a limit order.
+  assert.equal(propose({ ...meta, price: 480 }, T, C).order?.market, undefined);
+  assert.equal(propose({ ...meta, accountValue: 10, buyingPower: 0.5 }, T, C).why.at(-1), '$0.50 is under $1.00, the smallest part-share order.');
+});
+
+test('a part-share is checked as Robinhood takes one: in regular hours, a dollar amount of at least $1, six decimal places', () => {
+  const meta = ctx({ symbol: 'META', accountValue: 10_000, buyingPower: 10_000, price: 648.85 });
+  const buy: Order = { symbol: 'META', side: 'buy', quantity: 0.770594, limitPrice: 648.85, timeInForce: 'gfd', market: true, dollars: 500 };
+  const failing = (o: Partial<Order>, c: Partial<TicketContext> = {}) => check({ ...buy, ...o }, { ...meta, ...c }, T, C).filter((x) => !x.ok).map((x) => x.words).join(' | ');
+  assert.equal(failing({}, { session: { open: true, opens: '' } }), '');
+  assert.ok(check(buy, { ...meta, session: { open: true, opens: '' } }, T, C).some((x) => x.ok && x.words === 'The US market is open, so a part-share can be sent now'));
+  assert.equal(failing({}, { session: { open: false, opens: 'Monday 2026-11-16 at 9:30 a.m. New York time' } }), 'A part-share is sent only while the US market is open, 9:30 a.m. to 4 p.m. New York time: it opens Monday 2026-11-16 at 9:30 a.m. New York time');
+  assert.match(failing({ dollars: 0.5 }), /dollar amount in dollars and cents, at least \$1\.00/);
+  assert.match(failing({ dollars: 10.005 }), /dollars and cents/);
+  assert.match(failing({ dollars: undefined }), /dollar amount/);
+  assert.match(failing({ dollars: 600, quantity: 0.924713 }), /\$600\.00 is over your cap of \$500\.00 an order/);
+  assert.match(failing({}, { price: null }), /no live price for META to estimate the order with/);
+  assert.match(failing({}, { held: 1 }), /META would be 11\.5% of the account; your cap is 10%/, 'what is held counts at the live price, the part-share at its dollar amount');
+  const sell: Order = { symbol: 'META', side: 'sell', quantity: 0.5, limitPrice: 648.85, timeInForce: 'gfd', market: true };
+  assert.equal(passes(check(sell, { ...meta, held: 0.770594 }, T, C)), true);
+  assert.match(check({ ...sell, quantity: 0.0000001 }, { ...meta, held: 0.770594 }, T, C).filter((x) => !x.ok)[0]!.words, /six decimal places/);
+  assert.match(check({ ...sell, quantity: 0.001 }, { ...meta, held: 0.770594 }, T, C).filter((x) => !x.ok)[0]!.words, /About \$0\.65: a part-share order is at least \$1\.00, unless it sells everything held/);
+  assert.equal(passes(check({ ...sell, quantity: 0.001 }, { ...meta, held: 0.001 }, T, C)), true, 'everything held may be less than $1');
+  assert.match(check({ ...sell, quantity: 0.8 }, { ...meta, held: 0.770594 }, T, C).filter((x) => !x.ok)[0]!.words, /Only 0\.770594 share\(s\) are held/);
+  assert.equal(passes(check({ ...buy, symbol: 'BTC-USD' }, { ...meta, symbol: 'BTC-USD' }, T, C)), false, 'crypto is never a market order here');
+});
+
+test('the person switches a ticket between whole shares and a part-share; never its stock or side', () => {
+  const meta = ctx({ symbol: 'META', price: 648.853 });
+  const limit: Order = { symbol: 'META', side: 'buy', quantity: 1, limitPrice: 648.85, timeInForce: 'gtc' };
+  assert.deepEqual(edit(limit, meta, T, { market: true, dollars: 250, symbol: 'TSLA', side: 'sell' }), { symbol: 'META', side: 'buy', quantity: 0.385297, limitPrice: 648.85, timeInForce: 'gfd', market: true, dollars: 250 });
+  assert.deepEqual(edit(limit, meta, T, { quantity: 2, limitPrice: 640 }), { symbol: 'META', side: 'buy', quantity: 2, limitPrice: 640, timeInForce: 'gtc' }, 'a limit order keeps its own time in force');
+  const part = edit(limit, meta, T, { market: true, dollars: 250 });
+  assert.deepEqual(edit(part, meta, T, { quantity: 1, limitPrice: 648.85 }), { symbol: 'META', side: 'buy', quantity: 1, limitPrice: 648.85, timeInForce: 'gfd' }, 'back to whole shares, at the time in force of the person\'s settings');
+  assert.deepEqual(edit({ ...limit, side: 'sell' }, meta, T, { market: true, quantity: 0.25 }), { symbol: 'META', side: 'sell', quantity: 0.25, limitPrice: 648.85, timeInForce: 'gfd', market: true });
+  assert.ok(Number.isNaN(edit(limit, meta, T, { market: true, dollars: '250' }).dollars!), 'a figure must be a number');
+  assert.equal(edit({ ...limit, symbol: 'BTC-USD' }, meta, T, { market: true, quantity: 0.1, limitPrice: 80_000 }).market, undefined, 'crypto stays a limit order');
 });
 
 test('every check an order must pass, each said in plain words', () => {
@@ -155,7 +217,7 @@ test('Robinhood\'s check is read into its alerts, its approval flag and its own 
   assert.equal(parseReview({ failed: true, text: 'account 5RH88004321 is not agentic', data: null }).error, 'account ##### is not agentic', 'the whole account number is hidden, letters and all');
 });
 
-test('the reviewer asks only for Robinhood\'s check, only on the Agentic account, only for a whole limit order', async () => {
+test('the reviewer asks only for Robinhood\'s check, only on the Agentic account, only for an order the desk sends', async () => {
   const calls: string[] = [], reviewed: Array<Record<string, unknown>> = [];
   const [a, b] = InMemoryTransport.createLinkedPair();
   await accountTools(calls, { reviewed, reviewAlerts: ['Market closed: the order would wait for the open.'] }).connect(a);
@@ -168,7 +230,21 @@ test('the reviewer asks only for Robinhood\'s check, only on the Agentic account
   assert.deepEqual(reviewed, [{ account_number: AGENTIC, symbol: 'NVDA', side: 'buy', type: 'limit', quantity: '2', limit_price: '182.40', time_in_force: 'gfd', market_hours: 'regular_hours' }]);
   assert.deepEqual(r.alerts, ['Market closed: the order would wait for the open.']);
   assert.deepEqual(calls, ['review_equity_order'], 'Robinhood\'s check alone; nothing placed');
+  // A part-share: a market order in regular hours, a buy as a dollar amount, never with a limit price.
+  await rv.review({ accountNumber: AGENTIC, agentic: true }, { symbol: 'META', side: 'buy', quantity: 0.770594, limitPrice: 648.85, timeInForce: 'gfd', market: true, dollars: 500 });
+  assert.deepEqual(reviewed[1], { account_number: AGENTIC, symbol: 'META', side: 'buy', type: 'market', dollar_amount: '500.00', time_in_force: 'gfd', market_hours: 'regular_hours' });
+  await assert.rejects(rv.review({ accountNumber: AGENTIC, agentic: true }, { symbol: 'META', side: 'buy', quantity: 0.0015, limitPrice: 648.85, timeInForce: 'gfd', market: true, dollars: 0.99 }), /not complete/, 'under a dollar: not sent');
   await client.close();
+});
+
+test('what the two order doors send is Robinhood\'s own rules: whole shares at a limit, or a part-share at the market in regular hours', () => {
+  const o = (x: Partial<Order>): Order => ({ symbol: 'META', side: 'buy', quantity: 1, limitPrice: 648.85, timeInForce: 'gtc', ...x });
+  assert.deepEqual(equityOrderArgs('A1', o({})), { account_number: 'A1', symbol: 'META', side: 'buy', type: 'limit', quantity: '1', limit_price: '648.85', time_in_force: 'gtc', market_hours: 'regular_hours' });
+  assert.deepEqual(equityOrderArgs('A1', o({ market: true, dollars: 500, quantity: 0.770594 })), { account_number: 'A1', symbol: 'META', side: 'buy', type: 'market', dollar_amount: '500.00', time_in_force: 'gfd', market_hours: 'regular_hours' }, 'a buy is a dollar amount, good for the day, whatever the settings say');
+  assert.deepEqual(equityOrderArgs('A1', o({ side: 'sell', market: true, quantity: 0.5 })), { account_number: 'A1', symbol: 'META', side: 'sell', type: 'market', quantity: '0.5', time_in_force: 'gfd', market_hours: 'regular_hours' });
+  assert.equal(equityOrderArgs('A1', o({ side: 'sell', market: true, quantity: 0.770594 }))!.quantity, '0.770594');
+  assert.equal(equityOrderArgs('A1', o({ side: 'sell', market: true, quantity: 3 }))!.quantity, '3');
+  for (const bad of [o({ quantity: 0.5 }), o({ quantity: 0 }), o({ limitPrice: 0 }), o({ market: true }), o({ market: true, dollars: 0.5 }), o({ market: true, dollars: 10.001 }), o({ side: 'sell', market: true, quantity: 0.0000001 }), o({ side: 'sell', market: true, quantity: -1 }), o({ side: 'hold' as 'buy' })]) assert.equal(equityOrderArgs('A1', bad), null, JSON.stringify(bad));
 });
 
 // ---------- through the dashboard ----------
