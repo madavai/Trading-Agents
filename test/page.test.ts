@@ -444,7 +444,7 @@ test('page-27: Analysis status is a page of its own: the line about who runs the
   assert.doesNotMatch(page, /sec-analyses/);
   // its buttons and its table are written as they were
   assert.match(page, /press\('q-run', 'Run now'\)/);
-  assert.match(page, /\$\('#analysesDo'\)\.innerHTML = l && waiting && !running \? press\('q-run', 'Run now'\) : '';/, 'Run now rings for whichever app listens, and is the only button');
+  assert.match(page, /\$\('#analysesDo'\)\.innerHTML = atOnce \+ \(l && waiting && !running \? press\('q-run', 'Run now'\) : ''\);/, 'Run now rings for whichever app listens; beside it, only the choice of how many at once (side-by-side.test.ts)');
   assert.doesNotMatch(page, /listen-on|listen-off|Run automatically with Claude Code|Stop running automatically|api\.listen|Claude Code/, 'the desk runs analyses only in the app it runs in: no Claude Code button, no Stop, no words offering it');
   assert.match(page, /Nothing is listening, so analyses wait here\. Switch on "Run automatically" in Madav, or ask the desk to "analyse what is waiting" in a chat\./);
   assert.match(page, /<th>Stock<\/th><th>\$\{term\('depth'\)\}<\/th><th class="wrap">Where it stands<\/th><th>Asked<\/th>/);

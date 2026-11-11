@@ -1,7 +1,8 @@
 // The analyses the person asks for on the dashboard, and the contract between the dashboard and whatever runs the agents
 // (Madav's routine, a person typing in a chat). The desk starts no run of its own: it only waits to be asked. Three small files in desk-data:
 // - queue.json: each stock asked for, with the depth asked and where it stands: waiting, running, done or failed.
-//   The dashboard adds and removes; the desk's own tools mark a stock running and finished. One stock runs at a time.
+//   The dashboard adds and removes; the desk's own tools mark a stock running and finished. One run takes stocks from the
+//   list at a time; it analyses one stock at a time, or up to three side by side when the person chooses (`AT_ONCE`).
 // - doorbell.json: written when the person presses Analyse (or Run now), and when a run stops with stocks still waiting.
 //   A runner watches it and starts a run when it changes; the waiting list's own changes never ring it.
 // - listener.json: written by whoever is listening for the doorbell (its name, since when, a heartbeat, its last run),
@@ -62,6 +63,12 @@ export const runEnded = (i: QueueItem): boolean => !i.pid || !alive(i.pid);
 /** At most this many stocks waiting or running, and this many finished ones kept for the person to see (oldest go first). */
 export const MAX_OPEN = 20, MAX_FINISHED = 20;
 
+/** How many stocks one run may analyse side by side: the person's choice on the dashboard. 1 is one at a time, as shipped;
+ *  never more than 3, since each stock's analysts all ask the same free data sources and the same model at once. */
+export const AT_ONCE = [1, 2, 3] as const;
+export type AtOnce = (typeof AT_ONCE)[number];
+export const isAtOnce = (v: unknown): v is AtOnce => (AT_ONCE as readonly unknown[]).includes(v);
+
 /** The words a runner is started with: the analyse playbook's waiting list. Madav's routine "analyse-when-asked" (`.claude/routines.json`) sends the same. */
 export const RUN_WORDS = 'Analyse what is waiting on the dashboard.';
 /** A stock being analysed saves each step as it is written. One with nothing saved for this long (since it started, or
@@ -73,7 +80,7 @@ export const QUIET_REASON = 'nothing was saved for this analysis for two hours, 
 
 /** A refusal the desk's tools and the dashboard say in plain words; `code` lets a playbook tell them apart. */
 export class QueueRefusal extends Error {
-  constructor(readonly code: 'BUSY' | 'NOT_ON_LIST' | 'NOT_WAITING' | 'FINISHED' | 'RUNNING' | 'FULL', message: string) { super(message); }
+  constructor(readonly code: 'BUSY' | 'UNFINISHED' | 'NOT_ON_LIST' | 'NOT_WAITING' | 'FINISHED' | 'RUNNING' | 'FULL', message: string) { super(message); }
 }
 
 const queueFile = (dir: string) => path.join(dir, 'queue.json');
@@ -221,24 +228,28 @@ export function dequeue(dir: string, raw: string, now: Date = new Date()): Queue
 export const byAnother = (i: QueueItem, by?: Runner): boolean => !by || i.runner !== by.runner;
 const signed = (by?: Runner): Pick<QueueItem, 'runner' | 'pid'> => (by ? { runner: by.runner, ...(by.pid ? { pid: by.pid } : {}) } : {});
 
-/** Marks a waiting stock running, for an analysis of `date`, as started by `by` (the run asking). Only one stock runs at a
- *  time, whoever started the run, and a stock another run is analysing is never taken by a second one. */
-export function startItem(dir: string, raw: string, date: string, now: Date = new Date(), by?: Runner): QueueItem {
+/** Marks a waiting stock running, for an analysis of `date`, as started by `by` (the run asking). One run takes stocks from
+ *  the list at a time, whoever started it: while another run has a stock running this one starts none, and a stock another
+ *  run is analysing is never taken by a second one. A run holds at most `atOnce` stocks running (the person's choice:
+ *  1, one at a time, as shipped, up to 3 side by side); asked for one more, it is told to finish one first. */
+export function startItem(dir: string, raw: string, date: string, now: Date = new Date(), by?: Runner, atOnce: AtOnce = 1): QueueItem {
   const symbol = safeSymbol(raw);
   return change(dir, now, (list) => {
     const item = list.find((i) => i.symbol === symbol);
     if (!item) throw new QueueRefusal('NOT_ON_LIST', `${symbol} is not on the waiting list`);
-    const busy = list.find((i) => i.state === 'running' && i.symbol !== symbol);
-    if (busy) {
-      throw new QueueRefusal('BUSY', !by ? `${busy.symbol} is being analysed now: one stock runs at a time`
-        : byAnother(busy, by) ? `${busy.symbol} is being analysed now by another run: one stock runs at a time`
-          : `${busy.symbol}, which this run started, is not finished yet: call finish_queue_item for it (done once its call is recorded, or failed with why) before starting another`);
-    }
+    const others = list.filter((i) => i.state === 'running' && i.symbol !== symbol), theirs = others.find((i) => byAnother(i, by));
+    if (theirs) throw new QueueRefusal('BUSY', `${theirs.symbol} is being analysed now${by ? ' by another run' : ''}: one run takes stocks from the waiting list at a time`);
     if (item.state === 'running') {
-      if (by && item.runner && item.runner !== by.runner) throw new QueueRefusal('BUSY', `${symbol} is being analysed now by another run: one stock runs at a time`);
+      if (by && item.runner && item.runner !== by.runner) throw new QueueRefusal('BUSY', `${symbol} is being analysed now by another run: one run takes stocks from the waiting list at a time`);
       return { list, result: item };   // the same run asking again
     }
     if (item.state !== 'waiting') throw new QueueRefusal('NOT_WAITING', `${symbol} is not waiting (it is ${item.state}): the person presses Retry to ask again`);
+    if (others.length >= atOnce) {
+      const names = others.map((i) => i.symbol).join(' and '), one = others.length === 1;
+      throw new QueueRefusal('UNFINISHED', atOnce === 1
+        ? `${names}, which this run started, is not finished yet: call finish_queue_item for it (done once its call is recorded, or failed with why) before starting another`
+        : `${names}, which this run started, ${one ? 'is' : 'are'} not finished yet, and this run analyses at most ${atOnce} side by side (the person's choice): call finish_queue_item for ${one ? 'it' : 'one of them'} (done once its call is recorded, or failed with why) before starting another`);
+    }
     const started: QueueItem = { ...item, state: 'running', date, startedAt: now.toISOString(), ...signed(by) };
     delete started.endedAt; delete started.rating; delete started.reason; delete started.quiet; delete started.already;
     if (!by) { delete started.runner; delete started.pid; }

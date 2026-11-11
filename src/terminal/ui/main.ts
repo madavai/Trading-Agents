@@ -10,7 +10,7 @@ import { GLOSSARY, glossaryGroups, isTerm, means, type TermKey } from './glossar
 import { markdown } from './md.js';
 import { sameFigures, typedNumber, type Asked } from './typed.js';
 import { DEPTH_ORDER, DEPTH_WORDS, depthChoices, retryDepth } from './depth.js';
-import { isStale, standing } from './analyses.js';
+import { AT_ONCE_CHOICES, AT_ONCE_WHY, atOnceToast, isAtOnceChoice, isStale, paceWords, standing } from './analyses.js';
 import { cryptoBase, deskSymbol, isCrypto } from '../../data/symbols.js';
 import type { Quote, QuoteKind } from '../quotes.js';
 
@@ -227,7 +227,7 @@ function renderGuide(): void {
   const a = g.analyse, ask = toAsk(), l = d!.analyses.listener;
   const analyse = guideStep(3, a.done, `Ask the desk to analyse them, ${term('depth', 'shallow')}, and switch on running automatically`,
     `<div class="at-row">${factChip(a.asked > 0, `${a.asked} asked for`)}${factChip(!!a.automatic, a.automatic ? `runs by itself: ${a.automatic}` : 'not running by itself yet')}</div>
-    <p class="at-quiet ta-gwhy">Shallow is the quickest and costs least: each analysis is a full team run on the models of the app that runs it. Running automatically means each one you ask for starts by itself, one at a time; they are listed under ${STATUS_LINK}.</p>
+    <p class="at-quiet ta-gwhy">Shallow is the quickest and costs least: each analysis is a full team run on the models of the app that runs it. Running automatically means each one you ask for starts by itself, one at a time, or up to three side by side if you choose so; they are listed under ${STATUS_LINK}.</p>
     <div class="at-row">${ask.length ? `<button class="at-btn at-press primary" data-act="guide-ask"${GUIDE.asking ? ' disabled' : ''}><svg class="g"><use href="#i-bot"/></svg><span>${GUIDE.asking ? 'Asking…' : `Ask for your ${ask.length === 1 ? 'pick' : `${ask.length} picks`}, shallow`}</span></button>` : ''}</div>
     ${l ? '' : '<p class="at-quiet">Or switch on "Run automatically" in Madav, if you use it.</p>'}`);
 
@@ -933,10 +933,13 @@ function renderAnalyses(): void {
   // finished one whose stock has a newer call in the journal, or that finished more than a week ago. Waiting, running and failed rows always show.
   const listed = q.filter((x) => !isStale(x, d.calls)), cleared = q.length - listed.length;
   $('#analysesSub').textContent = l
-    ? `Runs by itself: ${l.listener} is listening on this computer${l.lastRun ? ` · last run ${l.lastRun.startOnly ? 'started ' : ''}${when(l.lastRun.at)}: ${l.lastRun.result.replace(/[\s.]+$/, '')}` : ''}. One stock at a time, at most ${d.analyses.perRun} a run.`
+    ? `Runs by itself: ${l.listener} is listening on this computer${l.lastRun ? ` · last run ${l.lastRun.startOnly ? 'started ' : ''}${when(l.lastRun.at)}: ${l.lastRun.result.replace(/[\s.]+$/, '')}` : ''}. ${paceWords(d.analyses.atOnce, d.analyses.perRun)}`
     : 'Nothing is listening, so analyses wait here. Switch on "Run automatically" in Madav, or ask the desk to "analyse what is waiting" in a chat.';
   const press = (act: string, words: string, primary = false) => `<button class="at-btn at-press${primary ? ' primary' : ''}" data-act="${act}">${esc(words)}</button>`;
-  $('#analysesDo').innerHTML = l && waiting && !running ? press('q-run', 'Run now') : '';   // it rings for whichever app listens; the desk starts no run of its own
+  // How many a run analyses side by side: the person's choice, one at a time as shipped (desk/queue.ts AT_ONCE).
+  const n = d.analyses.atOnce;
+  const atOnce = `<span class="at-row" title="${esc(AT_ONCE_WHY)}"><span class="at-quiet">At once</span><span class="at-seg" role="radiogroup" aria-label="How many stocks a run analyses at once">${AT_ONCE_CHOICES.map((c) => `<button class="at-seg-b${c === n ? ' on' : ''}" role="radio" aria-checked="${c === n}" data-act="q-together" data-n="${c}">${c}</button>`).join('')}</span></span>`;
+  $('#analysesDo').innerHTML = atOnce + (l && waiting && !running ? press('q-run', 'Run now') : '');   // Run now rings for whichever app listens; the desk starts no run of its own
   const stands = (x: QueueView): string => {
     if (x.state === 'running') return `<span class="at-chip accent">Being analysed</span> <span class="at-quiet">${esc(x.progress ?? 'starting')}</span>`;
     if (x.state === 'waiting') return `<span class="at-chip">Waiting</span>${l ? '' : ' <span class="at-quiet">for a run to start</span>'}`;
@@ -1574,6 +1577,7 @@ document.addEventListener('click', (e) => {
     case 'ask-yes': void askNow(); break;
     case 'q-retry': { const x = S.desk?.queue.find((i) => i.symbol === sym); void run(async () => { await api.enqueue(sym, retryDepth(x)); await refreshState(); toast(`${sym} is asked for again.`); }); break; }
     case 'q-run': void run(async () => { await api.runQueue(); await refreshState(); toast('Asked for a run of what is waiting.'); }); break;
+    case 'q-together': { const n = Number(el.dataset.n); if (!S.desk || !isAtOnceChoice(n) || n === S.desk.analyses.atOnce) break; remember({ atOnce: n }); S.desk.analyses.atOnce = n; renderAnalyses(); toast(atOnceToast(n)); break; }
     case 'open-call': void openCall(sym, el.dataset.date ?? ''); break;
     case 'decide': if (dlg.open) dlg.close(); if (ready()) void openTicket(sym, el.dataset.date ?? ''); break;
     case 'trade': if (dlg.open) dlg.close(); if (ready()) void openTicket(sym, '', el.dataset.side === 'sell' ? 'sell' : 'buy'); break;

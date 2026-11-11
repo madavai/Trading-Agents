@@ -68,9 +68,9 @@ test('routines-1, server-1, server-2: a run that finds another run analysing sto
     }
     assert.equal(owed, 0, 'the listener\'s run asked for no other run while AAPL is another run\'s');
     const list = await listener.call('read_queue');
-    assert.match(list, /^Being analysed now by another run: AAPL \(started \d\d:\d\d UTC\)\. One stock runs at a time: stop this run and say so\. Do not call end_queue_run: the run analysing AAPL asks for the next run itself when it finishes\./);
+    assert.match(list, /^Being analysed now by another run: AAPL \(started \d\d:\d\d UTC\)\. One run takes stocks from the waiting list at a time: stop this run and say so\. Do not call end_queue_run: the run analysing AAPL asks for the next run itself when it finishes\./);
     assert.match(await listener.call('end_queue_run'), /^AAPL is being analysed by another run, which asks for the next run itself when it finishes: no run was asked for here\. 2 still waiting\./);
-    assert.match(await listener.call('start_queue_item', { symbol: 'MSFT' }), /^BUSY: AAPL is being analysed now by another run: one stock runs at a time/);
+    assert.match(await listener.call('start_queue_item', { symbol: 'MSFT' }), /^BUSY: AAPL is being analysed now by another run: one run takes stocks from the waiting list at a time/);
     // the routine's own run finishes AAPL and ends: then, and only then, the next run is asked for
     recordCall(dir, 'AAPL', DAY);
     assert.match(await routine.call('finish_queue_item', { symbol: 'AAPL' }), /^Marked done: AAPL, Buy/);
@@ -201,7 +201,7 @@ test('routines-5: a morning that starts while another run analyses leaves the wa
   enqueue(dir, 'AAPL', '2026-11-09T12:00:00Z'); enqueue(dir, 'MSFT', '2026-11-09T12:00:01Z');
   startItem(dir, 'AAPL', DAY, new Date(), { runner: 'listener-run', pid: process.pid });
   const brief = morningBrief(dir, DAY, 5);
-  assert.match(brief, /AAPL is being analysed now by another run: leave it alone\. Waiting on the dashboard, left to that run \(one stock runs at a time\): MSFT\. Do not start them from this routine\./);
+  assert.match(brief, /AAPL is being analysed now by another run: leave it alone\. Waiting on the dashboard, left to that run \(one run takes stocks from the waiting list at a time\): MSFT\. Do not start them from this routine\./);
   assert.match(brief, /2\. Analyse, one after another, in this order \(1 of at most 5 a morning\), each by the \/analyse playbook with today's date:\n {3}1\. NVDA \(a starred watchlist stock\)\n/);
   assert.doesNotMatch(brief, /end_queue_run/);
 });

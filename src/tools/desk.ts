@@ -17,7 +17,7 @@ import { cells, iterGrid, renderSummary, summarize } from '../desk/backtest.js';
 import { buildPlan, journalOf, NeedsEmail, renderPlan, runContext, scoredWords, type Plan } from '../desk/plan.js';
 import { checkWords, rulesFor, windowWords, WHEN_SCORED, type Rules } from '../desk/scoring.js';
 import { SWEEP_ID, workspaceOf } from '../desk/workspace.js';
-import { byAnother, DEPTHS, finishItem, QueueRefusal, readQueue, ringDoorbell, RUNNER_ID, startItem, waitingIn, type Depth, type Runner } from '../desk/queue.js';
+import { byAnother, DEPTHS, finishItem, QueueRefusal, readQueue, ringDoorbell, RUNNER_ID, startItem, waitingIn, type Depth, type QueueItem, type Runner } from '../desk/queue.js';
 import { Journal } from '../desk/journal.js';
 import { writeWhole } from '../desk/lock.js';
 import { parseRating, RATINGS } from '../desk/rating.js';
@@ -311,7 +311,7 @@ export function registerDeskTools(server: McpServer, root: string): void {
         look = { screen: readScreen(dir) ?? worked, on };
       } catch (e) { look = { screen: null, failed: (e as Error).message, on }; }
     }
-    return morningBrief(dir, day, readSettings(root).routines.maxAnalyses, look, { now: new Date() });
+    return morningBrief(dir, day, readSettings(root).routines.maxAnalyses, look, { now: new Date() }, readPrefs(dir).atOnce ?? 1);
   }));
 
   server.registerTool('open_dashboard', {
@@ -321,15 +321,16 @@ export function registerDeskTools(server: McpServer, root: string): void {
   }, async () => act(() => openDashboard(root)));
 
   // The waiting list: the stocks the person asked for on the dashboard, and those Monday's re-rating and the morning switch
-  // put there. A run takes them one at a time, in order, up to the
-  // routines' limit: start_queue_item marks one running (one at a time, whoever started the run), finish_queue_item marks
-  // it done with the rating recorded or failed with why, and end_queue_run asks for another run when stocks still wait.
+  // put there. One run takes them at a time, in order, up to the routines' limit, one stock at a time or up to three side by
+  // side (the person's choice on the dashboard, `atOnce`): start_queue_item marks one running (never while another run has
+  // one), finish_queue_item marks it done with the rating recorded or failed with why, and end_queue_run asks for another
+  // run when stocks still wait.
   // Which run asks: this copy of the desk's tools, one per conversation. A launcher may give its run an id (each
   // copy its run starts shares it); any other conversation's copy makes its own. With its process, it is noted on each
   // stock this run starts, so a second run never takes it and only its own run's end finishes it.
   const given = process.env.TRADING_AGENTS_RUN;
   const me: Runner = { runner: given && RUNNER_ID.test(given) ? given : `tools-${randomUUID().slice(0, 8)}`, pid: process.pid };
-  const perRun = () => readSettings(root).routines.maxAnalyses;
+  const perRun = () => readSettings(root).routines.maxAnalyses, atOnce = () => readPrefs(dir).atOnce ?? 1;
   const depthWords = (d: Depth | undefined) => (d ? `${d} (debate_rounds ${DEPTHS[d]} and risk_rounds ${DEPTHS[d]})` : "the settings' depth (leave the rounds out)");
   const called = (sym: string, d: string) => new Journal(path.join(dir, 'journal.md')).load().find((e) => e.ticker === sym && e.date === d);
   const queueAct = (run: () => string) => act(() => { try { return run(); } catch (e) { if (e instanceof QueueRefusal) return `${e.code}: ${e.message}.`; throw e; } });
@@ -339,29 +340,32 @@ export function registerDeskTools(server: McpServer, root: string): void {
     description: 'The waiting list: the stocks the person asked the desk to analyse on the dashboard, and those Monday\'s re-rating and the morning switch put on it. It gives those waiting, in the order to run them, each with the depth asked, any being analysed now, and how many one run may analyse. /analyse with no ticker runs them. Read-only.',
     annotations: { readOnlyHint: true, openWorldHint: false },
   }, async () => act(() => {
-    const list = readQueue(dir), waiting = waitingIn(list), running = list.find((i) => i.state === 'running');
-    const lines: string[] = [], since = `started ${running?.startedAt?.slice(11, 16) ?? '?'} UTC`, another = !!running && byAnother(running, me);
+    const list = readQueue(dir), waiting = waitingIn(list), running = list.filter((i) => i.state === 'running'), n = atOnce();
+    const theirs = running.filter((i) => byAnother(i, me)), mine = running.filter((i) => !byAnother(i, me)), lines: string[] = [];
+    const since = (i: QueueItem) => `${i.symbol} (started ${i.startedAt?.slice(11, 16) ?? '?'} UTC)`, names = (l: QueueItem[]) => l.map((i) => i.symbol).join(' and ');
     // Another run's stock: this run stops, and asks for no other run, which would only find the same and stop (a loop).
-    if (running && another) lines.push(`Being analysed now by another run: ${running.symbol} (${since}). One stock runs at a time: stop this run and say so. Do not call end_queue_run: the run analysing ${running.symbol} asks for the next run itself when it finishes.`);
-    if (running && !another) lines.push(`Being analysed now by this run: ${running.symbol} (${since}). Finish it with finish_queue_item (done once its call is recorded, or failed with why) before starting another.`);
+    if (theirs.length) lines.push(`Being analysed now by another run: ${theirs.map(since).join(', ')}. One run takes stocks from the waiting list at a time: stop this run and say so. Do not call end_queue_run: the run analysing ${names(theirs)} asks for the next run itself when it finishes.`);
+    if (mine.length) lines.push(`Being analysed now by this run: ${mine.map(since).join(', ')}. Finish ${mine.length === 1 ? 'it' : 'each'} with finish_queue_item (done once its call is recorded, or failed with why)${mine.length >= n ? ' before starting another' : ''}.`);
     if (!waiting.length) {
       const doneN = list.filter((i) => i.state === 'done').length, failedN = list.filter((i) => i.state === 'failed').length;
       const kept = [doneN ? `${doneN} done` : '', failedN ? `${failedN} failed (the person presses Retry on the dashboard to ask again)` : ''].filter(Boolean).join(' and ');
       lines.push(!list.length ? 'Nothing is waiting: the list is empty.'
-        : `Nothing ${running ? 'else ' : ''}is waiting.${kept ? ` The list also keeps finished analyses for the person to see, ${kept}: none of them needs a run.` : ''}`);
-    } else if (another) {
-      lines.push(`Waiting behind it, left to that run: ${waiting.map((i) => i.symbol).join(', ')}.`);
+        : `Nothing ${running.length ? 'else ' : ''}is waiting.${kept ? ` The list also keeps finished analyses for the person to see, ${kept}: none of them needs a run.` : ''}`);
+    } else if (theirs.length) {
+      lines.push(`Waiting behind ${theirs.length === 1 ? 'it' : 'them'}, left to that run: ${waiting.map((i) => i.symbol).join(', ')}.`);
     } else {
-      lines.push(`${waiting.length} waiting, in the order to run them; one run analyses at most ${perRun()}:`);
-      waiting.forEach((i, n) => lines.push(`${n + 1}. ${i.symbol}, depth ${depthWords(i.depth)}, asked ${i.requestedAt.slice(0, 16).replace('T', ' ')} UTC`));
-      lines.push('For each, in order: start_queue_item, the analysis, then finish_queue_item. At the end, end_queue_run.');
+      lines.push(`${waiting.length} waiting, in the order to run them; one run analyses at most ${perRun()}${n > 1 ? `, up to ${n} side by side (the person's choice)` : ''}:`);
+      waiting.forEach((i, k) => lines.push(`${k + 1}. ${i.symbol}, depth ${depthWords(i.depth)}, asked ${i.requestedAt.slice(0, 16).replace('T', ' ')} UTC`));
+      lines.push(n > 1
+        ? `Keep up to ${n} of them going side by side, in this order, as the playbook's waiting list says: start_queue_item for each, their steps in rounds, finish_queue_item for each once its call is recorded, then the next waiting one in its place. At the end, end_queue_run.`
+        : 'For each, in order: start_queue_item, the analysis, then finish_queue_item. At the end, end_queue_run.');
     }
     return lines.join('\n');
   }));
 
   server.registerTool('start_queue_item', {
     title: 'Start a waiting analysis',
-    description: 'Mark a stock from the waiting list as being analysed now, before its analysis starts, so the dashboard shows it running. It answers the date and the debate rounds to plan with. BUSY means another run is analysing a stock: stop this run, without end_queue_run. ALREADY means it was called today: it is marked done, take the next. NOT STARTED means it cannot run now (it says why, and it is marked failed with that reason): take the next.',
+    description: 'Mark a stock from the waiting list as being analysed now, before its analysis starts, so the dashboard shows it running. It answers the date and the debate rounds to plan with. BUSY means another run is analysing a stock: stop this run, without end_queue_run. UNFINISHED means this run already has as many stocks going as it may analyse side by side: finish one with finish_queue_item first. ALREADY means it was called today: it is marked done, take the next. NOT STARTED means it cannot run now (it says why, and it is marked failed with that reason): take the next.',
     inputSchema: { symbol },
     annotations: write,
   }, async (a) => queueAct(() => {
@@ -373,7 +377,7 @@ export function registerDeskTools(server: McpServer, root: string): void {
       finishItem(dir, sym, { reason: `A backtest that includes ${sym} on ${d} is running, so an analysis now would be recorded in the backtest, not in the desk's journal: press Retry once it has ended.` }, new Date(), me);
       return `NOT STARTED: ${sym} on ${d} is a cell of the backtest sweep ${sweep}, which is running, so its analysis would be recorded in the sweep, not the live journal. It is marked failed with why; the person presses Retry once the backtest has ended. Take the next.`;
     }
-    const item = startItem(dir, sym, d, new Date(), me);
+    const item = startItem(dir, sym, d, new Date(), me, atOnce());
     return `START: ${sym} is marked as being analysed. Plan it with analysis date ${d}, depth ${depthWords(item.depth)}. When its call is recorded, call finish_queue_item; if it cannot be finished, call finish_queue_item with failed_because.`;
   }));
 
@@ -395,14 +399,14 @@ export function registerDeskTools(server: McpServer, root: string): void {
 
   server.registerTool('end_queue_run', {
     title: 'End a run of the waiting list',
-    description: 'Call once when a run of the waiting list stops. A stock this run started and left unfinished is marked failed. If stocks are still waiting (the run reached its limit, or stopped early), it asks whoever listens on this computer for another run, unless another run is analysing a stock: that run asks when it finishes. Answers one line to end the run with.',
+    description: 'Call once when a run of the waiting list stops. Each stock this run started and left unfinished is marked failed. If stocks are still waiting (the run reached its limit, or stopped early), it asks whoever listens on this computer for another run, unless another run is analysing a stock: that run asks when it finishes. Answers one line to end the run with.',
     annotations: write,
   }, async () => act(() => {
-    const now = new Date(), left = readQueue(dir, now).find((i) => i.state === 'running' && !byAnother(i, me));
-    if (left) finishItem(dir, left.symbol, { reason: 'The run analysing it ended before it was finished, without saying why: press Retry to ask again.' }, now, me);
+    const now = new Date(), left = readQueue(dir, now).filter((i) => i.state === 'running' && !byAnother(i, me));
+    for (const i of left) finishItem(dir, i.symbol, { reason: 'The run analysing it ended before it was finished, without saying why: press Retry to ask again.' }, now, me);
     const list = readQueue(dir), waiting = waitingIn(list).length, other = list.find((i) => i.state === 'running');
     const doneN = list.filter((i) => i.state === 'done').length, failedN = list.filter((i) => i.state === 'failed').length;
-    const tally = `On the dashboard's list: ${doneN} done, ${failedN} failed.`, mine = left ? `Marked failed: ${left.symbol}, which this run left unfinished without saying why. ` : '';
+    const tally = `On the dashboard's list: ${doneN} done, ${failedN} failed.`, mine = left.length ? `Marked failed: ${left.map((i) => i.symbol).join(', ')}, which this run left unfinished without saying why. ` : '';
     if (other) return `${mine}${other.symbol} is being analysed by another run, which asks for the next run itself when it finishes: no run was asked for here. ${waiting ? `${waiting} still waiting.` : 'Nothing else is waiting.'} ${tally}`;
     if (waiting) ringDoorbell(dir, 'more');
     return `${mine}${waiting ? `${waiting} still waiting: another run was asked for.` : 'Nothing is waiting.'} ${tally}`;

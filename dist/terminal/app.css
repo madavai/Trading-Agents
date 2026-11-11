@@ -1137,5 +1137,7 @@ details[open] > .at-input.at-select { border-color: var(--accent); }
 
 /* the Analyse box's choices (the settings' rounds and the three depths): on a phone, on two lines rather than out of the box */
 #askDialog .at-seg { flex-wrap: wrap; }
+/* Analysis status's top right (At once, Run now, Back to the desk): on a phone, on two lines rather than past the page's edge */
+#view-analyses .at-page-head > .at-head-tail { flex: 0 1 auto; flex-wrap: wrap; min-width: 0; }
 /* a sentence's pointer to a page: the words, underlined, that open it */
 .ta-link { padding: 0; border: 0; background: none; font: inherit; color: var(--accent); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }

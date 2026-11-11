@@ -3,7 +3,7 @@
     {
       "name": "analyse-when-asked",
       "title": "Run automatically when the dashboard asks",
-      "description": "When you press Analyse on the dashboard, the desk analyses the stocks waiting there, one at a time, and never places an order.",
+      "description": "When you press Analyse on the dashboard, the desk analyses the stocks waiting there, one at a time (or up to three side by side, if you choose so on its Analysis status page), and never places an order.",
       "agent": "trading-desk",
       "prompt": "Analyse what is waiting on the dashboard.",
       "watch": "desk-data/doorbell.json",

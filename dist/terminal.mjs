@@ -21744,6 +21744,8 @@ function alive(pid) {
 var runEnded = (i) => !i.pid || !alive(i.pid);
 var MAX_OPEN = 20;
 var MAX_FINISHED = 20;
+var AT_ONCE = [1, 2, 3];
+var isAtOnce = (v) => AT_ONCE.includes(v);
 var QUIET_MS = 2 * 60 * 6e4;
 var QUIET_REASON = "nothing was saved for this analysis for two hours, so its run has most likely stopped: press Retry. If it was still going, it shows done once its call is recorded";
 var QueueRefusal = class extends Error {
@@ -22341,6 +22343,7 @@ function cleanPrefs(raw) {
   const guide = one(r.guide, ["open", "away"]);
   if (guide) out.guide = guide;
   if (typeof r.readCall === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.readCall)) out.readCall = r.readCall;
+  if (isAtOnce(r.atOnce)) out.atOnce = r.atOnce;
   return out;
 }
 var prefsFile = (dir) => path14.join(dir, "dashboard.json");
@@ -22476,7 +22479,7 @@ function versionOf(root2) {
   } catch {
   }
   const p = readPrefs(dir);
-  const timely = `${listenerOf(dir) ? "L" : "n"}${readQueue(dir).map((i) => i.state[0]).join("")}|${p.guide ?? ""}${p.readCall ? "r" : ""}|${today()}`;
+  const timely = `${listenerOf(dir) ? "L" : "n"}${readQueue(dir).map((i) => i.state[0]).join("")}|${p.guide ?? ""}${p.readCall ? "r" : ""}${p.atOnce ?? 1}|${today()}`;
   return [stamp(path15.join(dir, "journal.md")), stamp(path15.join(dir, "watchlist.json")), stamp(path15.join(dir, "queue.json")), latest, stamp(path15.join(dir, "contact.json")), stamp(path15.join(dir, "listener.json")), stamp(path15.join(dir, "paper.json")), timely].join("-");
 }
 function queueOf(dir, now = /* @__PURE__ */ new Date()) {
@@ -22522,7 +22525,7 @@ function stateOf(root2, day2) {
     guide,
     record: { summary, text: renderSummary(summary), benchmarkNote: scoringNote(entries, s.scoring) },
     desk: { emailSaved: !!email2, tradingEnabled: false, holdingDays: s.scoring.holdingPeriodDays, benchmark: resolveBenchmark("SPY", s.scoring), scoring: scoringShort(s.scoring) },
-    analyses: { depth: depthOfRounds(s.analysis.debateRounds), rounds: { debate: s.analysis.debateRounds, risk: s.analysis.riskRounds }, perRun: s.routines.maxAnalyses, listener },
+    analyses: { depth: depthOfRounds(s.analysis.debateRounds), rounds: { debate: s.analysis.debateRounds, risk: s.analysis.riskRounds }, perRun: s.routines.maxAnalyses, atOnce: prefs.atOnce ?? 1, listener },
     paper: { ...record2, startUsd: readPaperStart(dir), minWeeks: RECORD_WEEKS, minWords: RECORD_WORDS }
   };
 }

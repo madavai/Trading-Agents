@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { safeSymbol } from '../data/symbols.js';
 import { withLock, writeWhole } from '../desk/lock.js';
+import { isAtOnce, type AtOnce } from '../desk/queue.js';
 import { addWatch, MAX_WATCH, readWatchlist } from './store.js';
 import { SHIPPED_MARKET, TIERS, type Tier } from './tiers.js';
 
@@ -35,6 +36,9 @@ export interface Prefs {
   /** The day the person first opened one of the desk's calls in full: the guide's fourth step. Set only by the dashboard
    *  when it serves a call, never by the page's choices. */
   readCall?: string;
+  /** How many stocks one run of the waiting list analyses side by side: 1 (one at a time, as shipped), 2 or 3. Set only by
+   *  its own choice on "Analysis status"; the desk's tools read it when a run starts a stock (`read_queue`, `start_queue_item`). */
+  atOnce?: AtOnce;
 }
 
 export const MAX_RECENT = 6;
@@ -73,6 +77,7 @@ export function cleanPrefs(raw: unknown): Prefs {
   if (typeof r.morningFrom === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.morningFrom)) out.morningFrom = r.morningFrom;
   const guide = one(r.guide, ['open', 'away'] as const); if (guide) out.guide = guide;
   if (typeof r.readCall === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.readCall)) out.readCall = r.readCall;
+  if (isAtOnce(r.atOnce)) out.atOnce = r.atOnce;
   return out;
 }
 

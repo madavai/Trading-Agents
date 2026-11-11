@@ -40864,6 +40864,8 @@ function alive(pid) {
 var runEnded = (i) => !i.pid || !alive(i.pid);
 var MAX_OPEN = 20;
 var MAX_FINISHED = 20;
+var AT_ONCE = [1, 2, 3];
+var isAtOnce = (v) => AT_ONCE.includes(v);
 var QUIET_MS = 2 * 60 * 6e4;
 var QUIET_REASON = "nothing was saved for this analysis for two hours, so its run has most likely stopped: press Retry. If it was still going, it shows done once its call is recorded";
 var QueueRefusal = class extends Error {
@@ -40987,20 +40989,22 @@ function enqueue(dir, raw, at, depth, now = /* @__PURE__ */ new Date()) {
 }
 var byAnother = (i, by) => !by || i.runner !== by.runner;
 var signed3 = (by) => by ? { runner: by.runner, ...by.pid ? { pid: by.pid } : {} } : {};
-function startItem(dir, raw, date5, now = /* @__PURE__ */ new Date(), by) {
+function startItem(dir, raw, date5, now = /* @__PURE__ */ new Date(), by, atOnce = 1) {
   const symbol4 = safeSymbol(raw);
   return change2(dir, now, (list2) => {
     const item = list2.find((i) => i.symbol === symbol4);
     if (!item) throw new QueueRefusal("NOT_ON_LIST", `${symbol4} is not on the waiting list`);
-    const busy = list2.find((i) => i.state === "running" && i.symbol !== symbol4);
-    if (busy) {
-      throw new QueueRefusal("BUSY", !by ? `${busy.symbol} is being analysed now: one stock runs at a time` : byAnother(busy, by) ? `${busy.symbol} is being analysed now by another run: one stock runs at a time` : `${busy.symbol}, which this run started, is not finished yet: call finish_queue_item for it (done once its call is recorded, or failed with why) before starting another`);
-    }
+    const others = list2.filter((i) => i.state === "running" && i.symbol !== symbol4), theirs = others.find((i) => byAnother(i, by));
+    if (theirs) throw new QueueRefusal("BUSY", `${theirs.symbol} is being analysed now${by ? " by another run" : ""}: one run takes stocks from the waiting list at a time`);
     if (item.state === "running") {
-      if (by && item.runner && item.runner !== by.runner) throw new QueueRefusal("BUSY", `${symbol4} is being analysed now by another run: one stock runs at a time`);
+      if (by && item.runner && item.runner !== by.runner) throw new QueueRefusal("BUSY", `${symbol4} is being analysed now by another run: one run takes stocks from the waiting list at a time`);
       return { list: list2, result: item };
     }
     if (item.state !== "waiting") throw new QueueRefusal("NOT_WAITING", `${symbol4} is not waiting (it is ${item.state}): the person presses Retry to ask again`);
+    if (others.length >= atOnce) {
+      const names = others.map((i) => i.symbol).join(" and "), one3 = others.length === 1;
+      throw new QueueRefusal("UNFINISHED", atOnce === 1 ? `${names}, which this run started, is not finished yet: call finish_queue_item for it (done once its call is recorded, or failed with why) before starting another` : `${names}, which this run started, ${one3 ? "is" : "are"} not finished yet, and this run analyses at most ${atOnce} side by side (the person's choice): call finish_queue_item for ${one3 ? "it" : "one of them"} (done once its call is recorded, or failed with why) before starting another`);
+    }
     const started = { ...item, state: "running", date: date5, startedAt: now.toISOString(), ...signed3(by) };
     delete started.endedAt;
     delete started.rating;
@@ -41215,13 +41219,14 @@ import fs12 from "node:fs";
 import path13 from "node:path";
 var REFUSALS_TO_LEAVE = 2;
 var NOTES_IDLE_MS = 60 * 6e4;
+var SKEW_MS = 6e4;
 var MAX_WHY = 600;
 var keyOf2 = (ticker, date5) => `${ticker}|${date5}`;
 var fileOf = (j, kind) => path13.join(path13.dirname(j.file), `${kind}.json`);
 function readNotes(j, kind, now) {
   try {
     const n2 = JSON.parse(fs12.readFileSync(fileOf(j, kind), "utf8"));
-    if (typeof n2.at === "number" && now - n2.at < NOTES_IDLE_MS && now >= n2.at) {
+    if (typeof n2.at === "number" && now - n2.at < NOTES_IDLE_MS && now >= n2.at - SKEW_MS) {
       const refused = {};
       for (const [k, v] of Object.entries(n2.refused ?? {})) {
         if (typeof v?.n === "number" && typeof v.why === "string") refused[k] = { n: v.n, why: v.why, saved: typeof v.saved === "number" ? v.saved : -1 };
@@ -41237,39 +41242,53 @@ function readNotes(j, kind, now) {
 }
 function writeNotes(j, kind, notes, now) {
   try {
-    writeWhole(fileOf(j, kind), JSON.stringify({ ...notes, at: now }));
+    writeWhole(fileOf(j, kind), JSON.stringify({ ...notes, at: Math.max(now, notes.at) }));
   } catch {
+  }
+}
+function changing(j, kind, edit) {
+  try {
+    return withLock(fileOf(j, kind), edit);
+  } catch (e) {
+    if (e.code === "ENOENT" || /in use by another run/.test(e.message)) return edit();
+    throw e;
   }
 }
 function noteStep(j, kind, now, saved) {
-  const notes = readNotes(j, kind, now);
-  if (saved) {
-    notes.saved++;
-    delete notes.refused[keyOf2(saved.ticker, saved.date)];
-    const unrowed = (notes.unrowed ?? []).filter((k) => k !== keyOf2(saved.ticker, saved.date));
-    if (unrowed.length) notes.unrowed = unrowed;
-    else delete notes.unrowed;
-  }
-  writeNotes(j, kind, notes, now);
+  changing(j, kind, () => {
+    const notes = readNotes(j, kind, now);
+    if (saved) {
+      notes.saved++;
+      delete notes.refused[keyOf2(saved.ticker, saved.date)];
+      const unrowed = (notes.unrowed ?? []).filter((k) => k !== keyOf2(saved.ticker, saved.date));
+      if (unrowed.length) notes.unrowed = unrowed;
+      else delete notes.unrowed;
+    }
+    writeNotes(j, kind, notes, now);
+  });
 }
 function noteRows(j, kind, shown2, now) {
-  const notes = readNotes(j, kind, now), before = notes.unrowed ?? [];
-  const after = [.../* @__PURE__ */ new Set([...before.filter((k) => !shown2.with.includes(k)), ...shown2.without])];
-  if (after.length === before.length && after.every((k) => before.includes(k))) return;
-  const { unrowed: _, ...rest } = notes;
-  try {
-    writeWhole(fileOf(j, kind), JSON.stringify(after.length ? { ...rest, unrowed: after } : rest));
-  } catch {
-  }
+  changing(j, kind, () => {
+    const notes = readNotes(j, kind, now), before = notes.unrowed ?? [];
+    const after = [.../* @__PURE__ */ new Set([...before.filter((k) => !shown2.with.includes(k)), ...shown2.without])];
+    if (after.length === before.length && after.every((k) => before.includes(k))) return;
+    const { unrowed: _, ...rest } = notes;
+    try {
+      writeWhole(fileOf(j, kind), JSON.stringify(after.length ? { ...rest, unrowed: after } : rest));
+    } catch {
+    }
+  });
 }
 var listedUnrowed = (notes, ticker, date5) => (notes.unrowed ?? []).includes(keyOf2(ticker, date5));
 function countRefusal(j, kind, ticker, date5, why, now) {
-  const notes = readNotes(j, kind, now), key = keyOf2(ticker, date5), before = notes.refused[key];
-  const n2 = (before?.n ?? 0) + 1;
-  notes.refused[key] = { n: n2, why: why.slice(0, MAX_WHY), saved: notes.saved };
-  writeNotes(j, kind, notes, now);
-  if (n2 < REFUSALS_TO_LEAVE) return { n: n2, answer: "again" };
-  return { n: n2, answer: before && before.n >= REFUSALS_TO_LEAVE && before.saved === notes.saved ? "stop" : "left" };
+  return changing(j, kind, () => {
+    const notes = readNotes(j, kind, now), key = keyOf2(ticker, date5), before = notes.refused[key];
+    const n2 = (before?.n ?? 0) + 1;
+    notes.refused[key] = { n: n2, why: why.slice(0, MAX_WHY), saved: notes.saved };
+    writeNotes(j, kind, notes, now);
+    if (n2 < REFUSALS_TO_LEAVE) return { n: n2, answer: "again" };
+    return { n: n2, answer: before && before.n >= REFUSALS_TO_LEAVE && before.saved === notes.saved ? "stop" : "left" };
+  });
 }
 function leftIn(notes, ticker, date5) {
   const r = notes.refused[keyOf2(ticker, date5)];
@@ -41962,8 +41981,8 @@ function morningList(dir, today2, max, screen = null) {
   const entries = new Journal(path19.join(dir, "journal.md")).load(), latest = /* @__PURE__ */ new Map();
   for (const e of entries) if ((latest.get(e.ticker) ?? "") < e.date) latest.set(e.ticker, e.date);
   const called = new Set(entries.filter((e) => e.date === today2).map((e) => e.ticker));
-  const queue2 = readQueue(dir), running = queue2.find((q) => q.state === "running")?.symbol ?? null, leftToRun = [];
-  const wanted = [], seen = new Set(running ? [running] : []);
+  const queue2 = readQueue(dir), running = queue2.filter((q) => q.state === "running").map((q) => q.symbol), leftToRun = [];
+  const wanted = [], seen = new Set(running);
   const add = (symbol4, why2, queued) => {
     if (!seen.has(symbol4) && !called.has(symbol4)) {
       seen.add(symbol4);
@@ -41978,7 +41997,7 @@ function morningList(dir, today2, max, screen = null) {
   };
   for (const q of queue2) {
     if (q.state !== "waiting") continue;
-    if (running && !called.has(q.symbol)) {
+    if (running.length && !called.has(q.symbol)) {
       leftToRun.push(q.symbol);
       seen.add(q.symbol);
     } else add(q.symbol, why(q), true);
@@ -41992,9 +42011,9 @@ function whereNow(symbols, m2, max) {
   const step2 = new Set(m2.analyse.map((a) => a.symbol)), called = new Set(m2.calledToday), left = new Set(m2.leftToRun), later = new Set(m2.later);
   const groups = [
     { words: () => "analysed in step 2", names: symbols.filter((s) => step2.has(s)) },
-    { words: () => "being analysed now by another run", names: symbols.filter((s) => s === m2.running) },
-    { words: () => "already called today, so not analysed again", names: symbols.filter((s) => !step2.has(s) && s !== m2.running && called.has(s)) },
-    { words: () => `left on the dashboard to the run analysing ${m2.running} (one stock runs at a time)`, names: symbols.filter((s) => !called.has(s) && left.has(s)) },
+    { words: () => "being analysed now by another run", names: symbols.filter((s) => m2.running.includes(s)) },
+    { words: () => "already called today, so not analysed again", names: symbols.filter((s) => !step2.has(s) && !m2.running.includes(s) && called.has(s)) },
+    { words: () => `left on the dashboard to the run analysing ${m2.running.join(" and ")} (one run takes stocks from the waiting list at a time)`, names: symbols.filter((s) => !called.has(s) && left.has(s)) },
     { words: (n2) => `over today's limit of ${max}, so ${n2 === 1 ? "it waits" : "they wait"} on the dashboard`, names: symbols.filter((s) => !called.has(s) && later.has(s)) }
   ];
   const told = new Set(groups.flatMap((g) => g.names));
@@ -42077,7 +42096,7 @@ function doneAlready(dir, today2) {
   }
   return marked;
 }
-function morningBrief(dir, today2, max, look, clock2) {
+function morningBrief(dir, today2, max, look, clock2, atOnce = 1) {
   const closed = marketClosed(today2);
   if (closed) return closedBrief(dir, today2, closed, clock2);
   const day3 = weekday2(today2), marked = doneAlready(dir, today2);
@@ -42087,10 +42106,11 @@ function morningBrief(dir, today2, max, look, clock2) {
   lines.push("", `1. Score past calls first: list_settlements, then record_outcome with a lesson for each READY call (the /settle playbook). ${LEFT_CALLS}`);
   if (isRerateDay(today2)) lines.push(...rerateLines(dir, today2, m2, max));
   lines.push(...lookLines(look, today2, m2, max));
-  if (m2.running) lines.push("", `   ${m2.running} is being analysed now by another run: leave it alone.${m2.leftToRun.length ? ` Waiting on the dashboard, left to that run (one stock runs at a time): ${m2.leftToRun.join(", ")}. Do not start them from this routine.` : ""}`);
+  const one3 = m2.running.length === 1;
+  if (m2.running.length) lines.push("", `   ${m2.running.join(" and ")} ${one3 ? "is" : "are"} being analysed now by another run: leave ${one3 ? "it" : "them"} alone.${m2.leftToRun.length ? ` Waiting on the dashboard, left to that run (one run takes stocks from the waiting list at a time): ${m2.leftToRun.join(", ")}. Do not start them from this routine.` : ""}`);
   if (!m2.analyse.length) lines.push("", "2. Nothing to analyse: no stock is waiting on the dashboard and no starred watchlist stock is without a call today. Say so.");
   else {
-    lines.push("", `2. Analyse, one after another, in this order (${m2.analyse.length} of at most ${max} a morning), each by the /analyse playbook with today's date:`);
+    lines.push("", atOnce > 1 && m2.analyse.length > 1 ? `2. Analyse in this order (${m2.analyse.length} of at most ${max} a morning), up to ${atOnce} side by side (the person's choice), each by the /analyse playbook with today's date, as its section 7 ("Side by side") says:` : `2. Analyse, one after another, in this order (${m2.analyse.length} of at most ${max} a morning), each by the /analyse playbook with today's date:`);
     m2.analyse.forEach((a, i) => lines.push(`   ${i + 1}. ${a.symbol} (${a.why})`));
     if (m2.analyse.some((a) => a.queued)) lines.push("   A stock asked for on the dashboard is run as the /analyse playbook's waiting list says: start_queue_item first (it gives the depth), finish_queue_item once its call is recorded or with why it failed. A starred stock uses the settings' depth.");
   }
@@ -42240,6 +42260,7 @@ function cleanPrefs(raw) {
   const guide = one2(r.guide, ["open", "away"]);
   if (guide) out.guide = guide;
   if (typeof r.readCall === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.readCall)) out.readCall = r.readCall;
+  if (isAtOnce(r.atOnce)) out.atOnce = r.atOnce;
   return out;
 }
 var prefsFile = (dir) => path20.join(dir, "dashboard.json");
@@ -42575,7 +42596,7 @@ ${renderSummary(summarize(entries))}`;
         look = { screen: null, failed: e.message, on };
       }
     }
-    return morningBrief(dir, day3, readSettings(root).routines.maxAnalyses, look, { now: /* @__PURE__ */ new Date() });
+    return morningBrief(dir, day3, readSettings(root).routines.maxAnalyses, look, { now: /* @__PURE__ */ new Date() }, readPrefs(dir).atOnce ?? 1);
   }));
   server.registerTool("open_dashboard", {
     title: "Open the dashboard",
@@ -42584,7 +42605,7 @@ ${renderSummary(summarize(entries))}`;
   }, async () => act(() => openDashboard(root)));
   const given = process.env.TRADING_AGENTS_RUN;
   const me = { runner: given && RUNNER_ID.test(given) ? given : `tools-${randomUUID().slice(0, 8)}`, pid: process.pid };
-  const perRun = () => readSettings(root).routines.maxAnalyses;
+  const perRun = () => readSettings(root).routines.maxAnalyses, atOnce = () => readPrefs(dir).atOnce ?? 1;
   const depthWords = (d) => d ? `${d} (debate_rounds ${DEPTHS[d]} and risk_rounds ${DEPTHS[d]})` : "the settings' depth (leave the rounds out)";
   const called = (sym2, d) => new Journal(path21.join(dir, "journal.md")).load().find((e) => e.ticker === sym2 && e.date === d);
   const queueAct = (run) => act(() => {
@@ -42600,26 +42621,27 @@ ${renderSummary(summarize(entries))}`;
     description: "The waiting list: the stocks the person asked the desk to analyse on the dashboard, and those Monday's re-rating and the morning switch put on it. It gives those waiting, in the order to run them, each with the depth asked, any being analysed now, and how many one run may analyse. /analyse with no ticker runs them. Read-only.",
     annotations: { readOnlyHint: true, openWorldHint: false }
   }, async () => act(() => {
-    const list2 = readQueue(dir), waiting = waitingIn(list2), running = list2.find((i) => i.state === "running");
-    const lines = [], since = `started ${running?.startedAt?.slice(11, 16) ?? "?"} UTC`, another = !!running && byAnother(running, me);
-    if (running && another) lines.push(`Being analysed now by another run: ${running.symbol} (${since}). One stock runs at a time: stop this run and say so. Do not call end_queue_run: the run analysing ${running.symbol} asks for the next run itself when it finishes.`);
-    if (running && !another) lines.push(`Being analysed now by this run: ${running.symbol} (${since}). Finish it with finish_queue_item (done once its call is recorded, or failed with why) before starting another.`);
+    const list2 = readQueue(dir), waiting = waitingIn(list2), running = list2.filter((i) => i.state === "running"), n2 = atOnce();
+    const theirs = running.filter((i) => byAnother(i, me)), mine = running.filter((i) => !byAnother(i, me)), lines = [];
+    const since = (i) => `${i.symbol} (started ${i.startedAt?.slice(11, 16) ?? "?"} UTC)`, names = (l) => l.map((i) => i.symbol).join(" and ");
+    if (theirs.length) lines.push(`Being analysed now by another run: ${theirs.map(since).join(", ")}. One run takes stocks from the waiting list at a time: stop this run and say so. Do not call end_queue_run: the run analysing ${names(theirs)} asks for the next run itself when it finishes.`);
+    if (mine.length) lines.push(`Being analysed now by this run: ${mine.map(since).join(", ")}. Finish ${mine.length === 1 ? "it" : "each"} with finish_queue_item (done once its call is recorded, or failed with why)${mine.length >= n2 ? " before starting another" : ""}.`);
     if (!waiting.length) {
       const doneN = list2.filter((i) => i.state === "done").length, failedN = list2.filter((i) => i.state === "failed").length;
       const kept = [doneN ? `${doneN} done` : "", failedN ? `${failedN} failed (the person presses Retry on the dashboard to ask again)` : ""].filter(Boolean).join(" and ");
-      lines.push(!list2.length ? "Nothing is waiting: the list is empty." : `Nothing ${running ? "else " : ""}is waiting.${kept ? ` The list also keeps finished analyses for the person to see, ${kept}: none of them needs a run.` : ""}`);
-    } else if (another) {
-      lines.push(`Waiting behind it, left to that run: ${waiting.map((i) => i.symbol).join(", ")}.`);
+      lines.push(!list2.length ? "Nothing is waiting: the list is empty." : `Nothing ${running.length ? "else " : ""}is waiting.${kept ? ` The list also keeps finished analyses for the person to see, ${kept}: none of them needs a run.` : ""}`);
+    } else if (theirs.length) {
+      lines.push(`Waiting behind ${theirs.length === 1 ? "it" : "them"}, left to that run: ${waiting.map((i) => i.symbol).join(", ")}.`);
     } else {
-      lines.push(`${waiting.length} waiting, in the order to run them; one run analyses at most ${perRun()}:`);
-      waiting.forEach((i, n2) => lines.push(`${n2 + 1}. ${i.symbol}, depth ${depthWords(i.depth)}, asked ${i.requestedAt.slice(0, 16).replace("T", " ")} UTC`));
-      lines.push("For each, in order: start_queue_item, the analysis, then finish_queue_item. At the end, end_queue_run.");
+      lines.push(`${waiting.length} waiting, in the order to run them; one run analyses at most ${perRun()}${n2 > 1 ? `, up to ${n2} side by side (the person's choice)` : ""}:`);
+      waiting.forEach((i, k) => lines.push(`${k + 1}. ${i.symbol}, depth ${depthWords(i.depth)}, asked ${i.requestedAt.slice(0, 16).replace("T", " ")} UTC`));
+      lines.push(n2 > 1 ? `Keep up to ${n2} of them going side by side, in this order, as the playbook's waiting list says: start_queue_item for each, their steps in rounds, finish_queue_item for each once its call is recorded, then the next waiting one in its place. At the end, end_queue_run.` : "For each, in order: start_queue_item, the analysis, then finish_queue_item. At the end, end_queue_run.");
     }
     return lines.join("\n");
   }));
   server.registerTool("start_queue_item", {
     title: "Start a waiting analysis",
-    description: "Mark a stock from the waiting list as being analysed now, before its analysis starts, so the dashboard shows it running. It answers the date and the debate rounds to plan with. BUSY means another run is analysing a stock: stop this run, without end_queue_run. ALREADY means it was called today: it is marked done, take the next. NOT STARTED means it cannot run now (it says why, and it is marked failed with that reason): take the next.",
+    description: "Mark a stock from the waiting list as being analysed now, before its analysis starts, so the dashboard shows it running. It answers the date and the debate rounds to plan with. BUSY means another run is analysing a stock: stop this run, without end_queue_run. UNFINISHED means this run already has as many stocks going as it may analyse side by side: finish one with finish_queue_item first. ALREADY means it was called today: it is marked done, take the next. NOT STARTED means it cannot run now (it says why, and it is marked failed with that reason): take the next.",
     inputSchema: { symbol: symbol2 },
     annotations: write
   }, async (a) => queueAct(() => {
@@ -42633,7 +42655,7 @@ ${renderSummary(summarize(entries))}`;
       finishItem(dir, sym2, { reason: `A backtest that includes ${sym2} on ${d} is running, so an analysis now would be recorded in the backtest, not in the desk's journal: press Retry once it has ended.` }, /* @__PURE__ */ new Date(), me);
       return `NOT STARTED: ${sym2} on ${d} is a cell of the backtest sweep ${sweep}, which is running, so its analysis would be recorded in the sweep, not the live journal. It is marked failed with why; the person presses Retry once the backtest has ended. Take the next.`;
     }
-    const item = startItem(dir, sym2, d, /* @__PURE__ */ new Date(), me);
+    const item = startItem(dir, sym2, d, /* @__PURE__ */ new Date(), me, atOnce());
     return `START: ${sym2} is marked as being analysed. Plan it with analysis date ${d}, depth ${depthWords(item.depth)}. When its call is recorded, call finish_queue_item; if it cannot be finished, call finish_queue_item with failed_because.`;
   }));
   server.registerTool("finish_queue_item", {
@@ -42656,14 +42678,14 @@ ${renderSummary(summarize(entries))}`;
   }));
   server.registerTool("end_queue_run", {
     title: "End a run of the waiting list",
-    description: "Call once when a run of the waiting list stops. A stock this run started and left unfinished is marked failed. If stocks are still waiting (the run reached its limit, or stopped early), it asks whoever listens on this computer for another run, unless another run is analysing a stock: that run asks when it finishes. Answers one line to end the run with.",
+    description: "Call once when a run of the waiting list stops. Each stock this run started and left unfinished is marked failed. If stocks are still waiting (the run reached its limit, or stopped early), it asks whoever listens on this computer for another run, unless another run is analysing a stock: that run asks when it finishes. Answers one line to end the run with.",
     annotations: write
   }, async () => act(() => {
-    const now = /* @__PURE__ */ new Date(), left = readQueue(dir, now).find((i) => i.state === "running" && !byAnother(i, me));
-    if (left) finishItem(dir, left.symbol, { reason: "The run analysing it ended before it was finished, without saying why: press Retry to ask again." }, now, me);
+    const now = /* @__PURE__ */ new Date(), left = readQueue(dir, now).filter((i) => i.state === "running" && !byAnother(i, me));
+    for (const i of left) finishItem(dir, i.symbol, { reason: "The run analysing it ended before it was finished, without saying why: press Retry to ask again." }, now, me);
     const list2 = readQueue(dir), waiting = waitingIn(list2).length, other = list2.find((i) => i.state === "running");
     const doneN = list2.filter((i) => i.state === "done").length, failedN = list2.filter((i) => i.state === "failed").length;
-    const tally = `On the dashboard's list: ${doneN} done, ${failedN} failed.`, mine = left ? `Marked failed: ${left.symbol}, which this run left unfinished without saying why. ` : "";
+    const tally = `On the dashboard's list: ${doneN} done, ${failedN} failed.`, mine = left.length ? `Marked failed: ${left.map((i) => i.symbol).join(", ")}, which this run left unfinished without saying why. ` : "";
     if (other) return `${mine}${other.symbol} is being analysed by another run, which asks for the next run itself when it finishes: no run was asked for here. ${waiting ? `${waiting} still waiting.` : "Nothing else is waiting."} ${tally}`;
     if (waiting) ringDoorbell(dir, "more");
     return `${mine}${waiting ? `${waiting} still waiting: another run was asked for.` : "Nothing is waiting."} ${tally}`;

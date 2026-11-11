@@ -36,6 +36,7 @@ Rules for a message to an analyst:
 - At most two in this run, each one or two sentences: what you found, where (the source and its date), and what they should weigh.
 - It points at a source or a date and never carries a figure of your own: the receiver checks it with its own tools.
 - Only to an analyst the request names as working in this run.
+- None when the request says several stocks are analysed side by side in this run: two analysts of the same name may then be working on other stocks, and a message could reach the wrong one. You may still ask the lead.
 - In your report, note each message you sent, one line each under "Told the other analysts".
 - When an analyst messages you, check it with your own tools and say in one line of your report what you did with it. Reply only to a question.
 - If you have no SendMessage tool, the team does not talk in this run: skip this section.`;
