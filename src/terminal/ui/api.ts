@@ -33,7 +33,11 @@ export type Trading = TradingState;
 export type { Placed };
 /** An open ticket; own: the person's own order for a stock they chose, not one of the desk's calls. */
 /** lost: an order of this stock sent from here in the last week got no clear answer from Robinhood, in plain words. */
-export interface TicketOpen { id: string; own: boolean; context: TicketContext; proposal: Proposal; checks: Check[]; caps: Caps; lost: string | null }
+/** limitTif: how long a limit order of whole shares stays open, in the person's settings (a part-share is good for the day). */
+export interface TicketOpen { id: string; own: boolean; context: TicketContext; proposal: Proposal; checks: Check[]; caps: Caps; lost: string | null; limitTif: 'gfd' | 'gtc' }
+/** What the person set on a ticket: whole shares at their limit price, or a part-share at the market price (a buy as a
+ *  dollar amount, a sell as shares). */
+export interface TicketFigures { quantity: number; limitPrice: number; market?: true; dollars?: number }
 
 export type { Check, Proposal, Review, TicketContext };
 export type { DeskState, History, QuoteResult, WatchItem, QueueView, ListenerView, Depth, LinkInfo, Snapshot, Account, AccountView, Holding, Order };
@@ -128,8 +132,8 @@ export const api = {
   care: () => call<{ at: string | null; holdings: HoldingCare[] }>('GET', '/api/care'),
   openTicket: (symbol: string, date: string) => call<TicketOpen>('POST', '/api/ticket', { symbol, date }),
   openOwnTicket: (symbol: string, side: 'buy' | 'sell') => call<TicketOpen>('POST', '/api/ticket/own', { symbol, side }),
-  checkTicket: (id: string, quantity: number, limitPrice: number) => call<{ checks: Check[] }>('POST', '/api/ticket/check', { id, quantity, limitPrice }),
-  reviewTicket: (id: string, quantity: number, limitPrice: number, early = false) => call<{ checks: Check[]; review: Review; confirm: string; trading: Trading }>('POST', '/api/ticket/review', { id, quantity, limitPrice, ...(early ? { early } : {}) }),
+  checkTicket: (id: string, f: TicketFigures) => call<{ checks: Check[] }>('POST', '/api/ticket/check', { id, ...f }),
+  reviewTicket: (id: string, f: TicketFigures, early = false) => call<{ checks: Check[]; review: Review; confirm: string; trading: Trading }>('POST', '/api/ticket/review', { id, ...f, ...(early ? { early } : {}) }),
   placeTicket: (id: string, confirm: string, early = false) => call<{ placed: Placed }>('POST', '/api/ticket/place', { id, confirm, ...(early ? { early } : {}) }),
   trading: () => call<Trading & { placedToday: number }>('GET', '/api/trading'),
   /** Switching on with under four weeks of record also says the person understood that. */

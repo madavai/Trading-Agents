@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { marketDay } from '../src/data/dates.js';
-import { firstMarketDayOfWeek, HOLIDAYS, holidaysKnown, isMarketDay, marketClosed, marketDaysBetween, nextMarketDay } from '../src/data/holidays.js';
+import { firstMarketDayOfWeek, HOLIDAYS, holidaysKnown, isMarketDay, marketClosed, marketDaysBetween, nextMarketDay, regularSession } from '../src/data/holidays.js';
 import { tradingDaysBetween } from '../src/desk/orders.js';
 
 test("New York's holiday list reaches the year after this one: renew it from the NYSE's own page before it runs out", () => {
@@ -42,4 +42,17 @@ test('a year not in the list is said to be unknown, and only its weekends are cl
   assert.deepEqual([holidaysKnown('2026-11-26'), holidaysKnown('2031-11-27')], [true, false]);
   assert.equal(marketClosed('2031-11-27'), null, 'Thanksgiving 2031 is not known: a weekday is taken as a market day');
   assert.equal(marketClosed('2031-11-29'), 'a Saturday');
+});
+
+test("New York's regular session, the only time a part-share is sent: 9:30 a.m. to the close, on market days, and when it next opens", () => {
+  const at = (iso: string) => regularSession(new Date(iso));
+  assert.deepEqual(at('2026-11-12T15:00:00Z'), { open: true, opens: '' }, 'a Thursday, 10:00 a.m. in New York');
+  assert.deepEqual(at('2026-11-12T14:30:00Z'), { open: true, opens: '' }, '9:30 a.m. exactly');
+  assert.deepEqual(at('2026-11-12T13:00:00Z'), { open: false, opens: 'today at 9:30 a.m. New York time' }, 'before the open');
+  assert.deepEqual(at('2026-11-12T21:00:00Z'), { open: false, opens: 'Friday 2026-11-13 at 9:30 a.m. New York time' }, '4:00 p.m.: closed');
+  assert.deepEqual(at('2026-11-14T16:00:00Z'), { open: false, opens: 'Monday 2026-11-16 at 9:30 a.m. New York time' }, 'a Saturday');
+  assert.deepEqual(at('2026-11-26T16:00:00Z'), { open: false, opens: 'Friday 2026-11-27 at 9:30 a.m. New York time' }, 'Thanksgiving Day');
+  assert.equal(at('2026-11-27T17:30:00Z').open, true, 'the day after Thanksgiving, 12:30 p.m.');
+  assert.deepEqual(at('2026-11-27T18:30:00Z'), { open: false, opens: 'Monday 2026-11-30 at 9:30 a.m. New York time' }, 'after its early close at 1:00 p.m.');
+  assert.equal(at('2026-07-01T13:30:00Z').open, true, 'in summer New York is four hours behind: 9:30 a.m.');
 });

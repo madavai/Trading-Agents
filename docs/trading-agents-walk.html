@@ -1106,7 +1106,7 @@ b, strong { font-weight: var(--weight-semibold); }
     "about": "A call becomes an order only through a ticket you open yourself. The ticket sizes the order from your settings (a Buy is a full position, 10% of the account as shipped), checks it against your caps, and can ask Robinhood for its own dry run. Placing it is section F; with trading switched off, as shipped, nothing can be placed.",
     "before": "Robinhood connected with the Agentic account shown (section D), and a call on NVDA (B1).",
     "tests": [
-    { "id": "E1", "title": "A ticket from NVIDIA's call", "tags": [], "changed": "2026-10-21",
+    { "id": "E1", "title": "A ticket from NVIDIA's call", "tags": [], "changed": "2026-11-11",
       "about": "\"Decide…\" turns the desk's call into a proposed order, with every number and check in plain view before anything happens.",
       "where": "Dashboard › The desk's calls › NVDA › Decide…",
       "do": [
@@ -1115,7 +1115,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "\"Buy NVDA\": \"The desk rated NVDA Buy on <date>: buy a full position. In the Agentic account only.\"",
         "Account value, buying power, held now, live price and orders today (\"0 of 3\").",
         "How it was sized, in plain lines (for example \"Your cap of $500.00 an order makes it $500.00.\").",
-        "Shares and limit price filled in, and every line under \"Your checks\" green; or no order, with the reason (for example too little to buy one share).",
+        "\"Whole shares at your price\" chosen, with the shares and limit price filled in, and every line under \"Your checks\" green; or no order, with the reason. When one share costs more than the order may spend, it is a part-share instead (E9).",
         "Without the Agentic account shown, it says instead: \"Show your Agentic account (Choose accounts) to open an order ticket: orders go to it alone.\""] },
     { "id": "E2", "title": "A Hold call", "tags": [], "changed": "2026-10-21",
       "about": "As shipped, Hold means do nothing, so its ticket proposes no order.",
@@ -1155,7 +1155,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "After a clean check, with trading switched off, look for a way to place it."],
       "see": [
         "\"Trading is switched off, so this order cannot be placed: switch it on in Your account first.\" No Place button."] },
-    { "id": "E7", "title": "Trade…: your own ticket", "tags": [], "changed": "2026-10-21",
+    { "id": "E7", "title": "Trade…: your own ticket", "tags": [], "changed": "2026-11-11",
       "about": "\"Trade…\" is for an order of your own, not one of the desk's calls: it starts at one share and gets the same caps and checks.",
       "where": "Dashboard › chart NVDA › Trade… beside the price (also on the stock page and in a call)",
       "do": [
@@ -1164,7 +1164,8 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "\"Buy NVDA\": \"Your own order, not one of the desk's calls\".",
         "\"Your own order: one whole share to start, at Robinhood's live price of $…. Change the shares and the limit price below.\"",
-        "The same checks and \"Review with Robinhood\" as a call's ticket. The desk's log records it as yours."] },
+        "The same checks and \"Review with Robinhood\" as a call's ticket. The desk's log records it as yours.",
+        "On a stock whose one share costs more than your cap (META, at about $650, over $500): \"Your own order: one share of META costs $…, more than your cap of $500.00 an order, so it starts as a part-share of $1.00 at the market price. Change the dollar amount below.\""] },
     { "id": "E8", "title": "Crypto and indices never open a ticket", "tags": [], "changed": "2026-11-11",
       "about": "Robinhood's agent doorway trades stocks and funds only. Coins are followed on paper (section L); an index such as the S&P 500 itself cannot be bought at all (a fund that follows it, such as SPY, can).",
       "where": "Dashboard › Start here, the watchlist, the chart and the desk's calls",
@@ -1172,7 +1173,29 @@ b, strong { font-weight: var(--weight-semibold); }
         "Point at Bitcoin's tile, then look at its call (B5). Then chart [[^GSPC]] (the S&P 500 index)."],
       "see": [
         "Bitcoin and Ether show \"on paper only\" in their call, where NVDA shows Decide…; other coins show \"no order ticket\". Pointing at a coin's tile says the same in full.",
-        "No \"Trade…\", \"Buy…\" or \"Sell…\" for a coin or an index, and no robot for an index. An index's call bar says \"The desk analyses stocks, not indices.\""] }
+        "No \"Trade…\", \"Buy…\" or \"Sell…\" for a coin or an index, and no robot for an index. An index's call bar says \"The desk analyses stocks, not indices.\""] },
+    { "id": "E9", "title": "A part-share when one share costs too much", "tags": [], "changed": "2026-11-11",
+      "about": "When one share costs more than the order may spend (META at about $650 against the $500 cap, or a small account's Overweight), the ticket buys a part of one share instead: a dollar amount, which Robinhood takes only as a market order (at the market's price at that moment) and only while the US market is open. Whenever a whole share fits, the ticket stays whole shares at your own limit price.",
+      "where": "Dashboard › The desk's calls › a Buy or Overweight call on a stock whose one share costs more than the order may spend (META, say) › Decide…",
+      "do": [
+        "Open the ticket, then read the lines under the figures and \"Your checks\".",
+        "If it is a weekend or outside 9:30 a.m. to 4 p.m. New York time, read \"Your checks\" again."],
+      "see": [
+        "\"One share costs $…, more than $…, so a part of a share: $… of META, about 0.… of a share at Robinhood's live price.\" and \"A part-share is a market order: Robinhood takes no limit price for it, so it fills at the market's price at that moment, and Robinhood's check shows only an estimate. It is sent only while the US market is open, 9:30 a.m. to 4 p.m. New York time.\"",
+        "\"A part-share at the market price\" chosen, a \"Dollar amount\" box, and \"About 0.… of a share at the live price of $…. Robinhood works out the exact part when it fills.\"",
+        "Checks: \"$… of META, about 0.… of a share at Robinhood's live price\", \"A market order: it fills at the market's price at that moment, about $… a share now; Robinhood's check shows only an estimate\", your caps on the dollar amount, and, while the market is open, \"The US market is open, so a part-share can be sent now\".",
+        "Outside market hours that last check is red: \"A part-share is sent only while the US market is open, 9:30 a.m. to 4 p.m. New York time: it opens <day> at 9:30 a.m. New York time\", and \"Review with Robinhood\" is greyed out."] },
+    { "id": "E10", "title": "Switch between whole shares and a part-share", "tags": [], "changed": "2026-11-11",
+      "about": "On any stock ticket you choose: whole shares at a price you set, or a part-share at the market price. A part-share buy is a dollar amount of at least $1.00; a part-share sell is shares, to six decimal places.",
+      "where": "Dashboard › chart NVDA › Trade… (Buy)",
+      "do": [
+        "Press \"A part-share at the market price\".",
+        "Type 0.50 in the Dollar amount box, then 100.",
+        "Press \"Whole shares at your price\"."],
+      "see": [
+        "The shares and limit price give way to the Dollar amount box (the same money as the shares were), with the market-order line under it.",
+        "At 0.50 a red check: \"A part-share is bought as a dollar amount in dollars and cents, at least $1.00\". At 100: \"$100.00 of NVDA, about 0.… of a share at Robinhood's live price\", and the estimate line changes as you type.",
+        "Back on whole shares, the shares (at least one) and the live price as the limit return, with the limit price's own check."] }
   ] },
   { "id": "F", "name": "Placing a real order",
     "sub": "Optional, real money. One share, during market hours, with Robinhood's phone approval on.",
@@ -1254,7 +1277,18 @@ b, strong { font-weight: var(--weight-semibold); }
         "The ticket's box says \"No clear answer\", with \"Robinhood's answer did not arrive (…), so this order may have gone through. Look at the Agentic account's orders in Robinhood's own app before you try again.\" and \"It is in the desk's order log as sent, so it counts towards your orders a day. This ticket sends nothing more.\" Only Close is left.",
         "A notice: \"No clear answer from Robinhood: look in its app before you try again.\"",
         "For a week, a new ticket for that stock begins with \"An order sent from here on <day> (Buy 1 NVDA at $…) got no clear answer from Robinhood, so it may have gone through. Look in Robinhood's own app before you place another.\" Its \"Orders today\" counts that order, even if Robinhood does not list it.",
-        "The evening wrap-up lists it as \"no clear answer from Robinhood, so it may have gone through\"."] }
+        "The evening wrap-up lists it as \"no clear answer from Robinhood, so it may have gone through\"."] },
+    { "id": "F10", "title": "Place a part-share", "tags": ["Real money","Market hours","Optional"], "changed": "2026-11-11",
+      "about": "A part-share is placed exactly as a whole share is, after Robinhood's clean check and your Confirm, but as a market order of a dollar amount: you know the money, not the exact price. Keep it small.",
+      "where": "Dashboard › chart a stock › Trade… (Buy) › A part-share at the market price",
+      "do": [
+        "During market hours, with trading on, type a small dollar amount (for example 5), press \"Review with Robinhood\", then \"Place order…\".",
+        "Read the button, then press it. Approve or decline on your phone (F4)."],
+      "see": [
+        "Robinhood's check, with its estimate.",
+        "The button names the order by its money: \"Confirm: Buy $5.00 of <stock> at the market price\".",
+        "\"Robinhood took it\", as in F3. Once it fills, Your account shows the part of a share held, at the price Robinhood filled it at.",
+        "The evening wrap-up lists it as \"Buy $5.00 of <stock> at the market price (a part-share)\"."] }
   ] },
   { "id": "G", "name": "Routines",
     "sub": "The morning routine and the evening wrap-up, by hand or from Madav's Routines, where the project ships them switched off.",
@@ -1762,7 +1796,17 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "\"The desk has N weeks and M calls of record on paper.\"",
         "With under four weeks: \"That is under four weeks: too little to tell whether the desk's calls are any good. Read your paper record first.\", and \"I understand\" before \"Yes, switch trading on\" appears.",
-        "Cancel leaves trading off."] }
+        "Cancel leaves trading off."] },
+    { "id": "L6", "title": "A part-share on paper", "tags": [], "changed": "2026-11-11",
+      "about": "A call whose share cost more than its order could spend once bought nothing on paper. Now paper buys a part of a share, as the real ticket would, filled at the next close like every paper order, which only approximates what a market order really pays. The record works itself out afresh, so its past changes: META's Overweight of 21 Oct now buys about 0.77 of a share at the close of 22 Oct, $648.85.",
+      "where": "Dashboard › side list › How the desk is doing › Your paper record, then The desk's calls",
+      "do": [
+        "In Your paper record, read \"Positions on paper now\".",
+        "In The desk's calls, find a call on a stock whose share costs more than its order could spend (META's of 21 Oct, if you have it), and point at (or tap) its \"paper: bought …\" chip."],
+      "see": [
+        "The part-share among the positions, for example \"META 0.770594\", with the cash it left.",
+        "\"Bought 0.770594 at the close of 22 Oct 2026: a part-share, which a real ticket buys at the market price; on paper it fills at that close, an approximation.\" (or the same words with its own figures).",
+        "The total and the chart count that part-share from its fill day on."] }
   ] },
   { "id": "M", "name": "Your caps and guard rails",
     "sub": "Set once by you, kept beside the trading switch in your private folder, and checked on every ticket and again just before an order is sent.",

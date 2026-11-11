@@ -229,7 +229,8 @@ export function eveningBrief(dir: string, today: string, now: Date, stops?: Stop
     lines.push(`3. Orders the dashboard sent today (${orders.length}), with what Robinhood answered when each was sent:`);
     for (const o of orders) {
       const r = o.robinhood, answer = r.unknown ? `no clear answer from Robinhood, so it may have gone through${r.error ? ` (${r.error})` : ''}` : !r.answered ? `refused${r.error ? `: ${r.error}` : ''}` : r.approvalRequired === true ? 'taken, waiting for the person\'s approval on their phone' : r.approvalRequired === false ? 'taken and sent to the market' : 'taken';
-      lines.push(`   - ${o.side === 'buy' ? 'Buy' : 'Sell'} ${o.quantity} ${o.symbol} at limit ${o.limitPrice.toFixed(2)}, ${o.at.slice(11, 16)} UTC${o.call ? `, from the ${o.call.rating} call of ${o.call.date}` : o.own ? ', your own order' : ''}: ${answer}${r.state ? ` (state then: ${r.state})` : ''}.`);
+      const what = o.market ? (o.side === 'buy' && typeof o.dollars === 'number' ? `Buy $${o.dollars.toFixed(2)} of ${o.symbol} at the market price (a part-share)` : `${o.side === 'buy' ? 'Buy' : 'Sell'} ${o.quantity} ${o.symbol} at the market price (a part-share)`) : `${o.side === 'buy' ? 'Buy' : 'Sell'} ${o.quantity} ${o.symbol} at limit ${o.limitPrice.toFixed(2)}`;
+      lines.push(`   - ${what}, ${o.at.slice(11, 16)} UTC${o.call ? `, from the ${o.call.rating} call of ${o.call.date}` : o.own ? ', your own order' : ''}: ${answer}${r.state ? ` (state then: ${r.state})` : ''}.`);
     }
     lines.push('   What happened since (filled, approved, cancelled) is on the dashboard and in the Robinhood app: the team does not read Robinhood. Say so; do not guess.');
   }

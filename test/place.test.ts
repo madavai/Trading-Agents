@@ -11,6 +11,7 @@ import { Refused } from '../src/robinhood/reader.js';
 import { Link } from '../src/robinhood/link.js';
 import { openSession } from '../src/robinhood/connect.js';
 import { Journal } from '../src/desk/journal.js';
+import { Sectors } from '../src/desk/sectors.js';
 import { DEFAULT_CAPS, type Caps } from '../src/settings.js';
 import { logOrder, readOrders } from '../src/desk/orders.js';
 import { confirmWords, placedToday, startTerminal, type Assets, type TerminalOptions } from '../src/terminal/server.js';
@@ -24,7 +25,7 @@ const CALL_DAY = today();
 const ORDER = { symbol: 'NVDA', side: 'buy' as const, quantity: 1, limitPrice: 182.4, timeInForce: 'gfd' as const };
 const UUID = '0b6f6a52-2f3c-4f4e-9b1a-6a0c5e3d2a11';
 
-test('the placer places only a whole-share limit order on the Agentic account, with Robinhood\'s duplicate protection', async () => {
+test('the placer places a whole-share limit order only on the Agentic account, with Robinhood\'s duplicate protection', async () => {
   const calls: string[] = [], placed: Array<Record<string, unknown>> = [];
   const [a, b] = InMemoryTransport.createLinkedPair();
   await accountTools(calls, { placed }).connect(a);
@@ -37,6 +38,28 @@ test('the placer places only a whole-share limit order on the Agentic account, w
   const r = await p.place({ accountNumber: AGENTIC, agentic: true }, ORDER, UUID);
   assert.deepEqual(placed, [{ account_number: AGENTIC, symbol: 'NVDA', side: 'buy', type: 'limit', quantity: '1', limit_price: '182.40', time_in_force: 'gfd', market_hours: 'regular_hours', ref_id: UUID }]);
   assert.deepEqual([r.answered, r.approvalRequired, r.orderId, r.state], [true, true, '6f1c2b9e-0000-4000-8000-00000000abcd', 'queued']);
+  await client.close();
+});
+
+test('the placer sends a part-share only as a market order, only while New York\'s regular session is open', async () => {
+  const calls: string[] = [], placed: Array<Record<string, unknown>> = [];
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  await accountTools(calls, { placed }).connect(a);
+  const client = new Client({ name: 'test', version: '0' }); await client.connect(b);
+  const p = new Placer(client, (await client.listTools()).tools), me = { accountNumber: AGENTIC, agentic: true };
+  const part = { symbol: 'META', side: 'buy' as const, quantity: 0.770594, limitPrice: 648.85, timeInForce: 'gfd' as const, market: true as const, dollars: 500 };
+  const saturday = new Date('2026-11-14T16:00:00Z'), evening = new Date('2026-11-12T21:30:00Z'), open = new Date('2026-11-12T15:00:00Z');
+  await assert.rejects(p.place(me, part, UUID, saturday), /sent only while the US market is open, 9:30 a\.m\. to 4 p\.m\. New York time: it opens Monday 2026-11-16 at 9:30 a\.m\. New York time\. Nothing was sent\./);
+  await assert.rejects(p.place(me, part, UUID, evening), /it opens Friday 2026-11-13 at 9:30/);
+  await assert.rejects(p.place(me, { ...part, dollars: 0.5 }, UUID, open), /not complete/);
+  assert.deepEqual(calls, [], 'nothing reached Robinhood');
+  await p.place(me, part, UUID, open);
+  await p.place(me, { ...part, side: 'sell', dollars: undefined }, UUID, open);
+  assert.deepEqual(placed, [
+    { account_number: AGENTIC, symbol: 'META', side: 'buy', type: 'market', dollar_amount: '500.00', time_in_force: 'gfd', market_hours: 'regular_hours', ref_id: UUID },
+    { account_number: AGENTIC, symbol: 'META', side: 'sell', type: 'market', quantity: '0.770594', time_in_force: 'gfd', market_hours: 'regular_hours', ref_id: UUID },
+  ], 'no limit price ever goes with a market order');
+  assert.doesNotThrow(() => p.ready(me, ORDER, UUID, saturday), 'a limit order of whole shares may be placed at any hour: Robinhood keeps it for the open');
   await client.close();
 });
 
@@ -67,13 +90,14 @@ const freePort = () => new Promise<number>((resolve) => { const s = net.createSe
 const approves = (url: URL) => { void (async () => { const r = await fetch(url, { redirect: 'manual' }); await fetch(r.headers.get('location')!); })(); };
 
 /** A desk with a signed-in, chosen Agentic account. `caps` are set the way the person sets them, beside the switch; the
- *  project's settings file is given wide-open caps, which must never be read. */
-async function desk(caps?: Partial<Caps>, more: Partial<TerminalOptions> = {}) {
-  const o = { placed: [] as Array<Record<string, unknown>>, reviewed: [] as Array<Record<string, unknown>>, agenticBuyingPower: '2500.00', agenticPositions: [] as unknown[] };
+ *  project's settings file is given wide-open caps, which must never be read. `rh`: Robinhood's live prices by symbol,
+ *  and the time the link reads as now (New York's market hours for a part-share). */
+async function desk(caps?: Partial<Caps>, more: Partial<TerminalOptions> = {}, rh: { prices?: Record<string, string>; now?: () => Date } = {}) {
+  const o = { placed: [] as Array<Record<string, unknown>>, reviewed: [] as Array<Record<string, unknown>>, agenticBuyingPower: '2500.00', agenticPositions: [] as unknown[], ...(rh.prices ? { prices: rh.prices } : {}) };
   fake = await fakeRobinhood((calls) => accountTools(calls, o));
   const port = await freePort(), file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ta-pl-')), 'sign-in.json');
   await (await openSession(file, { signIn: true, url: fake.url, port, open: approves })).close();
-  const link = new Link(file, { url: fake.url, port });
+  const link = new Link(file, { url: fake.url, port, ...(rh.now ? { now: rh.now } : {}) });
   if (caps) link.setCaps({ ...DEFAULT_CAPS, ...caps });
   const { accounts } = await link.accounts();
   await link.choose(accounts.filter((a) => !a.deactivated).map((a) => a.key));
@@ -122,6 +146,55 @@ test('an order is placed only with trading switched on, after Robinhood\'s clean
     assert.equal(readOrders(dir).length, 1, 'read back as one order');
     for (const n of [MAIN, AGENTIC]) assert.ok(!log.includes(n), 'no account number in the desk\'s order log');
     assert.equal(placedToday(dir, new Date()), 1);
+  } finally { await term.close(); }
+});
+
+/** A desk where Robinhood prices META at $648.85, more than a full position of the $2,500 account, at a time `now`. */
+async function metaDesk(now: Date) {
+  const d = await desk(undefined, { sectors: new Sectors(async () => ({ sector: 'Communication Services', fund: false })) }, { prices: { META: '648.85' }, now: () => now });
+  new Journal(path.join(d.dir, 'journal.md')).storeDecision('META', CALL_DAY, '**Rating**: Buy\n\n**Executive Summary**: Buy.');
+  return d;
+}
+type Chip = { ok: boolean; words: string };
+
+test('a part-share takes the same road: a market order of a dollar amount, in market hours, confirmed in its own words, logged once', async () => {
+  const { o, dir, term, post } = await metaDesk(new Date('2026-11-12T15:00:00Z'));   // a Thursday, 10 a.m. in New York
+  try {
+    assert.equal((await post('/api/trading', { on: true, confirm: 'switch trading on', understood: true })).json().on, true);
+    const t = (await post('/api/ticket', { symbol: 'META', date: CALL_DAY })).json();
+    // A full position is 10% of the $2,500 account, $250: less than one share at $648.85, so a part of one.
+    assert.deepEqual(t.proposal.order, { symbol: 'META', side: 'buy', quantity: 0.385297, limitPrice: 648.85, timeInForce: 'gfd', market: true, dollars: 250 });
+    assert.deepEqual(t.context.session, { open: true, opens: '' });
+    assert.ok(t.checks.every((c: Chip) => c.ok), JSON.stringify(t.checks));
+    const figures = { id: t.id, quantity: 0.385297, limitPrice: 648.85, market: true, dollars: 250 };
+    assert.equal((await post('/api/ticket/review', { ...figures, dollars: 600 })).status, 400, 'over the $500 cap: not sent for checking');
+    assert.deepEqual(o.reviewed, []);
+    const r = (await post('/api/ticket/review', figures)).json();
+    assert.equal(r.confirm, 'Buy $250.00 of META at the market price');
+    assert.deepEqual(o.reviewed, [{ account_number: AGENTIC, symbol: 'META', side: 'buy', type: 'market', dollar_amount: '250.00', time_in_force: 'gfd', market_hours: 'regular_hours' }]);
+    assert.match((await post('/api/ticket/place', { id: t.id, confirm: 'Buy 0.385297 META at $648.85' })).json().error, /does not name this order/);
+    assert.deepEqual(o.placed, []);
+    const ok = await post('/api/ticket/place', { id: t.id, confirm: 'Buy $250.00 of META at the market price' });
+    assert.equal(ok.status, 200, ok.body);
+    const sent = o.placed as unknown as Array<Record<string, unknown>>;
+    assert.deepEqual({ ...sent[0], ref_id: 'x' }, { account_number: AGENTIC, symbol: 'META', side: 'buy', type: 'market', dollar_amount: '250.00', time_in_force: 'gfd', market_hours: 'regular_hours', ref_id: 'x' });
+    const [line] = readOrders(dir);
+    assert.deepEqual([line!.market, line!.dollars, line!.quantity], [true, 250, 0.385297]);
+    assert.equal(confirmWords(line!), 'Buy $250.00 of META at the market price', 'the log names it as the person confirmed it');
+  } finally { await term.close(); }
+});
+
+test('outside market hours a part-share ticket says when the market opens, and nothing reaches Robinhood', async () => {
+  const { o, term, post } = await metaDesk(new Date('2026-11-14T16:00:00Z'));   // a Saturday
+  try {
+    const t = (await post('/api/ticket', { symbol: 'META', date: CALL_DAY })).json();
+    assert.equal(t.proposal.order.market, true);
+    assert.deepEqual(t.checks.filter((c: Chip) => !c.ok).map((c: Chip) => c.words), ['A part-share is sent only while the US market is open, 9:30 a.m. to 4 p.m. New York time: it opens Monday 2026-11-16 at 9:30 a.m. New York time']);
+    assert.equal((await post('/api/ticket/review', { id: t.id, quantity: 0.385297, limitPrice: 648.85, market: true, dollars: 250 })).status, 400);
+    const whole = (await post('/api/ticket/check', { id: t.id, quantity: 1, limitPrice: 648.85 })).json();
+    assert.ok(!whole.checks.some((c: Chip) => /market is open/.test(c.words)), 'whole shares at a limit price may be sent at any hour');
+    assert.ok(whole.checks.some((c: Chip) => !c.ok && /\$648\.85 is over your cap of \$500\.00 an order/.test(c.words)), 'and one META share is over the cap');
+    assert.deepEqual(o.reviewed, []);
   } finally { await term.close(); }
 });
 

@@ -175,7 +175,7 @@ the team's "talk" switch shows these messages in the Messages panel; with it off
 <a href="https://madavai.github.io/Trading-Agents/inside-the-trading-desk.html#robinhood">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/robinhood-dark.webp">
-  <img alt="Three narrow doors to Robinhood, used by the dashboard: one that only reads, one that only asks for Robinhood's dry-run check, and one that places a single limit order on your Confirm. The desk check's sign-in test, which a chat runs only on your yes, uses the reading door to count what answers." src="docs/readme/robinhood-light.webp">
+  <img alt="Three narrow doors to Robinhood, used by the dashboard: one that only reads, one that only asks for Robinhood's dry-run check, and one that places a single order on your Confirm (whole shares at your price, or a part-share at the market price). The desk check's sign-in test, which a chat runs only on your yes, uses the reading door to count what answers." src="docs/readme/robinhood-light.webp">
 </picture>
 </a>
 
@@ -188,7 +188,9 @@ the team's "talk" switch shows these messages in the Messages panel; with it off
   reports how many tools its connection offers and how many holdings answer, never their values. It never places an
   order. Analysis works without it.
 - Apart from that test, only the dashboard talks to Robinhood, through three narrow doors: one that only reads, one that
-  only asks for Robinhood's dry-run check, and one that places a single limit order. The last is used only when trading
+  only asks for Robinhood's dry-run check, and one that places a single order: whole shares at your limit price, or,
+  when one share costs more than the order may spend, a part-share at the market price, sent only while the US market
+  is open (Robinhood takes a part-share no other way). The last door is used only when trading
   is switched on (by you), on a ticket Robinhood checked with no alerts in the last five minutes and unchanged since,
   after your Confirm naming the exact order, and after every cap is checked again on fresh figures. A ticket sends one
   order.

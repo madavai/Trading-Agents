@@ -2,7 +2,7 @@
 // scorecard worked out from them, the watchlist, the analyses waiting, and the person's Robinhood accounts on a page of
 // their own. A number that cannot be had is a dash. An order starts only from a ticket - one of the desk's calls
 // (Decide…) or the person's own (Trade…) - and is placed only on their Confirm, with trading switched on by them.
-import { api, ApiError, claimKey, hasKey, KEY_LOST, type CallDetail, type DeskState, type Depth, type History, type LinkInfo, type Market, type Match, type Prefs, type Caps, type PaperView, type PaperTrade, type QueueView, type QuoteResult, type Account, type AccountView, type Holding, type Order, type Recent, type Snapshot, type TicketOpen, type Check, type Review, type Placed, type Trading, type Tier, type TierItem, type TierView, type Worth, type Screen, type Weather, type WeatherLine, type HoldingCare } from './api.js';
+import { api, ApiError, claimKey, hasKey, KEY_LOST, type CallDetail, type DeskState, type Depth, type History, type LinkInfo, type Market, type Match, type Prefs, type Caps, type PaperView, type PaperTrade, type QueueView, type QuoteResult, type Account, type AccountView, type Holding, type Order, type Recent, type Snapshot, type TicketFigures, type TicketOpen, type Check, type Review, type Placed, type Trading, type Tier, type TierItem, type TierView, type Worth, type Screen, type Weather, type WeatherLine, type HoldingCare } from './api.js';
 import { heroChart, paperChart, sparkline } from './chart.js';
 import { againstOver, averageOf, barOn, chipDay, dayText, esc, labelled, money, moveDayOf, notHorizon, NOTES, num, nyDay, opening, orderState, orderStateWhy, ownReturnLine, pct, plain, points, priceDayWords, qty, rangeFor, ratingMeaning, ratingTone, resultOf, scoreWords, SECTION_NAMES, shortDay, tone, weekDay, when, yardstickWhy } from './fmt.js';
 import { DELAY_SENTENCE, DELAY_SHORT, LATE } from '../../data/delay.js';
@@ -668,7 +668,11 @@ async function loadTrading(): Promise<void> {
 }
 
 // ---------- the order ticket: proposed, checked, reviewed by Robinhood, placed only on the person's Confirm ----------
-const T = { open: null as TicketOpen | null, checks: [] as Check[], review: null as Review | null, quantity: 0, limit: 0, busy: false, timer: 0, confirm: '', confirming: false, placed: null as Placed | null, early: false };
+// market: a part-share at the market price (a buy as `dollars`, a sell as shares), else whole shares at `limit`.
+const T = { open: null as TicketOpen | null, checks: [] as Check[], review: null as Review | null, quantity: 0, limit: 0, market: false, dollars: 0, busy: false, timer: 0, confirm: '', confirming: false, placed: null as Placed | null, early: false };
+/** The figures on the ticket now, as the server takes them, and as a Robinhood check was asked with. */
+const ticketFigures = (): TicketFigures => (T.market ? { quantity: T.quantity, limitPrice: T.limit, market: true, ...(T.open?.proposal.order?.side === 'buy' ? { dollars: T.dollars } : {}) } : { quantity: T.quantity, limitPrice: T.limit });
+const askedNow = (): Asked => ({ id: T.open?.id, quantity: T.quantity, limit: T.limit, market: T.market, ...(T.market ? { dollars: T.dollars } : {}) });
 const hasAgentic = () => !!A.snapshot?.views.some((v) => v.account.agentic);
 
 function renderTicketDyn(): void {
@@ -724,10 +728,53 @@ function renderTicket(): void {
   $('#tkHead').innerHTML = `${head}${t.lost ? `<p class="at-honest bad">${esc(daysInWords(t.lost))}</p>` : ''}
     <dl class="at-facts ruled at-box"><div><dt>Account value</dt><dd>${money(c.accountValue)}</dd></div><div><dt>Buying power</dt><dd>${money(c.buyingPower)}</dd></div><div><dt>Held now</dt><dd>${esc(String(c.held))} share(s)</dd></div><div><dt>Live price</dt><dd>${money(c.price)}</dd></div><div><dt>Orders today</dt><dd>${c.ordersToday} of ${t.caps.ordersPerDay}</dd></div></dl>
     ${t.proposal.why.map((w) => `<p class="at-quiet">${esc(w)}</p>`).join('')}`;
-  $('#tkFields').innerHTML = o ? `<div class="at-row">
-      <label class="at-field"><span class="at-field-l">Shares (${o.side === 'buy' ? 'to buy' : 'to sell'})</span><input class="at-input at-box" id="tkQty" type="number" min="1" step="1" inputmode="numeric" value="${o.quantity}"></label>
-      <label class="at-field"><span class="at-field-l">${term('limitOrder', 'Limit price')}, $ · good for the ${o.timeInForce === 'gtc' ? 'next 90 days' : 'day'}</span><input class="at-input at-box" id="tkLimit" type="text" inputmode="decimal" value="${o.limitPrice.toFixed(2)}"></label></div>` : '';
+  $('#tkFields').innerHTML = o ? ticketFields(o.side) : '';
   renderTicketDyn();
+}
+
+/** A share is counted to six decimal places, as Robinhood counts a part of one. */
+const sixPlaces = (n: number): number => Math.floor(n * 1e6 + 1e-6) / 1e6;
+/** What a part-share comes to at the live price, an estimate: the shares a dollar amount buys, or what shares sell for. */
+function partEstimate(): string {
+  const price = T.open?.context.price, side = T.open?.proposal.order?.side;
+  if (!price || !(price > 0)) return 'Robinhood gave no live price to estimate it with.';
+  if (side === 'buy') return T.dollars > 0 ? `About ${sixPlaces(T.dollars / price)} of a share at the live price of ${money(price)}. Robinhood works out the exact part when it fills.` : '';
+  return T.quantity > 0 ? `About ${money(T.quantity * price)} at the live price of ${money(price)}.` : '';
+}
+
+/** The ticket's fields: whole shares at the person's limit price, or a part-share at the market price (a buy as a dollar
+ *  amount, a sell as shares to six decimal places), with a switch between the two. */
+function ticketFields(side: 'buy' | 'sell'): string {
+  const t = T.open!;
+  const kinds = ([[false, 'Whole shares at your price'], [true, 'A part-share at the market price']] as const)
+    .map(([m, w]) => `<button class="at-seg-b${T.market === m ? ' on' : ''}" role="radio" aria-checked="${T.market === m}" data-act="tk-kind" data-kind="${m ? 'market' : 'limit'}">${w}</button>`).join('');
+  const seg = `<div class="at-row"><div class="at-seg" role="radiogroup" aria-label="Whole shares or a part-share">${kinds}</div></div>`;
+  if (!T.market) {
+    const tif = t.proposal.order?.market ? t.limitTif : t.proposal.order?.timeInForce ?? t.limitTif;
+    return `${seg}<div class="at-row">
+      <label class="at-field"><span class="at-field-l">Shares (${side === 'buy' ? 'to buy' : 'to sell'})</span><input class="at-input at-box" id="tkQty" type="number" min="1" step="1" inputmode="numeric" value="${T.quantity}"></label>
+      <label class="at-field"><span class="at-field-l">${term('limitOrder', 'Limit price')}, $ · good for the ${tif === 'gtc' ? 'next 90 days' : 'day'}</span><input class="at-input at-box" id="tkLimit" type="text" inputmode="decimal" value="${T.limit.toFixed(2)}"></label></div>`;
+  }
+  const field = side === 'buy'
+    ? `<label class="at-field"><span class="at-field-l">Dollar amount, $ (at least $1.00)</span><input class="at-input at-box" id="tkDollars" type="text" inputmode="decimal" value="${T.dollars.toFixed(2)}"></label>`
+    : `<label class="at-field"><span class="at-field-l">Shares to sell, to six decimal places</span><input class="at-input at-box" id="tkQty" type="number" min="0.000001" step="0.000001" inputmode="decimal" value="${T.quantity}"></label>`;
+  // A proposal that is a part-share already says this in its reasons above; said once is enough.
+  return `${seg}<div class="at-row">${field}</div><p class="at-quiet" id="tkEstimate">${esc(partEstimate())}</p>
+    ${t.proposal.order?.market ? '' : `<p class="at-honest">A ${term('partShare', 'part-share')} is a ${term('marketOrder', 'market order')}: it fills at the market's price at that moment, not a price you set, and Robinhood's check shows only an estimate. It is sent only while the US market is open, 9:30 a.m. to 4 p.m. New York time.</p>`}`;
+}
+
+/** The person switches between whole shares at their price and a part-share at the market price: the same money as a
+ *  dollar amount, or at least one whole share at the live price. The server checks the new figures as any change. */
+function ticketKind(market: boolean): void {
+  const t = T.open, o = t?.proposal.order;
+  if (!t || !o || T.market === market || T.placed || T.busy) return;
+  const price = t.context.price !== null && t.context.price > 0 ? Math.round(t.context.price * 100) / 100 : T.limit;
+  if (market && o.side === 'buy') T.dollars = Math.max(1, Math.floor(T.quantity * T.limit * 100 + 1e-6) / 100 || 1);
+  if (!market) { T.quantity = Math.max(1, Math.floor(T.quantity) || 1); if (T.market || !(T.limit > 0)) T.limit = price; }
+  T.market = market;
+  if (market) T.limit = price;
+  $('#tkFields').innerHTML = ticketFields(o.side);
+  ticketEdited();
 }
 
 /** Opens a ticket: from one of the desk's calls (a date), or the person's own for a stock and a side. */
@@ -738,31 +785,41 @@ async function openTicket(symbol: string, date: string, side?: 'buy' | 'sell'): 
   if (!dlg.open) dlg.showModal();
   try {
     const t = side ? await api.openOwnTicket(symbol, side) : await api.openTicket(symbol, date);
-    T.open = t; T.checks = t.checks; T.quantity = t.proposal.order?.quantity ?? 0; T.limit = t.proposal.order?.limitPrice ?? 0;
+    const o = t.proposal.order;
+    T.open = t; T.checks = t.checks; T.quantity = o?.quantity ?? 0; T.limit = o?.limitPrice ?? 0; T.market = o?.market === true; T.dollars = o?.dollars ?? 0;
     renderTicket();
   } catch (e) { dlg.close(); toast(say(e), 'bad'); }
   void loadTrading();   // reading the account for the ticket may have tripped the weekly loss limit
 }
 
 function ticketEdited(): void {
-  const t = T.open;
-  if (!t?.proposal.order) return;
-  T.quantity = Number($<HTMLInputElement>('#tkQty').value);
-  T.limit = typedNumber($<HTMLInputElement>('#tkLimit').value);
+  const t = T.open, o = t?.proposal.order;
+  if (!t || !o) return;
+  const field = (id: string) => document.querySelector<HTMLInputElement>(id)?.value ?? '';
+  if (T.market && o.side === 'buy') {
+    T.dollars = typedNumber(field('#tkDollars'));
+    const price = t.context.price;
+    T.quantity = price && price > 0 && T.dollars > 0 ? sixPlaces(T.dollars / price) : NaN;
+  } else {
+    T.quantity = Number(field('#tkQty'));
+    if (!T.market) T.limit = typedNumber(field('#tkLimit'));
+  }
+  const estimate = document.querySelector('#tkEstimate');
+  if (estimate) estimate.textContent = partEstimate();
   T.review = null; T.checks = []; T.confirming = false; renderTicketDyn();
   clearTimeout(T.timer);
-  T.timer = window.setTimeout(() => void run(async () => { if (T.open?.id !== t.id) return; T.checks = (await api.checkTicket(t.id, T.quantity, T.limit)).checks; renderTicketDyn(); }), 350);
+  T.timer = window.setTimeout(() => void run(async () => { if (T.open?.id !== t.id) return; T.checks = (await api.checkTicket(t.id, ticketFigures())).checks; renderTicketDyn(); }), 350);
 }
 
 async function reviewTicket(): Promise<void> {
   const t = T.open;
   if (!t || T.busy) return;
-  const asked: Asked = { id: t.id, quantity: T.quantity, limit: T.limit };
+  const asked = askedNow();
   T.busy = true; renderTicketDyn();
   try {
-    const r = await api.reviewTicket(t.id, T.quantity, T.limit, T.early);
+    const r = await api.reviewTicket(t.id, ticketFigures(), T.early);
     TR.state = { ...TR.state, ...r.trading }; renderTrading();
-    if (!sameFigures(asked, { id: T.open?.id, quantity: T.quantity, limit: T.limit })) return;   // changed while Robinhood checked: not the check of the new figures
+    if (!sameFigures(asked, askedNow())) return;   // changed while Robinhood checked: not the check of the new figures
     T.checks = r.checks; T.review = r.review; T.confirm = r.confirm; T.confirming = false;
   }
   catch (e) { toast(say(e), 'bad'); }
@@ -1620,6 +1677,7 @@ document.addEventListener('click', (e) => {
     case 'tk-place': T.confirming = true; renderTicketDyn(); break;
     case 'tk-back': T.confirming = false; renderTicketDyn(); break;
     case 'tk-early': T.early = true; renderTicketDyn(); break;
+    case 'tk-kind': ticketKind(el.dataset.kind === 'market'); break;
     case 'tk-confirm': void placeTicket(); break;
     case 'tr-ask': TR.asking = true; TR.understood = false; renderAccount(); break;
     case 'tr-understood': TR.understood = true; renderAccount(); break;
@@ -1645,7 +1703,7 @@ void loadTrading(); }); break;
   }
 });
 
-document.addEventListener('input', (e) => { const id = (e.target as Element).id; if (id === 'tkQty' || id === 'tkLimit') ticketEdited(); });
+document.addEventListener('input', (e) => { const id = (e.target as Element).id; if (id === 'tkQty' || id === 'tkLimit' || id === 'tkDollars') ticketEdited(); });
 // In the email field, Enter saves.
 document.addEventListener('keydown', (e) => {
   const t = e.target as HTMLInputElement;
