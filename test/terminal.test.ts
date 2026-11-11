@@ -173,7 +173,7 @@ test('an analysis asked for on the page waits at its depth, rings for whoever li
   assert.deepEqual([running.state, running.date, running.progress], ['running', '2026-10-12', 'starting']);
   assert.equal((await call(term, 'DELETE', '/api/queue?symbol=NVDA')).status, 409, 'a stock being analysed stays on the list');
   await call(term, 'POST', '/api/queue', { body: { symbol: 'AAPL' } });
-  assert.match(await tool('start_queue_item', { symbol: 'AAPL' }), /^BUSY: NVDA, which this run started, is not finished yet: call finish_queue_item for it/);
+  assert.match(await tool('start_queue_item', { symbol: 'AAPL' }), /^UNFINISHED: NVDA, which this run started, is not finished yet: call finish_queue_item for it/);
   assert.match(await tool('finish_queue_item', { symbol: 'NVDA' }), /^INPUT_ERROR: no call for NVDA on 2026-10-12 is recorded yet/);
   new Journal(path.join(dir(), 'journal.md')).storeDecision('NVDA', '2026-10-12', '**Rating**: Buy\n\n**Executive Summary**: Buy.');
   assert.match(await tool('finish_queue_item', { symbol: 'NVDA' }), /^Marked done: NVDA, Buy/);

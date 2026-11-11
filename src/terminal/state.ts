@@ -7,7 +7,7 @@ import { readContactEmail } from '../contact.js';
 import { Journal, type Entry } from '../desk/journal.js';
 import { hasReport, sectionsOf, stepWords } from '../desk/runs.js';
 import { alphaOf, renderSummary, summarize, worked, type Summary } from '../desk/backtest.js';
-import { depthOfRounds, readListener, readQueue, type Depth, type QueueItem } from '../desk/queue.js';
+import { depthOfRounds, readListener, readQueue, type AtOnce, type Depth, type QueueItem } from '../desk/queue.js';
 import { followed, lateWhy, readPaperStart, recordOf, RECORD_WEEKS, RECORD_WORDS, type PaperCall, type PaperRecord } from '../desk/paper.js';
 import { readSettings } from '../settings.js';
 import { againstWords, basisWords, checkName, copiesOf, legacyRules, ownReturn, resolveBenchmark, rulesFor, stockRules, WHEN_SCORED, windowWords, yardstickName, yardstickWords, type Rules, type Scoring } from '../desk/scoring.js';
@@ -53,7 +53,8 @@ export interface DeskState {
   /** The depth the page offers first (the settings' debate rounds, as the nearest depth at or below them), the settings'
    *  own debate and risk rounds (what an analysis asked for with no depth runs), how many one run analyses, and who
    *  listens for the doorbell. */
-  analyses: { depth: Depth; rounds: { debate: number; risk: number }; perRun: number; listener: ListenerView | null };
+  /** `atOnce`: how many stocks one run analyses side by side, the person's choice (1, as shipped, to 3). */
+  analyses: { depth: Depth; rounds: { debate: number; risk: number }; perRun: number; atOnce: AtOnce; listener: ListenerView | null };
   /** How much record the desk has on paper, the paper money it starts with, and the weeks under which switching trading
    *  on asks for one extra press, as a number and in words ("four weeks"). The paper book itself is /api/paper. */
   paper: PaperRecord & { startUsd: number; minWeeks: number; minWords: string };
@@ -161,7 +162,7 @@ export function versionOf(root: string): string {
   // and what "Get started" reads besides the desk's files: whether it is open, a call read, and
   // the day, which adds a week of paper record (the page's other choices, kept in the same file, change nothing it shows).
   const p = readPrefs(dir);
-  const timely = `${listenerOf(dir) ? 'L' : 'n'}${readQueue(dir).map((i) => i.state[0]).join('')}|${p.market?.join(',') ?? 'shipped'}|${p.guide ?? ''}${p.readCall ? 'r' : ''}|${today()}`;
+  const timely = `${listenerOf(dir) ? 'L' : 'n'}${readQueue(dir).map((i) => i.state[0]).join('')}|${p.market?.join(',') ?? 'shipped'}|${p.guide ?? ''}${p.readCall ? 'r' : ''}${p.atOnce ?? 1}|${today()}`;
   return [stamp(path.join(dir, 'journal.md')), stamp(path.join(dir, 'watchlist.json')), stamp(path.join(dir, 'queue.json')), latest, stamp(path.join(dir, 'contact.json')), stamp(path.join(dir, 'listener.json')), stamp(path.join(dir, 'paper.json')), timely].join('-');
 }
 
@@ -196,7 +197,7 @@ export function stateOf(root: string, day: string): DeskState {
     version: versionOf(root), today: day, watchlist, queue, calls, startHere, watchTiers: watch, market, guide,
     record: { summary, text: renderSummary(summary), benchmarkNote: scoringNote(entries, s.scoring) },
     desk: { emailSaved: !!email, tradingEnabled: false, holdingDays: s.scoring.holdingPeriodDays, benchmark: resolveBenchmark('SPY', s.scoring), scoring: scoringShort(s.scoring) },
-    analyses: { depth: depthOfRounds(s.analysis.debateRounds), rounds: { debate: s.analysis.debateRounds, risk: s.analysis.riskRounds }, perRun: s.routines.maxAnalyses, listener },
+    analyses: { depth: depthOfRounds(s.analysis.debateRounds), rounds: { debate: s.analysis.debateRounds, risk: s.analysis.riskRounds }, perRun: s.routines.maxAnalyses, atOnce: prefs.atOnce ?? 1, listener },
     paper: { ...record, startUsd: readPaperStart(dir), minWeeks: RECORD_WEEKS, minWords: RECORD_WORDS },
   };
 }
