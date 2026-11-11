@@ -17,6 +17,7 @@ import { NotSignedIn, openSession, type SessionOptions } from './connect.js';
 import { readSaved } from './store.js';
 import { LOOK_FIRST, masked, oneLine } from './rules.js';
 import { Refused } from './reader.js';
+import { refusalWords, unreachableWhy, unreachableWords, whatItSaid } from '../data/failure-words.js';
 
 export type LinkState = 'none' | 'saved' | 'waiting' | 'connected' | 'failed';
 export interface LinkInfo {
@@ -35,8 +36,39 @@ export interface Snapshot { at: string; views: AccountView[] }
  *  off, when and why; cleared when the person switches it on again. */
 export interface TradingState { on: boolean; since: string | null; caps: Caps; offBecause: { at: string; words: string } | null }
 
+// The connection's own failures come as a web answer's code with its words ("Streamable HTTP error: Error POSTing to
+// endpoint: ...") or as "fetch failed": said as what happened, never as the code (failure-words.ts). Robinhood's own
+// words are kept, with any account number hidden.
+const SDK = /^Streamable HTTP error: (?:Error POSTing to endpoint|Failed to open SSE stream|Failed to terminate session|Server returned \d+ after [^:]*)?:? ?/;
+const webStatus = (e: unknown): number | null => {
+  const code = (e as { code?: unknown } | null)?.code;
+  return e instanceof Error && SDK.test(e.message) && typeof code === 'number' && code >= 400 ? code : null;
+};
+const connectionFailed = (e: unknown): boolean => e instanceof Error && (e.name === 'TimeoutError' || (e instanceof TypeError && /fetch failed/i.test(e.message)));
+
+/** What Robinhood did, as words that follow its name, with what to do when that helps (`then`). */
+function robinhoodDid(e: unknown): { did: string; then: string } | null {
+  const status = webStatus(e);
+  if (status !== null) {
+    const { did, then } = refusalWords(status, 'the dashboard'), said = whatItSaid((e as Error).message.replace(SDK, ''));
+    return { did: `${did}${said ? `, saying "${masked(said)}"` : ''}`, then };
+  }
+  return connectionFailed(e) ? { did: unreachableWords(e), then: '' } : null;
+}
+
 /** A failure of Robinhood's, in plain words for the page. */
-export const plainFailure = (e: unknown): string => e instanceof NotSignedIn ? 'Robinhood asks you to sign in again: press Connect.' : `Robinhood did not answer as expected: ${masked(e instanceof Error ? e.message : String(e))}`;
+export const plainFailure = (e: unknown): string => {
+  if (e instanceof NotSignedIn) return 'Robinhood asks you to sign in again: press Connect.';
+  const m = e instanceof Error ? e.message : String(e), r = robinhoodDid(e);
+  return r ? `Robinhood ${r.did}${r.then}` : /^Robinhood refused/.test(m) ? masked(m) : `Robinhood did not answer as expected: ${masked(m)}`;
+};
+
+/** Why an order's answer did not arrive, in plain words: no advice to try again, which could send it twice. */
+const lostWhy = (e: unknown): string => {
+  if (connectionFailed(e)) return unreachableWhy(e);
+  const r = robinhoodDid(e);
+  return r ? `Robinhood ${r.did}` : masked(e instanceof Error ? e.message : String(e));
+};
 
 /** An order was sent to Robinhood, but its answer never came back (a dropped connection, a timeout): it may have gone
  *  through. Never told as a plain failure, which would invite a second order. */
@@ -221,7 +253,7 @@ export class Link {
       session.placer.ready(account, sent, refId);   // what this door would refuse is refused before anything is logged or sent
       sending();
       try { return { placed: await session.placer.place(account, sent, refId), context }; }
-      catch (e) { throw e instanceof Refused ? e : new AnswerLost(oneLine(masked(e instanceof Error ? e.message : String(e)), 120)); }
+      catch (e) { throw e instanceof Refused ? e : new AnswerLost(oneLine(lostWhy(e), 160)); }
     } finally { await session.close().catch(() => undefined); }   // closing the session afterwards never hides the answer
   }
 
@@ -278,8 +310,7 @@ export class Link {
   }
 
   private bad(e: unknown): Last {
-    const words = oneLine(masked(e instanceof Error ? e.message : String(e)), 200);
-    const why = e instanceof NotSignedIn ? 'Robinhood asks you to sign in again.' : /^Robinhood refused/.test(words) ? words : `Robinhood did not answer as expected: ${words}`;
+    const why = e instanceof NotSignedIn ? 'Robinhood asks you to sign in again.' : oneLine(plainFailure(e), 240);
     return { state: 'failed', checkedAt: this.now(), tools: null, message: why };
   }
 

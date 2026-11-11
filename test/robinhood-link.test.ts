@@ -119,7 +119,8 @@ test('a refusal on Robinhood\'s page, or Robinhood not answering, is reported in
   await fake.close();
   const down = await link.check();
   assert.equal(down.state, 'failed');
-  assert.match(down.message, /^Robinhood did not answer as expected: /);
+  assert.match(down.message, /^Robinhood (could not be reached \(.+\)|did not answer in time)$/, down.message);
+  assert.doesNotMatch(down.message, /fetch failed|HTTP|ECONN/);
   assert.ok(down.message.length < 260);
   // Robinhood's own words can carry an account number: the message keeps the words and hides the number.
   const loud = http.createServer((_req, res) => { res.writeHead(500, { 'content-type': 'text/plain' }); res.end('account 5RH88004321 is locked'); });
@@ -129,6 +130,8 @@ test('a refusal on Robinhood\'s page, or Robinhood not answering, is reported in
     assert.equal(said.state, 'failed');
     assert.match(said.message, /locked/);
     assert.ok(!said.message.includes('88004321'), said.message);
+    // a failed web answer is said as what happened, never as the connection's code and words ("Streamable HTTP error")
+    assert.equal(said.message, 'Robinhood had a fault on its own side and could not answer, saying "account ##### is locked"; try again later');
   } finally { loud.close(); }
 });
 

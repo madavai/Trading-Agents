@@ -1,15 +1,25 @@
 // The one door to the outside for the data tools: a request with the desk's user agent, a time limit and one retry when
 // a source is busy, and two kinds of failure kept apart - a source that could not answer (Unavailable) and a source
-// that answered with no data for what was asked (NoData). Neither ever reads as "nothing happened".
+// that answered with no data for what was asked (NoData). Neither ever reads as "nothing happened". Each says what
+// happened in plain words, with the source named as a person knows it (failure-words.ts): never a web error code.
 
-export class Unavailable extends Error { override name = 'Unavailable'; }
-export class NoData extends Error { override name = 'NoData'; }
+/** `status`: the code of the source's answer (403, 429, 503...), for the program only; the words never carry it.
+ *  `noEmail`: the SEC refused a request that carried no contact email, the one refusal the person can mend. */
+export class Unavailable extends Error {
+  override name = 'Unavailable';
+  constructor(message: string, readonly status?: number, readonly noEmail = false) { super(message); }
+}
+export class NoData extends Error {
+  override name = 'NoData';
+  constructor(message: string, readonly status?: number) { super(message); }
+}
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { userAgentFor } from '../check/probes.js';
 import { writeWhole } from '../desk/lock.js';
+import { refusalWords, sourceName, unreachableWords, whatItSaid } from './failure-words.js';
 
 type Fetch = typeof fetch;
 let fetchImpl: Fetch = (...a) => fetch(...a);
@@ -90,8 +100,15 @@ function pruneCache(dir: string): void {
   try { for (const f of fs.readdirSync(dir)) { const file = path.join(dir, f); if (Date.now() - fs.statSync(file).mtimeMs > 3 * 24 * 60 * MINUTE) fs.rmSync(file, { force: true }); } } catch { /* no cache yet */ }
 }
 
-/** What a source said when it refused, in a few plain words: its own explanation can be the whole diagnosis. */
-const excerpt = (body: string): string => body.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 140);
+/** A failed answer in plain words: who refused and how, what it said when that can be read, and, for the SEC, whether
+ *  the person's contact email went with the request (the SEC refuses a program that does not say who runs it). */
+function refusal(url: string, status: number, body: string): Unavailable {
+  const { did, then } = refusalWords(status), refused = status === 401 || status === 403 || status === 429;
+  const said = status === 403 || status === 429 ? whatItSaid(body) : '';
+  const sec = /(^|\.)sec\.gov$/.test(new URL(url).hostname), email = emailNow().trim() !== '';
+  const note = sec && refused ? (email ? ', though a contact email was sent with it' : ', and no contact email was sent with it') : '';
+  return new Unavailable(`${sourceName(url)} ${did}${said ? `, saying "${said}"` : ''}${note}${then}`, status, sec && refused && !email);
+}
 
 export async function getText(url: string, opts: { timeoutMs?: number; headers?: Record<string, string> } = {}): Promise<string> {
   return (await getTextAt(url, opts)).text;
@@ -111,7 +128,7 @@ export async function getTextAt(url: string, opts: { timeoutMs?: number; headers
     } catch (e) {
       const err = e as Error;
       if (attempt < 2 && err.name !== 'TimeoutError') { await sleep(800 * (attempt + 1)); continue; }
-      throw new Unavailable(`${host} did not answer (${err.name === 'TimeoutError' ? 'no answer in time' : err.message})`);
+      throw new Unavailable(`${sourceName(url)} ${unreachableWords(err)}`);
     }
     // A busy source is asked again, waiting as long as it says (up to 20 s) or, if it does not say, a little longer each time.
     if ((res.status === 429 || res.status >= 500) && attempt < 2) {
@@ -121,12 +138,8 @@ export async function getTextAt(url: string, opts: { timeoutMs?: number; headers
       continue;
     }
     const text = await res.text();
-    if (res.status === 404) throw new NoData(`${host} has nothing at that address (HTTP 404)`);
-    if (!res.ok) {
-      const sec = /(^|\.)sec\.gov$/.test(new URL(url).hostname);
-      const said = res.status === 403 || res.status === 429 ? excerpt(text) : '';
-      throw new Unavailable(`${host} refused (HTTP ${res.status})${said ? `, saying "${said}"` : ''}${res.status === 429 ? '; it is rate-limiting this computer, so try again in a few minutes' : ''}${sec ? (emailNow().trim() ? ' [a contact email was sent]' : ' [no contact email was sent]') : ''}`);
-    }
+    if (res.status === 404) throw new NoData(`${sourceName(url)} ${refusalWords(404).did}`, 404);
+    if (!res.ok) throw refusal(url, res.status, text);
     const at = Date.now();
     if (!opts.usable || opts.usable(text)) writeCache(url, text);
     return { text, at };
@@ -139,7 +152,7 @@ export async function getCookies(url: string): Promise<string> {
   try {
     res = await fetchImpl(url, { headers: { 'User-Agent': userAgentFor(url, contact, emailNow()) }, redirect: 'manual', signal: AbortSignal.timeout(15_000) });
   } catch (e) {
-    throw new Unavailable(`${new URL(url).host} did not answer (${(e as Error).message})`);
+    throw new Unavailable(`${sourceName(url)} ${unreachableWords(e)}`);
   }
   await res.body?.cancel().catch(() => {});
   return res.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
@@ -155,7 +168,7 @@ export async function getJsonAt<T>(url: string, opts: { timeoutMs?: number; head
   const read: { text?: string; value?: T } = {};
   const usable = (text: string): boolean => { try { read.value = JSON.parse(text) as T; read.text = text; return true; } catch { return false; } };
   const { text, at } = await getTextAt(url, { ...opts, usable });
-  if (read.text !== text) throw new Unavailable(`${new URL(url).host} answered with something that is not data`);
+  if (read.text !== text) throw new Unavailable(`${sourceName(url)} answered, but not with the data the desk reads`);
   return { value: read.value as T, at };
 }
 

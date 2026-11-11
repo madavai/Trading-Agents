@@ -19770,7 +19770,90 @@ function capsOf(raw) {
   return out;
 }
 
+// src/data/failure-words.ts
+function refusalWords(status, who = "the desk") {
+  if (status === 429) return { did: `turned ${who} away for asking too often`, then: "; it limits how often one computer may ask, so try again in a few minutes" };
+  if (status >= 500) return { did: "had a fault on its own side and could not answer", then: "; try again later" };
+  if (status === 404 || status === 410) return { did: `has nothing at the address ${who} asked for`, then: "" };
+  return { did: `refused ${who}'s request`, then: "" };
+}
+function unreachableWhy(e) {
+  const err = e;
+  const code = String(err?.cause?.code ?? err?.code ?? "");
+  const said = `${err?.message ?? ""} ${err?.cause?.message ?? ""}`;
+  if (err?.name === "TimeoutError" || err?.cause?.name === "TimeoutError" || /TIMEOUT|ETIMEDOUT/.test(code)) return "no answer in time";
+  if (/ENOTFOUND|EAI_AGAIN/.test(code)) return "this computer may be offline, or could not look up its address";
+  if (/ECONNREFUSED/.test(code)) return "nothing answered at its address";
+  if (/ECONNRESET|EPIPE|UND_ERR_SOCKET|UND_ERR_CLOSED/.test(code) || /other side closed|socket hang up/i.test(said)) return "the connection was cut off";
+  if (/CERT|SSL|TLS|SELF_SIGNED/i.test(code)) return "its security certificate could not be checked";
+  return "the connection failed";
+}
+function unreachableWords(e) {
+  const why = unreachableWhy(e);
+  return why === "no answer in time" ? "did not answer in time" : `could not be reached (${why})`;
+}
+function whatItSaid(body) {
+  const text2 = body.trim();
+  if (!text2) return "";
+  const clean = (s) => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;|&#x27;/g, "'").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim().slice(0, 140);
+  if (/^[[{]/.test(text2)) {
+    try {
+      const v = JSON.parse(text2);
+      const pick2 = (o, depth) => {
+        if (typeof o === "string") return o;
+        if (!o || typeof o !== "object" || depth > 3) return "";
+        if (Array.isArray(o)) {
+          for (const x of o) {
+            const s = pick2(x, depth + 1);
+            if (s) return s;
+          }
+          return "";
+        }
+        const r = o;
+        for (const k of ["message", "description", "error_description", "detail", "error", "errors", "title"]) {
+          const s = pick2(r[k], depth + 1);
+          if (s) return s;
+        }
+        for (const x of Object.values(r)) if (x && typeof x === "object") {
+          const s = pick2(x, depth + 1);
+          if (s) return s;
+        }
+        return "";
+      };
+      return clean(pick2(v, 0));
+    } catch {
+    }
+  }
+  if (/<feed[\s>]/.test(text2)) return clean(/<title[^>]*>([\s\S]*?)<\/title>/i.exec(text2)?.[1]?.replace(/<[^>]*>/g, " ") ?? "");
+  const page = text2.replace(/<\?[\s\S]*?\?>|<!--[\s\S]*?-->|<!DOCTYPE[^>]*>/gi, " ").replace(/<(head|script|style|noscript)[\s>][\s\S]*?<\/\1>/gi, " ").replace(/<[^>]*>/g, " ");
+  return clean(page) || clean(/<title[^>]*>([\s\S]*?)<\/title>/i.exec(text2)?.[1] ?? "");
+}
+
 // src/robinhood/link.ts
+var SDK = /^Streamable HTTP error: (?:Error POSTing to endpoint|Failed to open SSE stream|Failed to terminate session|Server returned \d+ after [^:]*)?:? ?/;
+var webStatus = (e) => {
+  const code = e?.code;
+  return e instanceof Error && SDK.test(e.message) && typeof code === "number" && code >= 400 ? code : null;
+};
+var connectionFailed = (e) => e instanceof Error && (e.name === "TimeoutError" || e instanceof TypeError && /fetch failed/i.test(e.message));
+function robinhoodDid(e) {
+  const status = webStatus(e);
+  if (status !== null) {
+    const { did, then } = refusalWords(status, "the dashboard"), said = whatItSaid(e.message.replace(SDK, ""));
+    return { did: `${did}${said ? `, saying "${masked(said)}"` : ""}`, then };
+  }
+  return connectionFailed(e) ? { did: unreachableWords(e), then: "" } : null;
+}
+var plainFailure = (e) => {
+  if (e instanceof NotSignedIn) return "Robinhood asks you to sign in again: press Connect.";
+  const m = e instanceof Error ? e.message : String(e), r = robinhoodDid(e);
+  return r ? `Robinhood ${r.did}${r.then}` : /^Robinhood refused/.test(m) ? masked(m) : `Robinhood did not answer as expected: ${masked(m)}`;
+};
+var lostWhy = (e) => {
+  if (connectionFailed(e)) return unreachableWhy(e);
+  const r = robinhoodDid(e);
+  return r ? `Robinhood ${r.did}` : masked(e instanceof Error ? e.message : String(e));
+};
 var AnswerLost = class extends Error {
   constructor(why) {
     super(`Robinhood's answer did not arrive (${why}), so this order may have gone through. ${LOOK_FIRST}`);
@@ -19981,7 +20064,7 @@ var Link = class {
       try {
         return { placed: await session.placer.place(account, sent, refId), context };
       } catch (e) {
-        throw e instanceof Refused ? e : new AnswerLost(oneLine(masked(e instanceof Error ? e.message : String(e)), 120));
+        throw e instanceof Refused ? e : new AnswerLost(oneLine(lostWhy(e), 160));
       }
     } finally {
       await session.close().catch(() => void 0);
@@ -20044,8 +20127,7 @@ var Link = class {
     };
   }
   bad(e) {
-    const words2 = oneLine(masked(e instanceof Error ? e.message : String(e)), 200);
-    const why = e instanceof NotSignedIn ? "Robinhood asks you to sign in again." : /^Robinhood refused/.test(words2) ? words2 : `Robinhood did not answer as expected: ${words2}`;
+    const why = e instanceof NotSignedIn ? "Robinhood asks you to sign in again." : oneLine(plainFailure(e), 240);
     return { state: "failed", checkedAt: this.now(), tools: null, message: why };
   }
   /** Sends the person to Robinhood's sign-in page and waits for them to come back, in the background. */

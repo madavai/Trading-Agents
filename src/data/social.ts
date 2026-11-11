@@ -30,7 +30,7 @@ export async function stocktwits(raw: string, from: string, to: string, limit: n
   const j = await getJson<TwitsJson>(`https://api.stocktwits.com/api/2/streams/symbol/${encodeURIComponent(sym)}.json`);
   if (!Array.isArray(j.messages)) {
     const said = j.errors?.map((e) => e.message).filter(Boolean).join('; ');
-    throw new Unavailable(`api.stocktwits.com answered without its list of messages${said ? `, saying "${clip(said, 140)}"` : ''}`);
+    throw new Unavailable(`StockTwits answered without its list of messages${said ? `, saying "${clip(said, 140)}"` : ''}`);
   }
   if (!j.messages.length) throw new Unavailable(`the stream for ${sym} came back with no messages at all, though it serves its latest messages however old they are: an empty stream is a fault, or a symbol no one has posted about`);
   const all = j.messages.filter((m) => m.body && m.created_at)
@@ -56,7 +56,7 @@ export async function reddit(raw: string, from: string, to: string, subs: string
   const body = await getText(url, { headers: { Accept: 'application/atom+xml' } });
   if (!/<feed[\s>]/.test(body)) {
     const title = plain(/<title[^>]*>([\s\S]*?)<\/title>/i.exec(body)?.[1] ?? '');
-    throw new Unavailable(`www.reddit.com answered with something that is not its feed of posts${title ? ` (a page titled "${clip(title, 80)}")` : ''}`);
+    throw new Unavailable(`Reddit answered with something that is not its feed of posts${title ? ` (a page titled "${clip(title, 80)}")` : ''}`);
   }
   const all = parseAtom(body);
   return { posts: all.filter((p) => within(p.time, from, to)), oldest: oldestOf(all), full: all.length >= 100 };

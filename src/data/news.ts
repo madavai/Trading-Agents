@@ -20,7 +20,7 @@ export async function search(q: string, count: number): Promise<Article[]> {
     try {
       const j = await getJson<SearchJson>(`${host}/v1/finance/search?${qs}`);
       // Its search always carries a list of articles, empty when there are none: an answer without one is broken.
-      if (!Array.isArray(j.news)) throw new Unavailable(`${new URL(host).host} answered its news search without a list of articles`);
+      if (!Array.isArray(j.news)) throw new Unavailable("Yahoo Finance answered its news search without a list of articles");
       return j.news.filter((n) => n.title && n.providerPublishTime).map((n) => ({ title: n.title!, publisher: n.publisher ?? 'unknown', link: n.link ?? '', time: stamp(n.providerPublishTime!), tickers: (n.relatedTickers ?? []).map((t) => t.toUpperCase()) }));
     } catch (e) { last = e; }
   }

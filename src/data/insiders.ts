@@ -147,7 +147,7 @@ export async function secInsiders(symbol: string, cik: string, asOf: string, day
       if (!/^[\d-]+$/.test(acc) || !/^[\w.-]+\.xml$/i.test(doc)) throw new NoData('its address in the SEC\'s list is not one the desk can read');
       const xml = await getText(`https://www.sec.gov/Archives/edgar/data/${Number(cik)}/${acc.replaceAll('-', '')}/${doc}`);
       // A web page in place of the filing (a refusal, a notice) has no table of trades: it is not read as a filing with none.
-      if (!/<ownershipDocument[\s>]/.test(xml)) throw new Unavailable('www.sec.gov answered with something that is not a Form 4');
+      if (!/<ownershipDocument[\s>]/.test(xml)) throw new Unavailable('the SEC answered with something that is not a Form 4');
       filings.push(parseFiling(xml, p.form, p.filed));
     } catch (e) { failed++; why ||= (e as Error).message; }
   }
