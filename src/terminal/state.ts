@@ -158,10 +158,10 @@ export function versionOf(root: string): string {
   try { for (const d of fs.readdirSync(runs)) latest = Math.max(latest, Number(stamp(path.join(runs, d, 'run.json')))); } catch { /* no runs yet */ }
   // Two things change with time alone, not with a file: a listener whose heartbeat stopped, and a run that died. Both are
   // part of the fingerprint, so the page hears of them too; so are the whole-market funds, which another page may change,
-  // and what "Get started" reads besides the desk's files: whether it is open, a call read, the Claude Code switch, and
+  // and what "Get started" reads besides the desk's files: whether it is open, a call read, and
   // the day, which adds a week of paper record (the page's other choices, kept in the same file, change nothing it shows).
   const p = readPrefs(dir);
-  const timely = `${listenerOf(dir) ? 'L' : 'n'}${readQueue(dir).map((i) => i.state[0]).join('')}|${p.market?.join(',') ?? 'shipped'}|${p.guide ?? ''}${p.readCall ? 'r' : ''}${p.autorun ? 'a' : ''}|${today()}`;
+  const timely = `${listenerOf(dir) ? 'L' : 'n'}${readQueue(dir).map((i) => i.state[0]).join('')}|${p.market?.join(',') ?? 'shipped'}|${p.guide ?? ''}${p.readCall ? 'r' : ''}|${today()}`;
   return [stamp(path.join(dir, 'journal.md')), stamp(path.join(dir, 'watchlist.json')), stamp(path.join(dir, 'queue.json')), latest, stamp(path.join(dir, 'contact.json')), stamp(path.join(dir, 'listener.json')), stamp(path.join(dir, 'paper.json')), timely].join('-');
 }
 
@@ -191,7 +191,7 @@ export function stateOf(root: string, day: string): DeskState {
   const { startHere, watch } = tiersOf(watchlist, market.symbols, calls);
   const queue = queueOf(dir), listener = listenerOf(dir), prefs = readPrefs(dir), email = readContactEmail(root);
   const record = recordOf(entries.map(paperCallOf), day);
-  const guide = guideOf({ email, watchlist, market: market.symbols, queue, calls, listener: listener?.listener ?? null, autorun: prefs.autorun === true, readCall: !!prefs.readCall, record, ...(prefs.guide ? { pref: prefs.guide } : {}) });
+  const guide = guideOf({ email, watchlist, market: market.symbols, queue, calls, listener: listener?.listener ?? null, readCall: !!prefs.readCall, record, ...(prefs.guide ? { pref: prefs.guide } : {}) });
   return {
     version: versionOf(root), today: day, watchlist, queue, calls, startHere, watchTiers: watch, market, guide,
     record: { summary, text: renderSummary(summary), benchmarkNote: scoringNote(entries, s.scoring) },

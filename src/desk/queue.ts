@@ -1,5 +1,5 @@
 // The analyses the person asks for on the dashboard, and the contract between the dashboard and whatever runs the agents
-// (Madav's routine, the desk's own watcher for Claude Code, a person typing in a chat). Three small files in desk-data:
+// (Madav's routine, a person typing in a chat). The desk starts no run of its own: it only waits to be asked. Three small files in desk-data:
 // - queue.json: each stock asked for, with the depth asked and where it stands: waiting, running, done or failed.
 //   The dashboard adds and removes; the desk's own tools mark a stock running and finished. One stock runs at a time.
 // - doorbell.json: written when the person presses Analyse (or Run now), and when a run stops with stocks still waiting.
@@ -61,6 +61,9 @@ export const runEnded = (i: QueueItem): boolean => !i.pid || !alive(i.pid);
 
 /** At most this many stocks waiting or running, and this many finished ones kept for the person to see (oldest go first). */
 export const MAX_OPEN = 20, MAX_FINISHED = 20;
+
+/** The words a runner is started with: the analyse playbook's waiting list. Madav's routine "analyse-when-asked" (`.claude/routines.json`) sends the same. */
+export const RUN_WORDS = 'Analyse what is waiting on the dashboard.';
 /** A stock being analysed saves each step as it is written. One with nothing saved for this long (since it started, or
  *  since its run last saved a step) belongs to a run that stopped without a word: it reads as failed and can be retried.
  *  However long an analysis takes, it is never marked failed while it is still saving its steps: in the desk's first real
@@ -292,12 +295,12 @@ export interface ListenerNote {
   since: string;
   /** Written at least once a minute while it listens; a note older than three minutes is from a listener that died. */
   beat: string;
-  /** The desk's own watcher writes its process id, to know the note is its own. */
+  /** A listener may write its process id, to know the note is its own. */
   pid?: number;
   /** The last run: when it started and ended (`at`; for a note that gives no end time, when it started), and what it did
    *  or why it stopped, in plain words. With `started`, a stock that run left "running" reads as failed with these words
    *  at once. `startOnly`: `at` is when it started, because the note gave no end time, so the page says "started".
-   *  `runner`: the run's id (the desk's own listener gives it to its run), so only a stock that run started is failed. */
+   *  `runner`: the run's id (a listener may give it to its run), so only a stock that run started is failed. */
   lastRun?: { started?: string; at: string; result: string; startOnly?: true; runner?: string };
 }
 export const LISTENER_FRESH_MS = 3 * 60_000;

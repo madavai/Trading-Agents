@@ -3263,8 +3263,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path21) {
-      let input = path21;
+    function removeDotSegments(path20) {
+      let input = path20;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3338,11 +3338,11 @@ var require_utils = __commonJS({
       }
       return output.join("");
     }
-    function removeDotSegmentsRelative(path21) {
-      if (path21 === "" || path21[0] === "/") {
-        return removeDotSegments(path21);
+    function removeDotSegmentsRelative(path20) {
+      if (path20 === "" || path20[0] === "/") {
+        return removeDotSegments(path20);
       }
-      const segments = path21.split("/");
+      const segments = path20.split("/");
       const last = segments.length - 1;
       const output = [];
       let trailingDirectory = false;
@@ -3705,8 +3705,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path21 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path21 && path21 !== "/" ? path21 : void 0;
+        const path20 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path20 && path20 !== "/" ? path20 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -7243,12 +7243,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list3, fs21, exportName) {
+    function addFormats(ajv, list3, fs20, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list3)
-        ajv.addFormat(f, fs21[f]);
+        ajv.addFormat(f, fs20[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -7361,9 +7361,9 @@ var require_content_type = __commonJS({
 });
 
 // src/terminal/main.ts
-import fs20 from "node:fs";
+import fs19 from "node:fs";
 import http3 from "node:http";
-import path20 from "node:path";
+import path19 from "node:path";
 import { spawn as spawn2 } from "node:child_process";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
@@ -7697,9 +7697,9 @@ async function getJsonAt(url2, opts = {}) {
 
 // src/terminal/server.ts
 import crypto6 from "node:crypto";
-import fs19 from "node:fs";
+import fs18 from "node:fs";
 import http2 from "node:http";
-import path19 from "node:path";
+import path18 from "node:path";
 import { fileURLToPath } from "node:url";
 
 // src/data/dates.ts
@@ -9148,10 +9148,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj4, path21) {
-  if (!path21)
+function getElementAtPath(obj4, path20) {
+  if (!path20)
     return obj4;
-  return path21.reduce((acc, key) => acc?.[key], obj4);
+  return path20.reduce((acc, key) => acc?.[key], obj4);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -9491,11 +9491,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path21, issues) {
+function prefixIssues(path20, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path21);
+    iss.path.unshift(path20);
     return iss;
   });
 }
@@ -9956,16 +9956,16 @@ function flattenError(error2, mapper = (issue2) => issue2.message) {
 }
 function formatError(error2, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error3, path21 = []) => {
+  const processError = (error3, path20 = []) => {
     for (const issue2 of error3.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path21, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path20, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path21, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path20, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path21, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path20, ...issue2.path]);
       } else {
-        const fullpath = [...path21, ...issue2.path];
+        const fullpath = [...path20, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -22340,7 +22340,7 @@ function cleanPrefs(raw) {
   if (theme) out.theme = theme;
   const side = one(r.side, ["open", "folded"]);
   if (side) out.side = side;
-  const view = one(r.view, ["overview", "account"]);
+  const view = one(r.view, ["overview", "account", "today", "score", "analyses"]);
   if (view) out.view = view;
   const symbol = sym(r.symbol);
   if (symbol) out.symbol = symbol;
@@ -22361,7 +22361,6 @@ function cleanPrefs(raw) {
     }
     out.recent = recent;
   }
-  if (typeof r.autorun === "boolean") out.autorun = r.autorun;
   const market = cleanMarket(r.market);
   if (market) out.market = market;
   if (Array.isArray(r.folded)) out.folded = TIERS.filter((t2) => r.folded.includes(t2));
@@ -22489,7 +22488,7 @@ function versionOf(root2) {
   } catch {
   }
   const p = readPrefs(dir);
-  const timely = `${listenerOf(dir) ? "L" : "n"}${readQueue(dir).map((i) => i.state[0]).join("")}|${p.market?.join(",") ?? "shipped"}|${p.guide ?? ""}${p.readCall ? "r" : ""}${p.autorun ? "a" : ""}|${today()}`;
+  const timely = `${listenerOf(dir) ? "L" : "n"}${readQueue(dir).map((i) => i.state[0]).join("")}|${p.market?.join(",") ?? "shipped"}|${p.guide ?? ""}${p.readCall ? "r" : ""}|${today()}`;
   return [stamp(path15.join(dir, "journal.md")), stamp(path15.join(dir, "watchlist.json")), stamp(path15.join(dir, "queue.json")), latest, stamp(path15.join(dir, "contact.json")), stamp(path15.join(dir, "listener.json")), stamp(path15.join(dir, "paper.json")), timely].join("-");
 }
 function queueOf(dir, now = /* @__PURE__ */ new Date()) {
@@ -22523,7 +22522,7 @@ function stateOf(root2, day2) {
   const { startHere, watch } = tiersOf(watchlist, market.symbols, calls);
   const queue2 = queueOf(dir), listener = listenerOf(dir), prefs = readPrefs(dir), email2 = readContactEmail(root2);
   const record2 = recordOf(entries.map(paperCallOf), day2);
-  const guide = guideOf({ email: email2, watchlist, market: market.symbols, queue: queue2, calls, listener: listener?.listener ?? null, autorun: prefs.autorun === true, readCall: !!prefs.readCall, record: record2, ...prefs.guide ? { pref: prefs.guide } : {} });
+  const guide = guideOf({ email: email2, watchlist, market: market.symbols, queue: queue2, calls, listener: listener?.listener ?? null, readCall: !!prefs.readCall, record: record2, ...prefs.guide ? { pref: prefs.guide } : {} });
   return {
     version: versionOf(root2),
     today: day2,
@@ -22547,6 +22546,19 @@ function callOf(root2, ticker, date4) {
 }
 
 // src/terminal/quotes.ts
+function quoteKind(instrumentType) {
+  switch (instrumentType) {
+    case "EQUITY":
+      return "company";
+    case "ETF":
+    case "MUTUALFUND":
+      return "fund";
+    case "CRYPTOCURRENCY":
+      return "coin";
+    default:
+      return void 0;
+  }
+}
 var finite2 = (v) => typeof v === "number" && Number.isFinite(v);
 function parseQuote(json, symbol, nowSec = Date.now() / 1e3) {
   const r = json.chart?.result?.[0];
@@ -22559,6 +22571,7 @@ function parseQuote(json, symbol, nowSec = Date.now() / 1e3) {
   const open4 = m.instrumentType === "CRYPTOCURRENCY" || finite2(reg?.start) && finite2(reg?.end) && nowSec >= reg.start && nowSec <= reg.end;
   const t2 = finite2(m.regularMarketTime) ? m.regularMarketTime : (r.timestamp ?? [])[Math.max(0, (r.timestamp ?? []).length - 1)];
   if (!finite2(t2)) throw new NoData(`Yahoo Finance gave a price for ${symbol} with no time, so when it is from is not known`);
+  const kind = quoteKind(m.instrumentType);
   return {
     symbol,
     name: m.longName ?? m.shortName,
@@ -22570,7 +22583,8 @@ function parseQuote(json, symbol, nowSec = Date.now() / 1e3) {
     open: open4,
     asOf: new Date(t2 * 1e3).toISOString(),
     points: points.length ? points : [price],
-    market: priceMarket(m)
+    market: priceMarket(m),
+    ...kind ? { kind } : {}
   };
 }
 var memo2 = /* @__PURE__ */ new Map();
@@ -22935,42 +22949,20 @@ async function weatherNow(day2, now = /* @__PURE__ */ new Date()) {
   return { at: now.toISOString(), lines: [trend, mood, rates] };
 }
 
-// src/watch/claude.ts
-import fs18 from "node:fs";
-import os3 from "node:os";
-import path17 from "node:path";
-function findClaude(env = process.env, platform = process.platform, exists = (p) => fs18.existsSync(p)) {
-  const p = platform === "win32" ? path17.win32 : path17.posix;
-  const dirs = (env.PATH ?? env.Path ?? "").split(platform === "win32" ? ";" : ":").filter(Boolean);
-  const home = env.USERPROFILE ?? env.HOME ?? os3.homedir();
-  if (platform === "win32") {
-    for (const d of [...dirs, p.join(home, ".local", "bin")]) {
-      if (exists(p.join(d, "claude.exe"))) return { command: p.join(d, "claude.exe"), args: [] };
-      if (!exists(p.join(d, "claude.cmd"))) continue;
-      const pkg = p.join(d, "node_modules", "@anthropic-ai", "claude-code");
-      if (exists(p.join(pkg, "bin", "claude.exe"))) return { command: p.join(pkg, "bin", "claude.exe"), args: [] };
-      if (exists(p.join(pkg, "cli.js"))) return { command: process.execPath, args: [p.join(pkg, "cli.js")] };
-    }
-    return null;
-  }
-  for (const d of [...dirs, p.join(home, ".local", "bin"), p.join(home, ".claude", "local")]) if (exists(p.join(d, "claude"))) return { command: p.join(d, "claude"), args: [] };
-  return null;
-}
-
 // src/terminal/launch.ts
 import crypto5 from "node:crypto";
-import path18 from "node:path";
+import path17 from "node:path";
 var PORTS = [47615, 47625];
-var deskIdOf = (root2) => crypto5.createHash("sha256").update(path18.resolve(root2)).digest("hex").slice(0, 12);
+var deskIdOf = (root2) => crypto5.createHash("sha256").update(path17.resolve(root2)).digest("hex").slice(0, 12);
 
 // src/terminal/server.ts
 var TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".woff2": "font/woff2", ".svg": "image/svg+xml" };
-function loadAssets(dir = path19.join(path19.dirname(fileURLToPath(import.meta.url)), "terminal")) {
+function loadAssets(dir = path18.join(path18.dirname(fileURLToPath(import.meta.url)), "terminal")) {
   const out = /* @__PURE__ */ new Map();
-  const add = (rel) => out.set(`/${rel.replace(/\\/g, "/")}`, { type: TYPES[path19.extname(rel)] ?? "application/octet-stream", body: fs19.readFileSync(path19.join(dir, rel)) });
+  const add = (rel) => out.set(`/${rel.replace(/\\/g, "/")}`, { type: TYPES[path18.extname(rel)] ?? "application/octet-stream", body: fs18.readFileSync(path18.join(dir, rel)) });
   for (const f of ["index.html", "app.js", "app.css"]) add(f);
   try {
-    for (const f of fs19.readdirSync(path19.join(dir, "fonts"))) if (f.endsWith(".woff2")) add(`fonts/${f}`);
+    for (const f of fs18.readdirSync(path18.join(dir, "fonts"))) if (f.endsWith(".woff2")) add(`fonts/${f}`);
   } catch {
   }
   return out;
@@ -23011,14 +23003,14 @@ function fingerprint(files) {
   const h = crypto6.createHash("sha256");
   for (const f of files) {
     try {
-      h.update(fs19.readFileSync(f));
+      h.update(fs18.readFileSync(f));
     } catch {
       h.update(`missing ${f}`);
     }
   }
   return h.digest("hex").slice(0, 12);
 }
-var OWN_LISTENER = "Claude Code";
+var RETIRED_LISTENER = "Claude Code";
 var KEY = /^[0-9a-f]{48}$/;
 var CLAIM = /^[0-9a-f]{36}$/;
 async function startTerminal(opts) {
@@ -23081,7 +23073,7 @@ async function startTerminal(opts) {
     });
     req.on("error", reject);
   });
-  const callsOf = () => new Journal(path19.join(dir, "journal.md")).load().map((e) => ({ ticker: e.ticker, date: e.date, rating: e.rating, ...e.recorded ? { recorded: e.recorded } : {} }));
+  const callsOf = () => new Journal(path18.join(dir, "journal.md")).load().map((e) => ({ ticker: e.ticker, date: e.date, rating: e.rating, ...e.recorded ? { recorded: e.recorded } : {} }));
   const closesOf = (d, today2) => {
     const rows = (d.traded ?? d.bars).map((r) => ({ date: r.date, close: r.close }));
     const unfinished = d.bars.length > 0 && (latestState(d, today2).open || !d.meta.session && d.bars.at(-1).date === today2);
@@ -23092,7 +23084,7 @@ async function startTerminal(opts) {
     const calls = callsOf(), caps = robinhood.trading().caps, startUsd = readPaperStart(dir), trading = readSettings(root2).trading;
     let stamp3 = "0";
     try {
-      stamp3 = String(fs19.statSync(path19.join(dir, "journal.md")).mtimeMs);
+      stamp3 = String(fs18.statSync(path18.join(dir, "journal.md")).mtimeMs);
     } catch {
     }
     const key = `${stamp3}|${startUsd}|${JSON.stringify(caps)}|${today2}`;
@@ -23266,7 +23258,7 @@ async function startTerminal(opts) {
     if (p === "/api/queue" && method === "POST") {
       const symbol = safeSymbol(name), d = b.depth;
       if (d !== void 0 && !isDepth(d)) throw new Refused2(400, "the depth is shallow, medium or deep");
-      const call = new Journal(path19.join(dir, "journal.md")).load().find((e) => e.ticker === symbol && e.date === day2);
+      const call = new Journal(path18.join(dir, "journal.md")).load().find((e) => e.ticker === symbol && e.date === day2);
       if (call) throw new Refused2(409, `${symbol} was already analysed today (${call.rating}): its call is in the journal. Ask again tomorrow`);
       queued(() => enqueue(dir, symbol, (/* @__PURE__ */ new Date()).toISOString(), isDepth(d) ? d : void 0));
       ringDoorbell(dir, "press");
@@ -23281,31 +23273,7 @@ async function startTerminal(opts) {
       ringDoorbell(dir, "press");
       return json(res, 200, { queue: queueOf(dir) });
     }
-    if (p === "/api/listen" && method === "POST") {
-      if (!opts.listen) throw new Refused2(404, "not found");
-      const now = listenerOf(dir);
-      if (b.on === false) {
-        if (now && now.listener !== OWN_LISTENER) throw new Refused2(409, `${now.listener} is listening, not Claude Code: switch it off there`);
-        savePrefs(dir, { autorun: false });
-        if (now) removeListener(dir);
-        return json(res, 200, { listener: null });
-      }
-      if (b.on !== true) throw new Refused2(400, "say on or off");
-      if (now) {
-        if (now.listener === OWN_LISTENER) return json(res, 200, { listener: now });
-        throw new Refused2(409, `${now.listener} is already listening: analyses already run by themselves`);
-      }
-      if (!(opts.listen.claude ?? (() => !!findClaude()))()) throw new Refused2(400, 'Claude Code is not installed on this computer: install it from claude.com/claude-code, or switch on "Run automatically" in Madav');
-      savePrefs(dir, { autorun: true });
-      opts.listen.start();
-      for (const until = Date.now() + 8e3; Date.now() < until; await new Promise((r) => setTimeout(r, 200))) {
-        const l = listenerOf(dir);
-        if (l) return json(res, 200, { listener: l });
-      }
-      throw new Refused2(502, "the listener did not start: see desk-data/watcher.log, or start it yourself with node dist/watch.mjs");
-    }
     if (p === "/api/prefs" && method === "POST") {
-      delete b.autorun;
       delete b.market;
       delete b.morning;
       delete b.morningFrom;
@@ -23383,7 +23351,7 @@ async function startTerminal(opts) {
     }
     if (p === "/api/ticket" && method === "POST") {
       const symbol = safeSymbol(typeof b.symbol === "string" ? b.symbol : ""), date4 = typeof b.date === "string" ? b.date : "";
-      const call = new Journal(path19.join(dir, "journal.md")).load().find((e) => e.ticker === symbol && e.date === date4);
+      const call = new Journal(path18.join(dir, "journal.md")).load().find((e) => e.ticker === symbol && e.date === date4);
       if (!call) throw new Refused2(404, "no such call");
       tradable(symbol);
       const trading = readSettings(root2).trading, { caps } = robinhood.trading();
@@ -23501,7 +23469,7 @@ async function startTerminal(opts) {
       json(res, /not a ticker|not on the watchlist|holds \d+ stocks|are already waiting/.test(m) ? 400 : 500, { error: /not a ticker|not on the watchlist|holds \d+ stocks|are already waiting/.test(m) ? m : "something went wrong" });
     });
   });
-  const listen2 = (candidate) => new Promise((resolve, reject) => {
+  const listen = (candidate) => new Promise((resolve, reject) => {
     const onError = (e) => {
       server.off("listening", onListen);
       e.code === "EADDRINUSE" ? resolve(false) : reject(e);
@@ -23515,7 +23483,7 @@ async function startTerminal(opts) {
     server.listen(candidate, "127.0.0.1");
   });
   const tryPorts = opts.port !== void 0 ? [opts.port] : Array.from({ length: PORTS[1] - PORTS[0] + 1 }, (_, i) => PORTS[0] + i);
-  for (const candidate of tryPorts) if (await listen2(candidate)) {
+  for (const candidate of tryPorts) if (await listen(candidate)) {
     port = server.address().port;
     break;
   }
@@ -23525,35 +23493,29 @@ async function startTerminal(opts) {
     try {
       let keys = {};
       try {
-        const v = JSON.parse(fs19.readFileSync(keyFile, "utf8"));
+        const v = JSON.parse(fs18.readFileSync(keyFile, "utf8"));
         if (v && typeof v === "object" && !Array.isArray(v)) keys = v;
       } catch {
       }
       change3(keys);
       if (Object.keys(keys).length) writePrivate(keyFile, JSON.stringify(keys, null, 2) + "\n");
-      else fs19.rmSync(keyFile, { force: true });
+      else fs18.rmSync(keyFile, { force: true });
     } catch {
     }
   };
   keep3((keys) => {
     keys[deskId] = { port, key: token };
   });
-  const claudeHere = opts.listen?.claude ?? (() => !!findClaude());
-  if (opts.listen && readPrefs(dir).autorun && !listenerOf(dir) && claudeHere()) {
-    try {
-      opts.listen.start();
-    } catch {
-    }
+  const retireOldListener = () => {
+    if (listenerOf(dir)?.listener === RETIRED_LISTENER) removeListener(dir);
+  };
+  try {
+    retireOldListener();
+  } catch {
   }
-  let quietLooks = 0;
   const keeper = setInterval(() => {
     try {
-      if (opts.listen && readPrefs(dir).autorun && !listenerOf(dir)) {
-        if (++quietLooks >= 5 && claudeHere()) {
-          quietLooks = 0;
-          opts.listen.start();
-        }
-      } else quietLooks = 0;
+      retireOldListener();
     } catch {
     }
     try {
@@ -23644,7 +23606,7 @@ var running = (port) => new Promise((resolve) => {
 async function openingLink(port) {
   const plain = `http://127.0.0.1:${port}/`;
   try {
-    const keys = JSON.parse(fs20.readFileSync(dashboardKeyFile(), "utf8"));
+    const keys = JSON.parse(fs19.readFileSync(dashboardKeyFile(), "utf8"));
     const mine = keys[deskIdOf(root)];
     if (!mine || mine.port !== port || typeof mine.key !== "string") return plain;
     const r = await fetch(`${plain}api/claim/new`, { method: "POST", headers: { "x-desk-token": mine.key, "content-type": "application/json" }, body: "{}" });
@@ -23666,7 +23628,7 @@ if (!again) {
   }
 }
 var self = fileURLToPath2(import.meta.url);
-var code = [self, ...["index.html", "app.js", "app.css"].map((f) => path20.join(path20.dirname(self), "terminal", f))];
+var code = [self, ...["index.html", "app.js", "app.css"].map((f) => path19.join(path19.dirname(self), "terminal", f))];
 var t = null;
 var quit = () => {
   void (t?.close() ?? Promise.resolve()).then(() => process.exit(0));
@@ -23681,11 +23643,7 @@ var restart = () => {
 };
 configure({ spacingMs: 250 });
 var quick = Number(process.env.TRADING_AGENTS_UPDATE_MS) || void 0;
-var listen = { start: () => {
-  spawn2(process.execPath, [path20.join(path20.dirname(self), "watch.mjs")], { cwd: root, detached: true, stdio: "ignore", windowsHide: true }).on("error", () => {
-  }).unref();
-} };
-var base = { root, assets: loadAssets(), code, restart, stop: quit, listen, ...quick ? { updateCheckMs: quick } : {} };
+var base = { root, assets: loadAssets(), code, restart, stop: quit, ...quick ? { updateCheckMs: quick } : {} };
 async function start() {
   if (again) for (let i = 0; i < 20; i++) {
     try {
