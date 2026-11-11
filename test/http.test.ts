@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { configure, getJson, getText, NoData, Unavailable } from '../src/data/http.js';
+import { configure, getJson, getText, KEPT_DAYS, keepFor, NoData, Unavailable } from '../src/data/http.js';
 import { clearSecCache } from '../src/data/sec.js';
 import { deskServer } from '../src/tools/server.js';
 import { financialStatement } from '../src/data/company.js';
@@ -134,9 +134,36 @@ test('answers expire: five minutes for most sources, a day for the SEC, and old 
   age(2 * 60);                                                                                              // two hours old
   assert.equal(await getText('https://query1.finance.yahoo.com/a'), 'n3');                                  // Yahoo's is stale
   assert.equal(await getText('https://data.sec.gov/b'), 'n2');                                              // the SEC's still stands
-  age(4 * 24 * 60);
+  age(31 * 24 * 60);
   configure({ cacheDir });                                                                                  // clearing happens when the cache is opened
   assert.deepEqual(fs.readdirSync(cacheDir), []);
+});
+
+// The owner (11 Nov 2026): "I want downloaded data to be kept for 30 days". Kept, but served again only when it cannot
+// have changed since it was read: a filed document, or FRED's figures as known on a past day. Everything else that moves
+// (prices, news, posts, odds, the latest figures) is asked again once its time is up, however long it stays on disk.
+test('downloads stay 30 days; only a filed document or a past day\'s figures are served again after their short time', async () => {
+  const cacheDir = path.join(tmp(), 'cache');
+  let calls = 0;
+  configure({ cacheDir, fetch: async () => { calls++; return new Response(`n${calls}`); } });
+  const form4 = 'https://www.sec.gov/Archives/edgar/data/1045810/000104581026000123/form4.xml';
+  const facts = 'https://data.sec.gov/api/xbrl/companyfacts/CIK0001045810.json';
+  const chart = 'https://query1.finance.yahoo.com/v8/finance/chart/NVDA?period1=1&period2=2&interval=1d';
+  const pastFigures = 'https://alfred.stlouisfed.org/graph/alfredgraph.csv?id=CPIAUCSL&vintage_date=2026-01-15&cosd=2025-01-15&coed=2026-01-15';
+  const latestFigures = 'https://fred.stlouisfed.org/graph/fredgraph.csv?id=CPIAUCSL&cosd=2025-11-01&coed=2026-11-11';
+  for (const u of [form4, facts, chart, pastFigures, latestFigures]) await getText(u);
+  assert.equal(calls, 5);
+  for (const f of fs.readdirSync(cacheDir)) { const t = new Date(Date.now() - 20 * 24 * 60 * 60_000); fs.utimesSync(path.join(cacheDir, f), t, t); }
+  configure({ cacheDir });                                                                                  // twenty days old: none cleared
+  assert.equal(fs.readdirSync(cacheDir).length, 5, 'every download stays on disk within 30 days');
+  assert.equal(await getText(form4), 'n1', 'a filed document is served again');
+  assert.equal(await getText(pastFigures), 'n4', "a past day's figures are served again");
+  assert.equal(await getText(facts), 'n6', "the SEC's figures are asked again after a day");
+  assert.equal(await getText(chart), 'n7', 'prices are asked again');
+  assert.equal(await getText(latestFigures), 'n8', 'the latest figures are asked again');
+  assert.equal(keepFor(form4), KEPT_DAYS * 24 * 60 * 60_000);
+  assert.equal(keepFor('https://alfred.stlouisfed.org/graph/alfredgraph.csv?id=CPIAUCSL&vintage_date=2999-01-01'), 60 * 60_000, 'a vintage not yet past is not fixed: an hour, as the latest figures');
+  assert.equal(keepFor('https://data.sec.gov/submissions/CIK0001045810.json'), 60 * 60_000, 'the list of filings, an hour');
 });
 
 // Audit 3 prices-6 (9 Nov 2026): a 200 answer that was a web page ("will be right back") was kept on disk before it was

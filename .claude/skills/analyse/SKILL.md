@@ -16,17 +16,18 @@ You run the desk: you call its agents in order and keep the work moving. You do 
 - **Depth**: shallow = 1, medium = 3, deep = 5 rounds of both the research and the risk debate. When none is given, leave the rounds out and the settings decide.
 - **Analysts**: only if the person names some (market, sentiment, news, fundamentals).
 - **Language**: only if the person names one.
+- **Full**: only if the person asks for a full analysis. Otherwise an analysis of today builds on the desk's recent full run of the stock, when there is one, and the plan says so.
 
 ## 2. Settle past calls first
 Call `list_settlements`. For each call marked READY, write its lesson and save it with `record_outcome`, following the /settle skill's rules for a lesson. Leave NOT YET and unavailable calls alone. This puts the latest lessons into today's plan.
 
 ## 3. Plan
-Call `plan_analysis` with the ticker, date, and any rounds, analysts or language the person asked for (debate_rounds and risk_rounds both take the depth's number).
+Call `plan_analysis` with the ticker, date, and any rounds, analysts, language or full the person asked for (debate_rounds and risk_rounds both take the depth's number).
 - **NEEDS_EMAIL**: ask the person for their own email. Say in one sentence why: the SEC asks every program that reads its filings for a contact address; it stays in this folder and is sent to the SEC alone. Save it with `set_contact_email`, never inventing one, then plan again.
 - **INPUT_ERROR**: tell the person what to correct and stop.
-- **Otherwise**: keep the plan. It lists the steps, marks any already done (a run that stopped is resumed), and gives the manager model. It also shows the holdings and the lessons it saved with the run: the agents read those from the desk themselves, so never copy them into a request.
+- **Otherwise**: keep the plan. It lists the steps, marks any already done (a run that stopped is resumed), and gives the manager model. It also shows the holdings and the lessons it saved with the run: the agents read those from the desk themselves, so never copy them into a request. Its "Builds on" line says whether the analysts write what changed since the desk's earlier full run of the stock: they find that out from the desk themselves, so you call them as always.
 
-Tell the person in two lines what will run: the analysts, the rounds, the language, and how long it can take: in the desk's first real runs, about 40 minutes at shallow depth and up to about 3 hours at medium; deep runs more rounds, so longer.
+Tell the person in two lines what will run: the analysts, the rounds, the language, what it builds on (the earlier run's day, or a full run), and how long it can take: in the desk's first real runs, about 40 minutes at shallow depth and up to about 3 hours at medium; deep runs more rounds, so longer.
 
 If the plan starts with a line naming a backtest sweep, and you were not asked to run one by the /backtest skill, this stock and date are a cell of a backtest running now, so the analysis would be recorded in that backtest, not in the person's journal. Stop and tell the person so (in a run of the waiting list, fail the stock with that reason); never end the backtest: only the conversation running it does.
 

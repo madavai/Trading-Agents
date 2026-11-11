@@ -36880,6 +36880,7 @@ var DEFAULTS = {
     riskRounds: 1,
     analysts: [...ANALYSTS],
     managerModel: "",
+    buildOnEarlierDays: 30,
     newsLookbackDays: 7,
     companyNewsLimit: 20,
     worldNewsLimit: 10,
@@ -36947,6 +36948,7 @@ function readSettings(root) {
       outputLanguage: languageName(a.outputLanguage),
       debateRounds: int2(a.debateRounds, 1, 5, 1),
       riskRounds: int2(a.riskRounds, 1, 5, 1),
+      buildOnEarlierDays: int2(a.buildOnEarlierDays, 0, 30, DEFAULTS.analysis.buildOnEarlierDays),
       analysts: analysts.length ? analysts : [...ANALYSTS],
       worldNewsSearches: searchesOf(a.worldNewsSearches),
       managerModel: typeof a.managerModel === "string" && /^[\w.\-[\]]{0,60}$/.test(a.managerModel.trim()) ? a.managerModel.trim() : ""
@@ -37191,6 +37193,50 @@ async function deskCheck(root = process.cwd(), fetchImpl2 = fetch, source = root
 import fs7 from "node:fs";
 import path7 from "node:path";
 import { createHash } from "node:crypto";
+
+// src/data/dates.ts
+var DAY = 864e5;
+var marketDay = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+var nyClock = (ms) => {
+  const f = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(ms));
+  const v = (t) => f.find((x) => x.type === t)?.value ?? "";
+  return `${v("year")}-${v("month")}-${v("day")} ${v("hour")}:${v("minute")}`;
+};
+function today(now) {
+  if (!now && process.env.TRADING_AGENTS_TODAY) return process.env.TRADING_AGENTS_TODAY;
+  return marketDay(now ?? /* @__PURE__ */ new Date());
+}
+function parseDate(value, what = "date") {
+  const v = String(value ?? "").trim();
+  const d = /* @__PURE__ */ new Date(`${v}T00:00:00Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v) || Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== v) {
+    throw new Error(`the ${what} "${value}" is not a date in YYYY-MM-DD form`);
+  }
+  return v;
+}
+function analysisDate(value) {
+  const d = parseDate(value, "analysis date");
+  if (d > today()) throw new Error(`the analysis date ${d} is in the future (today is ${today()}, New York's day, the market's: use it or an earlier day)`);
+  return d;
+}
+var isHistorical = (date5) => date5 < today();
+var addDays = (date5, days) => new Date(Date.parse(`${date5}T00:00:00Z`) + days * DAY).toISOString().slice(0, 10);
+var WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+var weekday = (date5) => WEEKDAYS[(/* @__PURE__ */ new Date(`${date5}T00:00:00Z`)).getUTCDay()];
+var withWeekday = (date5) => `${date5} (${weekday(date5)})`;
+var daysBetween = (from, to) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY);
+function window(start, end, analysis2) {
+  let s = parseDate(start, "start date"), e = parseDate(end, "end date");
+  if (s > e) [s, e] = [e, s];
+  if (e > analysis2) {
+    const span2 = daysBetween(s, e);
+    e = analysis2;
+    if (s > analysis2) s = addDays(analysis2, -span2);
+  }
+  return [s, e];
+}
+
+// src/data/http.ts
 var Unavailable = class extends Error {
   constructor(message, status, noEmail = false) {
     super(message);
@@ -37242,9 +37288,16 @@ async function pace(host) {
   await turn;
 }
 var MINUTE = 6e4;
+var DAY_MS = 24 * 60 * MINUTE;
+var KEPT_DAYS = 30;
 function keepFor(url2) {
   const u = new URL(url2);
-  if (/(^|\.)sec\.gov$/.test(u.hostname)) return /^\/submissions\//.test(u.pathname) ? 60 * MINUTE : 24 * 60 * MINUTE;
+  if (/(^|\.)sec\.gov$/.test(u.hostname)) {
+    if (/^\/Archives\/edgar\/data\//.test(u.pathname)) return KEPT_DAYS * DAY_MS;
+    return /^\/submissions\//.test(u.pathname) ? 60 * MINUTE : DAY_MS;
+  }
+  const vintage = u.searchParams.get("vintage_date");
+  if (/(^|\.)alfred\.stlouisfed\.org$/.test(u.hostname) && vintage && /^\d{4}-\d{2}-\d{2}$/.test(vintage) && vintage < today()) return KEPT_DAYS * DAY_MS;
   return /fred/.test(u.hostname) ? 60 * MINUTE : 5 * MINUTE;
 }
 var keyOf = (url2) => {
@@ -37277,7 +37330,7 @@ function pruneCache(dir) {
   try {
     for (const f of fs7.readdirSync(dir)) {
       const file5 = path7.join(dir, f);
-      if (Date.now() - fs7.statSync(file5).mtimeMs > 3 * 24 * 60 * MINUTE) fs7.rmSync(file5, { force: true });
+      if (Date.now() - fs7.statSync(file5).mtimeMs > KEPT_DAYS * DAY_MS) fs7.rmSync(file5, { force: true });
     }
   } catch {
   }
@@ -37498,48 +37551,6 @@ function compute(name, bars) {
     case "mfi":
       return mfi(bars);
   }
-}
-
-// src/data/dates.ts
-var DAY = 864e5;
-var marketDay = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
-var nyClock = (ms) => {
-  const f = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(ms));
-  const v = (t) => f.find((x) => x.type === t)?.value ?? "";
-  return `${v("year")}-${v("month")}-${v("day")} ${v("hour")}:${v("minute")}`;
-};
-function today(now) {
-  if (!now && process.env.TRADING_AGENTS_TODAY) return process.env.TRADING_AGENTS_TODAY;
-  return marketDay(now ?? /* @__PURE__ */ new Date());
-}
-function parseDate(value, what = "date") {
-  const v = String(value ?? "").trim();
-  const d = /* @__PURE__ */ new Date(`${v}T00:00:00Z`);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(v) || Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== v) {
-    throw new Error(`the ${what} "${value}" is not a date in YYYY-MM-DD form`);
-  }
-  return v;
-}
-function analysisDate(value) {
-  const d = parseDate(value, "analysis date");
-  if (d > today()) throw new Error(`the analysis date ${d} is in the future (today is ${today()}, New York's day, the market's: use it or an earlier day)`);
-  return d;
-}
-var isHistorical = (date5) => date5 < today();
-var addDays = (date5, days) => new Date(Date.parse(`${date5}T00:00:00Z`) + days * DAY).toISOString().slice(0, 10);
-var WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-var weekday = (date5) => WEEKDAYS[(/* @__PURE__ */ new Date(`${date5}T00:00:00Z`)).getUTCDay()];
-var withWeekday = (date5) => `${date5} (${weekday(date5)})`;
-var daysBetween = (from, to) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY);
-function window(start, end, analysis2) {
-  let s = parseDate(start, "start date"), e = parseDate(end, "end date");
-  if (s > e) [s, e] = [e, s];
-  if (e > analysis2) {
-    const span2 = daysBetween(s, e);
-    e = analysis2;
-    if (s > analysis2) s = addDays(analysis2, -span2);
-  }
-  return [s, e];
 }
 
 // src/data/symbols.ts
@@ -40533,16 +40544,18 @@ Its check before then: ${e.lessonCheck}` : ""}`, earlier: e.earlier, first: e.fi
    *  over and against (its own rules, or for a call recorded before the desk kept them, the rules it was made under, from
    *  `scoring`): a short first check, not the call's own time horizon. */
   pastContext(ticker, o = {}) {
-    const { sameLimit = 5, otherLimit = 3 } = o;
-    let settled2 = this.load().filter((e) => !e.pending);
+    const { sameLimit = 5, otherLimit = 3, unscoredLimit = 2 } = o;
+    const all = this.load();
+    let settled2 = all.filter((e) => !e.pending);
     if (o.asOf) settled2 = settled2.filter((e) => e.resolved && e.resolved <= o.asOf);
+    const unscored = o.unscoredBefore && !o.asOf ? all.filter((e) => e.pending && e.ticker === ticker && e.date < o.unscoredBefore).sort((a, b) => b.date.localeCompare(a.date)).slice(0, unscoredLimit) : [];
     const same = [], other = [];
     for (const e of settled2.reverse()) {
       if (e.ticker !== ticker && withheld(e)) continue;
       if (e.ticker === ticker ? same.length < sameLimit : other.length < otherLimit) (e.ticker === ticker ? same : other).push(e);
       if (same.length >= sameLimit && other.length >= otherLimit) break;
     }
-    if (!same.length && !other.length) return "";
+    if (!same.length && !other.length && !unscored.length) return "";
     const over = (e) => {
       const r = e.rules ?? (o.scoring ? legacyRules(e.ticker, o.scoring, e.holding) : null);
       return r ? `${checkName(r)}: ${ownReturn(r) ? `on its own return (${r.yardstick} is its own yardstick or copies the same index), so its alpha is its return,` : `against ${r.yardstick}`} over the ${windowWords(r)} after the call, not the call's own time horizon` : `over ${e.holding ?? "n/a"}`;
@@ -40557,7 +40570,13 @@ ${e.reflection}`] : []
     ].join("\n\n");
     const short2 = (e) => `${head2(e)}${e.reflection && LESSON_NOTE[e.lesson] ? ` (lesson ${LESSON_NOTE[e.lesson](e)})` : ""}
 ${e.reflection || e.decision.slice(0, 300) + (e.decision.length > 300 ? "..." : "")}`;
+    const notYet = (e) => {
+      const r = e.rules ?? (o.scoring ? legacyRules(e.ticker, o.scoring, e.holding) : null);
+      return [`[${e.date} | ${e.ticker} | ${e.rating} | not scored yet: it has no result, and is scored${r ? ` by ${checkWords(e.ticker, r)}` : ""} once a scoring runs after that window]`, `DECISION:
+${e.decision}`].join("\n\n");
+    };
     const parts = [];
+    if (unscored.length) parts.push(`The desk's latest calls on ${ticker} not scored yet (latest first; the call's own view on its day, not how it turned out):`, ...unscored.map(notYet));
     if (same.length) parts.push(`Past analyses of ${ticker} (latest recorded first):`, ...same.map(full));
     if (other.length) parts.push("Recent cross-ticker lessons:", ...other.map(short2));
     return parts.join("\n\n");
@@ -40591,8 +40610,24 @@ var PARTS2 = [
 ];
 var CONTEXT = ["holdings", "lessons"];
 var CONTEXT_LABELS = { holdings: "Holdings", lessons: "Lessons" };
-var folder = (dir, ticker, date5) => path11.join(dir, "runs", `${safeSymbol(ticker).replace(/\^/g, "IDX_").replace(/=/g, "_EQ_")}_${date5}`);
+var folderName = (ticker) => safeSymbol(ticker).replace(/\^/g, "IDX_").replace(/=/g, "_EQ_");
+var folder = (dir, ticker, date5) => path11.join(dir, "runs", `${folderName(ticker)}_${date5}`);
 var runFile = (dir, ticker, date5) => path11.join(folder(dir, ticker, date5), "run.json");
+function runDates(dir, ticker) {
+  const head2 = `${folderName(ticker)}_`;
+  let names = [];
+  try {
+    names = fs10.readdirSync(path11.join(dir, "runs"));
+  } catch {
+  }
+  return names.filter((n2) => n2.startsWith(head2) && /^\d{4}-\d{2}-\d{2}$/.test(n2.slice(head2.length))).map((n2) => n2.slice(head2.length)).sort().reverse();
+}
+function builtOnOf(plan) {
+  const b = plan?.builtOn;
+  if (!b || typeof b.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(b.date) || !Array.isArray(b.analysts)) return void 0;
+  const analysts = b.analysts.filter((a) => typeof a === "string" && REPORTS.includes(a));
+  return analysts.length ? { date: b.date, analysts } : void 0;
+}
 function load(dir, ticker, date5) {
   try {
     return JSON.parse(fs10.readFileSync(runFile(dir, ticker, date5), "utf8"));
@@ -40642,12 +40677,16 @@ function saveSection(dir, ticker, date5, section, text4) {
   if (miscount) throw new Error(miscount);
   let turns = 0;
   change(dir, ticker, date5, (r) => {
+    const base = builtOnOf(r.plan);
+    if (base?.analysts.includes(section) && !firstLine(t).includes(base.date)) throw new Error(sinceRefusal(base.date));
     if (!TURNS.has(section)) r.log = r.log.filter((e) => e.section !== section);
-    r.log.push({ section, text: t });
+    r.log.push({ section, text: t, at: (/* @__PURE__ */ new Date()).toISOString() });
     turns = r.log.filter((e) => e.section === section).length;
   });
   return turns;
 }
+var firstLine = (text4) => text4.trim().split("\n")[0] ?? "";
+var sinceRefusal = (date5) => `this run builds on the desk's full run of ${date5}, so your report says what changed since then, and its first line names that day, for example "What changed since ${date5}" (in the report language, the date written ${date5}), so a reader knows the earlier points are as of that day. Mend the first line and save again`;
 var REPORTS = ["market", "sentiment", "news", "fundamentals"];
 var FLAG = "[the fact it rested on was corrected: see the fact check]";
 var placesOf = (text4, words3) => {
@@ -40759,10 +40798,29 @@ function lastSaved(dir, ticker, date5) {
 function readSections(dir, ticker, date5, names, fallback) {
   return blocksOf(dir, ticker, date5, names, fallback).map((b) => b.text).join("\n\n");
 }
+var EARLIER = "earlier";
+function earlierBlocks(dir, ticker, date5, run, only) {
+  const base = builtOnOf(run.plan);
+  if (!base) return [{ name: "Earlier run", text: only ? "This run does not build on an earlier one: write your full report, as your instructions say." : "(This run does not build on an earlier run: every report in it is a full report of its own.)" }];
+  const wanted = only ? [only] : base.analysts;
+  if (only && !base.analysts.includes(only)) return [{ name: "Earlier run", text: `This run builds on the desk's full run of ${base.date}, but not for the ${LABELS[only]}: write your full report, as your instructions say.` }];
+  const earlier = load(dir, ticker, base.date).log, days = daysBetween(base.date, date5);
+  const head2 = `## From the desk's full run of ${base.date} (${days === 1 ? "one day" : `${days} days`} before ${date5})
+This run builds on it. ${only ? "Below is your report" : "Below are the analysts' reports"} from that run, as its fact checker corrected ${only ? "it" : "them"}. Every figure ${only ? "in it" : "in them"} is as of ${base.date}, not today: give one only with that date beside it, never as today's.`;
+  return wanted.map((s, i) => {
+    const text4 = earlier.filter((e) => e.section === s).map((e) => e.text).join("\n\n");
+    return { name: `${LABELS[s]} of ${base.date}`, text: `${i ? "" : `${head2}
+
+`}### ${LABELS[s]}, as of ${base.date}
+${text4 || `(That run has no ${LABELS[s]} report.)`}` };
+  });
+}
 function blocksOf(dir, ticker, date5, names, fallback) {
   const run = load(dir, ticker, date5), log = run.log;
   let ctx;
   return names.flatMap((name) => {
+    if (name === EARLIER) return earlierBlocks(dir, ticker, date5, run);
+    if (name.startsWith(`${EARLIER}:`) && isSection(name.slice(EARLIER.length + 1))) return earlierBlocks(dir, ticker, date5, run, name.slice(EARLIER.length + 1));
     if (CONTEXT.includes(name)) {
       ctx ??= contextOf(run) ?? fallback?.();
       const label2 = CONTEXT_LABELS[name];
@@ -40846,6 +40904,7 @@ function sectionsOf(dir, ticker, date5) {
   for (const e of load(dir, ticker, date5).log) (out[e.section] ??= []).push(e.text);
   return out;
 }
+var hasReport = (dir, ticker, date5) => fs10.existsSync(path11.join(folder(dir, ticker, date5), "complete_report.md"));
 
 // src/desk/queue.ts
 import fs11 from "node:fs";
@@ -41082,9 +41141,25 @@ function stepsFor(analysts, debateRounds, riskRounds) {
   steps.push({ section: "decision", turn: 1 });
   return steps;
 }
+function earlierRunFor(dir, o) {
+  if (o.full) return { why: "a full run was asked for" };
+  if (o.sweep) return { why: "a backtest analyses every day in full" };
+  if (isHistorical(o.day)) return { why: "a past day is analysed in full" };
+  if (o.days <= 0) return { why: "the desk's settings make every analysis a full run (buildOnEarlierDays 0)" };
+  const from = addDays(o.day, -o.days);
+  for (const date5 of runDates(dir, o.symbol)) {
+    if (date5 >= o.day) continue;
+    if (date5 < from) break;
+    const plan = savedPlan(dir, o.symbol, date5), done = progress(dir, o.symbol, date5);
+    if (!plan || builtOnOf(plan) || !hasReport(dir, o.symbol, date5) || !done.decision || !done.fact_check || plan.language !== o.language) continue;
+    const analysts = o.analysts.filter((a) => (done[ANALYST_SECTION[a]] ?? 0) > 0).map((a) => ANALYST_SECTION[a]);
+    if (analysts.length) return { builtOn: { date: date5, analysts }, why: "" };
+  }
+  return { why: `the desk has no full, finished and fact-checked run of ${o.symbol} in ${o.language} from the ${o.days} days before ${o.day}` };
+}
 function runContext(root, ws, symbol4, day3) {
   const scoring = readSettings(root).scoring;
-  const lessons = journalOf(root, ws).pastContext(symbol4, isHistorical(day3) ? { asOf: day3, scoring } : { scoring });
+  const lessons = journalOf(root, ws).pastContext(symbol4, isHistorical(day3) ? { asOf: day3, scoring } : { scoring, unscoredBefore: day3 });
   return {
     holdings: ws.sweep ? BACKTEST_HOLDINGS : renderHoldings(readHoldings(deskDataDir(root)), symbol4),
     lessons: lessons ? `Lessons from past calls:
@@ -41138,7 +41213,8 @@ function buildPlan(root, req, ws = workspaceOf(root)) {
     language = req.language !== void 0 ? languageName(req.language) : s.analysis.outputLanguage;
   }
   const window2 = resumed && saved?.window ? saved.window : rulesFor(symbol4, s.scoring);
-  const plan = { symbol: symbol4, analysisDate: day3, kind, analysts, debateRounds, riskRounds, language, managerModel: s.analysis.managerModel, benchmark: window2.yardstick, holdingDays: window2.days, window: window2, steps: [], notes };
+  const earlier = resumed ? { builtOn: builtOnOf(saved), why: "it began as a full run, and a run resumes as it was planned" } : earlierRunFor(dir, { symbol: symbol4, day: day3, analysts, language, days: s.analysis.buildOnEarlierDays, sweep: !!ws.sweep, full: req.full });
+  const plan = { symbol: symbol4, analysisDate: day3, kind, analysts, debateRounds, riskRounds, language, managerModel: s.analysis.managerModel, benchmark: window2.yardstick, holdingDays: window2.days, window: window2, steps: [], notes, ...earlier.builtOn ? { builtOn: earlier.builtOn } : {} };
   let steps = stepsFor(analysts, debateRounds, riskRounds);
   if (resumed && !done.fact_check && (done.bull ?? 0) > 0) {
     steps = steps.filter((st) => st.section !== "fact_check");
@@ -41148,10 +41224,16 @@ function buildPlan(root, req, ws = workspaceOf(root)) {
   if (!resumed || reRounded) startRun(dir, symbol4, day3, plan);
   const ctx = runContext(root, ws, symbol4, day3);
   saveContext(dir, symbol4, day3, ctx);
-  return { plan, ...ctx, resumed };
+  return { plan, ...ctx, resumed, fullWhy: earlier.why };
+}
+function builtOnWords(p, fullWhy) {
+  const b = p.builtOn;
+  if (!b) return `Builds on: nothing, a full run (${fullWhy}).`;
+  const full = p.analysts.filter((a) => !b.analysts.includes(ANALYST_SECTION[a]));
+  return `Builds on: the desk's full run of ${b.date}. ${b.analysts.join(", ")} write what changed since then, each reading their own report of that day with read_earlier_run first${full.length ? `; ${full.join(", ")} write${full.length === 1 ? "s" : ""} in full (that run has no such report)` : ""}. The fact checker checks what they carry from it. The debate, the trader, the risk voices and the decision work from today's reports, as in every run.`;
 }
 var scoredWords = (p) => p.window ? `${checkName(p.window)} ${againstWords(p.symbol, p.window)}, over the ${windowWords(p.window)} after the call, once a scoring runs after them. It is not the call's own time horizon.` : `after ${p.holdingDays} trading days against ${p.benchmark}`;
-function renderPlan({ plan: p, holdings, lessons, resumed }) {
+function renderPlan({ plan: p, holdings, lessons, resumed, fullWhy }) {
   const next2 = p.steps.find((x) => !x.done);
   const step = (x) => `${x.section}${x.turn > 1 || p.steps.filter((y) => y.section === x.section).length > 1 ? ` (turn ${x.turn})` : ""}`;
   return [
@@ -41162,6 +41244,7 @@ function renderPlan({ plan: p, holdings, lessons, resumed }) {
     `Report language: ${p.language}${p.language.toLowerCase() === "english" ? "" : " (the labelled lines **Rating**, **Action**, **Recommendation** keep their English words)"}`,
     `Manager model: ${p.managerModel || "the same as everyone else"}`,
     `Scored: ${scoredWords(p)}`,
+    builtOnWords(p, fullWhy),
     ...p.notes.length ? ["", ...p.notes.map((n2) => `Note: ${n2}`)] : [],
     "",
     `Steps${resumed ? " (resuming)" : ""}: ${p.steps.map((x) => `${x.done ? "[done] " : ""}${step(x)}`).join(" -> ")}`,
@@ -42376,13 +42459,14 @@ function registerDeskTools(server, root) {
       debate_rounds: external_exports.number().int().min(1).max(5).optional().describe("Rounds of bull and bear; the settings' when left out"),
       risk_rounds: external_exports.number().int().min(1).max(5).optional().describe("Rounds of the three risk voices; the settings' when left out"),
       language: external_exports.string().max(40).optional().describe("Report language, e.g. Spanish; the settings' when left out"),
-      restart: external_exports.boolean().optional().describe("Throw away an earlier unfinished run of this stock and day and start over")
+      restart: external_exports.boolean().optional().describe("Throw away an earlier unfinished run of this stock and day and start over"),
+      full: external_exports.boolean().optional().describe("A full run, when the person asks for one: never build on the desk's earlier full run of the stock. Left out, an analysis of today builds on that run when it is recent (the settings' buildOnEarlierDays)")
     },
     annotations: write
   }, async (a) => act(() => {
     const w = wsFor(a.symbol, analysisDate(a.analysis_date));
     return (w.sweep ? `[Backtest sweep ${w.sweep}: this run is recorded in the sweep's own journal, not the live one.]
-` : "") + renderPlan(buildPlan(root, { symbol: a.symbol, analysisDate: a.analysis_date, analysts: a.analysts, debateRounds: a.debate_rounds, riskRounds: a.risk_rounds, language: a.language, restart: a.restart }, w));
+` : "") + renderPlan(buildPlan(root, { symbol: a.symbol, analysisDate: a.analysis_date, analysts: a.analysts, debateRounds: a.debate_rounds, riskRounds: a.risk_rounds, language: a.language, restart: a.restart, full: a.full }, w));
   }));
   server.registerTool("save_run_section", {
     title: "Save a run section",
@@ -42414,11 +42498,11 @@ function registerDeskTools(server, root) {
   }));
   server.registerTool("read_run", {
     title: "Read a run",
-    description: `Read what the team has written so far for a stock and day. Without sections it lists which sections exist and how many turns each holds. With sections it returns their text; ${DEBATES2.join(" and ")} give a whole debate in the order spoken. A section not written yet is said to be missing, never blank. ${CONTEXT.join(" and ")} give what the plan saved with the run: what the person holds (or that none are saved) and the lessons from past calls. Ask for everything you need in one call: a read longer than ${PART_CHARS.toLocaleString("en-US")} characters comes in parts, cut between sections and turns, and its first part says what each part holds; read each part once, with the same sections and part 2, 3 and so on.`,
+    description: `Read what the team has written so far for a stock and day. Without sections it lists which sections exist and how many turns each holds. With sections it returns their text; ${DEBATES2.join(" and ")} give a whole debate in the order spoken. A section not written yet is said to be missing, never blank. ${CONTEXT.join(" and ")} give what the plan saved with the run: what the person holds (or that none are saved) and the lessons from past calls. ${EARLIER} gives, for a run that builds on the desk's earlier full run of the stock, that run's analyst reports as its fact checker corrected them, under a head that names their day (or says the run builds on none). Ask for everything you need in one call: a read longer than ${PART_CHARS.toLocaleString("en-US")} characters comes in parts, cut between sections and turns, and its first part says what each part holds; read each part once, with the same sections and part 2, 3 and so on.`,
     inputSchema: {
       symbol: symbol2,
       analysis_date: day2,
-      sections: external_exports.array(external_exports.enum([...SECTIONS, ...DEBATES2, ...CONTEXT])).optional(),
+      sections: external_exports.array(external_exports.enum([...SECTIONS, ...DEBATES2, ...CONTEXT, EARLIER])).optional(),
       part: external_exports.number().int().min(1).max(50).optional().describe("Which part of a read that comes in parts; 1 when left out")
     },
     annotations: { readOnlyHint: true, openWorldHint: false }
@@ -42427,6 +42511,20 @@ function registerDeskTools(server, root) {
     if (a.sections?.length) return readPart(w.dir, a.symbol, d, a.sections, a.part ?? 1, () => runContext(root, w, safeSymbol(a.symbol), d));
     const p = progress(w.dir, a.symbol, d);
     return Object.keys(p).length ? `Written so far for ${safeSymbol(a.symbol)} on ${d}: ${Object.entries(p).map(([k, n2]) => `${k} (${n2})`).join(", ")}` : `Nothing written yet for ${safeSymbol(a.symbol)} on ${d}.`;
+  }));
+  server.registerTool("read_earlier_run", {
+    title: "Read your report from the earlier run",
+    description: "Call it first, before any other tool. It says whether this analysis builds on the desk's earlier full run of the stock and, when it does, gives your own report from that run as its fact checker corrected it, under a head naming its day: every figure in it is as of that day, not today. When the run builds on none, it says so: then write your full report.",
+    inputSchema: {
+      symbol: symbol2,
+      analysis_date: day2,
+      section: external_exports.enum(["market", "sentiment", "news", "fundamentals"]).describe("Your own section: market, sentiment, news or fundamentals"),
+      part: external_exports.number().int().min(1).max(50).optional().describe("Which part of a read that comes in parts; 1 when left out")
+    },
+    annotations: { readOnlyHint: true, openWorldHint: false }
+  }, async (a) => act(() => {
+    const d = analysisDate(a.analysis_date), w = wsFor(a.symbol, d);
+    return readPart(w.dir, a.symbol, d, [`${EARLIER}:${a.section}`], a.part ?? 1);
   }));
   server.registerTool("write_report", {
     title: "Write the report",
@@ -42439,6 +42537,8 @@ function registerDeskTools(server, root) {
     const rating = parseRating(readSections(w.dir, sym2, d, ["decision"]));
     const header = [`Rating: ${rating}`, `Generated: ${(/* @__PURE__ */ new Date()).toISOString().slice(0, 16).replace("T", " ")} UTC`];
     if (plan?.analysts) header.push(`Analysts: ${plan.analysts.join(", ")}; research debate rounds ${plan.debateRounds}, risk debate rounds ${plan.riskRounds}; language ${plan.language}`, `Scored: ${scoredWords(plan)}`);
+    const base = builtOnOf(plan);
+    if (base) header.push(`Built on: the desk's full run of ${base.date} (its own report is kept in its folder); the ${base.analysts.join(", ")} report${base.analysts.length === 1 ? "" : "s"} below say${base.analysts.length === 1 ? "s" : ""} what changed since then, and what they carry from it is marked with that day`);
     const file5 = writeReport(w.dir, sym2, d, header);
     return `Report written: ${file5}
 Rating: ${rating}`;

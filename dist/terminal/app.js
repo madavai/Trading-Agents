@@ -1994,6 +1994,8 @@
     const shown = new Set(STAGES.flatMap((s) => s.keys)), extra = Object.keys(c.sections).filter((k) => k !== "decision" && !shown.has(k) && c.sections[k]?.length);
     const stages = STAGES.map((s) => ({ ...s, keys: s.keys.filter((k) => c.sections[k]?.length) })).filter((s) => s.keys.length);
     const named = nameOf(symbol), of = `the desk's call of ${dayText(date)}`;
+    const base = c.builtOn, baseCall = base ? S.desk?.calls.find((x) => x.ticker === symbol && x.date === base) : void 0;
+    const builtOn = base ? `<div class="at-row ta-builton"><span class="at-quiet">Built on the analysis of ${esc(dayText(base))}. Its analysts wrote what changed since then, and what they carried from it is marked with that day.</span>${baseCall ? readButton(symbol, base, "Read that analysis") : ""}</div>` : "";
     dlg.innerHTML = `<div class="ta-pophead"><div class="ta-pop-id"><h2>${esc(symbol)}</h2><span class="at-quiet">${esc(named !== symbol ? `${named} \xB7 ${of}` : of[0].toUpperCase() + of.slice(1))}</span></div><button class="icon-btn" data-act="close-dialog" aria-label="Close"><svg class="g"><use href="#i-x"/></svg></button></div>
     <div class="ta-callhero ${verdictClass(rating)}">
       <div class="ta-callhero-main">
@@ -2005,11 +2007,13 @@
       <div class="ta-callhero-side"><span class="ta-spark-tall" id="callSpark"></span><p class="at-quiet" id="callSince">Reading the price since the call.</p></div>
     </div>
     ${facts ? `<dl class="at-facts row ta-callfacts">${facts}</dl>` : ""}
+    ${builtOn}
     ${stepCard("decision", [c.decision], true)}
     ${stages.map((s) => `<p class="at-kicker ta-stage">${esc(s.name)}</p><div class="ta-steps">${s.keys.map((k) => stepCard(k, c.sections[k])).join("")}</div>`).join("")}
     ${extra.length ? `<p class="at-kicker ta-stage">More</p><div class="ta-steps">${extra.map((k) => stepCard(k, c.sections[k])).join("")}</div>` : ""}
     <p class="at-honest">This is the team's reasoning as it wrote it. It is not investment advice.</p>`;
-    dlg.showModal();
+    if (!dlg.open) dlg.showModal();
+    dlg.scrollTop = 0;
     void sinceCall(symbol, date);
   }
   async function sinceCall(symbol, date) {

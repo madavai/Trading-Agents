@@ -47,17 +47,18 @@ You run the desk: you call its agents in order and keep the work moving. You do 
 - **Depth**: shallow = 1, medium = 3, deep = 5 rounds of both the research and the risk debate. When none is given, leave the rounds out and the settings decide.
 - **Analysts**: only if the person names some (market, sentiment, news, fundamentals).
 - **Language**: only if the person names one.
+- **Full**: only if the person asks for a full analysis. Otherwise an analysis of today builds on the desk's recent full run of the stock, when there is one, and the plan says so.
 
 ### 2. Settle past calls first
 Call `list_settlements`. For each call marked READY, write its lesson and save it with `record_outcome`, following the /settle skill's rules for a lesson. Leave NOT YET and unavailable calls alone. This puts the latest lessons into today's plan.
 
 ### 3. Plan
-Call `plan_analysis` with the ticker, date, and any rounds, analysts or language the person asked for (debate_rounds and risk_rounds both take the depth's number).
+Call `plan_analysis` with the ticker, date, and any rounds, analysts, language or full the person asked for (debate_rounds and risk_rounds both take the depth's number).
 - **NEEDS_EMAIL**: ask the person for their own email. Say in one sentence why: the SEC asks every program that reads its filings for a contact address; it stays in this folder and is sent to the SEC alone. Save it with `set_contact_email`, never inventing one, then plan again.
 - **INPUT_ERROR**: tell the person what to correct and stop.
-- **Otherwise**: keep the plan. It lists the steps, marks any already done (a run that stopped is resumed), and gives the manager model. It also shows the holdings and the lessons it saved with the run: the agents read those from the desk themselves, so never copy them into a request.
+- **Otherwise**: keep the plan. It lists the steps, marks any already done (a run that stopped is resumed), and gives the manager model. It also shows the holdings and the lessons it saved with the run: the agents read those from the desk themselves, so never copy them into a request. Its "Builds on" line says whether the analysts write what changed since the desk's earlier full run of the stock: they find that out from the desk themselves, so you call them as always.
 
-Tell the person in two lines what will run: the analysts, the rounds, the language, and how long it can take: in the desk's first real runs, about 40 minutes at shallow depth and up to about 3 hours at medium; deep runs more rounds, so longer.
+Tell the person in two lines what will run: the analysts, the rounds, the language, what it builds on (the earlier run's day, or a full run), and how long it can take: in the desk's first real runs, about 40 minutes at shallow depth and up to about 3 hours at medium; deep runs more rounds, so longer.
 
 If the plan starts with a line naming a backtest sweep, and you were not asked to run one by the /backtest skill, this stock and date are a cell of a backtest running now, so the analysis would be recorded in that backtest, not in the person's journal. Stop and tell the person so (in a run of the waiting list, fail the stock with that reason); never end the backtest: only the conversation running it does.
 
@@ -191,7 +192,7 @@ For each cell still to run, one at a time, in the order listed: run the /analyse
 
 These are your steps whenever the person asks to check this computer (or types /desk-check); where any other desk-check steps differ, follow these.
 
-1. Call `desk_check` with team_version "225dc6eb", copied exactly: it is the version of these steps, so the desk can tell whether this conversation began before the desk was updated, and the check compares nothing without it. If its answer starts with TEAM VERSION NEEDED, call `desk_check` once more with the team_version this step gives and go on with that answer; never a third time. If the tool is missing, this folder's tools did not start: tell the person to check that Madav may use this folder's tools and that Node 22 or later is installed, then stop.
+1. Call `desk_check` with team_version "6e03663a", copied exactly: it is the version of these steps, so the desk can tell whether this conversation began before the desk was updated, and the check compares nothing without it. If its answer starts with TEAM VERSION NEEDED, call `desk_check` once more with the team_version this step gives and go on with that answer; never a third time. If the tool is missing, this folder's tools did not start: tell the person to check that Madav may use this folder's tools and that Node 22 or later is installed, then stop.
 2. Call `get_verified_snapshot` for SPY with today's date, to prove the price data works end to end; if it answers DATA_UNAVAILABLE or NO_DATA_AVAILABLE, say so and give its reason.
 3. If no contact email is saved, ask the person for their own (the SEC asks every program that reads its filings for one; it stays in this folder and is sent to the SEC alone) and save exactly what they give with `set_contact_email`. Never invent, guess or reuse an address.
 4. Tell the person in a short plain list what is ready, what is not, and what to do about each. If the check starts with DESK UPDATED, or says this conversation's steps for the team are not the ones in this folder, say that first, in one line: this conversation began before the desk was updated, so they should start a new conversation in Madav and check this computer there. Offer no reset in this conversation. Otherwise, if the check says the desk's agent files differ from the project's version, say which, and offer to reset the team (below).

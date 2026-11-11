@@ -21,7 +21,7 @@ import { byAnother, DEPTHS, finishItem, QueueRefusal, readQueue, ringDoorbell, R
 import { Journal } from '../desk/journal.js';
 import { writeWhole } from '../desk/lock.js';
 import { parseRating, RATINGS } from '../desk/rating.js';
-import { CONTEXT, correctSection, PART_CHARS, progress, readPart, readSections, savedPlan, saveSection, SECTIONS, writeReport } from '../desk/runs.js';
+import { builtOnOf, CONTEXT, correctSection, EARLIER, PART_CHARS, progress, readPart, readSections, savedPlan, saveSection, SECTIONS, writeReport } from '../desk/runs.js';
 import { dueSettlements, settleOne } from '../desk/settle.js';
 import { correctLesson, flagLesson, lessonsToRecheck } from '../desk/lessons.js';
 import { failureText, NoData, Unavailable } from '../data/http.js';
@@ -96,11 +96,12 @@ export function registerDeskTools(server: McpServer, root: string): void {
       risk_rounds: z.number().int().min(1).max(5).optional().describe('Rounds of the three risk voices; the settings\' when left out'),
       language: z.string().max(40).optional().describe('Report language, e.g. Spanish; the settings\' when left out'),
       restart: z.boolean().optional().describe('Throw away an earlier unfinished run of this stock and day and start over'),
+      full: z.boolean().optional().describe('A full run, when the person asks for one: never build on the desk\'s earlier full run of the stock. Left out, an analysis of today builds on that run when it is recent (the settings\' buildOnEarlierDays)'),
     },
     annotations: write,
   }, async (a) => act(() => {
     const w = wsFor(a.symbol, analysisDate(a.analysis_date));
-    return (w.sweep ? `[Backtest sweep ${w.sweep}: this run is recorded in the sweep's own journal, not the live one.]\n` : '') + renderPlan(buildPlan(root, { symbol: a.symbol, analysisDate: a.analysis_date, analysts: a.analysts, debateRounds: a.debate_rounds, riskRounds: a.risk_rounds, language: a.language, restart: a.restart }, w));
+    return (w.sweep ? `[Backtest sweep ${w.sweep}: this run is recorded in the sweep's own journal, not the live one.]\n` : '') + renderPlan(buildPlan(root, { symbol: a.symbol, analysisDate: a.analysis_date, analysts: a.analysts, debateRounds: a.debate_rounds, riskRounds: a.risk_rounds, language: a.language, restart: a.restart, full: a.full }, w));
   }));
 
   server.registerTool('save_run_section', {
@@ -134,9 +135,9 @@ export function registerDeskTools(server: McpServer, root: string): void {
 
   server.registerTool('read_run', {
     title: 'Read a run',
-    description: `Read what the team has written so far for a stock and day. Without sections it lists which sections exist and how many turns each holds. With sections it returns their text; ${DEBATES.join(' and ')} give a whole debate in the order spoken. A section not written yet is said to be missing, never blank. ${CONTEXT.join(' and ')} give what the plan saved with the run: what the person holds (or that none are saved) and the lessons from past calls. Ask for everything you need in one call: a read longer than ${PART_CHARS.toLocaleString('en-US')} characters comes in parts, cut between sections and turns, and its first part says what each part holds; read each part once, with the same sections and part 2, 3 and so on.`,
+    description: `Read what the team has written so far for a stock and day. Without sections it lists which sections exist and how many turns each holds. With sections it returns their text; ${DEBATES.join(' and ')} give a whole debate in the order spoken. A section not written yet is said to be missing, never blank. ${CONTEXT.join(' and ')} give what the plan saved with the run: what the person holds (or that none are saved) and the lessons from past calls. ${EARLIER} gives, for a run that builds on the desk's earlier full run of the stock, that run's analyst reports as its fact checker corrected them, under a head that names their day (or says the run builds on none). Ask for everything you need in one call: a read longer than ${PART_CHARS.toLocaleString('en-US')} characters comes in parts, cut between sections and turns, and its first part says what each part holds; read each part once, with the same sections and part 2, 3 and so on.`,
     inputSchema: {
-      symbol, analysis_date: day, sections: z.array(z.enum([...SECTIONS, ...DEBATES, ...CONTEXT])).optional(),
+      symbol, analysis_date: day, sections: z.array(z.enum([...SECTIONS, ...DEBATES, ...CONTEXT, EARLIER])).optional(),
       part: z.number().int().min(1).max(50).optional().describe('Which part of a read that comes in parts; 1 when left out'),
     },
     annotations: { readOnlyHint: true, openWorldHint: false },
@@ -145,6 +146,22 @@ export function registerDeskTools(server: McpServer, root: string): void {
     if (a.sections?.length) return readPart(w.dir, a.symbol, d, a.sections, a.part ?? 1, () => runContext(root, w, safeSymbol(a.symbol), d));
     const p = progress(w.dir, a.symbol, d);
     return Object.keys(p).length ? `Written so far for ${safeSymbol(a.symbol)} on ${d}: ${Object.entries(p).map(([k, n]) => `${k} (${n})`).join(', ')}` : `Nothing written yet for ${safeSymbol(a.symbol)} on ${d}.`;
+  }));
+
+  // An analyst's own report from the earlier full run this run builds on, and nothing else: the analysts work at the same
+  // time and none reads another's report of today, so they get this narrow door instead of read_run.
+  server.registerTool('read_earlier_run', {
+    title: 'Read your report from the earlier run',
+    description: 'Call it first, before any other tool. It says whether this analysis builds on the desk\'s earlier full run of the stock and, when it does, gives your own report from that run as its fact checker corrected it, under a head naming its day: every figure in it is as of that day, not today. When the run builds on none, it says so: then write your full report.',
+    inputSchema: {
+      symbol, analysis_date: day,
+      section: z.enum(['market', 'sentiment', 'news', 'fundamentals']).describe('Your own section: market, sentiment, news or fundamentals'),
+      part: z.number().int().min(1).max(50).optional().describe('Which part of a read that comes in parts; 1 when left out'),
+    },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  }, async (a) => act(() => {
+    const d = analysisDate(a.analysis_date), w = wsFor(a.symbol, d);
+    return readPart(w.dir, a.symbol, d, [`${EARLIER}:${a.section}`], a.part ?? 1);
   }));
 
   server.registerTool('write_report', {
@@ -158,6 +175,8 @@ export function registerDeskTools(server: McpServer, root: string): void {
     const rating = parseRating(readSections(w.dir, sym, d, ['decision']));
     const header = [`Rating: ${rating}`, `Generated: ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC`];
     if (plan?.analysts) header.push(`Analysts: ${plan.analysts.join(', ')}; research debate rounds ${plan.debateRounds}, risk debate rounds ${plan.riskRounds}; language ${plan.language}`, `Scored: ${scoredWords(plan)}`);
+    const base = builtOnOf(plan);
+    if (base) header.push(`Built on: the desk's full run of ${base.date} (its own report is kept in its folder); the ${base.analysts.join(', ')} report${base.analysts.length === 1 ? '' : 's'} below say${base.analysts.length === 1 ? 's' : ''} what changed since then, and what they carry from it is marked with that day`);
     const file = writeReport(w.dir, sym, d, header);
     return `Report written: ${file}\nRating: ${rating}`;
   }));

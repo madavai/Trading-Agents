@@ -139,7 +139,9 @@ the team's "talk" switch shows these messages in the Messages panel; with it off
    (the fund that copies the S&P 500) over the 5 trading days after the call, a coin against SPY over the 7 calendar
    days after it. Each call keeps its window and yardstick in the journal from the day it is made. It is scored when a
    scoring runs after that window (`/settle`, an analysis or a routine), not by itself, and the lessons go into later
-   analyses.
+   analyses. A new analysis of a stock the desk analysed in full in the last 30 days builds on that analysis: the
+   analysts write what changed since, every point they carry over keeps its day, and anything that moves with the
+   market is read again. The rest of the team works in full, as always. Ask for a full analysis to start from nothing.
    `/backtest NVDA,AAPL 2026-06-01 2026-08-01` runs the team over past dates in a journal of its own and reports, by
    rating, how often the direction was right and the mean alpha. It is slow and uses a lot of model time, and for past
    dates it reads only what was out by then, though not all of it as it stood then: what US companies and funds filed
