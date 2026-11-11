@@ -1184,26 +1184,35 @@
   function tradingBlock() {
     return signedIn() ? switchBlock() + capsBlock() : "";
   }
+  var CAPS_SCOPE = "These limits apply to orders you place from this page, not to trades you make in the Robinhood app.";
   var CAPS = { editing: false };
+  var capRow = (name, body, note = "") => `<div class="ta-cap"><dt>${name}</dt><dd>${body}${note ? `<p class="at-quiet">${esc(note)}</p>` : ""}</dd></div>`;
   function capsBlock() {
     const c = TR.state?.caps;
     if (!c) return "";
-    if (CAPS.editing) return `<div class="at-card-head"><h3>Your caps</h3></div>
-    <p class="at-lede">The most an order may cost, the most of the account one stock or one sector may be after a buy, the most in crypto, the most orders in a day, the fall in a week after which trading switches itself off, and the shortest hold, in trading days, of a stock bought here. Every ticket is checked against them, and again just before an order is sent. They are kept beside the trading switch, where agents are refused.</p>
-    <div class="at-row">
-      <label class="at-field"><span class="at-field-l">An order at most, $</span><input class="at-input at-box" id="capOrder" type="text" inputmode="decimal" value="${c.perOrderUsd}"></label>
-      <label class="at-field"><span class="at-field-l">One stock, % of the account</span><input class="at-input at-box" id="capStock" type="text" inputmode="decimal" value="${c.perStockPercent}"></label>
-      <label class="at-field"><span class="at-field-l">One sector, % of the account</span><input class="at-input at-box" id="capSector" type="text" inputmode="decimal" value="${c.perSectorPercent}"></label>
-      <label class="at-field"><span class="at-field-l">Crypto, % of the account</span><input class="at-input at-box" id="capCrypto" type="text" inputmode="decimal" value="${c.cryptoPercent}"></label></div>
-    <div class="at-row">
-      <label class="at-field"><span class="at-field-l">Orders a day</span><input class="at-input at-box" id="capDay" type="number" min="1" max="50" step="1" inputmode="numeric" value="${c.ordersPerDay}"></label>
-      <label class="at-field"><span class="at-field-l">Switch off after a fall in a week of, %</span><input class="at-input at-box" id="capWeek" type="text" inputmode="decimal" value="${c.weeklyLossPercent}"></label>
-      <label class="at-field"><span class="at-field-l">Shortest hold, trading days</span><input class="at-input at-box" id="capHold" type="number" min="0" max="60" step="1" inputmode="numeric" value="${c.minHoldDays}"></label></div>
+    if (CAPS.editing) {
+      const field = (id, label, value, whole) => `<label class="at-field"><span class="at-field-l">${esc(label)}</span><input class="at-input at-box" id="${id}" ${whole ? `type="number" min="${whole[0]}" max="${whole[1]}" step="1" inputmode="numeric"` : 'type="text" inputmode="decimal"'} value="${value}"></label>`;
+      const fields = (...xs) => `<div class="ta-capfields">${xs.join("")}</div>`;
+      return `<div class="at-card-head ta-caps-head"><h3>Your caps</h3></div>
+    <p class="at-lede">${CAPS_SCOPE} Every ticket is checked against them, and again just before it is sent; a failed check stops the order. Only you can change them, and the agents are blocked from where they are kept.</p>
+    <dl class="ta-caps">
+      ${capRow("Buys", fields(field("capOrder", "An order at most, $", c.perOrderUsd), field("capStock", "One stock, % of the account", c.perStockPercent), field("capSector", "One sector, % of the account", c.perSectorPercent), field("capCrypto", "Crypto, % of the account", c.cryptoPercent)), "The crypto limit only sizes the paper record: orders here are for stocks and funds, never coins.")}
+      ${capRow("Buys and sells", fields(field("capDay", "Orders a day", c.ordersPerDay, [1, 50])))}
+      ${capRow("Sells", fields(field("capHold", "Shortest hold, trading days", c.minHoldDays, [0, 60])), "The desk proposes no sale sooner than this, and a sale of your own takes one more press (Sell anyway).")}
+      ${capRow("The account", fields(field("capWeek", "Switch off after a fall in a week of, %", c.weeklyLossPercent)), "Checked each time the dashboard reads the account.")}
+    </dl>
     <div class="at-row">${rhButton("caps-save", "Save the caps", { primary: true })}${rhButton("caps-cancel", "Cancel")}</div>`;
+    }
     const chip = (k, words, more = "") => `<span class="at-chip" title="${esc(`${means(k)}${more}`)}">${esc(words)}</span>`;
-    return `<div class="at-card-head"><h3>Your ${term("cap", "caps")}</h3></div>
-    <div class="at-row">${chip("cap", `${money(c.perOrderUsd)} an order at most`)}${chip("cap", `${c.perStockPercent}% of the account in one stock`)}${chip("cap", `${c.ordersPerDay} ${c.ordersPerDay === 1 ? "order" : "orders"} a day`)}</div>
-    <div class="at-row">${chip("sector", `one sector at most ${c.perSectorPercent}%`, " For this limit a whole-market fund, such as SPY or the Nasdaq 100 fund QQQ, counts in no sector, though QQQ is mostly technology.")}${chip("crypto", `crypto at most ${c.cryptoPercent}%`)}${chip("weeklyLoss", `switches itself off after a ${c.weeklyLossPercent}% fall in a week`)}${chip("shortestHold", `a stock bought here is held at least ${c.minHoldDays} trading ${c.minHoldDays === 1 ? "day" : "days"}`)}</div>
+    const chips = (...xs) => `<div class="at-row">${xs.join("")}</div>`;
+    return `<div class="at-card-head ta-caps-head"><h3>Your ${term("cap", "caps")}</h3></div>
+    <p class="at-quiet">${CAPS_SCOPE}</p>
+    <dl class="ta-caps">
+      ${capRow("Buys", chips(chip("cap", `${money(c.perOrderUsd)} an order at most`), chip("cap", `${c.perStockPercent}% of the account in one stock`), chip("sector", `one sector at most ${c.perSectorPercent}%`, " For this limit a whole-market fund, such as SPY or the Nasdaq 100 fund QQQ, counts in no sector, though QQQ is mostly technology."), chip("crypto", `crypto at most ${c.cryptoPercent}%`)))}
+      ${capRow("Buys and sells", chips(chip("cap", `${c.ordersPerDay} ${c.ordersPerDay === 1 ? "order" : "orders"} a day`)))}
+      ${capRow("Sells", chips(chip("shortestHold", `a stock bought here is held at least ${c.minHoldDays} trading ${c.minHoldDays === 1 ? "day" : "days"}`)))}
+      ${capRow("The account", chips(chip("weeklyLoss", `switches itself off after a ${c.weeklyLossPercent}% fall in a week`)))}
+    </dl>
     <div class="at-row">${rhButton("caps-edit", "Change the caps\u2026")}</div>`;
   }
   var capsTyped = () => {

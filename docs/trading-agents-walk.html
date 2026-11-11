@@ -928,7 +928,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "Press \"Connect Robinhood\" and sign in on Robinhood's own page (or \"Check the connection\" if you connected before)."],
       "see": [
         "\"Connected\": \"The sign-in works and Robinhood answered.\"",
-        "\"Robinhood offers N tools: X that only read, Y that order or move money (of these, this page uses only Robinhood's dry run, when you press Review, and the order itself, on your Confirm; no agent ever gets one) and Z others.\"",
+        "\"Robinhood offers N tools (things a program can ask it to do): X that only read, Y that order or move money and Z that do something else. This page uses only reading tools, plus two of the order ones, each only when you press Review (Robinhood's check, which places nothing) or Confirm (the order). No agent gets an order tool.\" N, X, Y and Z are Robinhood's own list, so they follow it when it changes.",
         "It never says that this page never uses them.",
         "If this happens (Robinhood is out of reach, or answers with a failure): \"Not working\", with what happened in plain words, for example \"Robinhood could not be reached (the connection failed)\" or \"Robinhood had a fault on its own side and could not answer, saying …; try again later\", with Robinhood's own words and any account number hidden. Never \"Streamable HTTP error\", \"fetch failed\" or a web error code such as 500."] },
     { "id": "D2", "title": "You choose the accounts", "tags": [], "changed": "2026-10-21",
@@ -991,7 +991,18 @@ b, strong { font-weight: var(--weight-semibold); }
         "Press \"Disconnect\", then \"Connect Robinhood\", and sign in on Robinhood's own page."],
       "see": [
         "\"The saved Robinhood sign-in is deleted from this computer, and trading is switched off.\" The top of the page says \"Trading off\" straight away, without reloading the page.",
-        "Back to connected: you choose the accounts again, and trading is switched off. Your caps stay as you set them."] }
+        "Back to connected: you choose the accounts again, and trading is switched off. Your caps stay as you set them."] },
+    { "id": "D10", "title": "The account page is easy to scan", "tags": [], "changed": "2026-11-11",
+      "about": "Nothing on the account page is stretched or crowded: the side list's rows do not touch, and each card is only as tall as what is in it.",
+      "where": "Dashboard › Your account",
+      "do": [
+        "With Robinhood connected and trading on, open \"Your account\" in the side list.",
+        "Look at the side list's \"Your account\" block, then at the Robinhood and Trading cards.",
+        "Make the window narrow."],
+      "see": [
+        "Each marked row of the block (\"Robinhood · connected\", \"Trading is on\" and the account's name) has a small space above the next, so they do not touch.",
+        "The Robinhood and Trading cards stand side by side, each only as tall as its own words: \"Check again\" and \"Disconnect\" sit right under the Robinhood card's text, not at the foot of the taller card.",
+        "On a narrow window the two cards stack one over the other; at a phone's width the caps fields also go one to a line, each row's name over its limits."] }
   ] },
   { "id": "E", "name": "Deciding on a call",
     "sub": "The ticket proposes an order from your settings and caps, and Robinhood checks it. Nothing is placed here.",
@@ -1588,21 +1599,24 @@ b, strong { font-weight: var(--weight-semibold); }
     "about": "Caps are the limits you set once, so no single decision can go too far: the most an order costs, the most of the account in one company, one sector or crypto, orders a day, a weekly loss that switches trading off by itself, and how long a company bought here is held before the desk proposes selling it. They ship small; you can raise them on the dashboard, and nothing else can.",
     "before": "Robinhood connected (section D): the caps sit beside the trading switch on Your account.",
     "tests": [
-    { "id": "M1", "title": "Your caps, as shipped", "tags": [], "changed": "2026-10-21",
-      "about": "The seven caps, in plain words.",
+    { "id": "M1", "title": "Your caps, as shipped", "tags": [], "changed": "2026-11-11",
+      "about": "The seven caps, in plain words, in four rows by what each limit is for.",
       "where": "Dashboard › Your account › Trading › Your caps",
       "do": [
         "Read \"Your caps\"."],
       "see": [
-        "\"$500.00 an order at most\", \"10% of the account in one stock\", \"3 orders a day\", \"one sector at most 30%\", \"crypto at most 5%\", \"switches itself off after a 5% fall in a week\" and \"a stock bought here is held at least 5 trading days\" (or your own values)."] },
-    { "id": "M2", "title": "Change a cap", "tags": [], "changed": "2026-11-09",
+        "Under the heading: \"These limits apply to orders you place from this page, not to trades you make in the Robinhood app.\"",
+        "Four rows, each named at its left. Buys: \"$500.00 an order at most\", \"10% of the account in one stock\", \"one sector at most 30%\" and \"crypto at most 5%\". Buys and sells: \"3 orders a day\". Sells: \"a stock bought here is held at least 5 trading days\". The account: \"switches itself off after a 5% fall in a week\" (or your own values)."] },
+    { "id": "M2", "title": "Change a cap", "tags": [], "changed": "2026-11-11",
       "about": "Changing a cap takes effect on the next ticket.",
       "where": "Dashboard › Your account › Your caps › Change the caps…",
       "do": [
+        "Press \"Change the caps…\" and look at the fields before you change any.",
         "Set \"Orders a day\" to [[2]] and press \"Save the caps\". Open the NVDA ticket.",
         "Put it back to [[3]]",
         "Set \"One stock, % of the account\" to [[7,5]] and save. Then put it back to [[10]]"],
       "see": [
+        "The seven fields stand in the same four rows as the chips (Buys, Buys and sells, Sells, The account), all of one size, two to a line under Buys, level with each other even where a label takes two lines.",
         "\"Your caps are saved. Every ticket is checked against them.\"",
         "The ticket's orders today reads \"0 of 2\".",
         "\"7.5% of the account in one stock\": a decimal comma is read as a decimal point, never as 75%. A figure that is unclear, such as 1,2,3, is refused and nothing is saved."] },
@@ -1631,7 +1645,19 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "Trading switches itself off, and the card says why in red: \"The Agentic account fell …% below its highest value of the last seven days (…), past your weekly limit of 5%. Trading switched itself off. A large withdrawal can do this too. When you switch it back on, the limit counts from then.\"",
         "The top of the page says \"Trading off\" as soon as the dashboard reads your accounts or you open a ticket, without reloading the page.",
-        "Switched back on (F2), trading stays on: the seven days start again from then."] }
+        "Switched back on (F2), trading stays on: the seven days start again from then."] },
+    { "id": "M6", "title": "What your caps cover", "tags": [], "changed": "2026-11-11",
+      "about": "Your caps are real limits, but only on orders you place from this dashboard: Robinhood itself does not know them, so a trade you make in the Robinhood app is not limited by them. Each ticket is checked against them when it opens and when you change it, and again with Robinhood's fresh figures just before it is sent; a failed check stops the order.",
+      "where": "Dashboard › Your account › Your caps › Change the caps…",
+      "do": [
+        "Read the line under \"Your caps\".",
+        "Press \"Change the caps…\" and read the lines under the heading and under Buys, Sells and The account."],
+      "see": [
+        "\"These limits apply to orders you place from this page, not to trades you make in the Robinhood app.\"",
+        "While you edit, after it: \"Every ticket is checked against them, and again just before it is sent; a failed check stops the order. Only you can change them, and the agents are blocked from where they are kept.\" It names no folder.",
+        "Under Buys: \"The crypto limit only sizes the paper record: orders here are for stocks and funds, never coins.\"",
+        "Under Sells: \"The desk proposes no sale sooner than this, and a sale of your own takes one more press (Sell anyway).\"",
+        "Under The account: \"Checked each time the dashboard reads the account.\""] }
   ] },
   { "id": "N", "name": "Care for what you hold",
     "sub": "The desk's view beside each holding, its stop watched, and sells you confirm. Nothing is ever sold by itself.",

@@ -917,6 +917,8 @@ details[open] > .at-input.at-select { border-color: var(--accent); }
 
 /* the side list, open or folded into a strip of icons; folded, the page takes the whole width */
 .app-body > aside[hidden] { display: none; }
+/* its account block: with the account page open every row is marked, and marked rows would touch: one small space apart */
+#sideAccount > .at-li + .at-li { margin-top: var(--space-1); }
 .ta-rail { display: flex; flex-direction: column; align-items: center; gap: var(--space-1); padding: var(--space-3) var(--space-1); }
 .ta-rail > .icon-btn { position: relative; }
 .ta-rail > .icon-btn > .at-dot { position: absolute; top: var(--space-1); right: var(--space-1); }
@@ -1082,7 +1084,19 @@ details[open] > .at-input.at-select { border-color: var(--accent); }
 .ta-gloss dt { color: var(--text); font-weight: var(--weight-medium); }
 
 /* a ticket's checks are sentences, some long: each wraps inside the ticket, never cut off at its edge */
-.ta-checks > .at-chip { flex: 0 1 auto; max-width: 100%; height: auto; min-height: var(--chip-height); white-space: normal; line-height: var(--line-tight); padding-block: var(--space-1); }
+.ta-checks > .at-chip, .ta-caps .at-chip { flex: 0 1 auto; max-width: 100%; height: auto; min-height: var(--chip-height); white-space: normal; line-height: var(--line-tight); padding-block: var(--space-1); }
+
+/* your caps, one design in both views: a row for what they limit (buys, buys and sells, sells, the account), its name
+   at the left and its limits beside it, as chips or as fields of one width; on a phone the name sits over them */
+.ta-caps-head { padding-top: var(--space-4); border-top: 1px solid var(--line); }
+.ta-caps { display: flex; flex-direction: column; gap: var(--space-3); margin: 0; }
+.ta-cap { display: grid; grid-template-columns: calc(var(--unit) * 26) minmax(0, 1fr); gap: var(--space-1) var(--space-3); }
+.ta-cap + .ta-cap { padding-top: var(--space-3); border-top: 1px solid var(--line); }
+.ta-cap > dt { padding-top: var(--space-1); font-size: var(--size-small); font-weight: var(--weight-medium); color: var(--text-3); }
+.ta-cap > dd { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; margin: 0; }
+.ta-capfields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2) var(--space-3); }
+.ta-capfields > .at-field { justify-content: flex-end; }   /* a label that wraps grows upwards, so the fields in a row stay level */
+@media (max-width: 640px) { .ta-cap { grid-template-columns: minmax(0, 1fr); } .ta-capfields { grid-template-columns: minmax(0, 1fr); } }
 
 /* a style that sets display would otherwise show an element the page has hidden */
 .ta-suggest[hidden], .ta-update-wrap[hidden] { display: none; }

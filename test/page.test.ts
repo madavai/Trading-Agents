@@ -161,3 +161,24 @@ test('server-11: the Analyse box offers the settings\' own rounds first and asks
   assert.match(page, /await api\.enqueue\(sym, ASK\.depth \?\? undefined\);/);
   assert.match(fs.readFileSync('src/terminal/ui/api.ts', 'utf8'), /enqueue: \(symbol: string, depth\?: Depth\) => call<\{ queue: QueueView\[\] \}>\('POST', '\/api\/queue', depth \? \{ symbol, depth \} : \{ symbol \}\)/, 'no depth sent at all for the settings');
 });
+
+test('page-16 (dashboard tour, 11 Nov 2026): the account page keeps its rows apart, its cards at their own height, and its caps in four rows in both views', () => {
+  const css = fs.readFileSync('src/terminal/ui/dashboard.css', 'utf8'), html = fs.readFileSync('src/terminal/ui/index.html', 'utf8');
+  // The side list's account block: every row is marked while the account page is open, and marked rows touched.
+  assert.match(css, /#sideAccount > \.at-li \+ \.at-li \{ margin-top: var\(--space-1\); \}/, 'a small space between the account block\'s rows');
+  // The Robinhood and Trading cards were stretched to one height, with Check again and Disconnect pushed to the foot of the taller card.
+  const pair = /<div class="([^"]*)">\s*<div class="at-card at-box" id="accountCard">/.exec(html);
+  assert.ok(pair, 'the two account cards stand in one row');
+  assert.doesNotMatch(pair[1]!, /ta-even/, 'each card is as tall as its own words');
+  // The caps: what they apply to, said once and in both views; four rows by what a limit is for; the seven fields of one size.
+  assert.match(page, /const CAPS_SCOPE = 'These limits apply to orders you place from this page, not to trades you make in the Robinhood app\.';/);
+  assert.equal([...page.matchAll(/\$\{CAPS_SCOPE\}/g)].length, 2, 'the chips view and the edit view both say it');
+  for (const row of ['Buys', 'Buys and sells', 'Sells', 'The account']) assert.equal([...page.matchAll(new RegExp(`capRow\\('${row}'`, 'g'))].length, 2, `${row}: a row in the chips view and in the edit view`);
+  for (const id of ['capOrder', 'capStock', 'capSector', 'capCrypto', 'capDay', 'capHold', 'capWeek']) assert.match(page, new RegExp(`field\\('${id}'`), `${id} is a field of the edit view`);
+  assert.match(css, /\.ta-capfields \{ display: grid; grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/, 'fields of one width, two to a line');
+  assert.match(css, /\.ta-capfields > \.at-field \{ justify-content: flex-end; \}/, 'a label that wraps grows upwards, so the fields stay level');
+  // The short words: the old paragraph ("kept beside the trading switch, where agents are refused") is gone, and no folder is named.
+  assert.doesNotMatch(page, /where agents are refused|The most an order may cost/);
+  assert.match(page, /Every ticket is checked against them, and again just before it is sent; a failed check stops the order\. Only you can change them, and the agents are blocked from where they are kept\./);
+  assert.doesNotMatch(page, /trading-agents|private folder/i, 'the page never names the private folder');
+});
