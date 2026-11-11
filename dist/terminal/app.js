@@ -658,6 +658,17 @@
     return row.length >= max ? "full" : "show";
   }
 
+  // src/terminal/ui/analyses.ts
+  var STALE_MS = 7 * 864e5;
+  function isStale(x, calls, now = Date.now()) {
+    if (x.state !== "done") return false;
+    if (x.date && calls.some((c) => c.ticker === x.symbol && c.date > x.date)) return true;
+    return now - Date.parse(x.endedAt ?? x.requestedAt) > STALE_MS;
+  }
+  function standing(queue) {
+    return { open: queue.filter((x) => x.state === "waiting" || x.state === "running").length, failed: queue.filter((x) => x.state === "failed").length };
+  }
+
   // src/terminal/ui/main.ts
   var RANGES = ["1M", "3M", "6M", "1Y", "5Y"];
   var OVER = { "1M": "the month", "3M": "three months", "6M": "six months", "1Y": "the year", "5Y": "five years" };
@@ -677,8 +688,9 @@
     historyError: "",
     lost: false
   };
-  var VIEWS = ["overview", "account", "today", "score"];
+  var VIEWS = ["overview", "account", "today", "score", "analyses"];
   var view = "overview";
+  var STATUS_LINK = '<button class="ta-link" data-act="view" data-view="analyses">Analysis status</button>';
   var $ = (sel) => document.querySelector(sel);
   var isQuote = (q2) => !!q2 && !("error" in q2);
   var isIndex = (sym) => sym.startsWith("^");
@@ -720,11 +732,14 @@
     }
   }
   var RECENT_MAX = 6;
-  function toast(text, kind = "ok") {
+  function toast(text, kind = "ok", opens) {
     const el = document.createElement("div");
     el.className = `at-toast ${kind}`;
     el.textContent = text;
-    el.addEventListener("click", () => el.remove());
+    el.addEventListener("click", () => {
+      el.remove();
+      if (opens) showView(opens);
+    });
     $("#toasts").append(el);
     setTimeout(() => el.classList.add("gone"), 4500);
     setTimeout(() => el.remove(), 5e3);
@@ -857,7 +872,7 @@
       a.done,
       `Ask the desk to analyse them, ${term("depth", "shallow")}, and switch on running automatically`,
       `<div class="at-row">${factChip(a.asked > 0, `${a.asked} asked for`)}${factChip(!!a.automatic, a.automatic ? `runs by itself: ${a.automatic}` : "not running by itself yet")}</div>
-    <p class="at-quiet ta-gwhy">Shallow is the quickest and costs least: each analysis is a full team run on the models of whatever runs it (Madav's own, or your Claude plan with Claude Code). Running automatically means each one you ask for starts by itself, one at a time; they are listed under Analysis status.</p>
+    <p class="at-quiet ta-gwhy">Shallow is the quickest and costs least: each analysis is a full team run on the models of whatever runs it (Madav's own, or your Claude plan with Claude Code). Running automatically means each one you ask for starts by itself, one at a time; they are listed under ${STATUS_LINK}.</p>
     <div class="at-row">${ask2.length ? `<button class="at-btn at-press primary" data-act="guide-ask"${GUIDE.asking ? " disabled" : ""}><svg class="g"><use href="#i-bot"/></svg><span>${GUIDE.asking ? "Asking\u2026" : `Ask for your ${ask2.length === 1 ? "pick" : `${ask2.length} picks`}, shallow`}</span></button>` : ""}${l ? "" : '<button class="at-btn at-press" data-act="listen-on"><span>Run automatically with Claude Code</span></button>'}</div>
     ${l ? "" : '<p class="at-quiet">Or switch on "Run automatically" in Madav, if you use it.</p>'}`
     );
@@ -1587,7 +1602,7 @@
       return;
     }
     if (!c) {
-      el.innerHTML = `${label}<span class="at-quiet ta-callbar-t">No call on ${esc(sym)} yet${isOpen(sym) ? ": it is asked for, see Analysis status" : ". Ask the desk to analyse it, above"}.</span>`;
+      el.innerHTML = `${label}<span class="at-quiet ta-callbar-t">No call on ${esc(sym)} yet${isOpen(sym) ? `: it is asked for, see ${STATUS_LINK}` : ". Ask the desk to analyse it, above"}.</span>`;
       return;
     }
     el.innerHTML = `${label}${ratingChip(c.rating)}<span class="at-quiet">${esc(dayText(c.date))}</span>${resultChip(c)}${paperChip(c.ticker, c.date)}
@@ -1605,6 +1620,9 @@
     const d = S.desk;
     if (!d) return;
     const q2 = d.queue, l = d.analyses.listener, waiting = q2.filter((x) => x.state === "waiting").length, running = q2.some((x) => x.state === "running");
+    const { open, failed } = standing(q2);
+    $("#analysesCount").innerHTML = `${open ? `<span title="${open} waiting or being analysed">${open}</span>` : ""}${failed ? `${open ? " " : ""}<span class="at-dot bad" role="img" aria-label="${failed} failed" title="${failed} failed"></span>` : ""}`;
+    const listed = q2.filter((x) => !isStale(x, d.calls)), cleared = q2.length - listed.length;
     $("#analysesSub").textContent = l ? `Runs by itself: ${l.listener} is listening on this computer${l.lastRun ? ` \xB7 last run ${l.lastRun.startOnly ? "started " : ""}${when(l.lastRun.at)}: ${l.lastRun.result.replace(/[\s.]+$/, "")}` : ""}. One stock at a time, at most ${d.analyses.perRun} a run.` : 'Nothing is listening, so analyses wait here. Switch on "Run automatically" in Madav, or run them with Claude Code on this computer, or ask the desk to "analyse what is waiting" in a chat.';
     const press = (act, words, primary = false) => `<button class="at-btn at-press${primary ? " primary" : ""}" data-act="${act}">${esc(words)}</button>`;
     $("#analysesDo").innerHTML = (l && waiting && !running ? press("q-run", "Run now") : "") + (!l ? press("listen-on", "Run automatically with Claude Code", waiting > 0) : l.listener === "Claude Code" ? press("listen-off", "Stop running automatically") : "");
@@ -1621,8 +1639,9 @@
       if (x.state === "failed") return `<span class="at-row"><button class="at-btn at-press" data-act="q-retry" data-symbol="${esc(x.symbol)}">Retry</button>${off}</span>`;
       return `<span class="at-row">${off}</span>`;
     };
-    const rows = q2.map((x) => `<tr><td><b>${esc(x.symbol)}</b></td><td>${esc(x.depth ? DEPTH_WORDS[x.depth][0] : "Settings")}</td><td class="wrap">${stands(x)}</td><td class="at-quiet">${esc(dayText(x.requestedAt))}</td><td>${doing(x)}</td></tr>`).join("");
-    $("#analysesTable").innerHTML = `<thead><tr><th>Stock</th><th>${term("depth")}</th><th class="wrap">Where it stands</th><th>Asked</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="ta-empty">Nothing asked for yet. Press the robot beside a stock to ask the desk to analyse it.</td></tr>'}</tbody>`;
+    const rows = listed.map((x) => `<tr><td><b>${esc(x.symbol)}</b></td><td>${esc(x.depth ? DEPTH_WORDS[x.depth][0] : "Settings")}</td><td class="wrap">${stands(x)}</td><td class="at-quiet">${esc(dayText(x.requestedAt))}</td><td>${doing(x)}</td></tr>`).join("");
+    $("#analysesTable").innerHTML = `<thead><tr><th>Stock</th><th>${term("depth")}</th><th class="wrap">Where it stands</th><th>Asked</th><th></th></tr></thead><tbody>${rows || `<tr><td colspan="5" class="ta-empty">${cleared ? "Nothing is waiting or running." : "Nothing asked for yet."} Press the robot beside a stock to ask the desk to analyse it.</td></tr>`}</tbody>`;
+    $("#analysesHidden").textContent = cleared ? `${cleared} older finished ${cleared === 1 ? "analysis is" : "analyses are"} not shown (a newer call on the stock, or finished over 7 days ago). Every call stays in The desk's calls.` : "";
   }
   function noticeFinished(before, after) {
     if (!before) return;
@@ -2032,14 +2051,16 @@
     $("#view-overview").hidden = v !== "overview";
     $("#view-today").hidden = v !== "today";
     $("#view-score").hidden = v !== "score";
+    $("#view-analyses").hidden = v !== "analyses";
     $("#view-account").hidden = v !== "account";
-    for (const [id, page] of [["#navOverview", "overview"], ["#navToday", "today"], ["#railToday", "today"], ["#navScore", "score"], ["#railScore", "score"]]) {
+    for (const [id, page] of [["#navOverview", "overview"], ["#navToday", "today"], ["#railToday", "today"], ["#navScore", "score"], ["#railScore", "score"], ["#navAnalyses", "analyses"], ["#railAnalyses", "analyses"]]) {
       const nav = $(id);
       if (v === page) nav.setAttribute("aria-current", "page");
       else nav.removeAttribute("aria-current");
     }
     $("#railToday").classList.toggle("on", v === "today");
     $("#railScore").classList.toggle("on", v === "score");
+    $("#railAnalyses").classList.toggle("on", v === "analyses");
     renderSideAccount();
     if (was !== v) $("#page").scrollTo({ top: 0 });
     if (v === "account" && signedIn() && A.chosen.length && !A.snapshot && !A.reading) void readAccounts();
@@ -2158,7 +2179,7 @@
     <p class="at-lede">The desk's thirteen agents read ${reads}, check the facts, argue both sides, and record a call you can read and decide on. It never places an order${coin ? `: ${it?.paper === false ? "among crypto, the desk follows only Bitcoin and Ether on paper" : "a coin is followed on paper only"}` : ""}.</p>
     <div class="at-seg" role="radiogroup" aria-label="How deep">${choices.map((c) => `<button class="at-seg-b${c === chosen ? " on" : ""}" role="radio" aria-checked="${c === chosen}" data-act="ask-depth" data-depth="${c.depth ?? ""}">${esc(c.label)}</button>`).join("")}</div>
     <p class="at-quiet">${term("depth")} \xB7 ${esc(chosen.means)}</p>
-    <p class="at-honest">${l ? `It runs by itself: ${esc(l.listener)} is listening.` : "Nothing is listening on this computer yet, so it waits until a run starts: see Analysis status."}</p>
+    <p class="at-honest">${l ? `It runs by itself: ${esc(l.listener)} is listening.` : `Nothing is listening on this computer yet, so it waits until a run starts: see ${STATUS_LINK}.`}</p>
     <div class="at-pop-do"><button class="at-btn at-press" data-act="ask-cancel">Cancel</button><button class="at-btn at-press primary" data-act="ask-yes"><svg class="g"><use href="#i-bot"/></svg><span>Ask the desk</span></button></div>`;
   }
   async function askNow() {
@@ -2167,7 +2188,7 @@
       await api.enqueue(sym, ASK.depth ?? void 0);
       $("#askDialog").close();
       await refreshState();
-      toast(l ? `${sym} is asked for: it runs by itself, and its call appears here.` : `${sym} is waiting. Nothing is listening yet: see Analysis status.`);
+      toast(l ? `${sym} is asked for: it runs by itself, and its call appears here.` : `${sym} is waiting. Nothing is listening yet: see Analysis status.`, "ok", "analyses");
     });
   }
   var onShade = (e, dlg) => {
@@ -2204,9 +2225,13 @@
         to?.scrollIntoView({ behavior: "smooth", block: "start" });
         break;
       }
-      case "view":
+      case "view": {
+        const dlg2 = $("#askDialog");
+        if (dlg2.open) dlg2.close();
         showView(VIEWS.find((v) => v === el.dataset.view) ?? "overview");
         break;
+      }
+      // a link inside the Analyse box leaves it
       case "side":
         setSide(el.dataset.side === "fold");
         break;

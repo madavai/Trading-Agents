@@ -11,6 +11,7 @@ import { markdown } from './md.js';
 import { sameFigures, typedNumber, type Asked } from './typed.js';
 import { DEPTH_ORDER, DEPTH_WORDS, depthChoices, retryDepth } from './depth.js';
 import { marketOffer, type MarketOffer } from './marketpick.js';
+import { isStale, standing } from './analyses.js';
 import { cryptoBase, deskSymbol, isCrypto } from '../../data/symbols.js';
 import type { Quote, QuoteKind } from '../quotes.js';
 
@@ -38,10 +39,13 @@ const S = {
 };
 
 /** Which page the main column shows: the desk (markets, chart, watchlist, calls), today's market (the weather and what is worth a
- *  look, worked out hourly), how the desk is doing (the paper record and the scorecard) or the person's account. */
-type View = 'overview' | 'account' | 'today' | 'score';
-const VIEWS: readonly View[] = ['overview', 'account', 'today', 'score'];
+ *  look, worked out hourly), how the desk is doing (the paper record and the scorecard), the analysis status (what was asked for and
+ *  where each stands) or the person's account. */
+type View = 'overview' | 'account' | 'today' | 'score' | 'analyses';
+const VIEWS: readonly View[] = ['overview', 'account', 'today', 'score', 'analyses'];
 let view: View = 'overview';
+/** The words "Analysis status" as a link that opens that page, wherever a sentence sends the person to it. */
+const STATUS_LINK = '<button class="ta-link" data-act="view" data-view="analyses">Analysis status</button>';
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string): T => document.querySelector<T>(sel)!;
 const isQuote = (q: QuoteResult | undefined | null): q is Quote => !!q && !('error' in q);
@@ -83,10 +87,11 @@ function browserPrefs(): Prefs {
 }
 const RECENT_MAX = 6;
 
-function toast(text: string, kind: 'ok' | 'bad' = 'ok'): void {
+/** `opens`: a page the notice points at, which a press on it opens (as well as putting it away). */
+function toast(text: string, kind: 'ok' | 'bad' = 'ok', opens?: View): void {
   const el = document.createElement('div');
   el.className = `at-toast ${kind}`; el.textContent = text;
-  el.addEventListener('click', () => el.remove());
+  el.addEventListener('click', () => { el.remove(); if (opens) showView(opens); });
   $('#toasts').append(el);
   setTimeout(() => el.classList.add('gone'), 4500);
   setTimeout(() => el.remove(), 5000);
@@ -223,7 +228,7 @@ function renderGuide(): void {
   const a = g.analyse, ask = toAsk(), l = d!.analyses.listener;
   const analyse = guideStep(3, a.done, `Ask the desk to analyse them, ${term('depth', 'shallow')}, and switch on running automatically`,
     `<div class="at-row">${factChip(a.asked > 0, `${a.asked} asked for`)}${factChip(!!a.automatic, a.automatic ? `runs by itself: ${a.automatic}` : 'not running by itself yet')}</div>
-    <p class="at-quiet ta-gwhy">Shallow is the quickest and costs least: each analysis is a full team run on the models of whatever runs it (Madav's own, or your Claude plan with Claude Code). Running automatically means each one you ask for starts by itself, one at a time; they are listed under Analysis status.</p>
+    <p class="at-quiet ta-gwhy">Shallow is the quickest and costs least: each analysis is a full team run on the models of whatever runs it (Madav's own, or your Claude plan with Claude Code). Running automatically means each one you ask for starts by itself, one at a time; they are listed under ${STATUS_LINK}.</p>
     <div class="at-row">${ask.length ? `<button class="at-btn at-press primary" data-act="guide-ask"${GUIDE.asking ? ' disabled' : ''}><svg class="g"><use href="#i-bot"/></svg><span>${GUIDE.asking ? 'Asking…' : `Ask for your ${ask.length === 1 ? 'pick' : `${ask.length} picks`}, shallow`}</span></button>` : ''}${l ? '' : '<button class="at-btn at-press" data-act="listen-on"><span>Run automatically with Claude Code</span></button>'}</div>
     ${l ? '' : '<p class="at-quiet">Or switch on "Run automatically" in Madav, if you use it.</p>'}`);
 
@@ -904,7 +909,7 @@ function renderCall(): void {
   const label = `<span class="ta-callbar-l">The desk's call</span>`;
   if (isIndex(sym)) { el.innerHTML = `${label}<span class="at-quiet ta-callbar-t">The desk analyses stocks, not ${term('index', 'indices')}.</span>`; return; }
   if (!c) {
-    el.innerHTML = `${label}<span class="at-quiet ta-callbar-t">No call on ${esc(sym)} yet${isOpen(sym) ? ': it is asked for, see Analysis status' : '. Ask the desk to analyse it, above'}.</span>`;
+    el.innerHTML = `${label}<span class="at-quiet ta-callbar-t">No call on ${esc(sym)} yet${isOpen(sym) ? `: it is asked for, see ${STATUS_LINK}` : '. Ask the desk to analyse it, above'}.</span>`;
     return;
   }
   el.innerHTML = `${label}${ratingChip(c.rating)}<span class="at-quiet">${esc(dayText(c.date))}</span>${resultChip(c)}${paperChip(c.ticker, c.date)}
@@ -923,6 +928,12 @@ function renderAnalyses(): void {
   const d = S.desk;
   if (!d) return;
   const q = d.queue, l = d.analyses.listener, waiting = q.filter((x) => x.state === 'waiting').length, running = q.some((x) => x.state === 'running');
+  // Beside the name in the side list: how many are waiting or being analysed (nothing when none), and a mark when any has failed.
+  const { open, failed } = standing(q);
+  $('#analysesCount').innerHTML = `${open ? `<span title="${open} waiting or being analysed">${open}</span>` : ''}${failed ? `${open ? ' ' : ''}<span class="at-dot bad" role="img" aria-label="${failed} failed" title="${failed} failed"></span>` : ''}`;
+  // Old finished rows clear themselves from this view alone (the desk's own list is not changed, and ✕ still takes one off it): a
+  // finished one whose stock has a newer call in the journal, or that finished more than a week ago. Waiting, running and failed rows always show.
+  const listed = q.filter((x) => !isStale(x, d.calls)), cleared = q.length - listed.length;
   $('#analysesSub').textContent = l
     ? `Runs by itself: ${l.listener} is listening on this computer${l.lastRun ? ` · last run ${l.lastRun.startOnly ? 'started ' : ''}${when(l.lastRun.at)}: ${l.lastRun.result.replace(/[\s.]+$/, '')}` : ''}. One stock at a time, at most ${d.analyses.perRun} a run.`
     : 'Nothing is listening, so analyses wait here. Switch on "Run automatically" in Madav, or run them with Claude Code on this computer, or ask the desk to "analyse what is waiting" in a chat.';
@@ -942,8 +953,9 @@ function renderAnalyses(): void {
     if (x.state === 'failed') return `<span class="at-row"><button class="at-btn at-press" data-act="q-retry" data-symbol="${esc(x.symbol)}">Retry</button>${off}</span>`;
     return `<span class="at-row">${off}</span>`;
   };
-  const rows = q.map((x) => `<tr><td><b>${esc(x.symbol)}</b></td><td>${esc(x.depth ? DEPTH_WORDS[x.depth][0] : 'Settings')}</td><td class="wrap">${stands(x)}</td><td class="at-quiet">${esc(dayText(x.requestedAt))}</td><td>${doing(x)}</td></tr>`).join('');
-  $('#analysesTable').innerHTML = `<thead><tr><th>Stock</th><th>${term('depth')}</th><th class="wrap">Where it stands</th><th>Asked</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="ta-empty">Nothing asked for yet. Press the robot beside a stock to ask the desk to analyse it.</td></tr>'}</tbody>`;
+  const rows = listed.map((x) => `<tr><td><b>${esc(x.symbol)}</b></td><td>${esc(x.depth ? DEPTH_WORDS[x.depth][0] : 'Settings')}</td><td class="wrap">${stands(x)}</td><td class="at-quiet">${esc(dayText(x.requestedAt))}</td><td>${doing(x)}</td></tr>`).join('');
+  $('#analysesTable').innerHTML = `<thead><tr><th>Stock</th><th>${term('depth')}</th><th class="wrap">Where it stands</th><th>Asked</th><th></th></tr></thead><tbody>${rows || `<tr><td colspan="5" class="ta-empty">${cleared ? 'Nothing is waiting or running.' : 'Nothing asked for yet.'} Press the robot beside a stock to ask the desk to analyse it.</td></tr>`}</tbody>`;
+  $('#analysesHidden').textContent = cleared ? `${cleared} older finished ${cleared === 1 ? 'analysis is' : 'analyses are'} not shown (a newer call on the stock, or finished over 7 days ago). Every call stays in The desk's calls.` : '';
 }
 
 /** A stock that finished since the page last looked: a notice, so the person hears of it wherever they are on the page. */
@@ -1382,14 +1394,16 @@ function showView(v: View, save = true): void {
   $('#view-overview').hidden = v !== 'overview';
   $('#view-today').hidden = v !== 'today';
   $('#view-score').hidden = v !== 'score';
+  $('#view-analyses').hidden = v !== 'analyses';
   $('#view-account').hidden = v !== 'account';
-  for (const [id, page] of [['#navOverview', 'overview'], ['#navToday', 'today'], ['#railToday', 'today'], ['#navScore', 'score'], ['#railScore', 'score']] as const) {
+  for (const [id, page] of [['#navOverview', 'overview'], ['#navToday', 'today'], ['#railToday', 'today'], ['#navScore', 'score'], ['#railScore', 'score'], ['#navAnalyses', 'analyses'], ['#railAnalyses', 'analyses']] as const) {
     const nav = $(id);
     if (v === page) nav.setAttribute('aria-current', 'page'); else nav.removeAttribute('aria-current');
   }
   // the folded rail's icons have no mark of their own for the current page
   $('#railToday').classList.toggle('on', v === 'today');
   $('#railScore').classList.toggle('on', v === 'score');
+  $('#railAnalyses').classList.toggle('on', v === 'analyses');
   renderSideAccount();
   if (was !== v) $('#page').scrollTo({ top: 0 });
   if (v === 'account' && signedIn() && A.chosen.length && !A.snapshot && !A.reading) void readAccounts();
@@ -1503,7 +1517,7 @@ function renderAsk(): void {
     <p class="at-lede">The desk's thirteen agents read ${reads}, check the facts, argue both sides, and record a call you can read and decide on. It never places an order${coin ? `: ${it?.paper === false ? 'among crypto, the desk follows only Bitcoin and Ether on paper' : 'a coin is followed on paper only'}` : ''}.</p>
     <div class="at-seg" role="radiogroup" aria-label="How deep">${choices.map((c) => `<button class="at-seg-b${c === chosen ? ' on' : ''}" role="radio" aria-checked="${c === chosen}" data-act="ask-depth" data-depth="${c.depth ?? ''}">${esc(c.label)}</button>`).join('')}</div>
     <p class="at-quiet">${term('depth')} · ${esc(chosen.means)}</p>
-    <p class="at-honest">${l ? `It runs by itself: ${esc(l.listener)} is listening.` : 'Nothing is listening on this computer yet, so it waits until a run starts: see Analysis status.'}</p>
+    <p class="at-honest">${l ? `It runs by itself: ${esc(l.listener)} is listening.` : `Nothing is listening on this computer yet, so it waits until a run starts: see ${STATUS_LINK}.`}</p>
     <div class="at-pop-do"><button class="at-btn at-press" data-act="ask-cancel">Cancel</button><button class="at-btn at-press primary" data-act="ask-yes"><svg class="g"><use href="#i-bot"/></svg><span>Ask the desk</span></button></div>`;
 }
 async function askNow(): Promise<void> {
@@ -1512,7 +1526,7 @@ async function askNow(): Promise<void> {
     await api.enqueue(sym, ASK.depth ?? undefined);
     $<HTMLDialogElement>('#askDialog').close();
     await refreshState();
-    toast(l ? `${sym} is asked for: it runs by itself, and its call appears here.` : `${sym} is waiting. Nothing is listening yet: see Analysis status.`);
+    toast(l ? `${sym} is asked for: it runs by itself, and its call appears here.` : `${sym} is waiting. Nothing is listening yet: see Analysis status.`, 'ok', 'analyses');
   });
 }
 
@@ -1534,7 +1548,7 @@ document.addEventListener('click', (e) => {
   const sym = el.dataset.symbol ?? '';
   switch (el.dataset.act) {
     case 'goto': { showView('overview'); const to = el.dataset.to === 'top' ? $('#page') : document.getElementById(el.dataset.to ?? ''); to?.scrollIntoView({ behavior: 'smooth', block: 'start' }); break; }
-    case 'view': showView(VIEWS.find((v) => v === el.dataset.view) ?? 'overview'); break;
+    case 'view': { const dlg = $<HTMLDialogElement>('#askDialog'); if (dlg.open) dlg.close(); showView(VIEWS.find((v) => v === el.dataset.view) ?? 'overview'); break; }   // a link inside the Analyse box leaves it
     case 'side': setSide(el.dataset.side === 'fold'); break;
     case 'theme': setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'); break;
     case 'kind': S.kind = el.dataset.kind === 'candles' ? 'candles' : 'area'; remember({ kind: S.kind }); renderControls(); renderHero(); break;

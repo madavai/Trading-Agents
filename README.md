@@ -150,8 +150,8 @@ the team's "talk" switch shows these messages in the Messages panel; with it off
    the markets, then the whole market, the eleven sectors and your own names side by side, a chart of any stock (area
    or candles, 50- and 200-day averages, volume, at the prices it traded at, as Nasdaq or your broker shows them; the
    desk's own analyses count dividends as part of the return), your watchlist by tier, a page per stock and the desk's calls with their full reasoning; and, on pages of their own in the side
-   list, Today's market (the market weather and what is worth a look today) and How the desk is doing (the paper record and how the
-   desk has scored). Pressing a stock anywhere on the page
+   list, Today's market (the market weather and what is worth a look today), How the desk is doing (the paper record and how the
+   desk has scored) and Analysis status (where each analysis you asked for stands). Pressing a stock anywhere on the page
    brings its chart into view. The agents see your chosen holdings when they analyse.
 3. **You decide and trade.** On a call, "Decide…" opens a ticket for the Agentic account, sized by your settings and
    checked against your caps; beside a stock's price, "Trade…" opens your own ticket instead, buy or sell, starting at
@@ -353,8 +353,11 @@ indices are analysed but not followed on paper.
 
 ### Analyses that run by themselves
 Press the robot beside any stock, choose how deep (shallow, medium or deep; your settings' depth is chosen first) and
-press "Ask the desk". The stock joins **Analysis status**, where each one shows where it stands: waiting, being
-analysed (with the step it is on), done with its rating, or failed with the reason and a Retry. When one finishes, a
+press "Ask the desk". The stock joins **Analysis status**, a page of its own in the side list (a small count beside its
+name shows how many are waiting or being analysed, and a red dot that one has failed), where each one shows where it
+stands: waiting, being analysed (with the step it is on), done with its rating, or failed with the reason and a Retry.
+A finished one clears from the page when its stock has a newer call or a week has passed; every call stays in the desk's
+calls. When one finishes, a
 notice says so wherever you are on the page. One stock is analysed at a time, at most five a run (the routines' limit
 in `desk-settings.json`); the rest wait for the next run, which is asked for by itself. Each runs at the depth you
 chose, whatever the team's lead plans: the time and the model allowance it spends are yours.

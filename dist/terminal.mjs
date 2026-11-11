@@ -22340,7 +22340,7 @@ function cleanPrefs(raw) {
   if (theme) out.theme = theme;
   const side = one(r.side, ["open", "folded"]);
   if (side) out.side = side;
-  const view = one(r.view, ["overview", "account", "today", "score"]);
+  const view = one(r.view, ["overview", "account", "today", "score", "analyses"]);
   if (view) out.view = view;
   const symbol = sym(r.symbol);
   if (symbol) out.symbol = symbol;
