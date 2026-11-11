@@ -38702,6 +38702,11 @@ var STATEMENTS = {
     ["Total Assets", ["Assets"]],
     ["Current Assets", ["AssetsCurrent"]],
     ["Cash and Equivalents", ["CashAndCashEquivalentsAtCarryingValue"]],
+    ["Marketable Securities (current)", ["MarketableSecuritiesCurrent"], true],
+    ["Accounts Receivable", ["AccountsReceivableNetCurrent"], true],
+    // Apple's vendor non-trade receivables, among others: receivables that are not from customers.
+    ["Other Receivables", ["NontradeReceivablesCurrent", "OtherReceivablesNetCurrent"], true],
+    ["Inventory", ["InventoryNet"], true],
     ["Total Liabilities", ["Liabilities"]],
     ["Current Liabilities", ["LiabilitiesCurrent"]],
     ["Stockholders Equity", ["StockholdersEquity", "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"]]
@@ -38718,8 +38723,16 @@ var STATEMENTS = {
   cashflow: { title: "Cash flow statement", lines: [
     ["Operating Cash Flow", ["NetCashProvidedByUsedInOperatingActivities", "NetCashProvidedByUsedInOperatingActivitiesContinuingOperations"]],
     ["Investing Cash Flow", ["NetCashProvidedByUsedInInvestingActivities"]],
+    ["Capital Expenditure", ["PaymentsToAcquirePropertyPlantAndEquipment", "PaymentsToAcquireProductiveAssets"]],
     ["Financing Cash Flow", ["NetCashProvidedByUsedInFinancingActivities"]],
-    ["Capital Expenditure", ["PaymentsToAcquirePropertyPlantAndEquipment", "PaymentsToAcquireProductiveAssets"]]
+    // The parts of the financing cash flow, as filed: a payment as a positive figure (cash paid), like capital expenditure.
+    ["Share Buybacks", ["PaymentsForRepurchaseOfCommonStock"], true],
+    ["Dividends Paid", ["PaymentsOfDividends", "PaymentsOfDividendsCommonStock"], true],
+    ["Debt Issued", ["ProceedsFromIssuanceOfLongTermDebt", "ProceedsFromDebtNetOfIssuanceCosts"], true],
+    ["Debt Repaid", ["RepaymentsOfLongTermDebt", "RepaymentsOfDebt"], true],
+    // Raised less repaid: negative when more was repaid.
+    ["Commercial Paper (net)", ["ProceedsFromRepaymentsOfCommercialPaper"], true],
+    ["Tax Paid on Employee Share Awards", ["PaymentsRelatedToTaxWithholdingForShareBasedCompensation"], true]
   ] }
 };
 var QUARTER = [60, 115];
@@ -38885,21 +38898,34 @@ function filedStatement(usGaap, kind, freq, asOf, basis) {
   const quarterly = freq === "quarterly", flows = kind !== "balance_sheet";
   const spans = quarterly ? [QUARTER, ...YEAR_TO_DATE.map(([lo, hi]) => [lo, hi])] : [YEAR];
   const names = quarterly ? ["", ...YEAR_TO_DATE.map(([, , m2]) => ` (${m2} months to date)`)] : [""];
-  const lines = STATEMENTS[kind].lines.map(([label, tags]) => ({ label, ...lineAsOf(usGaap, tags, asOf, spans, quarterly ? [] : ANNUAL_FORMS) }));
+  const lines = STATEMENTS[kind].lines.map(([label, tags, part]) => ({ label, part: !!part, ...lineAsOf(usGaap, tags, asOf, spans, quarterly ? [] : ANNUAL_FORMS) }));
   const notes = [];
   const worked2 = lines.map((l, n2) => quarterly && flows && !perShareUnit(l.unit) ? quartersOf(l.values, lineAsOf(usGaap, STATEMENTS[kind].lines[n2][1], asOf, [YEAR], ANNUAL_FORMS).values, changesOf(refilingsOf(usGaap, STATEMENTS[kind].lines[n2][1], asOf))) : { quarters: /* @__PURE__ */ new Map(), blocked: /* @__PURE__ */ new Map() });
   const quarters = worked2.map((w) => w.quarters);
+  const toDate = lines.map(() => /* @__PURE__ */ new Map());
   const chosen = lines.map((l, n2) => {
     const m2 = /* @__PURE__ */ new Map();
-    for (const key of l.values.keys()) {
-      const [end, i] = key.split("|");
-      if (!quarters[n2].has(end)) m2.set(end, Math.min(Number(i), m2.get(end) ?? Number(i)));
+    for (const [key, f] of l.values) {
+      const [end, s] = key.split("|"), i = Number(s);
+      if (quarters[n2].has(end)) continue;
+      if (l.part && i > 0) {
+        const was = toDate[n2].get(end);
+        if (!was || i < was.i) toDate[n2].set(end, { f, i });
+        continue;
+      }
+      m2.set(end, Math.min(i, m2.get(end) ?? i));
     }
     for (const end of quarters[n2].keys()) m2.set(end, 0);
     return m2;
   });
   const ends = [...new Set(chosen.flatMap((m2) => [...m2.keys()]))].sort().reverse().slice(0, SHOWN2[freq]);
   const periods = ends.flatMap((end) => [...new Set(chosen.map((m2) => m2.get(end)).filter((i) => i !== void 0))].sort().map((i) => ({ end, i })));
+  toDate.forEach((m2, n2) => {
+    for (const [end, { i }] of m2) if (!chosen[n2].has(end) && periods.some((p) => p.end === end && p.i === i)) {
+      chosen[n2].set(end, i);
+      m2.delete(end);
+    }
+  });
   if (!periods.length) throw new NoData(`no ${freq} ${STATEMENTS[kind].title.toLowerCase()} was filed with the SEC by ${asOf}`);
   const derived2 = /* @__PURE__ */ new Map();
   for (const q of quarters) for (const [end, v] of q) if (v.how && ends.includes(end)) (derived2.get(end) ?? derived2.set(end, /* @__PURE__ */ new Set()).get(end)).add(v.how);
@@ -38910,6 +38936,14 @@ function filedStatement(usGaap, kind, freq, asOf, basis) {
       if (quarters[n2].has(end) || !ends.length || end < ends.at(-1)) continue;
       const r = ch.r, what = `a filing of ${r.filed} restated an earlier figure of it (${spanWords({ ...r, val: 0 })} to ${r.end}, first filed as ${million(r.first)} million ${lines[n2].unit}, refiled then as ${million(r.now)} million), as when a business is sold or spun off`;
       notes.push(lo <= ch.from && hi >= ch.by ? `${lines[n2].label} for the quarter to ${end} is not derived: ${spanWords(c)} to ${c.end} (filed ${c.filed}) and ${other} are on different bases, since ${what}. The one less the other would not be a quarter.` : `${lines[n2].label} for the quarter to ${end} is not derived: ${spanWords(c)} to ${c.end} (filed ${c.filed}) and ${other} may be on different bases: ${what}, and the filings show only that the change came after ${ch.from} and by ${ch.by}. The one less the other may not be a quarter.`);
+    }
+  });
+  const noted = /* @__PURE__ */ new Set();
+  toDate.forEach((m2, n2) => {
+    for (const [end, { f }] of [...m2].sort((a, b) => b[0].localeCompare(a[0]))) {
+      if (!ends.includes(end) || worked2[n2].blocked.has(end)) continue;
+      noted.add(n2);
+      notes.push(`${lines[n2].label} for the quarter to ${end} is not derived: its filings give ${spanWords(f)} to ${end} (${million(f.val)} million ${lines[n2].unit}, filed ${f.filed}) and no figure of it for the months before, so its quarter is not known; never take ${spanWords(f)} for it.`);
     }
   });
   const onto = "the basis of the later filings";
@@ -38930,7 +38964,7 @@ function filedStatement(usGaap, kind, freq, asOf, basis) {
       if (named.length && !basis) notes.push(silent ? `${l.label} for ${spanWords(f)} to ${f.end} was filed on ${f.filed}, before ${splitList(named)}; shown here on ${onto}.` : `${l.label} for ${spanWords(f)} to ${f.end} was filed on ${f.filed} as ${plain2(f.val)}, before ${splitList(named)}; shown here on ${onto}: ${plain2(v)}.`);
       return v;
     });
-    return { label: l.label, unit: l.unit, cells: cells2 };
+    return noted.has(n2) ? { label: l.label, unit: l.unit, cells: cells2, noted: true } : { label: l.label, unit: l.unit, cells: cells2 };
   });
   if (basis && perShare) notes.push("Per-share figures are on the price source's share basis of today, the one its prices are on: a figure filed before a share split since then is divided by that split's ratio, so it can differ from the number in its filing.");
   return { columns: periods.map((p) => p.end + (p.i === 0 && derived2.has(p.end) ? " (derived)" : names[p.i])), rows, notes };
@@ -39801,24 +39835,25 @@ async function fundProfile(raw, analysis2, topN = 10) {
   return [`Fund profile for ${sym2}, from Yahoo Finance as it stands today (${day3}). A fund has no company accounts, insider trades or results releases of its own, so no results dates: what it holds and what it costs to own are its fundamentals.`, "", ...lines].join("\n");
 }
 var YAHOO_LINES = {
-  balance_sheet: ["TotalAssets", "CurrentAssets", "CashAndCashEquivalents", "TotalLiabilitiesNetMinorityInterest", "CurrentLiabilities", "StockholdersEquity"],
-  income_statement: ["TotalRevenue", "CostOfRevenue", "GrossProfit", "OperatingIncome", "NetIncome", "DilutedEPS"],
-  cashflow: ["OperatingCashFlow", "InvestingCashFlow", "FinancingCashFlow", "CapitalExpenditure"]
+  balance_sheet: { "Total Assets": "TotalAssets", "Current Assets": "CurrentAssets", "Cash and Equivalents": "CashAndCashEquivalents", "Total Liabilities": "TotalLiabilitiesNetMinorityInterest", "Current Liabilities": "CurrentLiabilities", "Stockholders Equity": "StockholdersEquity" },
+  income_statement: { Revenue: "TotalRevenue", "Cost of Revenue": "CostOfRevenue", "Gross Profit": "GrossProfit", "Operating Income": "OperatingIncome", "Net Income": "NetIncome", "Diluted EPS": "DilutedEPS" },
+  cashflow: { "Operating Cash Flow": "OperatingCashFlow", "Investing Cash Flow": "InvestingCashFlow", "Capital Expenditure": "CapitalExpenditure", "Financing Cash Flow": "FinancingCashFlow" }
 };
+var yahooLines = (kind) => STATEMENTS[kind].lines.flatMap(([label]) => YAHOO_LINES[kind][label] ? [[label, YAHOO_LINES[kind][label]]] : []);
 function yahooTable(j, kind, freq) {
   const series = /* @__PURE__ */ new Map();
   for (const r of j.timeseries?.result ?? []) {
     const t = r.meta?.type?.[0];
     if (t && Array.isArray(r[t])) series.set(t, r[t].filter((p) => !!p));
   }
-  const lines = YAHOO_LINES[kind].map((name, i) => {
+  const lines = yahooLines(kind).map(([label, name]) => {
     const values = /* @__PURE__ */ new Map();
     let unit = "";
     for (const p of series.get(freq + name) ?? []) if (p.asOfDate && has(p.reportedValue)) {
       values.set(p.asOfDate, p.reportedValue.raw);
       unit = p.currencyCode ?? unit;
     }
-    return { label: STATEMENTS[kind].lines[i][0], unit: name === "DilutedEPS" ? `${unit}/shares` : unit, values };
+    return { label, unit: name === "DilutedEPS" ? `${unit}/shares` : unit, values };
   });
   const ends = [...new Set(lines.flatMap((l) => [...l.values.keys()]))].sort().reverse().slice(0, SHOWN2[freq]);
   if (!ends.length) throw new NoData(`Yahoo Finance has no ${freq} ${STATEMENTS[kind].title.toLowerCase()}`);
@@ -39826,7 +39861,7 @@ function yahooTable(j, kind, freq) {
 }
 var epoch2 = (date5) => Math.floor(Date.parse(`${date5}T00:00:00Z`) / 1e3);
 async function yahooStatement(sym2, kind, freq, day3) {
-  const types = YAHOO_LINES[kind].map((n2) => freq + n2).join(",");
+  const types = yahooLines(kind).map(([, n2]) => freq + n2).join(",");
   const j = await yahooJson(`/ws/fundamentals-timeseries/v1/finance/timeseries/${encodeURIComponent(sym2)}?symbol=${encodeURIComponent(sym2)}&type=${types}&period1=${epoch2(addDays(day3, -6 * 366))}&period2=${epoch2(addDays(day3, 1))}`);
   return yahooTable(j, kind, freq);
 }
@@ -39901,22 +39936,24 @@ function withWorkedRows(t, kind, freq) {
   }
   return { ...t, rows: [...t.rows, ...out.filter((r) => r !== null)] };
 }
-function renderTable(t, head2, note) {
-  const rows = t.rows.filter((r) => r.cells.some((c) => c !== null)), missing = t.rows.filter((r) => !rows.includes(r) && !r.worked).map((r) => r.label);
+var NOT_IN_FILINGS = (labels) => `No figure in the company's SEC filings' data for: ${labels.join(", ")}. The company may have none of it, or file it under a name of its own or in pieces, which the desk does not add up: never take another line for it, and never read it as zero.`;
+function renderTable(t, head2, note, filed = false) {
+  const rows = t.rows.filter((r) => r.noted || r.cells.some((c) => c !== null)), missing = t.rows.filter((r) => !rows.includes(r) && !r.worked).map((r) => r.label);
   const perShare = (u) => u.includes("/");
   const main = rows.find((r) => !perShare(r.unit) && !r.worked)?.unit ?? "";
   const name = (r) => r.worked === "percent" || r.worked === "times" ? r.label : perShare(r.unit) ? `${r.label} (${r.unit.split("/")[0] || "currency"} per share)` : r.unit !== main ? `${r.label} (millions of ${r.unit || "an unstated currency"})` : r.label;
   const cell = (v, r) => v === null ? "\u2013" : r.worked === "percent" ? `${v.toFixed(1)}%` : r.worked === "times" ? v.toFixed(2) : perShare(r.unit) ? v.toFixed(2) : (v / 1e6).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   const worked2 = rows.some((r) => r.worked) ? ' Rows marked "worked out" are worked out by the desk from the figures in this table, as named; quote them rather than working your own.' : "";
+  const dash = filed ? '"\u2013" means the filings give no figure for that period: not known, never zero.' : '"\u2013" means no figure for that period.';
   const out = [
     head2,
-    `Money in millions of ${main || "an unstated currency"} unless the row says otherwise; "\u2013" means no figure for that period. ${note}${worked2}`,
+    `Money in millions of ${main || "an unstated currency"} unless the row says otherwise; ${dash} ${note}${worked2}`,
     "",
     `Line | ${t.columns.join(" | ")}`,
     `---|${t.columns.map(() => "---:").join("|")}`,
     ...rows.map((r) => `${name(r)} | ${r.cells.map((c) => cell(c, r)).join(" | ")}`)
   ];
-  if (missing.length) out.push("", `Not reported by this source: ${missing.join(", ")}.`);
+  if (missing.length) out.push("", filed ? NOT_IN_FILINGS(missing) : `Not reported by this source: ${missing.join(", ")}.`);
   if (t.notes?.length) out.push("", ...t.notes);
   return out.join("\n");
 }
@@ -39937,6 +39974,11 @@ async function statementBasis(sym2, day3) {
     return { note: "" };
   }
 }
+var PARTS = {
+  balance_sheet: " Marketable securities (current), accounts receivable, other receivables and inventory are parts of current assets, each given only where the filings give that whole part; what they and cash do not cover is not itemized here, so never say what it is.",
+  income_statement: "",
+  cashflow: " Capital expenditure, share buybacks, dividends paid, debt repaid and tax paid on employee share awards are cash paid out, shown as positive figures as the filings give them; debt issued is cash received; commercial paper (net) is cash raised less repaid, negative when more was repaid. The financing cash flow is the net of all financing, negative when more cash went out than came in; the lines after it are its parts the filings give, and what they do not cover is not itemized: never call the whole of it buybacks and dividends."
+};
 async function financialStatement(raw, kind, freq, analysis2) {
   const day3 = analysisDate(analysis2), sym2 = companySymbol(raw), title = STATEMENTS[kind].title;
   let secFailure;
@@ -39944,7 +39986,7 @@ async function financialStatement(raw, kind, freq, analysis2) {
     const basis = kind === "income_statement" ? await statementBasis(sym2, day3) : { note: "" };
     const t = withWorkedRows(await secStatement(sym2, kind, freq, day3, basis.splits), kind, freq);
     const q = kind !== "balance_sheet" && freq === "quarterly" ? ' Every column is one quarter in a row of quarters; a quarter no filing states (a fourth quarter, which only the annual report covers, or one filed only inside a year to date) is derived from two filed figures of the same year, its column marked "(derived)", and the notes below say from which. Per-share figures are never derived.' : "";
-    return renderTable(t, `${title} for ${sym2} (${freq}), as filed with the SEC on or before ${day3}`, `Each figure is the latest filing of it by that day; a restatement counts only from the day it was filed.${q}${basis.note}`);
+    return renderTable(t, `${title} for ${sym2} (${freq}), as filed with the SEC on or before ${day3}`, `Each figure is the latest filing of it by that day; a restatement counts only from the day it was filed.${q}${PARTS[kind]}${basis.note}`, true);
   } catch (e) {
     secFailure = e;
   }
@@ -40540,7 +40582,7 @@ var DEBATES = { investment_debate: ["bull", "bear"], risk_debate: ["aggressive",
 var TURNS = new Set(Object.values(DEBATES).flat());
 var MAX_CHARS = 6e4;
 var LABELS = { market: "Market Analyst", sentiment: "Sentiment Analyst", news: "News Analyst", fundamentals: "Fundamentals Analyst", fact_check: "Fact Checker", bull: "Bull Researcher", bear: "Bear Researcher", research_plan: "Research Manager", trader: "Trader", aggressive: "Aggressive Analyst", conservative: "Conservative Analyst", neutral: "Neutral Analyst", decision: "Portfolio Manager" };
-var PARTS = [
+var PARTS2 = [
   ["I. Analyst Team Reports", ["market", "sentiment", "news", "fundamentals", "fact_check"]],
   ["II. Research Team Decision", ["bull", "bear", "research_plan"]],
   ["III. Trading Team Plan", ["trader"]],
@@ -40781,7 +40823,7 @@ ${parts[part - 1].text}`;
 }
 function writeReport(dir, ticker, date5, header) {
   const log = load(dir, ticker, date5).log, root = folder(dir, ticker, date5);
-  const body = PARTS.flatMap(([heading, secs]) => {
+  const body = PARTS2.flatMap(([heading, secs]) => {
     const written = secs.map((s) => ({ s, texts: log.filter((e) => e.section === s).map((e) => e.text) })).filter((x) => x.texts.length);
     if (!written.length) return [];
     return [`## ${heading}
@@ -42862,7 +42904,7 @@ function deskServer(root = process.cwd(), fetchImpl2, source = root, home) {
   }, async (a) => answer("profile of " + a.symbol, () => companyOverview(a.symbol, a.analysis_date)));
   server.registerTool("get_financial_statement", {
     title: "Financial statement",
-    description: `A balance sheet, income statement or cash flow statement, quarterly or annual, latest periods first, with margins, growth, free cash flow and balance-sheet ratios worked out in rows of their own; statement "all" gives the three, and frequency "both" each quarterly and annual, in one call. For a US filer it is the SEC filing as it stood on the analysis date (a quarter no filing states derived and marked so, per-share figures on the basis of the latest filings across a share split); otherwise Yahoo Finance's, for today only.`,
+    description: `A balance sheet, income statement or cash flow statement, quarterly or annual, latest periods first, with margins, growth, free cash flow and balance-sheet ratios worked out in rows of their own; statement "all" gives the three, and frequency "both" each quarterly and annual, in one call. For a US filer it is the SEC filing as it stood on the analysis date (a quarter no filing states derived and marked so, per-share figures on the basis of the latest filings across a share split), with the parts of current assets (marketable securities, receivables, inventory) and of the financing cash flow (share buybacks, dividends paid, debt issued and repaid, commercial paper, tax paid on employee share awards) where the filings give them, and a part they do not give named as having no figure, never a zero; otherwise Yahoo Finance's, for today only, without those parts.`,
     inputSchema: {
       symbol: symbol3,
       analysis_date: analysis,
