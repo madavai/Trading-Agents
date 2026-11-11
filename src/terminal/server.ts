@@ -43,7 +43,6 @@ import { addWatch, readWatchlist, removeWatch, setFavourite } from './store.js';
 import { nextMarketDay, queueTop, readScreen, SCREEN_MS, screenToday, switchDue, TOP_QUEUED, type Screen } from '../desk/screen.js';
 import { weatherNow, type Weather } from '../desk/weather.js';
 import { dequeue, enqueue, isDepth, QueueRefusal, readQueue, removeListener, ringDoorbell, waitingIn } from '../desk/queue.js';
-import { findClaude } from '../watch/claude.js';
 import { maskEmail } from './guide.js';
 
 export interface Asset { type: string; body: Buffer | string }
@@ -128,9 +127,6 @@ export interface TerminalOptions {
   keyFile?: string;
   /** How long a one-time link stays good (two minutes). */
   claimMs?: number;
-  /** Starts the desk's own listener (`node dist/watch.mjs`) for "Run automatically with Claude Code"; `claude` says
-   *  whether Claude Code is on this computer. Without it the page offers no such switch. */
-  listen?: { start: () => void; claude?: () => boolean };
   /** Where a stock's sector is looked up (Yahoo Finance's profiles, unless the tests say otherwise). */
   sectors?: Sectors;
   /** How often the dashboard looks after the person's switches while it runs, with or without a page open (a minute). */
@@ -139,8 +135,10 @@ export interface TerminalOptions {
   now?: () => Date;
 }
 
-/** The listener the switch starts calls itself this, in its note. */
-const OWN_LISTENER = 'Claude Code';
+/** The desk once had a listener of its own that ran analyses in Claude Code, and it called itself this in its note. It is gone:
+ *  the desk runs analyses only in the app it is running in. One left running from before an update is stopped by taking its
+ *  note away (below), never by starting anything. */
+const RETIRED_LISTENER = 'Claude Code';
 
 const KEY = /^[0-9a-f]{48}$/, CLAIM = /^[0-9a-f]{36}$/;
 
@@ -389,25 +387,7 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
       ringDoorbell(dir, 'press');
       return json(res, 200, { queue: queueOf(dir) });
     }
-    // "Run automatically with Claude Code": the desk's own listener, started and stopped from here, remembered across starts.
-    if (p === '/api/listen' && method === 'POST') {
-      if (!opts.listen) throw new Refused(404, 'not found');
-      const now = listenerOf(dir);
-      if (b.on === false) {
-        if (now && now.listener !== OWN_LISTENER) throw new Refused(409, `${now.listener} is listening, not Claude Code: switch it off there`);
-        savePrefs(dir, { autorun: false });
-        if (now) removeListener(dir);   // the listener ends after the run in hand
-        return json(res, 200, { listener: null });
-      }
-      if (b.on !== true) throw new Refused(400, 'say on or off');
-      if (now) { if (now.listener === OWN_LISTENER) return json(res, 200, { listener: now }); throw new Refused(409, `${now.listener} is already listening: analyses already run by themselves`); }
-      if (!(opts.listen.claude ?? (() => !!findClaude()))()) throw new Refused(400, 'Claude Code is not installed on this computer: install it from claude.com/claude-code, or switch on "Run automatically" in Madav');
-      savePrefs(dir, { autorun: true });
-      opts.listen.start();
-      for (const until = Date.now() + 8_000; Date.now() < until; await new Promise((r) => setTimeout(r, 200))) { const l = listenerOf(dir); if (l) return json(res, 200, { listener: l }); }
-      throw new Refused(502, 'the listener did not start: see desk-data/watcher.log, or start it yourself with node dist/watch.mjs');
-    }
-    if (p === '/api/prefs' && method === 'POST') { delete b.autorun; delete b.market; delete b.morning; delete b.morningFrom; delete b.readCall; return json(res, 200, savePrefs(dir, b)); }   // only their own switches set autorun and morning, only Change… the whole market, only a call served readCall
+    if (p === '/api/prefs' && method === 'POST') { delete b.market; delete b.morning; delete b.morningFrom; delete b.readCall; return json(res, 200, savePrefs(dir, b)); }   // only their own switches set autorun and morning, only the whole-market row's own save the whole market, only a call served readCall
     // The contact email the SEC asks for, from the field in "Get started": checked, kept in the desk's records like the
     // desk tool set_contact_email keeps it, sent to sec.gov alone, and never shown back in full.
     if (p === '/api/contact' && method === 'POST') {
@@ -611,24 +591,17 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
   };
   keep((keys) => { keys[deskId] = { port, key: token }; });
 
-  // "Run automatically with Claude Code" was left on: start the listener again, unless someone already listens.
-  const claudeHere = opts.listen?.claude ?? (() => !!findClaude());
-  if (opts.listen && readPrefs(dir).autorun && !listenerOf(dir) && claudeHere()) {
-    try { opts.listen.start(); } catch { /* the page then says nothing is listening */ }
-  }
+  // The desk's own listener for Claude Code is gone. One still running from before an update would go on starting runs in another
+  // app, so its note, which it keeps for as long as it listens, is taken away: it sees that and stops after the run in hand. (Its
+  // program file is gone too, so it also stops when it next looks at its own code.) Madav's note, under Madav's own name, is left.
+  const retireOldListener = (): void => { if (listenerOf(dir)?.listener === RETIRED_LISTENER) removeListener(dir); };
+  try { retireOldListener(); } catch { /* tried again at the next look */ }
 
-  // While it runs, the dashboard keeps the person's two switches itself, with or without a page open. "Run automatically
-  // with Claude Code" left on: when nothing has listened for five looks in a row (the listener stopped, or Madav, which
-  // it made way for, stopped listening), it starts the listener again, at most once in five looks. "Analyse the top
+  // While it runs, the dashboard keeps the person's morning switch itself, with or without a page open. "Analyse the top
   // three each market morning" on: on a market morning, until the top three went on the list that day, it works out the
   // screen (at most once an hour, as for a page) and puts them on, ringing for whoever listens.
-  let quietLooks = 0;
   const keeper = setInterval(() => {
-    try {
-      if (opts.listen && readPrefs(dir).autorun && !listenerOf(dir)) {
-        if (++quietLooks >= 5 && claudeHere()) { quietLooks = 0; opts.listen.start(); }
-      } else quietLooks = 0;
-    } catch { /* tried again at the next look */ }
+    try { retireOldListener(); } catch { /* tried again at the next look */ }
     try {
       const prefs = readPrefs(dir), now = clock(), day = today(now);
       if (prefs.morning === true && switchDue(dir, day, now, prefs.morningFrom)) void screenNow(day).catch(() => { /* the next look tries again */ });

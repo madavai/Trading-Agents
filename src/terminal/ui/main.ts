@@ -10,8 +10,10 @@ import { GLOSSARY, glossaryGroups, isTerm, means, type TermKey } from './glossar
 import { markdown } from './md.js';
 import { sameFigures, typedNumber, type Asked } from './typed.js';
 import { DEPTH_ORDER, DEPTH_WORDS, depthChoices, retryDepth } from './depth.js';
-import { deskSymbol, isCrypto } from '../../data/symbols.js';
-import type { Quote } from '../quotes.js';
+import { marketOffer, type MarketOffer } from './marketpick.js';
+import { isStale, standing } from './analyses.js';
+import { cryptoBase, deskSymbol, isCrypto } from '../../data/symbols.js';
+import type { Quote, QuoteKind } from '../quotes.js';
 
 const RANGES = ['1M', '3M', '6M', '1Y', '5Y'] as const;
 type Range = (typeof RANGES)[number];
@@ -36,8 +38,14 @@ const S = {
   lost: false,
 };
 
-/** Which page the main column shows: the desk (markets, chart, watchlist, calls, scorecard) or the person's account. */
-let view: 'overview' | 'account' = 'overview';
+/** Which page the main column shows: the desk (markets, chart, watchlist, calls), today's market (the weather and what is worth a
+ *  look, worked out hourly), how the desk is doing (the paper record and the scorecard), the analysis status (what was asked for and
+ *  where each stands) or the person's account. */
+type View = 'overview' | 'account' | 'today' | 'score' | 'analyses';
+const VIEWS: readonly View[] = ['overview', 'account', 'today', 'score', 'analyses'];
+let view: View = 'overview';
+/** The words "Analysis status" as a link that opens that page, wherever a sentence sends the person to it. */
+const STATUS_LINK = '<button class="ta-link" data-act="view" data-view="analyses">Analysis status</button>';
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string): T => document.querySelector<T>(sel)!;
 const isQuote = (q: QuoteResult | undefined | null): q is Quote => !!q && !('error' in q);
@@ -79,10 +87,11 @@ function browserPrefs(): Prefs {
 }
 const RECENT_MAX = 6;
 
-function toast(text: string, kind: 'ok' | 'bad' = 'ok'): void {
+/** `opens`: a page the notice points at, which a press on it opens (as well as putting it away). */
+function toast(text: string, kind: 'ok' | 'bad' = 'ok', opens?: View): void {
   const el = document.createElement('div');
   el.className = `at-toast ${kind}`; el.textContent = text;
-  el.addEventListener('click', () => el.remove());
+  el.addEventListener('click', () => { el.remove(); if (opens) showView(opens); });
   $('#toasts').append(el);
   setTimeout(() => el.classList.add('gone'), 4500);
   setTimeout(() => el.remove(), 5000);
@@ -219,8 +228,8 @@ function renderGuide(): void {
   const a = g.analyse, ask = toAsk(), l = d!.analyses.listener;
   const analyse = guideStep(3, a.done, `Ask the desk to analyse them, ${term('depth', 'shallow')}, and switch on running automatically`,
     `<div class="at-row">${factChip(a.asked > 0, `${a.asked} asked for`)}${factChip(!!a.automatic, a.automatic ? `runs by itself: ${a.automatic}` : 'not running by itself yet')}</div>
-    <p class="at-quiet ta-gwhy">Shallow is the quickest and costs least: each analysis is a full team run on the models of whatever runs it (Madav's own, or your Claude plan with Claude Code). Running automatically means each one you ask for starts by itself, one at a time; they are listed under Analyses you asked for.</p>
-    <div class="at-row">${ask.length ? `<button class="at-btn at-press primary" data-act="guide-ask"${GUIDE.asking ? ' disabled' : ''}><svg class="g"><use href="#i-bot"/></svg><span>${GUIDE.asking ? 'Asking…' : `Ask for your ${ask.length === 1 ? 'pick' : `${ask.length} picks`}, shallow`}</span></button>` : ''}${l ? '' : '<button class="at-btn at-press" data-act="listen-on"><span>Run automatically with Claude Code</span></button>'}</div>
+    <p class="at-quiet ta-gwhy">Shallow is the quickest and costs least: each analysis is a full team run on the models of the app that runs it. Running automatically means each one you ask for starts by itself, one at a time; they are listed under ${STATUS_LINK}.</p>
+    <div class="at-row">${ask.length ? `<button class="at-btn at-press primary" data-act="guide-ask"${GUIDE.asking ? ' disabled' : ''}><svg class="g"><use href="#i-bot"/></svg><span>${GUIDE.asking ? 'Asking…' : `Ask for your ${ask.length === 1 ? 'pick' : `${ask.length} picks`}, shallow`}</span></button>` : ''}</div>
     ${l ? '' : '<p class="at-quiet">Or switch on "Run automatically" in Madav, if you use it.</p>'}`);
 
   const r = g.read, mean = (k: TermKey) => `<div><dt>${esc(GLOSSARY[k].term)}</dt><dd>${esc(GLOSSARY[k].means)}</dd></div>`;
@@ -232,7 +241,7 @@ function renderGuide(): void {
   const paper = guideStep(5, w.done, `Follow them ${term('paper', 'on paper')} for ${esc(w.words)}, then read the ${term('scorecard', 'scorecard')} before deciding about money and Robinhood`,
     `<div class="at-meter${w.done ? ' ok' : ''}"><progress class="at-bar" max="${w.need}" value="${Math.min(w.weeks, w.need)}" aria-label="${w.weeks} of ${w.need} weeks on paper"></progress><b>${Math.min(w.weeks, w.need)} of ${w.need} weeks</b></div>
     <p class="at-quiet ta-gwhy">Paper follows every call with pretend money, against SPY, the fund that copies the ${term('sp500', 'S&P 500')}. A few weeks are noise, not proof: read the scorecard, good or bad, before you decide anything. Connecting Robinhood and switching trading on stay your own decisions.</p>
-    <div class="at-row"><button class="at-btn at-press" data-act="goto" data-to="sec-score"><svg class="g"><use href="#i-target"/></svg><span>Go to the scorecard</span></button></div>`);
+    <div class="at-row"><button class="at-btn at-press" data-act="view" data-view="score"><svg class="g"><use href="#i-target"/></svg><span>Go to the scorecard</span></button></div>`);
 
   const all = g.done === g.of;
   $('#guideSub').textContent = all ? 'All five done. The desk keeps reading and proposing; every decision stays yours.'
@@ -314,16 +323,21 @@ function renderAccount(): void {
   if (r.state === 'none') { lede = "Connect Robinhood to bring your accounts here. Connecting opens Robinhood's own sign-in page in your browser. Until you switch trading on, the dashboard only reads."; actions = connect('Connect Robinhood', true); }
   else if (r.state === 'saved') actions = check('Check the connection', true) + leave;
   else if (r.state === 'connected') {
-    const checked = r.checkedAt ? when(r.checkedAt) : '';
+    // Robinhood's tools sentence folds away under one line, so the card stays short beside the caps; it keeps its place
+    // open when the card is drawn again (a refresh or the trading switch redraws it).
+    const checked = r.checkedAt ? when(r.checkedAt) : '', open = $('#accountCard').querySelector<HTMLDetailsElement>('.ta-more')?.open === true;
     lede = 'The sign-in works and Robinhood answered.';
-    facts = `<p class="at-quiet">${esc(r.message)}${checked ? ` Checked at ${esc(checked)}.` : ''}</p>`;
+    facts = `${checked ? `<p class="at-quiet">Checked at ${esc(checked)}.</p>` : ''}<details class="ta-more"${open ? ' open' : ''}><summary><svg class="g"><use href="#i-chev-right"/></svg><span>What this page can do in Robinhood</span></summary><p class="at-quiet">${esc(r.message)}</p></details>`;
     actions = check('Check again', false) + leave;
   } else if (r.state === 'failed') actions = connect('Connect again', true) + check('Check again', false);
   $('#accountCard').innerHTML = `<div class="at-card-head"><h3>Robinhood</h3><span class="at-chip ${w.chip}">${esc(w.label)}</span></div>
     <p class="at-lede">${esc(lede)}</p>${facts}${actions ? `<div class="at-row">${actions}</div>` : ''}`;
-  const card = $('#tradingCard');
+  // Where Robinhood and trading stand, stacked on the left; the caps in their own card on the right (layout C, 11 Nov 2026).
+  const card = $('#tradingCard'), caps = $('#capsCard');
   card.hidden = !signedIn();
-  card.innerHTML = tradingBlock();
+  card.innerHTML = signedIn() ? switchBlock() : '';
+  caps.innerHTML = signedIn() ? capsBlock() : '';
+  caps.hidden = !caps.innerHTML;
   $('#accountSub').textContent = !signedIn() ? 'Connect Robinhood to show your accounts here.'
     : tradingOn() ? 'Trading is on: an order is placed only from a ticket, on your own Confirm.' : 'Trading is off: the dashboard only reads your accounts.';
 }
@@ -587,16 +601,11 @@ function renderTrading(): void {
   $('#tradeFoot').textContent = on ? 'An order is placed only when you press Confirm on a ticket Robinhood has checked.' : 'This page places no order: trading is switched off.';
 }
 
-/** The trading card's inside: the switch and the caps, the person's alone. */
-function tradingBlock(): string {
-  return signedIn() ? switchBlock() + capsBlock() : '';
-}
-
 /** What the caps apply to, said once: both views of the caps carry it. Each cap is checked on a ticket opened from this
  *  page (desk/ticket.ts check, again in link.ts placeChecked), never on a trade made in the Robinhood app. */
 const CAPS_SCOPE = 'These limits apply to orders you place from this page, not to trades you make in the Robinhood app.';
 
-/** The person's caps and guard rails, kept beside the switch: shown as chips, and changed in fields on their press. Both
+/** The person's caps and guard rails, in their own card beside the switch: shown as chips, and changed in fields on their press. Both
  *  views stand in the same four rows, by what a limit is for: a buy, a buy or a sell, a sell, the whole account (desk/ticket.ts
  *  check: the order, stock, sector and crypto limits are checked on a buy, the orders a day on both, the shortest hold on a sell). */
 const CAPS = { editing: false };
@@ -608,7 +617,7 @@ function capsBlock(): string {
     const field = (id: string, label: string, value: number, whole?: [number, number]) =>
       `<label class="at-field"><span class="at-field-l">${esc(label)}</span><input class="at-input at-box" id="${id}" ${whole ? `type="number" min="${whole[0]}" max="${whole[1]}" step="1" inputmode="numeric"` : 'type="text" inputmode="decimal"'} value="${value}"></label>`;
     const fields = (...xs: string[]) => `<div class="ta-capfields">${xs.join('')}</div>`;
-    return `<div class="at-card-head ta-caps-head"><h3>Your caps</h3></div>
+    return `<div class="at-card-head"><h3>Your caps</h3></div>
     <p class="at-lede">${CAPS_SCOPE} Every ticket is checked against them, and again just before it is sent; a failed check stops the order. Only you can change them, and the agents are blocked from where they are kept.</p>
     <dl class="ta-caps">
       ${capRow('Buys', fields(field('capOrder', 'An order at most, $', c.perOrderUsd), field('capStock', 'One stock, % of the account', c.perStockPercent), field('capSector', 'One sector, % of the account', c.perSectorPercent), field('capCrypto', 'Crypto, % of the account', c.cryptoPercent)), 'The crypto limit only sizes the paper record: orders here are for stocks and funds, never coins.')}
@@ -622,15 +631,14 @@ function capsBlock(): string {
   const chips = (...xs: string[]) => `<div class="at-row">${xs.join('')}</div>`;
   // Each chip points at its own meaning: the most in one stock is a cap, not the size of a position (both 10% as shipped).
   // A whole-market fund counts in no sector (desk/sectors.ts MARKET_FUNDS), QQQ included, so the sector chip says so.
-  return `<div class="at-card-head ta-caps-head"><h3>Your ${term('cap', 'caps')}</h3></div>
+  return `<div class="at-card-head"><h3>Your ${term('cap', 'caps')}</h3><span class="at-card-tail">${rhButton('caps-edit', 'Change the caps…')}</span></div>
     <p class="at-quiet">${CAPS_SCOPE}</p>
     <dl class="ta-caps">
       ${capRow('Buys', chips(chip('cap', `${money(c.perOrderUsd)} an order at most`), chip('cap', `${c.perStockPercent}% of the account in one stock`), chip('sector', `one sector at most ${c.perSectorPercent}%`, ' For this limit a whole-market fund, such as SPY or the Nasdaq 100 fund QQQ, counts in no sector, though QQQ is mostly technology.'), chip('crypto', `crypto at most ${c.cryptoPercent}%`)))}
       ${capRow('Buys and sells', chips(chip('cap', `${c.ordersPerDay} ${c.ordersPerDay === 1 ? 'order' : 'orders'} a day`)))}
       ${capRow('Sells', chips(chip('shortestHold', `a stock bought here is held at least ${c.minHoldDays} trading ${c.minHoldDays === 1 ? 'day' : 'days'}`)))}
       ${capRow('The account', chips(chip('weeklyLoss', `switches itself off after a ${c.weeklyLossPercent}% fall in a week`)))}
-    </dl>
-    <div class="at-row">${rhButton('caps-edit', 'Change the caps…')}</div>`;
+    </dl>`;
 }
 
 /** What the person typed for the caps: numbers, as the desk will check them. */
@@ -904,7 +912,7 @@ function renderCall(): void {
   const label = `<span class="ta-callbar-l">The desk's call</span>`;
   if (isIndex(sym)) { el.innerHTML = `${label}<span class="at-quiet ta-callbar-t">The desk analyses stocks, not ${term('index', 'indices')}.</span>`; return; }
   if (!c) {
-    el.innerHTML = `${label}<span class="at-quiet ta-callbar-t">No call on ${esc(sym)} yet${isOpen(sym) ? ': it is asked for, see Analyses you asked for' : '. Ask the desk to analyse it, above'}.</span>`;
+    el.innerHTML = `${label}<span class="at-quiet ta-callbar-t">No call on ${esc(sym)} yet${isOpen(sym) ? `: it is asked for, see ${STATUS_LINK}` : '. Ask the desk to analyse it, above'}.</span>`;
     return;
   }
   el.innerHTML = `${label}${ratingChip(c.rating)}<span class="at-quiet">${esc(dayText(c.date))}</span>${resultChip(c)}${paperChip(c.ticker, c.date)}
@@ -918,17 +926,22 @@ const itemOf = (sym: string) => S.desk?.queue.find((x) => x.symbol === sym);
 const isOpen = (sym: string) => { const x = itemOf(sym); return !!x && isOpenItem(x); };
 const openChip = (sym: string) => (itemOf(sym)?.state === 'running' ? '<span class="at-chip accent">being analysed</span>' : '<span class="at-chip">waiting to be analysed</span>');
 
-/** Each stock asked for, where it stands, and who runs them: a listener (Madav, Claude Code), or nobody yet. */
+/** Each stock asked for, where it stands, and who runs them: a listener (Madav), or nobody yet. */
 function renderAnalyses(): void {
   const d = S.desk;
   if (!d) return;
   const q = d.queue, l = d.analyses.listener, waiting = q.filter((x) => x.state === 'waiting').length, running = q.some((x) => x.state === 'running');
+  // Beside the name in the side list: how many are waiting or being analysed (nothing when none), and a mark when any has failed.
+  const { open, failed } = standing(q);
+  $('#analysesCount').innerHTML = `${open ? `<span title="${open} waiting or being analysed">${open}</span>` : ''}${failed ? `${open ? ' ' : ''}<span class="at-dot bad" role="img" aria-label="${failed} failed" title="${failed} failed"></span>` : ''}`;
+  // Old finished rows clear themselves from this view alone (the desk's own list is not changed, and ✕ still takes one off it): a
+  // finished one whose stock has a newer call in the journal, or that finished more than a week ago. Waiting, running and failed rows always show.
+  const listed = q.filter((x) => !isStale(x, d.calls)), cleared = q.length - listed.length;
   $('#analysesSub').textContent = l
     ? `Runs by itself: ${l.listener} is listening on this computer${l.lastRun ? ` · last run ${l.lastRun.startOnly ? 'started ' : ''}${when(l.lastRun.at)}: ${l.lastRun.result.replace(/[\s.]+$/, '')}` : ''}. One stock at a time, at most ${d.analyses.perRun} a run.`
-    : 'Nothing is listening, so analyses wait here. Switch on "Run automatically" in Madav, or run them with Claude Code on this computer, or ask the desk to "analyse what is waiting" in a chat.';
+    : 'Nothing is listening, so analyses wait here. Switch on "Run automatically" in Madav, or ask the desk to "analyse what is waiting" in a chat.';
   const press = (act: string, words: string, primary = false) => `<button class="at-btn at-press${primary ? ' primary' : ''}" data-act="${act}">${esc(words)}</button>`;
-  $('#analysesDo').innerHTML = (l && waiting && !running ? press('q-run', 'Run now') : '')
-    + (!l ? press('listen-on', 'Run automatically with Claude Code', waiting > 0) : l.listener === 'Claude Code' ? press('listen-off', 'Stop running automatically') : '');
+  $('#analysesDo').innerHTML = l && waiting && !running ? press('q-run', 'Run now') : '';   // it rings for whichever app listens; the desk starts no run of its own
   const stands = (x: QueueView): string => {
     if (x.state === 'running') return `<span class="at-chip accent">Being analysed</span> <span class="at-quiet">${esc(x.progress ?? 'starting')}</span>`;
     if (x.state === 'waiting') return `<span class="at-chip">Waiting</span>${l ? '' : ' <span class="at-quiet">for a run to start</span>'}`;
@@ -942,8 +955,9 @@ function renderAnalyses(): void {
     if (x.state === 'failed') return `<span class="at-row"><button class="at-btn at-press" data-act="q-retry" data-symbol="${esc(x.symbol)}">Retry</button>${off}</span>`;
     return `<span class="at-row">${off}</span>`;
   };
-  const rows = q.map((x) => `<tr><td><b>${esc(x.symbol)}</b></td><td>${esc(x.depth ? DEPTH_WORDS[x.depth][0] : 'Settings')}</td><td class="wrap">${stands(x)}</td><td class="at-quiet">${esc(dayText(x.requestedAt))}</td><td>${doing(x)}</td></tr>`).join('');
-  $('#analysesTable').innerHTML = `<thead><tr><th>Stock</th><th>${term('depth')}</th><th class="wrap">Where it stands</th><th>Asked</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="ta-empty">Nothing asked for yet. Press the robot beside a stock to ask the desk to analyse it.</td></tr>'}</tbody>`;
+  const rows = listed.map((x) => `<tr><td><b>${esc(x.symbol)}</b></td><td>${esc(x.depth ? DEPTH_WORDS[x.depth][0] : 'Settings')}</td><td class="wrap">${stands(x)}</td><td class="at-quiet">${esc(dayText(x.requestedAt))}</td><td>${doing(x)}</td></tr>`).join('');
+  $('#analysesTable').innerHTML = `<thead><tr><th>Stock</th><th>${term('depth')}</th><th class="wrap">Where it stands</th><th>Asked</th><th></th></tr></thead><tbody>${rows || `<tr><td colspan="5" class="ta-empty">${cleared ? 'Nothing is waiting or running.' : 'Nothing asked for yet.'} Press the robot beside a stock to ask the desk to analyse it.</td></tr>`}</tbody>`;
+  $('#analysesHidden').textContent = cleared ? `${cleared} older finished ${cleared === 1 ? 'analysis is' : 'analyses are'} not shown (a newer call on the stock, or finished over 7 days ago). Every call stays in The desk's calls.` : '';
 }
 
 /** A stock that finished since the page last looked: a notice, so the person hears of it wherever they are on the page. */
@@ -1049,58 +1063,74 @@ function renderWatch(): void {
 }
 
 // ---------- start here: the world in tiers, broadest first ----------
-/** The whole-market funds are being changed: the field stays as typed while the page refreshes around it. */
-const MK = { editing: false };
+/** The whole-market row is being saved: a second press waits, since each save sends the whole list as the page last read it. */
+const MK = { saving: false };
 const EMPTY: Partial<Record<Tier, string>> = {
-  market: 'You chose no whole-market funds. Press Change… to add one, such as SPY.',
+  market: 'The whole market is empty. Search a fund in the box at the top, such as SPY, and press Show in The whole market.',
   names: 'No single names on your watchlist yet: search a company above to add one. Bitcoin and Ether can be watched too, on paper only.',
 };
 
-/** One tile: its name in plain words, what it holds, today's move, the desk's latest call, and the robot. */
-function tierTile(i: TierItem): string {
-  const q = quoteOf(i.symbol);
-  const call = i.call ? `${ratingChip(i.call.rating)}<span class="at-quiet">${esc(dayText(i.call.date))}</span>` : `<span class="at-quiet" title="${esc(means('call'))}">no call yet</span>`;
+/** What a badge is shaded by. With the price answer in, Yahoo's own word for it (the quote's kind: a company, a fund or a
+ *  coin; an index or anything else says none), never a guess. Without a price (not asked yet, or it failed), a tile in "The
+ *  whole market" or "Sectors" is a fund, as its row says, and anything else has no kind. */
+type Kind = QuoteKind | '';
+const kindOf = (sym: string, tier?: Tier): Kind => {
+  const q = quoteOf(sym);
+  if (q) return q.kind ?? '';
+  const at = tier ?? S.desk?.startHere.find((t) => (t.tier === 'market' || t.tier === 'sectors') && t.items.some((i) => i.symbol === sym))?.tier;
+  return at === 'market' || at === 'sectors' ? 'fund' : '';
+};
+/** The letters in a badge: the ticker up to a dash, dot or equals sign (BTC for BTC-USD, BRK for BRK-B), at most four. */
+const badgeLetters = (sym: string): string => (cryptoBase(sym) ?? sym.replace(/^\^/, '').split(/[-.=]/)[0] ?? sym).slice(0, 4).toUpperCase();
+/** The House's logo box with letters, no picture (the page loads none from outside), shaded by kind. */
+const badge = (sym: string, kind: Kind): string => `<span class="at-logo-box sm ta-badge${kind ? ` ${kind}` : ''}"><span class="at-logo fallback">${esc(badgeLetters(sym))}</span></span>`;
+
+/** What a tile no longer writes out, said when it is pointed at: its full name, its ticker and what it holds, the desk's
+ *  latest call with its day, and why it has no order ticket. The chart and the stock page say the same in full. */
+function tileWords(i: TierItem, name: string): string {
+  return [
+    name,
+    `${i.symbol}${i.meaning ? ` · ${i.meaning}` : ''}`,
+    i.call ? `The desk's latest call: ${i.call.rating}, ${dayText(i.call.date)}.` : 'The desk has made no call on it yet.',
+    ...(i.ticket ? [] : [i.paper ? `${means('paper')} ${NOTES.coinOnPaper}` : NOTES.noTicket]),
+  ].join('\n');
+}
+
+/** One tile, in three lines, the same on every tile: its plain name; its code (the badge) and today's move; then the desk's latest
+ *  rating (or "no call") with the robot, + when it is not watched, and ✕ in The whole market, side by side. What leaves the tile is in its hover (tileWords), and a press charts it. A tile in "The
+ *  whole market" also has ✕, which takes it out of that row (never off the watchlist). */
+function tierTile(i: TierItem, tier: Tier): string {
+  const q = quoteOf(i.symbol), name = i.name ?? q?.name ?? i.symbol, words = esc(tileWords(i, name));
+  const call = i.call ? ratingChip(i.call.rating) : `<span class="at-quiet" title="${esc(means('call'))}">no call</span>`;
+  const out = `Take ${i.symbol} out of The whole market`;
   const ask = (isIndex(i.symbol) ? '' : isOpen(i.symbol) ? openChip(i.symbol) : robot(i.symbol))
-    + (i.watched ? '' : `<button class="icon-btn" data-act="watch-add" data-symbol="${esc(i.symbol)}" title="Add ${esc(i.symbol)} to your watchlist" aria-label="Add ${esc(i.symbol)} to your watchlist"><svg class="g"><use href="#i-plus"/></svg></button>`);
-  return `<div class="at-tile at-box ta-tier-tile${i.symbol === S.symbol ? ' on' : ''}">
-    <button class="ta-tier-go" data-act="select" data-symbol="${esc(i.symbol)}" title="Chart ${esc(i.symbol)}">
-      <span class="ta-tier-top"><b class="at-tile-name">${esc(i.name ?? q?.name ?? i.symbol)}</b>${changeChip(q)}</span>
-      <span class="at-tile-sub">${esc(i.symbol)}${i.meaning ? ` · ${esc(i.meaning)}` : ''}</span>
-    </button>
-    <div class="at-tile-foot">${call}${i.ticket ? '' : noTicketChip(i.paper)}<span class="at-tail">${ask}</span></div>
+    + (i.watched ? '' : `<button class="icon-btn" data-act="watch-add" data-symbol="${esc(i.symbol)}" title="Add ${esc(i.symbol)} to your watchlist" aria-label="Add ${esc(i.symbol)} to your watchlist"><svg class="g"><use href="#i-plus"/></svg></button>`)
+    + (tier === 'market' ? `<button class="icon-btn" data-act="mk-remove" data-symbol="${esc(i.symbol)}" title="${esc(out)}" aria-label="${esc(out)}"><svg class="g"><use href="#i-x"/></svg></button>` : '');
+  return `<div class="at-tile at-box ta-tier-tile${i.symbol === S.symbol ? ' on' : ''}" title="${words}">
+    <button class="ta-tier-go" data-act="select" data-symbol="${esc(i.symbol)}" title="${words}"><b class="at-tile-name">${esc(name)}</b></button>
+    <div class="ta-tile-row"><span class="ta-tile-id">${badge(i.symbol, kindOf(i.symbol, tier))}${changeChip(q)}</span><span class="ta-tile-rate">${call}</span><span class="at-tail">${ask}</span></div>
   </div>`;
 }
 
-function marketEditor(): string {
-  const m = S.desk!.market;
-  return `<div class="at-row">
-    <label class="at-field ta-grow"><span class="at-field-l">Up to ${m.max} broad funds, by ticker, separated by commas</span><input class="at-input at-box" id="mkInput" type="text" value="${esc(m.symbols.join(', '))}" maxlength="160" spellcheck="false" autocomplete="off"></label>
-    <button class="at-btn at-press primary" data-act="mk-save">Save</button><button class="at-btn at-press" data-act="mk-cancel">Cancel</button>${m.asShipped ? '' : `<button class="at-btn at-press" data-act="mk-shipped">Put back ${esc(listWords(m.shipped))}</button>`}
-  </div><p class="at-quiet">Each is checked with Yahoo Finance before it is kept. Sector funds and crypto have tiers of their own.</p>`;
-}
-
-function tierBlock(t: TierView): string {
-  const change = t.tier === 'market' && !MK.editing ? '<button class="at-btn at-press" data-act="mk-edit" title="Choose the broad funds this tier shows">Change…</button>' : '';
+function tierBlock(t: TierView, market: DeskState['market']): string {
+  // The row is changed from the search box at the top (Show in The whole market) and by ✕ on a tile; this puts the four the desk ships back.
+  const putBack = t.tier === 'market' && !market.asShipped ? `<button class="at-btn at-press" data-act="mk-shipped">Put back ${esc(listWords(market.shipped))}</button>` : '';
   const name = t.tier === 'sectors' ? term('sector', t.name) : t.tier === 'crypto' ? term('crypto', t.name) : t.tier === 'names' ? term('stock', t.name) : esc(t.name);
-  const head = `<div class="ta-tier-head"><h3>${name}</h3><p class="at-quiet">${esc(t.meaning)}</p>${change}</div>`;
-  const body = t.items.length ? `<div class="at-deck ta-tier-deck">${t.items.map(tierTile).join('')}</div>` : `<p class="at-quiet">${esc(EMPTY[t.tier] ?? '')}</p>`;
+  const head = `<div class="ta-tier-head"><h3>${name}</h3><p class="at-quiet">${esc(t.meaning)}</p>${putBack}</div>`;
+  const body = t.items.length ? `<div class="at-deck ta-tier-deck">${t.items.map((i) => tierTile(i, t.tier)).join('')}</div>` : `<p class="at-quiet">${esc(EMPTY[t.tier] ?? '')}</p>`;
+  const how = t.tier === 'market' && t.items.length ? '<p class="at-quiet">✕ takes a fund out of this row. To add one, search for it in the box at the top and press Show in The whole market.</p>' : '';
   const more = t.more ? `<div class="at-row"><button class="at-btn at-press" data-act="goto" data-to="sec-watch">${t.more} more on your watchlist</button></div>` : '';
-  return `<div class="ta-tier">${head}${t.tier === 'market' && MK.editing ? marketEditor() : ''}${body}${more}</div>`;
+  return `<div class="ta-tier">${head}${body}${how}${more}</div>`;
 }
 
 function renderStart(): void {
   const d = S.desk, el = $('#startHere');
   if (!d) { el.innerHTML = '<p class="at-quiet">Reading the desk\'s files.</p>'; return; }
-  // What is being typed in the whole-market field survives the refresh around it.
-  const typing = document.getElementById('mkInput') as HTMLInputElement | null;
-  const kept = typing ? { value: typing.value, focus: document.activeElement === typing, from: typing.selectionStart, to: typing.selectionEnd } : null;
-  el.innerHTML = d.startHere.map(tierBlock).join('')
-    + `<p class="at-honest">${term('today')} is the change over the latest trading day, from the close before it, with the day named (Fri) when it was not today; a dash is a price Yahoo Finance did not give. Each ${term('call', 'call')} is the desk's rating, from Buy to Sell: Buy and Overweight lean towards owning it, Hold keeps what is held, Underweight and Sell lean against it, and pointing at a rating says what its ticket does. A ${term('fund', 'fund')} holds many companies at once; + adds one to your watchlist. Nothing here is investment advice.</p>`;
-  const field = document.getElementById('mkInput') as HTMLInputElement | null;
-  if (kept && field) { field.value = kept.value; if (kept.focus) { field.focus(); field.setSelectionRange(kept.from, kept.to); } }
+  el.innerHTML = d.startHere.map((t) => tierBlock(t, d.market)).join('')
+    + `<p class="at-honest">${term('today')} is the change over the latest trading day; a dash is a price Yahoo Finance did not give. Each ${term('call', 'call')} is the desk's rating, Buy to Sell; a ${term('fund', 'fund')} holds many companies at once. Nothing here is investment advice.</p>`;
 }
 
-// ---------- this morning: the market weather, and what is worth a look today ----------
+// ---------- today's market: the market weather, and what is worth a look today ----------
 // Both are worked out by the desk from figures, at most once an hour; the page asks when it opens and every hour after.
 /** `known`: whether the morning switch is on has been read (with the remembered choices, or the screen's answer). */
 const MORNING = { weather: null as Weather | null, weatherFailed: '', screen: null as Screen | null, screenFailed: '', on: false, known: false, top: 3, from: '' };
@@ -1123,7 +1153,7 @@ function lookRow(p: Worth): string {
   const it = tierItem(p.symbol), name = it?.name ?? quoteOf(p.symbol)?.name ?? p.symbol;
   const move = p.movePct === null ? '<span class="at-chip">—</span>' : `<span class="at-chip ${tone(p.movePct)}" title="${p.live ? `The move on ${esc(dayText(p.session))} as read before its close was final, from the close before` : `The move on ${esc(dayText(p.session))}, from the close before`}">${pct(p.movePct)}</span>`;
   return `<div class="ta-look">
-    <button class="ta-look-go" data-act="select" data-symbol="${esc(p.symbol)}" title="Chart ${esc(p.symbol)}"><span class="ta-tier-top"><b class="at-tile-name">${esc(name)}</b>${move}</span><span class="at-tile-sub">${esc(p.symbol)} · ${esc(p.why)}</span></button>
+    <button class="ta-look-go" data-act="select" data-symbol="${esc(p.symbol)}" title="Chart ${esc(p.symbol)}"><span class="ta-tier-top">${badge(p.symbol, kindOf(p.symbol))}<b class="at-tile-name">${esc(name)}</b>${move}</span><span class="at-tile-sub">${esc(p.symbol)} · ${esc(p.why)}</span></button>
     <span class="at-tail">${isOpen(p.symbol) ? openChip(p.symbol) : robot(p.symbol)}</span></div>`;
 }
 
@@ -1132,7 +1162,7 @@ function renderLook(): void {
   const head = `<div class="at-card-head"><h3>Worth a look today</h3>${s ? `<span class="at-chip" title="How many funds and stocks were looked at">${s.picks.length} of ${s.looked}</span>` : ''}</div>`;
   // No switch is drawn until the page knows whether it is on: one drawn "off" meanwhile would be pressed to turn it on.
   const sw = !MORNING.known ? `<p class="at-quiet">${MORNING.screenFailed ? 'Whether' : 'Reading whether'} "Analyse the top ${MORNING.top} each market morning" is on${MORNING.screenFailed ? ' could not be read just now' : ''}.</p>` : `<button class="at-toggle" data-act="morning-switch" role="switch" aria-checked="${MORNING.on}"><span class="at-switch${MORNING.on ? ' on' : ''}"></span><span>Analyse the top ${MORNING.top} each market morning</span></button>
-    <p class="at-quiet">${MORNING.on ? `On${MORNING.from ? `, from ${esc(dayText(MORNING.from))}` : ''}: each market morning (before noon in New York), the top ${MORNING.top} not already called that day go on the waiting list at shallow depth, once. Each analysis is a full team run on the models of whatever runs it (Madav's own, or your Claude plan with Claude Code).` : `Off as shipped. When on, it starts the next market morning: then the top ${MORNING.top} go on the waiting list at shallow depth once each market morning, and run when something is listening. Switching it on puts nothing on the list at once.`}</p>`;
+    <p class="at-quiet">${MORNING.on ? `On${MORNING.from ? `, from ${esc(dayText(MORNING.from))}` : ''}: each market morning (before noon in New York), the top ${MORNING.top} not already called that day go on the waiting list at shallow depth, once. Each analysis is a full team run on the models of the app that runs it.` : `Off as shipped. When on, it starts the next market morning: then the top ${MORNING.top} go on the waiting list at shallow depth once each market morning, and run when something is listening. Switching it on puts nothing on the list at once.`}</p>`;
   if (!s) { el.innerHTML = `${head}<p class="at-quiet">${esc(MORNING.screenFailed || "Looking over the whole market, the sectors and your names: the first look of the day takes a minute.")}</p>${sw}`; return; }
   const list = s.picks.length ? `<div class="ta-looks">${s.picks.map(lookRow).join('')}</div>`
     : `<p class="at-lede">Nothing stood out among the ${s.looked} looked at: no move of 3% or more, no volume twice its usual, no 52-week high or low, no cross of an average${!s.news?.read ? '' : s.news.unread.length ? ', and no news today about your other companies or coins' : ', and no news today about your companies or coins'}.</p>`;
@@ -1156,15 +1186,20 @@ async function loadMorning(): Promise<void> {
   renderMorning();
 }
 
-/** Keeps the whole-market funds the person typed, once the desk has checked each one's price. */
+/** Keeps the whole-market row as the person changed it (a fund added from the search list, one taken out, the four put
+ *  back), once the desk has checked each one's price. Each save sends the whole row as the page last read it, so a press
+ *  made while one is being saved waits to be pressed again. */
 async function saveMarketList(symbols: string[]): Promise<void> {
-  await run(async () => {
-    const { market } = await api.setMarket(symbols);
-    MK.editing = false;
-    await refreshState();
-    void refreshQuotes();
-    toast(market.symbols.length ? `The whole market now shows ${listWords(market.symbols)}.` : 'The whole market shows no funds now.');
-  });
+  if (MK.saving) { toast('The whole market is still being saved. Press again in a moment.', 'bad'); return; }
+  MK.saving = true;
+  try {
+    await run(async () => {
+      const { market } = await api.setMarket(symbols);
+      await refreshState();
+      void refreshQuotes();
+      toast(market.symbols.length ? `The whole market now shows ${listWords(market.symbols)}.` : 'The whole market shows no funds now.');
+    });
+  } finally { MK.saving = false; }
 }
 
 function renderCalls(): void {
@@ -1242,6 +1277,8 @@ function renderScore(): void {
   if (!d) return;
   renderPaper();
   const r = d.record.summary, pctOf = (v: number) => pct(v * 100, 1);
+  // the page says in words that it runs by itself, from what the desk holds: what a call is followed against and the days it is graded over
+  $('#scoreIntro').textContent = `It runs by itself: each call the desk records is followed with pretend money, at the first close after its day and sized as its order ticket would size it, and compared with just holding ${fundWords(d.desk.benchmark)}. The scorecard grades each call once, over its first ${d.desk.holdingDays} market days, and nothing here needs pressing, apart from the paper money you start with.`;
   $('#scoreSub').textContent = `${r.resolved} scored · ${r.pending} waiting${r.unscored ? ` · ${r.unscored} unreadable` : ''}`;
   const names = [...RATINGS.filter((x) => r.byRating[x]), ...Object.keys(r.byRating).filter((x) => !RATINGS.includes(x))];
   const grid = names.length
@@ -1351,18 +1388,28 @@ function renderAll(): void {
   renderSub(); renderGuide(); renderFavs(); renderAccount(); renderToday(); renderStart(); renderMorning(); renderControls(); renderHero(); renderCall(); renderStock(); renderAnalyses(); renderWatch(); renderCalls(); renderScore();
 }
 
-/** Shows the desk or the account page; the side list marks where the person is. */
-function showView(v: 'overview' | 'account', save = true): void {
+/** Shows the desk, today's market, how the desk is doing or the account page; the side list marks where the person is. */
+function showView(v: View, save = true): void {
   const was = view;
   view = v;
   if (save) remember({ view: v });
   $('#view-overview').hidden = v !== 'overview';
+  $('#view-today').hidden = v !== 'today';
+  $('#view-score').hidden = v !== 'score';
+  $('#view-analyses').hidden = v !== 'analyses';
   $('#view-account').hidden = v !== 'account';
-  const nav = $('#navOverview');
-  if (v === 'overview') nav.setAttribute('aria-current', 'page'); else nav.removeAttribute('aria-current');
+  for (const [id, page] of [['#navOverview', 'overview'], ['#navToday', 'today'], ['#railToday', 'today'], ['#navScore', 'score'], ['#railScore', 'score'], ['#navAnalyses', 'analyses'], ['#railAnalyses', 'analyses']] as const) {
+    const nav = $(id);
+    if (v === page) nav.setAttribute('aria-current', 'page'); else nav.removeAttribute('aria-current');
+  }
+  // the folded rail's icons have no mark of their own for the current page
+  $('#railToday').classList.toggle('on', v === 'today');
+  $('#railScore').classList.toggle('on', v === 'score');
+  $('#railAnalyses').classList.toggle('on', v === 'analyses');
   renderSideAccount();
   if (was !== v) $('#page').scrollTo({ top: 0 });
   if (v === 'account' && signedIn() && A.chosen.length && !A.snapshot && !A.reading) void readAccounts();
+  if (v === 'score') renderPaper();   // its chart is drawn to the width of the page it is on, which a hidden page has not got (nothing is fetched)
 }
 
 /** Whether a ticket can be opened: Robinhood connected and the Agentic account shown. Otherwise the account page says how. */
@@ -1381,6 +1428,16 @@ function select(sym: string, chosen = true, name = ''): void {
   renderFavs(); renderControls(); renderHero(); renderCall(); renderStock(); renderStart(); renderWatch(); renderMarkets();
   void loadHistory();
   void refreshQuotes();
+}
+
+/** After a press on a tile or a row of the page (Start here, Markets, Worth a look, the watchlist), the chart comes into view
+ *  unless all of it is on screen already. Smooth, but not for a person who asked for less motion. Only a press does this (and one
+ *  on a star in the side list, which first goes back to the Overview from Your account): never the page opening, nor putting
+ *  back the stock last charted. */
+function showChart(): void {
+  const c = $('#sec-chart'), page = $('#page').getBoundingClientRect(), at = c.getBoundingClientRect();
+  if (at.top >= page.top && at.bottom <= page.bottom) return;
+  c.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
 }
 
 /** The recent stocks with this one first: its name as given, else as last known. */
@@ -1462,7 +1519,7 @@ function renderAsk(): void {
     <p class="at-lede">The desk's thirteen agents read ${reads}, check the facts, argue both sides, and record a call you can read and decide on. It never places an order${coin ? `: ${it?.paper === false ? 'among crypto, the desk follows only Bitcoin and Ether on paper' : 'a coin is followed on paper only'}` : ''}.</p>
     <div class="at-seg" role="radiogroup" aria-label="How deep">${choices.map((c) => `<button class="at-seg-b${c === chosen ? ' on' : ''}" role="radio" aria-checked="${c === chosen}" data-act="ask-depth" data-depth="${c.depth ?? ''}">${esc(c.label)}</button>`).join('')}</div>
     <p class="at-quiet">${term('depth')} · ${esc(chosen.means)}</p>
-    <p class="at-honest">${l ? `It runs by itself: ${esc(l.listener)} is listening.` : 'Nothing is listening on this computer yet, so it waits until a run starts: see Analyses you asked for.'}</p>
+    <p class="at-honest">${l ? `It runs by itself: ${esc(l.listener)} is listening.` : `Nothing is listening on this computer yet, so it waits until a run starts: see ${STATUS_LINK}.`}</p>
     <div class="at-pop-do"><button class="at-btn at-press" data-act="ask-cancel">Cancel</button><button class="at-btn at-press primary" data-act="ask-yes"><svg class="g"><use href="#i-bot"/></svg><span>Ask the desk</span></button></div>`;
 }
 async function askNow(): Promise<void> {
@@ -1471,7 +1528,7 @@ async function askNow(): Promise<void> {
     await api.enqueue(sym, ASK.depth ?? undefined);
     $<HTMLDialogElement>('#askDialog').close();
     await refreshState();
-    toast(l ? `${sym} is asked for: it runs by itself, and its call appears here.` : `${sym} is waiting. Nothing is listening yet: see Analyses you asked for.`);
+    toast(l ? `${sym} is asked for: it runs by itself, and its call appears here.` : `${sym} is waiting. Nothing is listening yet: see Analysis status.`, 'ok', 'analyses');
   });
 }
 
@@ -1493,7 +1550,7 @@ document.addEventListener('click', (e) => {
   const sym = el.dataset.symbol ?? '';
   switch (el.dataset.act) {
     case 'goto': { showView('overview'); const to = el.dataset.to === 'top' ? $('#page') : document.getElementById(el.dataset.to ?? ''); to?.scrollIntoView({ behavior: 'smooth', block: 'start' }); break; }
-    case 'view': showView(el.dataset.view === 'account' ? 'account' : 'overview'); break;
+    case 'view': { const dlg = $<HTMLDialogElement>('#askDialog'); if (dlg.open) dlg.close(); showView(VIEWS.find((v) => v === el.dataset.view) ?? 'overview'); break; }   // a link inside the Analyse box leaves it
     case 'side': setSide(el.dataset.side === 'fold'); break;
     case 'theme': setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'); break;
     case 'kind': S.kind = el.dataset.kind === 'candles' ? 'candles' : 'area'; remember({ kind: S.kind }); renderControls(); renderHero(); break;
@@ -1512,7 +1569,14 @@ document.addEventListener('click', (e) => {
       life.stopped = true; $<HTMLDialogElement>('#stopDialog').close(); renderSub();
       toast('The dashboard is stopped. Ask the team to open it again any time.');
     }); break;
-    case 'select': select(sym); break;
+    case 'select': {
+      // A press on the page or on a star in the side list shows the chart, from Your account too (which has none: the Overview comes first).
+      // Asked before charting, which draws the tiles again, so the pressed one is gone.
+      const shows = !!el.closest('#page, #sideOpen');
+      select(sym);
+      if (shows) { if (view !== 'overview') showView('overview'); showChart(); }
+      break;
+    }
     case 'guide-open': remember({ guide: 'open' }); showView('overview'); renderGuide(); $('#sec-guide').scrollIntoView({ behavior: 'smooth', block: 'start' }); break;
     case 'guide-away': remember({ guide: 'away' }); renderGuide(); toast('Get started is put away. The side list opens it again any time.'); break;
     case 'gloss-open': openGlossary(); break;
@@ -1535,9 +1599,8 @@ document.addEventListener('click', (e) => {
       toast(!r.morning.on ? 'Switched off: nothing goes on the waiting list by itself.'
         : `Switched on: nothing is queued now. From ${r.morning.from ? dayText(r.morning.from) : 'the next market morning'}, the top ${r.morning.top} go on the waiting list at shallow depth each market morning.`);
     }); break;
-    case 'mk-edit': MK.editing = true; renderStart(); document.getElementById('mkInput')?.focus(); break;
-    case 'mk-cancel': MK.editing = false; renderStart(); break;
-    case 'mk-save': void saveMarketList($<HTMLInputElement>('#mkInput').value.split(/[\s,]+/).filter(Boolean)); break;
+    case 'find-market': { const r = findRows()[Number(el.dataset.i)]; if (r) showInMarket(r); break; }
+    case 'mk-remove': if (S.desk) void saveMarketList(S.desk.market.symbols.filter((s) => s !== sym)); break;
     case 'mk-shipped': void saveMarketList([...(S.desk?.market.shipped ?? [])]); break;
     case 'fav': void run(async () => { const on = !S.desk?.watchlist.find((w) => w.symbol === sym)?.favourite; await api.favourite(sym, on); await refreshState(); }); break;
     case 'remove': void run(async () => { await api.removeWatch(sym); await refreshState(); toast(`${sym} is off the watchlist.`); }); break;
@@ -1548,8 +1611,6 @@ document.addEventListener('click', (e) => {
     case 'ask-yes': void askNow(); break;
     case 'q-retry': { const x = S.desk?.queue.find((i) => i.symbol === sym); void run(async () => { await api.enqueue(sym, retryDepth(x)); await refreshState(); toast(`${sym} is asked for again.`); }); break; }
     case 'q-run': void run(async () => { await api.runQueue(); await refreshState(); toast('Asked for a run of what is waiting.'); }); break;
-    case 'listen-on': void run(async () => { await api.listen(true); await refreshState(); toast('Analyses you ask for now run by themselves, with Claude Code on this computer.'); }); break;
-    case 'listen-off': void run(async () => { await api.listen(false); await refreshState(); toast('Analyses no longer run by themselves. A run in progress finishes first.'); }); break;
     case 'open-call': void openCall(sym, el.dataset.date ?? ''); break;
     case 'decide': if (dlg.open) dlg.close(); if (ready()) void openTicket(sym, el.dataset.date ?? ''); break;
     case 'trade': if (dlg.open) dlg.close(); if (ready()) void openTicket(sym, '', el.dataset.side === 'sell' ? 'sell' : 'buy'); break;
@@ -1585,13 +1646,10 @@ void loadTrading(); }); break;
 });
 
 document.addEventListener('input', (e) => { const id = (e.target as Element).id; if (id === 'tkQty' || id === 'tkLimit') ticketEdited(); });
-// In the whole-market field, Enter saves and Esc puts it away; in the email field, Enter saves.
+// In the email field, Enter saves.
 document.addEventListener('keydown', (e) => {
   const t = e.target as HTMLInputElement;
-  if (t.id === 'contactInput' && e.key === 'Enter') { e.preventDefault(); void saveContact(); return; }
-  if (t.id !== 'mkInput') return;
-  if (e.key === 'Enter') { e.preventDefault(); void saveMarketList(t.value.split(/[\s,]+/).filter(Boolean)); }
-  else if (e.key === 'Escape') { e.preventDefault(); MK.editing = false; renderStart(); }
+  if (t.id === 'contactInput' && e.key === 'Enter') { e.preventDefault(); void saveContact(); }
 });
 
 // ---------- finding a stock ----------
@@ -1609,14 +1667,35 @@ const findInput = $<HTMLInputElement>('#addInput');
 
 const findRows = (): FindRow[] => (F.mode === 'recent' ? P.recent ?? [] : F.mode === 'matches' || F.mode === 'loading' ? F.matches : []);
 
+/** What a match may do for "The whole market" row (ui/marketpick.ts), with the sector funds as the desk lists them. */
+function rowOffer(r: FindRow): MarketOffer {
+  const d = S.desk;
+  if (!d) return 'none';
+  return marketOffer(r, d.market.symbols, new Set(d.startHere.find((t) => t.tier === 'sectors')?.items.map((i) => i.symbol)), d.market.max);
+}
+const marketFull = (max: number): string => `The whole market already holds ${max} funds: take one out to make room.`;
+
+/** A fund the row can take gets two presses under its name: Add to watchlist (the same as pressing the row, left out when
+ *  it is watched already) and Show in The whole market; a fund already in the row says so, and a full row says it is full. */
+function rowActions(r: FindRow, i: number, watched: boolean): string {
+  const offer = rowOffer(r);
+  if (offer === 'none') return '';
+  const add = watched ? '' : `<button type="button" class="at-btn at-press" data-act="find-pick" data-i="${i}">Add to watchlist</button>`;
+  const market = offer === 'show' ? `<button type="button" class="at-btn at-press" data-act="find-market" data-i="${i}">Show in The whole market</button>`
+    : offer === 'in' ? '<span class="at-chip">In The whole market</span>'
+    : `<span class="at-quiet">${esc(marketFull(S.desk!.market.max))}</span>`;
+  return `<span class="ta-opt-do">${add}${market}</span>`;
+}
+
 function findRow(r: FindRow, i: number): string {
-  const watched = S.desk?.watchlist.some((w) => w.symbol === r.symbol), call = latestCall(r.symbol);
+  const watched = !!S.desk?.watchlist.some((w) => w.symbol === r.symbol), call = latestCall(r.symbol);
   const where = [r.exchange, r.kind].filter(Boolean).join(' · ');
   const name = r.name && r.name !== r.symbol ? r.name : '';
   return `<li class="ta-opt${i === F.active ? ' on' : ''}" role="option" id="find-${i}" aria-selected="${i === F.active}" data-act="find-pick" data-i="${i}">
     <b class="ta-opt-sym">${esc(r.symbol)}</b>
     <span class="ta-opt-name"><span>${esc(name)}</span>${where ? `<small>${esc(where)}</small>` : ''}</span>
     <span class="ta-opt-tags">${call ? ratingChip(call.rating) : ''}${watched ? '<span class="at-chip">Watched</span>' : ''}</span>
+    ${rowActions(r, i, watched)}
   </li>`;
 }
 
@@ -1634,7 +1713,8 @@ function renderFind(): void {
   $('#findList').innerHTML = rows.map(findRow).join('');
   $('#findFoot').textContent = F.mode === 'failed' ? `Yahoo Finance's search did not answer. Press Enter to add “${F.query}” as a ticker.`
     : F.mode === 'matches' && !rows.length ? `Nothing matches “${F.query}” at Yahoo Finance. Check the spelling, or type the ticker.`
-    : F.mode === 'recent' ? 'The stocks you looked at last. Type to search.' : 'From Yahoo Finance · ↑ ↓ to move · Enter to add · Esc to close';
+    : F.mode === 'recent' ? 'The stocks you looked at last. Type to search.'
+    : `From Yahoo Finance · ↑ ↓ to move · Enter to add${rows[F.active] && rowOffer(rows[F.active]!) === 'show' ? ' to your watchlist · Shift+Enter to show it in The whole market' : ''} · Esc to close`;
   document.getElementById(`find-${F.active}`)?.scrollIntoView({ block: 'nearest' });
 }
 
@@ -1669,6 +1749,21 @@ function pick(r: FindRow): void {
   else { remember({ recent: withRecent(r.symbol, r.name) }); void addStock(r.symbol); }
 }
 
+/** A fund from the list put in "The whole market" row, which keeps it once the desk has checked its price. It is not put on
+ *  the watchlist: that is the other press. Said in words when the row cannot take it (it is in the row, or the row is full). */
+function showInMarket(r: FindRow): void {
+  const d = S.desk, offer = rowOffer(r);
+  if (!d) return;
+  if (offer !== 'show') {
+    if (offer === 'in') toast(`${r.symbol} is already in The whole market.`);
+    else if (offer === 'full') toast(marketFull(d.market.max), 'bad');
+    return;
+  }
+  closeFind(true);
+  findInput.blur();
+  void saveMarketList([...d.market.symbols, r.symbol]);
+}
+
 findInput.addEventListener('input', () => {
   const q = findInput.value.trim();
   if (F.timer) { clearTimeout(F.timer); F.timer = null; }
@@ -1690,7 +1785,7 @@ findInput.addEventListener('keydown', (e) => {
     F.active = e.key === 'ArrowDown' ? (F.active + 1) % n : (F.active - 1 + n) % n;
     renderFind();
   } else if (e.key === 'Escape' && F.mode !== 'closed') { e.preventDefault(); closeFind(); }
-  else if (e.key === 'Enter' && F.active >= 0 && rows[F.active]) { e.preventDefault(); pick(rows[F.active]!); }
+  else if (e.key === 'Enter' && F.active >= 0 && rows[F.active]) { e.preventDefault(); if (e.shiftKey) showInMarket(rows[F.active]!); else pick(rows[F.active]!); }
 });
 // A press on the list must not take the focus from the box first, or the list would close before the press lands.
 $('#findPanel').addEventListener('mousedown', (e) => e.preventDefault());
@@ -1732,7 +1827,7 @@ async function loadPrefs(): Promise<void> {
     else if (Object.values(here).some((v) => v !== undefined)) remember({ ...P });
     try { localStorage.setItem('ta.prefs', JSON.stringify(P)); } catch { /* the page works without it */ }
   } catch { /* this browser's copy stands */ }
-  if (P.view === 'account') showView('account', false);
+  if (P.view && P.view !== 'overview') showView(P.view, false);
 }
 
 let seen = '', build = '';

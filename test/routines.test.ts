@@ -4,9 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { deskDataDir } from '../src/paths.js';
-import { doorbellFile, enqueue, listenerFile, readListener, readQueue, startItem, writeListener } from '../src/desk/queue.js';
-import { RUN_WORDS } from '../src/watch/claude.js';
-import { AlreadyListening, watch, type Watcher } from '../src/watch/watcher.js';
+import { doorbellFile, enqueue, listenerFile, readListener, readQueue, RUN_WORDS, startItem, writeListener } from '../src/desk/queue.js';
 import { listenerOf } from '../src/terminal/state.js';
 
 const repo = process.cwd();
@@ -35,7 +33,7 @@ test("the routines shipped to Madav are complete, the desk's own team's, and lea
     }
   }
   const asked = list.find((r) => r.name === 'analyse-when-asked')!;
-  assert.equal(asked.prompt, RUN_WORDS, "the same words as the desk's own listener for Claude Code");
+  assert.equal(asked.prompt, RUN_WORDS, "the words the desk's playbook for a run is started with");
   assert.equal(asked.watch, posix(path.relative(repo, doorbellFile(deskDataDir(repo)))), 'it watches the doorbell the dashboard rings');
   assert.equal(asked.listener, posix(path.relative(repo, listenerFile(deskDataDir(repo)))), 'and keeps its note where the dashboard reads who listens');
   assert.equal(asked.cron, undefined, 'it runs when asked, not on a clock');
@@ -79,19 +77,4 @@ test("Madav's note is read like the desk's own: who listens, the heartbeat, the 
   put(madav({ lastRun: { at: '2026-10-21T10:32:05.000Z', ended: 'failed', endedAt: '2026-10-21T10:38:00.000Z', result: "Claude's usage limit was reached" } }));
   const nvda = readQueue(dir, now)[0]!;
   assert.deepEqual([nvda.state, nvda.reason], ['failed', "Madav's run ended before this stock was finished: failed: Claude's usage limit was reached"]);
-});
-
-test("the desk's own listener never starts beside Madav's, and makes way when Madav takes over", async (t) => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ta-madav-')), dir = deskDataDir(root);
-  fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(listenerFile(dir), JSON.stringify(madav({ since: new Date().toISOString(), checked: new Date().toISOString() })));
-  let stray: Watcher | undefined;
-  t.after(() => { stray?.stop(); w.stop(); });   // a listener that should not have started is still stopped
-  assert.throws(() => { stray = watch({ dir, listener: 'Claude Code', run: async () => {}, pid: 501, settleMs: 50, pollMs: 10 }); }, AlreadyListening);
-  fs.rmSync(listenerFile(dir));
-  const w = watch({ dir, listener: 'Claude Code', run: async () => {}, pid: 502, settleMs: 50, pollMs: 10 });
-  writeListener(dir, { listener: 'Claude Code', since: new Date().toISOString(), beat: new Date().toISOString(), pid: 502 });
-  fs.writeFileSync(listenerFile(dir), JSON.stringify(madav({ since: new Date().toISOString(), checked: new Date().toISOString() })));
-  assert.equal(await w.done, 'off', "Madav's note in its place: switched off");
-  assert.equal(readListener(dir)!.listener, 'Madav', "and Madav's note is left as it is");
 });

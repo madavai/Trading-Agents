@@ -120,8 +120,6 @@ export const api = {
   dequeue: (symbol: string) => call<{ queue: QueueView[] }>('DELETE', `/api/queue?${q({ symbol })}`),
   /** Rings again for what is waiting (Run now). */
   runQueue: () => call<{ queue: QueueView[] }>('POST', '/api/queue/run', {}),
-  /** "Run automatically with Claude Code": the desk's own listener, on or off. */
-  listen: (on: boolean) => call<{ listener: ListenerView | null }>('POST', '/api/listen', { on }),
   robinhood: () => call<LinkInfo>('GET', '/api/robinhood'),
   connectRobinhood: () => call<LinkInfo>('POST', '/api/robinhood/connect', {}),
   checkRobinhood: () => call<LinkInfo>('POST', '/api/robinhood/check', {}),

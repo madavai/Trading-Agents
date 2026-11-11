@@ -12,7 +12,7 @@ import { Journal } from '../src/desk/journal.js';
 import { saveSection } from '../src/desk/runs.js';
 import { saveContactEmail } from '../src/contact.js';
 import { deskServer } from '../src/tools/server.js';
-import { clearQuotes, parseQuote } from '../src/terminal/quotes.js';
+import { clearQuotes, parseQuote, quote, quoteKind } from '../src/terminal/quotes.js';
 import { clearSearches, parseSearch } from '../src/terminal/search.js';
 import { MAX_RECENT, readPrefs, savePrefs } from '../src/terminal/prefs.js';
 import { scoredBy, scoringNote, scoringShort, summaryOf } from '../src/terminal/state.js';
@@ -233,35 +233,6 @@ test('a call made before a dividend fills on paper at the close the market print
   assert.equal(book.dividendsUsd, Math.round(t.quantity * 0.69 * 100) / 100);
 });
 
-test('"Run automatically with Claude Code": started and stopped from the page, remembered across starts, and never over another listener', async () => {
-  assert.equal((await call(term, 'POST', '/api/listen', { body: { on: true } })).status, 404, 'a dashboard given no way to start it has no switch');
-  let started = 0, claude = true;
-  const own = () => { started++; writeListener(dir(), { listener: 'Claude Code', since: new Date().toISOString(), beat: new Date().toISOString(), pid: 4242 }); };
-  const t = await startTerminal({ root, assets: ASSETS, port: 0, keyFile: KEYS(), listen: { start: own, claude: () => claude } });
-  try {
-    claude = false;
-    assert.match((await call(t, 'POST', '/api/listen', { body: { on: true } })).json().error, /Claude Code is not installed on this computer/);
-    claude = true;
-    assert.equal((await call(t, 'POST', '/api/listen', { body: { on: true } })).json().listener.listener, 'Claude Code');
-    assert.deepEqual([started, readPrefs(dir()).autorun], [1, true]);
-    assert.equal((await call(t, 'GET', '/api/state')).json().analyses.listener.listener, 'Claude Code');
-    assert.equal((await call(t, 'POST', '/api/prefs', { body: { autorun: false, theme: 'light' } })).json().autorun, true, "the page's other choices never change the switch");
-    assert.equal((await call(t, 'POST', '/api/listen', { body: { on: false } })).json().listener, null);
-    assert.deepEqual([fs.existsSync(path.join(dir(), 'listener.json')), readPrefs(dir()).autorun], [false, false], 'off: the note is taken away, and the listener ends after the run in hand');
-    writeListener(dir(), { listener: 'Madav', since: new Date().toISOString(), beat: new Date().toISOString() });
-    assert.match((await call(t, 'POST', '/api/listen', { body: { on: true } })).json().error, /Madav is already listening/);
-    assert.match((await call(t, 'POST', '/api/listen', { body: { on: false } })).json().error, /Madav is listening, not Claude Code: switch it off there/);
-    writeListener(dir(), { listener: 'Madav', since: '2026-10-01T09:00:00Z', beat: '2026-10-01T09:00:00Z' });
-    assert.equal((await call(t, 'GET', '/api/state')).json().analyses.listener, null, 'a listener whose heartbeat stopped is not believed');
-  } finally { await t.close(); }
-  savePrefs(dir(), { autorun: true });
-  started = 0;
-  const again = await startTerminal({ root, assets: ASSETS, port: 0, keyFile: KEYS(), listen: { start: own, claude: () => true } });
-  try { assert.equal(started, 1, 'left on: started again with the dashboard'); } finally { await again.close(); }
-  const third = await startTerminal({ root, assets: ASSETS, port: 0, keyFile: KEYS(), listen: { start: own, claude: () => true } });
-  try { assert.equal(started, 1, 'not twice: someone already listens'); } finally { await third.close(); }
-});
-
 const BUY = '**Rating**: Overweight\n\n**Executive Summary**: Add gradually on a close above 229.\n\n**Investment Thesis**: The trend is up.';
 
 test('the page\'s state is the desk\'s own files: calls, how they turned out, and nothing invented', async () => {
@@ -326,6 +297,31 @@ test('a quote is read from Yahoo\'s answer; what it lacks is left out, never fil
   assert.equal(parseQuote(intraday('BTC-USD', 50, 49, { instrumentType: 'CRYPTOCURRENCY' }), 'BTC-USD', NOW + 7200).open, true);        // a coin never closes
   assert.equal(parseQuote(intraday('X', undefined, 49), 'X', NOW).price, 102);                                                           // falls back to the last point
   assert.throws(() => parseQuote({ chart: { result: null, error: { description: 'No data found' } } }, 'ZZZZ'), /no price for ZZZZ \(No data found\)/);
+});
+
+test('a quote carries what Yahoo says it is (a company, a fund or a coin) and nothing else: an index, a currency, a future, no word, or a failed quote has no kind', async () => {
+  // the mapping: Yahoo's own words, three of them; anything else, in any spelling, is no kind
+  for (const [type, kind] of [['EQUITY', 'company'], ['ETF', 'fund'], ['MUTUALFUND', 'fund'], ['CRYPTOCURRENCY', 'coin']] as const) {
+    assert.equal(quoteKind(type), kind, type);
+    assert.equal(parseQuote(intraday('X', 50, 49, { instrumentType: type }), 'X', NOW).kind, kind, `${type} in a quote`);
+  }
+  for (const type of ['INDEX', 'CURRENCY', 'FUTURE', 'OPTION', 'MONEYMARKET', 'etf', 'Equity', ' ETF', '', 'constructor', 'toString', '__proto__', 5, null, undefined, {}]) {
+    assert.equal(quoteKind(type), undefined, String(type));
+  }
+  // a quote whose answer names no kind, or a kind that is none of the three, has no kind key at all (so nothing is read from its absence either)
+  for (const extra of [{}, { instrumentType: 'INDEX' }, { instrumentType: 'CURRENCY' }, { instrumentType: 'FUTURE' }, { instrumentType: 7 }]) assert.equal('kind' in parseQuote(intraday('X', 50, 49, extra), 'X', NOW), false, JSON.stringify(extra));
+  // the same through the desk's own quote(): a failed quote has none either
+  const kinds = async (symbol: string, type?: string) => {
+    clearQuotes();
+    configure({ fetch: async () => new Response(JSON.stringify(symbol === 'ZZZZ' ? { chart: { result: null, error: { description: 'No data found' } } } : intraday(symbol, 102, 100, type ? { instrumentType: type } : {}))) });
+    return (await quote(symbol) as any).kind;
+  };
+  assert.equal(await kinds('NVDA', 'EQUITY'), 'company');
+  assert.equal(await kinds('SPY', 'ETF'), 'fund');
+  assert.equal(await kinds('BTC-USD', 'CRYPTOCURRENCY'), 'coin');
+  assert.equal(await kinds('^GSPC', 'INDEX'), undefined);
+  assert.equal(await kinds('PLAIN'), undefined, 'no word from Yahoo: no kind');
+  assert.equal(await kinds('ZZZZ'), undefined, 'a quote that failed');
 });
 
 test('prices: markets, quotes and unavailable symbols are told apart, and Yahoo is asked once for a burst', async () => {
@@ -394,6 +390,10 @@ test('what the person chose is remembered in desk-data, each in its own shape, a
   assert.deepEqual(saved, { theme: 'dark', side: 'folded', view: 'account', symbol: 'NVDA', range: '1Y', kind: 'candles', layers: { ma50: false, ma200: true, vol: true }, recent: [{ symbol: 'TSLA', name: 'Tesla, Inc.' }, { symbol: 'AAPL', name: 'AAPL' }] });
   const next = (await call(term, 'POST', '/api/prefs', { body: { theme: 'purple', range: '10Y', side: 'open', layers: { ma50: 'yes' } } })).json();
   assert.deepEqual([next.theme, next.range, next.side, next.layers.ma50], ['dark', '1Y', 'open', false], 'a value it does not know leaves the one before');
+  assert.equal((await call(term, 'POST', '/api/prefs', { body: { view: 'today' } })).json().view, 'today', "Today's market is a page it remembers");
+  assert.equal((await call(term, 'POST', '/api/prefs', { body: { view: 'score' } })).json().view, 'score', '"How the desk is doing" is a page it remembers');
+  assert.equal((await call(term, 'POST', '/api/prefs', { body: { view: 'tomorrow' } })).json().view, 'score', 'a page it does not know leaves the one before');
+  assert.equal((await call(term, 'POST', '/api/prefs', { body: { view: 'account' } })).json().view, 'account');
   const file = JSON.parse(fs.readFileSync(path.join(dir(), 'dashboard.json'), 'utf8'));
   assert.deepEqual(Object.keys(file).sort(), ['kind', 'layers', 'range', 'recent', 'side', 'symbol', 'theme', 'view']);
   const again = await startTerminal({ root, assets: ASSETS, port: 0, keyFile: KEYS() });   // another start, or another browser, finds it as it was left
@@ -424,7 +424,7 @@ test('Start here is in the page\'s state: the whole market, the eleven sectors a
   assert.deepEqual(s.calls.filter((c: any) => c.ticker === 'XLE').map((c: any) => c.ticket), [true]);
 });
 
-test('the whole-market funds are the person\'s to change, each a fund Yahoo prices, checked before it is kept; only Change… sets them', async () => {
+test('the whole-market funds are the person\'s to change, each a fund Yahoo prices, checked before it is kept; only the whole-market row\'s own save sets them', async () => {
   const set = (symbols: unknown, o: Parameters<typeof call>[3] = {}) => call(term, 'POST', '/api/tiers/market', { body: { symbols }, ...o });
   for (const [symbols, status, why] of [
     [['SPY', 'BTC-USD'], 400, /BTC-USD is crypto/], [['XLK'], 400, /XLK is a sector fund/], [['^GSPC'], 400, /cannot be held/], [['../x'], 400, /not a ticker/],

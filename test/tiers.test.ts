@@ -7,6 +7,8 @@ import { ratingMeaning } from '../src/terminal/ui/fmt.js';
 import { GLOSSARY, means, type TermKey } from '../src/terminal/ui/glossary.js';
 import type { WatchItem } from '../src/terminal/store.js';
 import { MARKETS } from '../src/terminal/quotes.js';
+import { parseSearch } from '../src/terminal/search.js';
+import { FUND_KINDS, marketOffer } from '../src/terminal/ui/marketpick.js';
 
 const watch = (symbol: string, favourite = false): WatchItem => ({ symbol, favourite, addedOn: '2026-10-01' });
 
@@ -25,6 +27,33 @@ test('the whole-market list holds funds and stocks only, each once, at most eigh
   assert.equal(cleanMarket(Array.from({ length: 12 }, (_, i) => `F${i}`))!.length, MAX_MARKET);
   assert.deepEqual(cleanMarket([]), [], 'an empty list is the person\'s choice, kept as empty');
   assert.equal(cleanMarket('SPY'), undefined, 'not a list: nothing');
+});
+
+test('the search list offers "Show in The whole market" for exactly the funds the desk\'s own check would keep, and says when it is in the row or the row is full', () => {
+  // The page cannot load marketSymbol, so its rule (ui/marketpick.ts) is held to it here: every kind Yahoo gives, read by the search itself.
+  const sectors = new Set(tiersOf([], SHIPPED_MARKET, []).startHere.find((t) => t.tier === 'sectors')!.items.map((i) => i.symbol));
+  assert.deepEqual([...sectors], Object.keys(SECTOR_FUNDS), 'the page learns the sector funds from the sectors tier the desk sends');
+  assert.deepEqual(FUND_KINDS, ['ETF', 'Fund'], "Yahoo's ETF and mutual fund, as the search names them");
+  const types = ['EQUITY', 'ETF', 'MUTUALFUND', 'INDEX', 'CRYPTOCURRENCY', 'CURRENCY'];
+  const symbols = ['SPY', 'VOO', 'VFIAX', 'VT', 'XLK', 'XLRE', 'AAPL', 'BTC-USD', 'DOGE-USD', '^GSPC', '^TNX', 'EURUSD=X', 'GC=F', 'BRK-B'];
+  // one reading for each kind (the search lists a symbol once)
+  const matches = types.flatMap((quoteType) => parseSearch({ quotes: symbols.map((symbol) => ({ symbol, quoteType, shortname: symbol })) }, 500));
+  assert.ok(matches.length >= symbols.length, 'the search reads them');
+  let offered = 0;
+  for (const m of matches) {
+    let takes = true;
+    try { marketSymbol(m.symbol); } catch { takes = false; }
+    const should: boolean = takes && FUND_KINDS.includes(m.kind);
+    assert.equal(marketOffer(m, [], sectors, MAX_MARKET) !== 'none', should, `${m.symbol} (${m.kind})`);
+    if (should) offered++;
+  }
+  assert.ok(offered >= 8, 'funds such as SPY and VOO are offered, as an ETF and as a fund');
+  const spy = { symbol: 'SPY', kind: 'ETF' };
+  assert.equal(marketOffer(spy, ['QQQ'], sectors, MAX_MARKET), 'show');
+  assert.equal(marketOffer(spy, ['QQQ', 'SPY'], sectors, MAX_MARKET), 'in', 'a fund in the row says so, even in a full row');
+  assert.equal(marketOffer(spy, Array.from({ length: MAX_MARKET }, (_, i) => `F${i}`), sectors, MAX_MARKET), 'full');
+  assert.equal(marketOffer(spy, Array.from({ length: MAX_MARKET - 1 }, (_, i) => `F${i}`), sectors, MAX_MARKET), 'show', 'room for one more');
+  assert.equal(marketOffer({ symbol: 'SPY' }, [], sectors, MAX_MARKET), 'none', 'a match of no known kind (one remembered as recent) is never offered');
 });
 
 test('Start here: the whole market and the eleven sectors always, the person\'s own names starred first, crypto when watched, each with the latest call', () => {

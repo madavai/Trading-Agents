@@ -158,7 +158,7 @@ Each was the owner's, or agreed with them. Change one only on their word.
   `permissionMode`, and each agent's name is in one file only.
 - Analyses asked for on the dashboard wait on a list in `desk-data` and ring a doorbell; whatever listens runs them, one
   stock at a time, at most five a run. The contract (queue, doorbell, listener note) is engine-neutral and documented in
-  CONTRIBUTING. Two listeners exist: Madav's routine and the desk's own Claude Code listener (`node dist/watch.mjs`).
+  CONTRIBUTING. One listener exists: Madav's routine. The desk's own Claude Code listener (`node dist/watch.mjs`) was removed on 11 Nov 2026: the desk starts no run of its own.
 - The project ships three routines to Madav in `.claude/routines.json`, all off until the person switches them on:
   "Run automatically when the dashboard asks" (watches the doorbell), "Morning routine" (8:00 on weekdays) and
   "Evening wrap-up" (17:00 on weekdays). Madav pauses them whenever anything under `.claude`, `.mcp.json` or
