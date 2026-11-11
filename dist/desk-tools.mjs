@@ -40617,6 +40617,13 @@ var MARKS = new RegExp(` \\[corrected: was "[\\s\\S]*?"\\]| ${FLAG.replace(/[[\]
 var within3 = (s, e, [a, b]) => s >= a && e <= b;
 var touches = (s, e, [a, b]) => s < b && e > a;
 var lineAt = (text4, i) => text4.slice(text4.lastIndexOf("\n", i - 1) + 1, text4.indexOf("\n", i) < 0 ? text4.length : text4.indexOf("\n", i));
+var MARK_HEAD = ' [corrected: was "';
+var analystsOwn = (mark, row) => {
+  const kept = mark.slice(MARK_HEAD.length, -2);
+  if (!row) return [kept];
+  const plain4 = kept.replace(/\\\|/g, "|");
+  return [plain4, plain4.replace(/\s*\|\s*$/, "")];
+};
 function correctSection(dir, ticker, date5, section, corrections, flagAfter = []) {
   if (!REPORTS.includes(section)) throw new Error(`only an analyst's report can be corrected (${REPORTS.join(", ")}), not ${section}`);
   if (!corrections.length && !flagAfter.length) throw new Error("give at least one correction or one conclusion to flag");
@@ -40649,11 +40656,16 @@ function correctSection(dir, ticker, date5, section, corrections, flagAfter = []
       else if (clash) lines.push(`- not applied: "${c.was}" runs into an earlier correction (its new words or the old words it keeps); correct words outside it, or only within the new words it gave, so that each mark keeps the analyst's own words, once`);
       else if (live.length > 1 && !c.every) lines.push(`- not applied: "${c.was}" is in the ${section} report ${live.length} times; give more of the words around the one to correct, or set every to correct all ${live.length}`);
       else {
-        let again = 0;
+        let again = 0, back = 0;
         for (const { s, e } of [...live].reverse()) {
           const own2 = news.find((x) => within3(s, e, x.span));
           if (own2) {
             const [a] = own2.span, fresh = own2.f.now.slice(0, s - a) + now + own2.f.now.slice(e - a);
+            if (analystsOwn(own2.f.mark, /^[ \t]*\|/.test(lineAt(t, a))).includes(fresh)) {
+              t = t.slice(0, a) + fresh + t.slice(a + own2.f.now.length + own2.f.mark.length);
+              back++;
+              continue;
+            }
             t = t.slice(0, a) + fresh + t.slice(a + own2.f.now.length);
             fixes.push({ now: fresh, mark: own2.f.mark });
             again++;
@@ -40665,7 +40677,8 @@ function correctSection(dir, ticker, date5, section, corrections, flagAfter = []
           fixes.push({ now: cell ?? now, mark });
         }
         const n2 = live.length;
-        lines.push(`- corrected${n2 > 1 ? ` in ${n2} places` : ""}: "${c.was}" now reads "${now}"${again ? `${n2 > 1 ? `; ${again} of them` : ""} within an earlier correction's new words, whose mark still keeps the analyst's own words` : ""}`);
+        if (back === n2) lines.push(`- taken back${n2 > 1 ? ` in ${n2} places` : ""}: "${c.was}" now reads "${now}", so the passage is again the analyst's own words and its correction mark is gone; it is no longer a correction, so leave it out of your table`);
+        else lines.push(`- corrected${n2 > 1 ? ` in ${n2} places` : ""}: "${c.was}" now reads "${now}"${again ? `${n2 > 1 ? `; ${again} of them` : ""} within an earlier correction's new words, whose mark still keeps the analyst's own words` : ""}${back ? `; ${back} of them taken back to the analyst's own words, their marks gone` : ""}`);
       }
     }
     for (const f of flagAfter) {
@@ -42287,7 +42300,7 @@ function registerDeskTools(server, root) {
   }));
   server.registerTool("correct_report", {
     title: "Correct an analyst's report",
-    description: `The fact checker's corrections to an analyst's report (market, sentiment, news or fundamentals), made by the desk word for word before the debate begins. Each correction gives the report's exact old words and the right ones: the desk replaces them where they stand and keeps the old words beside them as [corrected: was "..."]. flag_after names the exact words that end a conclusion resting on a corrected fact; the desk adds a note after them. Nothing else in the report changes, so never save a corrected report yourself. Words found more than once need more of the words around them, or every set to true to correct them all. It answers line by line what was done and what was not, and why.`,
+    description: `The fact checker's corrections to an analyst's report (market, sentiment, news or fundamentals), made by the desk word for word before the debate begins. Each correction gives the report's exact old words and the right ones: the desk replaces them where they stand and keeps the old words beside them as [corrected: was "..."]. Correcting a correction's new words back to the analyst's own takes it back: the mark goes. flag_after names the exact words that end a conclusion resting on a corrected fact; the desk adds a note after them. Nothing else in the report changes, so never save a corrected report yourself. Words found more than once need more of the words around them, or every set to true to correct them all. It answers line by line what was done and what was not, and why.`,
     inputSchema: {
       symbol: symbol2,
       analysis_date: day2,
