@@ -323,16 +323,21 @@ function renderAccount(): void {
   if (r.state === 'none') { lede = "Connect Robinhood to bring your accounts here. Connecting opens Robinhood's own sign-in page in your browser. Until you switch trading on, the dashboard only reads."; actions = connect('Connect Robinhood', true); }
   else if (r.state === 'saved') actions = check('Check the connection', true) + leave;
   else if (r.state === 'connected') {
-    const checked = r.checkedAt ? when(r.checkedAt) : '';
+    // Robinhood's tools sentence folds away under one line, so the card stays short beside the caps; it keeps its place
+    // open when the card is drawn again (a refresh or the trading switch redraws it).
+    const checked = r.checkedAt ? when(r.checkedAt) : '', open = $('#accountCard').querySelector<HTMLDetailsElement>('.ta-more')?.open === true;
     lede = 'The sign-in works and Robinhood answered.';
-    facts = `<p class="at-quiet">${esc(r.message)}${checked ? ` Checked at ${esc(checked)}.` : ''}</p>`;
+    facts = `${checked ? `<p class="at-quiet">Checked at ${esc(checked)}.</p>` : ''}<details class="ta-more"${open ? ' open' : ''}><summary><svg class="g"><use href="#i-chev-right"/></svg><span>What this page can do in Robinhood</span></summary><p class="at-quiet">${esc(r.message)}</p></details>`;
     actions = check('Check again', false) + leave;
   } else if (r.state === 'failed') actions = connect('Connect again', true) + check('Check again', false);
   $('#accountCard').innerHTML = `<div class="at-card-head"><h3>Robinhood</h3><span class="at-chip ${w.chip}">${esc(w.label)}</span></div>
     <p class="at-lede">${esc(lede)}</p>${facts}${actions ? `<div class="at-row">${actions}</div>` : ''}`;
-  const card = $('#tradingCard');
+  // Where Robinhood and trading stand, stacked on the left; the caps in their own card on the right (layout C, 11 Nov 2026).
+  const card = $('#tradingCard'), caps = $('#capsCard');
   card.hidden = !signedIn();
-  card.innerHTML = tradingBlock();
+  card.innerHTML = signedIn() ? switchBlock() : '';
+  caps.innerHTML = signedIn() ? capsBlock() : '';
+  caps.hidden = !caps.innerHTML;
   $('#accountSub').textContent = !signedIn() ? 'Connect Robinhood to show your accounts here.'
     : tradingOn() ? 'Trading is on: an order is placed only from a ticket, on your own Confirm.' : 'Trading is off: the dashboard only reads your accounts.';
 }
@@ -596,16 +601,11 @@ function renderTrading(): void {
   $('#tradeFoot').textContent = on ? 'An order is placed only when you press Confirm on a ticket Robinhood has checked.' : 'This page places no order: trading is switched off.';
 }
 
-/** The trading card's inside: the switch and the caps, the person's alone. */
-function tradingBlock(): string {
-  return signedIn() ? switchBlock() + capsBlock() : '';
-}
-
 /** What the caps apply to, said once: both views of the caps carry it. Each cap is checked on a ticket opened from this
  *  page (desk/ticket.ts check, again in link.ts placeChecked), never on a trade made in the Robinhood app. */
 const CAPS_SCOPE = 'These limits apply to orders you place from this page, not to trades you make in the Robinhood app.';
 
-/** The person's caps and guard rails, kept beside the switch: shown as chips, and changed in fields on their press. Both
+/** The person's caps and guard rails, in their own card beside the switch: shown as chips, and changed in fields on their press. Both
  *  views stand in the same four rows, by what a limit is for: a buy, a buy or a sell, a sell, the whole account (desk/ticket.ts
  *  check: the order, stock, sector and crypto limits are checked on a buy, the orders a day on both, the shortest hold on a sell). */
 const CAPS = { editing: false };
@@ -617,7 +617,7 @@ function capsBlock(): string {
     const field = (id: string, label: string, value: number, whole?: [number, number]) =>
       `<label class="at-field"><span class="at-field-l">${esc(label)}</span><input class="at-input at-box" id="${id}" ${whole ? `type="number" min="${whole[0]}" max="${whole[1]}" step="1" inputmode="numeric"` : 'type="text" inputmode="decimal"'} value="${value}"></label>`;
     const fields = (...xs: string[]) => `<div class="ta-capfields">${xs.join('')}</div>`;
-    return `<div class="at-card-head ta-caps-head"><h3>Your caps</h3></div>
+    return `<div class="at-card-head"><h3>Your caps</h3></div>
     <p class="at-lede">${CAPS_SCOPE} Every ticket is checked against them, and again just before it is sent; a failed check stops the order. Only you can change them, and the agents are blocked from where they are kept.</p>
     <dl class="ta-caps">
       ${capRow('Buys', fields(field('capOrder', 'An order at most, $', c.perOrderUsd), field('capStock', 'One stock, % of the account', c.perStockPercent), field('capSector', 'One sector, % of the account', c.perSectorPercent), field('capCrypto', 'Crypto, % of the account', c.cryptoPercent)), 'The crypto limit only sizes the paper record: orders here are for stocks and funds, never coins.')}
@@ -631,15 +631,14 @@ function capsBlock(): string {
   const chips = (...xs: string[]) => `<div class="at-row">${xs.join('')}</div>`;
   // Each chip points at its own meaning: the most in one stock is a cap, not the size of a position (both 10% as shipped).
   // A whole-market fund counts in no sector (desk/sectors.ts MARKET_FUNDS), QQQ included, so the sector chip says so.
-  return `<div class="at-card-head ta-caps-head"><h3>Your ${term('cap', 'caps')}</h3></div>
+  return `<div class="at-card-head"><h3>Your ${term('cap', 'caps')}</h3><span class="at-card-tail">${rhButton('caps-edit', 'Change the caps…')}</span></div>
     <p class="at-quiet">${CAPS_SCOPE}</p>
     <dl class="ta-caps">
       ${capRow('Buys', chips(chip('cap', `${money(c.perOrderUsd)} an order at most`), chip('cap', `${c.perStockPercent}% of the account in one stock`), chip('sector', `one sector at most ${c.perSectorPercent}%`, ' For this limit a whole-market fund, such as SPY or the Nasdaq 100 fund QQQ, counts in no sector, though QQQ is mostly technology.'), chip('crypto', `crypto at most ${c.cryptoPercent}%`)))}
       ${capRow('Buys and sells', chips(chip('cap', `${c.ordersPerDay} ${c.ordersPerDay === 1 ? 'order' : 'orders'} a day`)))}
       ${capRow('Sells', chips(chip('shortestHold', `a stock bought here is held at least ${c.minHoldDays} trading ${c.minHoldDays === 1 ? 'day' : 'days'}`)))}
       ${capRow('The account', chips(chip('weeklyLoss', `switches itself off after a ${c.weeklyLossPercent}% fall in a week`)))}
-    </dl>
-    <div class="at-row">${rhButton('caps-edit', 'Change the caps…')}</div>`;
+    </dl>`;
 }
 
 /** What the person typed for the caps: numbers, as the desk will check them. */

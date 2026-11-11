@@ -365,14 +365,11 @@ test('page-25: the section that shows where each analysis stands is called "Anal
   assert.match(fs.readFileSync('README.md', 'utf8'), /The stock joins \*\*Analysis status\*\*, a page of its own in the side list/);
 });
 
-test('page-16 (dashboard tour, 11 Nov 2026): the account page keeps its rows apart, its cards at their own height, and its caps in four rows in both views', () => {
-  const css = fs.readFileSync('src/terminal/ui/dashboard.css', 'utf8'), html = fs.readFileSync('src/terminal/ui/index.html', 'utf8');
+test('page-16 (dashboard tour, 11 Nov 2026): the account page keeps its rows apart and its caps in four rows in both views', () => {
+  const css = fs.readFileSync('src/terminal/ui/dashboard.css', 'utf8');
   // The side list's account block: every row is marked while the account page is open, and marked rows touched.
   assert.match(css, /#sideAccount > \.at-li \+ \.at-li \{ margin-top: var\(--space-1\); \}/, 'a small space between the account block\'s rows');
-  // The Robinhood and Trading cards were stretched to one height, with Check again and Disconnect pushed to the foot of the taller card.
-  const pair = /<div class="([^"]*)">\s*<div class="at-card at-box" id="accountCard">/.exec(html);
-  assert.ok(pair, 'the two account cards stand in one row');
-  assert.doesNotMatch(pair[1]!, /ta-even/, 'each card is as tall as its own words');
+  // Where the cards stand is page-28's (the owner's layout C).
   // The caps: what they apply to, said once and in both views; four rows by what a limit is for; the seven fields of one size.
   assert.match(page, /const CAPS_SCOPE = 'These limits apply to orders you place from this page, not to trades you make in the Robinhood app\.';/);
   assert.equal([...page.matchAll(/\$\{CAPS_SCOPE\}/g)].length, 2, 'the chips view and the edit view both say it');
@@ -481,4 +478,23 @@ test('page-27: Analysis status is a page of its own: the line about who runs the
   assert.match(page, /case 'view': \{ const dlg = \$<HTMLDialogElement>\('#askDialog'\); if \(dlg\.open\) dlg\.close\(\); showView\(/);
   assert.match(page, /el\.addEventListener\('click', \(\) => \{ el\.remove\(\); if \(opens\) showView\(opens\); \}\);/);
   assert.match(fs.readFileSync('src/terminal/ui/dashboard.css', 'utf8'), /\.ta-link \{ padding: 0; border: 0; background: none; font: inherit; color: var\(--accent\);/);
+});
+
+test('page-28 (the owner\'s pick, 11 Nov 2026): the account page\'s top is layout C: Robinhood over Trading on the left, the caps in a card of their own on the right, the two columns ending on one line', () => {
+  const css = fs.readFileSync('src/terminal/ui/dashboard.css', 'utf8'), html = fs.readFileSync('src/terminal/ui/index.html', 'utf8');
+  // Before: the caps sat inside the Trading card, so it stood far taller than the Robinhood card beside it, with a hole under that one.
+  assert.match(html, /<div class="ta-acct">\s*<div class="ta-acct-status">\s*<div class="at-card at-box" id="accountCard"><\/div>\s*<div class="at-card at-box" id="tradingCard" hidden><\/div>\s*<\/div>\s*<div class="at-card at-box" id="capsCard" hidden><\/div>\s*<\/div>/);
+  assert.match(css, /\.ta-acct \{ display: grid; grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1\.6fr\); gap: var\(--grid-gap\); align-items: stretch; \}/, 'two columns that end on one line');
+  assert.match(css, /\.ta-acct-status > \.at-card \{ flex: 1 1 auto; \}/, 'the two left cards share their column\'s height');
+  assert.match(css, /\.ta-acct-status > \.at-card > \.at-row:last-child \{ margin-top: auto; \}/, 'each left card\'s buttons at its foot');
+  assert.match(css, /@media \(max-width: 1180px\) \{ \.ta-acct \{ grid-template-columns: minmax\(0, 1fr\); \} \}/, 'one column on a narrow window');
+  // The Trading card holds the switch alone; the caps card holds the caps, with "Change the caps…" in its head.
+  assert.match(page, /card\.innerHTML = signedIn\(\) \? switchBlock\(\) : '';/);
+  assert.match(page, /caps\.innerHTML = signedIn\(\) \? capsBlock\(\) : '';\s*caps\.hidden = !caps\.innerHTML;/);
+  assert.doesNotMatch(page, /tradingBlock|ta-caps-head/);
+  assert.doesNotMatch(css, /ta-caps-head/, 'no line drawn over the caps: they are a card of their own');
+  assert.match(page, /<h3>Your \$\{term\('cap', 'caps'\)\}<\/h3><span class="at-card-tail">\$\{rhButton\('caps-edit', 'Change the caps…'\)\}<\/span><\/div>/);
+  // Robinhood's tools sentence, word for word as before, folds under one line and stays open when the card is drawn again.
+  assert.match(page, /<details class="ta-more"\$\{open \? ' open' : ''\}><summary><svg class="g"><use href="#i-chev-right"\/><\/svg><span>What this page can do in Robinhood<\/span><\/summary><p class="at-quiet">\$\{esc\(r\.message\)\}<\/p><\/details>/);
+  assert.match(page, /open = \$\('#accountCard'\)\.querySelector<HTMLDetailsElement>\('\.ta-more'\)\?\.open === true;/);
 });

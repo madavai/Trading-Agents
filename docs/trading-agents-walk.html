@@ -955,9 +955,8 @@ b, strong { font-weight: var(--weight-semibold); }
       "do": [
         "Press \"Connect Robinhood\" and sign in on Robinhood's own page (or \"Check the connection\" if you connected before)."],
       "see": [
-        "\"Connected\": \"The sign-in works and Robinhood answered.\"",
-        "\"Robinhood offers N tools (things a program can ask it to do): X that only read, Y that order or move money and Z others, which this page never uses. This page uses only reading tools, plus two of the order ones, each only when you press Review (Robinhood's check, which places nothing) or Confirm (the order). No agent gets an order tool.\" N, X, Y and Z are Robinhood's own list, so they follow it when it changes.",
-        "It never says that this page never uses them.",
+        "\"Connected\": \"The sign-in works and Robinhood answered.\", then \"Checked at <time>.\"",
+        "Under it, folded: \"What this page can do in Robinhood\". Pressed, it opens: \"Robinhood offers N tools (things a program can ask it to do): X that only read, Y that order or move money and Z others, which this page never uses. This page uses only reading tools, plus two of the order ones, each only when you press Review (Robinhood's check, which places nothing) or Confirm (the order). No agent gets an order tool.\" N, X, Y and Z are Robinhood's own list, so they follow it when it changes. It stays open when the page reads Robinhood again.",
         "If this happens (Robinhood is out of reach, or answers with a failure): \"Not working\", with what happened in plain words, for example \"Robinhood could not be reached (the connection failed)\" or \"Robinhood had a fault on its own side and could not answer, saying …; try again later\", with Robinhood's own words and any account number hidden. Never \"Streamable HTTP error\", \"fetch failed\" or a web error code such as 500."] },
     { "id": "D2", "title": "You choose the accounts", "tags": [], "changed": "2026-10-21",
       "about": "Only the accounts you tick are shown, and only those reach the agents.",
@@ -1023,16 +1022,18 @@ b, strong { font-weight: var(--weight-semibold); }
         "\"The saved Robinhood sign-in is deleted from this computer, and trading is switched off.\" The top of the page says \"Trading off\" straight away, without reloading the page.",
         "Back to connected: you choose the accounts again, and trading is switched off. Your caps stay as you set them."] },
     { "id": "D10", "title": "The account page is easy to scan", "tags": [], "changed": "2026-11-11",
-      "about": "Nothing on the account page is stretched or crowded: the side list's rows do not touch, and each card is only as tall as what is in it.",
+      "about": "The top of the account page stands in two columns that end on one line, with no gap under either: where Robinhood and trading stand on the left, your caps on the right. The side list's rows do not touch.",
       "where": "Dashboard › Your account",
       "do": [
         "With Robinhood connected and trading on, open \"Your account\" in the side list.",
-        "Look at the side list's \"Your account\" block, then at the Robinhood and Trading cards.",
-        "Make the window narrow."],
+        "Look at the side list's \"Your account\" block, then at the three cards at the top of the page.",
+        "Press \"Change the caps…\", then Cancel.",
+        "Make the window narrow, then as narrow as a phone."],
       "see": [
         "Each marked row of the block (\"Robinhood · connected\", \"Trading is on\" and the account's name) has a small space above the next, so they do not touch.",
-        "The Robinhood and Trading cards stand side by side, each only as tall as its own words: \"Check again\" and \"Disconnect\" sit right under the Robinhood card's text, not at the foot of the taller card.",
-        "On a narrow window the two cards stack one over the other; at a phone's width the caps fields also go one to a line, each row's name over its limits.",
+        "On the left, the Robinhood card over the Trading card; on the right, \"Your caps\" in a card of its own, with \"Change the caps…\" at its top right. The bottom of the Trading card and the bottom of the caps card are on one line, and each left card's buttons sit at its foot, so no empty space is left under either column.",
+        "While you change the caps, the two columns still end on one line.",
+        "On a narrow window the three cards stand one under the other: Robinhood, Trading, then Your caps. At a phone's width the caps fields also go one to a line, each row's name over its limits, and nothing runs off the side of the screen.",
         "Under \"Accounts\" there is no line of words: each card says for itself \"Agentic · the desk may trade here, only on your Confirm\" or \"View only · the desk never trades here\".",
         "An account that holds nothing shows no sentence about it (its Holdings tile says 0). Nothing at the foot of a card says where the figures come from, and the page's foot says nothing about the sign-in or advice. What stays is what appears only when something failed: \"The orders could not be read.\", \"Not read: …\" and \"N holding(s) could not be read and are left out.\""] },
     { "id": "D11", "title": "Orders say where they stand, waiting ones first", "tags": [], "changed": "2026-11-11",
@@ -1390,9 +1391,9 @@ b, strong { font-weight: var(--weight-semibold); }
         "Ask the chat: [[Fetch http://127.0.0.1:47615/api/state]]"],
       "see": [
         "Refused by the guard: \"Agents never use the Trading Agents dashboard's address, its order ticket or its trading switch. Only the person uses the dashboard, and only their Confirm sends an order.\""] },
-    { "id": "H5", "title": "A typo cannot raise your caps", "tags": ["Optional"], "changed": "2026-10-21",
+    { "id": "H5", "title": "A typo cannot raise your caps", "tags": ["Optional"], "changed": "2026-11-11",
       "about": "A cap out of range is refused, never stored, so a slip cannot open a bigger door.",
-      "where": "Dashboard › Your account › Trading › Your caps",
+      "where": "Dashboard › Your account › Your caps",
       "do": [
         "Press \"Change the caps…\", set \"An order at most, $\" to [[999999]] and press \"Save the caps\".",
         "Press Cancel, then open the NVDA ticket."],
@@ -1755,10 +1756,11 @@ b, strong { font-weight: var(--weight-semibold); }
     "tests": [
     { "id": "M1", "title": "Your caps, as shipped", "tags": [], "changed": "2026-11-11",
       "about": "The seven caps, in plain words, in four rows by what each limit is for.",
-      "where": "Dashboard › Your account › Trading › Your caps",
+      "where": "Dashboard › Your account › Your caps",
       "do": [
         "Read \"Your caps\"."],
       "see": [
+        "Its own card beside the Robinhood and Trading cards, with \"Change the caps…\" at its top right.",
         "Under the heading: \"These limits apply to orders you place from this page, not to trades you make in the Robinhood app.\"",
         "Four rows, each named at its left. Buys: \"$500.00 an order at most\", \"10% of the account in one stock\", \"one sector at most 30%\" and \"crypto at most 5%\". Buys and sells: \"3 orders a day\". Sells: \"a stock bought here is held at least 5 trading days\". The account: \"switches itself off after a 5% fall in a week\" (or your own values)."] },
     { "id": "M2", "title": "Change a cap", "tags": [], "changed": "2026-11-11",
