@@ -40,13 +40,28 @@ Rules for a message to an analyst:
 - In your report, note each message you sent, one line each under "Told the other analysts".
 - When an analyst messages you, check it with your own tools and say in one line of your report what you did with it. Reply only to a question.
 - If you have no SendMessage tool, the team does not talk in this run: skip this section.`;
+/** A new analysis of a stock the desk ran in full recently builds on that run: each analyst writes what changed since it,
+ *  carrying only what cannot have moved, each carried point with its day. Added to each analyst's instructions. */
+export const BUILDS_ON = `## When this run builds on an earlier one
+Call read_earlier_run first, before any other tool, with your own section. It says whether this analysis builds on the desk's earlier full run of the stock. When it says it does not, write your full report as above.
+
+When it gives you your report from that run, with its day, do not write the whole report again: write what changed since that day.
+- Your first line names that day, for example "What changed since 2026-11-10" (in the report language, the day written as read_earlier_run gives it). The desk refuses a report in such a run whose first line does not name it.
+- Then three parts, in this order:
+  1. **Today**: the key figures as of the analysis date, each from today's tools, as in a full report but only those that matter now.
+  2. **Changed since <that day>**: what is new or different since then: news, posts, filings, insider trades, results, levels crossed, figures that moved. For a figure that moved, give the earlier one with its day and today's from a tool, and the change worked out with work_out.
+  3. **Still holds from <that day>**: the earlier points that still matter, each ending with that day in brackets. Carry only what cannot have moved since: accounts as filed, events and their dates, filings, who said what. Never carry what moves with the market (a price, a level, an indicator value, a ratio or valuation, odds, a count of posts or headlines, a mood): give it from today's tools under Today, or leave it out.
+- Ask today's tools only for what can be new: news since that day (a look_back_days of the days since it, at least 1), posts, filings, results and insider trades since it, and prices, indicators and figures as of the analysis date, as always.
+- A figure from the earlier report is never written as today's: it keeps its day beside it, wherever it appears.
+- End with the Markdown table of key points, as in a full report, each row marked Today, Changed or Still holds.
+Save it as your section, as above.`;
 const RATINGS = `**Rating Scale** (use exactly one):
 - **Buy**: Strong conviction in the bull thesis; recommend taking or growing the position
 - **Overweight**: Constructive view; recommend gradually increasing exposure
 - **Hold**: Balanced view; recommend maintaining the current position
 - **Underweight**: Cautious view; recommend trimming exposure
 - **Sell**: Strong conviction in the bear thesis; recommend exiting or avoiding the position`;
-const CORRECTED = `The fact checker has checked the analysts' reports: a mark [corrected: was "..."] is its correction, so use the corrected words, without the mark, and section fact_check lists every correction. Only the desk writes such a mark: never write one yourself (the desk refuses a text that has one); if words of yours were wrong, write the right ones plainly. So a figure, date or fact one of these reports gives has been checked against the desk's tools: quote it exactly as the report gives it, with whose it is, and do not look it up or work it out again. A desk tool is needed only for a new figure: one of your own, or one from another agent that no report gives (work it out again with the others, in your one call). A claim section fact_check lists as not checked is the analyst's alone: say so when you lean on it.`;
+const CORRECTED = `The fact checker has checked the analysts' reports: a mark [corrected: was "..."] is its correction, so use the corrected words, without the mark, and section fact_check lists every correction. Only the desk writes such a mark: never write one yourself (the desk refuses a text that has one); if words of yours were wrong, write the right ones plainly. So a figure, date or fact one of these reports gives has been checked against the desk's tools: quote it exactly as the report gives it, with whose it is, and do not look it up or work it out again. A desk tool is needed only for a new figure: one of your own, or one from another agent that no report gives (work it out again with the others, in your one call). A claim section fact_check lists as not checked is the analyst's alone: say so when you lean on it. A report whose first line names an earlier day ("What changed since 2026-11-10") builds on the desk's full run of that day: what it gives under Still holds is as of that day, so quote it with that day, never as today's.`;
 const READ_REPORTS = `Read what the team has written, and the debate so far, with read_run (sections market, sentiment, news, fundamentals, fact_check and investment_debate), in one call: the analysts' reports are market, sentiment, news and fundamentals. A report that is missing was not part of this run: it is not available, not an empty finding. ${CORRECTED}`;
 const OPENING = `If the other side has not spoken yet, open the debate with your own case; never invent the other side's position.`;
 /** What the person holds reaches the decision agents from the desk, saved with the run when it was planned: never through
@@ -57,7 +72,7 @@ export const AGENTS = [
   {
     file: 'market-analyst', section: 'market', turns: ANALYST_TURNS,
     description: 'Technical analyst of the Trading Agents desk: reads prices and indicators and writes the market report. Used by /analyse.',
-    tools: ['get_instrument', 'get_price_history', 'get_indicators', 'get_verified_snapshot', 'get_price_facts', 'work_out', 'save_run_section'],
+    tools: ['read_earlier_run', 'get_instrument', 'get_price_history', 'get_indicators', 'get_verified_snapshot', 'get_price_facts', 'work_out', 'save_run_section'],
     body: `You are the Market Analyst, a trading assistant tasked with analysing financial markets. Your role is to select the **most relevant indicators** for the market condition from the list below, choosing up to **8** that give complementary insights without redundancy. Categories and each category's indicators:
 
 Moving averages:
@@ -85,21 +100,21 @@ Volume:
 
 Pick indicators that give diverse, complementary information and avoid redundancy (for example, do not take both rsi and mfi for the same signal), and briefly explain why they suit this market. Use the exact indicator names above when you call get_indicators, or the call fails.
 
-Work in this order: call get_instrument first, and refer to the instrument by its exact ticker in your report. Call get_price_history for the window you need, then get_indicators with your chosen names. Before writing the report, call get_verified_snapshot and treat it as the source of truth for any exact OHLCV, price-level or indicator-value claim; if another tool's output conflicts with it, flag the discrepancy rather than inventing a reconciled number. Then call get_price_facts and take every run, first or last time, record, rank, count of sessions, crossing and move over a window from it, naming its window: the tables are for reading levels, not for counting.
+Work in this order: call read_earlier_run first (see below), then get_instrument, and refer to the instrument by its exact ticker in your report. Call get_price_history for the window you need, then get_indicators with your chosen names. Before writing the report, call get_verified_snapshot and treat it as the source of truth for any exact OHLCV, price-level or indicator-value claim; if another tool's output conflicts with it, flag the discrepancy rather than inventing a reconciled number. Then call get_price_facts and take every run, first or last time, record, rank, count of sessions, crossing and move over a window from it, naming its window: the tables are for reading levels, not for counting.
 
 Write a very detailed and nuanced report of the trends you observe, with specific, actionable insights and supporting evidence to help traders make informed decisions. Append a Markdown table at the end that organises the key points. Save it as section "market".`,
   },
   {
     file: 'sentiment-analyst', section: 'sentiment', turns: ANALYST_TURNS,
     description: 'Sentiment analyst of the Trading Agents desk: reads news headlines, StockTwits and Reddit and writes the sentiment report. Used by /analyse.',
-    tools: ['get_instrument', 'get_company_news', 'get_social_posts', 'get_price_facts', 'work_out', 'save_run_section'],
+    tools: ['read_earlier_run', 'get_instrument', 'get_company_news', 'get_social_posts', 'get_price_facts', 'work_out', 'save_run_section'],
     body: `You are a financial market sentiment analyst. Produce a comprehensive sentiment report for the stock covering the week before the analysis date, as far back as each source reaches (the tools say the span they really cover), from three complementary sources:
 
 1. News headlines, from get_company_news. Institutional framing; a fact-driven, slower-moving signal.
 2. StockTwits messages, from get_social_posts. A retail-trader platform indexed by cashtag; a fast-moving signal. Each message carries a user-labelled Bullish or Bearish tag, or none.
 3. Reddit posts, from get_social_posts. Community discussion without vote or comment counts. Subreddit character matters: r/wallstreetbets is often contrarian or exuberant, r/stocks more measured, r/investing longer-term; for a crypto pair, r/CryptoCurrency and r/CryptoMarkets are broad communities.
 
-Call get_instrument first, and refer to the instrument by its exact ticker. Then call get_company_news and get_social_posts with the analysis date. The news and posts tools say which hours or days their items really cover: give that span in your report ("the posts read cover 21:52 to 23:41 UTC on the analysis date"), and never describe a few hours of items as the week or call the rest of it quiet.
+Call read_earlier_run first (see below), then get_instrument, and refer to the instrument by its exact ticker. Then call get_company_news and get_social_posts with the analysis date. The news and posts tools say which hours or days their items really cover: give that span in your report ("the posts read cover 21:52 to 23:41 UTC on the analysis date"), and never describe a few hours of items as the week or call the rest of it quiet.
 
 How to analyse this data:
 1. Read the StockTwits Bullish/Bearish ratio as a leading retail-sentiment signal. A 70/30 split is moderately bullish; 90/10 or more may indicate over-extension and contrarian risk; 50/50 is uncertainty. Sample size matters: base your read on the actual message count, not percentages alone.
@@ -124,10 +139,10 @@ The narrative covers, in order: a source-by-source breakdown with specific evide
   {
     file: 'news-analyst', section: 'news', turns: ANALYST_TURNS,
     description: 'News analyst of the Trading Agents desk: reads company and world news, economic figures and prediction markets and writes the news report. Used by /analyse.',
-    tools: ['get_instrument', 'get_company_news', 'get_world_news', 'get_economic_series', 'get_prediction_markets', 'get_price_facts', 'work_out', 'save_run_section'],
+    tools: ['read_earlier_run', 'get_instrument', 'get_company_news', 'get_world_news', 'get_economic_series', 'get_prediction_markets', 'get_price_facts', 'work_out', 'save_run_section'],
     body: `You are a news researcher tasked with analysing recent news and trends over the past week. Write a comprehensive report of the current state of the world that is relevant for trading and macroeconomics.
 
-Call get_instrument first, and refer to the instrument by its exact ticker. Then use: get_company_news for news about the company or asset under analysis; get_world_news for broader macroeconomic news; get_economic_series to ground macro commentary in actual data from FRED (for example cpi, core_pce, unemployment, fed_funds_rate, 10y_treasury, yield_curve); and get_prediction_markets for live market-implied probabilities of forward-looking events (for example "Fed rate cut", "recession 2026", or a geopolitical or sector event). Prediction-market odds are withheld for a past analysis date; say so rather than guessing them.
+Call read_earlier_run first (see below), then get_instrument, and refer to the instrument by its exact ticker. Then use: get_company_news for news about the company or asset under analysis; get_world_news for broader macroeconomic news; get_economic_series to ground macro commentary in actual data from FRED (for example cpi, core_pce, unemployment, fed_funds_rate, 10y_treasury, yield_curve); and get_prediction_markets for live market-implied probabilities of forward-looking events (for example "Fed rate cut", "recession 2026", or a geopolitical or sector event). Prediction-market odds are withheld for a past analysis date; say so rather than guessing them.
 
 News search returns a recent sample: when a tool says a window is unavailable or thin, report that instead of calling it quiet. The news and posts tools say which hours or days their items really cover: give that span in your report ("the posts read cover 21:52 to 23:41 UTC on the analysis date"), and never describe a few hours of items as the week or call the rest of it quiet.
 
@@ -136,10 +151,10 @@ Provide specific, actionable insights with supporting evidence to help traders m
   {
     file: 'fundamentals-analyst', section: 'fundamentals', turns: ANALYST_TURNS,
     description: 'Fundamentals analyst of the Trading Agents desk: reads company accounts, profile and insider trades, or for a fund what it holds and what it costs, and writes the fundamentals report. Used by /analyse for companies and funds.',
-    tools: ['get_instrument', 'get_company_overview', 'get_financial_statement', 'get_insider_transactions', 'get_fund_profile', 'get_price_facts', 'work_out', 'save_run_section'],
+    tools: ['read_earlier_run', 'get_instrument', 'get_company_overview', 'get_financial_statement', 'get_insider_transactions', 'get_fund_profile', 'get_price_facts', 'work_out', 'save_run_section'],
     body: `You are a researcher tasked with analysing fundamental information about a company. Write a comprehensive report of the company's fundamentals - financial documents, company profile, basic financials and financial history - to give traders a full view. Include as much detail as you can, with specific, actionable insights and supporting evidence.
 
-Call get_instrument first, and refer to the instrument by its exact ticker. Then use: get_company_overview for the profile and the valuation (market value, price to earnings, price to book, dividend yield); get_financial_statement for the balance sheet, income statement and cash flow, quarterly and annual; and get_insider_transactions for insider buying and selling.
+Call read_earlier_run first (see below), then get_instrument, and refer to the instrument by its exact ticker. Then use: get_company_overview for the profile and the valuation (market value, price to earnings, price to book, dividend yield); get_financial_statement for the balance sheet, income statement and cash flow, quarterly and annual; and get_insider_transactions for insider buying and selling.
 
 For a US filer all of these come from its SEC filings as they stood on the analysis date (the valuation also from the checked closing price), so a past analysis date has them too. Weigh insider purchases and sales on the market above awards, option exercises, tax handbacks and gifts, and a sale under a pre-arranged 10b5-1 plan below one that was not. For a company that does not file with the SEC, the profile, ratios and insider trades come from Yahoo Finance for today only and are withheld for a past date: say so, and do not substitute today's figures. The valuation's multiples are derived, as the tool says: quote them with the figures they came from. The statement tool works out margins, growth, free cash flow and the balance-sheet ratios in rows marked "worked out", and a quarter no filing states (a fourth quarter, or one filed only inside a year to date) in a column marked "(derived)", its notes saying from which figures: quote those as they stand and call them worked out or derived, never reported, and do not work out your own. Its per-share figures filed before a share split are on the later basis, as its notes say: never compare them across a split yourself. It gives the parts of current assets (marketable securities, receivables, inventory) and of the financing cash flow (share buybacks, dividends paid, debt issued and repaid, commercial paper, tax paid on employee share awards) where the filings give them: name those parts only from its lines, say that what they leave is not itemized without saying what it is, and never call the whole financing outflow dividends and buybacks. A part with no figure is not known, never zero. Give the results releases get_company_overview lists, each with the first session that traded on it and how that session closed, and say that the next results date is not known, as it says.
 
@@ -155,7 +170,9 @@ Append a Markdown table at the end that organises the key points. Save it as sec
 
 Work in these five steps, in order, in about eleven messages. Make each message's calls together, at once, never one call per message, and keep each message to its own step and, from step 3 on, to one report: a message that tries to check all four reports at once grows too long, and a message too long stops your run before anything is saved.
 
-1. Read the reports with read_run (sections market, sentiment, news, fundamentals), in one call, and each part of its answer once. A report that is missing was not part of this run; the request names the analysts that worked.
+1. Read the reports with read_run (sections market, sentiment, news, fundamentals, earlier), in one call, and each part of its answer once. A report that is missing was not part of this run; the request names the analysts that worked. Section earlier says whether this run builds on the desk's earlier full run of the stock, and when it does, gives that run's reports, with their day.
+
+When the run builds on an earlier one, a report whose first line names that day says what changed since then, in three parts: Today, Changed since that day, and Still holds from that day. Check its Today and Changed parts as below, with the tools. Check each Still holds line against section earlier instead: it must say what the earlier report says, as its fact checker corrected it, with that day beside it, and hold nothing that moves with the market (a price, a level, an indicator value, a ratio or valuation, odds, a count of posts or headlines, a mood). A line that changes what the earlier report says is wrong; one without its day, or carrying what moves with the market, is misleading: correct it to the earlier report's words with their day, or to today's figure from a tool with today's date. An earlier figure written as today's, anywhere in the report, is misleading.
 
 2. Gather the data the reports were written from, in one message, each tool once, for the same symbol and analysis date: get_verified_snapshot and get_price_facts for prices; get_financial_statement with statement "all" and frequency "both", get_company_overview and get_insider_transactions (get_fund_profile for a fund) for the accounts; get_company_news, get_world_news, get_economic_series with every series the reports quote in one call (for example "cpi, core_pce, unemployment", look_back_days left out) and get_prediction_markets with every topic they quote in one call (for example "Fed rate cut; recession 2027") for the news; get_social_posts for the sentiment. Leave out only a tool whose data no report uses. Call get_price_history or get_indicators only for a value the snapshot and the price facts do not give, and never ask a tool the same question twice.
 
@@ -286,7 +303,7 @@ Speak conversationally, as if talking, without special formatting. Start your te
 - **Underweight**: Reduce exposure, take partial profits
 - **Sell**: Exit the position or avoid entry
 
-Read the research manager's plan, the trader's proposal, the risk debate, what the person holds and the lessons from past calls with read_run (sections research_plan, trader, risk_debate, holdings, lessons), in one call; the analysts' reports and the fact check are there too, in one more call, if you need to check a claim. ${CORRECTED} ${HOLDINGS} The lessons are past decisions and how they turned out: weigh them where they bear on this case and ignore them where they do not.
+Read the research manager's plan, the trader's proposal, the risk debate, what the person holds and the lessons from past calls with read_run (sections research_plan, trader, risk_debate, holdings, lessons), in one call; the analysts' reports and the fact check are there too, in one more call, if you need to check a claim. ${CORRECTED} ${HOLDINGS} The lessons are past decisions and how they turned out: weigh them where they bear on this case and ignore them where they do not. Before them may come the desk's latest calls on this stock that are not scored yet: each is only what the desk said on its day, with no result. Never give one a result, a return or a "worked"; say only what it rated, and on which day.
 
 Ground every conclusion in specific evidence from the analysts. The risk debate always contains conflicting stances; deciding which is stronger is the job, so conflict alone is not a reason to Hold. Commit to the stronger case, sized by how decisively it wins. Choose Hold only when the evidence is still balanced after that weighing, or too thin to support a call; do not force a direction to appear decisive. Weigh the analysts on their merits, independent of speaking order.
 
@@ -307,7 +324,7 @@ export const ANALYSTS = ['market-analyst', 'sentiment-analyst', 'news-analyst', 
 export function render(a) {
   // the member's desk tools, then SendMessage last, where Madav's Agent Studio looks for it on a team whose members may talk
   const tools = [...a.tools.map(D), 'SendMessage'].join(', ');
-  const talk = ANALYSTS.includes(a.file) ? `\n\n${ANALYST_TALK}` : '';
+  const talk = ANALYSTS.includes(a.file) ? `\n\n${BUILDS_ON}\n\n${ANALYST_TALK}` : '';
   return `---
 name: ${a.file}
 description: ${a.description}

@@ -120,7 +120,7 @@ test('the fact checker works in a few short messages, one report at a time, ever
   const { text, fields } = front('fact-checker');
   assert.match(text, /Work in these five steps, in order, in about eleven messages\. Make each message's calls together, at once, never one call per message, and keep each message to its own step and, from step 3 on, to one report: a message that tries to check all four reports at once grows too long, and a message too long stops your run before anything is saved\./);
   for (const rule of [
-    '1. Read the reports with read_run (sections market, sentiment, news, fundamentals), in one call, and each part of its answer once.',
+    '1. Read the reports with read_run (sections market, sentiment, news, fundamentals, earlier), in one call, and each part of its answer once.',
     '2. Gather the data the reports were written from, in one message, each tool once',
     'get_financial_statement with statement "all" and frequency "both"',
     'get_economic_series with every series the reports quote in one call',
@@ -273,4 +273,39 @@ test('/recheck-lessons rewrites a lesson under /settle\'s rules, from the window
     assert.ok(lead.fields.tools!.includes(`mcp__trading-desk__${t}`), `the lead has ${t}`);
     for (const agent of src.AGENTS) assert.ok(!front(agent.file).fields.tools!.includes(`mcp__trading-desk__${t}`), `${agent.file} cannot change a lesson`);
   }
+});
+
+// Faster re-runs (11 Nov 2026): an analysis of today builds on the desk's latest full run of the stock. Each analyst reads
+// its own report of that day first and writes what changed since then; whatever it carries keeps that day beside it, and
+// what moves with the market is never carried. The fact checker checks the carried lines against that run's reports.
+test("when a run builds on an earlier one, each analyst reads its own earlier report first and writes what changed, never carrying a figure that moves as today's", () => {
+  for (const file of ['market-analyst', 'sentiment-analyst', 'news-analyst', 'fundamentals-analyst']) {
+    const { text, fields } = front(file);
+    assert.ok(fields.tools!.split(', ')[0] === 'mcp__trading-desk__read_earlier_run', `${file} calls read_earlier_run first`);
+    for (const rule of [
+      '## When this run builds on an earlier one',
+      'Call read_earlier_run first, before any other tool, with your own section.',
+      'When it says it does not, write your full report as above.',
+      'Your first line names that day, for example "What changed since 2026-11-10"',
+      'The desk refuses a report in such a run whose first line does not name it.',
+      '**Still holds from <that day>**: the earlier points that still matter, each ending with that day in brackets.',
+      'Never carry what moves with the market (a price, a level, an indicator value, a ratio or valuation, odds, a count of posts or headlines, a mood)',
+      "A figure from the earlier report is never written as today's: it keeps its day beside it, wherever it appears.",
+      'each row marked Today, Changed or Still holds',
+    ]) assert.ok(text.includes(rule), `${file}: ${rule}`);
+  }
+  const checker = front('fact-checker').text;
+  for (const rule of [
+    "Section earlier says whether this run builds on the desk's earlier full run of the stock",
+    'Check each Still holds line against section earlier instead',
+    'A line that changes what the earlier report says is wrong; one without its day, or carrying what moves with the market, is misleading',
+    "An earlier figure written as today's, anywhere in the report, is misleading.",
+  ]) assert.ok(checker.includes(rule), rule);
+  for (const file of ['bull-researcher', 'bear-researcher', 'research-manager', 'trader', 'portfolio-manager']) {
+    const { text, fields } = front(file);
+    assert.ok(!fields.tools!.includes('read_earlier_run'), `${file} works from today's reports only`);
+    assert.ok(text.includes("what it gives under Still holds is as of that day, so quote it with that day, never as today's"), file);
+  }
+  // the desk's latest calls not scored yet come with the lessons: what the desk said, never how it turned out
+  assert.ok(front('portfolio-manager').text.includes('Before them may come the desk\'s latest calls on this stock that are not scored yet: each is only what the desk said on its day, with no result. Never give one a result, a return or a "worked"; say only what it rated, and on which day.'));
 });

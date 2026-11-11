@@ -14,6 +14,9 @@ export interface Settings {
     analysts: Analyst[];
     /** The model for the two managers, who weigh the debates; empty means the same as everyone else. */
     managerModel: string;
+    /** A new analysis of a stock builds on the desk's last full run of it when that run is at most this many days old:
+     *  the analysts write what changed since then. 0 means every analysis is a full run. */
+    buildOnEarlierDays: number;
     newsLookbackDays: number;
     companyNewsLimit: number;
     worldNewsLimit: number;
@@ -70,6 +73,7 @@ export const DEFAULTS: Settings = {
     riskRounds: 1,
     analysts: [...ANALYSTS],
     managerModel: '',
+    buildOnEarlierDays: 30,
     newsLookbackDays: 7,
     companyNewsLimit: 20,
     worldNewsLimit: 10,
@@ -166,6 +170,7 @@ export function readSettings(root: string): Settings {
       outputLanguage: languageName(a.outputLanguage),
       debateRounds: int(a.debateRounds, 1, 5, 1),
       riskRounds: int(a.riskRounds, 1, 5, 1),
+      buildOnEarlierDays: int(a.buildOnEarlierDays, 0, 30, DEFAULTS.analysis.buildOnEarlierDays),
       analysts: analysts.length ? analysts : [...ANALYSTS],
       worldNewsSearches: searchesOf(a.worldNewsSearches),
       managerModel: typeof a.managerModel === 'string' && /^[\w.\-[\]]{0,60}$/.test(a.managerModel.trim()) ? a.managerModel.trim() : '',

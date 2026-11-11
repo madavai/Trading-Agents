@@ -19,6 +19,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { userAgentFor } from '../check/probes.js';
 import { writeWhole } from '../desk/lock.js';
+import { today } from './dates.js';
 import { refusalWords, sourceName, unreachableWords, whatItSaid } from './failure-words.js';
 
 type Fetch = typeof fetch;
@@ -64,15 +65,29 @@ async function pace(host: string): Promise<void> {
 }
 
 // Answers are kept on disk, shared by every copy of the tool server, so the analysts and a repeated question do not ask a
-// source again. A filed document never changes and the SEC's yearly figures change only when something is filed, so they
-// are kept a day; a filer's list of filings gains a Form 4 any hour, so it is kept an hour, as is FRED (a figure released
-// at 8:30 must reach a 9:00 analysis); prices and the rest five minutes. A failure is never kept, nor an answer asked for
-// as data that is not data (a web page saying the service will be right back). Every tool that serves a
-// kept answer can say when it was read (`getTextAt`, `readWords`).
-const MINUTE = 60_000;
+// source again. How long one is served again depends on whether it can have changed since it was read. A filed document
+// (an insider's Form 4, a fund's holdings report: the SEC's archive of filings) never changes, since a correction is a
+// filing of its own, and FRED's figures as they were known on a past day never change either: both are served for 30
+// days. The SEC's yearly figures change only when something is filed, so they are served for a day; a filer's list of
+// filings gains a Form 4 any hour, so it is served for an hour, as is FRED's latest (a figure released at 8:30 must reach
+// a 9:00 analysis); prices, news, posts, odds and the rest for five minutes. Past price rows are never served from an old
+// copy: they are adjusted for every dividend and split paid since, so a dividend between two runs changes them all.
+// Every answer stays on disk for 30 days (`KEPT_DAYS`, the person's choice), but one past its time is never served
+// again: the source is asked afresh. A failure is never kept, nor an answer asked for as data that is not data (a web
+// page saying the service will be right back). Every tool that serves a kept answer can say when it was read
+// (`getTextAt`, `readWords`).
+const MINUTE = 60_000, DAY_MS = 24 * 60 * MINUTE;
+/** How many days a downloaded answer stays on disk, whether or not it may still be served. */
+export const KEPT_DAYS = 30;
 export function keepFor(url: string): number {
   const u = new URL(url);
-  if (/(^|\.)sec\.gov$/.test(u.hostname)) return /^\/submissions\//.test(u.pathname) ? 60 * MINUTE : 24 * 60 * MINUTE;
+  if (/(^|\.)sec\.gov$/.test(u.hostname)) {
+    if (/^\/Archives\/edgar\/data\//.test(u.pathname)) return KEPT_DAYS * DAY_MS;
+    return /^\/submissions\//.test(u.pathname) ? 60 * MINUTE : DAY_MS;
+  }
+  // FRED's archive of what was known on a day (ALFRED), for a day before today: fixed once that day has passed.
+  const vintage = u.searchParams.get('vintage_date');
+  if (/(^|\.)alfred\.stlouisfed\.org$/.test(u.hostname) && vintage && /^\d{4}-\d{2}-\d{2}$/.test(vintage) && vintage < today()) return KEPT_DAYS * DAY_MS;
   return /fred/.test(u.hostname) ? 60 * MINUTE : 5 * MINUTE;
 }
 const keyOf = (url: string): string => { const u = new URL(url); u.searchParams.delete('crumb'); return createHash('sha256').update(u.toString()).digest('hex').slice(0, 40); };
@@ -97,7 +112,7 @@ function writeCache(url: string, text: string): void {
 }
 
 function pruneCache(dir: string): void {
-  try { for (const f of fs.readdirSync(dir)) { const file = path.join(dir, f); if (Date.now() - fs.statSync(file).mtimeMs > 3 * 24 * 60 * MINUTE) fs.rmSync(file, { force: true }); } } catch { /* no cache yet */ }
+  try { for (const f of fs.readdirSync(dir)) { const file = path.join(dir, f); if (Date.now() - fs.statSync(file).mtimeMs > KEPT_DAYS * DAY_MS) fs.rmSync(file, { force: true }); } } catch { /* no cache yet */ }
 }
 
 /** A failed answer in plain words: who refused and how, what it said when that can be read, and, for the SEC, whether

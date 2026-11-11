@@ -42,7 +42,8 @@ export interface TicketFigures { quantity: number; limitPrice: number; market?: 
 export type { Check, Proposal, Review, TicketContext };
 export type { DeskState, History, QuoteResult, WatchItem, QueueView, ListenerView, Depth, LinkInfo, Snapshot, Account, AccountView, Holding, OpenOrder, Order };
 export interface Market { symbol: string; name: string; unit?: '%'; quote: QuoteResult }
-export interface CallDetail { decision: string; sections: Record<string, string[]>; hasReport: boolean }
+/** `builtOn`: the day of the desk's earlier full run this call's analysts built on, when they did. */
+export interface CallDetail { decision: string; sections: Record<string, string[]>; hasReport: boolean; builtOn?: string }
 
 const KEPT = 'ta.key';
 let key = '';
