@@ -281,6 +281,21 @@
 .ta-term { text-decoration: underline dotted; text-decoration-color: var(--text-3); text-underline-offset: 0.2em; cursor: help; }
 .ta-gloss dt { color: var(--text); font-weight: var(--weight-medium); }
 
+/* the account page's top (layout C, the owner's pick, 11 Nov 2026): where Robinhood and trading stand, stacked on the
+   left, and the caps in their own card on the right; the two columns end on one line, each card's buttons at its foot.
+   Under the width where pairs stack (1180px), the three cards stand in one column. */
+.ta-acct { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: var(--grid-gap); align-items: stretch; }
+.ta-acct-status { display: flex; flex-direction: column; gap: var(--grid-gap); min-width: 0; }
+.ta-acct-status > .at-card { flex: 1 1 auto; }
+.ta-acct-status > .at-card > .at-row:last-child { margin-top: auto; }
+@media (max-width: 1180px) { .ta-acct { grid-template-columns: minmax(0, 1fr); } }
+/* Robinhood's tools sentence, folded under one line */
+.ta-more > summary { display: inline-flex; align-items: center; gap: var(--space-1); cursor: pointer; font-size: var(--size-small); color: var(--text-2); }
+.ta-more > summary:hover { color: var(--text); }
+.ta-more > summary > .g { flex: none; color: var(--text-3); transition: transform var(--fast) var(--ease); }
+.ta-more[open] > summary > .g { transform: rotate(90deg); }
+.ta-more > p { margin-top: var(--space-2); }
+
 /* the Agentic account's orders: its phone approval and what waits for it are status chips at the head's end, under the heading on a phone */
 .ta-orders-head { flex-wrap: wrap; }
 .at-card > .ta-orders-head > .at-card-tail { flex: 0 1 auto; flex-wrap: wrap; min-width: 0; }
@@ -290,7 +305,6 @@
 
 /* your caps, one design in both views: a row for what they limit (buys, buys and sells, sells, the account), its name
    at the left and its limits beside it, as chips or as fields of one width; on a phone the name sits over them */
-.ta-caps-head { padding-top: var(--space-4); border-top: 1px solid var(--line); }
 .ta-caps { display: flex; flex-direction: column; gap: var(--space-3); margin: 0; }
 .ta-cap { display: grid; grid-template-columns: calc(var(--unit) * 26) minmax(0, 1fr); gap: var(--space-1) var(--space-3); }
 .ta-cap + .ta-cap { padding-top: var(--space-3); border-top: 1px solid var(--line); }
