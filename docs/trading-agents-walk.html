@@ -806,11 +806,11 @@ b, strong { font-weight: var(--weight-semibold); }
         "Each report's line previews its first sentence, never a heading alone: round 1's fact check reads \"Instrument confirmed: …\", not just \"Data note and verification.\"",
         "At the foot: \"This is the team's reasoning as it wrote it. It is not investment advice.\"",
         "A press inside the window, its margin and gaps included, leaves it open; only a press on the shaded page around it closes it. Every window on the dashboard does the same: an order ticket, the stop and \"Every word explained\"."] },
-    { "id": "C7", "title": "Scorecard", "tags": [], "changed": "2026-11-09",
+    { "id": "C7", "title": "Scorecard", "tags": [], "changed": "2026-11-11",
       "about": "Each call is scored once, in a first-week check against a named yardstick: SPY, the fund that copies the S&P 500, over the 5 trading days after a call on a US stock or fund, or the 7 calendar days after a call on a coin. It is a short first check, not the call's own time horizon (its decision states that): did it call the direction, and by how much did it beat or trail SPY (its \"alpha\")? The scorecard adds them up by rating. Alpha above zero is good for a Buy or Overweight, and below zero is good for an Underweight or Sell. A call is scored when a scoring runs, not by itself.",
-      "where": "Dashboard › How the desk is doing",
+      "where": "Dashboard › side list › How the desk is doing",
       "do": [
-        "Look at the scorecard under your paper record.",
+        "Open \"How the desk is doing\" in the side list. Look at the scorecard under your paper record.",
         "Point at each rating's average alpha.",
         "With a scored call on SPY itself (or VOO, IVV) in your journal, read the line under the table."],
       "see": [
@@ -891,9 +891,9 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "Your accounts, the Agentic account's buying power, the S&P 500 and the desk's calls, each with its figure or a dash when it cannot be had.",
         "The S&P 500 tile shows the index (about 7,400 in November 2026) and says when its move is from: \"now\" while the market trades, \"today's close\" after it, \"close of Fri 6 Nov\" on a weekend."] },
-    { "id": "C15", "title": "A figure that rounds to zero has no minus sign", "tags": [], "changed": "2026-11-08",
+    { "id": "C15", "title": "A figure that rounds to zero has no minus sign", "tags": [], "changed": "2026-11-11",
       "about": "A call that trailed its yardstick by a hair, say 0.02%, rounds to zero. The page writes it as zero, so a minus sign never says it lost ground when it did not. Calls scored before this was fixed read the same way.",
-      "where": "Dashboard › The desk's calls; How the desk is doing; a stock's page",
+      "where": "Dashboard › The desk's calls; side list › How the desk is doing; a stock's page",
       "do": [
         "Look at the \"alpha\" chips on the scored calls and the scorecard's \"Average alpha vs the yardstick\".",
         "Open a stock's page on a quiet day and read its change, and on the Your account page each holding's gain since bought."],
@@ -924,10 +924,23 @@ b, strong { font-weight: var(--weight-semibold); }
         "Press a tile again while the whole chart is already on screen.",
         "Reload the page, with a stock charted and the page scrolled to the top."],
       "see": [
-        "The order: Get started (when shown), the four tiles, \"What you hold needs a look\" (when it shows), Markets, Start here, the Chart, the stock's own page (once one is charted), Watchlist, Analyses you asked for, How the desk is doing, The desk's calls. The side list follows the same order, and each of its entries goes to its heading, except \"Today's market\", which opens a page of its own (J9).",
+        "The order: Get started (when shown), the four tiles, \"What you hold needs a look\" (when it shows), Markets, Start here, the Chart, the stock's own page (once one is charted), Watchlist, Analyses you asked for, The desk's calls. The side list follows the same order, and each of its entries goes to its heading, except \"Today's market\" (J9) and \"How the desk is doing\" (C18), which each open a page of their own.",
         "Pressing a Start here tile, a Markets tile or a watchlist row slides the Chart into view, at the top of the page. A tile in \"Worth a look today\" and a star in the side list do the same.",
         "A star in the side list charts the stock and slides the Chart into view too. From Your account, it takes you back to the desk first, so the chart is there to see: pressing it never changes a chart you cannot see.",
-        "With the whole chart already on screen, nothing moves. Reloading puts back the stock you last charted and does not scroll. If your computer is set to reduce motion, the chart appears at once, without the slide."] }
+        "With the whole chart already on screen, nothing moves. Reloading puts back the stock you last charted and does not scroll. If your computer is set to reduce motion, the chart appears at once, without the slide."] },
+    { "id": "C18", "title": "How the desk is doing is a page of its own", "tags": [], "changed": "2026-11-11",
+      "about": "The paper record and the scorecard are in the side list as a page of their own, not at the foot of a long scroll. The page says that it runs by itself: there is nothing to press on it, apart from the paper money you start with.",
+      "where": "Dashboard › side list › How the desk is doing",
+      "do": [
+        "Press \"How the desk is doing\" in the side list. Then fold the side list away and press its target icon in the narrow bar.",
+        "Read the two lines under the heading.",
+        "Press \"Change…\" beside \"Paper money\", enter [[25000]], press Save, then put it back to [[10000]] (L3).",
+        "Reload the page while it shows, then press \"Back to the desk\". In \"Get started\", step 5, press \"Go to the scorecard\"."],
+      "see": [
+        "A page headed \"How the desk is doing.\", then \"Your paper record\" and the scorecard, one under the other, with \"Back to the desk\" and the paper money at the top. The side list entry (and the target icon in the narrow bar) is marked as the page you are on. The Overview has no such section any more, and its \"The desk's calls\" still shows each call's paper badge.",
+        "First: \"It runs by itself: each call the desk records is followed with pretend money, at the first close after its day and sized as its order ticket would size it, and compared with just holding SPY (the S&P 500 fund). The scorecard grades each call once, over its first 5 market days, and nothing here needs pressing, apart from the paper money you start with.\" Then the count, for example \"3 scored · 2 waiting\".",
+        "The paper money changes and the record is worked out again, as before, on this page.",
+        "The reload opens the same page again. Step 5's button opens this page, not a place down the Overview. The paper record and the scorecard load as they did: no extra wait when you open the page, and the chart is drawn at the full width of the page."] }
   ] },
   { "id": "D", "name": "Your Robinhood accounts",
     "sub": "The dashboard reads the accounts you choose, at Robinhood's live prices. It never shows your account numbers.",
@@ -1585,11 +1598,11 @@ b, strong { font-weight: var(--weight-semibold); }
     "about": "\"On paper\" means with pretend money. Every call the desk makes on a company, a fund, Bitcoin or Ether is followed exactly as its ticket would size it, starting from $10,000, and compared with simply holding SPY, the fund that copies the S&P 500. It is how you find out whether the desk's calls are any good before real money is at stake.",
     "before": "A few calls recorded (section B). The record grows by itself; it starts with the first call.",
     "tests": [
-    { "id": "L1", "title": "The paper record", "tags": [], "changed": "2026-11-09",
+    { "id": "L1", "title": "The paper record", "tags": [], "changed": "2026-11-11",
       "about": "One sentence and one chart: what following the desk would have done, against SPY, the fund that copies the S&P 500 (the index itself cannot be bought). Paper buys and sells at the closing prices the market really printed, and each dividend is paid into paper cash on its ex-dividend day (the first day a new buyer no longer gets it), as a real account would receive it. SPY's line is paid its own dividends the same way, so the two stay a fair match. It never shows a total that leaves a stock out, and never values a stock it holds at what it cost.",
-      "where": "Dashboard › How the desk is doing › Your paper record",
+      "where": "Dashboard › side list › How the desk is doing › Your paper record",
       "do": [
-        "Read \"Your paper record\".",
+        "Open \"How the desk is doing\" in the side list. Read \"Your paper record\".",
         "Open the stock page of a stock bought on paper and point at the chart on the day it filled.",
         "If you have a call the team analysed for a past date (run today for an earlier day, outside a back-test), point at its paper badge."],
       "see": [
@@ -1612,9 +1625,9 @@ b, strong { font-weight: var(--weight-semibold); }
         "Pointing at a bought badge says \"Bought 2 at the close of 26 Oct 2026. NVDA has moved −13.59% since that close, to the latest close: its move since the paper buy, not the call's result.\"",
         "A call fills at the first closing price after its day. No costs are counted.",
         "A call that places no order on paper (\"paper: no order\", such as a Sell of a stock not held) does not use up one of the day's orders: another call that day still fills."] },
-    { "id": "L3", "title": "Change the paper money", "tags": [], "changed": "2026-10-21",
+    { "id": "L3", "title": "Change the paper money", "tags": [], "changed": "2026-11-11",
       "about": "Start the record from a sum that looks like yours; the record is worked out again from the first call.",
-      "where": "Dashboard › How the desk is doing › Paper money $10,000.00 › Change…",
+      "where": "Dashboard › side list › How the desk is doing › Paper money $10,000.00 › Change…",
       "do": [
         "Press \"Change…\", enter [[25000]] and press Save. Then try [[50]]",
         "Put it back to [[10000]]"],

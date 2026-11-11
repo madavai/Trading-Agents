@@ -420,7 +420,8 @@ test('what the person chose is remembered in desk-data, each in its own shape, a
   const next = (await call(term, 'POST', '/api/prefs', { body: { theme: 'purple', range: '10Y', side: 'open', layers: { ma50: 'yes' } } })).json();
   assert.deepEqual([next.theme, next.range, next.side, next.layers.ma50], ['dark', '1Y', 'open', false], 'a value it does not know leaves the one before');
   assert.equal((await call(term, 'POST', '/api/prefs', { body: { view: 'today' } })).json().view, 'today', "Today's market is a page it remembers");
-  assert.equal((await call(term, 'POST', '/api/prefs', { body: { view: 'tomorrow' } })).json().view, 'today', 'a page it does not know leaves the one before');
+  assert.equal((await call(term, 'POST', '/api/prefs', { body: { view: 'score' } })).json().view, 'score', '"How the desk is doing" is a page it remembers');
+  assert.equal((await call(term, 'POST', '/api/prefs', { body: { view: 'tomorrow' } })).json().view, 'score', 'a page it does not know leaves the one before');
   assert.equal((await call(term, 'POST', '/api/prefs', { body: { view: 'account' } })).json().view, 'account');
   const file = JSON.parse(fs.readFileSync(path.join(dir(), 'dashboard.json'), 'utf8'));
   assert.deepEqual(Object.keys(file).sort(), ['kind', 'layers', 'range', 'recent', 'side', 'symbol', 'theme', 'view']);

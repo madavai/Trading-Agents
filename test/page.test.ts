@@ -244,15 +244,15 @@ test('page-18: a Start here tile is three lines, the same on every tile (name; c
   assert.doesNotMatch(css, /\.ta-tier-tile[^{}]*:hover[^{}]*\{[^}]*display/, 'nothing is shown only on a hover');
 });
 
-test('page-19: the Overview runs Markets, Start here, the Chart, the stock page, the watchlist, Analyses, the scorecard and the calls, and the side list and rail follow it; a press on the page brings the chart into view, and nothing else does', () => {
+test('page-19: the Overview runs Markets, Start here, the Chart, the stock page, the watchlist, Analyses and the calls, and the side list and rail follow it; a press on the page brings the chart into view, and nothing else does', () => {
   const html = fs.readFileSync('src/terminal/ui/index.html', 'utf8');
   const overview = html.slice(html.indexOf('id="view-overview"'), html.indexOf('id="view-today"'));
   const ids = [...overview.matchAll(/<section class="at-section[^"]*" id="(sec-[a-z]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(ids, ['sec-guide', 'sec-today', 'sec-care', 'sec-markets', 'sec-start', 'sec-chart', 'sec-stock', 'sec-watch', 'sec-analyses', 'sec-score', 'sec-calls']);
+  assert.deepEqual(ids, ['sec-guide', 'sec-today', 'sec-care', 'sec-markets', 'sec-start', 'sec-chart', 'sec-stock', 'sec-watch', 'sec-analyses', 'sec-calls']);
   // the side list and the rail jump to the same headings in the same order, and every jump lands on a heading that exists
   const jumps = (from: string) => [...from.matchAll(/data-act="goto" data-to="(sec-[a-z]+)"/g)].map((m) => m[1]!);
   const side = html.slice(html.indexOf('id="sideOpen"'), html.indexOf('id="sideFolded"')), rail = html.slice(html.indexOf('id="sideFolded"'), html.indexOf('<div class="main-col">'));
-  const want = ['sec-start', 'sec-chart', 'sec-stock', 'sec-watch', 'sec-analyses', 'sec-score', 'sec-calls'];
+  const want = ['sec-start', 'sec-chart', 'sec-stock', 'sec-watch', 'sec-analyses', 'sec-calls'];
   assert.deepEqual(jumps(side), want);
   assert.deepEqual(jumps(rail), want);
   for (const id of new Set([...jumps(html), ...[...page.matchAll(/data-to="(sec-[a-z]+)"/g)].map((m) => m[1]!)])) assert.ok(ids.includes(id), `${id} is a heading on the page`);
@@ -289,13 +289,14 @@ test("page-20: Today's market is a page of its own, opened from the side list an
   // the side list and the rail each have the button that opens it, marked as current while it shows
   assert.match(html, /<button class="at-li" data-act="view" data-view="today" id="navToday">.*<span class="at-li-t">Today's market<\/span><\/button>/);
   assert.match(html, /<button class="icon-btn" data-act="view" data-view="today" id="railToday" aria-label="Today's market" title="Today's market">/);
-  assert.match(page, /for \(const \[id, page\] of \[\['#navOverview', 'overview'\], \['#navToday', 'today'\], \['#railToday', 'today'\]\] as const\) \{/);
+  assert.match(page, /for \(const \[id, page\] of \[\['#navOverview', 'overview'\], \['#navToday', 'today'\], \['#railToday', 'today'\], /);
   assert.match(page, /\$\('#view-today'\)\.hidden = v !== 'today';/);
   assert.match(page, /\$\('#railToday'\)\.classList\.toggle\('on', v === 'today'\);/);
-  assert.match(page, /case 'view': showView\(el\.dataset\.view === 'account' \? 'account' : el\.dataset\.view === 'today' \? 'today' : 'overview'\); break;/);
+  assert.match(page, /case 'view': showView\(VIEWS\.find\(\(v\) => v === el\.dataset\.view\) \?\? 'overview'\); break;/, "the page opens whichever of the four it is asked for (the desk's own list)");
+  assert.match(page, /const VIEWS: readonly View\[\] = \['overview', 'account', 'today', 'score'\];/);
   // remembered, and put back where the person left it, like the account page (the desk's prefs accept the new page: terminal.test)
-  assert.match(page, /if \(P\.view === 'account' \|\| P\.view === 'today'\) showView\(P\.view, false\);/);
-  assert.match(fs.readFileSync('src/terminal/prefs.ts', 'utf8'), /one\(r\.view, \['overview', 'account', 'today'\] as const\)/);
+  assert.match(page, /if \(P\.view && P\.view !== 'overview'\) showView\(P\.view, false\);/);
+  assert.match(fs.readFileSync('src/terminal/prefs.ts', 'utf8'), /one\(r\.view, \['overview', 'account', 'today', 'score'\] as const\)/);
   // a press on a Worth a look pick charts it from the Overview, as a side-list star does; its robot keeps its own act
   assert.match(page, /<button class="ta-look-go" data-act="select" data-symbol="\$\{esc\(p\.symbol\)\}"/);
   assert.match(page, /\$\{isOpen\(p\.symbol\) \? openChip\(p\.symbol\) : robot\(p\.symbol\)\}/);
@@ -306,4 +307,42 @@ test("page-20: Today's market is a page of its own, opened from the side list an
   assert.equal((page.match(/void loadMorning\(\)/g) ?? []).length, 2, 'at the start, and by the hourly timer');
   assert.match(page, /setInterval\(\(\) => void loadMorning\(\), 60 \* 60_000\);/);
   assert.doesNotMatch(page, /case 'view':[^\n]*loadMorning/, 'opening the page asks for nothing again');
+});
+
+test('page-21: "How the desk is doing" is a page of its own with both cards, opened from the side list and the rail, remembered, saying in words that it runs by itself, and loading as it did', () => {
+  const html = fs.readFileSync('src/terminal/ui/index.html', 'utf8');
+  const score = html.slice(html.indexOf('id="view-score"'), html.indexOf('id="view-account"'));
+  // the page: its heading (the scorecard's dotted word kept), a subtitle written by the page from what the desk holds, the counts, the paper money control, a way back
+  assert.match(html, /<div class="at-page-col" id="view-score" hidden>/);
+  assert.match(score, /<h1 class="page-title"><span class="ta-term" data-term="scorecard">How the desk is <em>doing\.<\/em><\/span><\/h1>/);
+  for (const id of ['scoreIntro', 'scoreSub', 'paperDo', 'paperCard', 'score']) assert.equal((html.match(new RegExp(`id="${id}"`, 'g')) ?? []).length, 1, `${id} is on the page once`);
+  assert.ok(['scoreIntro', 'scoreSub', 'paperDo', 'paperCard'].every((id) => score.includes(`id="${id}"`)) && score.includes('id="score"'), 'all of it is on the new page');
+  assert.match(score, /data-act="view" data-view="overview"/);
+  // nothing of it stays in the Overview, and no link goes to a section that is gone
+  assert.doesNotMatch(html, /sec-score/);
+  assert.doesNotMatch(page, /sec-score/);
+  assert.match(page, /<button class="at-btn at-press" data-act="view" data-view="score"><svg class="g"><use href="#i-target"\/><\/svg><span>Go to the scorecard<\/span><\/button>/, 'Get started step 5 opens the page');
+  // the side list and the rail: the buttons that open it, marked as current while it shows; the old Scorecard jump is gone from both
+  assert.match(html, /<button class="at-li" data-act="view" data-view="score" id="navScore">.*<span class="at-li-t">How the desk is doing<\/span><\/button>/);
+  assert.match(html, /<button class="icon-btn" data-act="view" data-view="score" id="railScore" aria-label="How the desk is doing" title="How the desk is doing">/);
+  assert.doesNotMatch(html, /aria-label="Scorecard"|<span class="at-li-t">Scorecard<\/span>/);
+  assert.match(page, /\['#navScore', 'score'\], \['#railScore', 'score'\]\] as const\) \{/);
+  assert.match(page, /\$\('#view-score'\)\.hidden = v !== 'score';/);
+  assert.match(page, /\$\('#railScore'\)\.classList\.toggle\('on', v === 'score'\);/);
+  assert.match(page, /case 'view': showView\(VIEWS\.find\(\(v\) => v === el\.dataset\.view\) \?\? 'overview'\); break;/);
+  // remembered like the account page (the desk's prefs accept it: terminal.test)
+  assert.match(page, /if \(P\.view && P\.view !== 'overview'\) showView\(P\.view, false\);/);
+  assert.match(fs.readFileSync('src/terminal/prefs.ts', 'utf8'), /one\(r\.view, \['overview', 'account', 'today', 'score'\] as const\)/);
+  // the page says in plain words that it runs by itself, and every fact in it is the code's: what a call is followed with and against, and the days it is graded over
+  assert.match(page, /\$\('#scoreIntro'\)\.textContent = `It runs by itself: each call the desk records is followed with pretend money, at the first close after its day and sized as its order ticket would size it, and compared with just holding \$\{fundWords\(d\.desk\.benchmark\)\}\. The scorecard grades each call once, over its first \$\{d\.desk\.holdingDays\} market days, and nothing here needs pressing, apart from the paper money you start with\.`;/);
+  assert.match(page, /fills at the first closing price after its day/, 'the paper card says the same of its fills');
+  assert.match(page, /followed as its order ticket would size it/);
+  // the paper money's edit works from the new page: the same control, still written into #paperDo
+  assert.match(page, /\$\('#paperDo'\)\.innerHTML = PAPER\.editing/);
+  assert.match(page, /case 'paper-edit': PAPER\.editing = true; renderPaper\(\); break;/);
+  assert.match(page, /case 'paper-save': void run\(async \(\) => \{ PAPER\.book = await api\.setPaperStart\(/);
+  // loading as before: the paper record is asked for by the desk's records changing, never by the page being shown, and the chart is drawn again when the page opens (a hidden page has no width), asking for nothing
+  assert.equal((page.match(/api\.paper\(\)/g) ?? []).length, 1);
+  assert.match(page, /if \(v === 'score'\) renderPaper\(\);/);
+  assert.doesNotMatch(page, /case 'view':[^\n]*(loadPaper|api\.paper)/);
 });

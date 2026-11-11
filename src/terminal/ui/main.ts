@@ -37,9 +37,10 @@ const S = {
   lost: false,
 };
 
-/** Which page the main column shows: the desk (markets, chart, watchlist, calls, scorecard), today's market (the weather and
- *  what is worth a look, worked out hourly) or the person's account. */
-type View = 'overview' | 'account' | 'today';
+/** Which page the main column shows: the desk (markets, chart, watchlist, calls), today's market (the weather and what is worth a
+ *  look, worked out hourly), how the desk is doing (the paper record and the scorecard) or the person's account. */
+type View = 'overview' | 'account' | 'today' | 'score';
+const VIEWS: readonly View[] = ['overview', 'account', 'today', 'score'];
 let view: View = 'overview';
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string): T => document.querySelector<T>(sel)!;
@@ -235,7 +236,7 @@ function renderGuide(): void {
   const paper = guideStep(5, w.done, `Follow them ${term('paper', 'on paper')} for ${esc(w.words)}, then read the ${term('scorecard', 'scorecard')} before deciding about money and Robinhood`,
     `<div class="at-meter${w.done ? ' ok' : ''}"><progress class="at-bar" max="${w.need}" value="${Math.min(w.weeks, w.need)}" aria-label="${w.weeks} of ${w.need} weeks on paper"></progress><b>${Math.min(w.weeks, w.need)} of ${w.need} weeks</b></div>
     <p class="at-quiet ta-gwhy">Paper follows every call with pretend money, against SPY, the fund that copies the ${term('sp500', 'S&P 500')}. A few weeks are noise, not proof: read the scorecard, good or bad, before you decide anything. Connecting Robinhood and switching trading on stay your own decisions.</p>
-    <div class="at-row"><button class="at-btn at-press" data-act="goto" data-to="sec-score"><svg class="g"><use href="#i-target"/></svg><span>Go to the scorecard</span></button></div>`);
+    <div class="at-row"><button class="at-btn at-press" data-act="view" data-view="score"><svg class="g"><use href="#i-target"/></svg><span>Go to the scorecard</span></button></div>`);
 
   const all = g.done === g.of;
   $('#guideSub').textContent = all ? 'All five done. The desk keeps reading and proposing; every decision stays yours.'
@@ -1226,6 +1227,8 @@ function renderScore(): void {
   if (!d) return;
   renderPaper();
   const r = d.record.summary, pctOf = (v: number) => pct(v * 100, 1);
+  // the page says in words that it runs by itself, from what the desk holds: what a call is followed against and the days it is graded over
+  $('#scoreIntro').textContent = `It runs by itself: each call the desk records is followed with pretend money, at the first close after its day and sized as its order ticket would size it, and compared with just holding ${fundWords(d.desk.benchmark)}. The scorecard grades each call once, over its first ${d.desk.holdingDays} market days, and nothing here needs pressing, apart from the paper money you start with.`;
   $('#scoreSub').textContent = `${r.resolved} scored · ${r.pending} waiting${r.unscored ? ` · ${r.unscored} unreadable` : ''}`;
   const names = [...RATINGS.filter((x) => r.byRating[x]), ...Object.keys(r.byRating).filter((x) => !RATINGS.includes(x))];
   const grid = names.length
@@ -1335,22 +1338,26 @@ function renderAll(): void {
   renderSub(); renderGuide(); renderFavs(); renderAccount(); renderToday(); renderStart(); renderMorning(); renderControls(); renderHero(); renderCall(); renderStock(); renderAnalyses(); renderWatch(); renderCalls(); renderScore();
 }
 
-/** Shows the desk, today's market or the account page; the side list marks where the person is. */
+/** Shows the desk, today's market, how the desk is doing or the account page; the side list marks where the person is. */
 function showView(v: View, save = true): void {
   const was = view;
   view = v;
   if (save) remember({ view: v });
   $('#view-overview').hidden = v !== 'overview';
   $('#view-today').hidden = v !== 'today';
+  $('#view-score').hidden = v !== 'score';
   $('#view-account').hidden = v !== 'account';
-  for (const [id, page] of [['#navOverview', 'overview'], ['#navToday', 'today'], ['#railToday', 'today']] as const) {
+  for (const [id, page] of [['#navOverview', 'overview'], ['#navToday', 'today'], ['#railToday', 'today'], ['#navScore', 'score'], ['#railScore', 'score']] as const) {
     const nav = $(id);
     if (v === page) nav.setAttribute('aria-current', 'page'); else nav.removeAttribute('aria-current');
   }
-  $('#railToday').classList.toggle('on', v === 'today');   // the folded rail's icon has no mark of its own for the current page
+  // the folded rail's icons have no mark of their own for the current page
+  $('#railToday').classList.toggle('on', v === 'today');
+  $('#railScore').classList.toggle('on', v === 'score');
   renderSideAccount();
   if (was !== v) $('#page').scrollTo({ top: 0 });
   if (v === 'account' && signedIn() && A.chosen.length && !A.snapshot && !A.reading) void readAccounts();
+  if (v === 'score') renderPaper();   // its chart is drawn to the width of the page it is on, which a hidden page has not got (nothing is fetched)
 }
 
 /** Whether a ticket can be opened: Robinhood connected and the Agentic account shown. Otherwise the account page says how. */
@@ -1491,7 +1498,7 @@ document.addEventListener('click', (e) => {
   const sym = el.dataset.symbol ?? '';
   switch (el.dataset.act) {
     case 'goto': { showView('overview'); const to = el.dataset.to === 'top' ? $('#page') : document.getElementById(el.dataset.to ?? ''); to?.scrollIntoView({ behavior: 'smooth', block: 'start' }); break; }
-    case 'view': showView(el.dataset.view === 'account' ? 'account' : el.dataset.view === 'today' ? 'today' : 'overview'); break;
+    case 'view': showView(VIEWS.find((v) => v === el.dataset.view) ?? 'overview'); break;
     case 'side': setSide(el.dataset.side === 'fold'); break;
     case 'theme': setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'); break;
     case 'kind': S.kind = el.dataset.kind === 'candles' ? 'candles' : 'area'; remember({ kind: S.kind }); renderControls(); renderHero(); break;
@@ -1770,7 +1777,7 @@ async function loadPrefs(): Promise<void> {
     else if (Object.values(here).some((v) => v !== undefined)) remember({ ...P });
     try { localStorage.setItem('ta.prefs', JSON.stringify(P)); } catch { /* the page works without it */ }
   } catch { /* this browser's copy stands */ }
-  if (P.view === 'account' || P.view === 'today') showView(P.view, false);
+  if (P.view && P.view !== 'overview') showView(P.view, false);
 }
 
 let seen = '', build = '';
