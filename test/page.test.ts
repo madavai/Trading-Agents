@@ -186,54 +186,45 @@ test('server-11: the Analyse box offers the settings\' own rounds first and asks
   assert.match(fs.readFileSync('src/terminal/ui/api.ts', 'utf8'), /enqueue: \(symbol: string, depth\?: Depth\) => call<\{ queue: QueueView\[\] \}>\('POST', '\/api\/queue', depth \? \{ symbol, depth \} : \{ symbol \}\)/, 'no depth sent at all for the settings');
 });
 
-test('page-19: The whole market is changed only from the search box and the tiles: no typed list, no Change… button, and no word that points at them', () => {
-  // Before: "Change…" opened a field for up to eight tickers typed with commas and no suggestions, beside the search box at the top.
-  for (const gone of [/mkInput/, /mk-edit/, /mk-cancel/, /mk-save/, /marketEditor/, /separated by commas/, /Press Change… to add/, /MK\.editing/, /Choose the broad funds this tier shows/]) assert.doesNotMatch(page, gone, String(gone));
-  assert.match(page, /market: 'The whole market is empty\. Search a fund in the box at the top, such as SPY, and press Show in The whole market\.',/);
-  assert.match(page, /<p class="at-quiet">✕ takes a fund out of this row\. To add one, search for it in the box at the top and press Show in The whole market\.<\/p>/);
-  // every save goes through the desk's own, which checks each fund's price (and the desk's rules) before it keeps the row
-  assert.equal((page.match(/api\.setMarket\(/g) ?? []).length, 1);
-  assert.match(page, /case 'mk-remove': if \(S\.desk\) void saveMarketList\(S\.desk\.market\.symbols\.filter\(\(s\) => s !== sym\)\); break;/);
-  assert.match(page, /case 'mk-shipped': void saveMarketList\(\[\.\.\.\(S\.desk\?\.market\.shipped \?\? \[\]\)\]\); break;/);
-  // ✕ only on a tile of The whole market; "Put back" only while the row is not the four the desk ships
-  assert.match(page, /\(tier === 'market' \? `<button class="icon-btn" data-act="mk-remove" data-symbol="\$\{esc\(i\.symbol\)\}" title="\$\{esc\(out\)\}" aria-label="\$\{esc\(out\)\}"><svg class="g"><use href="#i-x"\/><\/svg><\/button>` : ''\)/);
-  assert.match(page, /const out = `Take \$\{i\.symbol\} out of The whole market`;/);
-  assert.match(page, /t\.tier === 'market' && !market\.asShipped \? `<button class="at-btn at-press" data-act="mk-shipped">Put back \$\{esc\(listWords\(market\.shipped\)\)\}<\/button>` : ''/);
-  // each save sends the whole row as the page last read it, so a press made while one is being saved waits to be pressed again
-  assert.match(page, /if \(MK\.saving\) \{ toast\('The whole market is still being saved\. Press again in a moment\.', 'bad'\); return; \}/);
-  assert.match(page, /\} finally \{ MK\.saving = false; \}/);
+test('page-19: the whole-market row is gone from the page: no ✕ on a tile, no "Put back", no saving of a row, no "Show in The whole market", no extra presses in the search list', () => {
+  for (const gone of [/mk-remove/, /mk-shipped/, /saveMarketList/, /\bMK\b/, /api\.setMarket/, /Show in The whole market/, /In The whole market/, /find-market/, /showInMarket/, /rowOffer/, /rowActions/, /marketOffer/, /marketpick/, /Shift\+Enter/, /d\.market\b/,
+    /out of The whole market/, /takes a fund out of this row/, /mkInput/, /mk-edit/, /marketEditor/, /separated by commas/, /Choose the broad funds this tier shows/]) assert.doesNotMatch(page, gone, String(gone));
+  assert.equal(fs.existsSync('src/terminal/ui/marketpick.ts'), false, 'its drift test and its module went with it');
+  assert.doesNotMatch(fs.readFileSync('src/terminal/ui/api.ts', 'utf8'), /setMarket|MarketView|tiers\/market/);
+  assert.doesNotMatch(fs.readFileSync('src/terminal/ui/dashboard.css', 'utf8'), /ta-opt-do/, 'the two presses under a fund in the search list are gone');
+  // a row in the search list is one press (add it); the line under the list says so
+  assert.match(page, /: 'From Yahoo Finance · ↑ ↓ to move · Enter to add to your watchlist · Esc to close';/);
+  assert.match(page, /else if \(e\.key === 'Enter' && F\.active >= 0 && rows\[F\.active\]\) \{ e\.preventDefault\(\); pick\(rows\[F\.active\]!\); \}/);
   // the other "Change…" buttons stay: the SEC contact email's and the paper money's
   assert.match(page, /data-act="contact-edit">Change…/);
   assert.match(page, /data-act="paper-edit">Change…/);
 });
 
-test('page-20: a fund in the search list gets "Add to watchlist" and "Show in The whole market"; one in the row, or a full row, says so; Shift+Enter does what the button does', () => {
-  assert.match(page, /import \{ marketOffer, type MarketOffer \} from '\.\/marketpick\.js';/);
-  assert.match(page, /return marketOffer\(r, d\.market\.symbols, new Set\(d\.startHere\.find\(\(t\) => t\.tier === 'sectors'\)\?\.items\.map\(\(i\) => i\.symbol\)\), d\.market\.max\);/);
-  assert.match(page, /const add = watched \? '' : `<button type="button" class="at-btn at-press" data-act="find-pick" data-i="\$\{i\}">Add to watchlist<\/button>`;/);
-  assert.match(page, /offer === 'show' \? `<button type="button" class="at-btn at-press" data-act="find-market" data-i="\$\{i\}">Show in The whole market<\/button>`/);
-  assert.match(page, /: offer === 'in' \? '<span class="at-chip">In The whole market<\/span>'/);
-  assert.match(page, /const marketFull = \(max: number\): string => `The whole market already holds \$\{max\} funds: take one out to make room\.`;/);
-  // the second press keeps the fund in the row alone, last; it never puts it on the watchlist
-  assert.match(page, /void saveMarketList\(\[\.\.\.d\.market\.symbols, r\.symbol\]\);/);
-  assert.match(page, /if \(e\.shiftKey\) showInMarket\(rows\[F\.active\]!\); else pick\(rows\[F\.active\]!\);/);
-  assert.match(page, / to your watchlist · Shift\+Enter to show it in The whole market/, 'the line under the list says it only for a fund the row can take');
-  // a press on a button inside a row is that button's, never the row's: the closest [data-act] is the button itself
-  assert.match(page, /case 'find-market': \{ const r = findRows\(\)\[Number\(el\.dataset\.i\)\]; if \(r\) showInMarket\(r\); break; \}/);
-  // two buttons, drawn on a phone as on a desktop: nothing waits for a hover, and the phone's rule hides only the tags
-  const css = fs.readFileSync('src/terminal/ui/dashboard.css', 'utf8');
-  assert.match(css, /\.ta-opt-do \{ grid-column: 2 \/ -1;/);
-  assert.doesNotMatch(css, /\.ta-opt-do[^{}]*:hover/);
-  assert.doesNotMatch(css, /\.ta-opt-do[^{}]*\{[^}]*display: none/);
-  assert.match(css, /@media \(max-width: 640px\) \{ \.ta-opt \{ grid-template-columns: calc\(var\(--unit\) \* 18\) minmax\(0, 1fr\); \} \.ta-opt-tags \{ display: none; \} \}/);
+test('page-20: the first section is "Sectors": its heading and line, the side list and the rail say so, it holds the eleven sector tiles and nothing else, and Get started points to it by that name', () => {
+  const html = fs.readFileSync('src/terminal/ui/index.html', 'utf8');
+  assert.doesNotMatch(html, /Start here/, 'the section has one name');
+  assert.match(html, /<section class="at-section" id="sec-start">\n\s*<div class="at-sect-head"><div class="at-head-words"><h2>Sectors<\/h2><p>The eleven parts of the economy, one fund each\. Press a tile to chart it; the robot asks the desk to analyse it and \+ adds it to your watchlist\.<\/p><\/div><\/div>/);
+  assert.match(html, /<button class="at-li" data-act="goto" data-to="sec-start"><svg class="g"><use href="#i-layers"\/><\/svg><span class="at-li-t">Sectors<\/span><\/button>/);
+  assert.match(html, /<button class="icon-btn" data-act="goto" data-to="sec-start" aria-label="Sectors" title="Sectors">/);
+  assert.doesNotMatch(page, /Start here/);
+  // the section draws the desk's sector tiles alone: no heading of its own inside, no row of names, no coins, no "more on your watchlist"
+  assert.match(page, /function tierBlock\(t: TierView\): string \{\n {2}return `<div class="ta-tier"><div class="at-deck ta-tier-deck">\$\{t\.items\.map\(\(i\) => tierTile\(i, t\.tier\)\)\.join\(''\)\}<\/div><\/div>`;\n\}/);
+  assert.match(page, /el\.innerHTML = d\.startHere\.map\(tierBlock\)\.join\(''\)/);
+  assert.doesNotMatch(page, /more on your watchlist|No single names on your watchlist yet|ta-tier-head/);
+  assert.match(page, /and do the same for a broad \$\{term\('fund', 'fund'\)\} such as SPY \(a fund for the whole market\)\. In Sectors, press \+ on one or two you understand\./, 'Get started: the whole market comes from the search box, the sectors from the tiles');
+  assert.match(page, /<span>Go to Sectors<\/span>/);
+  // "Worth a look" says what it looks over
+  assert.match(page, /Looking over the sectors and your watchlist: the first look of the day takes a minute\./);
+  // a tile's fund shade without a price comes from the tier it is in, on the watchlist's tiers too (the whole-market funds are there now)
+  assert.match(page, /const at = tier \?\? \[\.\.\.\(S\.desk\?\.startHere \?\? \[\]\), \.\.\.\(S\.desk\?\.watchTiers \?\? \[\]\)\]\.find\(\(t\) => \(t\.tier === 'market' \|\| t\.tier === 'sectors'\) && t\.items\.some\(\(i\) => i\.symbol === sym\)\)\?\.tier;/);
 });
 
-test('page-21: a Start here tile is three lines, the same on every tile (name; code and move; rating and presses), with a letter badge, what leaves it is said when it is pointed at, and a badge is shaded only by the kind Yahoo gives', () => {
+test('page-21: a Sectors tile is three lines, the same on every tile (name; code and move; rating and presses), with a letter badge, what leaves it is said when it is pointed at, and a badge is shaded only by the kind Yahoo gives', () => {
   // the badge: the House's logo box holding letters, no picture, so nothing is fetched from outside (the page's policy allows images from this computer only)
   assert.match(page, /const badge = \(sym: string, kind: Kind\): string => `<span class="at-logo-box sm ta-badge\$\{kind \? ` \$\{kind\}` : ''\}"><span class="at-logo fallback">\$\{esc\(badgeLetters\(sym\)\)\}<\/span><\/span>`;/);
   assert.doesNotMatch(page, /<img\b/, 'no picture from anywhere');
   assert.match(page, /const badgeLetters = \(sym: string\): string => \(cryptoBase\(sym\) \?\? sym\.replace\(\/\^\\\^\/, ''\)\.split\(\/\[-\.=\]\/\)\[0\] \?\? sym\)\.slice\(0, 4\)\.toUpperCase\(\);/, 'BTC for BTC-USD, BRK for BRK-B, at most four letters');
-  // a kind only from Yahoo's own word on the quote (a company, a fund or a coin; anything else says none); with no price yet, or a failed one, a tile in The whole market or Sectors is a fund as its row says, and nothing else is anything
+  // a kind only from Yahoo's own word on the quote (a company, a fund or a coin; anything else says none); with no price yet, or a failed one, a symbol in the whole-market or sectors tier is a fund as the desk files it, and nothing else is anything
   assert.match(page, /type Kind = QuoteKind \| '';/);
   assert.match(page, /const q = quoteOf\(sym\);\n {2}if \(q\) return q\.kind \?\? '';/);
   assert.match(page, /return at === 'market' \|\| at === 'sectors' \? 'fund' : '';/);
@@ -258,7 +249,7 @@ test('page-21: a Start here tile is three lines, the same on every tile (name; c
   // Worth a look takes the same badge and keeps its words
   assert.match(page, /<span class="ta-tier-top">\$\{badge\(p\.symbol, kindOf\(p\.symbol\)\)\}<b class="at-tile-name">\$\{esc\(name\)\}<\/b>\$\{move\}<\/span><span class="at-tile-sub">\$\{esc\(p\.symbol\)\} · \$\{esc\(p\.why\)\}<\/span>/);
   // the shorter words: the subtitle and the line under the tiers, with the dotted words and the advice line kept
-  assert.match(fs.readFileSync('src/terminal/ui/index.html', 'utf8'), /<h2>Start here<\/h2><p>The broadest first\. Press a tile to chart it; the robot asks the desk to analyse it and \+ adds it to your watchlist\.<\/p>/);
+  assert.match(fs.readFileSync('src/terminal/ui/index.html', 'utf8'), /<h2>Sectors<\/h2><p>The eleven parts of the economy, one fund each\. Press a tile to chart it; the robot asks the desk to analyse it and \+ adds it to your watchlist\.<\/p>/);
   assert.match(page, /\$\{term\('today'\)\} is the change over the latest trading day; a dash is a price Yahoo Finance did not give\. Each \$\{term\('call', 'call'\)\} is the desk's rating, Buy to Sell; a \$\{term\('fund', 'fund'\)\} holds many companies at once\. Nothing here is investment advice\./);
   // the style: a shade for a fund and one for a coin, the neutral box for the rest; nothing shown only on a hover
   const css = fs.readFileSync('src/terminal/ui/dashboard.css', 'utf8');
@@ -268,7 +259,7 @@ test('page-21: a Start here tile is three lines, the same on every tile (name; c
   assert.doesNotMatch(css, /\.ta-tier-tile[^{}]*:hover[^{}]*\{[^}]*display/, 'nothing is shown only on a hover');
 });
 
-test('page-22: the Overview runs Markets, Start here, the Chart, the stock page, the watchlist and the calls, and the side list and rail follow it; a press on the page brings the chart into view, and nothing else does', () => {
+test('page-22: the Overview runs Markets, Sectors, the Chart, the stock page, the watchlist and the calls, and the side list and rail follow it; a press on the page brings the chart into view, and nothing else does', () => {
   const html = fs.readFileSync('src/terminal/ui/index.html', 'utf8');
   const overview = html.slice(html.indexOf('id="view-overview"'), html.indexOf('id="view-today"'));
   const ids = [...overview.matchAll(/<section class="at-section[^"]*" id="(sec-[a-z]+)"/g)].map((m) => m[1]);
@@ -292,7 +283,7 @@ test('page-22: the Overview runs Markets, Start here, the Chart, the stock page,
   assert.ok(fs.readFileSync('src/terminal/ui/index.html', 'utf8').indexOf('id="favs"') < fs.readFileSync('src/terminal/ui/index.html', 'utf8').indexOf('id="sideFolded"'), 'the stars are in the open side list, #sideOpen');
   assert.doesNotMatch(/function select\([\s\S]*?\n\}\n/.exec(page)![0], /showChart/);
   // the tiles, Markets, Worth a look and the watchlist rows all press through the same act
-  assert.equal((page.match(/data-act="select"/g) ?? []).length, 5, 'the side list star, a Markets tile, a watchlist row, a Start here tile and a Worth a look tile');
+  assert.equal((page.match(/data-act="select"/g) ?? []).length, 5, 'the side list star, a Markets tile, a watchlist row, a Sectors tile and a Worth a look tile');
 });
 
 test("page-23: Today's market is a page of its own, opened from the side list and the rail like Your account, remembered, and fed by the one hourly refresh whichever page shows", () => {

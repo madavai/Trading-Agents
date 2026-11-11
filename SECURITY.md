@@ -89,7 +89,7 @@ order tool.
   one-time link, which the page swaps for the key once, within two minutes, and then keeps for itself. A page opened by
   hand has no key and says so; opening the dashboard again (run /terminal) opens a page that has one.
 - What the dashboard remembers between visits (light or dark, the side list, the page and the stock you were on, the
-  chart's settings, the stocks you looked at last, your whole-market funds, which watchlist tiers you folded, whether
+  chart's settings, the stocks you looked at last, which watchlist tiers you folded, whether
   Get started is open, and the day you first opened a call in full, which the dashboard notes itself when it shows you
   one and the page cannot set) is kept in `desk-data/dashboard.json`, each value checked before it is kept. Nothing
   about an order is ever remembered: every ticket starts afresh.
@@ -100,7 +100,7 @@ order tool.
 - After an update the dashboard offers Restart at the top of the page: new code on this computer runs only after your
   press, and never while an order is being sent. Stop, at the top right of the page, closes it.
 - The search box sends what you type to Yahoo Finance's public search, which suggests matching stocks.
-- "Today's market" asks Yahoo Finance for the daily prices of the whole-market funds, the sector funds and your watchlist
+- "Today's market" asks Yahoo Finance for the daily prices of the sector funds and your watchlist
   (and its news search for your companies and coins), and asks Polymarket's public search for its odds on the Federal
   Reserve, at most once an hour. The list is kept in `desk-data/screen.json`. The switch "Analyse the top 3 each market
   morning" ships off and starts the next market morning once switched on; it only puts those stocks on the waiting list, never an order.

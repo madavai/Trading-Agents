@@ -2,12 +2,12 @@
 // dashboard opens the browser on a one-time link (#open=…), which the page swaps for the key once (claimKey) and keeps
 // in this browser's own storage for this address alone. A page opened by hand, or one left from a dashboard that was
 // since stopped and started afresh, has no key, and says so rather than guessing.
-import type { DeskState, MarketView } from '../state.js';
+import type { DeskState } from '../state.js';
 import type { Tier, TierItem, TierView } from '../tiers.js';
 import type { Pick as Worth, Screen } from '../../desk/screen.js';
 import type { Weather, WeatherLine } from '../../desk/weather.js';
 /** One stock worth a look today (desk/screen.ts Pick; renamed so it does not hide TypeScript's own Pick). */
-export type { MarketView, Tier, TierItem, TierView, Worth, Screen, Weather, WeatherLine };
+export type { Tier, TierItem, TierView, Worth, Screen, Weather, WeatherLine };
 /** The morning switch as the page shows it: on or off, and how many it puts on the waiting list. */
 export interface Morning { on: boolean; top: number; /** The first market day the switch may act (YYYY-MM-DD), while it is on. */ from?: string }
 import type { History, QuoteResult } from '../quotes.js';
@@ -105,8 +105,6 @@ export const api = {
   weather: () => call<{ weather: Weather }>('GET', '/api/weather'),
   /** "Analyse the top three each market morning", on or off. */
   setMorning: (on: boolean) => call<{ morning: Morning; queued: string[] }>('POST', '/api/screen/morning', { on }),
-  /** The whole-market funds on "Start here"; the desk checks each has a price before it keeps the list. */
-  setMarket: (symbols: string[]) => call<{ market: MarketView }>('POST', '/api/tiers/market', { symbols }),
   stop: () => call<{ stopping: boolean }>('POST', '/api/stop', {}),
   quotes: (symbols: string[]) => call<{ quotes: QuoteResult[] }>('GET', `/api/quotes?${q({ symbols: symbols.join(',') })}`),
   markets: () => call<{ markets: Market[] }>('GET', '/api/markets'),

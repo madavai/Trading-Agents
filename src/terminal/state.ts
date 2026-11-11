@@ -1,5 +1,5 @@
 // What the page shows of the desk itself: the calls in the journal, how they turned out, the stocks being watched, the
-// world in tiers ("Start here"), the analyses waiting and the first month's steps ("Get started"). All of it is read from
+// world in tiers (the "Sectors" section and the watchlist), the analyses waiting and the first month's steps ("Get started"). All of it is read from
 // the desk's own files; nothing here is invented, and a part with nothing in it is empty.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -16,8 +16,8 @@ import { isCrypto } from '../data/symbols.js';
 import { deskDataDir } from '../paths.js';
 import { today } from '../data/dates.js';
 import { readWatchlist, type WatchItem } from './store.js';
-import { marketOf, readPrefs } from './prefs.js';
-import { isShipped, MAX_MARKET, SHIPPED_MARKET, ticketable, tiersOf, type TierView } from './tiers.js';
+import { readPrefs } from './prefs.js';
+import { ticketable, tiersOf, type TierView } from './tiers.js';
 import { guideOf, type Guide } from './guide.js';
 
 /** A stock on the waiting list as the page shows it: a running one says where its run stands. */
@@ -58,20 +58,13 @@ export interface DeskState {
   /** How much record the desk has on paper, the paper money it starts with, and the weeks under which switching trading
    *  on asks for one extra press, as a number and in words ("four weeks"). The paper book itself is /api/paper. */
   paper: PaperRecord & { startUsd: number; minWeeks: number; minWords: string };
-  /** "Start here": the whole market, the eleven sectors, the person's own names (and crypto, when they watch any), each
-   *  with the desk's latest call; and the watchlist grouped the same way, broadest first. Prices are /api/quotes. */
+  /** The "Sectors" section (named "Start here" before, hence the field): the eleven sector funds, each with the desk's latest
+   *  call; and the watchlist grouped by tier, broadest first, which is where the whole-market funds, single names and coins
+   *  the person follows are. Prices are /api/quotes. */
   startHere: TierView[]; watchTiers: TierView[];
-  /** The person's whole-market funds, whether they are the shipped four, those four, and how many the list may hold. */
-  market: MarketView;
   /** "Get started": the first month's five steps, each ticked from the desk's own records. */
   guide: Guide;
 }
-export interface MarketView { symbols: string[]; asShipped: boolean; shipped: string[]; max: number }
-
-export const marketView = (dir: string): MarketView => {
-  const symbols = marketOf(dir);
-  return { symbols, asShipped: isShipped(symbols), shipped: [...SHIPPED_MARKET], max: MAX_MARKET };
-};
 
 /** Markdown's marks taken out, so a few words read as words: bold, slanted, code, headings, list marks, table bars. */
 const plainText = (s: string): string => s
@@ -158,11 +151,11 @@ export function versionOf(root: string): string {
   let latest = 0;
   try { for (const d of fs.readdirSync(runs)) latest = Math.max(latest, Number(stamp(path.join(runs, d, 'run.json')))); } catch { /* no runs yet */ }
   // Two things change with time alone, not with a file: a listener whose heartbeat stopped, and a run that died. Both are
-  // part of the fingerprint, so the page hears of them too; so are the whole-market funds, which another page may change,
-  // and what "Get started" reads besides the desk's files: whether it is open, a call read, and
-  // the day, which adds a week of paper record (the page's other choices, kept in the same file, change nothing it shows).
+  // part of the fingerprint, so the page hears of them too; so is what "Get started" reads besides the desk's files:
+  // whether it is open, a call read, and the day, which adds a week of paper record (the page's other choices, kept in
+  // the same file, change nothing it shows).
   const p = readPrefs(dir);
-  const timely = `${listenerOf(dir) ? 'L' : 'n'}${readQueue(dir).map((i) => i.state[0]).join('')}|${p.market?.join(',') ?? 'shipped'}|${p.guide ?? ''}${p.readCall ? 'r' : ''}${p.atOnce ?? 1}|${today()}`;
+  const timely = `${listenerOf(dir) ? 'L' : 'n'}${readQueue(dir).map((i) => i.state[0]).join('')}|${p.guide ?? ''}${p.readCall ? 'r' : ''}${p.atOnce ?? 1}|${today()}`;
   return [stamp(path.join(dir, 'journal.md')), stamp(path.join(dir, 'watchlist.json')), stamp(path.join(dir, 'queue.json')), latest, stamp(path.join(dir, 'contact.json')), stamp(path.join(dir, 'listener.json')), stamp(path.join(dir, 'paper.json')), timely].join('-');
 }
 
@@ -188,13 +181,13 @@ export function stateOf(root: string, day: string): DeskState {
     summary: summaryOf(e.decision), hasReport: hasReport(dir, e.ticker, e.date), ticket: ticketable(e.ticker), ...paperOf(e),
     ...scoredBy(e, s.scoring), noun: nounOf(e.ticker),
   })).reverse().sort((a, b) => b.date.localeCompare(a.date));
-  const summary = summarize(entries), watchlist = readWatchlist(dir), market = marketView(dir);
-  const { startHere, watch } = tiersOf(watchlist, market.symbols, calls);
+  const summary = summarize(entries), watchlist = readWatchlist(dir);
+  const { startHere, watch } = tiersOf(watchlist, calls);
   const queue = queueOf(dir), listener = listenerOf(dir), prefs = readPrefs(dir), email = readContactEmail(root);
   const record = recordOf(entries.map(paperCallOf), day);
-  const guide = guideOf({ email, watchlist, market: market.symbols, queue, calls, listener: listener?.listener ?? null, readCall: !!prefs.readCall, record, ...(prefs.guide ? { pref: prefs.guide } : {}) });
+  const guide = guideOf({ email, watchlist, queue, calls, listener: listener?.listener ?? null, readCall: !!prefs.readCall, record, ...(prefs.guide ? { pref: prefs.guide } : {}) });
   return {
-    version: versionOf(root), today: day, watchlist, queue, calls, startHere, watchTiers: watch, market, guide,
+    version: versionOf(root), today: day, watchlist, queue, calls, startHere, watchTiers: watch, guide,
     record: { summary, text: renderSummary(summary), benchmarkNote: scoringNote(entries, s.scoring) },
     desk: { emailSaved: !!email, tradingEnabled: false, holdingDays: s.scoring.holdingPeriodDays, benchmark: resolveBenchmark('SPY', s.scoring), scoring: scoringShort(s.scoring) },
     analyses: { depth: depthOfRounds(s.analysis.debateRounds), rounds: { debate: s.analysis.debateRounds, risk: s.analysis.riskRounds }, perRun: s.routines.maxAnalyses, atOnce: prefs.atOnce ?? 1, listener },
