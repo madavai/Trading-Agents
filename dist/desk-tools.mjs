@@ -42237,7 +42237,6 @@ function cleanPrefs(raw) {
     }
     out.recent = recent;
   }
-  if (typeof r.autorun === "boolean") out.autorun = r.autorun;
   const market = cleanMarket(r.market);
   if (market) out.market = market;
   if (Array.isArray(r.folded)) out.folded = TIERS.filter((t) => r.folded.includes(t));

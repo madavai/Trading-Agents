@@ -103,7 +103,7 @@ built, which decisions stand, every document, and what is pending.
   the team's version line covers it. Agent files never set `permissionMode` (Madav ignores it in routine runs; the person's choice
   rules), and each agent's name is in one file only (a name in two files is not started); a test keeps both true.
 - `.claude/routines.json` - the routines the project ships to Madav, each off until the person switches it on: the
-  waiting list (`watch` the doorbell, `listener` the note, the same words as the desk's own listener, `RUN_WORDS`), and
+  waiting list (`watch` the doorbell, `listener` the note, the words `RUN_WORDS` in `desk/queue.ts`), and
   the morning and evening routines (`cron`). Madav reads it and never writes it. A change under `.claude`, to
   `.mcp.json` or to `CLAUDE.md` pauses the routines until the person switches them on again, so nothing written at run
   time may live there.
@@ -215,17 +215,12 @@ built, which decisions stand, every document, and what is pending.
     `{ listening, routine, since, checked, running, lastRun?: { at, ended: "finished"|"failed"|"stopped", endedAt?,
     result } }`, where `checked` is the heartbeat and `lastRun.at` is when the run started (`endedAt`, when given,
     when it ended).
-- `src/watch/` - the desk's own listener for Claude Code (`node dist/watch.mjs`): `watcher.ts` keeps the contract above
-  (a short wait so several presses make one run, one run at a time with at most one owed, no run when nothing waits,
-  stopping when its note is taken away, and making way for an update between runs; after a run, its own words go
-  beside each stock it started and left unfinished, also one the quiet rule already read as failed; its last run's
-  `result` counts `already` stocks apart from those analysed). `stopWhy` is when it stops a run: nothing saved for
-  `QUIET_MS` by the stocks this run started (or since it began), or one stock analysed for `STOCK_MAX_MS` (six hours,
-  in case the team goes round in a loop); a long run that keeps saving goes on, however many stocks it takes.
-  `claude.ts` finds Claude Code without a shell and runs it with the fixed words and options in `RUN_ARGS`, never from a
-  project file, asking `stopIf` (`stopWhy`) each minute, and `stopReason` turns its last words, when it stops early,
-  into the stock's reason (its usage limit and when it resets, a sign-in, no credit, a busy service); `main.ts` is the
-  program, logging to `desk-data/watcher.log`.
+- The desk has no listener of its own (`src/watch/` and `dist/watch.mjs` were removed: it runs analyses only in the app it runs
+  in, and the dashboard has no button that starts Claude Code). Whatever runs them follows the contract above: Madav's routine,
+  or a chat. `desk/queue.ts` `RUN_WORDS` is the words a runner is started with. A dashboard that starts takes away, and
+  then at every look, a listener note that names itself "Claude Code" (`server.ts` `retireOldListener`): the note an
+  older version's listener kept, which makes one left running from before an update stop after the run in hand. Madav's
+  note is never touched. An `autorun` an older version saved in `dashboard.json` is not read and is dropped on the next save.
 - `src/desk/routine.ts` - the morning and evening briefs the routines run from (desk tool `routine_brief`, skill
   `/routine`, the team's playbook); `src/desk/orders.ts` - the dashboard's log of the orders it sent.
 - `src/desk/care.ts` - care for what is held, and it never sells. `viewOf` is a holding's latest call and its age;

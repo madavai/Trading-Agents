@@ -49,14 +49,12 @@ folder asks you before it runs one.
 ## Analyses that run by themselves
 When you ask for an analysis on the dashboard, it waits on a list in `desk-data` and the dashboard rings a "doorbell"
 (a small file there). Whatever listens for it (Madav's routine "Run automatically when the dashboard asks", which the
-project ships switched off, or the desk's own listener for Claude Code) runs the
+project ships switched off) runs the
 trading-desk team, which proposes only, exactly as when you ask in a chat: the same agents, tools and guard, and no
 order tool.
-- The desk's own listener (`node dist/watch.mjs`, started by "Run automatically with Claude Code") runs one fixed
-  thing, written in its code: Claude Code as the trading-desk team, with the words "Analyse what is waiting on the
-  dashboard", in a mode that refuses anything this folder's settings do not already allow instead of asking. Nothing
-  in the project's files can change that command, so a file an agent could write never chooses what it runs. It never
-  runs with permission checks bypassed.
+- The desk starts no run of its own: it has no listener, program or button that starts Claude Code or any other app. An
+  older version had one; on an update, the dashboard takes away the note such a listener keeps (so one left running
+  stops after the run in hand), the program is no longer shipped, and a switch an older version saved is not read.
 - Madav's routines (`.claude/routines.json`: the waiting list, the morning routine and the evening wrap-up) ship
   switched off, and only you switch one on. A run takes its model and permissions from what you chose in Madav, never
   from the project's files (no desk agent file sets a permission mode), and Madav never runs one with permission checks

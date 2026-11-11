@@ -233,35 +233,6 @@ test('a call made before a dividend fills on paper at the close the market print
   assert.equal(book.dividendsUsd, Math.round(t.quantity * 0.69 * 100) / 100);
 });
 
-test('"Run automatically with Claude Code": started and stopped from the page, remembered across starts, and never over another listener', async () => {
-  assert.equal((await call(term, 'POST', '/api/listen', { body: { on: true } })).status, 404, 'a dashboard given no way to start it has no switch');
-  let started = 0, claude = true;
-  const own = () => { started++; writeListener(dir(), { listener: 'Claude Code', since: new Date().toISOString(), beat: new Date().toISOString(), pid: 4242 }); };
-  const t = await startTerminal({ root, assets: ASSETS, port: 0, keyFile: KEYS(), listen: { start: own, claude: () => claude } });
-  try {
-    claude = false;
-    assert.match((await call(t, 'POST', '/api/listen', { body: { on: true } })).json().error, /Claude Code is not installed on this computer/);
-    claude = true;
-    assert.equal((await call(t, 'POST', '/api/listen', { body: { on: true } })).json().listener.listener, 'Claude Code');
-    assert.deepEqual([started, readPrefs(dir()).autorun], [1, true]);
-    assert.equal((await call(t, 'GET', '/api/state')).json().analyses.listener.listener, 'Claude Code');
-    assert.equal((await call(t, 'POST', '/api/prefs', { body: { autorun: false, theme: 'light' } })).json().autorun, true, "the page's other choices never change the switch");
-    assert.equal((await call(t, 'POST', '/api/listen', { body: { on: false } })).json().listener, null);
-    assert.deepEqual([fs.existsSync(path.join(dir(), 'listener.json')), readPrefs(dir()).autorun], [false, false], 'off: the note is taken away, and the listener ends after the run in hand');
-    writeListener(dir(), { listener: 'Madav', since: new Date().toISOString(), beat: new Date().toISOString() });
-    assert.match((await call(t, 'POST', '/api/listen', { body: { on: true } })).json().error, /Madav is already listening/);
-    assert.match((await call(t, 'POST', '/api/listen', { body: { on: false } })).json().error, /Madav is listening, not Claude Code: switch it off there/);
-    writeListener(dir(), { listener: 'Madav', since: '2026-10-01T09:00:00Z', beat: '2026-10-01T09:00:00Z' });
-    assert.equal((await call(t, 'GET', '/api/state')).json().analyses.listener, null, 'a listener whose heartbeat stopped is not believed');
-  } finally { await t.close(); }
-  savePrefs(dir(), { autorun: true });
-  started = 0;
-  const again = await startTerminal({ root, assets: ASSETS, port: 0, keyFile: KEYS(), listen: { start: own, claude: () => true } });
-  try { assert.equal(started, 1, 'left on: started again with the dashboard'); } finally { await again.close(); }
-  const third = await startTerminal({ root, assets: ASSETS, port: 0, keyFile: KEYS(), listen: { start: own, claude: () => true } });
-  try { assert.equal(started, 1, 'not twice: someone already listens'); } finally { await third.close(); }
-});
-
 const BUY = '**Rating**: Overweight\n\n**Executive Summary**: Add gradually on a close above 229.\n\n**Investment Thesis**: The trend is up.';
 
 test('the page\'s state is the desk\'s own files: calls, how they turned out, and nothing invented', async () => {

@@ -248,8 +248,8 @@ never from what the page says happened:
    two. It ticks with three of your own names, a whole-market fund and a sector fund watched (or asked about). The desk
    suggests no company: the names are yours.
 3. **Ask the desk to analyse them, shallow, and switch on running automatically.** One press asks for every pick it has
-   not called yet, at shallow depth; another switches on "Run automatically with Claude Code" (or use Madav's
-   routine). It ticks when something is asked for and something runs it.
+   not called yet, at shallow depth; running automatically is Madav's "Run automatically" routine. It ticks when
+   something is asked for and something runs it.
 4. **Read your first calls**, with what Buy, Hold, Sell and alpha mean beside them. It ticks when you open a call in
    full.
 5. **Follow them on paper for four weeks, then read the scorecard** before deciding anything about money and Robinhood.
@@ -362,13 +362,10 @@ notice says so wherever you are on the page. One stock is analysed at a time, at
 in `desk-settings.json`); the rest wait for the next run, which is asked for by itself. Each runs at the depth you
 chose, whatever the team's lead plans: the time and the model allowance it spends are yours.
 
-Something has to run them. The page says who is listening:
+Something has to run them, and the desk starts no run of its own: it runs analyses only in the app it runs in, never in
+another app beside it. The dashboard has no button that starts Claude Code. The page says who is listening:
 - **Madav**: switch on its "Run automatically when the dashboard asks" routine, once. The project ships it, off; it
   watches the dashboard's doorbell and runs the trading-desk team as you set it up in Madav.
-- **Claude Code**: press "Run automatically with Claude Code" on the dashboard. It starts the desk's own listener
-  (`node dist/watch.mjs`), which runs the trading-desk team with Claude Code on this computer whenever you ask for an
-  analysis, and keeps a log in `desk-data/watcher.log`. It stays on until you switch it off, and starts again with
-  the dashboard. Each run uses your own Claude Code plan, like a chat.
 - **By hand**: ask the desk to "analyse what is waiting" in a chat, or type `/analyse` with no stock.
 
 A run of the waiting list never asks you anything: what it cannot do (for example, no email saved for the SEC yet) is
@@ -376,13 +373,10 @@ marked failed with the reason, for you to fix and Retry. An analysis takes a whi
 Madav, on its default model), about 40 minutes at shallow depth and nearly 3 hours at medium; deep runs more rounds.
 However long it takes, a stock is never marked failed while its analysis is still saving its steps.
 
-When the run itself stops early, the stock it was on says why in plain words. With the desk's own Claude Code
-listener it says so at once: for example "Claude Code's weekly usage limit was reached; it resets 6am
-(America/Chicago). Press Retry after that." With Madav it can say so at once only when Madav's note gives the time its
-run ended, which it does not yet: until then the stock shows "being analysed" until nothing has been saved for it for
+When the run itself stops early, the stock it was on says why in plain words. With Madav it can say so at once only
+when Madav's note gives the time its run ended, which it does not yet: until then the stock shows "being analysed" until nothing has been saved for it for
 two hours, then failed, saying exactly that. If a stock marked failed that way was in fact still going, it shows done
-once its call is recorded. The desk's own listener stops a run that has saved nothing for two hours, or that has
-analysed one stock for six hours (in case the team is going round in a loop), and says so beside the stock. On the
+once its call is recorded. On the
 same day, Retry carries on from the step it stopped at.
 
 The desk counts days by New York's calendar, the market's own, wherever your computer is: an analysis run on an

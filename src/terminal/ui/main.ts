@@ -228,8 +228,8 @@ function renderGuide(): void {
   const a = g.analyse, ask = toAsk(), l = d!.analyses.listener;
   const analyse = guideStep(3, a.done, `Ask the desk to analyse them, ${term('depth', 'shallow')}, and switch on running automatically`,
     `<div class="at-row">${factChip(a.asked > 0, `${a.asked} asked for`)}${factChip(!!a.automatic, a.automatic ? `runs by itself: ${a.automatic}` : 'not running by itself yet')}</div>
-    <p class="at-quiet ta-gwhy">Shallow is the quickest and costs least: each analysis is a full team run on the models of whatever runs it (Madav's own, or your Claude plan with Claude Code). Running automatically means each one you ask for starts by itself, one at a time; they are listed under ${STATUS_LINK}.</p>
-    <div class="at-row">${ask.length ? `<button class="at-btn at-press primary" data-act="guide-ask"${GUIDE.asking ? ' disabled' : ''}><svg class="g"><use href="#i-bot"/></svg><span>${GUIDE.asking ? 'Asking…' : `Ask for your ${ask.length === 1 ? 'pick' : `${ask.length} picks`}, shallow`}</span></button>` : ''}${l ? '' : '<button class="at-btn at-press" data-act="listen-on"><span>Run automatically with Claude Code</span></button>'}</div>
+    <p class="at-quiet ta-gwhy">Shallow is the quickest and costs least: each analysis is a full team run on the models of the app that runs it. Running automatically means each one you ask for starts by itself, one at a time; they are listed under ${STATUS_LINK}.</p>
+    <div class="at-row">${ask.length ? `<button class="at-btn at-press primary" data-act="guide-ask"${GUIDE.asking ? ' disabled' : ''}><svg class="g"><use href="#i-bot"/></svg><span>${GUIDE.asking ? 'Asking…' : `Ask for your ${ask.length === 1 ? 'pick' : `${ask.length} picks`}, shallow`}</span></button>` : ''}</div>
     ${l ? '' : '<p class="at-quiet">Or switch on "Run automatically" in Madav, if you use it.</p>'}`);
 
   const r = g.read, mean = (k: TermKey) => `<div><dt>${esc(GLOSSARY[k].term)}</dt><dd>${esc(GLOSSARY[k].means)}</dd></div>`;
@@ -923,7 +923,7 @@ const itemOf = (sym: string) => S.desk?.queue.find((x) => x.symbol === sym);
 const isOpen = (sym: string) => { const x = itemOf(sym); return !!x && isOpenItem(x); };
 const openChip = (sym: string) => (itemOf(sym)?.state === 'running' ? '<span class="at-chip accent">being analysed</span>' : '<span class="at-chip">waiting to be analysed</span>');
 
-/** Each stock asked for, where it stands, and who runs them: a listener (Madav, Claude Code), or nobody yet. */
+/** Each stock asked for, where it stands, and who runs them: a listener (Madav), or nobody yet. */
 function renderAnalyses(): void {
   const d = S.desk;
   if (!d) return;
@@ -936,10 +936,9 @@ function renderAnalyses(): void {
   const listed = q.filter((x) => !isStale(x, d.calls)), cleared = q.length - listed.length;
   $('#analysesSub').textContent = l
     ? `Runs by itself: ${l.listener} is listening on this computer${l.lastRun ? ` · last run ${l.lastRun.startOnly ? 'started ' : ''}${when(l.lastRun.at)}: ${l.lastRun.result.replace(/[\s.]+$/, '')}` : ''}. One stock at a time, at most ${d.analyses.perRun} a run.`
-    : 'Nothing is listening, so analyses wait here. Switch on "Run automatically" in Madav, or run them with Claude Code on this computer, or ask the desk to "analyse what is waiting" in a chat.';
+    : 'Nothing is listening, so analyses wait here. Switch on "Run automatically" in Madav, or ask the desk to "analyse what is waiting" in a chat.';
   const press = (act: string, words: string, primary = false) => `<button class="at-btn at-press${primary ? ' primary' : ''}" data-act="${act}">${esc(words)}</button>`;
-  $('#analysesDo').innerHTML = (l && waiting && !running ? press('q-run', 'Run now') : '')
-    + (!l ? press('listen-on', 'Run automatically with Claude Code', waiting > 0) : l.listener === 'Claude Code' ? press('listen-off', 'Stop running automatically') : '');
+  $('#analysesDo').innerHTML = l && waiting && !running ? press('q-run', 'Run now') : '';   // it rings for whichever app listens; the desk starts no run of its own
   const stands = (x: QueueView): string => {
     if (x.state === 'running') return `<span class="at-chip accent">Being analysed</span> <span class="at-quiet">${esc(x.progress ?? 'starting')}</span>`;
     if (x.state === 'waiting') return `<span class="at-chip">Waiting</span>${l ? '' : ' <span class="at-quiet">for a run to start</span>'}`;
@@ -1160,7 +1159,7 @@ function renderLook(): void {
   const head = `<div class="at-card-head"><h3>Worth a look today</h3>${s ? `<span class="at-chip" title="How many funds and stocks were looked at">${s.picks.length} of ${s.looked}</span>` : ''}</div>`;
   // No switch is drawn until the page knows whether it is on: one drawn "off" meanwhile would be pressed to turn it on.
   const sw = !MORNING.known ? `<p class="at-quiet">${MORNING.screenFailed ? 'Whether' : 'Reading whether'} "Analyse the top ${MORNING.top} each market morning" is on${MORNING.screenFailed ? ' could not be read just now' : ''}.</p>` : `<button class="at-toggle" data-act="morning-switch" role="switch" aria-checked="${MORNING.on}"><span class="at-switch${MORNING.on ? ' on' : ''}"></span><span>Analyse the top ${MORNING.top} each market morning</span></button>
-    <p class="at-quiet">${MORNING.on ? `On${MORNING.from ? `, from ${esc(dayText(MORNING.from))}` : ''}: each market morning (before noon in New York), the top ${MORNING.top} not already called that day go on the waiting list at shallow depth, once. Each analysis is a full team run on the models of whatever runs it (Madav's own, or your Claude plan with Claude Code).` : `Off as shipped. When on, it starts the next market morning: then the top ${MORNING.top} go on the waiting list at shallow depth once each market morning, and run when something is listening. Switching it on puts nothing on the list at once.`}</p>`;
+    <p class="at-quiet">${MORNING.on ? `On${MORNING.from ? `, from ${esc(dayText(MORNING.from))}` : ''}: each market morning (before noon in New York), the top ${MORNING.top} not already called that day go on the waiting list at shallow depth, once. Each analysis is a full team run on the models of the app that runs it.` : `Off as shipped. When on, it starts the next market morning: then the top ${MORNING.top} go on the waiting list at shallow depth once each market morning, and run when something is listening. Switching it on puts nothing on the list at once.`}</p>`;
   if (!s) { el.innerHTML = `${head}<p class="at-quiet">${esc(MORNING.screenFailed || "Looking over the whole market, the sectors and your names: the first look of the day takes a minute.")}</p>${sw}`; return; }
   const list = s.picks.length ? `<div class="ta-looks">${s.picks.map(lookRow).join('')}</div>`
     : `<p class="at-lede">Nothing stood out among the ${s.looked} looked at: no move of 3% or more, no volume twice its usual, no 52-week high or low, no cross of an average${!s.news?.read ? '' : s.news.unread.length ? ', and no news today about your other companies or coins' : ', and no news today about your companies or coins'}.</p>`;
@@ -1609,8 +1608,6 @@ document.addEventListener('click', (e) => {
     case 'ask-yes': void askNow(); break;
     case 'q-retry': { const x = S.desk?.queue.find((i) => i.symbol === sym); void run(async () => { await api.enqueue(sym, retryDepth(x)); await refreshState(); toast(`${sym} is asked for again.`); }); break; }
     case 'q-run': void run(async () => { await api.runQueue(); await refreshState(); toast('Asked for a run of what is waiting.'); }); break;
-    case 'listen-on': void run(async () => { await api.listen(true); await refreshState(); toast('Analyses you ask for now run by themselves, with Claude Code on this computer.'); }); break;
-    case 'listen-off': void run(async () => { await api.listen(false); await refreshState(); toast('Analyses no longer run by themselves. A run in progress finishes first.'); }); break;
     case 'open-call': void openCall(sym, el.dataset.date ?? ''); break;
     case 'decide': if (dlg.open) dlg.close(); if (ready()) void openTicket(sym, el.dataset.date ?? ''); break;
     case 'trade': if (dlg.open) dlg.close(); if (ready()) void openTicket(sym, '', el.dataset.side === 'sell' ? 'sell' : 'buy'); break;

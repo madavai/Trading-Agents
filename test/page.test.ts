@@ -456,8 +456,9 @@ test('page-27: Analysis status is a page of its own: the line about who runs the
   assert.doesNotMatch(page, /sec-analyses/);
   // its buttons and its table are written as they were
   assert.match(page, /press\('q-run', 'Run now'\)/);
-  assert.match(page, /press\('listen-on', 'Run automatically with Claude Code', waiting > 0\)/);
-  assert.match(page, /press\('listen-off', 'Stop running automatically'\)/);
+  assert.match(page, /\$\('#analysesDo'\)\.innerHTML = l && waiting && !running \? press\('q-run', 'Run now'\) : '';/, 'Run now rings for whichever app listens, and is the only button');
+  assert.doesNotMatch(page, /listen-on|listen-off|Run automatically with Claude Code|Stop running automatically|api\.listen|Claude Code/, 'the desk runs analyses only in the app it runs in: no Claude Code button, no Stop, no words offering it');
+  assert.match(page, /Nothing is listening, so analyses wait here\. Switch on "Run automatically" in Madav, or ask the desk to "analyse what is waiting" in a chat\./);
   assert.match(page, /<th>Stock<\/th><th>\$\{term\('depth'\)\}<\/th><th class="wrap">Where it stands<\/th><th>Asked<\/th>/);
   assert.match(page, /data-act="dequeue" data-symbol=/, '✕ still takes a row off');
   // the side list and the rail open it, marked while it shows; the count and the failed mark sit beside the name, in House's danger colour

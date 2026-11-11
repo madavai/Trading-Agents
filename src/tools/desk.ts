@@ -321,7 +321,7 @@ export function registerDeskTools(server: McpServer, root: string): void {
   // put there. A run takes them one at a time, in order, up to the
   // routines' limit: start_queue_item marks one running (one at a time, whoever started the run), finish_queue_item marks
   // it done with the rating recorded or failed with why, and end_queue_run asks for another run when stocks still wait.
-  // Which run asks: this copy of the desk's tools, one per conversation. The desk's own listener gives its run an id (each
+  // Which run asks: this copy of the desk's tools, one per conversation. A launcher may give its run an id (each
   // copy its run starts shares it); any other conversation's copy makes its own. With its process, it is noted on each
   // stock this run starts, so a second run never takes it and only its own run's end finishes it.
   const given = process.env.TRADING_AGENTS_RUN;
