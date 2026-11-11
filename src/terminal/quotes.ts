@@ -9,11 +9,25 @@ import { compute } from '../data/indicators.js';
 import { safeSymbol } from '../data/symbols.js';
 import { daily, HOSTS } from '../data/yahoo.js';
 
+/** What Yahoo itself says a quote is, in the page's words: a company (its EQUITY), a fund (an ETF or a mutual fund) or a coin
+ *  (its CRYPTOCURRENCY). Any other kind (an index, a currency, a future) or none given is no kind at all: never a guess. */
+export type QuoteKind = 'company' | 'fund' | 'coin';
+export function quoteKind(instrumentType: unknown): QuoteKind | undefined {
+  switch (instrumentType) {
+    case 'EQUITY': return 'company';
+    case 'ETF': case 'MUTUALFUND': return 'fund';
+    case 'CRYPTOCURRENCY': return 'coin';
+    default: return undefined;
+  }
+}
+
 export interface Quote {
   symbol: string; name?: string; currency?: string; price: number; previousClose: number | null; change: number | null; changePct: number | null;
   open: boolean; asOf: string; points: number[];
   /** The market the price is from, for how late it may be (data/delay.ts): a US stock or fund, a coin, or any other. */
   market: PriceMarket;
+  /** What Yahoo says it is (`quoteKind`), for the letter badges on the page; left out when Yahoo says none of the three. */
+  kind?: QuoteKind;
 }
 export type QuoteResult = Quote | { symbol: string; error: 'unavailable' | 'no-data'; message: string };
 
@@ -41,10 +55,12 @@ export function parseQuote(json: IntradayJson, symbol: string, nowSec = Date.now
   // Every price on the page says when it is from ("now", a close, a day): one that comes with no time is not shown at all,
   // never stamped with the moment it was read.
   if (!finite(t)) throw new NoData(`Yahoo Finance gave a price for ${symbol} with no time, so when it is from is not known`);
+  const kind = quoteKind(m.instrumentType);
   return {
     symbol, name: m.longName ?? m.shortName, currency: m.currency, price, previousClose,
     change: previousClose === null ? null : price - previousClose, changePct: previousClose === null ? null : (price / previousClose - 1) * 100,
     open, asOf: new Date(t * 1000).toISOString(), points: points.length ? points : [price], market: priceMarket(m),
+    ...(kind ? { kind } : {}),
   };
 }
 

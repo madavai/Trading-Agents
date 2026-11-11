@@ -22534,6 +22534,19 @@ function callOf(root2, ticker, date4) {
 }
 
 // src/terminal/quotes.ts
+function quoteKind(instrumentType) {
+  switch (instrumentType) {
+    case "EQUITY":
+      return "company";
+    case "ETF":
+    case "MUTUALFUND":
+      return "fund";
+    case "CRYPTOCURRENCY":
+      return "coin";
+    default:
+      return void 0;
+  }
+}
 var finite2 = (v) => typeof v === "number" && Number.isFinite(v);
 function parseQuote(json, symbol, nowSec = Date.now() / 1e3) {
   const r = json.chart?.result?.[0];
@@ -22546,6 +22559,7 @@ function parseQuote(json, symbol, nowSec = Date.now() / 1e3) {
   const open4 = m.instrumentType === "CRYPTOCURRENCY" || finite2(reg?.start) && finite2(reg?.end) && nowSec >= reg.start && nowSec <= reg.end;
   const t2 = finite2(m.regularMarketTime) ? m.regularMarketTime : (r.timestamp ?? [])[Math.max(0, (r.timestamp ?? []).length - 1)];
   if (!finite2(t2)) throw new NoData(`Yahoo Finance gave a price for ${symbol} with no time, so when it is from is not known`);
+  const kind = quoteKind(m.instrumentType);
   return {
     symbol,
     name: m.longName ?? m.shortName,
@@ -22557,7 +22571,8 @@ function parseQuote(json, symbol, nowSec = Date.now() / 1e3) {
     open: open4,
     asOf: new Date(t2 * 1e3).toISOString(),
     points: points.length ? points : [price],
-    market: priceMarket(m)
+    market: priceMarket(m),
+    ...kind ? { kind } : {}
   };
 }
 var memo2 = /* @__PURE__ */ new Map();

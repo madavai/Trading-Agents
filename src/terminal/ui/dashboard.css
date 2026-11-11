@@ -242,13 +242,15 @@
 .ta-tier-tile > .at-tile-foot { gap: var(--space-1) var(--space-2); padding-top: 0; }
 .ta-tier-tile .at-tail { gap: 0; flex-wrap: wrap; justify-content: flex-end; min-width: 0; }
 .ta-tier-tile .icon-btn { min-width: calc(var(--control) * 0.75); height: calc(var(--control) * 0.75); padding: 0; }
-/* the badge: the House's logo box holding letters, shaded by what the desk knows the kind to be (none known: the neutral box) */
+/* the badge: the House's logo box holding letters, shaded by what Yahoo says it is: a fund, a coin or a company (anything else: the neutral box) */
 .at-logo-box.ta-badge { width: auto; min-width: var(--avatar); padding: 0 var(--space-1); }
 .ta-badge > .at-logo.fallback { width: auto; height: auto; line-height: 1; }
 .ta-badge.fund { background: var(--accent-tint); }
 .ta-badge.fund > .at-logo { color: var(--accent); }
 .ta-badge.coin { background: color-mix(in srgb, var(--warn) 18%, transparent); }
 .ta-badge.coin > .at-logo { color: var(--warn); }
+.ta-badge.company { background: color-mix(in srgb, var(--file-page) 18%, transparent); }
+.ta-badge.company > .at-logo { color: var(--file-page); }
 .ta-grow { flex: 1 1 var(--card-min); }
 
 /* this morning: the weather's three lines, and the few stocks worth a look, each a row */

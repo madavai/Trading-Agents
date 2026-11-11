@@ -12,7 +12,7 @@ import { sameFigures, typedNumber, type Asked } from './typed.js';
 import { DEPTH_ORDER, DEPTH_WORDS, depthChoices, retryDepth } from './depth.js';
 import { marketOffer, type MarketOffer } from './marketpick.js';
 import { cryptoBase, deskSymbol, isCrypto } from '../../data/symbols.js';
-import type { Quote } from '../quotes.js';
+import type { Quote, QuoteKind } from '../quotes.js';
 
 const RANGES = ['1M', '3M', '6M', '1Y', '5Y'] as const;
 type Range = (typeof RANGES)[number];
@@ -1017,12 +1017,13 @@ const EMPTY: Partial<Record<Tier, string>> = {
   names: 'No single names on your watchlist yet: search a company above to add one. Bitcoin and Ether can be watched too, on paper only.',
 };
 
-/** What a badge is shaded by, from what the desk itself knows: a coin by its ticker, a fund by standing in "The whole
- *  market" or "Sectors", which hold funds only. A single name is a company or a narrower fund and nothing here says
- *  which, so it has no kind and a neutral shade: never a guess. */
-type Kind = 'fund' | 'coin' | '';
+/** What a badge is shaded by. With the price answer in, Yahoo's own word for it (the quote's kind: a company, a fund or a
+ *  coin; an index or anything else says none), never a guess. Without a price (not asked yet, or it failed), a tile in "The
+ *  whole market" or "Sectors" is a fund, as its row says, and anything else has no kind. */
+type Kind = QuoteKind | '';
 const kindOf = (sym: string, tier?: Tier): Kind => {
-  if (isCrypto(sym)) return 'coin';
+  const q = quoteOf(sym);
+  if (q) return q.kind ?? '';
   const at = tier ?? S.desk?.startHere.find((t) => (t.tier === 'market' || t.tier === 'sectors') && t.items.some((i) => i.symbol === sym))?.tier;
   return at === 'market' || at === 'sectors' ? 'fund' : '';
 };

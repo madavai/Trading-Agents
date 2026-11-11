@@ -160,7 +160,8 @@ built, which decisions stand, every document, and what is pending.
   page it serves: the browser is opened on a one-time link, `#open=<claim>`, which the page swaps for the key once at
   `/api/claim`; while it runs the key is kept in the private folder, `dashboard.json`, so `main.ts` can open the page
   again with a fresh link from `/api/claim/new`; strict CSP),
-  `quotes.ts` (Yahoo prices), `search.ts` (Yahoo's matches for what is typed), `prefs.ts` (what the page remembers, in
+  `quotes.ts` (Yahoo prices; each quote carries what Yahoo calls it, `quoteKind`: company, fund or coin, and none for an index,
+  a currency, a future or no word, which the page's letter badges are shaded by), `search.ts` (Yahoo's matches for what is typed), `prefs.ts` (what the page remembers, in
   `desk-data/dashboard.json`, each value checked; the whole-market funds only through `/api/tiers/market`, which checks
   each one's price first), `tiers.ts` (the world in tiers for "Start here" and the watchlist: the whole market, the
   sector funds, single names and crypto, with every fund's and tier's name and meaning in plain words; the page draws

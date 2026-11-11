@@ -275,8 +275,8 @@ After the markets row, the dashboard shows the world in tiers, broadest first, b
 - **Crypto**: Bitcoin and Ether when you watch them. They are followed on paper only: a coin never opens an order
   ticket, and its calls say "on paper only" where a stock's say Decide….
 
-Each tile is two lines. The first has a badge with the ticker's letters (blue for a fund in the whole market or the sectors,
-amber for a coin, plain for a single name, whose kind the desk does not keep), its plain name and the day's move (with the
+Each tile is two lines. The first has a badge with the ticker's letters (shaded by what Yahoo Finance says it is: blue for a fund,
+teal for a company, amber for a coin, plain for anything else), its plain name and the day's move (with the
 day named, such as Fri, when it was not today; a dash when Yahoo Finance gave none). The second has the desk's latest rating
 or "no call", the robot, which asks the desk to analyse a fund as readily as a stock (for a fund it reads what it holds, from
 its reports to the SEC), and + to add it to your watchlist. Point at a tile for its full name, what it holds, and the desk's

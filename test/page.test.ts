@@ -204,15 +204,16 @@ test('page-17: a fund in the search list gets "Add to watchlist" and "Show in Th
   assert.match(css, /@media \(max-width: 640px\) \{ \.ta-opt \{ grid-template-columns: calc\(var\(--unit\) \* 18\) minmax\(0, 1fr\); \} \.ta-opt-tags \{ display: none; \} \}/);
 });
 
-test('page-18: a Start here tile is two lines with a letter badge, what leaves it is said when it is pointed at, and a badge is shaded only by a kind the desk knows', () => {
+test('page-18: a Start here tile is two lines with a letter badge, what leaves it is said when it is pointed at, and a badge is shaded only by the kind Yahoo gives', () => {
   // the badge: the House's logo box holding letters, no picture, so nothing is fetched from outside (the page's policy allows images from this computer only)
   assert.match(page, /const badge = \(sym: string, kind: Kind\): string => `<span class="at-logo-box sm ta-badge\$\{kind \? ` \$\{kind\}` : ''\}"><span class="at-logo fallback">\$\{esc\(badgeLetters\(sym\)\)\}<\/span><\/span>`;/);
   assert.doesNotMatch(page, /<img\b/, 'no picture from anywhere');
   assert.match(page, /const badgeLetters = \(sym: string\): string => \(cryptoBase\(sym\) \?\? sym\.replace\(\/\^\\\^\/, ''\)\.split\(\/\[-\.=\]\/\)\[0\] \?\? sym\)\.slice\(0, 4\)\.toUpperCase\(\);/, 'BTC for BTC-USD, BRK for BRK-B, at most four letters');
-  // a kind only from what the desk knows: a coin by its ticker, a fund by standing in The whole market or Sectors; a single name has none
-  assert.match(page, /if \(isCrypto\(sym\)\) return 'coin';/);
+  // a kind only from Yahoo's own word on the quote (a company, a fund or a coin; anything else says none); with no price yet, or a failed one, a tile in The whole market or Sectors is a fund as its row says, and nothing else is anything
+  assert.match(page, /type Kind = QuoteKind \| '';/);
+  assert.match(page, /const q = quoteOf\(sym\);\n {2}if \(q\) return q\.kind \?\? '';/);
   assert.match(page, /return at === 'market' \|\| at === 'sectors' \? 'fund' : '';/);
-  assert.doesNotMatch(page, /'company'/, 'no kind is guessed for a single name');
+  assert.doesNotMatch(page, /isCrypto\(sym\)\) return 'coin'/, 'no kind is read from how a ticker looks');
   // the tile: badge, name and move; then the rating or "no call", and the presses. The old second line and its chips are gone from the tile.
   assert.match(page, /<span class="ta-tier-top">\$\{badge\(i\.symbol, kindOf\(i\.symbol, tier\)\)\}<b class="at-tile-name">\$\{esc\(name\)\}<\/b>\$\{changeChip\(q\)\}<\/span>/);
   assert.match(page, /const call = i\.call \? ratingChip\(i\.call\.rating\) : `<span class="at-quiet" title="\$\{esc\(means\('call'\)\)\}">no call<\/span>`;/);
@@ -233,6 +234,7 @@ test('page-18: a Start here tile is two lines with a letter badge, what leaves i
   const css = fs.readFileSync('src/terminal/ui/dashboard.css', 'utf8');
   assert.match(css, /\.ta-badge\.fund \{ background: var\(--accent-tint\); \}/);
   assert.match(css, /\.ta-badge\.coin \{ background: color-mix\(in srgb, var\(--warn\) 18%, transparent\); \}/);
+  assert.match(css, /\.ta-badge\.company \{ background: color-mix\(in srgb, var\(--file-page\) 18%, transparent\); \}/);
   assert.doesNotMatch(css, /\.ta-tier-tile[^{}]*:hover[^{}]*\{[^}]*display/, 'nothing is shown only on a hover');
 });
 

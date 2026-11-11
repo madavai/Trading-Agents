@@ -1633,7 +1633,8 @@
     names: "No single names on your watchlist yet: search a company above to add one. Bitcoin and Ether can be watched too, on paper only."
   };
   var kindOf = (sym, tier) => {
-    if (isCrypto(sym)) return "coin";
+    const q2 = quoteOf(sym);
+    if (q2) return q2.kind ?? "";
     const at = tier ?? S.desk?.startHere.find((t) => (t.tier === "market" || t.tier === "sectors") && t.items.some((i) => i.symbol === sym))?.tier;
     return at === "market" || at === "sectors" ? "fund" : "";
   };

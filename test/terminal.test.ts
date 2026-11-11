@@ -12,7 +12,7 @@ import { Journal } from '../src/desk/journal.js';
 import { saveSection } from '../src/desk/runs.js';
 import { saveContactEmail } from '../src/contact.js';
 import { deskServer } from '../src/tools/server.js';
-import { clearQuotes, parseQuote } from '../src/terminal/quotes.js';
+import { clearQuotes, parseQuote, quote, quoteKind } from '../src/terminal/quotes.js';
 import { clearSearches, parseSearch } from '../src/terminal/search.js';
 import { MAX_RECENT, readPrefs, savePrefs } from '../src/terminal/prefs.js';
 import { scoredBy, scoringNote, scoringShort, summaryOf } from '../src/terminal/state.js';
@@ -326,6 +326,31 @@ test('a quote is read from Yahoo\'s answer; what it lacks is left out, never fil
   assert.equal(parseQuote(intraday('BTC-USD', 50, 49, { instrumentType: 'CRYPTOCURRENCY' }), 'BTC-USD', NOW + 7200).open, true);        // a coin never closes
   assert.equal(parseQuote(intraday('X', undefined, 49), 'X', NOW).price, 102);                                                           // falls back to the last point
   assert.throws(() => parseQuote({ chart: { result: null, error: { description: 'No data found' } } }, 'ZZZZ'), /no price for ZZZZ \(No data found\)/);
+});
+
+test('a quote carries what Yahoo says it is (a company, a fund or a coin) and nothing else: an index, a currency, a future, no word, or a failed quote has no kind', async () => {
+  // the mapping: Yahoo's own words, three of them; anything else, in any spelling, is no kind
+  for (const [type, kind] of [['EQUITY', 'company'], ['ETF', 'fund'], ['MUTUALFUND', 'fund'], ['CRYPTOCURRENCY', 'coin']] as const) {
+    assert.equal(quoteKind(type), kind, type);
+    assert.equal(parseQuote(intraday('X', 50, 49, { instrumentType: type }), 'X', NOW).kind, kind, `${type} in a quote`);
+  }
+  for (const type of ['INDEX', 'CURRENCY', 'FUTURE', 'OPTION', 'MONEYMARKET', 'etf', 'Equity', ' ETF', '', 'constructor', 'toString', '__proto__', 5, null, undefined, {}]) {
+    assert.equal(quoteKind(type), undefined, String(type));
+  }
+  // a quote whose answer names no kind, or a kind that is none of the three, has no kind key at all (so nothing is read from its absence either)
+  for (const extra of [{}, { instrumentType: 'INDEX' }, { instrumentType: 'CURRENCY' }, { instrumentType: 'FUTURE' }, { instrumentType: 7 }]) assert.equal('kind' in parseQuote(intraday('X', 50, 49, extra), 'X', NOW), false, JSON.stringify(extra));
+  // the same through the desk's own quote(): a failed quote has none either
+  const kinds = async (symbol: string, type?: string) => {
+    clearQuotes();
+    configure({ fetch: async () => new Response(JSON.stringify(symbol === 'ZZZZ' ? { chart: { result: null, error: { description: 'No data found' } } } : intraday(symbol, 102, 100, type ? { instrumentType: type } : {}))) });
+    return (await quote(symbol) as any).kind;
+  };
+  assert.equal(await kinds('NVDA', 'EQUITY'), 'company');
+  assert.equal(await kinds('SPY', 'ETF'), 'fund');
+  assert.equal(await kinds('BTC-USD', 'CRYPTOCURRENCY'), 'coin');
+  assert.equal(await kinds('^GSPC', 'INDEX'), undefined);
+  assert.equal(await kinds('PLAIN'), undefined, 'no word from Yahoo: no kind');
+  assert.equal(await kinds('ZZZZ'), undefined, 'a quote that failed');
 });
 
 test('prices: markets, quotes and unavailable symbols are told apart, and Yahoo is asked once for a burst', async () => {
