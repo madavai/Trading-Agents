@@ -870,12 +870,12 @@ var require_codegen = __commonJS({
       }
       // `for-in` statement.
       // With option `ownProperties` replaced with a `for-of` loop for object keys
-      forIn(nameOrPrefix, obj4, forBody, varKind = this.opts.es5 ? scope_1.varKinds.var : scope_1.varKinds.const) {
+      forIn(nameOrPrefix, obj5, forBody, varKind = this.opts.es5 ? scope_1.varKinds.var : scope_1.varKinds.const) {
         if (this.opts.ownProperties) {
-          return this.forOf(nameOrPrefix, (0, code_1._)`Object.keys(${obj4})`, forBody);
+          return this.forOf(nameOrPrefix, (0, code_1._)`Object.keys(${obj5})`, forBody);
         }
         const name = this._scope.toName(nameOrPrefix);
-        return this._for(new ForIter("in", varKind, name, obj4), () => forBody(name));
+        return this._for(new ForIter("in", varKind, name, obj5), () => forBody(name));
       }
       // end `for` loop
       endFor() {
@@ -2695,11 +2695,11 @@ var require_validate = __commonJS({
         if (!this.allErrors)
           this.gen.if(cond);
       }
-      setParams(obj4, assign) {
+      setParams(obj5, assign) {
         if (assign)
-          Object.assign(this.params, obj4);
+          Object.assign(this.params, obj5);
         else
-          this.params = obj4;
+          this.params = obj5;
       }
       block$data(valid, codeBlock, $dataValid = codegen_1.nil) {
         this.gen.block(() => {
@@ -7268,12 +7268,12 @@ var require_content_type = __commonJS({
     var TYPE_REGEXP = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+\/[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
     exports.format = format;
     exports.parse = parse3;
-    function format(obj4) {
-      if (!obj4 || typeof obj4 !== "object") {
+    function format(obj5) {
+      if (!obj5 || typeof obj5 !== "object") {
         throw new TypeError("argument obj is required");
       }
-      var parameters = obj4.parameters;
-      var type = obj4.type;
+      var parameters = obj5.parameters;
+      var type = obj5.type;
       if (!type || !TYPE_REGEXP.test(type)) {
         throw new TypeError("invalid type");
       }
@@ -7304,7 +7304,7 @@ var require_content_type = __commonJS({
       if (!TYPE_REGEXP.test(type)) {
         throw new TypeError("invalid media type");
       }
-      var obj4 = new ContentType(type.toLowerCase());
+      var obj5 = new ContentType(type.toLowerCase());
       if (index !== -1) {
         var key;
         var match;
@@ -7323,20 +7323,20 @@ var require_content_type = __commonJS({
               value = value.replace(QESC_REGEXP, "$1");
             }
           }
-          obj4.parameters[key] = value;
+          obj5.parameters[key] = value;
         }
         if (index !== header.length) {
           throw new TypeError("invalid parameter format");
         }
       }
-      return obj4;
+      return obj5;
     }
-    function getcontenttype(obj4) {
+    function getcontenttype(obj5) {
       var header;
-      if (typeof obj4.getHeader === "function") {
-        header = obj4.getHeader("content-type");
-      } else if (typeof obj4.headers === "object") {
-        header = obj4.headers && obj4.headers["content-type"];
+      if (typeof obj5.getHeader === "function") {
+        header = obj5.getHeader("content-type");
+      } else if (typeof obj5.headers === "object") {
+        header = obj5.headers && obj5.headers["content-type"];
       }
       if (typeof header !== "string") {
         throw new TypeError("content-type header is missing from object");
@@ -7538,8 +7538,8 @@ function defineLazy(object3, key, getter) {
     configurable: true
   });
 }
-function objectClone(obj4) {
-  return Object.create(Object.getPrototypeOf(obj4), Object.getOwnPropertyDescriptors(obj4));
+function objectClone(obj5) {
+  return Object.create(Object.getPrototypeOf(obj5), Object.getOwnPropertyDescriptors(obj5));
 }
 function assignProp(target, prop, value) {
   Object.defineProperty(target, prop, {
@@ -7610,10 +7610,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj4, path4) {
+function getElementAtPath(obj5, path4) {
   if (!path4)
-    return obj4;
-  return path4.reduce((acc, key) => acc?.[key], obj4);
+    return obj5;
+  return path4.reduce((acc, key) => acc?.[key], obj5);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -8049,9 +8049,9 @@ function parsedType(data) {
       if (Array.isArray(data)) {
         return "array";
       }
-      const obj4 = data;
-      if (obj4 && Object.getPrototypeOf(obj4) !== Object.prototype && "constructor" in obj4 && obj4.constructor) {
-        return obj4.constructor.name;
+      const obj5 = data;
+      if (obj5 && Object.getPrototypeOf(obj5) !== Object.prototype && "constructor" in obj5 && obj5.constructor) {
+        return obj5.constructor.name;
       }
     }
   }
@@ -8069,8 +8069,8 @@ function issue(...args) {
   }
   return { ...iss };
 }
-function cleanEnum(obj4) {
-  return Object.entries(obj4).filter(([k, _]) => {
+function cleanEnum(obj5) {
+  return Object.entries(obj5).filter(([k, _]) => {
     return Number.isNaN(Number.parseInt(k, 10));
   }).map((el) => el[1]);
 }
@@ -8394,15 +8394,15 @@ var $ZodError = $constructor("$ZodError", initializer);
 var $ZodRealError = $constructor("$ZodError", initializer, void 0, {
   Parent: Error
 });
-function node(obj4, key, make) {
-  if (!Object.prototype.hasOwnProperty.call(obj4, key)) {
+function node(obj5, key, make) {
+  if (!Object.prototype.hasOwnProperty.call(obj5, key)) {
     if (key === "__proto__") {
-      Object.defineProperty(obj4, key, { value: make(), writable: true, enumerable: true, configurable: true });
+      Object.defineProperty(obj5, key, { value: make(), writable: true, enumerable: true, configurable: true });
     } else {
-      obj4[key] = make();
+      obj5[key] = make();
     }
   }
-  return obj4[key];
+  return obj5[key];
 }
 function flattenError(error2, mapper = (issue2) => issue2.message) {
   const fieldErrors = {};
@@ -16845,15 +16845,15 @@ function applyElicitationDefaults(schema, data) {
   if (!schema || data === null || typeof data !== "object")
     return;
   if (schema.type === "object" && schema.properties && typeof schema.properties === "object") {
-    const obj4 = data;
+    const obj5 = data;
     const props = schema.properties;
     for (const key of Object.keys(props)) {
       const propSchema = props[key];
-      if (obj4[key] === void 0 && Object.prototype.hasOwnProperty.call(propSchema, "default")) {
-        obj4[key] = propSchema.default;
+      if (obj5[key] === void 0 && Object.prototype.hasOwnProperty.call(propSchema, "default")) {
+        obj5[key] = propSchema.default;
       }
-      if (obj4[key] !== void 0) {
-        applyElicitationDefaults(propSchema, obj4[key]);
+      if (obj5[key] !== void 0) {
+        applyElicitationDefaults(propSchema, obj5[key]);
       }
     }
   }
@@ -19121,10 +19121,10 @@ function typeOf(s) {
   if (Array.isArray(s.type)) return s.type.join(" or ");
   return s.type ?? "any";
 }
-function argsOf(tool) {
+function argsOf(tool, noteMax = 160) {
   const schema = tool.inputSchema;
   const required2 = new Set(schema.required ?? []);
-  return Object.entries(schema.properties ?? {}).map(([name, s]) => ({ name, type: typeOf(s), required: required2.has(name), note: (s.description ?? "").replace(/\s+/g, " ").slice(0, 160) }));
+  return Object.entries(schema.properties ?? {}).map(([name, s]) => ({ name, type: typeOf(s), required: required2.has(name), note: (s.description ?? "").replace(/\s+/g, " ").trim().slice(0, noteMax) }));
 }
 var labelOf = (v) => {
   if (v === null) return "null";
@@ -19531,8 +19531,42 @@ async function discover(reader, opts = {}) {
   out.push("", "Nothing was ordered, changed or cancelled. No value from your account is shown above: only the names and kinds of what Robinhood answers.");
   return out;
 }
+function discoverFull(reader) {
+  const { order } = reader.byKind(), out = [];
+  out.push(`The ${order.length} tools that order, review or move money, in Robinhood's full words. None of them is called here.`);
+  for (const t of order) {
+    const lines = (t.description ?? "").split(/\r?\n/).map((l) => l.trimEnd()).filter((l, i, all) => l !== "" || i > 0 && all[i - 1] !== "");
+    out.push("", `* ${t.name}`, "  says:", ...lines.length ? lines.map((l) => `    ${l}`) : ["    (no description)"], "  takes:");
+    const args = argsOf(t, Infinity);
+    out.push(...args.length ? args.map((a) => `    - ${a.name} (${a.type}${a.required ? ", required" : ""})${a.note ? `: ${a.note}` : ""}`) : ["    nothing"]);
+    out.push(`  labelled read-only by Robinhood: ${t.annotations?.readOnlyHint === true ? "yes" : "no"}`);
+  }
+  out.push("", "Nothing was called, ordered, changed or cancelled.");
+  return out;
+}
+var obj3 = (v) => v && typeof v === "object" && !Array.isArray(v) ? v : {};
+var ACCOUNT_ARGS = ["account_number", "rhs_account_number"];
+async function withAgentic(reader, args) {
+  const asked = ACCOUNT_ARGS.filter((k) => args[k] === "agentic");
+  if (!asked.length) return args;
+  const r = await reader.read("get_accounts");
+  const d = obj3(r.data), all = obj3(d.data).accounts ?? d.accounts;
+  const agentic = (Array.isArray(all) ? all : []).map(obj3).filter((a) => a.agentic_allowed === true);
+  if (r.failed || agentic.length !== 1) throw new Refused(r.failed ? `Robinhood did not list the accounts: ${masked(r.text)}` : `Robinhood listed ${agentic.length} accounts that agents may trade, not one, so "agentic" cannot stand for an account.`);
+  const out = { ...args };
+  for (const k of asked) {
+    const n = agentic[0][k];
+    if (typeof n !== "string" || !n.trim()) throw new Refused(`Robinhood gave no ${k} for the Agentic account.`);
+    out[k] = n.trim();
+  }
+  return out;
+}
+function argsFromWords(reader, name, pairs) {
+  const tool = reader.tools.find((t) => t.name === name), types = new Map((tool ? argsOf(tool) : []).map((a) => [a.name, a.type]));
+  return Object.fromEntries(Object.entries(pairs).map(([k, v]) => [k, /\barray\b|^list of\b/.test(types.get(k) ?? "") ? v.split("+").map((x) => x.trim()).filter(Boolean) : v]));
+}
 async function shapeOfRead(reader, name, args, opts = {}) {
-  const r = await reader.read(name, args);
+  const r = await reader.read(name, await withAgentic(reader, args));
   if (r.failed) return [`Robinhood reported an error: ${masked(r.text)}`];
   if (r.data === null) return [`answered with plain text (${r.text.length} characters), not data`];
   return shapeLines(r.data, opts.words === true);
@@ -19558,7 +19592,7 @@ var isDone = (state) => DONE.test(state);
 var DONE_WORDS = Object.values(DONE_GROUPS).flat();
 
 // src/robinhood/account.ts
-var obj3 = (v) => v && typeof v === "object" && !Array.isArray(v) ? v : {};
+var obj4 = (v) => v && typeof v === "object" && !Array.isArray(v) ? v : {};
 var list = (v) => Array.isArray(v) ? v : [];
 var text = (v) => typeof v === "string" && v.trim() ? v.trim() : null;
 var figure = (v) => {
@@ -19566,13 +19600,13 @@ var figure = (v) => {
   if (typeof v !== "string" || !/^-?\d+(\.\d+)?$/.test(v.trim())) return null;
   return Number(v.trim());
 };
-var dataOf = (answer) => obj3(obj3(answer).data);
+var dataOf = (answer) => obj4(obj4(answer).data);
 var keyOf = (accountNumber, secret) => crypto3.createHmac("sha256", secret).update(accountNumber).digest("hex").slice(0, 16);
 var TYPE_WORDS = { individual: "Individual", ira_traditional: "Traditional IRA", ira_roth: "Roth IRA", joint: "Joint", custodial: "Custodial" };
 var titleOf = (raw) => TYPE_WORDS[raw] ?? raw.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 function parseAccounts(answer, secret) {
   return list(dataOf(answer).accounts).flatMap((v) => {
-    const a = obj3(v), number4 = text(a.account_number);
+    const a = obj4(v), number4 = text(a.account_number);
     if (!number4) return [];
     const kind = text(a.brokerage_account_type) ?? text(a.type);
     const key = keyOf(number4, secret), agentic = a.agentic_allowed === true;
@@ -19597,20 +19631,20 @@ function parsePortfolio(answer) {
     crypto: figure(d.crypto_value),
     options: figure(d.options_value),
     cash: figure(d.cash),
-    buyingPower: figure(obj3(d.buying_power).buying_power),
+    buyingPower: figure(obj4(d.buying_power).buying_power),
     currency: text(d.currency) ?? "USD"
   };
 }
 function parsePositions(answer) {
   return list(dataOf(answer).positions).flatMap((v) => {
-    const p = obj3(v), symbol = text(p.symbol), quantity = figure(p.quantity);
+    const p = obj4(v), symbol = text(p.symbol), quantity = figure(p.quantity);
     return symbol && quantity !== null && quantity !== 0 ? [{ symbol: symbol.toUpperCase(), quantity, averageCost: figure(p.average_buy_price) }] : [];
   });
 }
 function parseCrypto(answer) {
   const rows = list(dataOf(answer).results);
   const holdings = rows.flatMap((v) => {
-    const p = obj3(v), symbol = text(p.symbol) ?? text(obj3(p.currency).code) ?? text(p.asset_code), quantity = figure(p.quantity) ?? figure(p.quantity_available);
+    const p = obj4(v), symbol = text(p.symbol) ?? text(obj4(p.currency).code) ?? text(p.asset_code), quantity = figure(p.quantity) ?? figure(p.quantity_available);
     return symbol && quantity !== null && quantity !== 0 ? [{ symbol: symbol.toUpperCase(), quantity, averageCost: figure(p.average_cost) ?? figure(p.average_buy_price) }] : [];
   });
   return { holdings, unread: rows.length - holdings.length };
@@ -19618,13 +19652,13 @@ function parseCrypto(answer) {
 function parseQuotes(answer) {
   const out = /* @__PURE__ */ new Map();
   for (const v of list(dataOf(answer).results)) {
-    const q = obj3(obj3(v).quote), symbol = text(q.symbol), price = figure(q.last_trade_price);
+    const q = obj4(obj4(v).quote), symbol = text(q.symbol), price = figure(q.last_trade_price);
     if (symbol && price !== null) out.set(symbol.toUpperCase(), price);
   }
   return out;
 }
 var orderOf = (v) => {
-  const o = obj3(v);
+  const o = obj4(v);
   return {
     symbol: text(o.symbol)?.toUpperCase() ?? null,
     side: text(o.side),
@@ -19644,7 +19678,7 @@ function openOrders(answer) {
   const open2 = [];
   let unread = 0;
   rows.forEach((v, i) => {
-    const o = all[i], raw = obj3(v);
+    const o = all[i], raw = obj4(v);
     if (o.state && isDone(o.state)) return;
     const quantity = figure(raw.quantity), filled = figure(raw.cumulative_quantity) ?? 0;
     if (!o.state || !o.symbol || o.side !== "buy" && o.side !== "sell" || quantity === null) {
@@ -19656,7 +19690,7 @@ function openOrders(answer) {
   return { all, open: open2.filter((o) => o.quantity > 0), unread };
 }
 function parseApprovals(setting, approvals) {
-  const s = obj3(dataOf(setting).setting);
+  const s = obj4(dataOf(setting).setting);
   return { required: typeof s.human_must_approve_trades === "boolean" ? s.human_must_approve_trades : null, pending: list(dataOf(approvals).approvals).length };
 }
 var QUOTES_PER_CALL = 20;
@@ -20200,7 +20234,7 @@ var Link = class {
 // src/robinhood/cli.ts
 var say = (words2) => console.log(words2);
 async function main(args) {
-  const words2 = args.includes("--words"), [command, ...rest] = args.filter((a) => a !== "--words");
+  const words2 = args.includes("--words"), full = args.includes("--full"), [command, ...rest] = args.filter((a) => a !== "--words" && a !== "--full");
   const file = robinhoodFile();
   if (command === "status") {
     say(fs4.existsSync(file) ? `A Robinhood sign-in is saved (last refreshed ${fs4.statSync(file).mtime.toISOString().slice(0, 16).replace("T", " ")} UTC).` : "No Robinhood sign-in is saved yet.");
@@ -20212,25 +20246,38 @@ async function main(args) {
     return 0;
   }
   if (command === "discover" || command === "shape") {
-    let json = {};
+    let json = {}, pairs = null;
     if (command === "shape") {
       if (!rest[0]) {
-        say(`Use: node dist/robinhood.mjs shape TOOL '{"argument": "value"}'`);
+        say(`Use: node dist/robinhood.mjs shape TOOL account_number=agentic symbols=META (or '{"argument": "value"}'). "agentic" stands for the Agentic account; a list is written META+NVDA.`);
         return 2;
       }
-      try {
-        const v = JSON.parse(rest[1] ?? "{}");
-        if (!v || typeof v !== "object" || Array.isArray(v)) throw new Error("not an object");
-        json = v;
-      } catch {
-        say(`The arguments must be a JSON object, for example '{"account_number": "123"}'.`);
-        return 2;
+      if (rest.length > 1 && !rest[1].trim().startsWith("{")) {
+        pairs = {};
+        for (const w of rest.slice(1)) {
+          const at = w.indexOf("=");
+          if (at < 1) {
+            say(`"${w}" is not name=value, for example account_number=agentic.`);
+            return 2;
+          }
+          pairs[w.slice(0, at)] = w.slice(at + 1);
+        }
+      } else {
+        try {
+          const v = JSON.parse(rest[1] ?? "{}");
+          if (!v || typeof v !== "object" || Array.isArray(v)) throw new Error("not an object");
+          json = v;
+        } catch {
+          say("The arguments must be name=value words (account_number=agentic symbols=META) or a JSON object.");
+          return 2;
+        }
       }
     }
     try {
       const session = await openSession(file, { signIn: true, say });
       try {
-        for (const l of command === "discover" ? await discover(session.reader, { words: words2 }) : await shapeOfRead(session.reader, rest[0], json, { words: words2 })) say(l);
+        const lines = command === "shape" ? await shapeOfRead(session.reader, rest[0], pairs ? argsFromWords(session.reader, rest[0], pairs) : json, { words: words2 }) : full ? discoverFull(session.reader) : await discover(session.reader, { words: words2 });
+        for (const l of lines) say(l);
       } finally {
         await session.close();
       }
@@ -20242,7 +20289,7 @@ async function main(args) {
     }
   }
   if (command !== "connect") {
-    say("Use: node dist/robinhood.mjs connect | status | forget | discover | shape TOOL [JSON]");
+    say("Use: node dist/robinhood.mjs connect | status | forget | discover [--full] | shape TOOL [JSON]");
     return 2;
   }
   try {

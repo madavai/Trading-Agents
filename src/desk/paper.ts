@@ -19,8 +19,9 @@
 // its date would move the record's start back, adding weeks of record that were never kept. It stays in the journal and
 // is scored like any call. A call recorded before the desk kept its time is followed as it always was.
 //
-// Quantities are kept in whole steps of the order ticket's (a millionth of a coin, a whole share), so two buys of a coin
-// add up to what they are, never a figure with a long tail of float noise.
+// Quantities are kept in steps of a millionth (of a coin, or of a share when a ticket buys a part of one because a whole
+// share costs more than the order may spend), so two buys add up to what they are, never a figure with a long tail of
+// float noise. A part-share is a market order on a real ticket; on paper it fills at the close, as every paper order does.
 import fs from 'node:fs';
 import path from 'node:path';
 import { addDays, daysBetween, nyClock } from '../data/dates.js';
@@ -203,14 +204,17 @@ export function paperBook(calls: readonly PaperCall[], closes: Closes, o: { star
     if (!p.order) { f.trade.why = p.why.at(-1) ?? 'No order.'; return false; }
     const failing = check(p.order, context, o.trading, o.caps);
     if (!passes(failing)) { f.trade.why = `Its order would not pass: ${failing.filter((x) => !x.ok).map((x) => x.words).join('; ')}.`; return false; }
-    const { side, quantity, limitPrice } = p.order, amount = cents(quantity * limitPrice);
+    const { side, quantity, limitPrice, market } = p.order, amount = cents(quantity * limitPrice);
     if (side === 'buy') { cash = cents(cash - amount); held.set(f.trade.ticker, { quantity: units(h.quantity + quantity), cost: cents(h.cost + amount) }); boughtOn.set(f.trade.ticker, f.date); }
     else {
       const left = units(h.quantity - quantity);
       cash = cents(cash + amount);
       if (left > 0) held.set(f.trade.ticker, { quantity: left, cost: cents(h.cost * (left / h.quantity)) }); else held.delete(f.trade.ticker);
     }
-    Object.assign(f.trade, { status: 'filled', side, quantity, price: limitPrice, fillDate: f.date, why: `${side === 'buy' ? 'Bought' : 'Sold'} ${quantity} at the close of ${f.date}.` });
+    // A part-share is a market order on a real ticket: on paper it fills at the close too, which only approximates the
+    // price a market order gets at its moment.
+    const part = market ? `: a part-share, which a real ticket ${side === 'buy' ? 'buys' : 'sells'} at the market price; on paper it fills at that close, an approximation` : '';
+    Object.assign(f.trade, { status: 'filled', side, quantity, price: limitPrice, fillDate: f.date, why: `${side === 'buy' ? 'Bought' : 'Sold'} ${quantity} at the close of ${f.date}${part}.` });
     return true;
   };
   // The orders placed on paper each day: a call that places none (a Sell of nothing held) leaves room for another.

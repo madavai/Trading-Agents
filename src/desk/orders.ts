@@ -10,6 +10,9 @@ import { marketDaysBetween } from '../data/holidays.js';
 
 export interface SentOrder {
   at: string; symbol: string; side: 'buy' | 'sell'; quantity: number; limitPrice: number; timeInForce?: string;
+  /** A part-share at the market price: limitPrice is then Robinhood's live price when it was sent, an estimate, and a
+   *  buy's dollar amount is what was sent. */
+  market?: true; dollars?: number;
   call?: { date: string; rating: string }; own?: true; ticket?: string;   // own: the person's own order, not from a call
   /** answered: Robinhood took it. unknown: no clear answer (none yet, none ever came, or one without an order id): it may
    *  have gone through. Neither: Robinhood refused it, in its words. */

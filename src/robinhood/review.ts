@@ -1,12 +1,13 @@
 // The second door to Robinhood, and the narrowest: it can ask Robinhood to check one stock order without placing it
 // (review_equity_order, which Robinhood describes as "Simulate a stock order without placing it"), for the Agentic
-// account, as a limit order of whole shares. It can call no other tool: this file names only that one, and a test checks
-// it. It is used only when the person presses Review on a ticket in the dashboard; no agent can reach it.
+// account: a limit order of whole shares, or a part-share at the market price (rules.ts, equityOrderArgs). It can call no
+// other tool: this file names only that one, and a test checks it. It is used only when the person presses Review on a
+// ticket in the dashboard; no agent can reach it.
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 import type { Order } from '../desk/ticket.js';
 import { Refused } from './reader.js';
-import { masked } from './rules.js';
+import { equityOrderArgs, masked } from './rules.js';
 
 const REVIEW = 'review_equity_order';
 
@@ -67,11 +68,9 @@ export class Reviewer {
   async review(account: { accountNumber: string; agentic: boolean }, o: Order): Promise<Review> {
     if (!account.agentic) throw new Refused('Only the Agentic account can have an order checked, and this is not it.');
     if (!this.tools.some((t) => t.name === REVIEW)) throw new Refused("Robinhood's connection no longer offers its order check, so nothing was sent.");
-    if (!Number.isInteger(o.quantity) || o.quantity < 1 || !(o.limitPrice > 0) || (o.side !== 'buy' && o.side !== 'sell')) throw new Refused('That order is not complete, so it was not sent for checking.');
-    const r = await this.client.callTool({ name: REVIEW, arguments: {
-      account_number: account.accountNumber, symbol: o.symbol, side: o.side, type: 'limit', quantity: String(o.quantity),
-      limit_price: o.limitPrice.toFixed(2), time_in_force: o.timeInForce, market_hours: 'regular_hours',
-    } }) as { content?: Array<{ type: string; text?: string }>; structuredContent?: unknown; isError?: boolean };
+    const args = equityOrderArgs(account.accountNumber, o);
+    if (!args) throw new Refused('That order is not complete, so it was not sent for checking.');
+    const r = await this.client.callTool({ name: REVIEW, arguments: args }) as { content?: Array<{ type: string; text?: string }>; structuredContent?: unknown; isError?: boolean };
     const text = (r.content ?? []).filter((c) => c.type === 'text').map((c) => c.text ?? '').join('\n');
     let data: unknown = r.structuredContent ?? null;
     if (data === null) { try { data = JSON.parse(text) as unknown; } catch { /* words only */ } }

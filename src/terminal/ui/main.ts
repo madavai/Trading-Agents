@@ -660,7 +660,11 @@ async function loadTrading(): Promise<void> {
 }
 
 // ---------- the order ticket: proposed, checked, reviewed by Robinhood, placed only on the person's Confirm ----------
-const T = { open: null as TicketOpen | null, checks: [] as Check[], review: null as Review | null, quantity: 0, limit: 0, busy: false, timer: 0, confirm: '', confirming: false, placed: null as Placed | null, early: false };
+// market: a part-share at the market price (a buy as `dollars`, a sell as shares), else whole shares at `limit`.
+const T = { open: null as TicketOpen | null, checks: [] as Check[], review: null as Review | null, quantity: 0, limit: 0, market: false, dollars: 0, busy: false, timer: 0, confirm: '', confirming: false, placed: null as Placed | null, early: false };
+/** The figures on the ticket now, as the server takes them, and as a Robinhood check was asked with. */
+const ticketFigures = (): TicketFigures => (T.market ? { quantity: T.quantity, limitPrice: T.limit, market: true, ...(T.open?.proposal.order?.side === 'buy' ? { dollars: T.dollars } : {}) } : { quantity: T.quantity, limitPrice: T.limit });
+const askedNow = (): Asked => ({ id: T.open?.id, quantity: T.quantity, limit: T.limit, market: T.market, ...(T.market ? { dollars: T.dollars } : {}) });
 const hasAgentic = () => !!A.snapshot?.views.some((v) => v.account.agentic);
 
 function renderTicketDyn(): void {

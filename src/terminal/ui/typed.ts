@@ -14,5 +14,6 @@ export function typedNumber(typed: string): number {
 
 /** The figures a ticket was sent to Robinhood's check with, against the ones on the page now: an answer that comes back
  *  after the person changed them is not the check of the new figures. */
-export interface Asked { id?: string; quantity: number; limit: number }
-export const sameFigures = (asked: Asked, now: Asked): boolean => asked.id === now.id && asked.quantity === now.quantity && asked.limit === now.limit;
+export interface Asked { id?: string; quantity: number; limit: number; market?: boolean; dollars?: number }
+export const sameFigures = (asked: Asked, now: Asked): boolean => asked.id === now.id && asked.quantity === now.quantity && asked.limit === now.limit
+  && !!asked.market === !!now.market && (asked.dollars ?? null) === (now.dollars ?? null);

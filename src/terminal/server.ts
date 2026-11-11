@@ -28,7 +28,7 @@ import { careOf, deskSymbol, stopIn, toWatch, watched, type HoldingCare, type Wa
 import { lastBuy, logOrder, placedToday, unanswered, type SentOrder } from '../desk/orders.js';
 import { Sectors } from '../desk/sectors.js';
 export { placedToday };
-import { check, passes, propose, proposeOwn, type Check, type Order, type Proposal, type TicketContext } from '../desk/ticket.js';
+import { check, edit, passes, propose, proposeOwn, type Check, type Order, type Proposal, type TicketContext } from '../desk/ticket.js';
 import type { Review } from '../robinhood/review.js';
 import type { Placed } from '../robinhood/order.js';
 import { Journal } from '../desk/journal.js';
@@ -74,8 +74,13 @@ export function shareHoldings(dir: string, snap: Snapshot, day: string): boolean
 }
 
 const REVIEW_MS = 5 * 60_000;
-/** The exact words the person confirms: what is bought or sold, how many, at what limit. */
-export const confirmWords = (o: Pick<Order, 'side' | 'quantity' | 'symbol' | 'limitPrice'>): string => `${o.side === 'buy' ? 'Buy' : 'Sell'} ${o.quantity} ${o.symbol} at $${o.limitPrice.toFixed(2)}`;
+/** The exact words the person confirms: what is bought or sold, how many, at what limit; or, for a part-share, the
+ *  dollar amount of a buy or the shares of a sell, at the market price. */
+export const confirmWords = (o: Pick<Order, 'side' | 'quantity' | 'symbol' | 'limitPrice' | 'market' | 'dollars'>): string => {
+  const side = o.side === 'buy' ? 'Buy' : 'Sell';
+  if (o.market) return o.side === 'buy' && typeof o.dollars === 'number' ? `${side} $${o.dollars.toFixed(2)} of ${o.symbol} at the market price` : `${side} ${o.quantity} ${o.symbol} at the market price`;
+  return `${side} ${o.quantity} ${o.symbol} at $${o.limitPrice.toFixed(2)}`;
+};
 
 export interface Terminal {
   url: string; port: number; token: string; deskId: string;
@@ -175,8 +180,8 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
   };
   const edited = (t: Ticket, b: Record<string, unknown>): Order => {
     if (!t.proposal.order) throw new Refused(400, 'this ticket proposes no order');
-    const quantity = typeof b.quantity === 'number' ? b.quantity : NaN, limitPrice = typeof b.limitPrice === 'number' ? b.limitPrice : NaN;
-    return { ...t.proposal.order, quantity, limitPrice };   // the person can change how many and the price; never the stock, the side or the account
+    // The person can change how many, the price, and whole shares or a part-share; never the stock, the side or the account.
+    return edit(t.proposal.order, t.context, readSettings(root).trading, b);
   };
   let port = 0;
   const hosts = () => new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
@@ -485,7 +490,7 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
       if (!side) throw new Refused(400, 'say whether to buy or to sell');
       const trading = readSettings(root).trading, { caps } = robinhood.trading();
       const context: TicketContext = await limited({ ...(await askRobinhood(() => robinhood.ticketContext(symbol))), rating: '', callDate: '' });
-      const t = opened(true, context, proposeOwn(context, side, trading), trading, caps);
+      const t = opened(true, context, proposeOwn(context, side, trading, caps), trading, caps);
       return json(res, 200, { id: t.id, own: true, context, proposal: t.proposal, checks: t.checks, caps, lost: lostWords(symbol) });
     }
     if (p === '/api/ticket/check' && method === 'POST') {
@@ -525,7 +530,7 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
       if (t.checks.some((c) => c.ask) && b.early !== true) throw new Refused(400, `${t.order.symbol} was bought here under your shortest hold: press "Sell anyway" to go on`);
       const order = t.order, trading = readSettings(root).trading;
       tradable(order.symbol);
-      const line = (answer: SentOrder['robinhood']) => logOrder(dir, { at: new Date().toISOString(), symbol: order.symbol, side: order.side, quantity: order.quantity, limitPrice: order.limitPrice, timeInForce: order.timeInForce, ...(t.own ? { own: true as const } : { call: { date: t.context.callDate, rating: t.context.rating } }), ticket: t.id, robinhood: answer });
+      const line = (answer: SentOrder['robinhood']) => logOrder(dir, { at: new Date().toISOString(), symbol: order.symbol, side: order.side, quantity: order.quantity, limitPrice: order.limitPrice, timeInForce: order.timeInForce, ...(order.market ? { market: true as const, ...(order.dollars === undefined ? {} : { dollars: order.dollars }) } : {}), ...(t.own ? { own: true as const } : { call: { date: t.context.callDate, rating: t.context.rating } }), ticket: t.id, robinhood: answer });
       let sent = false;
       t.placing = true;
       try {

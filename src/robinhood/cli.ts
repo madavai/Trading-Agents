@@ -1,20 +1,22 @@
-// node dist/robinhood.mjs connect | status | forget | discover [--words] | shape TOOL [JSON] [--words]
+// node dist/robinhood.mjs connect | status | forget | discover [--words | --full] | shape TOOL [JSON] [--words]
 // connect: sign in through Robinhood's own page if needed, list what its connection offers, and read the positions
 // once - read-only, nothing is ever ordered. status: whether a sign-in is saved. forget: delete the saved sign-in and
 // switch trading off, as the dashboard's Disconnect does.
 // discover: each tool's arguments and the shape (never the values) of what the read tools answer, to build the desk on.
-// shape: the same for one read tool that needs arguments. --words also shows short lower-case words such as a status.
+// shape: the same for one read tool that needs arguments; "agentic" in place of an account number stands for the Agentic
+// account, read from Robinhood and never printed. --words also shows short lower-case words such as a status.
+// discover --full: the whole words of the tools that order, review or move money (discover cuts them short), calling none.
 import fs from 'node:fs';
 import { robinhoodFile } from '../paths.js';
 import { connect, openSession } from './connect.js';
-import { discover, shapeOfRead } from './discover.js';
+import { argsFromWords, discover, discoverFull, shapeOfRead } from './discover.js';
 import { Link } from './link.js';
 import { masked } from './rules.js';
 
 const say = (words: string) => console.log(words);
 
 async function main(args: string[]): Promise<number> {
-  const words = args.includes('--words'), [command, ...rest] = args.filter((a) => a !== '--words');
+  const words = args.includes('--words'), full = args.includes('--full'), [command, ...rest] = args.filter((a) => a !== '--words' && a !== '--full');
   const file = robinhoodFile();
   if (command === 'status') {
     say(fs.existsSync(file) ? `A Robinhood sign-in is saved (last refreshed ${fs.statSync(file).mtime.toISOString().slice(0, 16).replace('T', ' ')} UTC).` : 'No Robinhood sign-in is saved yet.');
@@ -26,16 +28,23 @@ async function main(args: string[]): Promise<number> {
     return 0;
   }
   if (command === 'discover' || command === 'shape') {
-    let json: Record<string, unknown> = {};
+    let json: Record<string, unknown> = {}, pairs: Record<string, string> | null = null;
     if (command === 'shape') {
-      if (!rest[0]) { say('Use: node dist/robinhood.mjs shape TOOL \'{"argument": "value"}\''); return 2; }
-      try { const v = JSON.parse(rest[1] ?? '{}') as unknown; if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error('not an object'); json = v as Record<string, unknown>; }
-      catch { say('The arguments must be a JSON object, for example \'{"account_number": "123"}\'.'); return 2; }
+      if (!rest[0]) { say('Use: node dist/robinhood.mjs shape TOOL account_number=agentic symbols=META (or \'{"argument": "value"}\'). "agentic" stands for the Agentic account; a list is written META+NVDA.'); return 2; }
+      if (rest.length > 1 && !rest[1]!.trim().startsWith('{')) {
+        // name=value words, which a Windows shell passes as they are (it strips the quotes inside a JSON object)
+        pairs = {};
+        for (const w of rest.slice(1)) { const at = w.indexOf('='); if (at < 1) { say(`"${w}" is not name=value, for example account_number=agentic.`); return 2; } pairs[w.slice(0, at)] = w.slice(at + 1); }
+      } else {
+        try { const v = JSON.parse(rest[1] ?? '{}') as unknown; if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error('not an object'); json = v as Record<string, unknown>; }
+        catch { say('The arguments must be name=value words (account_number=agentic symbols=META) or a JSON object.'); return 2; }
+      }
     }
     try {
       const session = await openSession(file, { signIn: true, say });
       try {
-        for (const l of command === 'discover' ? await discover(session.reader, { words }) : await shapeOfRead(session.reader, rest[0]!, json, { words })) say(l);
+        const lines = command === 'shape' ? await shapeOfRead(session.reader, rest[0]!, pairs ? argsFromWords(session.reader, rest[0]!, pairs) : json, { words }) : full ? discoverFull(session.reader) : await discover(session.reader, { words });
+        for (const l of lines) say(l);
       } finally { await session.close(); }
       return 0;
     } catch (e) {
@@ -45,7 +54,7 @@ async function main(args: string[]): Promise<number> {
     }
   }
   if (command !== 'connect') {
-    say('Use: node dist/robinhood.mjs connect | status | forget | discover | shape TOOL [JSON]');
+    say('Use: node dist/robinhood.mjs connect | status | forget | discover [--full] | shape TOOL [JSON]');
     return 2;
   }
   try {
