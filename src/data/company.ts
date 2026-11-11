@@ -359,12 +359,14 @@ export async function fundProfile(raw: string, analysis: string, topN = 10): Pro
   return [`Fund profile for ${sym}, from Yahoo Finance as it stands today (${day}). A fund has no company accounts, insider trades or results releases of its own, so no results dates: what it holds and what it costs to own are its fundamentals.`, '', ...lines].join('\n');
 }
 
-// Yahoo's names for the statement lines, in the order of the SEC table's lines, so both sources read alike.
-const YAHOO_LINES: Record<Statement, string[]> = {
-  balance_sheet: ['TotalAssets', 'CurrentAssets', 'CashAndCashEquivalents', 'TotalLiabilitiesNetMinorityInterest', 'CurrentLiabilities', 'StockholdersEquity'],
-  income_statement: ['TotalRevenue', 'CostOfRevenue', 'GrossProfit', 'OperatingIncome', 'NetIncome', 'DilutedEPS'],
-  cashflow: ['OperatingCashFlow', 'InvestingCashFlow', 'FinancingCashFlow', 'CapitalExpenditure'],
+// Yahoo's names for the SEC table's lines it is read for, under the SEC table's labels and in its order, so both sources
+// read alike. The parts of current assets and of the financing cash flow are read from the SEC only.
+const YAHOO_LINES: Record<Statement, Record<string, string>> = {
+  balance_sheet: { 'Total Assets': 'TotalAssets', 'Current Assets': 'CurrentAssets', 'Cash and Equivalents': 'CashAndCashEquivalents', 'Total Liabilities': 'TotalLiabilitiesNetMinorityInterest', 'Current Liabilities': 'CurrentLiabilities', 'Stockholders Equity': 'StockholdersEquity' },
+  income_statement: { Revenue: 'TotalRevenue', 'Cost of Revenue': 'CostOfRevenue', 'Gross Profit': 'GrossProfit', 'Operating Income': 'OperatingIncome', 'Net Income': 'NetIncome', 'Diluted EPS': 'DilutedEPS' },
+  cashflow: { 'Operating Cash Flow': 'OperatingCashFlow', 'Investing Cash Flow': 'InvestingCashFlow', 'Capital Expenditure': 'CapitalExpenditure', 'Financing Cash Flow': 'FinancingCashFlow' },
 };
+const yahooLines = (kind: Statement) => STATEMENTS[kind].lines.flatMap(([label]) => (YAHOO_LINES[kind][label] ? [[label, YAHOO_LINES[kind][label]!] as const] : []));
 
 interface Point { asOfDate?: string; currencyCode?: string; reportedValue?: V }
 interface TimeseriesJson { timeseries?: { result?: Array<{ meta?: { type?: string[] } } & Record<string, unknown>> | null } }
@@ -373,11 +375,11 @@ interface TimeseriesJson { timeseries?: { result?: Array<{ meta?: { type?: strin
 export function yahooTable(j: TimeseriesJson, kind: Statement, freq: Frequency): Table {
   const series = new Map<string, Point[]>();
   for (const r of j.timeseries?.result ?? []) { const t = r.meta?.type?.[0]; if (t && Array.isArray(r[t])) series.set(t, (r[t] as Array<Point | null>).filter((p): p is Point => !!p)); }
-  const lines = YAHOO_LINES[kind].map((name, i) => {
+  const lines = yahooLines(kind).map(([label, name]) => {
     const values = new Map<string, number>();
     let unit = '';
     for (const p of series.get(freq + name) ?? []) if (p.asOfDate && has(p.reportedValue)) { values.set(p.asOfDate, p.reportedValue.raw); unit = p.currencyCode ?? unit; }
-    return { label: STATEMENTS[kind].lines[i]![0], unit: name === 'DilutedEPS' ? `${unit}/shares` : unit, values };
+    return { label, unit: name === 'DilutedEPS' ? `${unit}/shares` : unit, values };
   });
   const ends = [...new Set(lines.flatMap((l) => [...l.values.keys()]))].sort().reverse().slice(0, SHOWN[freq]);
   if (!ends.length) throw new NoData(`Yahoo Finance has no ${freq} ${STATEMENTS[kind].title.toLowerCase()}`);
@@ -387,7 +389,7 @@ export function yahooTable(j: TimeseriesJson, kind: Statement, freq: Frequency):
 const epoch = (date: string) => Math.floor(Date.parse(`${date}T00:00:00Z`) / 1000);
 
 async function yahooStatement(sym: string, kind: Statement, freq: Frequency, day: string): Promise<Table> {
-  const types = YAHOO_LINES[kind].map((n) => freq + n).join(',');
+  const types = yahooLines(kind).map(([, n]) => freq + n).join(',');
   const j = await yahooJson<TimeseriesJson>(`/ws/fundamentals-timeseries/v1/finance/timeseries/${encodeURIComponent(sym)}?symbol=${encodeURIComponent(sym)}&type=${types}&period1=${epoch(addDays(day, -6 * 366))}&period2=${epoch(addDays(day, 1))}`);
   return yahooTable(j, kind, freq);
 }
@@ -449,18 +451,25 @@ export function withWorkedRows(t: Table, kind: Statement, freq: Frequency): Tabl
   return { ...t, rows: [...t.rows, ...out.filter((r): r is Row => r !== null)] };
 }
 
+/** What a table from the SEC says of a line with no figure in any period shown: the filings' data has none under the
+ *  names the desk reads, and no other line or a zero may stand for it. */
+export const NOT_IN_FILINGS = (labels: readonly string[]) =>
+  `No figure in the company's SEC filings' data for: ${labels.join(', ')}. The company may have none of it, or file it under a name of its own or in pieces, which the desk does not add up: never take another line for it, and never read it as zero.`;
+
 /** A statement as a table an agent reads: millions of the main currency, per-share rows as they are, worked-out rows as
- *  percentages or multiples, "–" for no figure, then the table's notes. */
-export function renderTable(t: Table, head: string, note: string): string {
-  const rows = t.rows.filter((r) => r.cells.some((c) => c !== null)), missing = t.rows.filter((r) => !rows.includes(r) && !r.worked).map((r) => r.label);
+ *  percentages or multiples, "–" for no figure, then the table's notes. `filed`: the table is from the SEC filings, and
+ *  says so of a line it has no figure for. */
+export function renderTable(t: Table, head: string, note: string, filed = false): string {
+  const rows = t.rows.filter((r) => r.noted || r.cells.some((c) => c !== null)), missing = t.rows.filter((r) => !rows.includes(r) && !r.worked).map((r) => r.label);
   const perShare = (u: string) => u.includes('/');
   const main = rows.find((r) => !perShare(r.unit) && !r.worked)?.unit ?? '';
   const name = (r: Row) => (r.worked === 'percent' || r.worked === 'times' ? r.label : perShare(r.unit) ? `${r.label} (${r.unit.split('/')[0] || 'currency'} per share)` : r.unit !== main ? `${r.label} (millions of ${r.unit || 'an unstated currency'})` : r.label);
   const cell = (v: number | null, r: Row) => (v === null ? '–' : r.worked === 'percent' ? `${v.toFixed(1)}%` : r.worked === 'times' ? v.toFixed(2) : perShare(r.unit) ? v.toFixed(2) : (v / 1e6).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
   const worked = rows.some((r) => r.worked) ? ' Rows marked "worked out" are worked out by the desk from the figures in this table, as named; quote them rather than working your own.' : '';
-  const out = [head, `Money in millions of ${main || 'an unstated currency'} unless the row says otherwise; "–" means no figure for that period. ${note}${worked}`, '',
+  const dash = filed ? '"–" means the filings give no figure for that period: not known, never zero.' : '"–" means no figure for that period.';
+  const out = [head, `Money in millions of ${main || 'an unstated currency'} unless the row says otherwise; ${dash} ${note}${worked}`, '',
     `Line | ${t.columns.join(' | ')}`, `---|${t.columns.map(() => '---:').join('|')}`, ...rows.map((r) => `${name(r)} | ${r.cells.map((c) => cell(c, r)).join(' | ')}`)];
-  if (missing.length) out.push('', `Not reported by this source: ${missing.join(', ')}.`);
+  if (missing.length) out.push('', filed ? NOT_IN_FILINGS(missing) : `Not reported by this source: ${missing.join(', ')}.`);
   if (t.notes?.length) out.push('', ...t.notes);
   return out.join('\n');
 }
@@ -483,6 +492,14 @@ async function statementBasis(sym: string, day: string): Promise<{ splits?: Spli
   } catch { return { note: '' }; }
 }
 
+/** What a statement from the SEC says of the lines that are parts of a total (`part` in `STATEMENTS`): their signs, and
+ *  that what they do not cover is not itemized, so an agent neither guesses the rest nor takes a total for its parts. */
+const PARTS: Record<Statement, string> = {
+  balance_sheet: ' Marketable securities (current), accounts receivable, other receivables and inventory are parts of current assets, each given only where the filings give that whole part; what they and cash do not cover is not itemized here, so never say what it is.',
+  income_statement: '',
+  cashflow: ' Capital expenditure, share buybacks, dividends paid, debt repaid and tax paid on employee share awards are cash paid out, shown as positive figures as the filings give them; debt issued is cash received; commercial paper (net) is cash raised less repaid, negative when more was repaid. The financing cash flow is the net of all financing, negative when more cash went out than came in; the lines after it are its parts the filings give, and what they do not cover is not itemized: never call the whole of it buybacks and dividends.',
+};
+
 /** A financial statement: as filed with the SEC by the analysis date for a US filer; else, for today only, Yahoo's. */
 export async function financialStatement(raw: string, kind: Statement, freq: Frequency, analysis: string): Promise<string> {
   const day = analysisDate(analysis), sym = companySymbol(raw), title = STATEMENTS[kind].title;
@@ -491,7 +508,7 @@ export async function financialStatement(raw: string, kind: Statement, freq: Fre
     const basis = kind === 'income_statement' ? await statementBasis(sym, day) : { note: '' };
     const t = withWorkedRows(await secStatement(sym, kind, freq, day, basis.splits), kind, freq);
     const q = kind !== 'balance_sheet' && freq === 'quarterly' ? ' Every column is one quarter in a row of quarters; a quarter no filing states (a fourth quarter, which only the annual report covers, or one filed only inside a year to date) is derived from two filed figures of the same year, its column marked "(derived)", and the notes below say from which. Per-share figures are never derived.' : '';
-    return renderTable(t, `${title} for ${sym} (${freq}), as filed with the SEC on or before ${day}`, `Each figure is the latest filing of it by that day; a restatement counts only from the day it was filed.${q}${basis.note}`);
+    return renderTable(t, `${title} for ${sym} (${freq}), as filed with the SEC on or before ${day}`, `Each figure is the latest filing of it by that day; a restatement counts only from the day it was filed.${q}${PARTS[kind]}${basis.note}`, true);
   } catch (e) { secFailure = e; }
   if (isHistorical(day)) {
     if (!(secFailure instanceof NoData)) throw new Unavailable(`the SEC, the only source of accounts as filed by ${day}, could not answer (${reason(secFailure)})`);

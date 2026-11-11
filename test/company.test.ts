@@ -154,6 +154,84 @@ test('the desk works out margins, growth only between neighbouring periods, free
   assert.deepEqual(balance.rows.slice(5).map((r) => [r.label.split(' (')[0], r.cells[0]]), [['Current ratio', 2.5], ['Liabilities to equity', 0.5], ['Non-current liabilities', 100e6], ['Current assets other than cash', 400e6]]);
 });
 
+// Apple's year to 26 Sep 2026 and its nine months to 27 Jun 2026, as filed (millions). In the run of 11 Nov 2026 the
+// statement had only the financing cash flow, and the debate called all of its 127,446 "dividends and buybacks": they
+// were 102,111, the rest debt repaid, commercial paper and tax paid on employee share awards.
+const year = (v: number) => q('2025-09-28', '2026-09-26', v * 1e6, '2026-11-03', '10-K');
+const nine = (v: number) => q('2025-09-28', '2026-06-27', v * 1e6, '2026-07-31');
+const flow = (y: number, n: number) => ({ units: { USD: [year(y), nine(n)] } });
+const held = (v: number) => ({ units: { USD: [at('2026-09-26', v * 1e6, '2026-11-03', '10-K')] } });
+const APPLE: Facts = {
+  NetCashProvidedByUsedInOperatingActivities: flow(145097, 116996), PaymentsToAcquirePropertyPlantAndEquipment: flow(9041, 6799),
+  NetCashProvidedByUsedInFinancingActivities: flow(-127446, -94575), PaymentsForRepurchaseOfCommonStock: flow(86390, 62094),
+  PaymentsOfDividends: flow(15721, 11778), ProceedsFromIssuanceOfLongTermDebt: flow(0, 0), RepaymentsOfLongTermDebt: flow(12396, 8146),
+  ProceedsFromRepaymentsOfCommercialPaper: flow(-5911, -5911), PaymentsRelatedToTaxWithholdingForShareBasedCompensation: flow(6793, 6462),
+  ProceedsFromPaymentsForOtherFinancingActivities: flow(-235, -184),   // no line of the desk's: part of what is not itemized
+  AssetsCurrent: held(173857), CashAndCashEquivalentsAtCarryingValue: held(36305), MarketableSecuritiesCurrent: held(20417),
+  AccountsReceivableNetCurrent: held(43817), NontradeReceivablesCurrent: held(39896), InventoryNet: held(14541),
+  OtherAssetsCurrent: held(18881),                                      // no line of the desk's either
+};
+const PARTS = ['Financing Cash Flow', 'Share Buybacks', 'Dividends Paid', 'Debt Issued', 'Debt Repaid', 'Commercial Paper (net)', 'Tax Paid on Employee Share Awards'];
+
+test("a company's financing cash flow comes with its parts as filed, so it is never taken for buybacks and dividends", async () => {
+  const t = filedStatement(APPLE, 'cashflow', 'annual', '2026-11-11');
+  const cells = (tt: typeof t, label: string) => tt.rows.find((r) => r.label === label)?.cells;
+  assert.deepEqual(PARTS.map((l) => cells(t, l)), [[-127446e6], [86390e6], [15721e6], [0], [12396e6], [-5911e6], [6793e6]]);
+  // A fourth quarter is derived for the parts as for every flow; a part filed only to date fills the column the others have.
+  const quarters = filedStatement(APPLE, 'cashflow', 'quarterly', '2026-11-11');
+  assert.deepEqual(quarters.columns, ['2026-09-26 (derived)', '2026-06-27 (9 months to date)']);
+  assert.deepEqual(PARTS.map((l) => cells(quarters, l)), [[-32871e6, -94575e6], [24296e6, 62094e6], [3943e6, 11778e6], [0, 0], [4250e6, 8146e6], [0, -5911e6], [331e6, 6462e6]]);
+  // The parts of current assets, each as filed; what they and cash leave (Apple's other current assets) has no line.
+  const balance = filedStatement(APPLE, 'balance_sheet', 'annual', '2026-11-11');
+  assert.deepEqual(['Current Assets', 'Cash and Equivalents', 'Marketable Securities (current)', 'Accounts Receivable', 'Other Receivables', 'Inventory'].map((l) => cells(balance, l)),
+    [[173857e6], [36305e6], [20417e6], [43817e6], [39896e6], [14541e6]]);
+  // The tool's words: the parts and their signs, and that the rest is not itemized.
+  process.env.TRADING_AGENTS_TODAY = '2026-11-11';
+  configure({ fetch: route([[/company_tickers\.json/, () => json({ 0: { cik_str: 320193, ticker: 'AAPL', title: 'Apple Inc.' } })], [/CIK0000320193\.json/, () => json({ facts: { 'us-gaap': APPLE } })]]) });
+  const text = await financialStatement('AAPL', 'cashflow', 'annual', '2026-11-11');
+  assert.match(text, /\nFinancing Cash Flow \| -127,446\.0\nShare Buybacks \| 86,390\.0\nDividends Paid \| 15,721\.0\nDebt Issued \| 0\.0\nDebt Repaid \| 12,396\.0\nCommercial Paper \(net\) \| -5,911\.0\nTax Paid on Employee Share Awards \| 6,793\.0\n/);
+  assert.match(text, /share buybacks, dividends paid, debt repaid and tax paid on employee share awards are cash paid out, shown as positive figures/);
+  assert.match(text, /what they do not cover is not itemized: never call the whole of it buybacks and dividends\./);
+  assert.match(text, /"–" means the filings give no figure for that period: not known, never zero\./);
+  const assets = await financialStatement('AAPL', 'balance_sheet', 'annual', '2026-11-11');
+  assert.match(assets, /\nMarketable Securities \(current\) \| 20,417\.0\nAccounts Receivable \| 43,817\.0\nOther Receivables \| 39,896\.0\nInventory \| 14,541\.0\n/);
+  assert.match(assets, /what they and cash do not cover is not itemized here, so never say what it is\./);
+});
+
+// NVIDIA's 10-Qs of 2026 split its marketable securities into debt and equity securities under other tags, and it
+// raised debt in its second quarter only: the six months to date are filed, nothing for the first quarter.
+const NVIDIA: Facts = {
+  AssetsCurrent: { units: { USD: [at('2026-07-26', 197412e6, '2026-08-26'), at('2025-10-26', 116492e6, '2025-11-19')] } },
+  CashAndCashEquivalentsAtCarryingValue: { units: { USD: [at('2026-07-26', 22443e6, '2026-08-26'), at('2025-10-26', 11486e6, '2025-11-19')] } },
+  MarketableSecuritiesCurrent: { units: { USD: [at('2025-10-26', 49122e6, '2025-11-19')] } },
+  DebtSecuritiesCurrent: { units: { USD: [at('2026-07-26', 34143e6, '2026-08-26')] } },
+  EquitySecuritiesFvNi: { units: { USD: [at('2026-07-26', 42783e6, '2026-08-26')] } },
+  AccountsReceivableNetCurrent: { units: { USD: [at('2026-07-26', 63059e6, '2026-08-26'), at('2025-10-26', 33391e6, '2025-11-19')] } },
+  InventoryNet: { units: { USD: [at('2026-07-26', 31575e6, '2026-08-26'), at('2025-10-26', 19784e6, '2025-11-19')] } },
+  NetCashProvidedByUsedInFinancingActivities: { units: { USD: [q('2026-01-26', '2026-04-26', -21283e6, '2026-05-20'), q('2026-01-26', '2026-07-26', -27459e6, '2026-08-26')] } },
+  PaymentsForRepurchaseOfCommonStock: { units: { USD: [q('2026-01-26', '2026-04-26', 19312e6, '2026-05-20'), q('2026-01-26', '2026-07-26', 39044e6, '2026-08-26')] } },
+  ProceedsFromDebtNetOfIssuanceCosts: { units: { USD: [q('2026-01-26', '2026-07-26', 24896e6, '2026-08-26')] } },
+};
+
+test('a part the filings do not give whole is no figure, never a piece of it or a zero, and one filed only to date is a note', async () => {
+  const balance = filedStatement(NVIDIA, 'balance_sheet', 'quarterly', '2026-11-09');
+  assert.deepEqual(balance.columns, ['2026-07-26', '2025-10-26']);
+  assert.deepEqual(balance.rows.find((r) => r.label === 'Marketable Securities (current)')!.cells, [null, 49122e6]);   // never the debt securities' 34,143 alone
+  const cash = filedStatement(NVIDIA, 'cashflow', 'quarterly', '2026-11-09');
+  assert.deepEqual(cash.columns, ['2026-07-26 (derived)', '2026-04-26']);                                           // no column of six months for one line
+  assert.deepEqual(cash.rows.find((r) => r.label === 'Share Buybacks')!.cells, [19732e6, 19312e6]);
+  assert.deepEqual(cash.rows.find((r) => r.label === 'Debt Issued'), { label: 'Debt Issued', unit: 'USD', cells: [null, null], noted: true });
+  assert.ok(cash.notes!.includes('Debt Issued for the quarter to 2026-07-26 is not derived: its filings give the six months to 2026-07-26 (24,896.0 million USD, filed 2026-08-26) and no figure of it for the months before, so its quarter is not known; never take the six months for it.'), String(cash.notes));
+  process.env.TRADING_AGENTS_TODAY = '2026-11-11';
+  configure({ fetch: route([[/company_tickers\.json/, () => json({ 0: { cik_str: 1045810, ticker: 'NVDA', title: 'NVIDIA CORP' } })], [/CIK0001045810\.json/, () => json({ facts: { 'us-gaap': NVIDIA } })]]) });
+  const assets = await financialStatement('NVDA', 'balance_sheet', 'quarterly', '2026-11-09');
+  assert.match(assets, /\nMarketable Securities \(current\) \| – \| 49,122\.0\n/);
+  assert.match(assets, /\n\nNo figure in the company's SEC filings' data for: Total Assets, Other Receivables, Total Liabilities, Current Liabilities, Stockholders Equity\. The company may have none of it, or file it under a name of its own or in pieces, which the desk does not add up: never take another line for it, and never read it as zero\./);
+  const flows = await financialStatement('NVDA', 'cashflow', 'quarterly', '2026-11-09');
+  assert.match(flows, /\nDebt Issued \| – \| –\n/);
+  assert.match(flows, /No figure in the company's SEC filings' data for: Operating Cash Flow, Investing Cash Flow, Capital Expenditure, Dividends Paid, Debt Repaid, Commercial Paper \(net\), Tax Paid on Employee Share Awards\./);
+});
+
 test('the tool serves a US filer from the SEC, in millions, with the email sent to the SEC alone', async () => {
   const seen: Array<{ url: string; headers: Record<string, string> }> = [];
   configure({ contact: 'ta (+x)', secEmail: 'me@example.com', fetch: route(SEC, seen) });
@@ -162,7 +240,7 @@ test('the tool serves a US filer from the SEC, in millions, with the email sent 
   assert.match(t, /Line \| 2025-06-30 \| 2025-03-31 \| 2024-06-30/);
   assert.match(t, /Revenue \| 120\.0 \| 100\.0 \| 95\.0/);
   assert.match(t, /Diluted EPS \(USD per share\) \| 1\.23 \| – \| –/);
-  assert.match(t, /Not reported by this source: Cost of Revenue, Gross Profit, Operating Income, Net Income\./);
+  assert.match(t, /No figure in the company's SEC filings' data for: Cost of Revenue, Gross Profit, Operating Income, Net Income\. The company may have none of it/);
   assert.match(t, /a quarter no filing states .* is derived from two filed figures of the same year, its column marked "\(derived\)"/);
   assert.match(t, /Revenue growth on the quarter just before \(worked out\) \| 20\.0% \| – \| –/);      // 120 on 100; never across the gap to 2024
   assert.match(t, /Revenue growth on the same quarter a year before \(worked out\) \| 26\.3% \| – \| –/);
@@ -196,8 +274,10 @@ test('a company the SEC does not list is withheld for a past day and served by Y
   configure({ fetch: route([...SEC, ...YAHOO_SESSION, [/fundamentals-timeseries/, () => json(TS)]]) });
   assert.match(await financialStatement('7203.T', 'balance_sheet', 'annual', '2026-06-01'), /^Balance sheet for 7203\.T is withheld for 2026-06-01: 7203\.T is not in the SEC's list of US filers, and .*cannot show which figures were public/);
   const now = await financialStatement('7203.T', 'balance_sheet', 'annual', '2026-10-12');
-  assert.match(now, /Money in millions of JPY/);
+  assert.match(now, /Money in millions of JPY unless the row says otherwise; "–" means no figure for that period\./);
   assert.match(now, /Total Assets \| 90,000,000\.0/);
+  // Yahoo is read for the lines it was read for before, in its own words; the parts of a total are the SEC's only.
+  assert.match(now, /\n\nNot reported by this source: Current Assets, Cash and Equivalents, Total Liabilities, Current Liabilities, Stockholders Equity\.$/);
 });
 
 const SUMMARY = { quoteSummary: { result: [{

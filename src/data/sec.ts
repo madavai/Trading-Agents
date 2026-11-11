@@ -9,12 +9,20 @@ export type Statement = 'balance_sheet' | 'income_statement' | 'cashflow';
 export type Frequency = 'quarterly' | 'annual';
 
 /** The line items of each statement, each with the tags filers use for it, best first. A period takes the first tag that
- *  reports it; values are never added across tags, which would count a figure twice. */
-export const STATEMENTS: Record<Statement, { title: string; lines: Array<[string, string[]]> }> = {
+ *  reports it; values are never added across tags, which would count a figure twice. A line marked `part` is a part of a
+ *  total (of current assets, of the financing cash flow) and takes only tags that name that whole part: a filer that
+ *  splits it into pieces or files it under a tag of its own (NVIDIA's marketable securities in 2026, debt and equity
+ *  securities apart) gives no figure, never a piece of it under the part's name. */
+export const STATEMENTS: Record<Statement, { title: string; lines: Array<[label: string, tags: string[], part?: true]> }> = {
   balance_sheet: { title: 'Balance sheet', lines: [
     ['Total Assets', ['Assets']],
     ['Current Assets', ['AssetsCurrent']],
     ['Cash and Equivalents', ['CashAndCashEquivalentsAtCarryingValue']],
+    ['Marketable Securities (current)', ['MarketableSecuritiesCurrent'], true],
+    ['Accounts Receivable', ['AccountsReceivableNetCurrent'], true],
+    // Apple's vendor non-trade receivables, among others: receivables that are not from customers.
+    ['Other Receivables', ['NontradeReceivablesCurrent', 'OtherReceivablesNetCurrent'], true],
+    ['Inventory', ['InventoryNet'], true],
     ['Total Liabilities', ['Liabilities']],
     ['Current Liabilities', ['LiabilitiesCurrent']],
     ['Stockholders Equity', ['StockholdersEquity', 'StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest']],
@@ -31,17 +39,26 @@ export const STATEMENTS: Record<Statement, { title: string; lines: Array<[string
   cashflow: { title: 'Cash flow statement', lines: [
     ['Operating Cash Flow', ['NetCashProvidedByUsedInOperatingActivities', 'NetCashProvidedByUsedInOperatingActivitiesContinuingOperations']],
     ['Investing Cash Flow', ['NetCashProvidedByUsedInInvestingActivities']],
-    ['Financing Cash Flow', ['NetCashProvidedByUsedInFinancingActivities']],
     ['Capital Expenditure', ['PaymentsToAcquirePropertyPlantAndEquipment', 'PaymentsToAcquireProductiveAssets']],
+    ['Financing Cash Flow', ['NetCashProvidedByUsedInFinancingActivities']],
+    // The parts of the financing cash flow, as filed: a payment as a positive figure (cash paid), like capital expenditure.
+    ['Share Buybacks', ['PaymentsForRepurchaseOfCommonStock'], true],
+    ['Dividends Paid', ['PaymentsOfDividends', 'PaymentsOfDividendsCommonStock'], true],
+    ['Debt Issued', ['ProceedsFromIssuanceOfLongTermDebt', 'ProceedsFromDebtNetOfIssuanceCosts'], true],
+    ['Debt Repaid', ['RepaymentsOfLongTermDebt', 'RepaymentsOfDebt'], true],
+    // Raised less repaid: negative when more was repaid.
+    ['Commercial Paper (net)', ['ProceedsFromRepaymentsOfCommercialPaper'], true],
+    ['Tax Paid on Employee Share Awards', ['PaymentsRelatedToTaxWithholdingForShareBasedCompensation'], true],
   ] },
 };
 
 /** A statement as a table: columns are periods, newest first; a row's unit is USD, another currency, or per share. A row
  *  the desk worked out from the others has `worked` (a percentage, a multiple, or money in the table's unit); `notes`
- *  says how any derived figure was worked out. */
+ *  says how any derived figure was worked out. A row with `noted` has a figure only in the notes (filed only to date),
+ *  so it is shown even with no figure in a column. */
 export interface Table {
   columns: string[];
-  rows: Array<{ label: string; unit: string; cells: Array<number | null>; worked?: 'percent' | 'times' | 'money' }>;
+  rows: Array<{ label: string; unit: string; cells: Array<number | null>; worked?: 'percent' | 'times' | 'money'; noted?: true }>;
   notes?: string[];
 }
 
@@ -252,22 +269,32 @@ export function filedStatement(usGaap: Facts, kind: Statement, freq: Frequency, 
   const quarterly = freq === 'quarterly', flows = kind !== 'balance_sheet';
   const spans: Array<[number, number]> = quarterly ? [QUARTER, ...YEAR_TO_DATE.map(([lo, hi]) => [lo, hi] as [number, number])] : [YEAR];
   const names = quarterly ? ['', ...YEAR_TO_DATE.map(([, , m]) => ` (${m} months to date)`)] : [''];
-  const lines = STATEMENTS[kind].lines.map(([label, tags]) => ({ label, ...lineAsOf(usGaap, tags, asOf, spans, quarterly ? [] : ANNUAL_FORMS) }));
+  const lines = STATEMENTS[kind].lines.map(([label, tags, part]) => ({ label, part: !!part, ...lineAsOf(usGaap, tags, asOf, spans, quarterly ? [] : ANNUAL_FORMS) }));
   const notes: string[] = [];
   // A quarterly flow: every quarter filed or derived; a year to date only where it gives no quarter.
   const worked = lines.map((l, n) => (quarterly && flows && !perShareUnit(l.unit)
     ? quartersOf(l.values, lineAsOf(usGaap, STATEMENTS[kind].lines[n]![1], asOf, [YEAR], ANNUAL_FORMS).values, changesOf(refilingsOf(usGaap, STATEMENTS[kind].lines[n]![1], asOf)))
     : { quarters: new Map<string, Quarter>(), blocked: new Map<string, Blocked>() }));
   const quarters = worked.map((w) => w.quarters);
-  // Each row shows a period at the shortest span it was filed for; a column is one span of one period.
+  // Each row shows a period at the shortest span it was filed for; a column is one span of one period. A part filed only
+  // to date for a period, where no quarter of it can be worked out (debt raised in the second quarter of a year, so none
+  // filed for the first), gets no column of its own, which would stand empty in every other row: it fills such a column
+  // only when the other lines have one, and a note gives it otherwise.
+  const toDate = lines.map(() => new Map<string, { f: Fact; i: number }>());
   const chosen = lines.map((l, n) => {
     const m = new Map<string, number>();
-    for (const key of l.values.keys()) { const [end, i] = key.split('|') as [string, string]; if (!quarters[n]!.has(end)) m.set(end, Math.min(Number(i), m.get(end) ?? Number(i))); }
+    for (const [key, f] of l.values) {
+      const [end, s] = key.split('|') as [string, string], i = Number(s);
+      if (quarters[n]!.has(end)) continue;
+      if (l.part && i > 0) { const was = toDate[n]!.get(end); if (!was || i < was.i) toDate[n]!.set(end, { f, i }); continue; }
+      m.set(end, Math.min(i, m.get(end) ?? i));
+    }
     for (const end of quarters[n]!.keys()) m.set(end, 0);
     return m;
   });
   const ends = [...new Set(chosen.flatMap((m) => [...m.keys()]))].sort().reverse().slice(0, SHOWN[freq]);
   const periods = ends.flatMap((end) => [...new Set(chosen.map((m) => m.get(end)).filter((i) => i !== undefined))].sort().map((i) => ({ end, i: i! })));
+  toDate.forEach((m, n) => { for (const [end, { i }] of m) if (!chosen[n]!.has(end) && periods.some((p) => p.end === end && p.i === i)) { chosen[n]!.set(end, i); m.delete(end); } });
   if (!periods.length) throw new NoData(`no ${freq} ${STATEMENTS[kind].title.toLowerCase()} was filed with the SEC by ${asOf}`);
   const derived = new Map<string, Set<string>>();
   for (const q of quarters) for (const [end, v] of q) if (v.how && ends.includes(end)) (derived.get(end) ?? derived.set(end, new Set()).get(end)!).add(v.how);
@@ -282,6 +309,15 @@ export function filedStatement(usGaap: Facts, kind: Statement, freq: Frequency, 
       notes.push(lo <= ch.from && hi >= ch.by
         ? `${lines[n]!.label} for the quarter to ${end} is not derived: ${spanWords(c)} to ${c.end} (filed ${c.filed}) and ${other} are on different bases, since ${what}. The one less the other would not be a quarter.`
         : `${lines[n]!.label} for the quarter to ${end} is not derived: ${spanWords(c)} to ${c.end} (filed ${c.filed}) and ${other} may be on different bases: ${what}, and the filings show only that the change came after ${ch.from} and by ${ch.by}. The one less the other may not be a quarter.`);
+    }
+  });
+  // A part filed only to date, its quarter not known, said for each period shown.
+  const noted = new Set<number>();
+  toDate.forEach((m, n) => {
+    for (const [end, { f }] of [...m].sort((a, b) => b[0].localeCompare(a[0]))) {
+      if (!ends.includes(end) || worked[n]!.blocked.has(end)) continue;
+      noted.add(n);
+      notes.push(`${lines[n]!.label} for the quarter to ${end} is not derived: its filings give ${spanWords(f)} to ${end} (${million(f.val)} million ${lines[n]!.unit}, filed ${f.filed}) and no figure of it for the months before, so its quarter is not known; never take ${spanWords(f)} for it.`);
     }
   });
   // Per-share figures filed before a split, put on the basis of the latest filings, each named; or on the basis given (the
@@ -307,7 +343,7 @@ export function filedStatement(usGaap: Facts, kind: Statement, freq: Frequency, 
         : `${l.label} for ${spanWords(f)} to ${f.end} was filed on ${f.filed} as ${plain(f.val)}, before ${splitList(named)}; shown here on ${onto}: ${plain(v)}.`);
       return v;
     });
-    return { label: l.label, unit: l.unit, cells };
+    return noted.has(n) ? { label: l.label, unit: l.unit, cells, noted: true as const } : { label: l.label, unit: l.unit, cells };
   });
   if (basis && perShare) notes.push('Per-share figures are on the price source\'s share basis of today, the one its prices are on: a figure filed before a share split since then is divided by that split\'s ratio, so it can differ from the number in its filing.');
   return { columns: periods.map((p) => p.end + (p.i === 0 && derived.has(p.end) ? ' (derived)' : names[p.i]!)), rows, notes };
