@@ -924,7 +924,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "Press a tile again while the whole chart is already on screen.",
         "Reload the page, with a stock charted and the page scrolled to the top."],
       "see": [
-        "The order: Get started (when shown), the four tiles, \"What you hold needs a look\" (when it shows), Markets, Start here, the Chart, the stock's own page (once one is charted), Watchlist, This morning, Analyses you asked for, How the desk is doing, The desk's calls. The side list follows the same order, and each of its entries goes to its heading.",
+        "The order: Get started (when shown), the four tiles, \"What you hold needs a look\" (when it shows), Markets, Start here, the Chart, the stock's own page (once one is charted), Watchlist, Analyses you asked for, How the desk is doing, The desk's calls. The side list follows the same order, and each of its entries goes to its heading, except \"Today's market\", which opens a page of its own (J9).",
         "Pressing a Start here tile, a Markets tile or a watchlist row slides the Chart into view, at the top of the page. A tile in \"Worth a look today\" and a star in the side list do the same.",
         "A star in the side list charts the stock and slides the Chart into view too. From Your account, it takes you back to the desk first, so the chart is there to see: pressing it never changes a chart you cannot see.",
         "With the whole chart already on screen, nothing moves. Reloading puts back the stock you last charted and does not scroll. If your computer is set to reduce motion, the chart appears at once, without the slide."] }
@@ -1356,9 +1356,9 @@ b, strong { font-weight: var(--weight-semibold); }
         "The dashboard's calls and scorecard are unchanged. While it runs, an analysis of today you ask for, on the dashboard or in a chat, and the routines' scoring stay with your own calls, never in the back-test. The routines and other analyses never end it: the back-test's own chat ends it when it is done, or it ends by itself after two hours with no work on its cells.",
         "Your holdings are left out: what you hold now was not known on the days tested. In the back-test's own reports (in the desk-data folder, under backtest), each trader's proposal begins with a \"Holdings:\" line that says so."] }
   ] },
-  { "id": "J", "name": "Start here and This morning",
+  { "id": "J", "name": "Start here and Today's market",
     "sub": "The world in tiers, broadest first, then what ground the market is on and what moved: worked out from figures, never a forecast.",
-    "about": "The top of the dashboard shows the market from the broadest view down: the whole market, its eleven sectors, then single companies like NVIDIA. Broad funds carry the steadiest risk. \"This morning\" then says what ground the market is on (the market weather) and which names moved in a way worth reading about.",
+    "about": "The top of the dashboard shows the market from the broadest view down: the whole market, its eleven sectors, then single companies like NVIDIA. Broad funds carry the steadiest risk. \"Today's market\", a page of its own in the side list, then says what ground the market is on (the market weather) and which names moved in a way worth reading about.",
     "before": "The dashboard open (C1). The morning screen looks at prices once an hour at most, so the first look of the day takes a minute.",
     "tests": [
     { "id": "J1", "title": "The whole market, the sectors, your names", "tags": [], "changed": "2026-11-11",
@@ -1423,31 +1423,31 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "The watchlist is grouped as The whole market, Sectors, Single names and Crypto.",
         "The tier folds away and stays folded after the reload; pressing its name opens it again."] },
-    { "id": "J4", "title": "Market weather", "tags": [], "changed": "2026-11-09",
+    { "id": "J4", "title": "Market weather", "tags": [], "changed": "2026-11-11",
       "about": "Three plain lines on the ground the market stands on, each from figures (never a forecast): the trend of the S&P 500, the mood from the VIX (the market's own measure of expected swings), and what the crowd expects from the Federal Reserve's next interest-rate decision.",
-      "where": "Dashboard › This morning › Market weather",
+      "where": "Dashboard › side list › Today's market › Market weather",
       "do": [
-        "Read \"Market weather\"."],
+        "Open \"Today's market\" in the side list. Read \"Market weather\"."],
       "see": [
         "Marked \"never a forecast\", three lines: the trend (Rising, Mixed or Falling: the S&P 500 against its 50- and 200-day averages), the mood (Calm, Normal or Wild: the VIX) and rates (A cut, A rise or No change: Polymarket's odds on the Federal Reserve's next decision).",
         "During New York's trading hours the trend and the mood give the figure so far, never \"closed at\": \"The S&P 500 is at <figure> at <time> New York time on <day>, still trading (not a close)\". For 45 minutes after the close, before its figures are taken as final (Yahoo lists the VIX as 15 minutes late, and the desk waits longer for any market whose delay it has not checked), \"was at <figure> when read at <time> …, before that session's close was final (not a close)\". Then \"closed at <figure> on <day>\".",
         "A line that cannot be read says \"Unavailable\", never a guess. If Polymarket sends back an error, the rates line says \"Unavailable: Polymarket answered without its search results.\", never that there is no open market. An outcome with no price is never shown as 0%.",
         "A move in rates is in percentage points, for example \"a cut of 0.25 percentage points\", never \"0.25%\".",
         "\"From Yahoo Finance and Polymarket at <time>. Nothing here is investment advice.\""] },
-    { "id": "J5", "title": "Worth a look today", "tags": [], "changed": "2026-11-09",
+    { "id": "J5", "title": "Worth a look today", "tags": [], "changed": "2026-11-11",
       "about": "A cheap morning screen before the costly team run: up to five names that moved in a way worth reading about, each with its reason.",
-      "where": "Dashboard › This morning › Worth a look today",
+      "where": "Dashboard › side list › Today's market › Worth a look today",
       "do": [
-        "Read \"Worth a look today\"."],
+        "On \"Today's market\", read \"Worth a look today\"."],
       "see": [
         "Up to five from the whole market, the sectors and your watchlist, each with its reason in one line (for example \"Fell 4.2% on 3.1 times its usual volume, a new 52-week low\") and the robot.",
         "A new 52-week high or low is judged on the prices traded, as the chart shows them: a fund that pays a dividend (BND, XLU) is never called \"a new 52-week high\" while its chart shows a higher price within the year, and a new low on its chart is never missed.",
         "Or \"Nothing stood out among the N looked at\". The first look of the day can take a minute; it is worked out at most once an hour.",
         "At its foot: \"From Yahoo Finance's daily prices at <time>; the moves are from the session of <day>\", and while that session's close is not final yet (during New York's trading hours, and a few minutes after) also \", read before its close was final: so far, not a close\".",
         "If some names' news could not be read: \"News could not be read just now for <names>: whether they are in the news today is not known.\" \"Nothing stood out\" then never says \"no news\" for them."] },
-    { "id": "J6", "title": "The morning switch", "tags": ["Optional"], "changed": "2026-11-09",
+    { "id": "J6", "title": "The morning switch", "tags": ["Optional"], "changed": "2026-11-11",
       "about": "Switched on, the top three of the morning screen are analysed by themselves each market morning, at shallow depth, starting the next market morning. Off as shipped, since each analysis is a full team run on the models of whatever runs it (Madav's own, or your Claude plan with Claude Code).",
-      "where": "Dashboard › This morning › under Worth a look today",
+      "where": "Dashboard › side list › Today's market › under Worth a look today",
       "do": [
         "Read the switch \"Analyse the top 3 each market morning\", switch it on, then off again.",
         "Switch it on, reload the page and read the switch at once, while \"Worth a look today\" is still looking (the first look of the day takes a minute). Switch it off again.",
@@ -1460,7 +1460,20 @@ b, strong { font-weight: var(--weight-semibold); }
         "Off: \"Switched off: nothing goes on the waiting list by itself.\"",
         "With it on, leave the dashboard running and close its page: on a market morning the top three still join the waiting list, since the dashboard looks itself while it runs.",
         "If the morning's first look could not read the prices, nothing is used up: a later look before noon New York time puts the top three on the list.",
-        "The second tab gives the same <day> as the first: an \"on\" from another tab, or from a page left open since before, never moves the first morning on, so no morning is skipped."] }
+        "The second tab gives the same <day> as the first: an \"on\" from another tab, or from a page left open since before, never moves the first morning on, so no morning is skipped."] },
+    { "id": "J9", "title": "Today's market is a page of its own", "tags": [], "changed": "2026-11-11",
+      "about": "The weather and what is worth a look are worked out from figures once an hour, all day, so they sit on a page named for the day, not the morning, opened from the side list the way Your account is. Pressing a pick shows its chart on the desk.",
+      "where": "Dashboard › side list › Today's market",
+      "do": [
+        "Press \"Today's market\" in the side list. Then fold the side list away and press its cloud icon in the narrow bar.",
+        "Reload the page while \"Today's market\" shows. Then press \"Back to the desk\".",
+        "On \"Today's market\", press a pick in \"Worth a look today\" (not its robot). Then open \"Today's market\" again and press a pick's robot.",
+        "Leave the dashboard open past the top of the hour, on the desk, and then open \"Today's market\"."],
+      "see": [
+        "A page headed \"Today's market.\" with the line \"What ground the market is on, and what moved in a way worth reading about: worked out from figures once an hour, never a forecast.\", the \"Market weather\" card and the \"Worth a look today\" card with its switch, and \"Back to the desk\". The side list entry (and the cloud icon in the narrow bar) is marked as the page you are on; the desk's own sections no longer include a \"This morning\".",
+        "The reload opens \"Today's market\" again, where you left it. \"Back to the desk\" brings the desk back.",
+        "The pick goes to the desk and the Chart slides into view with that stock charted. The robot opens the \"Analyse\" box over the page, as it always did, and does not leave it.",
+        "The figures were refreshed in the background at the hour, whichever page was showing, and are asked for once: opening the page does not ask again."] }
   ] },
   { "id": "K", "name": "Analyses that run by themselves",
     "sub": "You ask on the dashboard; whatever listens (Madav, the desk's own Claude Code listener, or you in a chat) runs the team, one at a time.",

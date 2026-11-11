@@ -149,8 +149,8 @@ the team's "talk" switch shows these messages in the Messages panel; with it off
 2. **You see.** Ask the team to open the dashboard, or type `/terminal`: a page on your own computer that shows
    the markets, then the whole market, the eleven sectors and your own names side by side, a chart of any stock (area
    or candles, 50- and 200-day averages, volume, at the prices it traded at, as Nasdaq or your broker shows them; the
-   desk's own analyses count dividends as part of the return), your watchlist by tier, a page per stock, the market weather and what is worth a
-   look today, the desk's calls with their full reasoning, and how the desk has scored. Pressing a stock anywhere on the page
+   desk's own analyses count dividends as part of the return), your watchlist by tier, a page per stock, the desk's calls with their full reasoning, and how the desk has scored; and, on a
+   page of its own in the side list, Today's market: the market weather and what is worth a look today. Pressing a stock anywhere on the page
    brings its chart into view. The agents see your chosen holdings when they analyse.
 3. **You decide and trade.** On a call, "Decide…" opens a ticket for the Agentic account, sized by your settings and
    checked against your caps; beside a stock's price, "Trade…" opens your own ticket instead, buy or sell, starting at
@@ -284,8 +284,8 @@ latest call with its day; press it to chart it. Every trading word has its meani
 foot of the section, and on each rating and dotted word when you point at it. The watchlist further down is grouped the
 same way; press a tier's name to fold it away, and the dashboard remembers which you folded.
 
-### This morning: the market weather, and what is worth a look
-Further down, after the watchlist, two cards are worked out from figures, at most once an hour, and never from a model or a
+### Today's market: the market weather, and what is worth a look
+On a page of its own, opened from "Today's market" in the side list (it refreshes all day, so it is not named for the morning), two cards are worked out from figures, at most once an hour, and never from a model or a
 forecast:
 - **Market weather**, three plain lines, each with a colour and its meaning. The **trend**: the S&P 500 against its 50-
   and 200-day averages (above both rising, between them mixed, below both falling). The **mood**: the VIX, the market's
@@ -331,8 +331,8 @@ needs a look", with the reason and what you can do. Outside the dashboard only t
 runs; nothing comes by email or to your phone.
 
 ### Your paper record
-Before you risk money, every call the desk makes on a stock, a fund, Bitcoin or Ether is followed on paper, and after
-Start here and This morning the dashboard shows what that would have done: one sentence, a line of the paper money
+Before you risk money, every call the desk makes on a stock, a fund, Bitcoin or Ether is followed on paper, and further
+down, in How the desk is doing, the dashboard shows what that would have done: one sentence, a line of the paper money
 against SPY (the fund that copies the S&P 500) from the same start, and how many weeks and calls stand behind it. Each call is sized exactly as its order ticket would size it (the rating, a full
 position of 10%, your caps), takes no order the real ticket would refuse, and fills at the first closing price after
 the call's day, as the market printed it. Each dividend is paid into paper cash on its ex-dividend day, as an account

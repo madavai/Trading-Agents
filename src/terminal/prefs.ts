@@ -11,7 +11,7 @@ import { cleanMarket, isShipped, SHIPPED_MARKET, TIERS, type Tier } from './tier
 
 export interface Recent { symbol: string; name: string }
 export interface Prefs {
-  theme?: 'light' | 'dark'; side?: 'open' | 'folded'; view?: 'overview' | 'account';
+  theme?: 'light' | 'dark'; side?: 'open' | 'folded'; view?: 'overview' | 'account' | 'today';
   symbol?: string; range?: '1M' | '3M' | '6M' | '1Y' | '5Y'; kind?: 'area' | 'candles';
   layers?: { ma50: boolean; ma200: boolean; vol: boolean };
   recent?: Recent[];
@@ -49,7 +49,7 @@ export function cleanPrefs(raw: unknown): Prefs {
   const out: Prefs = {};
   const theme = one(r.theme, ['light', 'dark'] as const); if (theme) out.theme = theme;
   const side = one(r.side, ['open', 'folded'] as const); if (side) out.side = side;
-  const view = one(r.view, ['overview', 'account'] as const); if (view) out.view = view;
+  const view = one(r.view, ['overview', 'account', 'today'] as const); if (view) out.view = view;
   const symbol = sym(r.symbol); if (symbol) out.symbol = symbol;
   const range = one(r.range, ['1M', '3M', '6M', '1Y', '5Y'] as const); if (range) out.range = range;
   const kind = one(r.kind, ['area', 'candles'] as const); if (kind) out.kind = kind;

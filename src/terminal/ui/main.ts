@@ -37,8 +37,10 @@ const S = {
   lost: false,
 };
 
-/** Which page the main column shows: the desk (markets, chart, watchlist, calls, scorecard) or the person's account. */
-let view: 'overview' | 'account' = 'overview';
+/** Which page the main column shows: the desk (markets, chart, watchlist, calls, scorecard), today's market (the weather and
+ *  what is worth a look, worked out hourly) or the person's account. */
+type View = 'overview' | 'account' | 'today';
+let view: View = 'overview';
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string): T => document.querySelector<T>(sel)!;
 const isQuote = (q: QuoteResult | undefined | null): q is Quote => !!q && !('error' in q);
@@ -1077,7 +1079,7 @@ function renderStart(): void {
     + `<p class="at-honest">${term('today')} is the change over the latest trading day; a dash is a price Yahoo Finance did not give. Each ${term('call', 'call')} is the desk's rating, Buy to Sell; a ${term('fund', 'fund')} holds many companies at once. Nothing here is investment advice.</p>`;
 }
 
-// ---------- this morning: the market weather, and what is worth a look today ----------
+// ---------- today's market: the market weather, and what is worth a look today ----------
 // Both are worked out by the desk from figures, at most once an hour; the page asks when it opens and every hour after.
 /** `known`: whether the morning switch is on has been read (with the remembered choices, or the screen's answer). */
 const MORNING = { weather: null as Weather | null, weatherFailed: '', screen: null as Screen | null, screenFailed: '', on: false, known: false, top: 3, from: '' };
@@ -1333,15 +1335,19 @@ function renderAll(): void {
   renderSub(); renderGuide(); renderFavs(); renderAccount(); renderToday(); renderStart(); renderMorning(); renderControls(); renderHero(); renderCall(); renderStock(); renderAnalyses(); renderWatch(); renderCalls(); renderScore();
 }
 
-/** Shows the desk or the account page; the side list marks where the person is. */
-function showView(v: 'overview' | 'account', save = true): void {
+/** Shows the desk, today's market or the account page; the side list marks where the person is. */
+function showView(v: View, save = true): void {
   const was = view;
   view = v;
   if (save) remember({ view: v });
   $('#view-overview').hidden = v !== 'overview';
+  $('#view-today').hidden = v !== 'today';
   $('#view-account').hidden = v !== 'account';
-  const nav = $('#navOverview');
-  if (v === 'overview') nav.setAttribute('aria-current', 'page'); else nav.removeAttribute('aria-current');
+  for (const [id, page] of [['#navOverview', 'overview'], ['#navToday', 'today'], ['#railToday', 'today']] as const) {
+    const nav = $(id);
+    if (v === page) nav.setAttribute('aria-current', 'page'); else nav.removeAttribute('aria-current');
+  }
+  $('#railToday').classList.toggle('on', v === 'today');   // the folded rail's icon has no mark of its own for the current page
   renderSideAccount();
   if (was !== v) $('#page').scrollTo({ top: 0 });
   if (v === 'account' && signedIn() && A.chosen.length && !A.snapshot && !A.reading) void readAccounts();
@@ -1485,7 +1491,7 @@ document.addEventListener('click', (e) => {
   const sym = el.dataset.symbol ?? '';
   switch (el.dataset.act) {
     case 'goto': { showView('overview'); const to = el.dataset.to === 'top' ? $('#page') : document.getElementById(el.dataset.to ?? ''); to?.scrollIntoView({ behavior: 'smooth', block: 'start' }); break; }
-    case 'view': showView(el.dataset.view === 'account' ? 'account' : 'overview'); break;
+    case 'view': showView(el.dataset.view === 'account' ? 'account' : el.dataset.view === 'today' ? 'today' : 'overview'); break;
     case 'side': setSide(el.dataset.side === 'fold'); break;
     case 'theme': setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'); break;
     case 'kind': S.kind = el.dataset.kind === 'candles' ? 'candles' : 'area'; remember({ kind: S.kind }); renderControls(); renderHero(); break;
@@ -1764,7 +1770,7 @@ async function loadPrefs(): Promise<void> {
     else if (Object.values(here).some((v) => v !== undefined)) remember({ ...P });
     try { localStorage.setItem('ta.prefs', JSON.stringify(P)); } catch { /* the page works without it */ }
   } catch { /* this browser's copy stands */ }
-  if (P.view === 'account') showView('account', false);
+  if (P.view === 'account' || P.view === 'today') showView(P.view, false);
 }
 
 let seen = '', build = '';

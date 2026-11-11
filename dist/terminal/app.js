@@ -1959,10 +1959,14 @@
     view = v;
     if (save) remember({ view: v });
     $("#view-overview").hidden = v !== "overview";
+    $("#view-today").hidden = v !== "today";
     $("#view-account").hidden = v !== "account";
-    const nav = $("#navOverview");
-    if (v === "overview") nav.setAttribute("aria-current", "page");
-    else nav.removeAttribute("aria-current");
+    for (const [id, page] of [["#navOverview", "overview"], ["#navToday", "today"], ["#railToday", "today"]]) {
+      const nav = $(id);
+      if (v === page) nav.setAttribute("aria-current", "page");
+      else nav.removeAttribute("aria-current");
+    }
+    $("#railToday").classList.toggle("on", v === "today");
     renderSideAccount();
     if (was !== v) $("#page").scrollTo({ top: 0 });
     if (v === "account" && signedIn() && A.chosen.length && !A.snapshot && !A.reading) void readAccounts();
@@ -2127,7 +2131,7 @@
         break;
       }
       case "view":
-        showView(el.dataset.view === "account" ? "account" : "overview");
+        showView(el.dataset.view === "account" ? "account" : el.dataset.view === "today" ? "today" : "overview");
         break;
       case "side":
         setSide(el.dataset.side === "fold");
@@ -2714,7 +2718,7 @@
       }
     } catch {
     }
-    if (P.view === "account") showView("account", false);
+    if (P.view === "account" || P.view === "today") showView(P.view, false);
   }
   var seen = "";
   var build = "";

@@ -419,6 +419,9 @@ test('what the person chose is remembered in desk-data, each in its own shape, a
   assert.deepEqual(saved, { theme: 'dark', side: 'folded', view: 'account', symbol: 'NVDA', range: '1Y', kind: 'candles', layers: { ma50: false, ma200: true, vol: true }, recent: [{ symbol: 'TSLA', name: 'Tesla, Inc.' }, { symbol: 'AAPL', name: 'AAPL' }] });
   const next = (await call(term, 'POST', '/api/prefs', { body: { theme: 'purple', range: '10Y', side: 'open', layers: { ma50: 'yes' } } })).json();
   assert.deepEqual([next.theme, next.range, next.side, next.layers.ma50], ['dark', '1Y', 'open', false], 'a value it does not know leaves the one before');
+  assert.equal((await call(term, 'POST', '/api/prefs', { body: { view: 'today' } })).json().view, 'today', "Today's market is a page it remembers");
+  assert.equal((await call(term, 'POST', '/api/prefs', { body: { view: 'tomorrow' } })).json().view, 'today', 'a page it does not know leaves the one before');
+  assert.equal((await call(term, 'POST', '/api/prefs', { body: { view: 'account' } })).json().view, 'account');
   const file = JSON.parse(fs.readFileSync(path.join(dir(), 'dashboard.json'), 'utf8'));
   assert.deepEqual(Object.keys(file).sort(), ['kind', 'layers', 'range', 'recent', 'side', 'symbol', 'theme', 'view']);
   const again = await startTerminal({ root, assets: ASSETS, port: 0, keyFile: KEYS() });   // another start, or another browser, finds it as it was left

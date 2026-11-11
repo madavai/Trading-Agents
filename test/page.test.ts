@@ -244,15 +244,15 @@ test('page-18: a Start here tile is three lines, the same on every tile (name; c
   assert.doesNotMatch(css, /\.ta-tier-tile[^{}]*:hover[^{}]*\{[^}]*display/, 'nothing is shown only on a hover');
 });
 
-test('page-19: the Overview runs Markets, Start here, the Chart, the stock page, the watchlist, then This morning, and the side list and rail follow it; a press on the page brings the chart into view, and nothing else does', () => {
+test('page-19: the Overview runs Markets, Start here, the Chart, the stock page, the watchlist, Analyses, the scorecard and the calls, and the side list and rail follow it; a press on the page brings the chart into view, and nothing else does', () => {
   const html = fs.readFileSync('src/terminal/ui/index.html', 'utf8');
-  const overview = html.slice(html.indexOf('id="view-overview"'), html.indexOf('id="view-account"'));
+  const overview = html.slice(html.indexOf('id="view-overview"'), html.indexOf('id="view-today"'));
   const ids = [...overview.matchAll(/<section class="at-section[^"]*" id="(sec-[a-z]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(ids, ['sec-guide', 'sec-today', 'sec-care', 'sec-markets', 'sec-start', 'sec-chart', 'sec-stock', 'sec-watch', 'sec-morning', 'sec-analyses', 'sec-score', 'sec-calls']);
+  assert.deepEqual(ids, ['sec-guide', 'sec-today', 'sec-care', 'sec-markets', 'sec-start', 'sec-chart', 'sec-stock', 'sec-watch', 'sec-analyses', 'sec-score', 'sec-calls']);
   // the side list and the rail jump to the same headings in the same order, and every jump lands on a heading that exists
   const jumps = (from: string) => [...from.matchAll(/data-act="goto" data-to="(sec-[a-z]+)"/g)].map((m) => m[1]!);
   const side = html.slice(html.indexOf('id="sideOpen"'), html.indexOf('id="sideFolded"')), rail = html.slice(html.indexOf('id="sideFolded"'), html.indexOf('<div class="main-col">'));
-  const want = ['sec-start', 'sec-chart', 'sec-stock', 'sec-watch', 'sec-morning', 'sec-analyses', 'sec-score', 'sec-calls'];
+  const want = ['sec-start', 'sec-chart', 'sec-stock', 'sec-watch', 'sec-analyses', 'sec-score', 'sec-calls'];
   assert.deepEqual(jumps(side), want);
   assert.deepEqual(jumps(rail), want);
   for (const id of new Set([...jumps(html), ...[...page.matchAll(/data-to="(sec-[a-z]+)"/g)].map((m) => m[1]!)])) assert.ok(ids.includes(id), `${id} is a heading on the page`);
@@ -269,4 +269,41 @@ test('page-19: the Overview runs Markets, Start here, the Chart, the stock page,
   assert.doesNotMatch(/function select\([\s\S]*?\n\}\n/.exec(page)![0], /showChart/);
   // the tiles, Markets, Worth a look and the watchlist rows all press through the same act
   assert.equal((page.match(/data-act="select"/g) ?? []).length, 5, 'the side list star, a Markets tile, a watchlist row, a Start here tile and a Worth a look tile');
+});
+
+test("page-20: Today's market is a page of its own, opened from the side list and the rail like Your account, remembered, and fed by the one hourly refresh whichever page shows", () => {
+  const html = fs.readFileSync('src/terminal/ui/index.html', 'utf8');
+  const today = html.slice(html.indexOf('id="view-today"'), html.indexOf('id="view-account"'));
+  // the page: its heading and subtitle, the two cards as they were, and a way back; hidden until opened
+  assert.match(html, /<div class="at-page-col" id="view-today" hidden>/);
+  assert.match(today, /<h1 class="page-title">Today's <em>market\.<\/em><\/h1>/);
+  assert.match(today, /<p class="page-sub">What ground the market is on, and what moved in a way worth reading about: worked out from figures once an hour, never a forecast\.<\/p>/);
+  assert.match(today, /id="weatherCard"/);
+  assert.match(today, /id="lookCard"/);
+  assert.match(today, /data-act="view" data-view="overview"/);
+  // the cards are in no other place, and the Overview has no This morning section or jump to one
+  assert.equal((html.match(/id="weatherCard"/g) ?? []).length, 1);
+  assert.equal((html.match(/id="lookCard"/g) ?? []).length, 1);
+  assert.doesNotMatch(html, /sec-morning|This morning/);
+  assert.doesNotMatch(page, /sec-morning|data-to="sec-morning"/, 'no link in the page opens a section that is gone');
+  // the side list and the rail each have the button that opens it, marked as current while it shows
+  assert.match(html, /<button class="at-li" data-act="view" data-view="today" id="navToday">.*<span class="at-li-t">Today's market<\/span><\/button>/);
+  assert.match(html, /<button class="icon-btn" data-act="view" data-view="today" id="railToday" aria-label="Today's market" title="Today's market">/);
+  assert.match(page, /for \(const \[id, page\] of \[\['#navOverview', 'overview'\], \['#navToday', 'today'\], \['#railToday', 'today'\]\] as const\) \{/);
+  assert.match(page, /\$\('#view-today'\)\.hidden = v !== 'today';/);
+  assert.match(page, /\$\('#railToday'\)\.classList\.toggle\('on', v === 'today'\);/);
+  assert.match(page, /case 'view': showView\(el\.dataset\.view === 'account' \? 'account' : el\.dataset\.view === 'today' \? 'today' : 'overview'\); break;/);
+  // remembered, and put back where the person left it, like the account page (the desk's prefs accept the new page: terminal.test)
+  assert.match(page, /if \(P\.view === 'account' \|\| P\.view === 'today'\) showView\(P\.view, false\);/);
+  assert.match(fs.readFileSync('src/terminal/prefs.ts', 'utf8'), /one\(r\.view, \['overview', 'account', 'today'\] as const\)/);
+  // a press on a Worth a look pick charts it from the Overview, as a side-list star does; its robot keeps its own act
+  assert.match(page, /<button class="ta-look-go" data-act="select" data-symbol="\$\{esc\(p\.symbol\)\}"/);
+  assert.match(page, /\$\{isOpen\(p\.symbol\) \? openChip\(p\.symbol\) : robot\(p\.symbol\)\}/);
+  assert.match(page, /const shows = !!el\.closest\('#page, #sideOpen'\);/);
+  // the weather and the screen are asked for once when the page opens and once an hour after, whichever page shows, and nowhere else
+  assert.equal((page.match(/api\.weather\(\)/g) ?? []).length, 1);
+  assert.equal((page.match(/api\.screen\(\)/g) ?? []).length, 1);
+  assert.equal((page.match(/void loadMorning\(\)/g) ?? []).length, 2, 'at the start, and by the hourly timer');
+  assert.match(page, /setInterval\(\(\) => void loadMorning\(\), 60 \* 60_000\);/);
+  assert.doesNotMatch(page, /case 'view':[^\n]*loadMorning/, 'opening the page asks for nothing again');
 });
