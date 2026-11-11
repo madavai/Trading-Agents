@@ -143,7 +143,7 @@ function shares(list: Holding[], key: (h: Holding) => string): Array<[string, nu
 /** The report in plain words: size, what it holds, how concentrated, where, its own returns, and what it does not say. */
 export function renderReport(sym: string, day: string, r: Report, topN = 10): string {
   const lines: string[] = [
-    `Fund profile for ${sym}, from its portfolio report to the SEC (form N-PORT, filed ${r.filed}): what it held on ${r.asOf}, ${daysBetween(r.asOf, day)} days before ${day}. Funds make each quarter's last month public about two months later, so this is the latest anyone could read by ${day}. A fund has no company accounts or insider trades of its own: what it holds and what it costs are its fundamentals.`,
+    `Fund profile for ${sym}, from its portfolio report to the SEC (form N-PORT, filed ${r.filed}): what it held on ${r.asOf}, ${daysBetween(r.asOf, day)} days before ${day}. Funds make each quarter's last month public about two months later, so this is the latest anyone could read by ${day}. A fund has no company accounts, insider trades or results releases of its own, so no results dates: what it holds and what it costs are its fundamentals.`,
     '',
     `Name: ${r.series}`,
     ...(r.registrant && r.registrant.toLowerCase() !== r.series.toLowerCase() ? [`Filed by: ${r.registrant}`] : []),
