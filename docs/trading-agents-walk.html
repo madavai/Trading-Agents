@@ -773,7 +773,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "In the side list each starred move reads as in the watchlist: on a weekend NVDA's names its day (\"+2.78% · Fri\"), and the 10-year yield's is in points (\"+0.02 points · Fri\"), never a percent.",
         "The columns read Name, Price, \"Day's move\", \"Through the day\" and Latest call. On a weekend each move names its day (\"−1.85% · Fri\"); pointing at \"Day's move\" says \"Day's move: the change in price over the latest trading day, from the close before it. …\"",
         "For XXXXZZ the matches say \"Nothing matches “XXXXZZ” at Yahoo Finance\", and adding it is refused with a plain reason: \"Yahoo Finance has no price for XXXXZZ\"."] },
-    { "id": "C5", "title": "Chart", "tags": [], "changed": "2026-11-09",
+    { "id": "C5", "title": "Chart", "tags": [], "changed": "2026-11-11",
       "about": "Any company or fund can be charted: area or candles, five ranges, the 50- and 200-day averages (the usual trend lines) and volume. The chart is at the prices the stock traded at, as Nasdaq or your broker shows them; the desk's own analyses count dividends as part of the return instead.",
       "where": "Dashboard › Chart (press NVDA in the watchlist)",
       "do": [
@@ -782,7 +782,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "Read the chip and the line beside the price, on a weekday and on a weekend. Then chart \"US 10-year yield\".",
         "Point at the chart's last day at 1Y, then at any bar at 5Y, for NVDA and for the 10-year yield. Point at the move in the box."],
       "see": [
-        "The chart redraws each time, and the averages and volume come and go.",
+        "The chart redraws each time, and the averages and volume come and go. Pressing NVDA in the watchlist also slides the Chart into view (C17).",
         "The 5Y range's low and the change over five years match Nasdaq's prices: no day is lowered by a later dividend.",
         "While the market trades: \"+1.20% today\". On a weekend: \"+2.78% on Fri 6 Nov\", and under it \"… over five years · price at Fri 6 Nov, 03:00 PM · market closed\" (the time in your own time zone).",
         "For the 10-year yield, its move and its change over the range are in points, for example \"+0.02 points today\".",
@@ -914,7 +914,20 @@ b, strong { font-weight: var(--weight-semibold); }
         "Pointing at a chip says why, for example \"An Underweight works when the stock trails SPY over the 5 trading days after the call. It did (alpha -10.5%): the call worked. It is a first-week check, not the call's own time horizon.\"",
         "A call on a coin or a fund names it so: a Bitcoin Buy's chip says \"A Buy works when the coin beats SPY over the 7 calendar days after the call. …\", and a fund's \"…when the fund beats SPY…\".",
         "A call on SPY itself (or VOO or IVV) is scored on its own return: \"worked · its return +1.1%\", and pointing at it says \"A Buy works when the fund rises over the 5 trading days after the call. It did (its return +1.1%): the call worked. It is a first-week check, not the call's own time horizon. Scored on its own return: SPY is the yardstick itself, so against it the alpha would always be zero.\" On SPY's page: \"Each result is a first-week check on its own return over the 5 trading days after the call, not the call's own time horizon.\"",
-        "\"Alpha: how far a stock or coin beat (+) or trailed (−) its yardstick (SPY as shipped) in a call's first week (5 trading days; a coin, 7 days), not its time horizon. Above zero is good for a Buy or Overweight; below zero for an Underweight or Sell.\""] }
+        "\"Alpha: how far a stock or coin beat (+) or trailed (−) its yardstick (SPY as shipped) in a call's first week (5 trading days; a coin, 7 days), not its time horizon. Above zero is good for a Buy or Overweight; below zero for an Underweight or Sell.\""] },
+    { "id": "C17", "title": "The order of the page, and a press that shows the chart", "tags": [], "changed": "2026-11-11",
+      "about": "The page runs from the biggest picture to the detail, and pressing a stock anywhere on it brings its chart into view, so you never press a tile and then hunt for what it charted.",
+      "where": "Dashboard › the whole Overview page, and the side list",
+      "do": [
+        "Read the headings down the page, then the side list.",
+        "Scroll to the top. Press a tile in Start here, then a Markets tile, then a row of the watchlist, then a star in the side list.",
+        "Press a tile again while the whole chart is already on screen.",
+        "Reload the page, with a stock charted and the page scrolled to the top."],
+      "see": [
+        "The order: Get started (when shown), the four tiles, \"What you hold needs a look\" (when it shows), Markets, Start here, the Chart, the stock's own page (once one is charted), Watchlist, This morning, Analyses you asked for, How the desk is doing, The desk's calls. The side list follows the same order, and each of its entries goes to its heading.",
+        "Pressing a Start here tile, a Markets tile or a watchlist row slides the Chart into view, at the top of the page. A tile in \"Worth a look today\" does the same.",
+        "A star in the side list charts the stock without moving the page.",
+        "With the whole chart already on screen, nothing moves. Reloading puts back the stock you last charted and does not scroll. If your computer is set to reduce motion, the chart appears at once, without the slide."] }
   ] },
   { "id": "D", "name": "Your Robinhood accounts",
     "sub": "The dashboard reads the accounts you choose, at Robinhood's live prices. It never shows your account numbers.",
@@ -1057,13 +1070,13 @@ b, strong { font-weight: var(--weight-semibold); }
         "\"Buy NVDA\": \"Your own order, not one of the desk's calls\".",
         "\"Your own order: one whole share to start, at Robinhood's live price of $…. Change the shares and the limit price below.\"",
         "The same checks and \"Review with Robinhood\" as a call's ticket. The desk's log records it as yours."] },
-    { "id": "E8", "title": "Crypto and indices never open a ticket", "tags": [], "changed": "2026-10-21",
+    { "id": "E8", "title": "Crypto and indices never open a ticket", "tags": [], "changed": "2026-11-11",
       "about": "Robinhood's agent doorway trades stocks and funds only. Coins are followed on paper (section L); an index such as the S&P 500 itself cannot be bought at all (a fund that follows it, such as SPY, can).",
       "where": "Dashboard › Start here, the watchlist, the chart and the desk's calls",
       "do": [
-        "Look at Bitcoin's tile and its call (B5). Then chart [[^GSPC]] (the S&P 500 index)."],
+        "Point at Bitcoin's tile, then look at its call (B5). Then chart [[^GSPC]] (the S&P 500 index)."],
       "see": [
-        "Bitcoin and Ether show \"on paper only\" where NVDA shows Decide…; other coins show \"no order ticket\".",
+        "Bitcoin and Ether show \"on paper only\" in their call, where NVDA shows Decide…; other coins show \"no order ticket\". Pointing at a coin's tile says the same in full.",
         "No \"Trade…\", \"Buy…\" or \"Sell…\" for a coin or an index, and no robot for an index. An index's call bar says \"The desk analyses stocks, not indices.\""] }
   ] },
   { "id": "F", "name": "Placing a real order",
@@ -1354,11 +1367,12 @@ b, strong { font-weight: var(--weight-semibold); }
       "do": [
         "Look at Start here, on a weekday and on a weekend."],
       "see": [
-        "\"The whole market\": SPY (S&P 500 fund), QQQ (Nasdaq 100 fund), VT (The whole world) and BND (US bonds). Pointing at SPY says \"copies the S&P 500 index: the 500 largest US companies\".",
+        "\"The whole market\": SPY (S&P 500 fund), QQQ (Nasdaq 100 fund), VT (The whole world) and BND (US bonds). Pointing at SPY's tile says more (J8).",
         "\"Sectors\": the eleven S&P sector funds, from XLK (Technology) to XLC (Communication), each named in plain words.",
         "\"Single names\": your watchlist's companies, NVDA among them, starred first, twelve at most (the rest as \"N more on your watchlist\"). \"Crypto\" only when you watch Bitcoin or Ether.",
-        "Each tile: the day's move, with its day named on a weekend (\"+0.62% · Fri\"), or a dash; the desk's latest call with its date or \"no call yet\"; the robot; a + when it is not on your watchlist; and, in The whole market only, a ✕ (J7). Each tier's meaning is beside it.",
-        "At the foot: \"Day's move is the change over the latest trading day, from the close before it, with the day named (Fri) when it was not today; …\""] },
+        "Each tile is two lines. First, its badge (J8), its plain name and the day's move, with its day named on a weekend (\"+0.62% · Fri\"), or a dash. Then the desk's latest rating, or \"no call\"; the robot; a + when it is not on your watchlist; and, in The whole market only, a ✕ (J7). Each tier's meaning is beside its name.",
+        "Beneath the heading Start here, one short line: \"The broadest first. Press a tile to chart it; the robot asks the desk to analyse it and + adds it to your watchlist.\"",
+        "At the foot: \"Day's move is the change over the latest trading day; a dash is a price Yahoo Finance did not give. Each call is the desk's rating, Buy to Sell; a fund holds many companies at once. Nothing here is investment advice.\" Pointing at \"Day's move\", \"call\" or \"fund\", or at a rating, says what it means."] },
     { "id": "J2", "title": "Put a fund in The whole market", "tags": [], "changed": "2026-11-11",
       "about": "The search box at the top is the only place you type a ticker. A fund it finds can go on your watchlist, into The whole market row on Start here, or both. The row keeps a fund only once the desk has checked its price. Sector funds, coins, indices and single companies are never offered the row.",
       "where": "Dashboard › the search box at the top, then Start here › The whole market",
@@ -1387,6 +1401,20 @@ b, strong { font-weight: var(--weight-semibold); }
         "With none left, \"The whole market shows no funds now.\" and in the row: \"The whole market is empty. Search a fund in the box at the top, such as SPY, and press Show in The whole market.\"",
         "\"The whole market now shows SPY, QQQ, VT and BND.\" and the button goes away. Under the tiles: \"✕ takes a fund out of this row. To add one, search for it in the box at the top and press Show in The whole market.\"",
         "There is no field for typing a list of tickers and no Change… button in The whole market. At a phone's width the ✕ and the buttons under a fund are always there to press: none of them waits for a hover."] },
+    { "id": "J8", "title": "Small tiles with a badge; the rest when you point", "tags": [], "changed": "2026-11-11",
+      "about": "A tile on Start here is two lines, half the height it was, so more of the page fits on screen. A badge with the ticker's letters stands where a logo would; no picture is fetched from outside. What no longer fits in the tile is said when you point at it, and a press charts it, where the full words are.",
+      "where": "Dashboard › Start here",
+      "do": [
+        "Look at the tiles of The whole market, Sectors, Single names and Crypto, on a screen and at a phone's width.",
+        "Point at SPY's tile, then Bitcoin's, then a tile with no call.",
+        "Point at a rating, and at the + and the robot on a tile.",
+        "Press SPY's tile."],
+      "see": [
+        "Each tile: a badge, a plain name (cut with … when long) and the day's move; then the desk's latest rating or \"no call\", the robot, a + when it is not on your watchlist and, in The whole market, a ✕. The tile is about half as high as before.",
+        "The badge holds the ticker's letters: SPY, QQQ, XLK, BTC for BTC-USD. A fund in The whole market or Sectors is blue and a coin is amber; a single name, which may be a company or a narrower fund, is plain (the desk keeps no kind for it, so none is guessed).",
+        "Pointing at a tile says its full name, the ticker and what it holds (SPY: \"copies the S&P 500 index: about 500 large US companies, chosen by S&P\"), and the desk's latest call with its day (\"The desk's latest call: Overweight, 8 Oct 2026.\") or \"The desk has made no call on it yet.\" For a coin, also why it has no order ticket: \"On paper: followed with pretend money only, … a coin never gets an order ticket.\"",
+        "A rating says what it means, and the + and the robot say what they do, as before.",
+        "At a phone's width, nothing is left to a hover: the tiles are one column, the presses are always drawn, and pressing a tile shows the chart (C17), which names the stock and its latest call with its day."] },
     { "id": "J3", "title": "The watchlist by tier", "tags": [], "changed": "2026-10-21",
       "about": "The watchlist is grouped the same way; fold the tiers you are not looking at.",
       "where": "Dashboard › Watchlist",

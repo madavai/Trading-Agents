@@ -70,12 +70,12 @@
           <button class="at-li" data-act="guide-open"><svg class="g"><use href="#i-steps"/></svg><span class="at-li-t">Get started</span><small id="guideCount"></small></button>
           <button class="at-li" data-act="gloss-open"><svg class="g"><use href="#i-book"/></svg><span class="at-li-t">What does this mean?</span></button>
           <button class="at-li" data-act="goto" data-to="sec-start"><svg class="g"><use href="#i-layers"/></svg><span class="at-li-t">Start here</span></button>
-          <button class="at-li" data-act="goto" data-to="sec-morning"><svg class="g"><use href="#i-cloud"/></svg><span class="at-li-t">This morning</span></button>
-          <button class="at-li" data-act="goto" data-to="sec-score"><svg class="g"><use href="#i-target"/></svg><span class="at-li-t">Scorecard</span></button>
           <button class="at-li" data-act="goto" data-to="sec-chart"><svg class="g"><use href="#i-candle"/></svg><span class="at-li-t">Chart</span></button>
           <button class="at-li" data-act="goto" data-to="sec-stock"><svg class="g"><use href="#i-file"/></svg><span class="at-li-t">Stock page</span></button>
           <button class="at-li" data-act="goto" data-to="sec-watch"><svg class="g"><use href="#i-star"/></svg><span class="at-li-t">Watchlist</span></button>
+          <button class="at-li" data-act="goto" data-to="sec-morning"><svg class="g"><use href="#i-cloud"/></svg><span class="at-li-t">This morning</span></button>
           <button class="at-li" data-act="goto" data-to="sec-analyses"><svg class="g"><use href="#i-bot"/></svg><span class="at-li-t">Analyses</span></button>
+          <button class="at-li" data-act="goto" data-to="sec-score"><svg class="g"><use href="#i-target"/></svg><span class="at-li-t">Scorecard</span></button>
           <button class="at-li" data-act="goto" data-to="sec-calls"><svg class="g"><use href="#i-check"/></svg><span class="at-li-t">The desk's calls</span></button>
         </nav>
       </div>
@@ -94,12 +94,12 @@
       <button class="icon-btn" data-act="guide-open" aria-label="Get started" title="Get started"><svg class="g"><use href="#i-steps"/></svg></button>
       <button class="icon-btn" data-act="gloss-open" aria-label="What does this mean?" title="What does this mean?"><svg class="g"><use href="#i-book"/></svg></button>
       <button class="icon-btn" data-act="goto" data-to="sec-start" aria-label="Start here" title="Start here"><svg class="g"><use href="#i-layers"/></svg></button>
-      <button class="icon-btn" data-act="goto" data-to="sec-morning" aria-label="This morning" title="This morning"><svg class="g"><use href="#i-cloud"/></svg></button>
-      <button class="icon-btn" data-act="goto" data-to="sec-score" aria-label="Scorecard" title="Scorecard"><svg class="g"><use href="#i-target"/></svg></button>
       <button class="icon-btn" data-act="goto" data-to="sec-chart" aria-label="Chart" title="Chart"><svg class="g"><use href="#i-candle"/></svg></button>
       <button class="icon-btn" data-act="goto" data-to="sec-stock" aria-label="Stock page" title="Stock page"><svg class="g"><use href="#i-file"/></svg></button>
       <button class="icon-btn" data-act="goto" data-to="sec-watch" aria-label="Watchlist" title="Watchlist"><svg class="g"><use href="#i-star"/></svg></button>
+      <button class="icon-btn" data-act="goto" data-to="sec-morning" aria-label="This morning" title="This morning"><svg class="g"><use href="#i-cloud"/></svg></button>
       <button class="icon-btn" data-act="goto" data-to="sec-analyses" aria-label="Analyses" title="Analyses"><svg class="g"><use href="#i-bot"/></svg></button>
+      <button class="icon-btn" data-act="goto" data-to="sec-score" aria-label="Scorecard" title="Scorecard"><svg class="g"><use href="#i-target"/></svg></button>
       <button class="icon-btn" data-act="goto" data-to="sec-calls" aria-label="The desk's calls" title="The desk's calls"><svg class="g"><use href="#i-check"/></svg></button>
     </aside>
 
@@ -158,28 +158,14 @@
             <div class="at-box at-tablewrap"><table class="at-table fill" id="careTable"></table></div>
           </section>
 
-          <section class="at-section" id="sec-start">
-            <div class="at-sect-head"><div class="at-head-words"><h2>Start here</h2><p>The whole market first, then its parts, then single companies: the broadest risk is the steadiest. Press one to chart it · the robot asks the desk to analyse it · + adds it to your watchlist</p></div></div>
-            <div class="at-card at-box ta-tiers" id="startHere"></div>
-          </section>
-
-          <section class="at-section" id="sec-morning">
-            <div class="at-sect-head"><div class="at-head-words"><h2>This morning</h2><p>What ground the market is on, and what moved in a way worth reading about: worked out from figures once an hour, never a forecast</p></div></div>
-            <div class="ta-two ta-even">
-              <div class="at-card at-box" id="weatherCard"></div>
-              <div class="at-card at-box" id="lookCard"></div>
-            </div>
-          </section>
-
-          <section class="at-section" id="sec-score">
-            <div class="at-sect-head"><div class="at-head-words"><h2><span class="ta-term" data-term="scorecard">How the desk is doing</span></h2><p id="scoreSub"></p></div><div class="at-head-tail" id="paperDo"></div></div>
-            <div class="at-card at-box" id="paperCard"></div>
-            <div class="at-card at-box" id="score"></div>
-          </section>
-
           <section class="at-section" id="sec-markets">
             <div class="at-sect-head"><div class="at-head-words"><h2>Markets</h2><p>Press one to chart it · from Yahoo Finance</p></div></div>
             <div class="at-deck ta-deck-6" id="marketDeck"></div>
+          </section>
+
+          <section class="at-section" id="sec-start">
+            <div class="at-sect-head"><div class="at-head-words"><h2>Start here</h2><p>The broadest first. Press a tile to chart it; the robot asks the desk to analyse it and + adds it to your watchlist.</p></div></div>
+            <div class="at-card at-box ta-tiers" id="startHere"></div>
           </section>
 
           <section class="at-section" id="sec-chart">
@@ -226,9 +212,23 @@
             <div class="at-box at-tablewrap" id="watchWrap"><table class="at-table fill" id="watchTable"></table></div>
           </section>
 
+          <section class="at-section" id="sec-morning">
+            <div class="at-sect-head"><div class="at-head-words"><h2>This morning</h2><p>What ground the market is on, and what moved in a way worth reading about: worked out from figures once an hour, never a forecast</p></div></div>
+            <div class="ta-two ta-even">
+              <div class="at-card at-box" id="weatherCard"></div>
+              <div class="at-card at-box" id="lookCard"></div>
+            </div>
+          </section>
+
           <section class="at-section" id="sec-analyses">
             <div class="at-sect-head"><div class="at-head-words"><h2>Analyses you asked for</h2><p id="analysesSub">Reading the desk's waiting list.</p></div><div class="at-head-tail" id="analysesDo"></div></div>
             <div class="at-box at-tablewrap" id="analysesWrap"><table class="at-table fill" id="analysesTable"></table></div>
+          </section>
+
+          <section class="at-section" id="sec-score">
+            <div class="at-sect-head"><div class="at-head-words"><h2><span class="ta-term" data-term="scorecard">How the desk is doing</span></h2><p id="scoreSub"></p></div><div class="at-head-tail" id="paperDo"></div></div>
+            <div class="at-card at-box" id="paperCard"></div>
+            <div class="at-card at-box" id="score"></div>
           </section>
 
           <section class="at-section" id="sec-calls">

@@ -11,7 +11,7 @@ import { markdown } from './md.js';
 import { sameFigures, typedNumber, type Asked } from './typed.js';
 import { DEPTH_ORDER, DEPTH_WORDS, depthChoices, retryDepth } from './depth.js';
 import { marketOffer, type MarketOffer } from './marketpick.js';
-import { deskSymbol, isCrypto } from '../../data/symbols.js';
+import { cryptoBase, deskSymbol, isCrypto } from '../../data/symbols.js';
 import type { Quote } from '../quotes.js';
 
 const RANGES = ['1M', '3M', '6M', '1Y', '5Y'] as const;
@@ -1017,21 +1017,46 @@ const EMPTY: Partial<Record<Tier, string>> = {
   names: 'No single names on your watchlist yet: search a company above to add one. Bitcoin and Ether can be watched too, on paper only.',
 };
 
-/** One tile: its name in plain words, what it holds, today's move, the desk's latest call, and the robot. A tile in "The
+/** What a badge is shaded by, from what the desk itself knows: a coin by its ticker, a fund by standing in "The whole
+ *  market" or "Sectors", which hold funds only. A single name is a company or a narrower fund and nothing here says
+ *  which, so it has no kind and a neutral shade: never a guess. */
+type Kind = 'fund' | 'coin' | '';
+const kindOf = (sym: string, tier?: Tier): Kind => {
+  if (isCrypto(sym)) return 'coin';
+  const at = tier ?? S.desk?.startHere.find((t) => (t.tier === 'market' || t.tier === 'sectors') && t.items.some((i) => i.symbol === sym))?.tier;
+  return at === 'market' || at === 'sectors' ? 'fund' : '';
+};
+/** The letters in a badge: the ticker up to a dash, dot or equals sign (BTC for BTC-USD, BRK for BRK-B), at most four. */
+const badgeLetters = (sym: string): string => (cryptoBase(sym) ?? sym.replace(/^\^/, '').split(/[-.=]/)[0] ?? sym).slice(0, 4).toUpperCase();
+/** The House's logo box with letters, no picture (the page loads none from outside), shaded by kind. */
+const badge = (sym: string, kind: Kind): string => `<span class="at-logo-box sm ta-badge${kind ? ` ${kind}` : ''}"><span class="at-logo fallback">${esc(badgeLetters(sym))}</span></span>`;
+
+/** What a tile no longer writes out, said when it is pointed at: its full name, its ticker and what it holds, the desk's
+ *  latest call with its day, and why it has no order ticket. The chart and the stock page say the same in full. */
+function tileWords(i: TierItem, name: string): string {
+  return [
+    name,
+    `${i.symbol}${i.meaning ? ` · ${i.meaning}` : ''}`,
+    i.call ? `The desk's latest call: ${i.call.rating}, ${dayText(i.call.date)}.` : 'The desk has made no call on it yet.',
+    ...(i.ticket ? [] : [i.paper ? `${means('paper')} ${NOTES.coinOnPaper}` : NOTES.noTicket]),
+  ].join('\n');
+}
+
+/** One tile, in two lines: its badge, plain name and today's move; then the desk's latest rating (or "no call"), the robot,
+ *  and + when it is not watched. What leaves the tile is in its hover (tileWords), and a press charts it. A tile in "The
  *  whole market" also has ✕, which takes it out of that row (never off the watchlist). */
 function tierTile(i: TierItem, tier: Tier): string {
-  const q = quoteOf(i.symbol);
-  const call = i.call ? `${ratingChip(i.call.rating)}<span class="at-quiet">${esc(dayText(i.call.date))}</span>` : `<span class="at-quiet" title="${esc(means('call'))}">no call yet</span>`;
+  const q = quoteOf(i.symbol), name = i.name ?? q?.name ?? i.symbol, words = esc(tileWords(i, name));
+  const call = i.call ? ratingChip(i.call.rating) : `<span class="at-quiet" title="${esc(means('call'))}">no call</span>`;
   const out = `Take ${i.symbol} out of The whole market`;
   const ask = (isIndex(i.symbol) ? '' : isOpen(i.symbol) ? openChip(i.symbol) : robot(i.symbol))
     + (i.watched ? '' : `<button class="icon-btn" data-act="watch-add" data-symbol="${esc(i.symbol)}" title="Add ${esc(i.symbol)} to your watchlist" aria-label="Add ${esc(i.symbol)} to your watchlist"><svg class="g"><use href="#i-plus"/></svg></button>`)
     + (tier === 'market' ? `<button class="icon-btn" data-act="mk-remove" data-symbol="${esc(i.symbol)}" title="${esc(out)}" aria-label="${esc(out)}"><svg class="g"><use href="#i-x"/></svg></button>` : '');
-  return `<div class="at-tile at-box ta-tier-tile${i.symbol === S.symbol ? ' on' : ''}">
-    <button class="ta-tier-go" data-act="select" data-symbol="${esc(i.symbol)}" title="Chart ${esc(i.symbol)}">
-      <span class="ta-tier-top"><b class="at-tile-name">${esc(i.name ?? q?.name ?? i.symbol)}</b>${changeChip(q)}</span>
-      <span class="at-tile-sub">${esc(i.symbol)}${i.meaning ? ` · ${esc(i.meaning)}` : ''}</span>
+  return `<div class="at-tile at-box ta-tier-tile${i.symbol === S.symbol ? ' on' : ''}" title="${words}">
+    <button class="ta-tier-go" data-act="select" data-symbol="${esc(i.symbol)}" title="${words}">
+      <span class="ta-tier-top">${badge(i.symbol, kindOf(i.symbol, tier))}<b class="at-tile-name">${esc(name)}</b>${changeChip(q)}</span>
     </button>
-    <div class="at-tile-foot">${call}${i.ticket ? '' : noTicketChip(i.paper)}<span class="at-tail">${ask}</span></div>
+    <div class="at-tile-foot">${call}<span class="at-tail">${ask}</span></div>
   </div>`;
 }
 
@@ -1050,7 +1075,7 @@ function renderStart(): void {
   const d = S.desk, el = $('#startHere');
   if (!d) { el.innerHTML = '<p class="at-quiet">Reading the desk\'s files.</p>'; return; }
   el.innerHTML = d.startHere.map((t) => tierBlock(t, d.market)).join('')
-    + `<p class="at-honest">${term('today')} is the change over the latest trading day, from the close before it, with the day named (Fri) when it was not today; a dash is a price Yahoo Finance did not give. Each ${term('call', 'call')} is the desk's rating, from Buy to Sell: Buy and Overweight lean towards owning it, Hold keeps what is held, Underweight and Sell lean against it, and pointing at a rating says what its ticket does. A ${term('fund', 'fund')} holds many companies at once; + adds one to your watchlist. Nothing here is investment advice.</p>`;
+    + `<p class="at-honest">${term('today')} is the change over the latest trading day; a dash is a price Yahoo Finance did not give. Each ${term('call', 'call')} is the desk's rating, Buy to Sell; a ${term('fund', 'fund')} holds many companies at once. Nothing here is investment advice.</p>`;
 }
 
 // ---------- this morning: the market weather, and what is worth a look today ----------
@@ -1076,7 +1101,7 @@ function lookRow(p: Worth): string {
   const it = tierItem(p.symbol), name = it?.name ?? quoteOf(p.symbol)?.name ?? p.symbol;
   const move = p.movePct === null ? '<span class="at-chip">—</span>' : `<span class="at-chip ${tone(p.movePct)}" title="${p.live ? `The move on ${esc(dayText(p.session))} as read before its close was final, from the close before` : `The move on ${esc(dayText(p.session))}, from the close before`}">${pct(p.movePct)}</span>`;
   return `<div class="ta-look">
-    <button class="ta-look-go" data-act="select" data-symbol="${esc(p.symbol)}" title="Chart ${esc(p.symbol)}"><span class="ta-tier-top"><b class="at-tile-name">${esc(name)}</b>${move}</span><span class="at-tile-sub">${esc(p.symbol)} · ${esc(p.why)}</span></button>
+    <button class="ta-look-go" data-act="select" data-symbol="${esc(p.symbol)}" title="Chart ${esc(p.symbol)}"><span class="ta-tier-top">${badge(p.symbol, kindOf(p.symbol))}<b class="at-tile-name">${esc(name)}</b>${move}</span><span class="at-tile-sub">${esc(p.symbol)} · ${esc(p.why)}</span></button>
     <span class="at-tail">${isOpen(p.symbol) ? openChip(p.symbol) : robot(p.symbol)}</span></div>`;
 }
 
@@ -1341,6 +1366,15 @@ function select(sym: string, chosen = true, name = ''): void {
   void refreshQuotes();
 }
 
+/** After a press on a tile or a row of the page (Start here, Markets, Worth a look, the watchlist), the chart comes into view
+ *  unless all of it is on screen already. Smooth, but not for a person who asked for less motion. Only a press does this: never
+ *  the page opening, nor putting back the stock last charted, nor the side list. */
+function showChart(): void {
+  const c = $('#sec-chart'), page = $('#page').getBoundingClientRect(), at = c.getBoundingClientRect();
+  if (at.top >= page.top && at.bottom <= page.bottom) return;
+  c.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+}
+
 /** The recent stocks with this one first: its name as given, else as last known. */
 function withRecent(sym: string, name = ''): Recent[] {
   const before = (P.recent ?? []).find((r) => r.symbol === sym)?.name ?? '';
@@ -1470,7 +1504,7 @@ document.addEventListener('click', (e) => {
       life.stopped = true; $<HTMLDialogElement>('#stopDialog').close(); renderSub();
       toast('The dashboard is stopped. Ask the team to open it again any time.');
     }); break;
-    case 'select': select(sym); break;
+    case 'select': { const inPage = !!el.closest('#page'); select(sym); if (inPage) showChart(); break; }   // asked before: charting draws the tiles again, and the pressed one is gone
     case 'guide-open': remember({ guide: 'open' }); showView('overview'); renderGuide(); $('#sec-guide').scrollIntoView({ behavior: 'smooth', block: 'start' }); break;
     case 'guide-away': remember({ guide: 'away' }); renderGuide(); toast('Get started is put away. The side list opens it again any time.'); break;
     case 'gloss-open': openGlossary(); break;

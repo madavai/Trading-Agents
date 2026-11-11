@@ -203,3 +203,59 @@ test('page-17: a fund in the search list gets "Add to watchlist" and "Show in Th
   assert.doesNotMatch(css, /\.ta-opt-do[^{}]*\{[^}]*display: none/);
   assert.match(css, /@media \(max-width: 640px\) \{ \.ta-opt \{ grid-template-columns: calc\(var\(--unit\) \* 18\) minmax\(0, 1fr\); \} \.ta-opt-tags \{ display: none; \} \}/);
 });
+
+test('page-18: a Start here tile is two lines with a letter badge, what leaves it is said when it is pointed at, and a badge is shaded only by a kind the desk knows', () => {
+  // the badge: the House's logo box holding letters, no picture, so nothing is fetched from outside (the page's policy allows images from this computer only)
+  assert.match(page, /const badge = \(sym: string, kind: Kind\): string => `<span class="at-logo-box sm ta-badge\$\{kind \? ` \$\{kind\}` : ''\}"><span class="at-logo fallback">\$\{esc\(badgeLetters\(sym\)\)\}<\/span><\/span>`;/);
+  assert.doesNotMatch(page, /<img\b/, 'no picture from anywhere');
+  assert.match(page, /const badgeLetters = \(sym: string\): string => \(cryptoBase\(sym\) \?\? sym\.replace\(\/\^\\\^\/, ''\)\.split\(\/\[-\.=\]\/\)\[0\] \?\? sym\)\.slice\(0, 4\)\.toUpperCase\(\);/, 'BTC for BTC-USD, BRK for BRK-B, at most four letters');
+  // a kind only from what the desk knows: a coin by its ticker, a fund by standing in The whole market or Sectors; a single name has none
+  assert.match(page, /if \(isCrypto\(sym\)\) return 'coin';/);
+  assert.match(page, /return at === 'market' \|\| at === 'sectors' \? 'fund' : '';/);
+  assert.doesNotMatch(page, /'company'/, 'no kind is guessed for a single name');
+  // the tile: badge, name and move; then the rating or "no call", and the presses. The old second line and its chips are gone from the tile.
+  assert.match(page, /<span class="ta-tier-top">\$\{badge\(i\.symbol, kindOf\(i\.symbol, tier\)\)\}<b class="at-tile-name">\$\{esc\(name\)\}<\/b>\$\{changeChip\(q\)\}<\/span>/);
+  assert.match(page, /const call = i\.call \? ratingChip\(i\.call\.rating\) : `<span class="at-quiet" title="\$\{esc\(means\('call'\)\)\}">no call<\/span>`;/);
+  assert.match(page, /<div class="at-tile-foot">\$\{call\}<span class="at-tail">\$\{ask\}<\/span><\/div>/);
+  const tile = /function tierTile\([\s\S]*?\n\}\n/.exec(page)![0];
+  assert.doesNotMatch(tile, /at-tile-sub|noTicketChip|no call yet/, 'the tile writes no sub line, no order-ticket chip and no date');
+  // what left the tile is in its hover (the tile and its button, which is its accessible description): name, ticker and meaning, the call with its day, and why no ticket
+  const words = /function tileWords\([\s\S]*?\n\}\n/.exec(page)![0];
+  for (const kept of [/\n {4}name,/, /\$\{i\.symbol\}\$\{i\.meaning \? ` · \$\{i\.meaning\}` : ''\}/, /The desk's latest call: \$\{i\.call\.rating\}, \$\{dayText\(i\.call\.date\)\}\./, /The desk has made no call on it yet\./, /\$\{means\('paper'\)\} \$\{NOTES\.coinOnPaper\}`? : NOTES\.noTicket/]) assert.match(words, kept, String(kept));
+  assert.match(page, /<div class="at-tile at-box ta-tier-tile\$\{i\.symbol === S\.symbol \? ' on' : ''\}" title="\$\{words\}">/);
+  assert.match(page, /<button class="ta-tier-go" data-act="select" data-symbol="\$\{esc\(i\.symbol\)\}" title="\$\{words\}">/);
+  // Worth a look takes the same badge and keeps its words
+  assert.match(page, /<span class="ta-tier-top">\$\{badge\(p\.symbol, kindOf\(p\.symbol\)\)\}<b class="at-tile-name">\$\{esc\(name\)\}<\/b>\$\{move\}<\/span><span class="at-tile-sub">\$\{esc\(p\.symbol\)\} · \$\{esc\(p\.why\)\}<\/span>/);
+  // the shorter words: the subtitle and the line under the tiers, with the dotted words and the advice line kept
+  assert.match(fs.readFileSync('src/terminal/ui/index.html', 'utf8'), /<h2>Start here<\/h2><p>The broadest first\. Press a tile to chart it; the robot asks the desk to analyse it and \+ adds it to your watchlist\.<\/p>/);
+  assert.match(page, /\$\{term\('today'\)\} is the change over the latest trading day; a dash is a price Yahoo Finance did not give\. Each \$\{term\('call', 'call'\)\} is the desk's rating, Buy to Sell; a \$\{term\('fund', 'fund'\)\} holds many companies at once\. Nothing here is investment advice\./);
+  // the style: a shade for a fund and one for a coin, the neutral box for the rest; nothing shown only on a hover
+  const css = fs.readFileSync('src/terminal/ui/dashboard.css', 'utf8');
+  assert.match(css, /\.ta-badge\.fund \{ background: var\(--accent-tint\); \}/);
+  assert.match(css, /\.ta-badge\.coin \{ background: color-mix\(in srgb, var\(--warn\) 18%, transparent\); \}/);
+  assert.doesNotMatch(css, /\.ta-tier-tile[^{}]*:hover[^{}]*\{[^}]*display/, 'nothing is shown only on a hover');
+});
+
+test('page-19: the Overview runs Markets, Start here, the Chart, the stock page, the watchlist, then This morning, and the side list and rail follow it; a press on the page brings the chart into view, and nothing else does', () => {
+  const html = fs.readFileSync('src/terminal/ui/index.html', 'utf8');
+  const overview = html.slice(html.indexOf('id="view-overview"'), html.indexOf('id="view-account"'));
+  const ids = [...overview.matchAll(/<section class="at-section[^"]*" id="(sec-[a-z]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(ids, ['sec-guide', 'sec-today', 'sec-care', 'sec-markets', 'sec-start', 'sec-chart', 'sec-stock', 'sec-watch', 'sec-morning', 'sec-analyses', 'sec-score', 'sec-calls']);
+  // the side list and the rail jump to the same headings in the same order, and every jump lands on a heading that exists
+  const jumps = (from: string) => [...from.matchAll(/data-act="goto" data-to="(sec-[a-z]+)"/g)].map((m) => m[1]!);
+  const side = html.slice(html.indexOf('id="sideOpen"'), html.indexOf('id="sideFolded"')), rail = html.slice(html.indexOf('id="sideFolded"'), html.indexOf('<div class="main-col">'));
+  const want = ['sec-start', 'sec-chart', 'sec-stock', 'sec-watch', 'sec-morning', 'sec-analyses', 'sec-score', 'sec-calls'];
+  assert.deepEqual(jumps(side), want);
+  assert.deepEqual(jumps(rail), want);
+  for (const id of new Set([...jumps(html), ...[...page.matchAll(/data-to="(sec-[a-z]+)"/g)].map((m) => m[1]!)])) assert.ok(ids.includes(id), `${id} is a heading on the page`);
+  assert.deepEqual(want, ids.filter((x) => want.includes(x!)), 'the same order as the page');
+  // a press brings the chart into view: asked before charting (which draws the tiles again, so the pressed one is gone), unless all of it is on screen, smoothly unless motion is reduced
+  assert.match(page, /case 'select': \{ const inPage = !!el\.closest\('#page'\); select\(sym\); if \(inPage\) showChart\(\); break; \}/);
+  assert.match(page, /if \(at\.top >= page\.top && at\.bottom <= page\.bottom\) return;/);
+  assert.match(page, /c\.scrollIntoView\(\{ behavior: matchMedia\('\(prefers-reduced-motion: reduce\)'\)\.matches \? 'auto' : 'smooth', block: 'start' \}\);/);
+  // never from putting back the last stock, from the page opening, from adding a stock, or from the search list: only from a press on a tile or a row
+  assert.equal((page.match(/showChart\(\)/g) ?? []).length, 2, 'the definition and the one press');
+  assert.doesNotMatch(/function select\([\s\S]*?\n\}\n/.exec(page)![0], /showChart/);
+  // the tiles, Markets, Worth a look and the watchlist rows all press through the same act
+  assert.equal((page.match(/data-act="select"/g) ?? []).length, 5, 'the side list star, a Markets tile, a watchlist row, a Start here tile and a Worth a look tile');
+});

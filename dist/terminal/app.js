@@ -1632,17 +1632,31 @@
     market: "The whole market is empty. Search a fund in the box at the top, such as SPY, and press Show in The whole market.",
     names: "No single names on your watchlist yet: search a company above to add one. Bitcoin and Ether can be watched too, on paper only."
   };
+  var kindOf = (sym, tier) => {
+    if (isCrypto(sym)) return "coin";
+    const at = tier ?? S.desk?.startHere.find((t) => (t.tier === "market" || t.tier === "sectors") && t.items.some((i) => i.symbol === sym))?.tier;
+    return at === "market" || at === "sectors" ? "fund" : "";
+  };
+  var badgeLetters = (sym) => (cryptoBase(sym) ?? sym.replace(/^\^/, "").split(/[-.=]/)[0] ?? sym).slice(0, 4).toUpperCase();
+  var badge = (sym, kind) => `<span class="at-logo-box sm ta-badge${kind ? ` ${kind}` : ""}"><span class="at-logo fallback">${esc(badgeLetters(sym))}</span></span>`;
+  function tileWords(i, name) {
+    return [
+      name,
+      `${i.symbol}${i.meaning ? ` \xB7 ${i.meaning}` : ""}`,
+      i.call ? `The desk's latest call: ${i.call.rating}, ${dayText(i.call.date)}.` : "The desk has made no call on it yet.",
+      ...i.ticket ? [] : [i.paper ? `${means("paper")} ${NOTES.coinOnPaper}` : NOTES.noTicket]
+    ].join("\n");
+  }
   function tierTile(i, tier) {
-    const q2 = quoteOf(i.symbol);
-    const call2 = i.call ? `${ratingChip(i.call.rating)}<span class="at-quiet">${esc(dayText(i.call.date))}</span>` : `<span class="at-quiet" title="${esc(means("call"))}">no call yet</span>`;
+    const q2 = quoteOf(i.symbol), name = i.name ?? q2?.name ?? i.symbol, words = esc(tileWords(i, name));
+    const call2 = i.call ? ratingChip(i.call.rating) : `<span class="at-quiet" title="${esc(means("call"))}">no call</span>`;
     const out = `Take ${i.symbol} out of The whole market`;
     const ask2 = (isIndex(i.symbol) ? "" : isOpen(i.symbol) ? openChip(i.symbol) : robot(i.symbol)) + (i.watched ? "" : `<button class="icon-btn" data-act="watch-add" data-symbol="${esc(i.symbol)}" title="Add ${esc(i.symbol)} to your watchlist" aria-label="Add ${esc(i.symbol)} to your watchlist"><svg class="g"><use href="#i-plus"/></svg></button>`) + (tier === "market" ? `<button class="icon-btn" data-act="mk-remove" data-symbol="${esc(i.symbol)}" title="${esc(out)}" aria-label="${esc(out)}"><svg class="g"><use href="#i-x"/></svg></button>` : "");
-    return `<div class="at-tile at-box ta-tier-tile${i.symbol === S.symbol ? " on" : ""}">
-    <button class="ta-tier-go" data-act="select" data-symbol="${esc(i.symbol)}" title="Chart ${esc(i.symbol)}">
-      <span class="ta-tier-top"><b class="at-tile-name">${esc(i.name ?? q2?.name ?? i.symbol)}</b>${changeChip(q2)}</span>
-      <span class="at-tile-sub">${esc(i.symbol)}${i.meaning ? ` \xB7 ${esc(i.meaning)}` : ""}</span>
+    return `<div class="at-tile at-box ta-tier-tile${i.symbol === S.symbol ? " on" : ""}" title="${words}">
+    <button class="ta-tier-go" data-act="select" data-symbol="${esc(i.symbol)}" title="${words}">
+      <span class="ta-tier-top">${badge(i.symbol, kindOf(i.symbol, tier))}<b class="at-tile-name">${esc(name)}</b>${changeChip(q2)}</span>
     </button>
-    <div class="at-tile-foot">${call2}${i.ticket ? "" : noTicketChip(i.paper)}<span class="at-tail">${ask2}</span></div>
+    <div class="at-tile-foot">${call2}<span class="at-tail">${ask2}</span></div>
   </div>`;
   }
   function tierBlock(t, market) {
@@ -1660,7 +1674,7 @@
       el.innerHTML = `<p class="at-quiet">Reading the desk's files.</p>`;
       return;
     }
-    el.innerHTML = d.startHere.map((t) => tierBlock(t, d.market)).join("") + `<p class="at-honest">${term("today")} is the change over the latest trading day, from the close before it, with the day named (Fri) when it was not today; a dash is a price Yahoo Finance did not give. Each ${term("call", "call")} is the desk's rating, from Buy to Sell: Buy and Overweight lean towards owning it, Hold keeps what is held, Underweight and Sell lean against it, and pointing at a rating says what its ticket does. A ${term("fund", "fund")} holds many companies at once; + adds one to your watchlist. Nothing here is investment advice.</p>`;
+    el.innerHTML = d.startHere.map((t) => tierBlock(t, d.market)).join("") + `<p class="at-honest">${term("today")} is the change over the latest trading day; a dash is a price Yahoo Finance did not give. Each ${term("call", "call")} is the desk's rating, Buy to Sell; a ${term("fund", "fund")} holds many companies at once. Nothing here is investment advice.</p>`;
   }
   var MORNING = { weather: null, weatherFailed: "", screen: null, screenFailed: "", on: false, known: false, top: 3, from: "" };
   var LINE_TONE = { ok: "ok", warn: "warn", bad: "danger", "": "" };
@@ -1681,7 +1695,7 @@
     const it = tierItem(p.symbol), name = it?.name ?? quoteOf(p.symbol)?.name ?? p.symbol;
     const move = p.movePct === null ? '<span class="at-chip">\u2014</span>' : `<span class="at-chip ${tone(p.movePct)}" title="${p.live ? `The move on ${esc(dayText(p.session))} as read before its close was final, from the close before` : `The move on ${esc(dayText(p.session))}, from the close before`}">${pct(p.movePct)}</span>`;
     return `<div class="ta-look">
-    <button class="ta-look-go" data-act="select" data-symbol="${esc(p.symbol)}" title="Chart ${esc(p.symbol)}"><span class="ta-tier-top"><b class="at-tile-name">${esc(name)}</b>${move}</span><span class="at-tile-sub">${esc(p.symbol)} \xB7 ${esc(p.why)}</span></button>
+    <button class="ta-look-go" data-act="select" data-symbol="${esc(p.symbol)}" title="Chart ${esc(p.symbol)}"><span class="ta-tier-top">${badge(p.symbol, kindOf(p.symbol))}<b class="at-tile-name">${esc(name)}</b>${move}</span><span class="at-tile-sub">${esc(p.symbol)} \xB7 ${esc(p.why)}</span></button>
     <span class="at-tail">${isOpen(p.symbol) ? openChip(p.symbol) : robot(p.symbol)}</span></div>`;
   }
   function renderLook() {
@@ -1977,6 +1991,11 @@
     void loadHistory();
     void refreshQuotes();
   }
+  function showChart() {
+    const c = $("#sec-chart"), page = $("#page").getBoundingClientRect(), at = c.getBoundingClientRect();
+    if (at.top >= page.top && at.bottom <= page.bottom) return;
+    c.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+  }
   function withRecent(sym, name = "") {
     const before = (P.recent ?? []).find((r) => r.symbol === sym)?.name ?? "";
     const known = name || nameOf(sym);
@@ -2179,9 +2198,13 @@
           toast("The dashboard is stopped. Ask the team to open it again any time.");
         });
         break;
-      case "select":
+      case "select": {
+        const inPage = !!el.closest("#page");
         select(sym);
+        if (inPage) showChart();
         break;
+      }
+      // asked before: charting draws the tiles again, and the pressed one is gone
       case "guide-open":
         remember({ guide: "open" });
         showView("overview");

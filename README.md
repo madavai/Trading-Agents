@@ -146,12 +146,12 @@ the team's "talk" switch shows these messages in the Messages panel; with it off
    with the SEC (accounts, valuation, insider trades, holdings) as made public by that date; economic figures released
    by then, at today's revised values; prices adjusted for every split and dividend since. News, posts and odds exist
    only for recent days, so they are thin.
-2. **You see.** Ask the team to open the dashboard, or type `/terminal`: a page on your own computer that starts with
-   the whole market, the eleven sectors and your own names side by side, then the market weather and what is worth a
-   look today, then the markets, a chart of any stock (area
+2. **You see.** Ask the team to open the dashboard, or type `/terminal`: a page on your own computer that shows
+   the markets, then the whole market, the eleven sectors and your own names side by side, a chart of any stock (area
    or candles, 50- and 200-day averages, volume, at the prices it traded at, as Nasdaq or your broker shows them; the
-   desk's own analyses count dividends as part of the return), your watchlist by tier, a page per stock, the desk's calls with their
-   full reasoning, and how the desk has scored. The agents see your chosen holdings when they analyse.
+   desk's own analyses count dividends as part of the return), your watchlist by tier, a page per stock, the market weather and what is worth a
+   look today, the desk's calls with their full reasoning, and how the desk has scored. Pressing a stock anywhere on the page
+   brings its chart into view. The agents see your chosen holdings when they analyse.
 3. **You decide and trade.** On a call, "Decide…" opens a ticket for the Agentic account, sized by your settings and
    checked against your caps; beside a stock's price, "Trade…" opens your own ticket instead, buy or sell, starting at
    one share. Either way "Review with Robinhood" is Robinhood's own dry run, and with trading switched on (by you, on
@@ -263,7 +263,7 @@ you point at that word anywhere on the dashboard (a dotted line marks such a wor
 so a word means the same thing everywhere.
 
 ### Start here: the whole market first
-The first section of the dashboard shows the world in tiers, broadest first, because the broadest risk is the steadiest:
+After the markets row, the dashboard shows the world in tiers, broadest first, because the broadest risk is the steadiest:
 - **The whole market**: as shipped, four funds: SPY (the S&P 500 fund), QQQ (the Nasdaq 100 fund), VT (the whole world) and BND
   (US bonds). Choose your own, up to eight: search a fund in the box at the top and press "Show in The whole market"
   under it (only a fund the row can take gets that button, never a sector fund, a coin, an index or a single company),
@@ -275,14 +275,17 @@ The first section of the dashboard shows the world in tiers, broadest first, bec
 - **Crypto**: Bitcoin and Ether when you watch them. They are followed on paper only: a coin never opens an order
   ticket, and its calls say "on paper only" where a stock's say Decide….
 
-Each tile shows the day's move (with the day named, such as Fri, when it was not today; a dash when Yahoo Finance gave
-none), the desk's latest call with its date or "no call yet", the robot, which asks the desk to analyse a fund as readily as a stock (for a fund it reads what it holds, from
-its reports to the SEC), and + to add it to your watchlist. Every trading word has its meaning beside it: under each tier, at the
+Each tile is two lines. The first has a badge with the ticker's letters (blue for a fund in the whole market or the sectors,
+amber for a coin, plain for a single name, whose kind the desk does not keep), its plain name and the day's move (with the
+day named, such as Fri, when it was not today; a dash when Yahoo Finance gave none). The second has the desk's latest rating
+or "no call", the robot, which asks the desk to analyse a fund as readily as a stock (for a fund it reads what it holds, from
+its reports to the SEC), and + to add it to your watchlist. Point at a tile for its full name, what it holds, and the desk's
+latest call with its day; press it to chart it. Every trading word has its meaning beside it: under each tier, at the
 foot of the section, and on each rating and dotted word when you point at it. The watchlist further down is grouped the
 same way; press a tier's name to fold it away, and the dashboard remembers which you folded.
 
 ### This morning: the market weather, and what is worth a look
-Right after Start here, two cards are worked out from figures, at most once an hour, and never from a model or a
+Further down, after the watchlist, two cards are worked out from figures, at most once an hour, and never from a model or a
 forecast:
 - **Market weather**, three plain lines, each with a colour and its meaning. The **trend**: the S&P 500 against its 50-
   and 200-day averages (above both rising, between them mixed, below both falling). The **mood**: the VIX, the market's
