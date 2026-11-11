@@ -256,10 +256,12 @@ built, which decisions stand, every document, and what is pending.
   `/api/weather` keeps it an hour. Neither ever forecasts, and a figure that cannot be had leaves its line unavailable.
 - `src/desk/ticket.ts` - the order ticket: sizing from the person's settings and every cap check, on real figures only,
   the guard rails included (`sector`, `cryptoHeldUsd`, `boughtOn`/`heldDays` in its context; a `Check` with `ask`
-  passes but needs the person's "Sell anyway", which the server requires at Review and Place). Crypto is sized here for
-  the paper book only: in fractions to six decimal places, at least $1, within what the crypto limit leaves, and with
-  the crypto limit in place of a sector's. The dashboard's server refuses crypto and indices (`tradable`) when a ticket
-  opens and again at Review and Place, before Robinhood is asked anything.
+  passes but needs the person's "Sell anyway", which the server requires at Review and Place). A coin is sized as a
+  limit order, good till cancelled, with the crypto limit in place of a sector's: on a real ticket (`coin` in its
+  context) on Robinhood's own steps and bounds for the coin (`CoinRules`, from `get_currency_pairs`), counting coin buys
+  not yet filled (`coin.openUsd`) as if filled; on paper in fractions to six decimal places, at least $1. The dashboard's
+  server refuses any coin but `TICKET_COINS` (Bitcoin, Ether) and every index (`tradable`) when a ticket opens and again
+  at Review and Place, before Robinhood is asked anything.
 - `src/desk/sectors.ts` - a symbol's sector for the sector limit: the S&P sector funds and the whole-market funds by
   table, else the SEC (`data/company.ts` `profileSector`: a fund if in the SEC's funds list, else the sector of its
   industry code), an unknown one counted on its own; looked up

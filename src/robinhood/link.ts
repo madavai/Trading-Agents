@@ -4,11 +4,11 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { openOrders, parseAccounts, parsePortfolio, parsePositions, parseQuotes, QUOTES_PER_CALL, readAccount, sortAccounts, type Account, type AccountIds, type AccountView } from './account.js';
+import { coinOrders, coinUnusable, openOrders, parseAccounts, parseCoinQuotes, parseCrypto, parsePairs, parsePortfolio, parsePositions, parseQuotes, QUOTES_PER_CALL, readAccount, sortAccounts, type Account, type AccountIds, type AccountView, type CoinPair, type OpenOrder } from './account.js';
 import { marketDay } from '../data/dates.js';
 import { regularSession } from '../data/holidays.js';
-import { brokerSymbol, deskSymbol } from '../data/symbols.js';
-import type { Check, Order, TicketContext } from '../desk/ticket.js';
+import { brokerSymbol, deskSymbol, isCrypto } from '../data/symbols.js';
+import type { Check, CoinRules, Order, TicketContext } from '../desk/ticket.js';
 import { writePrivate } from '../private.js';
 import { capsOf, type Caps } from '../settings.js';
 import type { Placed } from './order.js';
@@ -153,6 +153,37 @@ export class Link {
     return this.withReader((r) => this.contextWith(r, symbol, now));
   }
 
+  /** Coin orders of the Agentic account since a day ago that fall on New York's day `now`, which count towards orders a
+   *  day with its stock orders; null when they could not be read. */
+  private async coinOrdersToday(r: Reader, rhs: string | null, now: Date): Promise<number | null> {
+    if (!rhs) return 0;   // no crypto number: Robinhood has no coin order of this account to list
+    let x;
+    try { x = await r.read('get_crypto_orders', { rhs_account_number: rhs, created_at_gte: new Date(now.getTime() - 86_400_000).toISOString() }); }
+    catch (e) { if (e instanceof Refused) return null; throw e; }   // Robinhood's connection offers no coin orders to read
+    return x.failed ? null : coinOrders(x.data).all.filter((o) => o.at && marketDay(new Date(o.at)) === marketDay(now)).length;
+  }
+
+  /** Every page of a list Robinhood gives a page at a time (its `next` mark passed back as `cursor`), up to five pages;
+   *  `complete` false when there were more. */
+  private async pages(data: (name: string, args: Record<string, unknown>) => Promise<unknown>, name: string, args: Record<string, unknown>): Promise<{ answers: unknown[]; complete: boolean }> {
+    const answers: unknown[] = [];
+    let cursor: string | null = null;
+    for (let i = 0; i < 5; i++) {
+      const d = await data(name, cursor ? { ...args, cursor } : args);
+      answers.push(d);
+      const next = ((d as { data?: { next?: unknown } } | null)?.data?.next);
+      if (typeof next !== 'string' || !next.trim()) return { answers, complete: true };
+      cursor = next;
+    }
+    return { answers, complete: false };
+  }
+
+  /** Robinhood's list of coins and their order rules, every page of it. */
+  private async coinPairs(data: (name: string, args: Record<string, unknown>) => Promise<unknown>): Promise<CoinPair[]> {
+    const { answers } = await this.pages(data, 'get_currency_pairs', { limit: 100 });
+    return answers.flatMap((a) => parsePairs(a).pairs);
+  }
+
   private async contextWith(r: Reader, symbol: string, now: Date): Promise<Omit<TicketContext, 'rating' | 'callDate'>> {
     {
       const a = await r.read('get_accounts');
@@ -162,12 +193,15 @@ export class Link {
       const data = async (name: string, args: Record<string, unknown>) => { const x = await r.read(name, args); if (x.failed) throw new Error(`Robinhood could not give ${name.replace(/^get_|_/g, ' ').trim()}`); return x.data; };
       const p = parsePortfolio(await data('get_portfolio', { account_number: ids.accountNumber }));
       this.noteValue(p.total, now);   // every read of the account's value counts towards the weekly loss limit
+      if (isCrypto(symbol)) return this.coinContextWith(r, data, ids, symbol, p, now);
       // The desk names a share class as Yahoo does (BRK-B), Robinhood with a dot (BRK.B): its figures are read by its own.
       const all = parsePositions(await data('get_equity_positions', { account_number: ids.accountNumber })), rh = brokerSymbol(symbol);
       const same = (s: string) => deskSymbol(s, 'stock') === deskSymbol(symbol, 'stock');
       const held = all.find((x) => same(x.symbol))?.quantity ?? 0;
       const orders = openOrders(await data('get_equity_orders', { account_number: ids.accountNumber }));
-      const ordersToday = orders.all.filter((o) => o.at && marketDay(new Date(o.at)) === marketDay(now)).length;
+      // Stock and coin orders count together towards orders a day. Coin orders that cannot be read count none here; the
+      // desk's own log of orders sent from the dashboard still counts every one it sent (server.ts).
+      const ordersToday = orders.all.filter((o) => o.at && marketDay(new Date(o.at)) === marketDay(now)).length + ((await this.coinOrdersToday(r, ids.rhsAccountNumber, now)) ?? 0);
       // Live prices for the stock, every holding and every open buy without a price of its own, twenty at a time as
       // Robinhood answers them: a holding left unpriced would count nothing towards its sector.
       const wanted = [...new Set([rh, ...all.map((x) => x.symbol), ...orders.open.filter((o) => o.side === 'buy' && o.price === null).map((o) => o.symbol)])];
@@ -179,6 +213,56 @@ export class Link {
         open: { buy: mine('buy'), sell: mine('sell') }, unreadOrders: orders.unread,
         openBuys: orders.open.filter((o) => o.side === 'buy').map((o) => ({ symbol: deskSymbol(o.symbol, 'stock'), quantity: o.quantity, price: o.price ?? quotes.get(o.symbol) ?? null })) };
     }
+  }
+
+  /** A coin ticket's figures (BTC-USD, ETH-USD), all from Robinhood: whether a crypto account is open, the coin as
+   *  Robinhood trades it (tradable now, not halted, its order rules), the coins held, every open coin order (an open buy
+   *  counts towards the crypto limit and the coin's own cap as if filled, at its own limit price), the orders of the day
+   *  (stocks and coins together), and the coin's live price. Coins trade at any hour, so there is no session. */
+  private async coinContextWith(r: Reader, data: (name: string, args: Record<string, unknown>) => Promise<unknown>, ids: AccountIds, symbol: string, p: ReturnType<typeof parsePortfolio>, now: Date): Promise<Omit<TicketContext, 'rating' | 'callDate'>> {
+    const base = { symbol, accountValue: p.total, buyingPower: p.buyingPower, held: 0, price: null, ordersToday: 0 };
+    const rhs = ids.rhsAccountNumber;
+    if (!rhs) return { ...base, coin: { rules: null, unusable: 'Robinhood gave no crypto number for the Agentic account, so it cannot trade coins here.' } };
+    let onboarding;
+    try { onboarding = await r.read('get_crypto_account_onboarding_info'); }
+    catch (e) { if (e instanceof Refused) return { ...base, coin: { rules: null, unusable: "Robinhood's connection offers no coin trading, so no coin order is proposed." } }; throw e; }
+    const onboarded = onboarding.failed ? null : (onboarding.data as { data?: { already_onboarded?: unknown } } | null)?.data?.already_onboarded;
+    const pairs = await this.coinPairs(data), pair = pairs.find((x) => x.symbol === symbol);
+    const unusable = onboarded === false ? "Robinhood says no crypto account is open yet: open one in Robinhood's app, then try again."
+      : onboarded !== true ? 'Robinhood did not say whether a crypto account is open, so no coin order is proposed.' : coinUnusable(symbol, pair);
+    const held = parseCrypto(await data('get_crypto_positions', { rhs_account_number: rhs }));
+    // Every open coin order, page by page, each named by its coin (by Robinhood's id for it when it gives no symbol).
+    const names = new Map(pairs.flatMap((x) => (x.id ? [[x.id, x.symbol] as const] : [])));
+    const openPages = await this.pages(data, 'get_crypto_orders', { rhs_account_number: rhs, state_group: 'open' });
+    const open: OpenOrder[] = [];
+    let unread = openPages.complete ? 0 : 1;   // more open coin orders than five pages: the caps cannot be checked
+    for (const a of openPages.answers) { const o = coinOrders(a, names); open.push(...o.open); unread += o.unread; }
+    const equity = openOrders(await data('get_equity_orders', { account_number: ids.accountNumber }));
+    const coinsToday = await this.coinOrdersToday(r, rhs, now);
+    if (coinsToday === null) throw new Error('Robinhood could not give the coin orders of today');
+    const ordersToday = equity.all.filter((o) => o.at && marketDay(new Date(o.at)) === marketDay(now)).length + coinsToday;
+    // Live coin prices for this coin, every coin held, and every open coin buy without a price of its own.
+    const coin = (s: string) => deskSymbol(s, 'crypto');
+    const wanted = [...new Set([symbol, ...held.holdings.map((h) => coin(h.symbol)), ...open.filter((o) => o.side === 'buy' && o.price === null).map((o) => o.symbol)])];
+    const quotes = parseCoinQuotes(await data('get_crypto_quotes', { symbols: wanted, rhs_account_number: rhs }));
+    const positions = held.holdings.map((h) => ({ symbol: coin(h.symbol), quantity: h.quantity, price: quotes.get(coin(h.symbol)) ?? null }));
+    const buys = open.filter((o) => o.side === 'buy').map((o) => ({ symbol: o.symbol, quantity: o.quantity, price: o.price ?? quotes.get(o.symbol) ?? null }));
+    const unchecked = [...new Set([...positions, ...buys].filter((x) => x.price === null).map((x) => `Robinhood gave no live price for ${x.symbol}`))];
+    if (held.unread) unchecked.push(`Robinhood listed ${held.unread} coin holding(s) that could not be read`);
+    const openUsd = buys.reduce((n, o) => n + o.quantity * (o.price ?? 0), 0);
+    const mine = (side: 'buy' | 'sell') => open.filter((o) => o.symbol === symbol && o.side === side).reduce((n, o) => n + o.quantity, 0);
+    return { ...base, held: positions.find((x) => x.symbol === symbol)?.quantity ?? 0, price: quotes.get(symbol) ?? null, ordersToday, positions,
+      open: { buy: mine('buy'), sell: mine('sell') }, unreadOrders: unread, openBuys: buys,
+      cryptoHeldUsd: positions.reduce((n, x) => n + x.quantity * (x.price ?? 0), 0) + openUsd,
+      coin: { rules: pair?.rules ?? null, ...(unusable ? { unusable } : {}), openUsd, ...(unchecked.length ? { unchecked } : {}) } };
+  }
+
+  /** The coin's own order rules, read from Robinhood just now, or why it cannot be traded now. */
+  private async coinRulesOf(r: Reader, symbol: string): Promise<CoinRules> {
+    const data = async (name: string, args: Record<string, unknown>) => { const x = await r.read(name, args); if (x.failed) throw new Error(`Robinhood could not give ${name.replace(/^get_|_/g, ' ').trim()}`); return x.data; };
+    const pair = (await this.coinPairs(data)).find((x) => x.symbol === symbol), why = coinUnusable(symbol, pair);
+    if (why || !pair?.rules) throw new Refused(`${why ?? `Robinhood gave no order sizes for ${symbol}.`} Nothing was sent.`);
+    return pair.rules;
   }
 
   /** Whether the person has switched trading on, on the dashboard, and their caps. Kept together beside the sign-in, where
@@ -251,10 +335,13 @@ export class Link {
       if (!now.on) throw new Error(`trading switched itself off: ${now.offBecause?.words ?? 'switch it on in Your account first'}`);
       const failed = (await approve(context)).filter((c) => !c.ok);
       if (failed.length) throw new Error(`the order no longer passes on Robinhood's latest figures: ${failed.map((c) => c.words).join('; ')}`);
-      const account = { accountNumber: this.agenticIds().accountNumber, agentic: true }, sent = { ...order, symbol: brokerSymbol(order.symbol) };
-      session.placer.ready(account, sent, refId, at);   // what this door would refuse is refused before anything is logged or sent
+      const ids = this.agenticIds(), account = { accountNumber: ids.accountNumber, rhsAccountNumber: ids.rhsAccountNumber, agentic: true }, sent = { ...order, symbol: brokerSymbol(order.symbol) };
+      // A coin is sent on its own rules as Robinhood gave them just now; a coin it no longer trades is refused here.
+      if (isCrypto(order.symbol) && (context.coin?.unusable || !context.coin?.rules)) throw new Refused(`${context.coin?.unusable ?? `Robinhood gave no order sizes for ${order.symbol}.`} Nothing was sent.`);
+      const rules = context.coin?.rules ?? undefined;
+      session.placer.ready(account, sent, refId, at, rules);   // what this door would refuse is refused before anything is logged or sent
       sending();
-      try { return { placed: await session.placer.place(account, sent, refId, at), context }; }
+      try { return { placed: await session.placer.place(account, sent, refId, at, rules), context }; }
       catch (e) { throw e instanceof Refused ? e : new AnswerLost(oneLine(lostWhy(e), 160)); }
     } finally { await session.close().catch(() => undefined); }   // closing the session afterwards never hides the answer
   }
@@ -266,7 +353,8 @@ export class Link {
       const a = await session.reader.read('get_accounts');
       if (a.failed) throw new Error('Robinhood could not list the accounts');
       this.learn(a.data);
-      return await session.reviewer.review({ accountNumber: this.agenticIds().accountNumber, agentic: true }, { ...order, symbol: brokerSymbol(order.symbol) });
+      const ids = this.agenticIds(), rules = isCrypto(order.symbol) ? await this.coinRulesOf(session.reader, order.symbol) : undefined;
+      return await session.reviewer.review({ accountNumber: ids.accountNumber, rhsAccountNumber: ids.rhsAccountNumber, agentic: true }, { ...order, symbol: brokerSymbol(order.symbol) }, rules);
     } finally { await session.close(); }
   }
 

@@ -7,6 +7,8 @@
 import crypto from 'node:crypto';
 import type { Reader } from './reader.js';
 import { isDone } from './states.js';
+import { deskSymbol } from '../data/symbols.js';
+import type { CoinRules } from '../desk/ticket.js';
 
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {});
 const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
@@ -88,26 +90,89 @@ export function parseQuotes(answer: unknown): Map<string, number> {
   return out;
 }
 
+/** Coin prices from Robinhood's live coin quotes (get_crypto_quotes), by the desk's name for each coin (BTC-USD). Robinhood
+ *  gives a bid, an ask and a mark price; the mark (between the two) is the one read. Its answer had not been seen when this
+ *  was written (11 Nov 2026), so a quote is read under `results` or `quotes`, and a price that cannot be read is left out:
+ *  the coin is then unpriced, never guessed. */
+export function parseCoinQuotes(answer: unknown): Map<string, number> {
+  const raw = obj(answer).data, d = obj(raw), out = new Map<string, number>();
+  const rows = Array.isArray(raw) ? raw : Array.isArray(d.results) ? d.results : list(d.quotes);
+  for (const v of rows) {
+    const row = obj(v), inner = obj(row.quote), q = Object.keys(inner).length ? inner : row;
+    const symbol = text(q.symbol) ?? text(row.symbol), price = figure(q.mark_price) ?? figure(q.mark) ?? figure(q.last_trade_price);
+    if (symbol && price !== null && price > 0) out.set(deskSymbol(symbol, 'crypto'), price);
+  }
+  return out;
+}
+
+/** One coin as Robinhood trades it (get_currency_pairs), named as the desk names it (BTC-USD): whether it can be traded now,
+ *  and its own order rules. Each flag is read only when Robinhood gave it as true or false. */
+export interface CoinPair {
+  id: string | null; symbol: string;
+  tradable: boolean; halted: boolean | null; displayOnly: boolean | null; marketOnly: boolean | null;
+  rules: CoinRules | null;
+}
+const flag = (v: unknown): boolean | null => (typeof v === 'boolean' ? v : null);
+export function parsePairs(answer: unknown): { pairs: CoinPair[]; next: string | null } {
+  const d = dataOf(answer);
+  const pairs = list(d.results).flatMap((v) => {
+    const p = obj(v), raw = text(p.symbol);
+    if (!raw) return [];
+    const quantityStep = figure(p.min_order_quantity_increment), priceStep = figure(p.min_order_price_increment), minQuantity = figure(p.min_order_size), maxQuantity = figure(p.max_order_size);
+    const rules = quantityStep !== null && quantityStep > 0 && priceStep !== null && priceStep > 0 && minQuantity !== null && minQuantity >= 0 && maxQuantity !== null && maxQuantity > 0
+      ? { quantityStep, priceStep, minQuantity, maxQuantity } : null;
+    return [{ id: text(p.id), symbol: deskSymbol(raw, 'crypto'), tradable: text(p.tradability) === 'tradable', halted: flag(p.halted), displayOnly: flag(p.display_only), marketOnly: flag(p.market_orders_only), rules }];
+  });
+  return { pairs, next: text(d.next) };
+}
+
+/** Why a coin ticket cannot be had for this coin now, in plain words, or null when Robinhood trades it now, at a limit
+ *  price, with order rules the desk can read. */
+export function coinUnusable(symbol: string, pair: CoinPair | undefined): string | null {
+  if (!pair) return `Robinhood does not list ${symbol} among the coins it trades.`;
+  if (pair.halted !== false) return pair.halted ? `Robinhood has halted trading in ${symbol} for now.` : `Robinhood did not say whether trading in ${symbol} is halted, so no coin order is proposed.`;
+  if (!pair.tradable) return `Robinhood marks ${symbol} as not tradable now.`;
+  if (pair.displayOnly !== false) return `Robinhood shows ${symbol} for display only, not to trade.`;
+  if (pair.marketOnly !== false) return `Robinhood takes ${symbol} only as a market order, and the desk's coin tickets are limit orders.`;
+  if (!pair.rules) return `Robinhood gave no order sizes for ${symbol} (its smallest step, least and most), so no coin order can be sized.`;
+  return null;
+}
+
 export interface Order { symbol: string | null; side: string | null; type: string | null; state: string | null; quantity: number | null; price: number | null; at: string | null }
-const orderOf = (v: unknown): Order => {
+const orderOf = (v: unknown, symbolOf: (o: Record<string, unknown>) => string | null = (o) => text(o.symbol)?.toUpperCase() ?? null): Order => {
   const o = obj(v);
-  return { symbol: text(o.symbol)?.toUpperCase() ?? null, side: text(o.side), type: text(o.type), state: text(o.state),
+  return { symbol: symbolOf(o), side: text(o.side), type: text(o.type), state: text(o.state),
     quantity: figure(o.quantity) ?? figure(o.cumulative_quantity), price: figure(o.average_price) ?? figure(o.price) ?? figure(o.limit_price), at: text(o.created_at) ?? text(o.updated_at) };
 };
 /** Orders. The Agentic account had none on 16 Oct 2026, so the fields are read as Robinhood's tool description names
  *  them; whatever cannot be read is null and shown as a dash. */
 export function parseOrders(answer: unknown): { orders: Order[]; count: number } {
   const rows = list(dataOf(answer).orders);
-  return { count: rows.length, orders: rows.slice(0, 20).map(orderOf) };
+  return { count: rows.length, orders: rows.slice(0, 20).map((v) => orderOf(v)) };
 }
 
 /** An order still open at Robinhood (queued, confirmed, partly filled...): what it still waits to buy or sell, at its own
  *  price. A filled part is already among the holdings, so only the rest counts. */
-export interface OpenOrder { symbol: string; side: 'buy' | 'sell'; quantity: number; price: number | null }
+export interface OpenOrder { symbol: string; side: 'buy' | 'sell'; quantity: number; price: number | null; at?: string }
 /** Every order Robinhood listed (all of them, not the page's twenty), for a ticket's checks: the ones still open, and how
  *  many could not be read well enough to tell (no stock, side, size or state): those are never taken as done. */
 export function openOrders(answer: unknown): { all: Order[]; open: OpenOrder[]; unread: number } {
-  const rows = list(dataOf(answer).orders), all = rows.map(orderOf);
+  const rows = list(dataOf(answer).orders), all = rows.map((v) => orderOf(v));
+  return { all, ...openOf(rows, all) };
+}
+
+/** The coin orders Robinhood listed (get_crypto_orders, under `results`), read as stock orders are, each named as the desk
+ *  names its coin (BTC-USD): by its own symbol, else by its coin's id in Robinhood's list of coins (`pairs`, id to name).
+ *  `next`: Robinhood's mark for the next page, when there is one. */
+export function coinOrders(answer: unknown, pairs: ReadonlyMap<string, string> = new Map()): { all: Order[]; open: OpenOrder[]; unread: number; next: string | null } {
+  const d = dataOf(answer), rows = list(d.results ?? d.orders);
+  const symbolOf = (o: Record<string, unknown>): string | null => { const s = text(o.symbol); if (s) return deskSymbol(s, 'crypto'); const id = text(o.currency_pair_id); return id ? pairs.get(id) ?? null : null; };
+  const all = rows.map((v) => orderOf(v, symbolOf));
+  return { all, ...openOf(rows, all), next: text(d.next) };
+}
+
+/** Of orders read, the ones still open with what each still waits to buy or sell, and how many could not be read. */
+function openOf(rows: unknown[], all: Order[]): { open: OpenOrder[]; unread: number } {
   const open: OpenOrder[] = [];
   let unread = 0;
   rows.forEach((v, i) => {
@@ -115,9 +180,10 @@ export function openOrders(answer: unknown): { all: Order[]; open: OpenOrder[]; 
     if (o.state && isDone(o.state)) return;   // done: filled, or never to be filled (states.ts, which the page words the states with too)
     const quantity = figure(raw.quantity), filled = figure(raw.cumulative_quantity) ?? 0;
     if (!o.state || !o.symbol || (o.side !== 'buy' && o.side !== 'sell') || quantity === null) { unread++; return; }
-    open.push({ symbol: o.symbol, side: o.side, quantity: Math.max(0, quantity - filled), price: figure(raw.price) ?? figure(raw.limit_price) });
+    // What is left to fill, without a computer's fraction noise (0.001 less 0.0004 is 0.0006, not 0.0006000000000000001).
+    open.push({ symbol: o.symbol, side: o.side, quantity: Math.max(0, Number((quantity - filled).toFixed(12))), price: figure(raw.price) ?? figure(raw.limit_price), ...(o.at ? { at: o.at } : {}) });
   });
-  return { all, open: open.filter((o) => o.quantity > 0), unread };
+  return { open: open.filter((o) => o.quantity > 0), unread };
 }
 
 export interface Approvals { required: boolean | null; pending: number }
@@ -134,6 +200,11 @@ export interface AccountView {
   unread: number;
   /** For the Agentic account only: its orders and Robinhood's own approval on the phone. */
   orders: { orders: Order[]; count: number } | null;
+  /** For the Agentic account only: its coin orders, newest first (at most twenty), how many Robinhood listed on its first
+   *  page and whether it has more; and, read apart, the ones still open (a coin limit order stays open until it fills or
+   *  the person cancels it, for at most 90 days), null when they could not be read, with whether that list is whole.
+   *  Absent when Robinhood gave no crypto account number. */
+  coinOrders?: { orders: Order[]; count: number; more: boolean; open: OpenOrder[] | null; openComplete: boolean } | null;
   approvals: Approvals | null;
   /** What could not be read, in plain words. */
   problems: string[];
@@ -164,18 +235,36 @@ export async function readAccount(reader: Reader, account: Account, ids: Account
     const q = await read('live prices', 'get_equity_quotes', { symbols: symbols.slice(i, i + QUOTES_PER_CALL) });
     for (const [s, v] of parseQuotes(q)) prices.set(s, v);
   }
+  // Coins held are priced at Robinhood's live coin quotes (its mark price), by the desk's name for each (BTC-USD).
+  const coinNames = [...new Set(base.filter((h) => h.kind === 'crypto').map((h) => deskSymbol(h.symbol, 'crypto')))];
+  const coinPrices = coinNames.length ? parseCoinQuotes(await read('live coin prices', 'get_crypto_quotes', { symbols: coinNames })) : new Map<string, number>();
   const holdings: Holding[] = base.map((h) => {
-    const price = prices.get(h.symbol) ?? null;
+    const price = (h.kind === 'crypto' ? coinPrices.get(deskSymbol(h.symbol, 'crypto')) : prices.get(h.symbol)) ?? null;
     return { ...h, price, value: price === null ? null : price * h.quantity, gainPct: price !== null && h.averageCost ? (price / h.averageCost - 1) * 100 : null };
   }).sort((a, b) => (b.value ?? -1) - (a.value ?? -1));
 
-  let orders: AccountView['orders'] = null, approvals: Approvals | null = null;
+  let orders: AccountView['orders'] = null, approvals: Approvals | null = null, coin: AccountView['coinOrders'];
   if (account.agentic) {
     const o = await read('the orders', 'get_equity_orders', { account_number: ids.accountNumber });
     orders = o === null ? null : parseOrders(o);
+    if (ids.rhsAccountNumber) {
+      // The latest coin orders, and on their own the ones still open (Robinhood lists those apart), so an open order is
+      // shown however old it is. A coin order may name its coin only by Robinhood's id for it: then Robinhood's list of
+      // coins names it.
+      const c = await read('the coin orders', 'get_crypto_orders', { rhs_account_number: ids.rhsAccountNumber });
+      const op = c === null ? null : await read('the open coin orders', 'get_crypto_orders', { rhs_account_number: ids.rhsAccountNumber, state_group: 'open' });
+      const unnamed = [c, op].some((a) => list(dataOf(a).results).some((v) => !text(obj(v).symbol) && text(obj(v).currency_pair_id)));
+      const names = unnamed ? new Map(parsePairs(await read("Robinhood's list of coins", 'get_currency_pairs', { limit: 100 })).pairs.flatMap((p) => (p.id ? [[p.id, p.symbol] as const] : []))) : new Map<string, string>();
+      const coinRead = c === null ? null : coinOrders(c, names), openRead = op === null ? null : coinOrders(op, names);
+      const newest = coinRead === null ? [] : [...coinRead.all].sort((a, b) => (b.at ?? '').localeCompare(a.at ?? ''));
+      coin = coinRead === null ? null : {
+        orders: newest.slice(0, 20), count: newest.length, more: coinRead.next !== null,
+        open: openRead === null ? null : openRead.open, openComplete: openRead !== null && openRead.next === null && openRead.unread === 0,
+      };
+    }
     const setting = await read('the phone approval setting', 'get_trade_approval_setting', { account_number: ids.accountNumber });
     const pending = await read('the approvals waiting', 'get_trade_approvals', { account_number: ids.accountNumber });
     approvals = setting === null && pending === null ? null : parseApprovals(setting, pending);
   }
-  return { account, portfolio: p === null ? null : parsePortfolio(p), holdings, unread: crypto.unread, orders, approvals, problems };
+  return { account, portfolio: p === null ? null : parsePortfolio(p), holdings, unread: crypto.unread, orders, approvals, problems, ...(coin === undefined ? {} : { coinOrders: coin }) };
 }

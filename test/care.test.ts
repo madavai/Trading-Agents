@@ -101,7 +101,7 @@ test('a Sell or Underweight on a holding of the Agentic account says "the desk s
   assert.deepEqual(find(care, 'ag', 'NVDA').sell, { action: 'sell half of what is held', ticket: true, early: null });
   assert.deepEqual(find(care, 'ag', 'AMD').sell, { action: 'sell everything held', ticket: true, early: { boughtOn: '2026-10-20', heldDays: 1, minHoldDays: 3 } });
   assert.equal(find(care, 'ag', 'TSLA').sell, null, 'a Hold asks for no sale');
-  assert.equal(find(care, 'ag', 'BTC').sell?.ticket, false, 'a coin gets no ticket: Robinhood\'s agent doorway trades stocks and funds');
+  assert.equal(find(care, 'ag', 'BTC').sell?.ticket, true, 'Bitcoin gets a ticket: among coins, the desk orders Bitcoin and Ether');
   assert.equal(find(care, 'main', 'AMD').sell, null, 'another account: information only');
   const held3 = careOf(input({ views, calls, caps: { ...DEFAULT_CAPS, minHoldDays: 1 }, bought: () => ({ boughtOn: '2026-10-20', heldDays: 1 }) }));
   assert.equal(find(held3, 'ag', 'AMD').sell?.early, null, 'held as long as the shortest hold: no longer early');

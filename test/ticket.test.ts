@@ -7,10 +7,10 @@ import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { check, edit, passes, propose, proposeOwn, type Order, type TicketContext } from '../src/desk/ticket.js';
-import { equityOrderArgs } from '../src/robinhood/rules.js';
+import { cryptoOrderArgs, equityOrderArgs, masked } from '../src/robinhood/rules.js';
 import { capsFrom, capsOf, DEFAULT_CAPS, DEFAULTS, readSettings, tradingOf } from '../src/settings.js';
 import { Sectors } from '../src/desk/sectors.js';
-import { parseReview, Reviewer } from '../src/robinhood/review.js';
+import { parsePreview, parseReview, Reviewer } from '../src/robinhood/review.js';
 import { Refused } from '../src/robinhood/reader.js';
 import { Link } from '../src/robinhood/link.js';
 import { openSession } from '../src/robinhood/connect.js';
@@ -20,6 +20,45 @@ import { accountTools, AGENTIC, fakeRobinhood, MAIN, type Fake } from './fake-ro
 
 const T = DEFAULTS.trading, C = DEFAULT_CAPS;   // full position 10%; caps $500 an order, 10% a stock, 3 orders a day
 const ctx = (o: Partial<TicketContext> = {}): TicketContext => ({ symbol: 'NVDA', rating: 'Buy', callDate: '2026-10-15', accountValue: 2500, buyingPower: 2500, held: 0, price: 182.4, ordersToday: 0, ...o });
+
+test('a real coin ticket: on Robinhood\'s own steps and bounds, good till cancelled, with coin buys not yet filled counted as if filled', () => {
+  const rules = { quantityStep: 1e-8, priceStep: 0.01, minQuantity: 0.000001, maxQuantity: 20 };
+  const btc = (o: Partial<TicketContext> = {}): TicketContext => ctx({ symbol: 'BTC-USD', price: 82_000.004, cryptoHeldUsd: 0, coin: { rules, openUsd: 0 }, ...o });
+  const p = propose(btc(), T, C);
+  assert.deepEqual(p.order, { symbol: 'BTC-USD', side: 'buy', quantity: 0.00152439, limitPrice: 82_000, timeInForce: 'gtc' }, '5% of $2,500 is $125, at the live price put on its cent step');
+  assert.match(p.why.join(' '), /rounded down to BTC-USD's step of 0\.00000001 BTC: 0\.00152439 BTC/);
+  assert.match(p.why.join(' '), /stays open until it fills or you cancel it in Robinhood's app, for at most 90 days/);
+  // One open buy of 3% ($75) leaves 2% ($50); two of 3% each ($150) are over the 5% limit, so a third coin buy is refused.
+  const one = propose(btc({ cryptoHeldUsd: 75, coin: { rules, openUsd: 75 } }), T, C);
+  assert.equal(one.order?.quantity, 0.00060975);
+  assert.match(one.why.join(' '), /Your crypto limit of 5% of the account leaves \$50\.00, counting \$75\.00 in coin buys not yet filled, so at most that\./);
+  const two = btc({ cryptoHeldUsd: 150, coin: { rules, openUsd: 150 } });
+  assert.equal(propose(two, T, C).order, null);
+  assert.ok(check({ ...p.order!, quantity: 0.00001 }, two, T, C).some((x) => !x.ok && /^Crypto would be 6\.0% of the account, counting \$150\.00 in coin buys not yet filled; your limit is 5%$/.test(x.words)));
+  // The coin's own cap counts the amount waiting in buys not yet filled, as a stock's does.
+  const wide = { ...C, cryptoPercent: 100 }, waiting = btc({ open: { buy: 0.002, sell: 0 }, cryptoHeldUsd: 164, coin: { rules, openUsd: 164 } });
+  assert.ok(check({ ...p.order!, quantity: 0.002 }, waiting, T, wide).some((x) => !x.ok && /^BTC-USD would be 13\.1% of the account, counting 0\.002 BTC in orders not yet filled; your cap is 10%$/.test(x.words)));
+  // Robinhood's steps and bounds, and its price step.
+  const fails = (x: Partial<Order>) => check({ ...p.order!, ...x }, btc(), T, C).filter((k) => !k.ok).map((k) => k.words).join(' | ');
+  assert.equal(fails({}), '');
+  for (const q of [0.000000015, 0.0000005, 21]) assert.equal(fails({ quantity: q }), "The amount must be in steps of 0.00000001 BTC, from 0.000001 to 20 BTC (Robinhood's rules for BTC-USD)");
+  assert.match(fails({ limitPrice: 82_000.005 }), /The limit price must be above zero, in dollars and cents/);
+  assert.match(fails({ market: true }), /BTC-USD is crypto: the desk sizes it at a limit price, never at the market price/);
+  // Nothing proposed when Robinhood says no, or when the crypto limit cannot be checked.
+  for (const unusable of ['Robinhood has halted trading in BTC-USD for now.', "Robinhood says no crypto account is open yet: open one in Robinhood's app, then try again."]) {
+    const x = propose(btc({ coin: { rules, unusable } }), T, C);
+    assert.deepEqual([x.order, x.why.at(-1)], [null, unusable]);
+    assert.ok(check(p.order!, btc({ coin: { rules, unusable } }), T, C).some((k) => !k.ok && unusable.startsWith(k.words)));
+  }
+  assert.match(propose(btc({ coin: { rules, openUsd: 0, unchecked: ['Robinhood gave no live price for ETH-USD'] } }), T, C).why.at(-1)!, /^Your crypto limit cannot be checked: Robinhood gave no live price for ETH-USD\.$/);
+  // A sell: on the step, at least the least Robinhood takes.
+  assert.deepEqual(propose(btc({ rating: 'Sell', held: 0.001234567 }), T, C).order, { symbol: 'BTC-USD', side: 'sell', quantity: 0.00123456, limitPrice: 82_000, timeInForce: 'gtc' });
+  assert.match(propose(btc({ rating: 'Underweight', held: 0.0000015 }), T, C).why.at(-1)!, /half of that is less than the smallest order Robinhood takes for it, 0\.000001 BTC/);
+  // The person's own coin order starts at the least Robinhood takes, at least a dollar's worth, on the step.
+  const own = proposeOwn(btc(), 'buy', T, C);
+  assert.deepEqual(own.order, { symbol: 'BTC-USD', side: 'buy', quantity: 0.00001220, limitPrice: 82_000, timeInForce: 'gtc' });
+  assert.equal(edit(own.order!, btc(), T, { quantity: 0.0001, limitPrice: 81_000 }).timeInForce, 'gtc', 'a coin stays good till cancelled whatever is typed');
+});
 
 test('the trading settings are read and checked: out of range falls back to what ships, and an unreadable call never trades', () => {
   const t = tradingOf({ enabled: true, fullPositionPercent: 500, caps: { perOrderUsd: 100_000 }, ratingToOrder: { Hold: 'buy a full position', 'Needs review': 'sell everything held', Buy: 'yolo' }, orderDefaults: { timeInForce: 'day' } });
@@ -65,10 +104,11 @@ test('the guard rails on a ticket: one sector, crypto, and the shortest hold, ea
   assert.equal(passes(check({ ...buy, symbol: 'BTC-USD', limitPrice: 182.4 }, { ...big, symbol: 'BTC-USD', cryptoHeldUsd: 300 }, T, C)), false, 'crypto at most 5%: $300 held and $364.80 more is 6.6%');
   assert.match(words({ ...buy, symbol: 'BTC-USD' }, { ...big, symbol: 'BTC-USD', cryptoHeldUsd: 100 }), /Crypto would be 4\.6% of the account; your limit is 5%/);
   assert.doesNotMatch(words({ ...buy, symbol: 'BTC-USD' }, { ...big, symbol: 'BTC-USD', cryptoHeldUsd: 100 }), /Sector/, 'crypto has its own limit in place of a sector');
-  // Crypto, sized for paper only: in fractions, within what the crypto limit leaves, never under a dollar.
+  // Crypto as paper sizes it (no coin rules from Robinhood): in fractions, within what the crypto limit leaves, never under
+  // a dollar; a coin limit order is always good till cancelled, as Robinhood takes it.
   const btc = propose({ ...big, symbol: 'BTC-USD', price: 82_000, cryptoHeldUsd: 200 }, T, C);
-  assert.deepEqual(btc.order, { symbol: 'BTC-USD', side: 'buy', quantity: 0.003658, limitPrice: 82_000, timeInForce: 'gfd' }, '5% of $10,000 less the $200 held leaves $300: 0.003658 BTC');
-  assert.match(btc.why.join(' '), /Your crypto limit of 5% of the account leaves \$300\.00, so at most that\..*rounded down to six decimal places: 0\.003658 unit\(s\)/);
+  assert.deepEqual(btc.order, { symbol: 'BTC-USD', side: 'buy', quantity: 0.003658, limitPrice: 82_000, timeInForce: 'gtc' }, '5% of $10,000 less the $200 held leaves $300: 0.003658 BTC');
+  assert.match(btc.why.join(' '), /Your crypto limit of 5% of the account leaves \$300\.00, so at most that\..*rounded down to six decimal places: 0\.003658 BTC/);
   assert.equal(passes(check(btc.order!, { ...big, symbol: 'BTC-USD', price: 82_000, cryptoHeldUsd: 200 }, T, C)), true);
   assert.match(propose({ ...big, symbol: 'BTC-USD', price: 82_000, cryptoHeldUsd: 499.5 }, T, C).why.at(-1)!, /\$0\.50 is under \$1\.00, the smallest crypto order/);
   assert.equal(propose({ ...big, symbol: 'BTC-USD', price: 82_000, held: 0.003658, rating: 'Underweight' }, T, C).order?.quantity, 0.001829, 'half of what is held, to six decimal places');
@@ -247,6 +287,36 @@ test('what the two order doors send is Robinhood\'s own rules: whole shares at a
   for (const bad of [o({ quantity: 0.5 }), o({ quantity: 0 }), o({ limitPrice: 0 }), o({ market: true }), o({ market: true, dollars: 0.5 }), o({ market: true, dollars: 10.001 }), o({ side: 'sell', market: true, quantity: 0.0000001 }), o({ side: 'sell', market: true, quantity: -1 }), o({ side: 'hold' as 'buy' })]) assert.equal(equityOrderArgs('A1', bad), null, JSON.stringify(bad));
 });
 
+test('a coin order is sent as Robinhood\'s rules for it say: a limit order, good till cancelled, on the coin\'s steps, in plain digits', () => {
+  const rules = { quantityStep: 1e-8, priceStep: 0.01, minQuantity: 0.000001, maxQuantity: 20 };
+  const o = (x: Partial<Order>): Order => ({ symbol: 'BTC-USD', side: 'buy', quantity: 0.0000123, limitPrice: 82_000, timeInForce: 'gtc', ...x });
+  assert.deepEqual(cryptoOrderArgs('881004321', o({}), rules), { rhs_account_number: '881004321', symbol: 'BTC-USD', side: 'buy', type: 'limit', quantity: '0.0000123', limit_price: '82000.00', time_in_force: 'gtc' }, 'never 1.23e-5');
+  assert.equal(cryptoOrderArgs('881004321', o({ quantity: 0.12345678, side: 'sell' }), rules)!.quantity, '0.12345678');
+  assert.equal(cryptoOrderArgs('881004321', o({ limitPrice: 0.000123 }), { ...rules, priceStep: 0.000001 })!.limit_price, '0.000123', 'a coin priced under a cent keeps its own price step');
+  assert.equal(cryptoOrderArgs('881004321', o({ timeInForce: 'gfd' }), rules)!.time_in_force, 'gtc', 'a coin limit order is always good till cancelled');
+  for (const bad of [o({ quantity: 0.000000015 }), o({ quantity: 0.0000005 }), o({ quantity: 21 }), o({ quantity: 0 }), o({ limitPrice: 82_000.005 }), o({ limitPrice: 0 }), o({ market: true, dollars: 50 }), o({ side: 'hold' as 'buy' })]) assert.equal(cryptoOrderArgs('881004321', bad, rules), null, JSON.stringify(bad));
+  assert.equal(cryptoOrderArgs('', o({}), rules), null, 'no crypto account number, no order');
+});
+
+test('Robinhood\'s coin check counts only when it names the same order back; its problems and a rounding are shown; otherwise it is not checked', () => {
+  const o = { side: 'buy', quantity: 0.0015 } as const;
+  const clean = parsePreview({ failed: false, text: '', data: { data: { order: { side: 'buy', quantity: '0.00150000', type: 'limit' }, estimated_cost: '121.50', fees: '0.00', rhs_account_number: '881004321' } } }, o);
+  assert.deepEqual([clean.answered, clean.unclear, clean.alerts, clean.error], [true, false, [], null]);
+  assert.ok(!JSON.stringify(clean).includes('881004321'), 'the crypto account number is never repeated');
+  const flagged = parsePreview({ failed: false, text: '', data: { data: { side: 'buy', quantity: '0.0015', errors: [{ message: 'Insufficient buying power.' }], requested_quantity: '0.00150001' } } }, o);
+  assert.equal(flagged.answered, true);
+  assert.deepEqual(flagged.alerts, ['Insufficient buying power.', "Robinhood would round the amount (0.00150001 asked): its order tool refuses an amount off the coin's step, so change it"]);
+  for (const data of [{ data: { ok: true } }, { data: { side: 'buy', quantity: '0.0016' } }, { data: { side: 'sell', quantity: '0.0015' } }, null]) {
+    const r = parsePreview({ failed: false, text: 'fine', data }, o);
+    assert.deepEqual([r.answered, r.unclear], [false, true], JSON.stringify(data));
+    assert.match(r.error!, /^Robinhood's coin check did not name this order back, so it counts as not checked and cannot be placed\./);
+  }
+  assert.equal(parsePreview({ failed: true, text: 'account 881004321 has no crypto', data: null }, o).error, 'account ##### has no crypto');
+  // A coin's price and amount keep every digit; an account or order number beside them is still hidden.
+  assert.equal(masked('Limit 82000.00 for 0.00150001 BTC on 881004321 (5RH88004321).'), 'Limit 82000.00 for 0.00150001 BTC on ##### (#####).');
+  assert.deepEqual(parsePreview({ failed: false, text: '', data: { data: { side: 'buy', quantity: '0.00150000', price: '82000.00', ref: '7004321998' } } }, o).facts, [['side', 'buy'], ['quantity', '0.00150000'], ['price', '82000.00'], ['ref', '#####']]);
+});
+
 // ---------- through the dashboard ----------
 let fake: Fake, file: string, port: number, reviewed: Array<Record<string, unknown>>;
 const freePort = () => new Promise<number>((resolve) => { const s = net.createServer().listen(0, '127.0.0.1', () => { const p = (s.address() as net.AddressInfo).port; s.close(() => resolve(p)); }); });
@@ -262,7 +332,7 @@ async function desk(buyingPower: string) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ta-tk-term-'));
   fs.copyFileSync('desk-settings.json', path.join(root, 'desk-settings.json'));
   new Journal(path.join(root, 'desk-data', 'journal.md')).storeDecision('NVDA', '2026-10-15', '**Rating**: Buy\n\n**Executive Summary**: Buy on strength.');
-  new Journal(path.join(root, 'desk-data', 'journal.md')).storeDecision('BTC-USD', '2026-10-15', '**Rating**: Buy\n\n**Executive Summary**: Buy, on paper.');
+  new Journal(path.join(root, 'desk-data', 'journal.md')).storeDecision('SHIB-USD', '2026-10-15', '**Rating**: Buy\n\n**Executive Summary**: Buy, followed nowhere.');
   const term = await startTerminal({ root, assets: new Map([['/index.html', { type: 'text/html', body: '<p>page</p>' }]]) as Assets, port: 0, robinhood: link, keyFile: path.join(path.dirname(file), 'dashboard.json') });
   const ask = async (p: string, body: unknown) => { const r = await fetch(`${term.url}${p.slice(1)}`, { method: 'POST', headers: { 'x-desk-token': term.token, 'content-type': 'application/json' }, body: JSON.stringify(body) }); const t = await r.text(); return { status: r.status, body: t, json: () => JSON.parse(t) }; };
   const show = async () => { const { accounts } = await link.accounts(); await link.choose(accounts.filter((a) => !a.deactivated).map((a) => a.key)); };
@@ -275,8 +345,8 @@ test("from a call to Robinhood's check: proposed on the real figures, changed on
     const early = await ask('/api/ticket', { symbol: 'NVDA', date: '2026-10-15' });
     assert.equal(early.status, 400);
     assert.match(early.json().error, /show your Agentic account on the dashboard first/);
-    const coin = await ask('/api/ticket', { symbol: 'BTC-USD', date: '2026-10-15' });
-    assert.deepEqual([coin.status, coin.json().error], [400, "Robinhood's agent doorway trades stocks and funds only: BTC-USD is crypto, which the desk follows on paper"], 'a crypto call never opens a ticket: it is refused before Robinhood is asked');
+    const coin = await ask('/api/ticket', { symbol: 'SHIB-USD', date: '2026-10-15' });
+    assert.deepEqual([coin.status, coin.json().error], [400, 'among coins, the order ticket trades only Bitcoin (BTC-USD) and Ether (ETH-USD), not SHIB-USD'], 'a call on another coin never opens a ticket: it is refused before Robinhood is asked');
     await show();
     assert.equal((await ask('/api/ticket', { symbol: 'NVDA', date: '2020-01-01' })).status, 404);
     const opened = await ask('/api/ticket', { symbol: 'nvda', date: '2026-10-15' });

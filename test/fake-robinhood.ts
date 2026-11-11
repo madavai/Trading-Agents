@@ -39,12 +39,24 @@ export const MAIN = '5RH77001234', MAIN_RHS = '771001234', AGENTIC = '5RH8800432
 export const MAIN_TOTAL = '9112.50', AGENTIC_CASH = '2500.00';
 const answer = (data: unknown) => text({ data, guide: 'Present the accounts in a table and always confirm with the user.' });
 
+/** Robinhood's list of coins as the tests use it: Bitcoin and Ether tradable, a halted coin, and one shown for display only. */
+export const PAIRS = [
+  { id: 'pair-btc', symbol: 'BTC-USD', tradability: 'tradable', halted: false, display_only: false, market_orders_only: false, min_order_size: '0.000001', max_order_size: '20', min_order_quantity_increment: '0.00000001', min_order_price_increment: '0.01' },
+  { id: 'pair-eth', symbol: 'ETH-USD', tradability: 'tradable', halted: false, display_only: false, market_orders_only: false, min_order_size: '0.0001', max_order_size: '500', min_order_quantity_increment: '0.000001', min_order_price_increment: '0.01' },
+  { id: 'pair-doge', symbol: 'DOGE-USD', tradability: 'tradable', halted: true, display_only: false, market_orders_only: false, min_order_size: '1', max_order_size: '1000000', min_order_quantity_increment: '0.01', min_order_price_increment: '0.000001' },
+];
+/** The coin side of the pretend Robinhood. onboarded: whether a crypto account is open (true). pairs: its list of coins
+ *  (PAIRS). positions, orders: coins held and coin orders (none). quotes: mark prices by coin (BTC $82,000, any other
+ *  $3,000). previewAnswer, placeAnswer: what the coin check and the coin order answer in place of an echo; previewErrors:
+ *  problems the echo lists. previewed, placed: each call's arguments. */
+export interface Coins { onboarded?: boolean; pairs?: unknown[]; positions?: unknown[]; orders?: unknown[]; quotes?: Record<string, string>; previewAnswer?: unknown; previewErrors?: string[]; placeAnswer?: unknown; previewed?: Array<Record<string, unknown>>; placed?: Array<Record<string, unknown>> }
+
 /** Two live accounts (the default one, and the one agents may trade) and a closed one; the default holds NVDA and AAPL. */
 /** quotesPerCall: Robinhood answers at most this many quotes an ask. placeWait: an order is answered only once it settles.
  *  placeAnswer: what Robinhood answers to an order, in place of a queued order. reviewAnswer: the same for its order check.
- *  prices: live prices by symbol, beside NVDA's $182.40 and $1.00 for any other. */
-export function accountTools(calls: string[], o: { approvalsOn?: boolean; orders?: unknown[]; reviewAlerts?: string[]; reviewed?: Array<Record<string, unknown>>; agenticBuyingPower?: string; placed?: Array<Record<string, unknown>>; agenticPositions?: unknown[]; quotesPerCall?: number; placeWait?: Promise<unknown>; placeAnswer?: unknown; reviewAnswer?: unknown; prices?: Record<string, string> } = {}): McpServer {
-  const s = new McpServer({ name: 'fake-robinhood-accounts', version: '0' });
+ *  prices: live prices by symbol, beside NVDA's $182.40 and $1.00 for any other. coin: the coin side (see Coins). */
+export function accountTools(calls: string[], o: { approvalsOn?: boolean; orders?: unknown[]; reviewAlerts?: string[]; reviewed?: Array<Record<string, unknown>>; agenticBuyingPower?: string; placed?: Array<Record<string, unknown>>; agenticPositions?: unknown[]; quotesPerCall?: number; placeWait?: Promise<unknown>; placeAnswer?: unknown; reviewAnswer?: unknown; prices?: Record<string, string>; coin?: Coins } = {}): McpServer {
+  const s = new McpServer({ name: 'fake-robinhood-accounts', version: '0' }), c = o.coin ?? {};
   const acct = { account_number: z.string() }, rhs = { rhs_account_number: z.string() };
   const reg = (name: string, readOnlyHint: boolean, run: (a: Record<string, unknown>) => unknown, inputSchema?: Record<string, z.ZodType>) => {
     const cb = async (a: unknown) => { calls.push(name); return answer(await run((a ?? {}) as Record<string, unknown>)); };
@@ -59,7 +71,21 @@ export function accountTools(calls: string[], o: { approvalsOn?: boolean; orders
     ? { total_value: MAIN_TOTAL, equity_value: '6009.50', crypto_value: '0', options_value: '0', cash: '3103.00', currency: 'USD', buying_power: { buying_power: '3103.00' } }
     : { total_value: AGENTIC_CASH, equity_value: '0', crypto_value: '0', options_value: '0', cash: AGENTIC_CASH, currency: 'USD', buying_power: { buying_power: o.agenticBuyingPower ?? 'not a number' } }), acct);
   reg('get_equity_positions', true, (a) => ({ positions: a.account_number === MAIN ? [{ symbol: 'NVDA', quantity: '20.0000', average_buy_price: '141.20' }, { symbol: 'AAPL', quantity: '10.0000', average_buy_price: '198.50' }, { symbol: 'ZERO', quantity: '0.0000' }] : o.agenticPositions ?? [] }), acct);
-  reg('get_crypto_positions', true, () => ({ results: [] }), rhs);
+  reg('get_crypto_positions', true, () => ({ results: c.positions ?? [] }), rhs);
+  // Coins, as Robinhood's tools describe them (discover --full, 11 Nov 2026): its list of coins with each one's order rules,
+  // whether a crypto account is open, live coin prices (mark price), coin orders (all, or the open ones), the coin check
+  // (preview) and the coin order. The answer shapes of the last four are made up: Robinhood's own were not seen.
+  reg('get_crypto_account_onboarding_info', true, () => ({ already_onboarded: c.onboarded ?? true }));
+  reg('get_currency_pairs', true, () => ({ results: c.pairs ?? PAIRS, next: null }), { limit: z.number().optional(), cursor: z.string().optional() });
+  reg('get_crypto_quotes', true, (a) => ({ results: (a.symbols as string[]).map((symbol) => ({ symbol, mark_price: c.quotes?.[symbol] ?? (symbol === 'BTC-USD' ? '82000.00' : '3000.00') })) }), { symbols: z.array(z.string()), rhs_account_number: z.string().optional() });
+  reg('get_crypto_orders', true, (a) => {
+    const all = c.orders ?? [], open = (x: unknown) => !/^(filled|cancel+ed|rejected|failed)$/.test(String((x as { state?: unknown }).state));
+    const since = typeof a.created_at_gte === 'string' ? Date.parse(a.created_at_gte) : null;
+    return { results: all.filter((x) => (a.state_group === 'open' ? open(x) : true) && (since === null || Date.parse(String((x as { created_at?: unknown }).created_at)) >= since)), next: null };
+  }, { ...rhs, state_group: z.string().optional(), created_at_gte: z.string().optional(), cursor: z.string().optional() });
+  const coinArgs = { ...rhs, symbol: z.string(), side: z.string(), type: z.string(), quantity: z.string().optional(), dollar_amount: z.string().optional(), limit_price: z.string().optional(), time_in_force: z.string() };
+  reg('preview_crypto_order', false, (a) => { c.previewed?.push(a); if (c.previewAnswer !== undefined) return c.previewAnswer; return { side: a.side, quantity: a.quantity, type: a.type, limit_price: a.limit_price, estimated_cost: (Number(a.quantity) * Number(a.limit_price)).toFixed(2), fees: '0.00', errors: c.previewErrors ?? [] }; }, coinArgs);
+  reg('place_crypto_order', false, (a) => { c.placed?.push(a); if (c.placeAnswer !== undefined) return c.placeAnswer; return { id: '7a2d3c4e-0000-4000-8000-00000000c01e', state: 'unconfirmed', side: a.side, quantity: a.quantity, price: a.limit_price }; }, { ...coinArgs, ref_id: z.string() });
   reg('get_equity_quotes', true, (a) => ({ results: (a.symbols as string[]).slice(0, o.quotesPerCall ?? Infinity).filter((x) => x !== 'AAPL').map((symbol) => ({ quote: { symbol, last_trade_price: o.prices?.[symbol] ?? (symbol === 'NVDA' ? '182.40' : '1.00') } })) }), { symbols: z.array(z.string()) });
   reg('get_equity_orders', true, () => ({ orders: o.orders ?? [] }), acct);
   reg('get_trade_approval_setting', true, (a) => ({ setting: { account_number: a.account_number, human_must_approve_trades: o.approvalsOn ?? true } }), acct);

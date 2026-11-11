@@ -19,7 +19,7 @@ import { latestState } from '../data/market.js';
 import { addDays, marketDay } from '../data/dates.js';
 import { readContactEmail, saveContactEmail } from '../contact.js';
 import { followed, paperBook, readPaperStart, recordOf, RECORD_WEEKS, RECORD_WORDS, savePaperStart, type Closes, type Dividends, type PaperBook } from '../desk/paper.js';
-import { isCrypto, safeSymbol } from '../data/symbols.js';
+import { cryptoBase, isCrypto, safeSymbol } from '../data/symbols.js';
 import { dashboardKeyFile, deskDataDir, robinhoodFile } from '../paths.js';
 import { writePrivate } from '../private.js';
 import { AnswerLost, Link, plainFailure, type Snapshot } from '../robinhood/link.js';
@@ -28,7 +28,7 @@ import { careOf, deskSymbol, stopIn, toWatch, watched, type HoldingCare, type Wa
 import { lastBuy, logOrder, placedToday, unanswered, type SentOrder } from '../desk/orders.js';
 import { Sectors } from '../desk/sectors.js';
 export { placedToday };
-import { check, edit, passes, propose, proposeOwn, type Check, type Order, type Proposal, type TicketContext } from '../desk/ticket.js';
+import { check, coinAmount, edit, passes, propose, proposeOwn, TICKET_COINS, type Check, type Order, type Proposal, type TicketContext } from '../desk/ticket.js';
 import type { Review } from '../robinhood/review.js';
 import type { Placed } from '../robinhood/order.js';
 import { Journal } from '../desk/journal.js';
@@ -78,6 +78,8 @@ const REVIEW_MS = 5 * 60_000;
 export const confirmWords = (o: Pick<Order, 'side' | 'quantity' | 'symbol' | 'limitPrice' | 'market' | 'dollars'>): string => {
   const side = o.side === 'buy' ? 'Buy' : 'Sell';
   if (o.market) return o.side === 'buy' && typeof o.dollars === 'number' ? `${side} $${o.dollars.toFixed(2)} of ${o.symbol} at the market price` : `${side} ${o.quantity} ${o.symbol} at the market price`;
+  // A coin by its amount in coins, as Robinhood says it: "Buy 0.00001031 BTC at $97000.00".
+  if (isCrypto(o.symbol)) return `${side} ${coinAmount(o.quantity)} ${cryptoBase(o.symbol) ?? o.symbol} at $${o.limitPrice.toFixed(2)}`;
   return `${side} ${o.quantity} ${o.symbol} at $${o.limitPrice.toFixed(2)}`;
 };
 
@@ -98,11 +100,12 @@ const SECURITY = {
 
 class Refused extends Error { constructor(readonly status: number, message: string) { super(message); } }
 
-/** Robinhood's agent doorway trades stocks and funds only: an index cannot be bought, and crypto is followed on paper.
- *  Asked when a ticket opens and again before Robinhood checks or places it, before anything reaches Robinhood. */
+/** What a ticket may trade: stocks and funds, and among coins Bitcoin and Ether (each then checked live against
+ *  Robinhood's list of coins); never an index, a future or a currency. Asked when a ticket opens and again before
+ *  Robinhood checks or places it, before anything reaches Robinhood. */
 function tradable(symbol: string): void {
-  if (isCrypto(symbol)) throw new Refused(400, `Robinhood's agent doorway trades stocks and funds only: ${symbol} is crypto, which the desk follows on paper`);
-  if (/[\^=]/.test(symbol)) throw new Refused(400, 'the order ticket trades stocks and funds only, not indices, futures or currencies');
+  if (isCrypto(symbol) && !TICKET_COINS.has(symbol)) throw new Refused(400, `among coins, the order ticket trades only Bitcoin (BTC-USD) and Ether (ETH-USD), not ${symbol}`);
+  if (/[\^=]/.test(symbol)) throw new Refused(400, 'the order ticket trades stocks, funds and coins only, not indices, futures or currencies');
 }
 
 /** A short fingerprint of the dashboard's own code on disk. When an update changes it, the running dashboard is old. */
@@ -244,7 +247,11 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
     const positions = [...(c.positions ?? []), ...(c.openBuys ?? []).map((o) => ({ ...o, open: true }))], bought = lastBuy(dir, c.symbol, new Date());
     return { ...c, ordersToday: Math.max(c.ordersToday, placedToday(dir, new Date())), sector: sectors.context(c.symbol, positions), ...(bought ? bought : {}) };
   };
-  const limited = async (c: TicketContext): Promise<TicketContext> => { await sectors.warm([c.symbol, ...(c.positions ?? []).map((p) => p.symbol), ...(c.openBuys ?? []).map((p) => p.symbol)]); return limitedNow(c); };
+  const limited = async (c: TicketContext): Promise<TicketContext> => {
+    // A coin is in no sector: crypto has a limit of its own (ticket.ts), so no sector is looked up for it.
+    if (isCrypto(c.symbol)) { const bought = lastBuy(dir, c.symbol, new Date()); return { ...c, ordersToday: Math.max(c.ordersToday, placedToday(dir, new Date())), ...(bought ? bought : {}) }; }
+    await sectors.warm([c.symbol, ...(c.positions ?? []).map((p) => p.symbol), ...(c.openBuys ?? []).map((p) => p.symbol)]); return limitedNow(c);
+  };
   /** An order of the stock sent from here in the last week whose answer was not clear: a new ticket says so first. */
   const lostWords = (symbol: string): string | null => {
     const o = unanswered(dir, symbol, new Date());
@@ -288,7 +295,7 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
   // Robinhood's failures are told in plain words; one of the person's own choices that is refused says why. When an
   // order was on its way, `nothingSent` adds that nothing went to Robinhood (only said when that is so).
   const refusalOf = (e: unknown, nothingSent = false): Refused => {
-    const m = e instanceof Error ? e.message : '', own = /not one of your Robinhood accounts|show your Agentic account|not the Agentic account|not complete, so it was not sent|no longer passes on Robinhood's latest figures|trading is switched off|trading switched itself off/.test(m);
+    const m = e instanceof Error ? e.message : '', own = /not one of your Robinhood accounts|show your Agentic account|not the Agentic account|not complete, so it was not sent|no longer passes on Robinhood's latest figures|trading is switched off|trading switched itself off|Nothing was sent\.$/.test(m);
     return new Refused(own ? 400 : 502, own ? m : `${plainFailure(e)}${nothingSent ? ' Nothing was sent.' : ''}`);
   };
   const askRobinhood = async <T>(job: () => Promise<T>): Promise<T> => {

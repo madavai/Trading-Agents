@@ -62,6 +62,32 @@ test('an account is read whole: priced at Robinhood\'s live quotes, a missing pr
   await close();
 });
 
+test('the Agentic account\'s coins: held coins priced at Robinhood\'s coin prices, its coin orders newest first, and the ones still open read apart, each with the day it was placed', async () => {
+  const order = (id: string, state: string, created_at: string, x: Record<string, unknown> = {}) => ({ id, side: 'buy', type: 'limit', state, quantity: '0.001', price: '75000.00', cumulative_quantity: '0', created_at, ...x });
+  const coin = {
+    positions: [{ currency: { code: 'BTC' }, quantity: '0.002', average_cost: '70000' }],
+    orders: [
+      order('a', 'filled', '2026-11-01T10:00:00Z', { symbol: 'ETH-USD', cumulative_quantity: '0.001' }),
+      order('b', 'confirmed', '2026-10-20T10:00:00Z', { currency_pair_id: 'pair-btc' }),   // named only by Robinhood's id for the coin
+      order('c', 'partially_filled', '2026-11-10T10:00:00Z', { symbol: 'BTC-USD', side: 'sell', cumulative_quantity: '0.0004', price: '90000' }),
+    ],
+  };
+  const calls: string[] = [], { reader, close } = await inMemory(calls, { coin });
+  const accounts = parseAccounts((await reader.read('get_accounts')).data, 'secret'), main = accounts.find((a) => a.isDefault)!, agentic = accounts.find((a) => a.agentic)!;
+  const g = await readAccount(reader, agentic, agentic.ids);
+  assert.deepEqual(g.holdings.map((h) => [h.symbol, h.kind, h.quantity, h.price, h.value]), [['BTC', 'crypto', 0.002, 82_000, 164]], 'priced at Robinhood\'s live coin price');
+  assert.deepEqual(g.coinOrders?.orders.map((o) => [o.symbol, o.state, o.at]), [['BTC-USD', 'partially_filled', '2026-11-10T10:00:00Z'], ['ETH-USD', 'filled', '2026-11-01T10:00:00Z'], ['BTC-USD', 'confirmed', '2026-10-20T10:00:00Z']], 'newest first');
+  assert.deepEqual(g.coinOrders?.open, [
+    { symbol: 'BTC-USD', side: 'buy', quantity: 0.001, price: 75_000, at: '2026-10-20T10:00:00Z' },
+    { symbol: 'BTC-USD', side: 'sell', quantity: 0.0006, price: 90_000, at: '2026-11-10T10:00:00Z' },
+  ], 'what is left to fill of each, with the day it was placed');
+  assert.deepEqual([g.coinOrders?.count, g.coinOrders?.more, g.coinOrders?.openComplete], [3, false, true]);
+  assert.deepEqual(g.problems, []);
+  assert.equal((await readAccount(reader, main, main.ids)).coinOrders, undefined, 'coin orders are read for the Agentic account only');
+  assert.ok(!calls.some((c) => /^(place|preview|cancel)_/.test(c)), 'reading places nothing');
+  await close();
+});
+
 let fake: Fake, file: string, port: number;
 beforeEach(async () => { fake = await fakeRobinhood((calls) => accountTools(calls, { orders: [{ symbol: 'nvda', side: 'buy', type: 'limit', state: 'filled', quantity: '2', average_price: '180.10', created_at: '2026-10-15T14:00:00Z' }] })); port = await freePort(); file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ta-acct-')), 'sign-in.json'); });
 afterEach(async () => { await fake.close(); });
