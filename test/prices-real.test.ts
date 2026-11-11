@@ -48,7 +48,7 @@ test('audit 2 P12: the same tool server read at 13:00 and again at 17:00 shows t
   last = 186.64;
   at('2026-11-06T22:00:00Z');   // 17:00, the same tool server, the source now has the close
   const second = await verifiedSnapshot('NVDA', DAY);
-  assert.match(second, /- The latest row, 2026-11-06, is a finished session: its figures are final\./);
+  assert.match(second, /- The latest row, 2026-11-06, is a finished session: its close is final\. Its open, high, low and volume are as the source first reported them/);
   assert.match(second, /\n\| Close \| 186\.64 \|/);
   assert.doesNotMatch(second, /180\.01/, 'the 13:00 price is gone once its kept copy is older than the source\'s own five minutes');
 });
@@ -59,12 +59,15 @@ test('audit 2 P12: rows read before the close was final are the latest price as 
   const during = latestState({ ...s, fetchedAt: Date.parse('2026-11-06T18:00:00Z') }, DAY, after);
   assert.equal(during.open, true);
   assert.equal(during.label, 'Latest price (read at 13:00 America/New_York time, not the close)');
-  assert.match(during.lines[0]!, /^- \*\*The latest row, 2026-11-06, was read at 13:00 America\/New_York time, while its session was still trading \(it ended at 16:00 America\/New_York time, and its figures are taken as final 15 minutes after\)\. Its "close" is the latest price as read then, not the close/);
+  assert.match(during.lines[0]!, /^- \*\*The latest row, 2026-11-06, was read at 13:00 America\/New_York time, while its session was still trading \(it ended at 16:00 America\/New_York time, and its close is taken as final 15 minutes after\)\. Its "close" is the latest price as read then, not the close/);
   const soon = latestState({ ...s, fetchedAt: CLOSE + 5 * 60_000 }, DAY, after);
   assert.equal(soon.open, true);
   assert.match(soon.lines[0]!, /was read at 16:05 America\/New_York time, just after its session ended/);
   const settled = latestState({ ...s, fetchedAt: CLOSE + 20 * 60_000 }, DAY, after);
-  assert.deepEqual([settled.open, settled.label, settled.lines], [false, 'Close', ['- The latest row, 2026-11-06, is a finished session: its figures are final.']]);
+  assert.deepEqual([settled.open, settled.label], [false, 'Close']);
+  assert.match(settled.lines[0]!, /^- The latest row, 2026-11-06, is a finished session: its close is final\. Its open, high, low and volume are as the source first reported them/);
+  const morning = latestState({ ...s, fetchedAt: CLOSE + 16 * 3_600_000 }, DAY, CLOSE + 17 * 3_600_000);
+  assert.deepEqual(morning.lines, ['- The latest row, 2026-11-06, is a finished session: its figures are final.']);
 });
 
 test('audit 2 P12: a price series is kept in memory no longer than on disk, and says when it was read', async () => {
