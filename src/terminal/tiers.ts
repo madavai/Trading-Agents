@@ -1,8 +1,8 @@
-// The world in tiers, as the dashboard shows it: the whole market (a few broad funds, the person's to change), the eleven
-// S&P sector funds, single names, and crypto, broadest first, so the page itself points a beginner to broad, cheaper risk
-// before single companies. Each tier, each broad fund and each sector fund has a name and a one-line meaning in plain
-// words. "Start here" shows the first two whole and the person's own names after them; the watchlist is grouped the same way.
-import { isCrypto, safeSymbol } from '../data/symbols.js';
+// The world in tiers, as the dashboard shows it: the whole market (a few broad funds), the eleven S&P sector funds, single
+// names, and crypto, broadest first, so the page itself points a beginner to broad, cheaper risk before single companies.
+// Each tier, each broad fund and each sector fund has a name and a one-line meaning in plain words. The "Sectors" section
+// shows the eleven sector funds; the watchlist, which holds everything else the person follows, is grouped by tier.
+import { isCrypto } from '../data/symbols.js';
 import { followed } from '../desk/paper.js';
 import { MARKET_FUNDS, SECTOR_FUNDS } from '../desk/sectors.js';
 import type { WatchItem } from './store.js';
@@ -18,11 +18,10 @@ export const TIER_WORDS: Readonly<Record<Tier, { name: string; meaning: string }
   crypto: { name: 'Crypto', meaning: 'Coins such as Bitcoin, which swing far more than shares: the desk follows Bitcoin and Ether on paper only, never with an order, and no other coin.' },
 };
 
-/** The whole-market tier as shipped: the S&P 500, the Nasdaq 100, the whole world and US bonds. */
+/** The four broad funds an older version put in everyone's "whole market" row: the S&P 500, the Nasdaq 100, the whole world and
+ *  US bonds. That row is gone; a person who never changed it gets these four on their watchlist, once (prefs.ts
+ *  moveMarketToWatchlist). */
 export const SHIPPED_MARKET: readonly string[] = ['SPY', 'QQQ', 'VT', 'BND'];
-export const MAX_MARKET = 8;
-/** How many of the person's own names "Start here" shows in a tier; the rest are in the watchlist below it. */
-export const START_NAMES = 12;
 
 // A fund that copies an index is named as a fund ("S&P 500 fund"), so it is never taken for the index itself, which the
 // Markets cards show under the index's own name at about ten times the fund's price.
@@ -54,48 +53,24 @@ export const PLAIN: Readonly<Record<string, { name: string; meaning: string }>> 
   'ETH-USD': { name: 'Ether', meaning: 'the coin of the Ethereum network, the second largest' },
 };
 
-/** A ticker the person may put in the whole-market tier: a fund or a stock, spelled as Yahoo spells it. Crypto, indices,
- *  futures, currencies and the sector funds are refused, each in words: they have tiers of their own, or cannot be held. */
-export function marketSymbol(raw: unknown): string {
-  if (typeof raw !== 'string') throw new Error('a ticker is a word, such as SPY');
-  const s = safeSymbol(raw);
-  if (isCrypto(s)) throw new Error(`${s} is crypto, which has a tier of its own`);
-  if (/[\^=]/.test(s)) throw new Error(`${s} is an index, a future or a currency, which cannot be held: choose a fund that follows it, such as SPY`);
-  if (SECTOR_FUNDS[s]) throw new Error(`${s} is a sector fund, already among the sectors`);
-  return s;
-}
-
-/** The person's whole-market list as kept: each a market ticker, once, at most eight; anything else is left out. */
-export function cleanMarket(raw: unknown): string[] | undefined {
-  if (!Array.isArray(raw)) return undefined;
-  const out: string[] = [];
-  for (const v of raw) {
-    if (out.length >= MAX_MARKET) break;
-    try { const s = marketSymbol(v); if (!out.includes(s)) out.push(s); } catch { /* left out */ }
-  }
-  return out;
-}
-
 /** Whether an order ticket can open for it: Robinhood's agent doorway trades stocks and funds, never crypto or an index,
  *  a future or a currency (the dashboard's server refuses those at every ticket door too). */
 export const ticketable = (symbol: string): boolean => !isCrypto(symbol) && !/[\^=]/.test(symbol);
 
-export const isShipped = (list: readonly string[]): boolean => list.length === SHIPPED_MARKET.length && list.every((s, i) => s === SHIPPED_MARKET[i]);
-
-/** The tier a symbol belongs to: crypto, a sector fund, the whole market (a broad fund, one in the person's list, or an
- *  index), else a single name. */
-export function tierOf(symbol: string, market: readonly string[] = SHIPPED_MARKET): Tier {
+/** The tier a symbol belongs to: crypto, a sector fund, the whole market (a broad fund the desk lists in desk/sectors.ts, or an
+ *  index), else a single name (one company, or a narrower fund). */
+export function tierOf(symbol: string): Tier {
   if (isCrypto(symbol)) return 'crypto';
   if (SECTOR_FUNDS[symbol]) return 'sectors';
-  if (symbol.startsWith('^') || MARKET_FUNDS.has(symbol) || market.includes(symbol)) return 'market';
+  if (symbol.startsWith('^') || MARKET_FUNDS.has(symbol)) return 'market';
   return 'names';
 }
 
-/** What "Worth a look today" looks at: the whole-market funds, the eleven sector funds and the watchlist; news is read
- *  for the single names and the coins alone (a fund is seldom in the news by its ticker). */
-export function screenUniverse(watchlist: readonly WatchItem[], market: readonly string[]): { symbols: string[]; news: Set<string> } {
-  const symbols = [...new Set([...market, ...Object.keys(SECTOR_FUNDS), ...watchlist.map((w) => w.symbol)])];
-  return { symbols, news: new Set(watchlist.map((w) => w.symbol).filter((s) => { const t = tierOf(s, market); return t === 'names' || t === 'crypto'; })) };
+/** What "Worth a look today" looks at: the eleven sector funds and the watchlist (broad funds the person follows are on it);
+ *  news is read for the single names and the coins alone (a fund is seldom in the news by its ticker). */
+export function screenUniverse(watchlist: readonly WatchItem[]): { symbols: string[]; news: Set<string> } {
+  const symbols = [...new Set([...Object.keys(SECTOR_FUNDS), ...watchlist.map((w) => w.symbol)])];
+  return { symbols, news: new Set(watchlist.map((w) => w.symbol).filter((s) => { const t = tierOf(s); return t === 'names' || t === 'crypto'; })) };
 }
 
 export interface TierItem {
@@ -111,16 +86,12 @@ export interface TierItem {
   /** Can open an order ticket: Robinhood's agent doorway trades stocks and funds, never crypto or an index. */
   ticket: boolean;
 }
-export interface TierView {
-  tier: Tier; name: string; meaning: string; items: TierItem[];
-  /** How many more of the person's own names are on the watchlist than "Start here" shows. */
-  more?: number;
-}
+export interface TierView { tier: Tier; name: string; meaning: string; items: TierItem[] }
 
-/** "Start here" and the watchlist by tier, from the watchlist, the person's whole-market list and the desk's calls.
- *  Start here: the whole market and the eleven sectors always, then the person's single names (starred first, at most
- *  START_NAMES), then their crypto when they watch any. The watchlist: each tier it has something in, broadest first. */
-export function tiersOf(watchlist: readonly WatchItem[], market: readonly string[], calls: ReadonlyArray<{ ticker: string; date: string; rating: string }>): { startHere: TierView[]; watch: TierView[] } {
+/** The "Sectors" section and the watchlist by tier, from the watchlist and the desk's calls. Sectors (sent as `startHere`,
+ *  the section's old name): the eleven sector funds, always, whether watched or not. The watchlist: each tier it has
+ *  something in, broadest first, which is where the whole-market funds, single names and coins the person follows are. */
+export function tiersOf(watchlist: readonly WatchItem[], calls: ReadonlyArray<{ ticker: string; date: string; rating: string }>): { startHere: TierView[]; watch: TierView[] } {
   const latest = new Map<string, { rating: string; date: string }>();
   for (const c of calls) { const was = latest.get(c.ticker); if (!was || c.date > was.date) latest.set(c.ticker, { rating: c.rating, date: c.date }); }
   const watched = new Map(watchlist.map((w) => [w.symbol, w]));
@@ -131,14 +102,10 @@ export function tiersOf(watchlist: readonly WatchItem[], market: readonly string
       call: latest.get(symbol) ?? null, paper: followed(symbol), ticket: ticketable(symbol),
     };
   };
-  const view = (tier: Tier, symbols: readonly string[], more = 0): TierView => ({ tier, ...TIER_WORDS[tier], items: symbols.map(item), ...(more > 0 ? { more } : {}) });
-  const of = (t: Tier) => watchlist.filter((w) => tierOf(w.symbol, market) === t).map((w) => w.symbol);
-  const own = (t: Tier): TierView => {
-    const list = watchlist.filter((w) => tierOf(w.symbol, market) === t).sort((a, b) => Number(b.favourite) - Number(a.favourite)).map((w) => w.symbol);
-    return view(t, list.slice(0, START_NAMES), list.length - START_NAMES);
-  };
+  const view = (tier: Tier, symbols: readonly string[]): TierView => ({ tier, ...TIER_WORDS[tier], items: symbols.map(item) });
+  const of = (t: Tier) => watchlist.filter((w) => tierOf(w.symbol) === t).map((w) => w.symbol);
   return {
-    startHere: [view('market', market), view('sectors', Object.keys(SECTOR_FUNDS)), own('names'), ...(of('crypto').length ? [own('crypto')] : [])],
+    startHere: [view('sectors', Object.keys(SECTOR_FUNDS))],
     watch: TIERS.map((t) => view(t, of(t))).filter((v) => v.items.length > 0),
   };
 }

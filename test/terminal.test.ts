@@ -14,11 +14,11 @@ import { saveContactEmail } from '../src/contact.js';
 import { deskServer } from '../src/tools/server.js';
 import { clearQuotes, parseQuote, quote, quoteKind } from '../src/terminal/quotes.js';
 import { clearSearches, parseSearch } from '../src/terminal/search.js';
-import { MAX_RECENT, readPrefs, savePrefs } from '../src/terminal/prefs.js';
+import { MAX_RECENT, moveMarketToWatchlist, readPrefs, savePrefs } from '../src/terminal/prefs.js';
 import { scoredBy, scoringNote, scoringShort, summaryOf } from '../src/terminal/state.js';
 import { lockState } from '../src/private.js';
 import { startTerminal, type Assets, type Terminal } from '../src/terminal/server.js';
-import { MAX_WATCH, addWatch } from '../src/terminal/store.js';
+import { MAX_WATCH, addWatch, readWatchlist, removeWatch, setFavourite } from '../src/terminal/store.js';
 import { enqueue, MAX_OPEN, readDoorbell, writeListener } from '../src/desk/queue.js';
 import { chartJson, series, weekdays, type Row } from './chart.js';
 import { readScreen } from '../src/desk/screen.js';
@@ -64,6 +64,9 @@ beforeEach(async () => {
   clearCache(); clearQuotes(); configure({ fetch: yahoo, secEmail: '' });
   root = fs.mkdtempSync(path.join(os.tmpdir(), 'ta-term-'));
   fs.copyFileSync('desk-settings.json', path.join(root, 'desk-settings.json'));
+  // the older whole-market row's funds are already on this desk's watchlist (the move is its own test): most tests start from an empty one
+  fs.mkdirSync(dir(), { recursive: true });
+  fs.writeFileSync(path.join(dir(), 'dashboard.json'), JSON.stringify({ marketMoved: true }));
   term = await startTerminal({ root, assets: ASSETS, port: 0, keyFile: KEYS() });
 });
 afterEach(async () => { await term.close(); });
@@ -381,13 +384,13 @@ test('a name or a ticker finds what Yahoo lists: ticker, name, market and kind, 
 });
 
 test('what the person chose is remembered in desk-data, each in its own shape, and nothing about an order', async () => {
-  assert.deepEqual((await call(term, 'GET', '/api/prefs')).json(), {});
+  assert.deepEqual((await call(term, 'GET', '/api/prefs')).json(), { marketMoved: true }, 'only the mark of the whole-market move, which this desk had done before the test began');
   const saved = (await call(term, 'POST', '/api/prefs', { body: {
     theme: 'dark', side: 'folded', view: 'account', symbol: 'nvda', range: '1Y', kind: 'candles', layers: { ma50: false, ma200: true, vol: true },
     recent: [{ symbol: 'tsla', name: 'Tesla, <b>Inc.</b>' }, { symbol: 'TSLA', name: 'again' }, { symbol: '../x', name: 'bad' }, { symbol: 'AAPL' }],
     ticket: { quantity: 5 }, confirm: 'Buy 5 NVDA at $1.00', trading: true,
   } })).json();
-  assert.deepEqual(saved, { theme: 'dark', side: 'folded', view: 'account', symbol: 'NVDA', range: '1Y', kind: 'candles', layers: { ma50: false, ma200: true, vol: true }, recent: [{ symbol: 'TSLA', name: 'Tesla, Inc.' }, { symbol: 'AAPL', name: 'AAPL' }] });
+  assert.deepEqual(saved, { theme: 'dark', side: 'folded', view: 'account', symbol: 'NVDA', range: '1Y', kind: 'candles', layers: { ma50: false, ma200: true, vol: true }, recent: [{ symbol: 'TSLA', name: 'Tesla, Inc.' }, { symbol: 'AAPL', name: 'AAPL' }], marketMoved: true });
   const next = (await call(term, 'POST', '/api/prefs', { body: { theme: 'purple', range: '10Y', side: 'open', layers: { ma50: 'yes' } } })).json();
   assert.deepEqual([next.theme, next.range, next.side, next.layers.ma50], ['dark', '1Y', 'open', false], 'a value it does not know leaves the one before');
   assert.equal((await call(term, 'POST', '/api/prefs', { body: { view: 'today' } })).json().view, 'today', "Today's market is a page it remembers");
@@ -395,7 +398,7 @@ test('what the person chose is remembered in desk-data, each in its own shape, a
   assert.equal((await call(term, 'POST', '/api/prefs', { body: { view: 'tomorrow' } })).json().view, 'score', 'a page it does not know leaves the one before');
   assert.equal((await call(term, 'POST', '/api/prefs', { body: { view: 'account' } })).json().view, 'account');
   const file = JSON.parse(fs.readFileSync(path.join(dir(), 'dashboard.json'), 'utf8'));
-  assert.deepEqual(Object.keys(file).sort(), ['kind', 'layers', 'range', 'recent', 'side', 'symbol', 'theme', 'view']);
+  assert.deepEqual(Object.keys(file).sort(), ['kind', 'layers', 'marketMoved', 'range', 'recent', 'side', 'symbol', 'theme', 'view']);
   const again = await startTerminal({ root, assets: ASSETS, port: 0, keyFile: KEYS() });   // another start, or another browser, finds it as it was left
   try { assert.equal((await call(again, 'GET', '/api/prefs')).json().symbol, 'NVDA'); } finally { await again.close(); }
   const many = Array.from({ length: 9 }, (_, i) => ({ symbol: `S${i}`, name: '' }));
@@ -404,52 +407,86 @@ test('what the person chose is remembered in desk-data, each in its own shape, a
   assert.equal((await call(term, 'POST', '/api/prefs', { body: { theme: 'light' }, token: false })).status, 401);
 });
 
-test('Start here is in the page\'s state: the whole market, the eleven sectors and the person\'s own names, each with the desk\'s latest call; and the watchlist by tier', async () => {
+test('Sectors is in the page\'s state: the eleven sector funds, each with the desk\'s latest call; the watchlist by tier holds the whole-market funds, the names and the coins', async () => {
   const empty = (await call(term, 'GET', '/api/state')).json();
-  assert.deepEqual(empty.startHere.map((t: any) => [t.tier, t.items.length]), [['market', 4], ['sectors', 11], ['names', 0]]);
+  assert.deepEqual(empty.startHere.map((t: any) => [t.tier, t.items.length]), [['sectors', 11]], 'no whole-market row, no single names, no coins');
   assert.deepEqual(empty.watchTiers, []);
-  assert.deepEqual(empty.market, { symbols: ['SPY', 'QQQ', 'VT', 'BND'], asShipped: true, shipped: ['SPY', 'QQQ', 'VT', 'BND'], max: 8 });
+  assert.equal('market' in empty, false, 'the page is sent no whole-market list any more');
   for (const s of ['NVDA', 'XLE', 'BTC-USD', 'SPY']) await call(term, 'POST', '/api/watchlist', { body: { symbol: s } });
   const j = new Journal(path.join(dir(), 'journal.md'));
   j.storeDecision('XLE', '2026-10-09', '**Rating**: Underweight\n\n**Executive Summary**: Lighten up.');
   j.storeDecision('BTC-USD', '2026-10-09', '**Rating**: Buy\n\n**Executive Summary**: A small coin position.');
   const s = (await call(term, 'GET', '/api/state')).json();
-  assert.deepEqual(s.startHere.map((t: any) => t.tier), ['market', 'sectors', 'names', 'crypto']);
-  const xle = s.startHere[1].items.find((i: any) => i.symbol === 'XLE');
+  assert.deepEqual(s.startHere.map((t: any) => t.tier), ['sectors']);
+  const xle = s.startHere[0].items.find((i: any) => i.symbol === 'XLE');
   assert.deepEqual([xle.name, xle.call, xle.watched], ['Energy', { rating: 'Underweight', date: '2026-10-09' }, true]);
-  assert.equal(s.startHere[0].items.find((i: any) => i.symbol === 'QQQ').call, null, 'no call yet: none, never made up');
+  assert.equal(s.startHere[0].items.find((i: any) => i.symbol === 'XLK').call, null, 'no call yet: none, never made up');
   assert.deepEqual(s.watchTiers.map((t: any) => [t.tier, t.items.map((i: any) => i.symbol)]), [['market', ['SPY']], ['sectors', ['XLE']], ['names', ['NVDA']], ['crypto', ['BTC-USD']]]);
   const coin = s.calls.find((c: any) => c.ticker === 'BTC-USD');
   assert.deepEqual([coin.ticket, coin.paper], [false, true], 'a call on a coin offers no order ticket: it is followed on paper');
   assert.deepEqual(s.calls.filter((c: any) => c.ticker === 'XLE').map((c: any) => c.ticket), [true]);
 });
 
-test('the whole-market funds are the person\'s to change, each a fund Yahoo prices, checked before it is kept; only the whole-market row\'s own save sets them', async () => {
-  const set = (symbols: unknown, o: Parameters<typeof call>[3] = {}) => call(term, 'POST', '/api/tiers/market', { body: { symbols }, ...o });
-  for (const [symbols, status, why] of [
-    [['SPY', 'BTC-USD'], 400, /BTC-USD is crypto/], [['XLK'], 400, /XLK is a sector fund/], [['^GSPC'], 400, /cannot be held/], [['../x'], 400, /not a ticker/],
-    [Array.from({ length: 9 }, (_, i) => `F${i}`), 400, /up to 8 funds/], ['SPY', 400, /up to 8 funds/], [['SPY', 'ZZZZ'], 422, /no price for ZZZZ/],
-  ] as const) {
-    const r = await set(symbols);
-    assert.deepEqual([r.status, why.test(r.json().error)], [status, true], JSON.stringify(symbols));
-  }
-  assert.equal(fs.existsSync(path.join(dir(), 'dashboard.json')), false, 'nothing refused is kept');
-  assert.equal((await set(['VTI'], { token: false })).status, 401);
-  assert.equal((await set(['VTI'], { headers: { origin: 'https://evil.example' } })).status, 403);
-  const v1 = (await call(term, 'GET', '/api/version')).json().version;
-  const ok = await set(['vti', 'VT', 'vti', 'DOWN']);
-  assert.deepEqual([ok.status, ok.json().market.symbols, ok.json().market.asShipped], [200, ['VTI', 'VT', 'DOWN'], false], 'each once; Yahoo down cannot be checked, so it is kept and shown unavailable');
-  assert.notEqual((await call(term, 'GET', '/api/version')).json().version, v1, 'the page hears of the change');
-  const s = (await call(term, 'GET', '/api/state')).json();
-  assert.deepEqual(s.startHere[0].items.map((i: any) => [i.symbol, i.name ?? null]), [['VTI', 'The whole US market'], ['VT', 'The whole world'], ['DOWN', null]]);
-  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir(), 'dashboard.json'), 'utf8')).market, ['VTI', 'VT', 'DOWN']);
-  await call(term, 'POST', '/api/prefs', { body: { market: ['BND'], theme: 'light' } });
-  assert.deepEqual((await call(term, 'GET', '/api/prefs')).json().market, ['VTI', 'VT', 'DOWN'], 'the page\'s other choices never change the whole market');
-  assert.deepEqual((await set([])).json().market.symbols, [], 'none at all is the person\'s choice');
-  const back = (await set(['SPY', 'QQQ', 'VT', 'BND'])).json().market;
-  assert.deepEqual([back.symbols, back.asShipped], [['SPY', 'QQQ', 'VT', 'BND'], true]);
+test('the whole-market row is gone: its address answers nothing, and nothing the page sends can set it', async () => {
+  const gone = await call(term, 'POST', '/api/tiers/market', { body: { symbols: ['VTI'] } });
+  assert.equal(gone.status, 404);
+  await call(term, 'POST', '/api/prefs', { body: { market: ['BND'], marketMoved: false, theme: 'light' } });
   const kept = JSON.parse(fs.readFileSync(path.join(dir(), 'dashboard.json'), 'utf8'));
-  assert.deepEqual(['market' in kept, kept.theme], [false, 'light'], 'the shipped four are kept as no list, so a later version\'s four reach the person');
+  assert.deepEqual([kept.theme, kept.marketMoved], ['light', true], 'the page\'s choices change neither the move\'s mark nor what it would move');
+  assert.equal(readPrefs(dir()).market, undefined, 'the page cannot hand the desk a list to move onto the watchlist');
+});
+
+/** A desk folder in its own root, with what an older version left in dashboard.json and the watchlist; the dashboard is started on it. */
+async function olderDesk(prefs: Record<string, unknown> | null, watchlist: string[] = []): Promise<{ at: string; stop: () => Promise<void>; list: () => string[]; stars: () => string[] }> {
+  const at = fs.mkdtempSync(path.join(os.tmpdir(), 'ta-older-')), data = path.join(at, 'desk-data');
+  fs.copyFileSync('desk-settings.json', path.join(at, 'desk-settings.json'));
+  fs.mkdirSync(data, { recursive: true });
+  if (prefs) fs.writeFileSync(path.join(data, 'dashboard.json'), JSON.stringify(prefs));
+  for (const [i, s] of watchlist.entries()) { addWatch(data, s, '2026-10-01'); if (i === 0) setFavourite(data, s, true); }
+  const t = await startTerminal({ root: at, assets: ASSETS, port: 0, keyFile: path.join(at, 'private', 'dashboard.json') });
+  return { at, stop: () => t.close(), list: () => readWatchlist(data).map((w) => w.symbol), stars: () => readWatchlist(data).filter((w) => w.favourite).map((w) => w.symbol) };
+}
+
+test('the whole-market funds an older version showed go on the watchlist once, when the dashboard starts: the shipped four for a row never changed, the person\'s own list otherwise', async () => {
+  // never changed: the four the older version showed, and nothing else of theirs is touched
+  const never = await olderDesk({ theme: 'light' });
+  try {
+    assert.deepEqual(never.list(), ['SPY', 'QQQ', 'VT', 'BND']);
+    assert.deepEqual(readPrefs(path.join(never.at, 'desk-data')), { theme: 'light', marketMoved: true });
+    // once: the person takes one off, and a later start does not put it back
+    removeWatch(path.join(never.at, 'desk-data'), 'SPY');
+  } finally { await never.stop(); }
+  const again = await startTerminal({ root: never.at, assets: ASSETS, port: 0, keyFile: path.join(never.at, 'private', 'dashboard.json') });
+  try { assert.deepEqual(readWatchlist(path.join(never.at, 'desk-data')).map((w) => w.symbol), ['QQQ', 'VT', 'BND'], 'moved once, never again'); } finally { await again.close(); }
+
+  // changed: their own funds, in their order, each once, after what they already watch; a fund already watched keeps its place and star
+  const own = await olderDesk({ market: ['VTI', 'schd', 'VT', 'VTI', 7, '../x'], view: 'score' }, ['VT', 'NVDA']);
+  try {
+    assert.deepEqual(own.list(), ['VT', 'NVDA', 'VTI', 'SCHD']);
+    assert.deepEqual(own.stars(), ['VT'], 'VT stays where it was, with its star');
+    assert.deepEqual(readPrefs(path.join(own.at, 'desk-data')), { view: 'score', marketMoved: true }, 'the old list is taken away once it is moved');
+  } finally { await own.stop(); }
+
+  // emptied: the person chose no funds, so none are added
+  const none = await olderDesk({ market: [] }, ['NVDA']);
+  try {
+    assert.deepEqual(none.list(), ['NVDA']);
+    assert.equal(readPrefs(path.join(none.at, 'desk-data')).marketMoved, true);
+  } finally { await none.stop(); }
+});
+
+test('moving the whole-market funds loses none: a full watchlist keeps the ones that do not fit until there is room, and the move is not marked done', () => {
+  const data = path.join(root, 'full');
+  for (let i = 0; i < MAX_WATCH - 1; i++) addWatch(data, `S${i}`, '2026-10-01');
+  savePrefs(data, { market: ['VTI', 'VT', 'BND'] });
+  assert.deepEqual(moveMarketToWatchlist(data, '2026-10-12'), ['VTI'], 'one place left');
+  assert.deepEqual(readPrefs(data), { market: ['VT', 'BND'] }, 'the rest wait, and the move is not marked done');
+  assert.deepEqual(moveMarketToWatchlist(data, '2026-10-12'), [], 'still full');
+  removeWatch(data, 'S0'); removeWatch(data, 'S1');
+  assert.deepEqual(moveMarketToWatchlist(data, '2026-10-12'), ['VT', 'BND'], 'with room, they go');
+  assert.deepEqual(readPrefs(data), { marketMoved: true });
+  assert.deepEqual(moveMarketToWatchlist(data, '2026-10-12'), [], 'done: nothing more to move');
+  assert.equal(readWatchlist(data).length, MAX_WATCH, 'S0 and S1 left; VTI, VT and BND joined');
 });
 
 test('which tiers of the watchlist are folded away is remembered, each one a tier the page knows', async () => {
@@ -491,7 +528,7 @@ test('"Worth a look today" is worked out from figures at most once an hour, kept
     ['TSLA', 'Fell 5.0%, a new 52-week low, crossed below its 50-day average, crossed below its 200-day average'],
     ['XLE', 'Rose 6.0%, a new 52-week high'], ['NVDA', 'In the news today (1 article)'],
   ]);
-  assert.deepEqual([first.screen.looked, first.screen.unavailable, first.screen.day], [18, ['DOWN'], '2026-10-12'], 'the four whole-market funds, the eleven sectors and the watchlist; one that does not answer is said to be unavailable');
+  assert.deepEqual([first.screen.looked, first.screen.unavailable, first.screen.day], [14, ['DOWN'], '2026-10-12'], 'the eleven sectors and the watchlist; one that does not answer is said to be unavailable');
   assert.deepEqual([first.morning, first.queued], [{ on: false, top: 3 }, []], 'off as shipped: nothing goes on the waiting list');
   assert.deepEqual(readScreen(dir())!.picks.map((p) => p.symbol), ['TSLA', 'XLE', 'NVDA'], 'kept for the morning routine');
   assert.ok(!asked.some((u) => u.includes('/search') && /q=(XLE|SPY)\b/.test(u)), 'news is read for companies and coins, not funds');

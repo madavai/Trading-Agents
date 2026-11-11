@@ -10,7 +10,6 @@ import { GLOSSARY, glossaryGroups, isTerm, means, type TermKey } from './glossar
 import { markdown } from './md.js';
 import { sameFigures, typedNumber, type Asked } from './typed.js';
 import { DEPTH_ORDER, DEPTH_WORDS, depthChoices, retryDepth } from './depth.js';
-import { marketOffer, type MarketOffer } from './marketpick.js';
 import { AT_ONCE_CHOICES, AT_ONCE_WHY, atOnceToast, isAtOnceChoice, isStale, paceWords, standing } from './analyses.js';
 import { cryptoBase, deskSymbol, isCrypto } from '../../data/symbols.js';
 import type { Quote, QuoteKind } from '../quotes.js';
@@ -222,8 +221,8 @@ function renderGuide(): void {
   const p = g.picks;
   const picks = guideStep(2, p.done, `Pick three to five ${term('stock', 'companies')} you know, plus the whole market and one or two ${term('sector', 'sectors')} you understand`,
     `<div class="at-row">${factChip(p.names >= p.need, `${Math.min(p.names, p.need)} of ${p.need} names`)}${factChip(p.market, p.market ? 'the whole market ✓' : 'the whole market')}${factChip(p.sector, p.sector ? 'a sector ✓' : 'a sector')}</div>
-    <p class="at-quiet ta-gwhy">Type a company you know in the search box at the top and press Add to watchlist. On Start here, press + on a whole-market ${term('fund', 'fund')} and on one or two sectors you understand. The desk suggests no company: the names are yours, and nothing here is investment advice.</p>
-    <div class="at-row ta-gwhy"><button class="at-btn at-press" data-act="goto" data-to="sec-start"><svg class="g"><use href="#i-layers"/></svg><span>Go to Start here</span></button></div>`);
+    <p class="at-quiet ta-gwhy">Type a company you know in the search box at the top and press Add to watchlist, and do the same for a broad ${term('fund', 'fund')} such as SPY (a fund for the whole market). In Sectors, press + on one or two you understand. The desk suggests no company: the names are yours, and nothing here is investment advice.</p>
+    <div class="at-row ta-gwhy"><button class="at-btn at-press" data-act="goto" data-to="sec-start"><svg class="g"><use href="#i-layers"/></svg><span>Go to Sectors</span></button></div>`);
 
   const a = g.analyse, ask = toAsk(), l = d!.analyses.listener;
   const analyse = guideStep(3, a.done, `Ask the desk to analyse them, ${term('depth', 'shallow')}, and switch on running automatically`,
@@ -1118,22 +1117,17 @@ function renderWatch(): void {
   }
 }
 
-// ---------- start here: the world in tiers, broadest first ----------
-/** The whole-market row is being saved: a second press waits, since each save sends the whole list as the page last read it. */
-const MK = { saving: false };
-const EMPTY: Partial<Record<Tier, string>> = {
-  market: 'The whole market is empty. Search a fund in the box at the top, such as SPY, and press Show in The whole market.',
-  names: 'No single names on your watchlist yet: search a company above to add one. Bitcoin and Ether can be watched too, on paper only.',
-};
+// ---------- sectors: the eleven parts of the economy, one fund each ----------
 
 /** What a badge is shaded by. With the price answer in, Yahoo's own word for it (the quote's kind: a company, a fund or a
- *  coin; an index or anything else says none), never a guess. Without a price (not asked yet, or it failed), a tile in "The
- *  whole market" or "Sectors" is a fund, as its row says, and anything else has no kind. */
+ *  coin; an index or anything else says none), never a guess. Without a price (not asked yet, or it failed), a symbol in the
+ *  tier "The whole market" or "Sectors" (the sector tiles, or the watchlist's rows of those tiers) is a fund, as the desk
+ *  files it, and anything else has no kind. */
 type Kind = QuoteKind | '';
 const kindOf = (sym: string, tier?: Tier): Kind => {
   const q = quoteOf(sym);
   if (q) return q.kind ?? '';
-  const at = tier ?? S.desk?.startHere.find((t) => (t.tier === 'market' || t.tier === 'sectors') && t.items.some((i) => i.symbol === sym))?.tier;
+  const at = tier ?? [...(S.desk?.startHere ?? []), ...(S.desk?.watchTiers ?? [])].find((t) => (t.tier === 'market' || t.tier === 'sectors') && t.items.some((i) => i.symbol === sym))?.tier;
   return at === 'market' || at === 'sectors' ? 'fund' : '';
 };
 /** The letters in a badge: the ticker up to a dash, dot or equals sign (BTC for BTC-USD, BRK for BRK-B), at most four. */
@@ -1153,36 +1147,28 @@ function tileWords(i: TierItem, name: string): string {
 }
 
 /** One tile, in three lines, the same on every tile: its plain name; its code (the badge) and today's move; then the desk's latest
- *  rating (or "no call") with the robot, + when it is not watched, and ✕ in The whole market, side by side. What leaves the tile is in its hover (tileWords), and a press charts it. A tile in "The
- *  whole market" also has ✕, which takes it out of that row (never off the watchlist). */
+ *  rating (or "no call") with the robot, and + when it is not watched, side by side. What leaves the tile is in its hover
+ *  (tileWords), and a press charts it. */
 function tierTile(i: TierItem, tier: Tier): string {
   const q = quoteOf(i.symbol), name = i.name ?? q?.name ?? i.symbol, words = esc(tileWords(i, name));
   const call = i.call ? ratingChip(i.call.rating) : `<span class="at-quiet" title="${esc(means('call'))}">no call</span>`;
-  const out = `Take ${i.symbol} out of The whole market`;
   const ask = (isIndex(i.symbol) ? '' : isOpen(i.symbol) ? openChip(i.symbol) : robot(i.symbol))
-    + (i.watched ? '' : `<button class="icon-btn" data-act="watch-add" data-symbol="${esc(i.symbol)}" title="Add ${esc(i.symbol)} to your watchlist" aria-label="Add ${esc(i.symbol)} to your watchlist"><svg class="g"><use href="#i-plus"/></svg></button>`)
-    + (tier === 'market' ? `<button class="icon-btn" data-act="mk-remove" data-symbol="${esc(i.symbol)}" title="${esc(out)}" aria-label="${esc(out)}"><svg class="g"><use href="#i-x"/></svg></button>` : '');
+    + (i.watched ? '' : `<button class="icon-btn" data-act="watch-add" data-symbol="${esc(i.symbol)}" title="Add ${esc(i.symbol)} to your watchlist" aria-label="Add ${esc(i.symbol)} to your watchlist"><svg class="g"><use href="#i-plus"/></svg></button>`);
   return `<div class="at-tile at-box ta-tier-tile${i.symbol === S.symbol ? ' on' : ''}" title="${words}">
     <button class="ta-tier-go" data-act="select" data-symbol="${esc(i.symbol)}" title="${words}"><b class="at-tile-name">${esc(name)}</b></button>
     <div class="ta-tile-row"><span class="ta-tile-id">${badge(i.symbol, kindOf(i.symbol, tier))}${changeChip(q)}</span><span class="ta-tile-rate">${call}</span><span class="at-tail">${ask}</span></div>
   </div>`;
 }
 
-function tierBlock(t: TierView, market: DeskState['market']): string {
-  // The row is changed from the search box at the top (Show in The whole market) and by ✕ on a tile; this puts the four the desk ships back.
-  const putBack = t.tier === 'market' && !market.asShipped ? `<button class="at-btn at-press" data-act="mk-shipped">Put back ${esc(listWords(market.shipped))}</button>` : '';
-  const name = t.tier === 'sectors' ? term('sector', t.name) : t.tier === 'crypto' ? term('crypto', t.name) : t.tier === 'names' ? term('stock', t.name) : esc(t.name);
-  const head = `<div class="ta-tier-head"><h3>${name}</h3><p class="at-quiet">${esc(t.meaning)}</p>${putBack}</div>`;
-  const body = t.items.length ? `<div class="at-deck ta-tier-deck">${t.items.map((i) => tierTile(i, t.tier)).join('')}</div>` : `<p class="at-quiet">${esc(EMPTY[t.tier] ?? '')}</p>`;
-  const how = t.tier === 'market' && t.items.length ? '<p class="at-quiet">✕ takes a fund out of this row. To add one, search for it in the box at the top and press Show in The whole market.</p>' : '';
-  const more = t.more ? `<div class="at-row"><button class="at-btn at-press" data-act="goto" data-to="sec-watch">${t.more} more on your watchlist</button></div>` : '';
-  return `<div class="ta-tier">${head}${body}${how}${more}</div>`;
+/** The Sectors section: the eleven sector funds as tiles. The section's own heading and line say what they are (index.html). */
+function tierBlock(t: TierView): string {
+  return `<div class="ta-tier"><div class="at-deck ta-tier-deck">${t.items.map((i) => tierTile(i, t.tier)).join('')}</div></div>`;
 }
 
 function renderStart(): void {
   const d = S.desk, el = $('#startHere');
   if (!d) { el.innerHTML = '<p class="at-quiet">Reading the desk\'s files.</p>'; return; }
-  el.innerHTML = d.startHere.map((t) => tierBlock(t, d.market)).join('')
+  el.innerHTML = d.startHere.map(tierBlock).join('')
     + `<p class="at-honest">${term('today')} is the change over the latest trading day; a dash is a price Yahoo Finance did not give. Each ${term('call', 'call')} is the desk's rating, Buy to Sell; a ${term('fund', 'fund')} holds many companies at once. Nothing here is investment advice.</p>`;
 }
 
@@ -1219,7 +1205,7 @@ function renderLook(): void {
   // No switch is drawn until the page knows whether it is on: one drawn "off" meanwhile would be pressed to turn it on.
   const sw = !MORNING.known ? `<p class="at-quiet">${MORNING.screenFailed ? 'Whether' : 'Reading whether'} "Analyse the top ${MORNING.top} each market morning" is on${MORNING.screenFailed ? ' could not be read just now' : ''}.</p>` : `<button class="at-toggle" data-act="morning-switch" role="switch" aria-checked="${MORNING.on}"><span class="at-switch${MORNING.on ? ' on' : ''}"></span><span>Analyse the top ${MORNING.top} each market morning</span></button>
     <p class="at-quiet">${MORNING.on ? `On${MORNING.from ? `, from ${esc(dayText(MORNING.from))}` : ''}: each market morning (before noon in New York), the top ${MORNING.top} not already called that day go on the waiting list at shallow depth, once. Each analysis is a full team run on the models of the app that runs it.` : `Off as shipped. When on, it starts the next market morning: then the top ${MORNING.top} go on the waiting list at shallow depth once each market morning, and run when something is listening. Switching it on puts nothing on the list at once.`}</p>`;
-  if (!s) { el.innerHTML = `${head}<p class="at-quiet">${esc(MORNING.screenFailed || "Looking over the whole market, the sectors and your names: the first look of the day takes a minute.")}</p>${sw}`; return; }
+  if (!s) { el.innerHTML = `${head}<p class="at-quiet">${esc(MORNING.screenFailed || "Looking over the sectors and your watchlist: the first look of the day takes a minute.")}</p>${sw}`; return; }
   const list = s.picks.length ? `<div class="ta-looks">${s.picks.map(lookRow).join('')}</div>`
     : `<p class="at-lede">Nothing stood out among the ${s.looked} looked at: no move of 3% or more, no volume twice its usual, no 52-week high or low, no cross of an average${!s.news?.read ? '' : s.news.unread.length ? ', and no news today about your other companies or coins' : ', and no news today about your companies or coins'}.</p>`;
   // a name whose news did not come is said as such, never counted as quiet
@@ -1240,22 +1226,6 @@ async function loadMorning(): Promise<void> {
     }, (e) => { MORNING.screenFailed = say(e); }),
   ]);
   renderMorning();
-}
-
-/** Keeps the whole-market row as the person changed it (a fund added from the search list, one taken out, the four put
- *  back), once the desk has checked each one's price. Each save sends the whole row as the page last read it, so a press
- *  made while one is being saved waits to be pressed again. */
-async function saveMarketList(symbols: string[]): Promise<void> {
-  if (MK.saving) { toast('The whole market is still being saved. Press again in a moment.', 'bad'); return; }
-  MK.saving = true;
-  try {
-    await run(async () => {
-      const { market } = await api.setMarket(symbols);
-      await refreshState();
-      void refreshQuotes();
-      toast(market.symbols.length ? `The whole market now shows ${listWords(market.symbols)}.` : 'The whole market shows no funds now.');
-    });
-  } finally { MK.saving = false; }
 }
 
 function renderCalls(): void {
@@ -1491,7 +1461,7 @@ function select(sym: string, chosen = true, name = ''): void {
   void refreshQuotes();
 }
 
-/** After a press on a tile or a row of the page (Start here, Markets, Worth a look, the watchlist), the chart comes into view
+/** After a press on a tile or a row of the page (Sectors, Markets, Worth a look, the watchlist), the chart comes into view
  *  unless all of it is on screen already. Smooth, but not for a person who asked for less motion. Only a press does this (and one
  *  on a star in the side list, which first goes back to the Overview from Your account): never the page opening, nor putting
  *  back the stock last charted. */
@@ -1528,7 +1498,7 @@ async function refreshState(): Promise<void> {
   } catch { S.lost = true; renderSub(); }
 }
 
-/** Every symbol "Start here" shows. */
+/** Every symbol the Sectors section shows. */
 const tierSymbols = (): string[] => (S.desk?.startHere ?? []).flatMap((t) => t.items.map((i) => i.symbol));
 /** What the desk says of a symbol in its tiers (its plain name, what it holds, whether paper follows it), if it is in one. */
 const tierItem = (sym: string): TierItem | undefined => [...(S.desk?.startHere ?? []), ...(S.desk?.watchTiers ?? [])].flatMap((t) => t.items).find((i) => i.symbol === sym);
@@ -1660,9 +1630,6 @@ document.addEventListener('click', (e) => {
       toast(!r.morning.on ? 'Switched off: nothing goes on the waiting list by itself.'
         : `Switched on: nothing is queued now. From ${r.morning.from ? dayText(r.morning.from) : 'the next market morning'}, the top ${r.morning.top} go on the waiting list at shallow depth each market morning.`);
     }); break;
-    case 'find-market': { const r = findRows()[Number(el.dataset.i)]; if (r) showInMarket(r); break; }
-    case 'mk-remove': if (S.desk) void saveMarketList(S.desk.market.symbols.filter((s) => s !== sym)); break;
-    case 'mk-shipped': void saveMarketList([...(S.desk?.market.shipped ?? [])]); break;
     case 'fav': void run(async () => { const on = !S.desk?.watchlist.find((w) => w.symbol === sym)?.favourite; await api.favourite(sym, on); await refreshState(); }); break;
     case 'remove': void run(async () => { await api.removeWatch(sym); await refreshState(); toast(`${sym} is off the watchlist.`); }); break;
     case 'analyse': ask(sym); break;
@@ -1730,26 +1697,6 @@ const findInput = $<HTMLInputElement>('#addInput');
 
 const findRows = (): FindRow[] => (F.mode === 'recent' ? P.recent ?? [] : F.mode === 'matches' || F.mode === 'loading' ? F.matches : []);
 
-/** What a match may do for "The whole market" row (ui/marketpick.ts), with the sector funds as the desk lists them. */
-function rowOffer(r: FindRow): MarketOffer {
-  const d = S.desk;
-  if (!d) return 'none';
-  return marketOffer(r, d.market.symbols, new Set(d.startHere.find((t) => t.tier === 'sectors')?.items.map((i) => i.symbol)), d.market.max);
-}
-const marketFull = (max: number): string => `The whole market already holds ${max} funds: take one out to make room.`;
-
-/** A fund the row can take gets two presses under its name: Add to watchlist (the same as pressing the row, left out when
- *  it is watched already) and Show in The whole market; a fund already in the row says so, and a full row says it is full. */
-function rowActions(r: FindRow, i: number, watched: boolean): string {
-  const offer = rowOffer(r);
-  if (offer === 'none') return '';
-  const add = watched ? '' : `<button type="button" class="at-btn at-press" data-act="find-pick" data-i="${i}">Add to watchlist</button>`;
-  const market = offer === 'show' ? `<button type="button" class="at-btn at-press" data-act="find-market" data-i="${i}">Show in The whole market</button>`
-    : offer === 'in' ? '<span class="at-chip">In The whole market</span>'
-    : `<span class="at-quiet">${esc(marketFull(S.desk!.market.max))}</span>`;
-  return `<span class="ta-opt-do">${add}${market}</span>`;
-}
-
 function findRow(r: FindRow, i: number): string {
   const watched = !!S.desk?.watchlist.some((w) => w.symbol === r.symbol), call = latestCall(r.symbol);
   const where = [r.exchange, r.kind].filter(Boolean).join(' · ');
@@ -1758,7 +1705,6 @@ function findRow(r: FindRow, i: number): string {
     <b class="ta-opt-sym">${esc(r.symbol)}</b>
     <span class="ta-opt-name"><span>${esc(name)}</span>${where ? `<small>${esc(where)}</small>` : ''}</span>
     <span class="ta-opt-tags">${call ? ratingChip(call.rating) : ''}${watched ? '<span class="at-chip">Watched</span>' : ''}</span>
-    ${rowActions(r, i, watched)}
   </li>`;
 }
 
@@ -1777,7 +1723,7 @@ function renderFind(): void {
   $('#findFoot').textContent = F.mode === 'failed' ? `Yahoo Finance's search did not answer. Press Enter to add “${F.query}” as a ticker.`
     : F.mode === 'matches' && !rows.length ? `Nothing matches “${F.query}” at Yahoo Finance. Check the spelling, or type the ticker.`
     : F.mode === 'recent' ? 'The stocks you looked at last. Type to search.'
-    : `From Yahoo Finance · ↑ ↓ to move · Enter to add${rows[F.active] && rowOffer(rows[F.active]!) === 'show' ? ' to your watchlist · Shift+Enter to show it in The whole market' : ''} · Esc to close`;
+    : 'From Yahoo Finance · ↑ ↓ to move · Enter to add to your watchlist · Esc to close';
   document.getElementById(`find-${F.active}`)?.scrollIntoView({ block: 'nearest' });
 }
 
@@ -1812,21 +1758,6 @@ function pick(r: FindRow): void {
   else { remember({ recent: withRecent(r.symbol, r.name) }); void addStock(r.symbol); }
 }
 
-/** A fund from the list put in "The whole market" row, which keeps it once the desk has checked its price. It is not put on
- *  the watchlist: that is the other press. Said in words when the row cannot take it (it is in the row, or the row is full). */
-function showInMarket(r: FindRow): void {
-  const d = S.desk, offer = rowOffer(r);
-  if (!d) return;
-  if (offer !== 'show') {
-    if (offer === 'in') toast(`${r.symbol} is already in The whole market.`);
-    else if (offer === 'full') toast(marketFull(d.market.max), 'bad');
-    return;
-  }
-  closeFind(true);
-  findInput.blur();
-  void saveMarketList([...d.market.symbols, r.symbol]);
-}
-
 findInput.addEventListener('input', () => {
   const q = findInput.value.trim();
   if (F.timer) { clearTimeout(F.timer); F.timer = null; }
@@ -1848,7 +1779,7 @@ findInput.addEventListener('keydown', (e) => {
     F.active = e.key === 'ArrowDown' ? (F.active + 1) % n : (F.active - 1 + n) % n;
     renderFind();
   } else if (e.key === 'Escape' && F.mode !== 'closed') { e.preventDefault(); closeFind(); }
-  else if (e.key === 'Enter' && F.active >= 0 && rows[F.active]) { e.preventDefault(); if (e.shiftKey) showInMarket(rows[F.active]!); else pick(rows[F.active]!); }
+  else if (e.key === 'Enter' && F.active >= 0 && rows[F.active]) { e.preventDefault(); pick(rows[F.active]!); }
 });
 // A press on the list must not take the focus from the box first, or the list would close before the press lands.
 $('#findPanel').addEventListener('mousedown', (e) => e.preventDefault());

@@ -2,11 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { guideOf, maskEmail, NAMES_TO_PICK, type GuideFacts } from '../src/terminal/guide.js';
 import { RECORD_WEEKS, RECORD_WORDS } from '../src/desk/paper.js';
-import { SHIPPED_MARKET } from '../src/terminal/tiers.js';
 import type { WatchItem } from '../src/terminal/store.js';
 
 const watch = (...symbols: string[]): WatchItem[] => symbols.map((symbol) => ({ symbol, favourite: false, addedOn: '2026-10-01' }));
-const none: GuideFacts = { email: '', watchlist: [], market: SHIPPED_MARKET, queue: [], calls: [], listener: null, readCall: false, record: { since: null, weeks: 0, calls: 0 } };
+const none: GuideFacts = { email: '', watchlist: [], queue: [], calls: [], listener: null, readCall: false, record: { since: null, weeks: 0, calls: 0 } };
 const ticks = (f: Partial<GuideFacts>) => { const g = guideOf({ ...none, ...f }); return [g.email.done, g.picks.done, g.analyse.done, g.read.done, g.paper.done]; };
 
 test('a newcomer sees the guide by itself, with nothing ticked; the owner with calls does not, until they open it', () => {
@@ -36,11 +35,11 @@ test('step two ticks once three names of the person\'s own, the whole market and
   assert.equal(guideOf({ ...none, watchlist: watch('NVDA', 'AAPL', 'KO', '^GSPC', 'XLK') }).picks.market, false, 'an index cannot be analysed or bought: it is not a pick');
   assert.equal(guideOf({ ...none, watchlist: watch('NVDA', 'AAPL', 'KO', 'SPY') }).picks.sector, false, 'no sector fund yet');
   assert.equal(guideOf({ ...none, watchlist: watch('BTC-USD', 'ETH-USD', 'SPY', 'XLE') }).picks.names, 0, 'coins are not names');
-  // the robot on Start here asks without the watchlist; a call counts too
+  // the robot on a sector tile asks without the watchlist; a call counts too
   const asked = guideOf({ ...none, watchlist: watch('NVDA', 'AAPL', 'KO'), queue: [{ symbol: 'VT' }], calls: [{ ticker: 'XLV', date: '2026-10-01', rating: 'Hold' }] });
   assert.deepEqual([asked.picks.market, asked.picks.sector, asked.picks.done], [true, true, true]);
   assert.equal(guideOf(none).picks.need, NAMES_TO_PICK);
-  assert.equal(guideOf({ ...none, market: ['VTI'], watchlist: watch('NVDA', 'AAPL', 'KO', 'VTI', 'XLK') }).picks.done, true, 'the person\'s own whole-market funds count');
+  assert.equal(guideOf({ ...none, watchlist: watch('NVDA', 'AAPL', 'KO', 'VTI', 'XLK') }).picks.done, true, 'a broad fund the person added from the search box counts as the whole market');
 });
 
 test('step three ticks once something was asked for and analyses run by themselves', () => {

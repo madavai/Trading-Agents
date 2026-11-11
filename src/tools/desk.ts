@@ -30,7 +30,7 @@ import { eveningBrief, morningBrief, type MorningLook } from '../desk/routine.js
 import { queueTop, readScreen, screenToday } from '../desk/screen.js';
 import { rerateWeekly, stopsAtClose } from '../desk/care.js';
 import { lastClose } from '../data/market.js';
-import { marketOf, readPrefs } from '../terminal/prefs.js';
+import { moveMarketToWatchlist, readPrefs } from '../terminal/prefs.js';
 import { readWatchlist } from '../terminal/store.js';
 import { screenUniverse } from '../terminal/tiers.js';
 
@@ -321,7 +321,10 @@ export function registerDeskTools(server: McpServer, root: string): void {
     if (open) {
       try { rerateWeekly(dir, day); } catch { /* the brief says the holdings due were not put on the list */ }   // Monday's re-rating first: what is held comes before what is worth a look
       try {
-        const { symbols, news } = screenUniverse(readWatchlist(dir), marketOf(dir));
+        // The funds of an older version's whole-market row go on the watchlist first (once; the dashboard does the same when it
+        // starts), so a routine that runs before the dashboard is restarted still looks at them.
+        try { moveMarketToWatchlist(dir, day); } catch { /* the dashboard tries again when it starts */ }
+        const { symbols, news } = screenUniverse(readWatchlist(dir));
         const worked = await screenToday(dir, symbols, news, day);
         if (on) queueTop(dir, worked, day, false, new Date(), readPrefs(dir).morningFrom);   // the routine analyses what waits itself: no doorbell
         look = { screen: readScreen(dir) ?? worked, on };

@@ -1013,9 +1013,6 @@ details[open] > .at-input.at-select { border-color: var(--accent); }
 .ta-opt-name > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
 .ta-opt-name > small { font-size: var(--size-small); color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ta-opt-tags { display: flex; align-items: center; gap: var(--space-1); }
-/* a fund the whole-market row can take: its two presses sit under its name, on a phone too (they are buttons, not a hover) */
-.ta-opt-do { grid-column: 2 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); min-width: 0; padding-bottom: var(--space-1); cursor: default; }
-@media (min-width: 641px) and (pointer: fine) { .ta-opt-do > .at-btn { height: var(--chip-height); padding: var(--chip-padding); } }   /* a mouse can hit the smaller button; a finger gets the full-height one */
 .ta-suggest-foot { flex-shrink: 0; padding: var(--space-1) var(--space-2) 0; border-top: 1px solid var(--line); font-size: var(--size-small); color: var(--text-3); }
 .ta-suggest-foot:empty { display: none; }
 @media (max-width: 640px) { .ta-opt { grid-template-columns: calc(var(--unit) * 18) minmax(0, 1fr); } .ta-opt-tags { display: none; } }
