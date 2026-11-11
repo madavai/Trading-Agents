@@ -1261,7 +1261,7 @@ b, strong { font-weight: var(--weight-semibold); }
     "about": "Routines are the desk's daily habits. The morning routine scores old calls, looks at what moved, analyses what you asked for and your starred companies, and lists the new calls to decide on; the evening wrap-up reports the day, first any holding that closed below its stop. Madav can run them on a schedule. They never place an order.",
     "before": "A few calls recorded (section B) and NVDA starred on your watchlist (C4).",
     "tests": [
-    { "id": "G1", "title": "The morning routine", "tags": [], "changed": "2026-11-09",
+    { "id": "G1", "title": "The morning routine", "tags": [], "changed": "2026-11-11",
       "about": "One prompt does a morning's work: at most five analyses, so it stays affordable.",
       "where": "Madav › Agent Studio › trading-desk › Put to work",
       "do": [
@@ -1272,7 +1272,8 @@ b, strong { font-weight: var(--weight-semibold); }
         "On a Monday (the Tuesday, when Monday is a New York market holiday) it first puts up to three of your holdings whose view is a week old on the waiting list (N6).",
         "On a day New York's market is closed, a weekend or one of its holidays such as Thanksgiving (26 Nov 2026), it only scores past calls: \"New York's market is closed today (<why>)\", with the next market day. After \"Analyse nothing today\" it names no company to analyse; what is waiting stays on the dashboard's list.",
         "Starred companies take turns: with more starred than a morning analyses, it names the rest \"Left for another morning\", and the next morning starts with the ones whose latest call is oldest, so every one gets its turn.",
-        "If an analysis from the dashboard's list is running when it starts (the listener's, say), it leaves that list to that run (\"left to that run (one stock runs at a time)\") and analyses your starred companies. A company asked for on the dashboard but already called today is marked done there, never analysed again.",
+        "If an analysis from the dashboard's list is running when it starts (the listener's, say), it leaves that list to that run (\"left to that run (one run takes stocks from the waiting list at a time)\") and analyses your starred companies. A company asked for on the dashboard but already called today is marked done there, never analysed again.",
+        "With \"At once\" set to 2 or 3 on Analysis status (K11), its step 2 says \"up to 2 side by side (the person's choice)\" and analyses that many together; at 1, as shipped, \"one after another\".",
         "It says \"analysed in step 2\" only of the companies step 2 lists: a re-rated holding or a switch pick over the morning's limit is said to wait on the dashboard, and one already called today is said so.",
         "If your computer's day is not New York's when it runs (8:00 on a Monday in Dubai is Sunday evening in New York), the brief says so first, \"The desk's day is New York's: …\", and works for New York's day.",
         "It ends with a one-line count, such as \"3 analysed, 1 skipped, 2 scored\". It never places an order."] },
@@ -1432,13 +1433,13 @@ b, strong { font-weight: var(--weight-semibold); }
         "The same results as asking the team in Agent Studio, except one line: first under \"This computer\", /desk-check in a chat says \"This conversation's steps for the team were not compared with the ones in this folder: no version was given. Only the trading-desk team's own steps carry a version, so a check from any other chat, or from a terminal, compares nothing here\". With everything else OK, the chat opens its answer with \"Ready, except one thing this check did not compare: whether this conversation's steps for the team are the ones in this folder\", as the check's own \"HOW TO SUM UP\" line tells it, and passes that line on as it is: never as a match, and nowhere \"everything is ready\" or \"nothing needs fixing\".",
         "/desk-check in a chat also offers, on your yes, to test the Robinhood sign-in read-only, saying first what it reads: the tools Robinhood's connection offers and how many holdings answer, never their values. Then \"Connected to Robinhood. Its connection offers N tools.\" It waits up to five minutes for your sign-in, never cut off sooner.",
         "If the test does not work: it says nothing was ordered, that the desk's analyses work without Robinhood, and that you can run the test again or press Connect on the dashboard's Your account. Never \"plan B\"."] },
-    { "id": "I2", "title": "/analyse with no company runs the waiting list", "tags": ["Optional"], "changed": "2026-11-09",
+    { "id": "I2", "title": "/analyse with no company runs the waiting list", "tags": ["Optional"], "changed": "2026-11-11",
       "about": "Without a company named, /analyse works through what you asked for on the dashboard.",
       "where": "The dashboard, then a Claude Code chat",
       "do": [
         "Ask for an analysis on the dashboard (the robot beside AAPL), then type [[/analyse]] in a chat."],
       "see": [
-        "It analyses what is waiting, one at a time, never asking you anything, and the dashboard shows where each one stands.",
+        "It analyses what is waiting, one at a time (or up to the number chosen under \"At once\" on Analysis status, side by side), never asking you anything, and the dashboard shows where each one stands.",
         "If another run is analysing a company from the list (a routine's, or the listener's), it stops at once and says so, \"Being analysed now by another run: …\", and asks for no other run: the run analysing that company carries on with the list when it finishes. It never takes or fails that run's company."] },
     { "id": "I3", "title": "A back-test", "tags": ["Optional"], "changed": "2026-11-09",
       "about": "A back-test runs the team over past dates to see how its calls would have done. It is slow and uses a lot of model time, and it is kept apart from your real calls.",
@@ -1571,7 +1572,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "The figures were refreshed in the background at the hour, whichever page was showing, and are asked for once: opening the page does not ask again."] }
   ] },
   { "id": "K", "name": "Analyses that run by themselves",
-    "sub": "You ask on the dashboard; whatever listens (Madav, or you in a chat) runs the team, one at a time. The desk starts no run of its own.",
+    "sub": "You ask on the dashboard; whatever listens (Madav, or you in a chat) runs the team, one stock at a time or up to three side by side, as you choose. The desk starts no run of its own.",
     "about": "Pressing the robot puts a company on a waiting list. Something then has to run the team: Madav's routine \"Run automatically when the dashboard asks\", or you, by asking in a chat. The desk never starts a run in another app beside the one it runs in: the dashboard has no button that starts Claude Code. The dashboard always says who is listening and where each analysis stands.",
     "before": "The dashboard open (C1), and Madav on this computer (or a chat in this folder).",
     "tests": [
@@ -1629,7 +1630,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "When it is done, ask the same again."],
       "see": [
         "\"Nothing is listening, so analyses wait here. Switch on \"Run automatically\" in Madav, or ask the desk to \"analyse what is waiting\" in a chat.\"",
-        "The chat runs them one at a time, never asking you anything.",
+        "The chat runs them one at a time (or side by side, up to the number chosen under \"At once\"), never asking you anything.",
         "Asked again with nothing waiting, the team says nothing is waiting, and that the finished analyses still on the list need no run. Never that you have not asked for any analysis.",
         "With a listener and something waiting, \"Run now\" asks for a run: \"Asked for a run of what is waiting.\"",
         "Asked while another run is analysing a company from the list, the team stops and says so, and asks for no other run; that run carries on with the list when it finishes."] },
@@ -1686,7 +1687,21 @@ b, strong { font-weight: var(--weight-semibold); }
         "Beside the name in the side list, a small number: how many stocks are waiting or being analysed, and nothing when none are.",
         "A small red dot beside it (and beside the number, if there is one) while any stock has failed; it goes when the failed one is retried and finishes, or is taken off.",
         "The old finished row is not in the table. Under it: \"1 older finished analysis is not shown (a newer call on the stock, or finished over 7 days ago). Every call stays in The desk's calls.\" A waiting, running or failed row is always listed, however old. Taking a row off with its ✕ still works, and the desk's own waiting list is not changed by this.",
-        "Each of those three places takes you to the page: the notice (pressing it), the line under the chart, and the words in the Analyse box (which closes)."] }
+        "Each of those three places takes you to the page: the notice (pressing it), the line under the chart, and the words in the Analyse box (which closes)."] },
+    { "id": "K11", "title": "Two or three at once", "tags": ["Later"], "changed": "2026-11-11",
+      "about": "One run can analyse two or three stocks side by side instead of one after another. It finishes a list sooner, but no single analysis is faster, and the stocks share the same free data sources and AI model, so a source may answer \"unavailable\" more often. It comes set to 1, one at a time; the choice is yours.",
+      "where": "Dashboard › side list › Analysis status",
+      "do": [
+        "Open Analysis status and find \"At once\" at the top, with 1, 2 and 3. Rest the pointer on it.",
+        "Press 2. Then reload the page.",
+        "With Madav listening, ask the desk for two stocks at Shallow (the robot beside each) and watch the page while the run works.",
+        "When both are done, open each one's call. Then press 1 again."],
+      "see": [
+        "1 is marked as chosen until you choose otherwise. Resting on it explains: \"How many stocks one run analyses side by side. More at once finishes a list sooner, but no single analysis is faster, …\"",
+        "On 2, the notice \"Up to 2 side by side: a run keeps up to 2 stocks going at once, from the next stock it starts.\", 2 is marked, and it stays marked after the reload. With Madav listening, the line under the heading ends \"Up to 2 side by side, at most 5 a run.\" instead of \"One stock at a time, at most 5 a run.\"",
+        "Both stocks \"Being analysed\" at the same time, each with its own step. When one finishes, the next waiting stock, if any, takes its place; never more than two at once.",
+        "Each call is about its own stock: its prices, news and figures are that stock's, never the other's. A step that fails for one stock marks only that stock failed, with why, and the other carries on.",
+        "On 1, the notice \"One at a time: a run analyses one stock, then the next, from the next stock it starts.\" A run already going keeps the stocks it has started and takes no new one until it is down to one."] }
   ] },
   { "id": "L", "name": "Your paper record",
     "sub": "Before you risk money: every call followed on paper against SPY, the S&P 500 fund, from the same start, and four weeks of it before trading.",

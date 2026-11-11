@@ -666,6 +666,11 @@
   function standing(queue) {
     return { open: queue.filter((x) => x.state === "waiting" || x.state === "running").length, failed: queue.filter((x) => x.state === "failed").length };
   }
+  var AT_ONCE_CHOICES = [1, 2, 3];
+  var isAtOnceChoice = (n) => AT_ONCE_CHOICES.includes(n);
+  var paceWords = (atOnce, perRun) => `${atOnce > 1 ? `Up to ${atOnce} side by side` : "One stock at a time"}, at most ${perRun} a run.`;
+  var AT_ONCE_WHY = 'How many stocks one run analyses side by side. More at once finishes a list sooner, but no single analysis is faster, and each stock asks the same free data sources and the same AI model at the same time, so a source may answer "unavailable" more often. 1 is one at a time, as shipped.';
+  var atOnceToast = (n) => n > 1 ? `Up to ${n} side by side: a run keeps up to ${n} stocks going at once, from the next stock it starts.` : "One at a time: a run analyses one stock, then the next, from the next stock it starts.";
 
   // src/terminal/ui/main.ts
   var RANGES = ["1M", "3M", "6M", "1Y", "5Y"];
@@ -870,7 +875,7 @@
       a.done,
       `Ask the desk to analyse them, ${term("depth", "shallow")}, and switch on running automatically`,
       `<div class="at-row">${factChip(a.asked > 0, `${a.asked} asked for`)}${factChip(!!a.automatic, a.automatic ? `runs by itself: ${a.automatic}` : "not running by itself yet")}</div>
-    <p class="at-quiet ta-gwhy">Shallow is the quickest and costs least: each analysis is a full team run on the models of the app that runs it. Running automatically means each one you ask for starts by itself, one at a time; they are listed under ${STATUS_LINK}.</p>
+    <p class="at-quiet ta-gwhy">Shallow is the quickest and costs least: each analysis is a full team run on the models of the app that runs it. Running automatically means each one you ask for starts by itself, one at a time, or up to three side by side if you choose so; they are listed under ${STATUS_LINK}.</p>
     <div class="at-row">${ask2.length ? `<button class="at-btn at-press primary" data-act="guide-ask"${GUIDE.asking ? " disabled" : ""}><svg class="g"><use href="#i-bot"/></svg><span>${GUIDE.asking ? "Asking\u2026" : `Ask for your ${ask2.length === 1 ? "pick" : `${ask2.length} picks`}, shallow`}</span></button>` : ""}</div>
     ${l ? "" : '<p class="at-quiet">Or switch on "Run automatically" in Madav, if you use it.</p>'}`
     );
@@ -1619,9 +1624,11 @@
     const { open, failed } = standing(q2);
     $("#analysesCount").innerHTML = `${open ? `<span title="${open} waiting or being analysed">${open}</span>` : ""}${failed ? `${open ? " " : ""}<span class="at-dot bad" role="img" aria-label="${failed} failed" title="${failed} failed"></span>` : ""}`;
     const listed = q2.filter((x) => !isStale(x, d.calls)), cleared = q2.length - listed.length;
-    $("#analysesSub").textContent = l ? `Runs by itself: ${l.listener} is listening on this computer${l.lastRun ? ` \xB7 last run ${l.lastRun.startOnly ? "started " : ""}${when(l.lastRun.at)}: ${l.lastRun.result.replace(/[\s.]+$/, "")}` : ""}. One stock at a time, at most ${d.analyses.perRun} a run.` : 'Nothing is listening, so analyses wait here. Switch on "Run automatically" in Madav, or ask the desk to "analyse what is waiting" in a chat.';
+    $("#analysesSub").textContent = l ? `Runs by itself: ${l.listener} is listening on this computer${l.lastRun ? ` \xB7 last run ${l.lastRun.startOnly ? "started " : ""}${when(l.lastRun.at)}: ${l.lastRun.result.replace(/[\s.]+$/, "")}` : ""}. ${paceWords(d.analyses.atOnce, d.analyses.perRun)}` : 'Nothing is listening, so analyses wait here. Switch on "Run automatically" in Madav, or ask the desk to "analyse what is waiting" in a chat.';
     const press = (act, words, primary = false) => `<button class="at-btn at-press${primary ? " primary" : ""}" data-act="${act}">${esc(words)}</button>`;
-    $("#analysesDo").innerHTML = l && waiting && !running ? press("q-run", "Run now") : "";
+    const n = d.analyses.atOnce;
+    const atOnce = `<span class="at-row" title="${esc(AT_ONCE_WHY)}"><span class="at-quiet">At once</span><span class="at-seg" role="radiogroup" aria-label="How many stocks a run analyses at once">${AT_ONCE_CHOICES.map((c) => `<button class="at-seg-b${c === n ? " on" : ""}" role="radio" aria-checked="${c === n}" data-act="q-together" data-n="${c}">${c}</button>`).join("")}</span></span>`;
+    $("#analysesDo").innerHTML = atOnce + (l && waiting && !running ? press("q-run", "Run now") : "");
     const stands = (x) => {
       if (x.state === "running") return `<span class="at-chip accent">Being analysed</span> <span class="at-quiet">${esc(x.progress ?? "starting")}</span>`;
       if (x.state === "waiting") return `<span class="at-chip">Waiting</span>${l ? "" : ' <span class="at-quiet">for a run to start</span>'}`;
@@ -2423,6 +2430,15 @@
           toast("Asked for a run of what is waiting.");
         });
         break;
+      case "q-together": {
+        const n = Number(el.dataset.n);
+        if (!S.desk || !isAtOnceChoice(n) || n === S.desk.analyses.atOnce) break;
+        remember({ atOnce: n });
+        S.desk.analyses.atOnce = n;
+        renderAnalyses();
+        toast(atOnceToast(n));
+        break;
+      }
       case "open-call":
         void openCall(sym, el.dataset.date ?? "");
         break;

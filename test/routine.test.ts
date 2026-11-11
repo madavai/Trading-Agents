@@ -45,7 +45,7 @@ test('the morning analyses what was asked for on the dashboard first, then the s
   // a stock being analysed by another run is left alone
   startItem(dir, 'NVDA', '2026-10-19');
   const busy = morningList(dir, '2026-10-19', 3);
-  assert.equal(busy.running, 'NVDA');
+  assert.deepEqual(busy.running, ['NVDA']);
   assert.deepEqual(busy.leftToRun, ['AAPL'], 'the rest of the waiting list is left to the run analysing NVDA');
   assert.deepEqual(busy.analyse.map((a) => a.symbol), ['AMD', 'TSLA'], 'and the morning analyses the starred stocks, never AAPL beside that run');
   assert.match(morningBrief(dir, '2026-10-19', 3), /NVDA is being analysed now by another run: leave it alone/);
