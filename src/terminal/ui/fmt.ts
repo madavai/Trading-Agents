@@ -2,6 +2,7 @@
 import { GLOSSARY, isTerm, means } from './glossary.js';
 import { LATE, type PriceMarket } from '../../data/delay.js';
 import { isDone, stateGroup } from '../../robinhood/states.js';
+import type { PriceIs } from '../../robinhood/account.js';
 
 const MINUS = '−';
 
@@ -126,10 +127,18 @@ export const orderStateWhy = (o: OrderState): string => (o.raw
   ? `Robinhood's word: “${o.raw}”.${o.open ? ' The desk counts it as still open: only filled, cancelled, rejected, failed, expired and voided orders are done.' : ''}`
   : 'Robinhood gave no state for this order.');
 
+/** Which price an order's Price cell holds, said beside the figure on every row (robinhood/account.ts takes `average_price` first, else
+ *  `price`, else `limit_price`, and says which it was): the word under the figure and what it means on a hover. */
+export const ORDER_PRICE: Readonly<Record<PriceIs, { words: string; why: string }>> = {
+  filled: { words: 'filled', why: "The price it filled at: Robinhood's average price for what has filled." },
+  limit: { words: 'limit', why: 'The limit price the order was set at: the most a buy pays, the least a sell takes. Robinhood gave no price for a fill.' },
+  listed: { words: 'listed', why: 'The price Robinhood lists for the order. It does not say whether this is a limit price or a price anything filled at.' },
+};
+
 /** Why a mark is there, each in one plain line. The trading words themselves are in the glossary (glossary.ts). */
 export const NOTES = {
-  /** The Price column of an order: robinhood/account.ts takes `average_price`, else `price`, else `limit_price`. */
-  orderPrice: "Robinhood's average price for what has filled, when it gives one; otherwise the price the order is listed at.",
+  /** The Price column of an order: each row says which price it is (ORDER_PRICE). */
+  orderPrice: "Each price says which it is: “filled” is Robinhood's average price for what has filled, “limit” is the limit price the order was set at, and “listed” is a price Robinhood lists without saying whether it is a limit.",
   coinOnPaper: "Robinhood's agent doorway trades stocks and funds, so a coin never gets an order ticket.",
   noTicket: 'No order ticket: Robinhood\'s agent doorway trades stocks and funds, and among crypto the desk follows only Bitcoin and Ether on paper.',
   noView: "No view yet: the desk has not analysed it. Ask it to (the robot); in the Agentic account, Monday's morning routine rates it.",

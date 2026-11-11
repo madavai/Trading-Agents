@@ -88,11 +88,19 @@ export function parseQuotes(answer: unknown): Map<string, number> {
   return out;
 }
 
-export interface Order { symbol: string | null; side: string | null; type: string | null; state: string | null; quantity: number | null; price: number | null; at: string | null }
+/** Which price an order's `price` is: what it filled at (Robinhood's average price), the limit price the order was set at, or a
+ *  price Robinhood lists without saying it is a limit (null when there is no price at all). */
+export type PriceIs = 'filled' | 'limit' | 'listed';
+export interface Order { symbol: string | null; side: string | null; type: string | null; state: string | null; quantity: number | null; price: number | null; priceIs: PriceIs | null; at: string | null }
 const orderOf = (v: unknown): Order => {
-  const o = obj(v);
-  return { symbol: text(o.symbol)?.toUpperCase() ?? null, side: text(o.side), type: text(o.type), state: text(o.state),
-    quantity: figure(o.quantity) ?? figure(o.cumulative_quantity), price: figure(o.average_price) ?? figure(o.price) ?? figure(o.limit_price), at: text(o.created_at) ?? text(o.updated_at) };
+  const o = obj(v), type = text(o.type);
+  const filled = figure(o.average_price), limit = figure(o.limit_price), listed = figure(o.price);
+  // average_price, else price, else limit_price, as before; what is new is that the answer says which of them it was. A
+  // price on a limit order, or a limit_price, is its limit; a price on any other order is only what Robinhood lists.
+  const price = filled ?? listed ?? limit;
+  const priceIs: PriceIs | null = price === null ? null : filled !== null ? 'filled' : (listed !== null ? type?.toLowerCase() === 'limit' : limit !== null) ? 'limit' : 'listed';
+  return { symbol: text(o.symbol)?.toUpperCase() ?? null, side: text(o.side), type, state: text(o.state),
+    quantity: figure(o.quantity) ?? figure(o.cumulative_quantity), price, priceIs, at: text(o.created_at) ?? text(o.updated_at) };
 };
 /** Orders. The Agentic account had none on 16 Oct 2026, so the fields are read as Robinhood's tool description names
  *  them; whatever cannot be read is null and shown as a dash. */

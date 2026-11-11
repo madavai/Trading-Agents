@@ -1042,12 +1042,13 @@ b, strong { font-weight: var(--weight-semibold); }
       "do": [
         "In the Agentic account's \"Orders in this account\", look at the State column.",
         "Open the Stock page of a stock you have ordered (\"Your orders on it\").",
-        "Point at a state, then at the \"Price\" heading."],
+        "Point at a state, then at the \"Price\" heading, then at the small word under a price."],
       "see": [
         "The same table in both places (When, Order, Quantity, Price, State): orders still open first, then the rest in the order Robinhood listed them.",
         "Each state is one of the words in D12 to D18, in amber (still open), green (filled) or red (done without a fill).",
         "Pointing at a state says Robinhood's own word, for example \"Robinhood's word: “confirmed”. The desk counts it as still open: only filled, cancelled, rejected, failed, expired and voided orders are done.\"",
-        "Pointing at \"Price\" says \"Robinhood's average price for what has filled, when it gives one; otherwise the price the order is listed at.\""] },
+        "Under every price there is a small word that says which price it is, on each row: \"filled\" (Robinhood's average price for what has filled), \"limit\" (the limit price the order was set at) or \"listed\" (a price Robinhood lists without saying whether it is a limit). A price that is a dash has no word. The same words are in both places.",
+        "Pointing at that word says it in full, for example \"The limit price the order was set at: the most a buy pays, the least a sell takes. Robinhood gave no price for a fill.\" Pointing at \"Price\" says \"Each price says which it is: “filled” is Robinhood's average price for what has filled, “limit” is the limit price the order was set at, and “listed” is a price Robinhood lists without saying whether it is a limit.\""] },
     { "id": "D12", "title": "A waiting order reads Pending", "tags": ["Optional"], "changed": "2026-11-11",
       "about": "An order Robinhood has taken but not yet filled (waiting for your approval on your phone, or for its limit price) is still open. It reads Pending, never a word that reads as finished.",
       "where": "Dashboard › Your account › Orders in this account (or the Stock page's Your orders on it)",
@@ -1818,7 +1819,7 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "Its own card beside the Robinhood and Trading cards, with \"Change the caps…\" at its top right.",
         "Under the heading: \"These limits apply to orders you place from this page, not to trades you make in the Robinhood app.\"",
-        "Four rows, each named at its left. Buys: \"$500.00 an order at most\", \"10% of the account in one stock\", \"one sector at most 30%\" and \"crypto at most 5%\". Buys and sells: \"3 orders a day\". Sells: \"a stock bought here is held at least 5 trading days\". The account: \"switches itself off after a 5% fall in a week\" (or your own values)."] },
+        "Four rows, each named at its left. Buys: \"$500.00 an order at most\", \"10% of the account in one stock\", \"one sector at most 30%\" and \"crypto at most 5%\". Buys and sells: \"3 orders a day\". Sells: \"a stock bought here is held at least 5 trading days\". The account: \"switches itself off after a 5% fall in a week\" (or your own values), with the line under it: \"Checked each time the dashboard reads the account: when you open Your account before anything has been read, when you press Refresh from Robinhood, when a ticket opens and when an order is sent.\" Pointing at the chip says what the weekly loss limit is, ending \"It is checked each time the dashboard reads the account.\""] },
     { "id": "M2", "title": "Change a cap", "tags": [], "changed": "2026-11-11",
       "about": "Changing a cap takes effect on the next ticket.",
       "where": "Dashboard › Your account › Your caps › Change the caps…",
@@ -1849,8 +1850,8 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "An amber check: \"NVDA was bought here on <day>, N trading day(s) ago, under your shortest hold of 5: selling it now takes one more press\".",
         "\"Sell anyway\" in place of \"Review with Robinhood\". A Sell call's ticket on it proposes no sell yet."] },
-    { "id": "M5", "title": "The weekly loss limit", "tags": ["Later","Optional"], "changed": "2026-11-09",
-      "about": "If the Agentic account falls 5% (as shipped) below its highest value of the last seven days, trading switches itself off and says why. When you switch it back on, the limit counts from that moment, so the same fall does not switch it off again.",
+    { "id": "M5", "title": "The weekly loss limit", "tags": ["Later","Optional"], "changed": "2026-11-11",
+      "about": "If the Agentic account falls 5% (as shipped) below its highest value of the last seven days, trading switches itself off and says why. It is looked at each time the dashboard reads the account (when you open Your account before anything has been read, press Refresh from Robinhood, open a ticket or send an order), never in between. When you switch it back on, the limit counts from that moment, so the same fall does not switch it off again.",
       "where": "Dashboard › Your account › Trading",
       "do": [
         "Nothing to press: this is read when it happens. With trading on, it trips when the Agentic account falls your limit below its highest value of the last seven days."],
@@ -1869,7 +1870,7 @@ b, strong { font-weight: var(--weight-semibold); }
         "While you edit, after it: \"Every ticket is checked against them, and again just before it is sent; a failed check stops the order. Only you can change them, and the agents are blocked from where they are kept.\" It names no folder.",
         "Under Buys: \"The crypto limit only sizes the paper record: orders here are for stocks and funds, never coins.\"",
         "Under Sells: \"The desk proposes no sale sooner than this, and a sale of your own takes one more press (Sell anyway).\"",
-        "Under The account: \"Checked each time the dashboard reads the account.\""] }
+        "Under The account: \"Checked each time the dashboard reads the account: when you open Your account before anything has been read, when you press Refresh from Robinhood, when a ticket opens and when an order is sent.\" The same line is under the chip row when you are not editing (M1)."] }
   ] },
   { "id": "N", "name": "Care for what you hold",
     "sub": "The desk's view beside each holding, its stop watched, and sells you confirm. Nothing is ever sold by itself.",

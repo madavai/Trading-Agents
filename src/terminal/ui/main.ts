@@ -4,7 +4,7 @@
 // (Decide…) or the person's own (Trade…) - and is placed only on their Confirm, with trading switched on by them.
 import { api, ApiError, claimKey, hasKey, KEY_LOST, type CallDetail, type DeskState, type Depth, type History, type LinkInfo, type Market, type Match, type Prefs, type Caps, type PaperView, type PaperTrade, type QueueView, type QuoteResult, type Account, type AccountView, type Holding, type Order, type Recent, type Snapshot, type TicketFigures, type TicketOpen, type Check, type Review, type Placed, type Trading, type Tier, type TierItem, type TierView, type Worth, type Screen, type Weather, type WeatherLine, type HoldingCare } from './api.js';
 import { heroChart, paperChart, sparkline } from './chart.js';
-import { againstOver, averageOf, barOn, chipDay, dayText, esc, labelled, money, moveDayOf, notHorizon, NOTES, num, nyDay, opening, orderState, orderStateWhy, ownReturnLine, pct, plain, points, priceDayWords, qty, rangeFor, ratingMeaning, ratingTone, resultOf, scoreWords, SECTION_NAMES, shortDay, tone, weekDay, when, yardstickWhy } from './fmt.js';
+import { againstOver, averageOf, barOn, chipDay, dayText, esc, labelled, money, moveDayOf, notHorizon, NOTES, num, ORDER_PRICE, nyDay, opening, orderState, orderStateWhy, ownReturnLine, pct, plain, points, priceDayWords, qty, rangeFor, ratingMeaning, ratingTone, resultOf, scoreWords, SECTION_NAMES, shortDay, tone, weekDay, when, yardstickWhy } from './fmt.js';
 import { DELAY_SENTENCE, DELAY_SHORT, LATE } from '../../data/delay.js';
 import { GLOSSARY, glossaryGroups, isTerm, means, type TermKey } from './glossary.js';
 import { markdown } from './md.js';
@@ -487,9 +487,14 @@ async function loadCare(): Promise<void> {
  *  the rest as Robinhood listed them. */
 function ordersTable(orders: readonly Order[], cur: string, symbols: boolean): string {
   const open = (x: Order) => orderState(x.side, x.state).open;
+  // The price, and under its figure which price it is (filled, limit or listed): never left to the heading's hover alone.
+  const price = (x: Order): string => {
+    const p = x.price !== null && x.priceIs ? ORDER_PRICE[x.priceIs] : null;
+    return `${money(x.price, cur)}${p ? ` <small class="at-quiet" title="${esc(p.why)}">${p.words}</small>` : ''}`;
+  };
   const row = (x: Order): string => {
     const s = orderState(x.side, x.state);
-    return `<tr><td>${esc(x.at ? dayText(x.at) : '—')}</td><td>${esc(symbols ? `${sideWord(x.side)} ${x.symbol ?? ''}`.trim() : sideWord(x.side))}${x.type ? ` <small class="at-quiet">${esc(x.type)}</small>` : ''}</td><td class="num">${qty(x.quantity)}</td><td class="num">${money(x.price, cur)}</td><td>${s.raw ? `<span class="at-chip ${s.tone}" title="${esc(orderStateWhy(s))}">${esc(s.words)}</span>` : '—'}</td></tr>`;
+    return `<tr><td>${esc(x.at ? dayText(x.at) : '—')}</td><td>${esc(symbols ? `${sideWord(x.side)} ${x.symbol ?? ''}`.trim() : sideWord(x.side))}${x.type ? ` <small class="at-quiet">${esc(x.type)}</small>` : ''}</td><td class="num">${qty(x.quantity)}</td><td class="num">${price(x)}</td><td>${s.raw ? `<span class="at-chip ${s.tone}" title="${esc(orderStateWhy(s))}">${esc(s.words)}</span>` : '—'}</td></tr>`;
   };
   return `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>When</th><th>Order</th><th class="num">Quantity</th><th class="num" title="${esc(NOTES.orderPrice)}">Price</th><th>State</th></tr></thead><tbody>${[...orders].sort((a, b) => Number(open(b)) - Number(open(a))).map(row).join('')}</tbody></table></div>`;
 }
@@ -608,6 +613,8 @@ const CAPS_SCOPE = 'These limits apply to orders you place from this page, not t
  *  views stand in the same four rows, by what a limit is for: a buy, a buy or a sell, a sell, the whole account (desk/ticket.ts
  *  check: the order, stock, sector and crypto limits are checked on a buy, the orders a day on both, the shortest hold on a sell). */
 const CAPS = { editing: false };
+/** When the weekly loss limit is looked at: every read of the Agentic account's value (robinhood/link.ts noteValue). */
+const WEEK_CHECK = 'Checked each time the dashboard reads the account: when you open Your account before anything has been read, when you press Refresh from Robinhood, when a ticket opens and when an order is sent.';
 const capRow = (name: string, body: string, note = ''): string => `<div class="ta-cap"><dt>${name}</dt><dd>${body}${note ? `<p class="at-quiet">${esc(note)}</p>` : ''}</dd></div>`;
 function capsBlock(): string {
   const c = TR.state?.caps;
@@ -622,7 +629,7 @@ function capsBlock(): string {
       ${capRow('Buys', fields(field('capOrder', 'An order at most, $', c.perOrderUsd), field('capStock', 'One stock, % of the account', c.perStockPercent), field('capSector', 'One sector, % of the account', c.perSectorPercent), field('capCrypto', 'Crypto, % of the account', c.cryptoPercent)), 'The crypto limit only sizes the paper record: orders here are for stocks and funds, never coins.')}
       ${capRow('Buys and sells', fields(field('capDay', 'Orders a day', c.ordersPerDay, [1, 50])))}
       ${capRow('Sells', fields(field('capHold', 'Shortest hold, trading days', c.minHoldDays, [0, 60])), 'The desk proposes no sale sooner than this, and a sale of your own takes one more press (Sell anyway).')}
-      ${capRow('The account', fields(field('capWeek', 'Switch off after a fall in a week of, %', c.weeklyLossPercent)), 'Checked each time the dashboard reads the account.')}
+      ${capRow('The account', fields(field('capWeek', 'Switch off after a fall in a week of, %', c.weeklyLossPercent)), WEEK_CHECK)}
     </dl>
     <div class="at-row">${rhButton('caps-save', 'Save the caps', { primary: true })}${rhButton('caps-cancel', 'Cancel')}</div>`;
   }
@@ -636,7 +643,7 @@ function capsBlock(): string {
       ${capRow('Buys', chips(chip('cap', `${money(c.perOrderUsd)} an order at most`), chip('cap', `${c.perStockPercent}% of the account in one stock`), chip('sector', `one sector at most ${c.perSectorPercent}%`, ' For this limit a whole-market fund, such as SPY or the Nasdaq 100 fund QQQ, counts in no sector, though QQQ is mostly technology.'), chip('crypto', `crypto at most ${c.cryptoPercent}%`)))}
       ${capRow('Buys and sells', chips(chip('cap', `${c.ordersPerDay} ${c.ordersPerDay === 1 ? 'order' : 'orders'} a day`)))}
       ${capRow('Sells', chips(chip('shortestHold', `a stock bought here is held at least ${c.minHoldDays} trading ${c.minHoldDays === 1 ? 'day' : 'days'}`)))}
-      ${capRow('The account', chips(chip('weeklyLoss', `switches itself off after a ${c.weeklyLossPercent}% fall in a week`)))}
+      ${capRow('The account', chips(chip('weeklyLoss', `switches itself off after a ${c.weeklyLossPercent}% fall in a week`)), WEEK_CHECK)}
     </dl>`;
 }
 

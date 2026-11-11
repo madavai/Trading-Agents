@@ -148,7 +148,7 @@
     ticket: { group: account, term: "Order ticket", means: "one proposed order with its checks against your caps, which Robinhood looks over and you confirm or close." },
     dryRun: { group: account, term: "Robinhood's check", means: "a dry run: Robinhood looks the order over and says what it would do, without placing it." },
     shortestHold: { group: account, term: "Shortest hold", means: "the fewest trading days a stock bought here is kept before the desk proposes selling it." },
-    weeklyLoss: { group: account, term: "Weekly loss limit", means: "when the Agentic account falls this much below its best value of the last seven days, trading switches itself off." }
+    weeklyLoss: { group: account, term: "Weekly loss limit", means: "when the Agentic account falls this much below its best value of the last seven days, trading switches itself off. It is checked each time the dashboard reads the account." }
   };
   var means = (key2) => `${GLOSSARY[key2].term}: ${GLOSSARY[key2].means}`;
   var isTerm = (key2) => Object.hasOwn(GLOSSARY, key2);
@@ -264,9 +264,14 @@
     }
   }
   var orderStateWhy = (o) => o.raw ? `Robinhood's word: \u201C${o.raw}\u201D.${o.open ? " The desk counts it as still open: only filled, cancelled, rejected, failed, expired and voided orders are done." : ""}` : "Robinhood gave no state for this order.";
+  var ORDER_PRICE = {
+    filled: { words: "filled", why: "The price it filled at: Robinhood's average price for what has filled." },
+    limit: { words: "limit", why: "The limit price the order was set at: the most a buy pays, the least a sell takes. Robinhood gave no price for a fill." },
+    listed: { words: "listed", why: "The price Robinhood lists for the order. It does not say whether this is a limit price or a price anything filled at." }
+  };
   var NOTES = {
-    /** The Price column of an order: robinhood/account.ts takes `average_price`, else `price`, else `limit_price`. */
-    orderPrice: "Robinhood's average price for what has filled, when it gives one; otherwise the price the order is listed at.",
+    /** The Price column of an order: each row says which price it is (ORDER_PRICE). */
+    orderPrice: "Each price says which it is: \u201Cfilled\u201D is Robinhood's average price for what has filled, \u201Climit\u201D is the limit price the order was set at, and \u201Clisted\u201D is a price Robinhood lists without saying whether it is a limit.",
     coinOnPaper: "Robinhood's agent doorway trades stocks and funds, so a coin never gets an order ticket.",
     noTicket: "No order ticket: Robinhood's agent doorway trades stocks and funds, and among crypto the desk follows only Bitcoin and Ether on paper.",
     noView: "No view yet: the desk has not analysed it. Ask it to (the robot); in the Agentic account, Monday's morning routine rates it.",
@@ -1131,9 +1136,13 @@
   }
   function ordersTable(orders, cur, symbols) {
     const open = (x) => orderState(x.side, x.state).open;
+    const price = (x) => {
+      const p = x.price !== null && x.priceIs ? ORDER_PRICE[x.priceIs] : null;
+      return `${money(x.price, cur)}${p ? ` <small class="at-quiet" title="${esc(p.why)}">${p.words}</small>` : ""}`;
+    };
     const row = (x) => {
       const s = orderState(x.side, x.state);
-      return `<tr><td>${esc(x.at ? dayText(x.at) : "\u2014")}</td><td>${esc(symbols ? `${sideWord(x.side)} ${x.symbol ?? ""}`.trim() : sideWord(x.side))}${x.type ? ` <small class="at-quiet">${esc(x.type)}</small>` : ""}</td><td class="num">${qty(x.quantity)}</td><td class="num">${money(x.price, cur)}</td><td>${s.raw ? `<span class="at-chip ${s.tone}" title="${esc(orderStateWhy(s))}">${esc(s.words)}</span>` : "\u2014"}</td></tr>`;
+      return `<tr><td>${esc(x.at ? dayText(x.at) : "\u2014")}</td><td>${esc(symbols ? `${sideWord(x.side)} ${x.symbol ?? ""}`.trim() : sideWord(x.side))}${x.type ? ` <small class="at-quiet">${esc(x.type)}</small>` : ""}</td><td class="num">${qty(x.quantity)}</td><td class="num">${price(x)}</td><td>${s.raw ? `<span class="at-chip ${s.tone}" title="${esc(orderStateWhy(s))}">${esc(s.words)}</span>` : "\u2014"}</td></tr>`;
     };
     return `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>When</th><th>Order</th><th class="num">Quantity</th><th class="num" title="${esc(NOTES.orderPrice)}">Price</th><th>State</th></tr></thead><tbody>${[...orders].sort((a, b) => Number(open(b)) - Number(open(a))).map(row).join("")}</tbody></table></div>`;
   }
@@ -1264,6 +1273,7 @@
   }
   var CAPS_SCOPE = "These limits apply to orders you place from this page, not to trades you make in the Robinhood app.";
   var CAPS = { editing: false };
+  var WEEK_CHECK = "Checked each time the dashboard reads the account: when you open Your account before anything has been read, when you press Refresh from Robinhood, when a ticket opens and when an order is sent.";
   var capRow = (name, body, note = "") => `<div class="ta-cap"><dt>${name}</dt><dd>${body}${note ? `<p class="at-quiet">${esc(note)}</p>` : ""}</dd></div>`;
   function capsBlock() {
     const c = TR.state?.caps;
@@ -1277,7 +1287,7 @@
       ${capRow("Buys", fields(field("capOrder", "An order at most, $", c.perOrderUsd), field("capStock", "One stock, % of the account", c.perStockPercent), field("capSector", "One sector, % of the account", c.perSectorPercent), field("capCrypto", "Crypto, % of the account", c.cryptoPercent)), "The crypto limit only sizes the paper record: orders here are for stocks and funds, never coins.")}
       ${capRow("Buys and sells", fields(field("capDay", "Orders a day", c.ordersPerDay, [1, 50])))}
       ${capRow("Sells", fields(field("capHold", "Shortest hold, trading days", c.minHoldDays, [0, 60])), "The desk proposes no sale sooner than this, and a sale of your own takes one more press (Sell anyway).")}
-      ${capRow("The account", fields(field("capWeek", "Switch off after a fall in a week of, %", c.weeklyLossPercent)), "Checked each time the dashboard reads the account.")}
+      ${capRow("The account", fields(field("capWeek", "Switch off after a fall in a week of, %", c.weeklyLossPercent)), WEEK_CHECK)}
     </dl>
     <div class="at-row">${rhButton("caps-save", "Save the caps", { primary: true })}${rhButton("caps-cancel", "Cancel")}</div>`;
     }
@@ -1289,7 +1299,7 @@
       ${capRow("Buys", chips(chip("cap", `${money(c.perOrderUsd)} an order at most`), chip("cap", `${c.perStockPercent}% of the account in one stock`), chip("sector", `one sector at most ${c.perSectorPercent}%`, " For this limit a whole-market fund, such as SPY or the Nasdaq 100 fund QQQ, counts in no sector, though QQQ is mostly technology."), chip("crypto", `crypto at most ${c.cryptoPercent}%`)))}
       ${capRow("Buys and sells", chips(chip("cap", `${c.ordersPerDay} ${c.ordersPerDay === 1 ? "order" : "orders"} a day`)))}
       ${capRow("Sells", chips(chip("shortestHold", `a stock bought here is held at least ${c.minHoldDays} trading ${c.minHoldDays === 1 ? "day" : "days"}`)))}
-      ${capRow("The account", chips(chip("weeklyLoss", `switches itself off after a ${c.weeklyLossPercent}% fall in a week`)))}
+      ${capRow("The account", chips(chip("weeklyLoss", `switches itself off after a ${c.weeklyLossPercent}% fall in a week`)), WEEK_CHECK)}
     </dl>`;
   }
   var capsTyped = () => {
