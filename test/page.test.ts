@@ -204,7 +204,7 @@ test('page-17: a fund in the search list gets "Add to watchlist" and "Show in Th
   assert.match(css, /@media \(max-width: 640px\) \{ \.ta-opt \{ grid-template-columns: calc\(var\(--unit\) \* 18\) minmax\(0, 1fr\); \} \.ta-opt-tags \{ display: none; \} \}/);
 });
 
-test('page-18: a Start here tile is two lines with a letter badge, what leaves it is said when it is pointed at, and a badge is shaded only by the kind Yahoo gives', () => {
+test('page-18: a Start here tile is three lines, the same on every tile (name; code and move; rating and presses), with a letter badge, what leaves it is said when it is pointed at, and a badge is shaded only by the kind Yahoo gives', () => {
   // the badge: the House's logo box holding letters, no picture, so nothing is fetched from outside (the page's policy allows images from this computer only)
   assert.match(page, /const badge = \(sym: string, kind: Kind\): string => `<span class="at-logo-box sm ta-badge\$\{kind \? ` \$\{kind\}` : ''\}"><span class="at-logo fallback">\$\{esc\(badgeLetters\(sym\)\)\}<\/span><\/span>`;/);
   assert.doesNotMatch(page, /<img\b/, 'no picture from anywhere');
@@ -215,9 +215,15 @@ test('page-18: a Start here tile is two lines with a letter badge, what leaves i
   assert.match(page, /return at === 'market' \|\| at === 'sectors' \? 'fund' : '';/);
   assert.doesNotMatch(page, /isCrypto\(sym\)\) return 'coin'/, 'no kind is read from how a ticker looks');
   // the tile: badge, name and move; then the rating or "no call", and the presses. The old second line and its chips are gone from the tile.
-  assert.match(page, /<span class="ta-tier-top">\$\{badge\(i\.symbol, kindOf\(i\.symbol, tier\)\)\}<b class="at-tile-name">\$\{esc\(name\)\}<\/b>\$\{changeChip\(q\)\}<\/span>/);
+  assert.match(page, /<button class="ta-tier-go" data-act="select" data-symbol="\$\{esc\(i\.symbol\)\}" title="\$\{words\}"><b class="at-tile-name">\$\{esc\(name\)\}<\/b><\/button>/, 'line 1: the name, in full');
+  assert.match(page, /<span class="ta-tile-id">\$\{badge\(i\.symbol, kindOf\(i\.symbol, tier\)\)\}\$\{changeChip\(q\)\}<\/span>/, 'line 2: the code and the day\'s move');
   assert.match(page, /const call = i\.call \? ratingChip\(i\.call\.rating\) : `<span class="at-quiet" title="\$\{esc\(means\('call'\)\)\}">no call<\/span>`;/);
-  assert.match(page, /<div class="at-tile-foot">\$\{call\}<span class="at-tail">\$\{ask\}<\/span><\/div>/);
+  assert.match(page, /<div class="ta-tile-row">.*<span class="ta-tile-rate">\$\{call\}<\/span><span class="at-tail">\$\{ask\}<\/span><\/div>/, 'line 3: the rating, then the robot, + and ✕ side by side');
+  const css0 = fs.readFileSync('src/terminal/ui/dashboard.css', 'utf8');
+  assert.match(css0, /\.ta-tile-row \{ display: grid; grid-template-columns: minmax\(0, 1fr\) auto; grid-template-areas: "id id" "rate tail";/, 'three lines on every tile, whatever the rating or the presses');
+  assert.match(css0, /\.ta-tier-tile \.at-tail \{ grid-area: tail; gap: 0; flex-wrap: nowrap; \}/, 'the presses side by side, no gap, never wrapped apart');
+  assert.match(css0, /\.ta-tier-tile \.at-tile-name \{ white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: break-word; \}/, 'a name is never cut with …');
+  assert.doesNotMatch(css0, /ta-tiles-[ab]|PROTOTYPE/);
   const tile = /function tierTile\([\s\S]*?\n\}\n/.exec(page)![0];
   assert.doesNotMatch(tile, /at-tile-sub|noTicketChip|no call yet/, 'the tile writes no sub line, no order-ticket chip and no date');
   // what left the tile is in its hover (the tile and its button, which is its accessible description): name, ticker and meaning, the call with its day, and why no ticket

@@ -1043,8 +1043,8 @@ function tileWords(i: TierItem, name: string): string {
   ].join('\n');
 }
 
-/** One tile, in two lines: its badge, plain name and today's move; then the desk's latest rating (or "no call"), the robot,
- *  and + when it is not watched. What leaves the tile is in its hover (tileWords), and a press charts it. A tile in "The
+/** One tile, in three lines, the same on every tile: its plain name; its code (the badge) and today's move; then the desk's latest
+ *  rating (or "no call") with the robot, + when it is not watched, and ✕ in The whole market, side by side. What leaves the tile is in its hover (tileWords), and a press charts it. A tile in "The
  *  whole market" also has ✕, which takes it out of that row (never off the watchlist). */
 function tierTile(i: TierItem, tier: Tier): string {
   const q = quoteOf(i.symbol), name = i.name ?? q?.name ?? i.symbol, words = esc(tileWords(i, name));
@@ -1054,10 +1054,8 @@ function tierTile(i: TierItem, tier: Tier): string {
     + (i.watched ? '' : `<button class="icon-btn" data-act="watch-add" data-symbol="${esc(i.symbol)}" title="Add ${esc(i.symbol)} to your watchlist" aria-label="Add ${esc(i.symbol)} to your watchlist"><svg class="g"><use href="#i-plus"/></svg></button>`)
     + (tier === 'market' ? `<button class="icon-btn" data-act="mk-remove" data-symbol="${esc(i.symbol)}" title="${esc(out)}" aria-label="${esc(out)}"><svg class="g"><use href="#i-x"/></svg></button>` : '');
   return `<div class="at-tile at-box ta-tier-tile${i.symbol === S.symbol ? ' on' : ''}" title="${words}">
-    <button class="ta-tier-go" data-act="select" data-symbol="${esc(i.symbol)}" title="${words}">
-      <span class="ta-tier-top">${badge(i.symbol, kindOf(i.symbol, tier))}<b class="at-tile-name">${esc(name)}</b>${changeChip(q)}</span>
-    </button>
-    <div class="at-tile-foot">${call}<span class="at-tail">${ask}</span></div>
+    <button class="ta-tier-go" data-act="select" data-symbol="${esc(i.symbol)}" title="${words}"><b class="at-tile-name">${esc(name)}</b></button>
+    <div class="ta-tile-row"><span class="ta-tile-id">${badge(i.symbol, kindOf(i.symbol, tier))}${changeChip(q)}</span><span class="ta-tile-rate">${call}</span><span class="at-tail">${ask}</span></div>
   </div>`;
 }
 

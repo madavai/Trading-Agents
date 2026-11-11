@@ -1029,20 +1029,22 @@ details[open] > .at-input.at-select { border-color: var(--accent); }
 .ta-tier-head > h3 { font-family: var(--font-title); font-weight: var(--weight-medium); font-size: var(--size-text); line-height: var(--line-tight); color: var(--text); }
 .ta-tier-head > p { flex: 1 1 calc(var(--card-min) * 1.2); min-width: 0; }
 .ta-tier-head > .at-btn { margin-left: auto; }
-.ta-tier-deck { grid-template-columns: repeat(auto-fill, minmax(min(calc(var(--card-min) * 0.7), 100%), 1fr)); }
-.ta-tier-tile { gap: var(--space-1); padding: var(--space-2) var(--space-3); }
+.ta-tier-deck { grid-template-columns: repeat(auto-fill, minmax(min(calc(var(--card-min) * 0.75), 100%), 1fr)); }
 .ta-tier-tile.on { border-color: var(--accent); }
 .ta-tier-go { display: flex; flex-direction: column; min-width: 0; text-align: left; }
 .ta-tier-go:hover .at-tile-name { color: var(--accent); }
 .ta-tier-top { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-1) var(--space-2); min-width: 0; }
 .ta-tier-top > .at-tile-name { flex: 1 1 auto; white-space: normal; overflow-wrap: break-word; }   /* a long plain name wraps by words, never cut (Worth a look) */
 .ta-tier-top > .at-chip { flex: none; margin-left: auto; }   /* beside the name, or under it at the right when the name is long */
-/* A tile on Start here is two lines: its badge, name and move; then its rating and its presses. A long name is cut with …: its full name, what it holds and the rest are in the hover. */
-.ta-tier-tile .ta-tier-top { flex-wrap: nowrap; align-items: center; }
-.ta-tier-tile .ta-tier-top > .at-tile-name { flex: 1 1 0; min-width: 0; white-space: nowrap; overflow-wrap: normal; }
-.ta-tier-tile .ta-tier-top > .at-chip { padding: 0 var(--space-1); }
-.ta-tier-tile > .at-tile-foot { gap: var(--space-1) var(--space-2); padding-top: 0; }
-.ta-tier-tile .at-tail { gap: 0; flex-wrap: wrap; justify-content: flex-end; min-width: 0; }
+/* A tile on Start here is three lines, the same on every tile: its name in full (it wraps by words, never cut); its code and the
+   day's move; then its rating (or "no call") at the left and its presses, side by side with no gap, at the right. */
+.ta-tier-tile { gap: var(--space-1); padding: var(--space-2); }
+.ta-tier-tile .at-tile-name { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: break-word; }
+.ta-tile-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "id id" "rate tail"; align-items: center; gap: var(--space-1); min-width: 0; }
+.ta-tile-id { grid-area: id; display: inline-flex; align-items: center; justify-self: start; gap: var(--space-1); }
+.ta-tile-id > .at-chip { padding: 0 var(--space-1); }
+.ta-tile-rate { grid-area: rate; justify-self: start; }
+.ta-tier-tile .at-tail { grid-area: tail; gap: 0; flex-wrap: nowrap; }
 .ta-tier-tile .icon-btn { min-width: calc(var(--control) * 0.75); height: calc(var(--control) * 0.75); padding: 0; }
 /* the badge: the House's logo box holding letters, shaded by what Yahoo says it is: a fund, a coin or a company (anything else: the neutral box) */
 .at-logo-box.ta-badge { width: auto; min-width: var(--avatar); padding: 0 var(--space-1); }

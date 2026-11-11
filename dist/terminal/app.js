@@ -1654,10 +1654,8 @@
     const out = `Take ${i.symbol} out of The whole market`;
     const ask2 = (isIndex(i.symbol) ? "" : isOpen(i.symbol) ? openChip(i.symbol) : robot(i.symbol)) + (i.watched ? "" : `<button class="icon-btn" data-act="watch-add" data-symbol="${esc(i.symbol)}" title="Add ${esc(i.symbol)} to your watchlist" aria-label="Add ${esc(i.symbol)} to your watchlist"><svg class="g"><use href="#i-plus"/></svg></button>`) + (tier === "market" ? `<button class="icon-btn" data-act="mk-remove" data-symbol="${esc(i.symbol)}" title="${esc(out)}" aria-label="${esc(out)}"><svg class="g"><use href="#i-x"/></svg></button>` : "");
     return `<div class="at-tile at-box ta-tier-tile${i.symbol === S.symbol ? " on" : ""}" title="${words}">
-    <button class="ta-tier-go" data-act="select" data-symbol="${esc(i.symbol)}" title="${words}">
-      <span class="ta-tier-top">${badge(i.symbol, kindOf(i.symbol, tier))}<b class="at-tile-name">${esc(name)}</b>${changeChip(q2)}</span>
-    </button>
-    <div class="at-tile-foot">${call2}<span class="at-tail">${ask2}</span></div>
+    <button class="ta-tier-go" data-act="select" data-symbol="${esc(i.symbol)}" title="${words}"><b class="at-tile-name">${esc(name)}</b></button>
+    <div class="ta-tile-row"><span class="ta-tile-id">${badge(i.symbol, kindOf(i.symbol, tier))}${changeChip(q2)}</span><span class="ta-tile-rate">${call2}</span><span class="at-tail">${ask2}</span></div>
   </div>`;
   }
   function tierBlock(t, market) {
