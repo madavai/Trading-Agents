@@ -182,3 +182,29 @@ test('page-16 (dashboard tour, 11 Nov 2026): the account page keeps its rows apa
   assert.match(page, /Every ticket is checked against them, and again just before it is sent; a failed check stops the order\. Only you can change them, and the agents are blocked from where they are kept\./);
   assert.doesNotMatch(page, /trading-agents|private folder/i, 'the page never names the private folder');
 });
+
+test('page-17 (dashboard tour, 11 Nov 2026): the Accounts section keeps only status: no explaining lines, the phone approval as a chip, one read time, and orders in plain words', () => {
+  const html = fs.readFileSync('src/terminal/ui/index.html', 'utf8');
+  // The owner marked these as unnecessary: each is gone, and nothing but a failure keeps a line under an account.
+  for (const gone of ['The accounts you chose to show', 'Nothing is held in this account', 'Keep it on until you trust the desk', "holdings valued at Robinhood's live prices", 'now see these holdings when they analyse a stock', 'is kept on this computer only and is never shown on this page']) {
+    assert.ok(!page.includes(gone) && !html.includes(gone), `"${gone}" is gone`);
+  }
+  assert.match(html, /<h2>Accounts<\/h2><\/div><\/div>/, 'the Accounts heading has no line under it');
+  // The phone approval is a status chip, marked when it is off; a pending approval is a chip of its own.
+  assert.match(page, /mark\('Phone approval: not read', "Robinhood's phone approval setting could not be read\."\)/);
+  assert.match(page, /mark\('Phone approval: on', .*'ok'\)/);
+  assert.match(page, /mark\('Phone approval: off', .*You can switch phone approval on in the Robinhood app\.", 'warn'\)/);
+  assert.match(page, /mark\(`\$\{ap\.pending\} waiting for your approval`/);
+  // How fresh the figures are: one read time, small, beside the Refresh button, never one more line in each card.
+  assert.match(page, /<span class="at-quiet">Read at \$\{esc\(when\(A\.snapshot\.at\)\)\}<\/span>/);
+  assert.match(page, /A\.snapshot\.views\.map\(viewCard\)/);
+  // The agents' holdings: said only when the read was not whole.
+  assert.match(page, /A\.snapshot && A\.shared === false \? '<p class="at-honest">Some holdings could not be read, so the agents were not given this read: they keep the last complete one\.<\/p>'/);
+  // Both tables of orders (an account's, a stock's) are one function: Robinhood's raw word is never the cell, and orders still open come first.
+  assert.equal([...page.matchAll(/ordersTable\(/g)].length, 3, 'defined once, used for the account card and the stock page');
+  assert.doesNotMatch(page, /esc\(x\.state \?\? '—'\)/, "Robinhood's raw state word is not what the table shows");
+  assert.match(page, /\[\.\.\.orders\]\.sort\(\(a, b\) => Number\(open\(b\)\) - Number\(open\(a\)\)\)/);
+  assert.match(page, /<th class="num" title="\$\{esc\(NOTES\.orderPrice\)\}">Price<\/th>/, 'the Price heading says which price it is');
+  // The lines that appear only when something failed stay.
+  for (const kept of ['The orders could not be read.', 'Not read: ', 'holding(s) could not be read and are left out.']) assert.ok(page.includes(kept), kept);
+});

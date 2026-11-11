@@ -954,21 +954,23 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "Your main account: \"View only · the desk never trades here\".",
         "Agentic: \"Agentic · the desk may trade here, only on your Confirm\"."] },
-    { "id": "D5", "title": "Orders and phone approval", "tags": [], "changed": "2026-10-21",
-      "about": "Robinhood can ask you to approve every agent trade on your phone. Keep that on until you trust the desk: it is a second lock you hold.",
+    { "id": "D5", "title": "Orders and phone approval", "tags": [], "changed": "2026-11-11",
+      "about": "Robinhood can ask you to approve every agent trade on your phone. Keep that on until you trust the desk: it is a second lock you hold. The page shows whether it is on as a status beside the orders.",
       "where": "Dashboard › Your account › the Agentic account",
       "do": [
-        "Read \"Orders in this account\" and the approval line."],
+        "Read \"Orders in this account\" and the chips beside its heading."],
       "see": [
-        "Its orders (When, Order, Quantity, Price, State), or \"No orders in this account yet.\"",
-        "\"Robinhood asks you to approve every trade on your phone. Keep it on until you trust the desk.\" when that is your Robinhood setting."] },
-    { "id": "D6", "title": "The agents get your holdings", "tags": [], "changed": "2026-11-09",
-      "about": "Each refresh hands the agents your chosen holdings, so an analysis of NVIDIA knows whether you already own it. Each share count goes to them exactly as Robinhood gives it, fractions of a share included.",
+        "Its orders (When, Order, Quantity, Price, State; D11), or \"No orders in this account yet.\"",
+        "Beside the heading: \"Phone approval: on\" (green), \"Phone approval: off\" (amber) or \"Phone approval: not read\", and, when Robinhood lists any, \"N waiting for your approval\". No sentence is written under the orders.",
+        "Pointing at \"Phone approval: on\" says \"Robinhood asks you to approve every trade of this account on your phone before it is sent.\" Pointing at \"off\" says \"Robinhood does not ask you to approve this account's trades on your phone: an order you Confirm here is sent at once. You can switch phone approval on in the Robinhood app.\""] },
+    { "id": "D6", "title": "The agents get your holdings", "tags": [], "changed": "2026-11-11",
+      "about": "Each refresh hands the agents your chosen holdings, so an analysis of NVIDIA knows whether you already own it. Each share count goes to them exactly as Robinhood gives it, fractions of a share included. The page says nothing about it unless something went wrong.",
       "where": "Dashboard › Your account › under the accounts",
       "do": [
-        "Press \"Refresh from Robinhood\", then read the note under the accounts."],
+        "Press \"Refresh from Robinhood\", then look under the accounts."],
       "see": [
-        "\"The desk's agents now see these holdings when they analyse a stock: the Agentic account as the one they may size a trade to, the others as view-only context.\"",
+        "When every holding was read, nothing is written under the accounts: the agents are given the holdings without a word about it.",
+        "If some holding could not be read: \"Some holdings could not be read, so the agents were not given this read: they keep the last complete one.\"",
         "A share class Robinhood spells with a dot, such as BRK.B, is the stock the desk spells with a dash (BRK-B): an analysis of BRK-B sees what you hold of it."] },
     { "id": "D7", "title": "No account numbers", "tags": [], "changed": "2026-10-21",
       "about": "A full account number never reaches the page or the desk's files.",
@@ -977,13 +979,13 @@ b, strong { font-weight: var(--weight-semibold); }
         "Look anywhere an account is named."],
       "see": [
         "Only the last four characters (\"•••• 1234\"), never the whole number."] },
-    { "id": "D8", "title": "Refresh", "tags": [], "changed": "2026-10-21",
-      "about": "The dashboard reads Robinhood when you ask, and shows when it last did.",
+    { "id": "D8", "title": "Refresh", "tags": [], "changed": "2026-11-11",
+      "about": "The dashboard reads Robinhood when you ask, and shows when it last did, once, small, beside the buttons.",
       "where": "Dashboard › Your account › Refresh from Robinhood",
       "do": [
         "Press \"Refresh from Robinhood\"."],
       "see": [
-        "It reads \"Reading from Robinhood…\", then \"From Robinhood at <time>\" moves to now."] },
+        "It reads \"Reading from Robinhood…\", then \"Read at <time>\" (with the day when it is not today) moves to now. No account card repeats it."] },
     { "id": "D9", "title": "Disconnect and reconnect", "tags": ["Optional"], "changed": "2026-11-09",
       "about": "Disconnect deletes the saved sign-in from your computer and switches trading off. To end the access on Robinhood's side too, remove it in Robinhood.",
       "where": "Dashboard › Your account",
@@ -1002,7 +1004,22 @@ b, strong { font-weight: var(--weight-semibold); }
       "see": [
         "Each marked row of the block (\"Robinhood · connected\", \"Trading is on\" and the account's name) has a small space above the next, so they do not touch.",
         "The Robinhood and Trading cards stand side by side, each only as tall as its own words: \"Check again\" and \"Disconnect\" sit right under the Robinhood card's text, not at the foot of the taller card.",
-        "On a narrow window the two cards stack one over the other; at a phone's width the caps fields also go one to a line, each row's name over its limits."] }
+        "On a narrow window the two cards stack one over the other; at a phone's width the caps fields also go one to a line, each row's name over its limits.",
+        "Under \"Accounts\" there is no line of words: each card says for itself \"Agentic · the desk may trade here, only on your Confirm\" or \"View only · the desk never trades here\".",
+        "An account that holds nothing shows no sentence about it (its Holdings tile says 0). Nothing at the foot of a card says where the figures come from, and the page's foot says nothing about the sign-in or advice. What stays is what appears only when something failed: \"The orders could not be read.\", \"Not read: …\" and \"N holding(s) could not be read and are left out.\""] },
+    { "id": "D11", "title": "An order says where it stands, in plain words", "tags": [], "changed": "2026-11-11",
+      "about": "Robinhood gives each order a state word (queued, confirmed, filled…). The page puts it in plain words and lists the orders still open first, so \"Any purchases done? Anything pending?\" reads at a glance. The desk reads a state one way: filled, cancelled, rejected, failed, expired and voided are done, and every other state is still open.",
+      "where": "Dashboard › Your account › Orders in this account, and Stock page › Your orders on it",
+      "do": [
+        "In the Agentic account's \"Orders in this account\", look at the State column; if you have an order Robinhood has taken but not filled, find it.",
+        "Open the Stock page of a stock you have ordered (\"Your orders on it\").",
+        "Point at a state, then at the \"Price\" heading."],
+      "see": [
+        "The same table in both places (When, Order, Quantity, Price, State): orders still open first, then the rest in the order Robinhood listed them.",
+        "An order Robinhood has not filled yet (queued or confirmed) reads \"Waiting to buy\" or \"Waiting to sell\" in blue, never \"confirmed\" as if it were done; a partly filled one reads \"Partly filled\"; any other open state reads \"Open: \" and Robinhood's own word.",
+        "A done order reads \"Bought\" or \"Sold\" (filled) in green; \"Cancelled\", \"Expired\" or \"Voided\" plain; \"Refused\" (Robinhood rejected it) or \"Failed\" in red. A state the page cannot read is a dash.",
+        "Pointing at a state says Robinhood's own word, for example \"Robinhood's word: “confirmed”. The desk counts it as still open: only filled, cancelled, rejected, failed, expired and voided orders are done.\"",
+        "Pointing at \"Price\" says \"Robinhood's average price for what has filled, when it gives one; otherwise the price the order is listed at.\""] }
   ] },
   { "id": "E", "name": "Deciding on a call",
     "sub": "The ticket proposes an order from your settings and caps, and Robinhood checks it. Nothing is placed here.",
@@ -1082,13 +1099,13 @@ b, strong { font-weight: var(--weight-semibold); }
     "about": "This is the only road from a call to a real order: trading switched on by you, a ticket Robinhood checked in the last five minutes, and your Confirm on the exact words of the order. Every cap is checked again on fresh figures just before it is sent, and a ticket sends one order at most.",
     "before": "Only if you want to try a real order: money in the Agentic account, Robinhood's phone approval on (F1), and ideally four weeks of paper record first (section L). Keep it to one share.",
     "tests": [
-    { "id": "F1", "title": "Robinhood's phone approval is on", "tags": ["Real money","Optional"], "changed": "2026-10-21",
+    { "id": "F1", "title": "Robinhood's phone approval is on", "tags": ["Real money","Optional"], "changed": "2026-11-11",
       "about": "With approval on, even an order sent from the dashboard waits for your OK on your phone before it reaches the market.",
       "where": "The Robinhood app, then Dashboard › Your account",
       "do": [
-        "In the Robinhood app, make sure agent trades need your approval."],
+        "In the Robinhood app, make sure agent trades need your approval, then press \"Refresh from Robinhood\"."],
       "see": [
-        "The Agentic account says \"Robinhood asks you to approve every trade on your phone\"."] },
+        "Beside \"Orders in this account\" the Agentic account shows \"Phone approval: on\" in green. With the setting off it shows \"Phone approval: off\" in amber instead."] },
     { "id": "F2", "title": "Switch trading on", "tags": ["Real money","Optional"], "changed": "2026-10-21",
       "about": "Switching trading on is yours alone, on the dashboard. With under four weeks of the desk's record on paper, it shows you that record first and asks you to say you understand.",
       "where": "Dashboard › Your account › Trading",
@@ -1110,13 +1127,13 @@ b, strong { font-weight: var(--weight-semibold); }
         "The button names exactly the order: \"Confirm: Buy 1 NVDA at $<price>\", over \"Pressing Confirm sends a real order with real money to Robinhood.\"",
         "\"Robinhood took it\", and \"Robinhood now asks you to approve it on your phone: it is not sent to the market until you do.\" A notice: \"The order is with Robinhood.\"",
         "If Robinhood marks the order rejected or failed, the box says \"Robinhood refused it\", with Robinhood's words. It is never shown as taken."] },
-    { "id": "F4", "title": "Approve or decline on your phone", "tags": ["Real money","Optional"], "changed": "2026-10-21",
+    { "id": "F4", "title": "Approve or decline on your phone", "tags": ["Real money","Optional"], "changed": "2026-11-11",
       "about": "The last word is yours on your phone; the dashboard then shows what Robinhood did.",
       "where": "The Robinhood app, then Dashboard › Your account",
       "do": [
         "Approve (or decline) in the Robinhood app, then press \"Refresh from Robinhood\"."],
       "see": [
-        "The order appears under the Agentic account's \"Orders in this account\", with its state."] },
+        "The order appears under the Agentic account's \"Orders in this account\", with its state in plain words (D11): \"Waiting to buy\" until it is filled, then \"Bought\"."] },
     { "id": "F5", "title": "One order per ticket", "tags": ["Optional"], "changed": "2026-10-21",
       "about": "A ticket can never send twice, so a double press cannot buy twice.",
       "where": "The same NVDA ticket",

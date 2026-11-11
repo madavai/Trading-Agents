@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { markdown } from '../src/terminal/ui/md.js';
-import { averageOf, barOn, chipDay, clock, labelled, money, moveDayOf, num, nyDay, opening, pct, plain, points, priceDayWords, qty, resultOf, shortDay, weekDay, when } from '../src/terminal/ui/fmt.js';
+import { averageOf, barOn, chipDay, clock, labelled, money, moveDayOf, NOTES, num, nyDay, opening, orderState, orderStateWhy, pct, plain, points, priceDayWords, qty, resultOf, shortDay, weekDay, when } from '../src/terminal/ui/fmt.js';
 import { LATE } from '../src/data/delay.js';
 
 const ui = 'src/terminal/ui';
@@ -186,4 +186,39 @@ test('every House object the page names is defined in the House sheet', () => {
   for (const f of sources) for (const m of read(f).matchAll(/\b(at-[a-z0-9]+(?:-[a-z0-9]+)*)\b/g)) names.add(m[1]!);
   const missing = [...names].filter((n) => !new RegExp(`\\.${n}(?![a-z0-9-])`).test(house) && !new RegExp(`\\.${n}(?![a-z0-9-])`).test(mine));
   assert.deepEqual(missing, []);
+});
+
+test('an order\'s state reads in plain words: done states have their own, "queued" and "confirmed" wait, any other open state says Open with Robinhood\'s word (11 Nov 2026)', () => {
+  // The owner's real order was "confirmed", which read as done: it was open and not filled. The desk reads a state one way
+  // only (robinhood/account.ts DONE): filled, cancelled, rejected, failed, expired and voided are done, all others are open.
+  const words = (side: string | null, state: string | null) => orderState(side, state).words;
+  assert.deepEqual([words('buy', 'confirmed'), words('sell', 'confirmed'), words('buy', 'queued'), words('sell', 'queued'), words(null, 'queued')], ['Waiting to buy', 'Waiting to sell', 'Waiting to buy', 'Waiting to sell', 'Waiting']);
+  assert.deepEqual([words('buy', 'filled'), words('sell', 'filled'), words(null, 'filled')], ['Bought', 'Sold', 'Filled']);
+  assert.deepEqual([words('buy', 'cancelled'), words('buy', 'canceled'), words('buy', 'CANCELLED'), words('buy', 'expired'), words('buy', 'voided')], ['Cancelled', 'Cancelled', 'Cancelled', 'Expired', 'Voided']);
+  assert.deepEqual([words('buy', 'rejected'), words('buy', 'failed')], ['Refused', 'Failed']);
+  assert.equal(words('buy', 'partially_filled'), 'Partly filled');
+  assert.equal(words('buy', 'Partially Filled'), 'Partly filled');
+  // a state the desk has not met is still open (as the caps count it), with Robinhood's own word, never a guess at its meaning
+  assert.equal(words('buy', 'pending_cancel'), 'Open: pending cancel');
+  assert.equal(words('buy', null), '—');
+  // open or done is the desk's own reading, for every state
+  for (const [state, open] of [['queued', true], ['confirmed', true], ['partially_filled', true], ['unconfirmed', true], ['filled', false], ['cancelled', false], ['canceled', false], ['rejected', false], ['failed', false], ['expired', false], ['voided', false]] as const) {
+    assert.equal(orderState('buy', state).open, open, state);
+  }
+  // the tone: open in the accent, bought in green, refused and failed in red, the rest plain
+  assert.deepEqual(['confirmed', 'filled', 'rejected', 'cancelled'].map((s) => orderState('buy', s).tone), ['accent', 'ok', 'danger', '']);
+  // hovering says Robinhood's word, and for an open one how the desk reads it
+  assert.equal(orderStateWhy(orderState('buy', 'filled')), "Robinhood's word: “filled”.");
+  assert.equal(orderStateWhy(orderState('buy', 'confirmed')), "Robinhood's word: “confirmed”. The desk counts it as still open: only filled, cancelled, rejected, failed, expired and voided orders are done.");
+  assert.equal(orderStateWhy(orderState('buy', null)), 'Robinhood gave no state for this order.');
+  // the Price column is robinhood/account.ts's own rule: the average price when Robinhood gives one, else the order's price
+  assert.equal(NOTES.orderPrice, "Robinhood's average price for what has filled, when it gives one; otherwise the price the order is listed at.");
+});
+
+test('the page reads "open or done" exactly as the desk counts orders towards its caps (robinhood/account.ts), for every state', async () => {
+  const { openOrders } = await import('../src/robinhood/account.js');
+  for (const state of ['queued', 'confirmed', 'unconfirmed', 'partially_filled', 'pending_cancel', 'filled', 'cancelled', 'canceled', 'rejected', 'failed', 'expired', 'voided', 'Filled', 'CANCELLED']) {
+    const counted = openOrders({ data: { orders: [{ symbol: 'NVDA', side: 'buy', type: 'limit', state, quantity: '2', cumulative_quantity: '0', price: '180.00' }] } }).open.length === 1;
+    assert.equal(orderState('buy', state).open, counted, `${state}: the page and the desk agree on whether it is still open`);
+  }
 });

@@ -4,7 +4,7 @@
 // (Decide…) or the person's own (Trade…) - and is placed only on their Confirm, with trading switched on by them.
 import { api, ApiError, claimKey, hasKey, KEY_LOST, type CallDetail, type DeskState, type Depth, type History, type LinkInfo, type Market, type Match, type Prefs, type Caps, type PaperView, type PaperTrade, type QueueView, type QuoteResult, type Account, type AccountView, type Holding, type Order, type Recent, type Snapshot, type TicketOpen, type Check, type Review, type Placed, type Trading, type Tier, type TierItem, type TierView, type Worth, type Screen, type Weather, type WeatherLine, type HoldingCare } from './api.js';
 import { heroChart, paperChart, sparkline } from './chart.js';
-import { againstOver, averageOf, barOn, chipDay, dayText, esc, labelled, money, moveDayOf, notHorizon, NOTES, num, nyDay, opening, ownReturnLine, pct, plain, points, priceDayWords, qty, rangeFor, ratingMeaning, ratingTone, resultOf, scoreWords, SECTION_NAMES, shortDay, tone, weekDay, when, yardstickWhy } from './fmt.js';
+import { againstOver, averageOf, barOn, chipDay, dayText, esc, labelled, money, moveDayOf, notHorizon, NOTES, num, nyDay, opening, orderState, orderStateWhy, ownReturnLine, pct, plain, points, priceDayWords, qty, rangeFor, ratingMeaning, ratingTone, resultOf, scoreWords, SECTION_NAMES, shortDay, tone, weekDay, when, yardstickWhy } from './fmt.js';
 import { DELAY_SENTENCE, DELAY_SHORT, LATE } from '../../data/delay.js';
 import { GLOSSARY, glossaryGroups, isTerm, means, type TermKey } from './glossary.js';
 import { markdown } from './md.js';
@@ -468,7 +468,30 @@ async function loadCare(): Promise<void> {
   renderCare(); renderViews(); renderStock();
 }
 
-function viewCard(v: AccountView, at: string): string {
+/** The table of orders, in an account's card and on a stock's page: when, what, how many, at what price, and where each
+ *  one stands in plain words (fmt.ts orderState, with Robinhood's own word on hover). Orders still open come first, then
+ *  the rest as Robinhood listed them. */
+function ordersTable(orders: readonly Order[], cur: string, symbols: boolean): string {
+  const open = (x: Order) => orderState(x.side, x.state).open;
+  const row = (x: Order): string => {
+    const s = orderState(x.side, x.state);
+    return `<tr><td>${esc(x.at ? dayText(x.at) : '—')}</td><td>${esc(symbols ? `${sideWord(x.side)} ${x.symbol ?? ''}`.trim() : sideWord(x.side))}${x.type ? ` <small class="at-quiet">${esc(x.type)}</small>` : ''}</td><td class="num">${qty(x.quantity)}</td><td class="num">${money(x.price, cur)}</td><td>${s.raw ? `<span class="at-chip ${s.tone}" title="${esc(orderStateWhy(s))}">${esc(s.words)}</span>` : '—'}</td></tr>`;
+  };
+  return `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>When</th><th>Order</th><th class="num">Quantity</th><th class="num" title="${esc(NOTES.orderPrice)}">Price</th><th>State</th></tr></thead><tbody>${[...orders].sort((a, b) => Number(open(b)) - Number(open(a))).map(row).join('')}</tbody></table></div>`;
+}
+
+/** The Agentic account's phone approval as status: whether Robinhood asks for the person's OK on their phone before an
+ *  order is sent, and how many wait for it. Off is marked, since an order confirmed here is then sent at once. */
+function approvalChips(ap: AccountView['approvals']): string {
+  const mark = (words: string, why: string, kind = '') => `<span class="at-chip ${kind}" title="${esc(why)}">${esc(words)}</span>`;   // not `chip(`: that name is the glossary's word-pointer
+  if (!ap || ap.required === null) return mark('Phone approval: not read', "Robinhood's phone approval setting could not be read.");
+  const setting = ap.required
+    ? mark('Phone approval: on', 'Robinhood asks you to approve every trade of this account on your phone before it is sent.', 'ok')
+    : mark('Phone approval: off', "Robinhood does not ask you to approve this account's trades on your phone: an order you Confirm here is sent at once. You can switch phone approval on in the Robinhood app.", 'warn');
+  return `${setting}${ap.pending ? mark(`${ap.pending} waiting for your approval`, 'Waiting for your OK on your phone.', 'accent') : ''}`;
+}
+
+function viewCard(v: AccountView): string {
   const a = v.account, cur = v.portfolio?.currency ?? 'USD', p = v.portfolio;
   const stocks = v.holdings.filter((h) => h.kind === 'stock').length, coins = v.holdings.filter((h) => h.kind === 'crypto').length;
   const role = a.agentic ? `<span class="at-chip accent" title="${esc(means('agentic'))}">Agentic · the desk may trade here, only on your Confirm</span>` : '<span class="at-chip">View only · the desk never trades here</span>';
@@ -486,24 +509,19 @@ function viewCard(v: AccountView, at: string): string {
     ? `<p class="at-quiet">The desk's view is its latest call on each holding. ${esc(NOTES.stopWatch)} Nothing is ever sold by itself: Sell… opens a ticket that Robinhood checks and you confirm.</p>`
     : "<p class=\"at-quiet\">The desk's view is shown for your information: it proposes orders for the Agentic account alone.</p>";
   const table = v.holdings.length
-    ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>Holding</th><th class="num">Quantity</th><th class="num">Average cost</th><th class="num">Price now</th><th class="num">Value</th><th>Share of the account</th><th class="num">Since bought</th><th class="wrap">The desk's view</th></tr></thead><tbody>${rows}</tbody></table></div>${care}`
-    : '<p class="at-quiet">Nothing is held in this account.</p>';
+    ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>Holding</th><th class="num">Quantity</th><th class="num">Average cost</th><th class="num">Price now</th><th class="num">Value</th><th>Share of the account</th><th class="num">Since bought</th><th class="wrap">The desk's view</th></tr></thead><tbody>${rows}</tbody></table></div>${care}` : '';
   let agentic = '';
   if (a.agentic) {
-    const ap = v.approvals;
-    const phone = ap === null ? "Robinhood's phone approval setting could not be read."
-      : `${ap.required === null ? "Robinhood's phone approval setting could not be read" : ap.required ? 'Robinhood asks you to approve every trade on your phone' : 'Robinhood does not ask you to approve trades on your phone'}${ap.pending ? ` · ${ap.pending} waiting for your approval now` : ''}.`;
     const o = v.orders;
     const orders = o === null ? '<p class="at-quiet">The orders could not be read.</p>'
       : o.count === 0 ? '<p class="at-quiet">No orders in this account yet.</p>'
-      : `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>When</th><th>Order</th><th class="num">Quantity</th><th class="num">Price</th><th>State</th></tr></thead><tbody>${o.orders.map((x: Order) => `<tr><td>${esc(x.at ? dayText(x.at) : '—')}</td><td>${esc(`${sideWord(x.side)} ${x.symbol ?? ''}`.trim())}${x.type ? ` <small class="at-quiet">${esc(x.type)}</small>` : ''}</td><td class="num">${qty(x.quantity)}</td><td class="num">${money(x.price, cur)}</td><td>${esc(x.state ?? '—')}</td></tr>`).join('')}</tbody></table></div>${o.count > o.orders.length ? `<p class="at-quiet">The latest ${o.orders.length} of ${o.count}.</p>` : ''}`;
-    agentic = `<div class="at-card-head"><h3>Orders in this account</h3></div>${orders}<p class="at-honest">${esc(phone)} Keep it on until you trust the desk.</p>`;
+      : `${ordersTable(o.orders, cur, true)}${o.count > o.orders.length ? `<p class="at-quiet">The latest ${o.orders.length} of ${o.count}.</p>` : ''}`;
+    agentic = `<div class="at-card-head ta-orders-head"><h3>Orders in this account</h3><span class="at-card-tail">${approvalChips(v.approvals)}</span></div>${orders}`;
   }
   const problems = v.problems.length ? `<p class="at-honest bad">Not read: ${esc(v.problems.join('; '))}. Those figures are left as dashes.</p>` : '';
   const unread = v.unread ? `<p class="at-honest">${v.unread} holding(s) could not be read and are left out.</p>` : '';
   return `<div class="at-card at-box"><div class="at-card-head"><h3>${esc(a.label)}</h3><span class="at-chip">•••• ${esc(a.last4)}</span>${role}</div>
-    ${tiles}${table}${unread}${agentic}${problems}
-    <p class="at-quiet">From Robinhood at ${esc(when(at))}; holdings valued at Robinhood's live prices.</p></div>`;
+    ${tiles}${table}${unread}${agentic}${problems}</div>`;
 }
 
 function renderViews(): void {
@@ -521,9 +539,11 @@ function renderViews(): void {
     el.innerHTML = `<div class="at-card at-box"><div class="at-card-head"><h3>Your accounts</h3></div><p class="at-lede">Choose which of your Robinhood accounts to show here.</p><div class="at-row">${rhButton('acc-pick', 'Choose accounts', { primary: true })}</div></div>`;
     return;
   }
-  const head = `<div class="at-row">${rhButton('acc-refresh', A.reading ? 'Reading from Robinhood…' : 'Refresh from Robinhood', { primary: !A.snapshot })}${rhButton('acc-pick', 'Change accounts')}</div>`;
-  const body = A.snapshot ? A.snapshot.views.map((v) => viewCard(v, A.snapshot!.at)).join('') : `<p class="at-quiet">${A.reading ? 'Reading your accounts from Robinhood.' : 'Press Refresh to read your accounts from Robinhood.'}</p>`;
-  const shared = A.snapshot && A.shared !== null ? `<p class="at-honest">${A.shared ? "The desk's agents now see these holdings when they analyse a stock: the Agentic account as the one they may size a trade to, the others as view-only context." : 'Some holdings could not be read, so the agents were not given this read: they keep the last complete one.'}</p>` : '';
+  // How fresh the figures are is part of their status: the time of the last read, small, beside the button that reads again.
+  const head = `<div class="at-row">${rhButton('acc-refresh', A.reading ? 'Reading from Robinhood…' : 'Refresh from Robinhood', { primary: !A.snapshot })}${rhButton('acc-pick', 'Change accounts')}${A.snapshot ? `<span class="at-quiet">Read at ${esc(when(A.snapshot.at))}</span>` : ''}</div>`;
+  const body = A.snapshot ? A.snapshot.views.map(viewCard).join('') : `<p class="at-quiet">${A.reading ? 'Reading your accounts from Robinhood.' : 'Press Refresh to read your accounts from Robinhood.'}</p>`;
+  // Said only when something is wrong: when every holding was read the agents are given them without a word about it.
+  const shared = A.snapshot && A.shared === false ? '<p class="at-honest">Some holdings could not be read, so the agents were not given this read: they keep the last complete one.</p>' : '';
   el.innerHTML = head + body + shared;
 }
 
@@ -978,7 +998,7 @@ function renderStock(): void {
     : !ag ? '<p class="at-quiet">Show your Agentic account to see its orders.</p>'
     : ag.orders === null ? '<p class="at-quiet">The orders could not be read.</p>'
     : isCrypto(sym) ? "<p class=\"at-quiet\">The dashboard reads the Agentic account's stock and fund orders only, so a coin's orders are not shown here.</p>"
-    : mine.length ? `<div class="at-box at-tablewrap"><table class="at-table fill"><thead><tr><th>When</th><th>Order</th><th class="num">Quantity</th><th class="num">Price</th><th>State</th></tr></thead><tbody>${mine.map((x) => `<tr><td>${esc(x.at ? dayText(x.at) : '—')}</td><td>${esc(sideWord(x.side))}${x.type ? ` <small class="at-quiet">${esc(x.type)}</small>` : ''}</td><td class="num">${qty(x.quantity)}</td><td class="num">${money(x.price)}</td><td>${esc(x.state ?? '—')}</td></tr>`).join('')}</tbody></table></div>${rest > 0 ? `<p class="at-quiet">Read from ${shown} of the ${count} orders Robinhood listed at ${esc(at)}: ${restWords}.</p>` : ''}`
+    : mine.length ? `${ordersTable(mine, 'USD', false)}${rest > 0 ? `<p class="at-quiet">Read from ${shown} of the ${count} orders Robinhood listed at ${esc(at)}: ${restWords}.</p>` : ''}`
     : !count ? `<p class="at-quiet">Robinhood listed no orders for the Agentic account at ${esc(at)}.</p>`
     : rest > 0 ? `<p class="at-quiet">No orders on ${esc(sym)} among the ${shown} the dashboard reads of the ${count} orders Robinhood listed for the Agentic account at ${esc(at)}: ${restWords}, so ${rest === 1 ? 'it' : 'one of them'} may be.</p>`
     : `<p class="at-quiet">No orders on ${esc(sym)} among the ${count === 1 ? 'one order' : `${count} orders`} Robinhood listed for the Agentic account at ${esc(at)}.</p>`;

@@ -281,6 +281,10 @@
 .ta-term { text-decoration: underline dotted; text-decoration-color: var(--text-3); text-underline-offset: 0.2em; cursor: help; }
 .ta-gloss dt { color: var(--text); font-weight: var(--weight-medium); }
 
+/* the Agentic account's orders: its phone approval and what waits for it are status chips at the head's end, under the heading on a phone */
+.ta-orders-head { flex-wrap: wrap; }
+.at-card > .ta-orders-head > .at-card-tail { flex: 0 1 auto; flex-wrap: wrap; min-width: 0; }
+
 /* a ticket's checks are sentences, some long: each wraps inside the ticket, never cut off at its edge */
 .ta-checks > .at-chip, .ta-caps .at-chip { flex: 0 1 auto; max-width: 100%; height: auto; min-height: var(--chip-height); white-space: normal; line-height: var(--line-tight); padding-block: var(--space-1); }
 
