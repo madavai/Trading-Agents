@@ -146,12 +146,13 @@ the team's "talk" switch shows these messages in the Messages panel; with it off
    with the SEC (accounts, valuation, insider trades, holdings) as made public by that date; economic figures released
    by then, at today's revised values; prices adjusted for every split and dividend since. News, posts and odds exist
    only for recent days, so they are thin.
-2. **You see.** Ask the team to open the dashboard, or type `/terminal`: a page on your own computer that starts with
-   the whole market, the eleven sectors and your own names side by side, then the market weather and what is worth a
-   look today, then the markets, a chart of any stock (area
+2. **You see.** Ask the team to open the dashboard, or type `/terminal`: a page on your own computer that shows
+   the markets, then the whole market, the eleven sectors and your own names side by side, a chart of any stock (area
    or candles, 50- and 200-day averages, volume, at the prices it traded at, as Nasdaq or your broker shows them; the
-   desk's own analyses count dividends as part of the return), your watchlist by tier, a page per stock, the desk's calls with their
-   full reasoning, and how the desk has scored. The agents see your chosen holdings when they analyse.
+   desk's own analyses count dividends as part of the return), your watchlist by tier, a page per stock and the desk's calls with their full reasoning; and, on pages of their own in the side
+   list, Today's market (the market weather and what is worth a look today), How the desk is doing (the paper record and how the
+   desk has scored) and Analysis status (where each analysis you asked for stands). Pressing a stock anywhere on the page
+   brings its chart into view. The agents see your chosen holdings when they analyse.
 3. **You decide and trade.** On a call, "Decide…" opens a ticket for the Agentic account, sized by your settings and
    checked against your caps; beside a stock's price, "Trade…" opens your own ticket instead, buy or sell, starting at
    one share. Either way "Review with Robinhood" is Robinhood's own dry run, and with trading switched on (by you, on
@@ -247,8 +248,8 @@ never from what the page says happened:
    two. It ticks with three of your own names, a whole-market fund and a sector fund watched (or asked about). The desk
    suggests no company: the names are yours.
 3. **Ask the desk to analyse them, shallow, and switch on running automatically.** One press asks for every pick it has
-   not called yet, at shallow depth; another switches on "Run automatically with Claude Code" (or use Madav's
-   routine). It ticks when something is asked for and something runs it.
+   not called yet, at shallow depth; running automatically is Madav's "Run automatically" routine. It ticks when
+   something is asked for and something runs it.
 4. **Read your first calls**, with what Buy, Hold, Sell and alpha mean beside them. It ticks when you open a call in
    full.
 5. **Follow them on paper for four weeks, then read the scorecard** before deciding anything about money and Robinhood.
@@ -263,24 +264,29 @@ you point at that word anywhere on the dashboard (a dotted line marks such a wor
 so a word means the same thing everywhere.
 
 ### Start here: the whole market first
-The first section of the dashboard shows the world in tiers, broadest first, because the broadest risk is the steadiest:
+After the markets row, the dashboard shows the world in tiers, broadest first, because the broadest risk is the steadiest:
 - **The whole market**: as shipped, four funds: SPY (the S&P 500 fund), QQQ (the Nasdaq 100 fund), VT (the whole world) and BND
-  (US bonds). Press Change… to choose your own, up to eight funds or stocks; each is checked with Yahoo Finance before
-  it is kept, and "Put back" brings the four back. Sector funds and crypto are refused there: they have tiers of their own.
+  (US bonds). Choose your own, up to eight: search a fund in the box at the top and press "Show in The whole market"
+  under it (only a fund the row can take gets that button, never a sector fund, a coin, an index or a single company),
+  and take one out with the ✕ on its tile. Each is checked with Yahoo Finance before it is kept, and "Put back" brings
+  the four back.
 - **Sectors**: the eleven S&P sector funds, from XLK (technology) to XLC (communication), each named in plain words with
   what it holds.
 - **Single names**: the companies on your watchlist, starred first (twelve here at most; the rest are in the watchlist).
 - **Crypto**: Bitcoin and Ether when you watch them. They are followed on paper only: a coin never opens an order
   ticket, and its calls say "on paper only" where a stock's say Decide….
 
-Each tile shows the day's move (with the day named, such as Fri, when it was not today; a dash when Yahoo Finance gave
-none), the desk's latest call with its date or "no call yet", the robot, which asks the desk to analyse a fund as readily as a stock (for a fund it reads what it holds, from
-its reports to the SEC), and + to add it to your watchlist. Every trading word has its meaning beside it: under each tier, at the
+Each tile is three lines, the same on every tile. The first is its plain name. The second has a badge with its code (shaded by
+what Yahoo Finance says it is: blue for a fund, teal for a company, amber for a coin, plain for anything else) and the day's
+move (with the day named, such as Fri, when it was not today; a dash when Yahoo Finance gave none). The third has the desk's
+latest rating or "no call", then the robot, which asks the desk to analyse a fund as readily as a stock (for a fund it reads what it holds, from
+its reports to the SEC), and + to add it to your watchlist. Point at a tile for its full name, what it holds, and the desk's
+latest call with its day; press it to chart it. Every trading word has its meaning beside it: under each tier, at the
 foot of the section, and on each rating and dotted word when you point at it. The watchlist further down is grouped the
 same way; press a tier's name to fold it away, and the dashboard remembers which you folded.
 
-### This morning: the market weather, and what is worth a look
-Right after Start here, two cards are worked out from figures, at most once an hour, and never from a model or a
+### Today's market: the market weather, and what is worth a look
+On a page of its own, opened from "Today's market" in the side list (it refreshes all day, so it is not named for the morning), two cards are worked out from figures, at most once an hour, and never from a model or a
 forecast:
 - **Market weather**, three plain lines, each with a colour and its meaning. The **trend**: the S&P 500 against its 50-
   and 200-day averages (above both rising, between them mixed, below both falling). The **mood**: the VIX, the market's
@@ -326,8 +332,8 @@ needs a look", with the reason and what you can do. Outside the dashboard only t
 runs; nothing comes by email or to your phone.
 
 ### Your paper record
-Before you risk money, every call the desk makes on a stock, a fund, Bitcoin or Ether is followed on paper, and after
-Start here and This morning the dashboard shows what that would have done: one sentence, a line of the paper money
+Before you risk money, every call the desk makes on a stock, a fund, Bitcoin or Ether is followed on paper, and on its own page,
+How the desk is doing (in the side list), the dashboard shows what that would have done: one sentence, a line of the paper money
 against SPY (the fund that copies the S&P 500) from the same start, and how many weeks and calls stand behind it. Each call is sized exactly as its order ticket would size it (the rating, a full
 position of 10%, your caps), takes no order the real ticket would refuse, and fills at the first closing price after
 the call's day, as the market printed it. Each dividend is paid into paper cash on its ex-dividend day, as an account
@@ -347,19 +353,19 @@ indices are analysed but not followed on paper.
 
 ### Analyses that run by themselves
 Press the robot beside any stock, choose how deep (shallow, medium or deep; your settings' depth is chosen first) and
-press "Ask the desk". The stock joins **Analyses you asked for**, where each one shows where it stands: waiting, being
-analysed (with the step it is on), done with its rating, or failed with the reason and a Retry. When one finishes, a
+press "Ask the desk". The stock joins **Analysis status**, a page of its own in the side list (a small count beside its
+name shows how many are waiting or being analysed, and a red dot that one has failed), where each one shows where it
+stands: waiting, being analysed (with the step it is on), done with its rating, or failed with the reason and a Retry.
+A finished one clears from the page when its stock has a newer call or a week has passed; every call stays in the desk's
+calls. When one finishes, a
 notice says so wherever you are on the page. One stock is analysed at a time, at most five a run (the routines' limit
 in `desk-settings.json`); the rest wait for the next run, which is asked for by itself. Each runs at the depth you
 chose, whatever the team's lead plans: the time and the model allowance it spends are yours.
 
-Something has to run them. The page says who is listening:
+Something has to run them, and the desk starts no run of its own: it runs analyses only in the app it runs in, never in
+another app beside it. The dashboard has no button that starts Claude Code. The page says who is listening:
 - **Madav**: switch on its "Run automatically when the dashboard asks" routine, once. The project ships it, off; it
   watches the dashboard's doorbell and runs the trading-desk team as you set it up in Madav.
-- **Claude Code**: press "Run automatically with Claude Code" on the dashboard. It starts the desk's own listener
-  (`node dist/watch.mjs`), which runs the trading-desk team with Claude Code on this computer whenever you ask for an
-  analysis, and keeps a log in `desk-data/watcher.log`. It stays on until you switch it off, and starts again with
-  the dashboard. Each run uses your own Claude Code plan, like a chat.
 - **By hand**: ask the desk to "analyse what is waiting" in a chat, or type `/analyse` with no stock.
 
 A run of the waiting list never asks you anything: what it cannot do (for example, no email saved for the SEC yet) is
@@ -367,13 +373,10 @@ marked failed with the reason, for you to fix and Retry. An analysis takes a whi
 Madav, on its default model), about 40 minutes at shallow depth and nearly 3 hours at medium; deep runs more rounds.
 However long it takes, a stock is never marked failed while its analysis is still saving its steps.
 
-When the run itself stops early, the stock it was on says why in plain words. With the desk's own Claude Code
-listener it says so at once: for example "Claude Code's weekly usage limit was reached; it resets 6am
-(America/Chicago). Press Retry after that." With Madav it can say so at once only when Madav's note gives the time its
-run ended, which it does not yet: until then the stock shows "being analysed" until nothing has been saved for it for
+When the run itself stops early, the stock it was on says why in plain words. With Madav it can say so at once only
+when Madav's note gives the time its run ended, which it does not yet: until then the stock shows "being analysed" until nothing has been saved for it for
 two hours, then failed, saying exactly that. If a stock marked failed that way was in fact still going, it shows done
-once its call is recorded. The desk's own listener stops a run that has saved nothing for two hours, or that has
-analysed one stock for six hours (in case the team is going round in a loop), and says so beside the stock. On the
+once its call is recorded. On the
 same day, Retry carries on from the step it stopped at.
 
 The desk counts days by New York's calendar, the market's own, wherever your computer is: an analysis run on an

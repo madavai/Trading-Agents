@@ -85,8 +85,6 @@
     dequeue: (symbol) => call("DELETE", `/api/queue?${q({ symbol })}`),
     /** Rings again for what is waiting (Run now). */
     runQueue: () => call("POST", "/api/queue/run", {}),
-    /** "Run automatically with Claude Code": the desk's own listener, on or off. */
-    listen: (on) => call("POST", "/api/listen", { on }),
     robinhood: () => call("GET", "/api/robinhood"),
     connectRobinhood: () => call("POST", "/api/robinhood/connect", {}),
     checkRobinhood: () => call("POST", "/api/robinhood/check", {}),
@@ -650,6 +648,25 @@
     return kind === "crypto" ? `${cryptoBase(s) ?? s}-USD` : yahooClass(s);
   }
 
+  // src/terminal/ui/marketpick.ts
+  var FUND_KINDS = ["ETF", "Fund"];
+  function marketOffer(m, row, sectorFunds, max) {
+    if (!m.kind || !FUND_KINDS.includes(m.kind) || isCrypto(m.symbol) || /[\^=]/.test(m.symbol) || sectorFunds.has(m.symbol)) return "none";
+    if (row.includes(m.symbol)) return "in";
+    return row.length >= max ? "full" : "show";
+  }
+
+  // src/terminal/ui/analyses.ts
+  var STALE_MS = 7 * 864e5;
+  function isStale(x, calls, now = Date.now()) {
+    if (x.state !== "done") return false;
+    if (x.date && calls.some((c) => c.ticker === x.symbol && c.date > x.date)) return true;
+    return now - Date.parse(x.endedAt ?? x.requestedAt) > STALE_MS;
+  }
+  function standing(queue) {
+    return { open: queue.filter((x) => x.state === "waiting" || x.state === "running").length, failed: queue.filter((x) => x.state === "failed").length };
+  }
+
   // src/terminal/ui/main.ts
   var RANGES = ["1M", "3M", "6M", "1Y", "5Y"];
   var OVER = { "1M": "the month", "3M": "three months", "6M": "six months", "1Y": "the year", "5Y": "five years" };
@@ -669,7 +686,9 @@
     historyError: "",
     lost: false
   };
+  var VIEWS = ["overview", "account", "today", "score", "analyses"];
   var view = "overview";
+  var STATUS_LINK = '<button class="ta-link" data-act="view" data-view="analyses">Analysis status</button>';
   var $ = (sel) => document.querySelector(sel);
   var isQuote = (q2) => !!q2 && !("error" in q2);
   var isIndex = (sym) => sym.startsWith("^");
@@ -711,11 +730,14 @@
     }
   }
   var RECENT_MAX = 6;
-  function toast(text, kind = "ok") {
+  function toast(text, kind = "ok", opens) {
     const el = document.createElement("div");
     el.className = `at-toast ${kind}`;
     el.textContent = text;
-    el.addEventListener("click", () => el.remove());
+    el.addEventListener("click", () => {
+      el.remove();
+      if (opens) showView(opens);
+    });
     $("#toasts").append(el);
     setTimeout(() => el.classList.add("gone"), 4500);
     setTimeout(() => el.remove(), 5e3);
@@ -848,8 +870,8 @@
       a.done,
       `Ask the desk to analyse them, ${term("depth", "shallow")}, and switch on running automatically`,
       `<div class="at-row">${factChip(a.asked > 0, `${a.asked} asked for`)}${factChip(!!a.automatic, a.automatic ? `runs by itself: ${a.automatic}` : "not running by itself yet")}</div>
-    <p class="at-quiet ta-gwhy">Shallow is the quickest and costs least: each analysis is a full team run on the models of whatever runs it (Madav's own, or your Claude plan with Claude Code). Running automatically means each one you ask for starts by itself, one at a time; they are listed under Analyses you asked for.</p>
-    <div class="at-row">${ask2.length ? `<button class="at-btn at-press primary" data-act="guide-ask"${GUIDE.asking ? " disabled" : ""}><svg class="g"><use href="#i-bot"/></svg><span>${GUIDE.asking ? "Asking\u2026" : `Ask for your ${ask2.length === 1 ? "pick" : `${ask2.length} picks`}, shallow`}</span></button>` : ""}${l ? "" : '<button class="at-btn at-press" data-act="listen-on"><span>Run automatically with Claude Code</span></button>'}</div>
+    <p class="at-quiet ta-gwhy">Shallow is the quickest and costs least: each analysis is a full team run on the models of the app that runs it. Running automatically means each one you ask for starts by itself, one at a time; they are listed under ${STATUS_LINK}.</p>
+    <div class="at-row">${ask2.length ? `<button class="at-btn at-press primary" data-act="guide-ask"${GUIDE.asking ? " disabled" : ""}><svg class="g"><use href="#i-bot"/></svg><span>${GUIDE.asking ? "Asking\u2026" : `Ask for your ${ask2.length === 1 ? "pick" : `${ask2.length} picks`}, shallow`}</span></button>` : ""}</div>
     ${l ? "" : '<p class="at-quiet">Or switch on "Run automatically" in Madav, if you use it.</p>'}`
     );
     const r = g.read, mean = (k) => `<div><dt>${esc(GLOSSARY[k].term)}</dt><dd>${esc(GLOSSARY[k].means)}</dd></div>`;
@@ -867,7 +889,7 @@
       `Follow them ${term("paper", "on paper")} for ${esc(w.words)}, then read the ${term("scorecard", "scorecard")} before deciding about money and Robinhood`,
       `<div class="at-meter${w.done ? " ok" : ""}"><progress class="at-bar" max="${w.need}" value="${Math.min(w.weeks, w.need)}" aria-label="${w.weeks} of ${w.need} weeks on paper"></progress><b>${Math.min(w.weeks, w.need)} of ${w.need} weeks</b></div>
     <p class="at-quiet ta-gwhy">Paper follows every call with pretend money, against SPY, the fund that copies the ${term("sp500", "S&P 500")}. A few weeks are noise, not proof: read the scorecard, good or bad, before you decide anything. Connecting Robinhood and switching trading on stay your own decisions.</p>
-    <div class="at-row"><button class="at-btn at-press" data-act="goto" data-to="sec-score"><svg class="g"><use href="#i-target"/></svg><span>Go to the scorecard</span></button></div>`
+    <div class="at-row"><button class="at-btn at-press" data-act="view" data-view="score"><svg class="g"><use href="#i-target"/></svg><span>Go to the scorecard</span></button></div>`
     );
     const all = g.done === g.of;
     $("#guideSub").textContent = all ? "All five done. The desk keeps reading and proposing; every decision stays yours." : "A safe first month, one step at a time. Each step ticks itself off when it is done, here or by asking the desk in a chat, except reading your first calls: that one ticks when you open a call here.";
@@ -1576,7 +1598,7 @@
       return;
     }
     if (!c) {
-      el.innerHTML = `${label}<span class="at-quiet ta-callbar-t">No call on ${esc(sym)} yet${isOpen(sym) ? ": it is asked for, see Analyses you asked for" : ". Ask the desk to analyse it, above"}.</span>`;
+      el.innerHTML = `${label}<span class="at-quiet ta-callbar-t">No call on ${esc(sym)} yet${isOpen(sym) ? `: it is asked for, see ${STATUS_LINK}` : ". Ask the desk to analyse it, above"}.</span>`;
       return;
     }
     el.innerHTML = `${label}${ratingChip(c.rating)}<span class="at-quiet">${esc(dayText(c.date))}</span>${resultChip(c)}${paperChip(c.ticker, c.date)}
@@ -1594,9 +1616,12 @@
     const d = S.desk;
     if (!d) return;
     const q2 = d.queue, l = d.analyses.listener, waiting = q2.filter((x) => x.state === "waiting").length, running = q2.some((x) => x.state === "running");
-    $("#analysesSub").textContent = l ? `Runs by itself: ${l.listener} is listening on this computer${l.lastRun ? ` \xB7 last run ${l.lastRun.startOnly ? "started " : ""}${when(l.lastRun.at)}: ${l.lastRun.result.replace(/[\s.]+$/, "")}` : ""}. One stock at a time, at most ${d.analyses.perRun} a run.` : 'Nothing is listening, so analyses wait here. Switch on "Run automatically" in Madav, or run them with Claude Code on this computer, or ask the desk to "analyse what is waiting" in a chat.';
+    const { open, failed } = standing(q2);
+    $("#analysesCount").innerHTML = `${open ? `<span title="${open} waiting or being analysed">${open}</span>` : ""}${failed ? `${open ? " " : ""}<span class="at-dot bad" role="img" aria-label="${failed} failed" title="${failed} failed"></span>` : ""}`;
+    const listed = q2.filter((x) => !isStale(x, d.calls)), cleared = q2.length - listed.length;
+    $("#analysesSub").textContent = l ? `Runs by itself: ${l.listener} is listening on this computer${l.lastRun ? ` \xB7 last run ${l.lastRun.startOnly ? "started " : ""}${when(l.lastRun.at)}: ${l.lastRun.result.replace(/[\s.]+$/, "")}` : ""}. One stock at a time, at most ${d.analyses.perRun} a run.` : 'Nothing is listening, so analyses wait here. Switch on "Run automatically" in Madav, or ask the desk to "analyse what is waiting" in a chat.';
     const press = (act, words, primary = false) => `<button class="at-btn at-press${primary ? " primary" : ""}" data-act="${act}">${esc(words)}</button>`;
-    $("#analysesDo").innerHTML = (l && waiting && !running ? press("q-run", "Run now") : "") + (!l ? press("listen-on", "Run automatically with Claude Code", waiting > 0) : l.listener === "Claude Code" ? press("listen-off", "Stop running automatically") : "");
+    $("#analysesDo").innerHTML = l && waiting && !running ? press("q-run", "Run now") : "";
     const stands = (x) => {
       if (x.state === "running") return `<span class="at-chip accent">Being analysed</span> <span class="at-quiet">${esc(x.progress ?? "starting")}</span>`;
       if (x.state === "waiting") return `<span class="at-chip">Waiting</span>${l ? "" : ' <span class="at-quiet">for a run to start</span>'}`;
@@ -1610,8 +1635,9 @@
       if (x.state === "failed") return `<span class="at-row"><button class="at-btn at-press" data-act="q-retry" data-symbol="${esc(x.symbol)}">Retry</button>${off}</span>`;
       return `<span class="at-row">${off}</span>`;
     };
-    const rows = q2.map((x) => `<tr><td><b>${esc(x.symbol)}</b></td><td>${esc(x.depth ? DEPTH_WORDS[x.depth][0] : "Settings")}</td><td class="wrap">${stands(x)}</td><td class="at-quiet">${esc(dayText(x.requestedAt))}</td><td>${doing(x)}</td></tr>`).join("");
-    $("#analysesTable").innerHTML = `<thead><tr><th>Stock</th><th>${term("depth")}</th><th class="wrap">Where it stands</th><th>Asked</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="ta-empty">Nothing asked for yet. Press the robot beside a stock to ask the desk to analyse it.</td></tr>'}</tbody>`;
+    const rows = listed.map((x) => `<tr><td><b>${esc(x.symbol)}</b></td><td>${esc(x.depth ? DEPTH_WORDS[x.depth][0] : "Settings")}</td><td class="wrap">${stands(x)}</td><td class="at-quiet">${esc(dayText(x.requestedAt))}</td><td>${doing(x)}</td></tr>`).join("");
+    $("#analysesTable").innerHTML = `<thead><tr><th>Stock</th><th>${term("depth")}</th><th class="wrap">Where it stands</th><th>Asked</th><th></th></tr></thead><tbody>${rows || `<tr><td colspan="5" class="ta-empty">${cleared ? "Nothing is waiting or running." : "Nothing asked for yet."} Press the robot beside a stock to ask the desk to analyse it.</td></tr>`}</tbody>`;
+    $("#analysesHidden").textContent = cleared ? `${cleared} older finished ${cleared === 1 ? "analysis is" : "analyses are"} not shown (a newer call on the stock, or finished over 7 days ago). Every call stays in The desk's calls.` : "";
   }
   function noticeFinished(before, after) {
     if (!before) return;
@@ -1686,37 +1712,45 @@
       }
     }
   }
-  var MK = { editing: false };
+  var MK = { saving: false };
   var EMPTY = {
-    market: "You chose no whole-market funds. Press Change\u2026 to add one, such as SPY.",
+    market: "The whole market is empty. Search a fund in the box at the top, such as SPY, and press Show in The whole market.",
     names: "No single names on your watchlist yet: search a company above to add one. Bitcoin and Ether can be watched too, on paper only."
   };
-  function tierTile(i) {
-    const q2 = quoteOf(i.symbol);
-    const call2 = i.call ? `${ratingChip(i.call.rating)}<span class="at-quiet">${esc(dayText(i.call.date))}</span>` : `<span class="at-quiet" title="${esc(means("call"))}">no call yet</span>`;
-    const ask2 = (isIndex(i.symbol) ? "" : isOpen(i.symbol) ? openChip(i.symbol) : robot(i.symbol)) + (i.watched ? "" : `<button class="icon-btn" data-act="watch-add" data-symbol="${esc(i.symbol)}" title="Add ${esc(i.symbol)} to your watchlist" aria-label="Add ${esc(i.symbol)} to your watchlist"><svg class="g"><use href="#i-plus"/></svg></button>`);
-    return `<div class="at-tile at-box ta-tier-tile${i.symbol === S.symbol ? " on" : ""}">
-    <button class="ta-tier-go" data-act="select" data-symbol="${esc(i.symbol)}" title="Chart ${esc(i.symbol)}">
-      <span class="ta-tier-top"><b class="at-tile-name">${esc(i.name ?? q2?.name ?? i.symbol)}</b>${changeChip(q2)}</span>
-      <span class="at-tile-sub">${esc(i.symbol)}${i.meaning ? ` \xB7 ${esc(i.meaning)}` : ""}</span>
-    </button>
-    <div class="at-tile-foot">${call2}${i.ticket ? "" : noTicketChip(i.paper)}<span class="at-tail">${ask2}</span></div>
+  var kindOf = (sym, tier) => {
+    const q2 = quoteOf(sym);
+    if (q2) return q2.kind ?? "";
+    const at = tier ?? S.desk?.startHere.find((t) => (t.tier === "market" || t.tier === "sectors") && t.items.some((i) => i.symbol === sym))?.tier;
+    return at === "market" || at === "sectors" ? "fund" : "";
+  };
+  var badgeLetters = (sym) => (cryptoBase(sym) ?? sym.replace(/^\^/, "").split(/[-.=]/)[0] ?? sym).slice(0, 4).toUpperCase();
+  var badge = (sym, kind) => `<span class="at-logo-box sm ta-badge${kind ? ` ${kind}` : ""}"><span class="at-logo fallback">${esc(badgeLetters(sym))}</span></span>`;
+  function tileWords(i, name) {
+    return [
+      name,
+      `${i.symbol}${i.meaning ? ` \xB7 ${i.meaning}` : ""}`,
+      i.call ? `The desk's latest call: ${i.call.rating}, ${dayText(i.call.date)}.` : "The desk has made no call on it yet.",
+      ...i.ticket ? [] : [i.paper ? `${means("paper")} ${NOTES.coinOnPaper}` : NOTES.noTicket]
+    ].join("\n");
+  }
+  function tierTile(i, tier) {
+    const q2 = quoteOf(i.symbol), name = i.name ?? q2?.name ?? i.symbol, words = esc(tileWords(i, name));
+    const call2 = i.call ? ratingChip(i.call.rating) : `<span class="at-quiet" title="${esc(means("call"))}">no call</span>`;
+    const out = `Take ${i.symbol} out of The whole market`;
+    const ask2 = (isIndex(i.symbol) ? "" : isOpen(i.symbol) ? openChip(i.symbol) : robot(i.symbol)) + (i.watched ? "" : `<button class="icon-btn" data-act="watch-add" data-symbol="${esc(i.symbol)}" title="Add ${esc(i.symbol)} to your watchlist" aria-label="Add ${esc(i.symbol)} to your watchlist"><svg class="g"><use href="#i-plus"/></svg></button>`) + (tier === "market" ? `<button class="icon-btn" data-act="mk-remove" data-symbol="${esc(i.symbol)}" title="${esc(out)}" aria-label="${esc(out)}"><svg class="g"><use href="#i-x"/></svg></button>` : "");
+    return `<div class="at-tile at-box ta-tier-tile${i.symbol === S.symbol ? " on" : ""}" title="${words}">
+    <button class="ta-tier-go" data-act="select" data-symbol="${esc(i.symbol)}" title="${words}"><b class="at-tile-name">${esc(name)}</b></button>
+    <div class="ta-tile-row"><span class="ta-tile-id">${badge(i.symbol, kindOf(i.symbol, tier))}${changeChip(q2)}</span><span class="ta-tile-rate">${call2}</span><span class="at-tail">${ask2}</span></div>
   </div>`;
   }
-  function marketEditor() {
-    const m = S.desk.market;
-    return `<div class="at-row">
-    <label class="at-field ta-grow"><span class="at-field-l">Up to ${m.max} broad funds, by ticker, separated by commas</span><input class="at-input at-box" id="mkInput" type="text" value="${esc(m.symbols.join(", "))}" maxlength="160" spellcheck="false" autocomplete="off"></label>
-    <button class="at-btn at-press primary" data-act="mk-save">Save</button><button class="at-btn at-press" data-act="mk-cancel">Cancel</button>${m.asShipped ? "" : `<button class="at-btn at-press" data-act="mk-shipped">Put back ${esc(listWords(m.shipped))}</button>`}
-  </div><p class="at-quiet">Each is checked with Yahoo Finance before it is kept. Sector funds and crypto have tiers of their own.</p>`;
-  }
-  function tierBlock(t) {
-    const change = t.tier === "market" && !MK.editing ? '<button class="at-btn at-press" data-act="mk-edit" title="Choose the broad funds this tier shows">Change\u2026</button>' : "";
+  function tierBlock(t, market) {
+    const putBack = t.tier === "market" && !market.asShipped ? `<button class="at-btn at-press" data-act="mk-shipped">Put back ${esc(listWords(market.shipped))}</button>` : "";
     const name = t.tier === "sectors" ? term("sector", t.name) : t.tier === "crypto" ? term("crypto", t.name) : t.tier === "names" ? term("stock", t.name) : esc(t.name);
-    const head = `<div class="ta-tier-head"><h3>${name}</h3><p class="at-quiet">${esc(t.meaning)}</p>${change}</div>`;
-    const body = t.items.length ? `<div class="at-deck ta-tier-deck">${t.items.map(tierTile).join("")}</div>` : `<p class="at-quiet">${esc(EMPTY[t.tier] ?? "")}</p>`;
+    const head = `<div class="ta-tier-head"><h3>${name}</h3><p class="at-quiet">${esc(t.meaning)}</p>${putBack}</div>`;
+    const body = t.items.length ? `<div class="at-deck ta-tier-deck">${t.items.map((i) => tierTile(i, t.tier)).join("")}</div>` : `<p class="at-quiet">${esc(EMPTY[t.tier] ?? "")}</p>`;
+    const how = t.tier === "market" && t.items.length ? '<p class="at-quiet">\u2715 takes a fund out of this row. To add one, search for it in the box at the top and press Show in The whole market.</p>' : "";
     const more = t.more ? `<div class="at-row"><button class="at-btn at-press" data-act="goto" data-to="sec-watch">${t.more} more on your watchlist</button></div>` : "";
-    return `<div class="ta-tier">${head}${t.tier === "market" && MK.editing ? marketEditor() : ""}${body}${more}</div>`;
+    return `<div class="ta-tier">${head}${body}${how}${more}</div>`;
   }
   function renderStart() {
     const d = S.desk, el = $("#startHere");
@@ -1724,17 +1758,7 @@
       el.innerHTML = `<p class="at-quiet">Reading the desk's files.</p>`;
       return;
     }
-    const typing = document.getElementById("mkInput");
-    const kept = typing ? { value: typing.value, focus: document.activeElement === typing, from: typing.selectionStart, to: typing.selectionEnd } : null;
-    el.innerHTML = d.startHere.map(tierBlock).join("") + `<p class="at-honest">${term("today")} is the change over the latest trading day, from the close before it, with the day named (Fri) when it was not today; a dash is a price Yahoo Finance did not give. Each ${term("call", "call")} is the desk's rating, from Buy to Sell: Buy and Overweight lean towards owning it, Hold keeps what is held, Underweight and Sell lean against it, and pointing at a rating says what its ticket does. A ${term("fund", "fund")} holds many companies at once; + adds one to your watchlist. Nothing here is investment advice.</p>`;
-    const field = document.getElementById("mkInput");
-    if (kept && field) {
-      field.value = kept.value;
-      if (kept.focus) {
-        field.focus();
-        field.setSelectionRange(kept.from, kept.to);
-      }
-    }
+    el.innerHTML = d.startHere.map((t) => tierBlock(t, d.market)).join("") + `<p class="at-honest">${term("today")} is the change over the latest trading day; a dash is a price Yahoo Finance did not give. Each ${term("call", "call")} is the desk's rating, Buy to Sell; a ${term("fund", "fund")} holds many companies at once. Nothing here is investment advice.</p>`;
   }
   var MORNING = { weather: null, weatherFailed: "", screen: null, screenFailed: "", on: false, known: false, top: 3, from: "" };
   var LINE_TONE = { ok: "ok", warn: "warn", bad: "danger", "": "" };
@@ -1755,14 +1779,14 @@
     const it = tierItem(p.symbol), name = it?.name ?? quoteOf(p.symbol)?.name ?? p.symbol;
     const move = p.movePct === null ? '<span class="at-chip">\u2014</span>' : `<span class="at-chip ${tone(p.movePct)}" title="${p.live ? `The move on ${esc(dayText(p.session))} as read before its close was final, from the close before` : `The move on ${esc(dayText(p.session))}, from the close before`}">${pct(p.movePct)}</span>`;
     return `<div class="ta-look">
-    <button class="ta-look-go" data-act="select" data-symbol="${esc(p.symbol)}" title="Chart ${esc(p.symbol)}"><span class="ta-tier-top"><b class="at-tile-name">${esc(name)}</b>${move}</span><span class="at-tile-sub">${esc(p.symbol)} \xB7 ${esc(p.why)}</span></button>
+    <button class="ta-look-go" data-act="select" data-symbol="${esc(p.symbol)}" title="Chart ${esc(p.symbol)}"><span class="ta-tier-top">${badge(p.symbol, kindOf(p.symbol))}<b class="at-tile-name">${esc(name)}</b>${move}</span><span class="at-tile-sub">${esc(p.symbol)} \xB7 ${esc(p.why)}</span></button>
     <span class="at-tail">${isOpen(p.symbol) ? openChip(p.symbol) : robot(p.symbol)}</span></div>`;
   }
   function renderLook() {
     const s = MORNING.screen, el = $("#lookCard");
     const head = `<div class="at-card-head"><h3>Worth a look today</h3>${s ? `<span class="at-chip" title="How many funds and stocks were looked at">${s.picks.length} of ${s.looked}</span>` : ""}</div>`;
     const sw = !MORNING.known ? `<p class="at-quiet">${MORNING.screenFailed ? "Whether" : "Reading whether"} "Analyse the top ${MORNING.top} each market morning" is on${MORNING.screenFailed ? " could not be read just now" : ""}.</p>` : `<button class="at-toggle" data-act="morning-switch" role="switch" aria-checked="${MORNING.on}"><span class="at-switch${MORNING.on ? " on" : ""}"></span><span>Analyse the top ${MORNING.top} each market morning</span></button>
-    <p class="at-quiet">${MORNING.on ? `On${MORNING.from ? `, from ${esc(dayText(MORNING.from))}` : ""}: each market morning (before noon in New York), the top ${MORNING.top} not already called that day go on the waiting list at shallow depth, once. Each analysis is a full team run on the models of whatever runs it (Madav's own, or your Claude plan with Claude Code).` : `Off as shipped. When on, it starts the next market morning: then the top ${MORNING.top} go on the waiting list at shallow depth once each market morning, and run when something is listening. Switching it on puts nothing on the list at once.`}</p>`;
+    <p class="at-quiet">${MORNING.on ? `On${MORNING.from ? `, from ${esc(dayText(MORNING.from))}` : ""}: each market morning (before noon in New York), the top ${MORNING.top} not already called that day go on the waiting list at shallow depth, once. Each analysis is a full team run on the models of the app that runs it.` : `Off as shipped. When on, it starts the next market morning: then the top ${MORNING.top} go on the waiting list at shallow depth once each market morning, and run when something is listening. Switching it on puts nothing on the list at once.`}</p>`;
     if (!s) {
       el.innerHTML = `${head}<p class="at-quiet">${esc(MORNING.screenFailed || "Looking over the whole market, the sectors and your names: the first look of the day takes a minute.")}</p>${sw}`;
       return;
@@ -1803,13 +1827,21 @@
     renderMorning();
   }
   async function saveMarketList(symbols) {
-    await run(async () => {
-      const { market } = await api.setMarket(symbols);
-      MK.editing = false;
-      await refreshState();
-      void refreshQuotes();
-      toast(market.symbols.length ? `The whole market now shows ${listWords(market.symbols)}.` : "The whole market shows no funds now.");
-    });
+    if (MK.saving) {
+      toast("The whole market is still being saved. Press again in a moment.", "bad");
+      return;
+    }
+    MK.saving = true;
+    try {
+      await run(async () => {
+        const { market } = await api.setMarket(symbols);
+        await refreshState();
+        void refreshQuotes();
+        toast(market.symbols.length ? `The whole market now shows ${listWords(market.symbols)}.` : "The whole market shows no funds now.");
+      });
+    } finally {
+      MK.saving = false;
+    }
   }
   function renderCalls() {
     const d = S.desk;
@@ -1879,6 +1911,7 @@
     if (!d) return;
     renderPaper();
     const r = d.record.summary, pctOf = (v) => pct(v * 100, 1);
+    $("#scoreIntro").textContent = `It runs by itself: each call the desk records is followed with pretend money, at the first close after its day and sized as its order ticket would size it, and compared with just holding ${fundWords(d.desk.benchmark)}. The scorecard grades each call once, over its first ${d.desk.holdingDays} market days, and nothing here needs pressing, apart from the paper money you start with.`;
     $("#scoreSub").textContent = `${r.resolved} scored \xB7 ${r.pending} waiting${r.unscored ? ` \xB7 ${r.unscored} unreadable` : ""}`;
     const names = [...RATINGS.filter((x) => r.byRating[x]), ...Object.keys(r.byRating).filter((x) => !RATINGS.includes(x))];
     const grid = names.length ? `<div class="ta-score"><span class="head">Rating</span><span class="head">Calls</span><span class="head">Called the direction</span><span class="head">Average ${term("alpha", "alpha")} vs the yardstick</span>${names.map((n) => {
@@ -2012,13 +2045,22 @@
     view = v;
     if (save) remember({ view: v });
     $("#view-overview").hidden = v !== "overview";
+    $("#view-today").hidden = v !== "today";
+    $("#view-score").hidden = v !== "score";
+    $("#view-analyses").hidden = v !== "analyses";
     $("#view-account").hidden = v !== "account";
-    const nav = $("#navOverview");
-    if (v === "overview") nav.setAttribute("aria-current", "page");
-    else nav.removeAttribute("aria-current");
+    for (const [id, page] of [["#navOverview", "overview"], ["#navToday", "today"], ["#railToday", "today"], ["#navScore", "score"], ["#railScore", "score"], ["#navAnalyses", "analyses"], ["#railAnalyses", "analyses"]]) {
+      const nav = $(id);
+      if (v === page) nav.setAttribute("aria-current", "page");
+      else nav.removeAttribute("aria-current");
+    }
+    $("#railToday").classList.toggle("on", v === "today");
+    $("#railScore").classList.toggle("on", v === "score");
+    $("#railAnalyses").classList.toggle("on", v === "analyses");
     renderSideAccount();
     if (was !== v) $("#page").scrollTo({ top: 0 });
     if (v === "account" && signedIn() && A.chosen.length && !A.snapshot && !A.reading) void readAccounts();
+    if (v === "score") renderPaper();
   }
   function ready() {
     if (signedIn() && hasAgentic()) return true;
@@ -2042,6 +2084,11 @@
     renderMarkets();
     void loadHistory();
     void refreshQuotes();
+  }
+  function showChart() {
+    const c = $("#sec-chart"), page = $("#page").getBoundingClientRect(), at = c.getBoundingClientRect();
+    if (at.top >= page.top && at.bottom <= page.bottom) return;
+    c.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
   }
   function withRecent(sym, name = "") {
     const before = (P.recent ?? []).find((r) => r.symbol === sym)?.name ?? "";
@@ -2128,7 +2175,7 @@
     <p class="at-lede">The desk's thirteen agents read ${reads}, check the facts, argue both sides, and record a call you can read and decide on. It never places an order${coin ? `: ${it?.paper === false ? "among crypto, the desk follows only Bitcoin and Ether on paper" : "a coin is followed on paper only"}` : ""}.</p>
     <div class="at-seg" role="radiogroup" aria-label="How deep">${choices.map((c) => `<button class="at-seg-b${c === chosen ? " on" : ""}" role="radio" aria-checked="${c === chosen}" data-act="ask-depth" data-depth="${c.depth ?? ""}">${esc(c.label)}</button>`).join("")}</div>
     <p class="at-quiet">${term("depth")} \xB7 ${esc(chosen.means)}</p>
-    <p class="at-honest">${l ? `It runs by itself: ${esc(l.listener)} is listening.` : "Nothing is listening on this computer yet, so it waits until a run starts: see Analyses you asked for."}</p>
+    <p class="at-honest">${l ? `It runs by itself: ${esc(l.listener)} is listening.` : `Nothing is listening on this computer yet, so it waits until a run starts: see ${STATUS_LINK}.`}</p>
     <div class="at-pop-do"><button class="at-btn at-press" data-act="ask-cancel">Cancel</button><button class="at-btn at-press primary" data-act="ask-yes"><svg class="g"><use href="#i-bot"/></svg><span>Ask the desk</span></button></div>`;
   }
   async function askNow() {
@@ -2137,7 +2184,7 @@
       await api.enqueue(sym, ASK.depth ?? void 0);
       $("#askDialog").close();
       await refreshState();
-      toast(l ? `${sym} is asked for: it runs by itself, and its call appears here.` : `${sym} is waiting. Nothing is listening yet: see Analyses you asked for.`);
+      toast(l ? `${sym} is asked for: it runs by itself, and its call appears here.` : `${sym} is waiting. Nothing is listening yet: see Analysis status.`, "ok", "analyses");
     });
   }
   var onShade = (e, dlg) => {
@@ -2174,9 +2221,13 @@
         to?.scrollIntoView({ behavior: "smooth", block: "start" });
         break;
       }
-      case "view":
-        showView(el.dataset.view === "account" ? "account" : "overview");
+      case "view": {
+        const dlg2 = $("#askDialog");
+        if (dlg2.open) dlg2.close();
+        showView(VIEWS.find((v) => v === el.dataset.view) ?? "overview");
         break;
+      }
+      // a link inside the Analyse box leaves it
       case "side":
         setSide(el.dataset.side === "fold");
         break;
@@ -2245,9 +2296,15 @@
           toast("The dashboard is stopped. Ask the team to open it again any time.");
         });
         break;
-      case "select":
+      case "select": {
+        const shows = !!el.closest("#page, #sideOpen");
         select(sym);
+        if (shows) {
+          if (view !== "overview") showView("overview");
+          showChart();
+        }
         break;
+      }
       case "guide-open":
         remember({ guide: "open" });
         showView("overview");
@@ -2304,17 +2361,13 @@
           toast(!r.morning.on ? "Switched off: nothing goes on the waiting list by itself." : `Switched on: nothing is queued now. From ${r.morning.from ? dayText(r.morning.from) : "the next market morning"}, the top ${r.morning.top} go on the waiting list at shallow depth each market morning.`);
         });
         break;
-      case "mk-edit":
-        MK.editing = true;
-        renderStart();
-        document.getElementById("mkInput")?.focus();
+      case "find-market": {
+        const r = findRows()[Number(el.dataset.i)];
+        if (r) showInMarket(r);
         break;
-      case "mk-cancel":
-        MK.editing = false;
-        renderStart();
-        break;
-      case "mk-save":
-        void saveMarketList($("#mkInput").value.split(/[\s,]+/).filter(Boolean));
+      }
+      case "mk-remove":
+        if (S.desk) void saveMarketList(S.desk.market.symbols.filter((s) => s !== sym));
         break;
       case "mk-shipped":
         void saveMarketList([...S.desk?.market.shipped ?? []]);
@@ -2368,20 +2421,6 @@
           await api.runQueue();
           await refreshState();
           toast("Asked for a run of what is waiting.");
-        });
-        break;
-      case "listen-on":
-        void run(async () => {
-          await api.listen(true);
-          await refreshState();
-          toast("Analyses you ask for now run by themselves, with Claude Code on this computer.");
-        });
-        break;
-      case "listen-off":
-        void run(async () => {
-          await api.listen(false);
-          await refreshState();
-          toast("Analyses no longer run by themselves. A run in progress finishes first.");
         });
         break;
       case "open-call":
@@ -2559,16 +2598,6 @@
     if (t.id === "contactInput" && e.key === "Enter") {
       e.preventDefault();
       void saveContact();
-      return;
-    }
-    if (t.id !== "mkInput") return;
-    if (e.key === "Enter") {
-      e.preventDefault();
-      void saveMarketList(t.value.split(/[\s,]+/).filter(Boolean));
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      MK.editing = false;
-      renderStart();
     }
   });
   var F = { mode: "closed", query: "", matches: [], found: "", active: -1, seq: 0, timer: null };
@@ -2576,14 +2605,28 @@
   var FIND_QUERY = /^[\p{L}\p{N} .&'\-^=,]{1,40}$/u;
   var findInput = $("#addInput");
   var findRows = () => F.mode === "recent" ? P.recent ?? [] : F.mode === "matches" || F.mode === "loading" ? F.matches : [];
+  function rowOffer(r) {
+    const d = S.desk;
+    if (!d) return "none";
+    return marketOffer(r, d.market.symbols, new Set(d.startHere.find((t) => t.tier === "sectors")?.items.map((i) => i.symbol)), d.market.max);
+  }
+  var marketFull = (max) => `The whole market already holds ${max} funds: take one out to make room.`;
+  function rowActions(r, i, watched) {
+    const offer = rowOffer(r);
+    if (offer === "none") return "";
+    const add = watched ? "" : `<button type="button" class="at-btn at-press" data-act="find-pick" data-i="${i}">Add to watchlist</button>`;
+    const market = offer === "show" ? `<button type="button" class="at-btn at-press" data-act="find-market" data-i="${i}">Show in The whole market</button>` : offer === "in" ? '<span class="at-chip">In The whole market</span>' : `<span class="at-quiet">${esc(marketFull(S.desk.market.max))}</span>`;
+    return `<span class="ta-opt-do">${add}${market}</span>`;
+  }
   function findRow(r, i) {
-    const watched = S.desk?.watchlist.some((w) => w.symbol === r.symbol), call2 = latestCall(r.symbol);
+    const watched = !!S.desk?.watchlist.some((w) => w.symbol === r.symbol), call2 = latestCall(r.symbol);
     const where = [r.exchange, r.kind].filter(Boolean).join(" \xB7 ");
     const name = r.name && r.name !== r.symbol ? r.name : "";
     return `<li class="ta-opt${i === F.active ? " on" : ""}" role="option" id="find-${i}" aria-selected="${i === F.active}" data-act="find-pick" data-i="${i}">
     <b class="ta-opt-sym">${esc(r.symbol)}</b>
     <span class="ta-opt-name"><span>${esc(name)}</span>${where ? `<small>${esc(where)}</small>` : ""}</span>
     <span class="ta-opt-tags">${call2 ? ratingChip(call2.rating) : ""}${watched ? '<span class="at-chip">Watched</span>' : ""}</span>
+    ${rowActions(r, i, watched)}
   </li>`;
   }
   function renderFind() {
@@ -2597,7 +2640,7 @@
     const q2 = esc(F.query);
     $("#findHead").innerHTML = F.mode === "recent" ? '<span><svg class="g"><use href="#i-history"/></svg>Recent</span><button type="button" class="at-btn at-press" data-act="find-clear">Clear</button>' : `<span><svg class="g"><use href="#i-search"/></svg>${F.mode === "loading" ? `Looking for \u201C${q2}\u201D\u2026` : `Matches for \u201C${q2}\u201D`}</span>`;
     $("#findList").innerHTML = rows.map(findRow).join("");
-    $("#findFoot").textContent = F.mode === "failed" ? `Yahoo Finance's search did not answer. Press Enter to add \u201C${F.query}\u201D as a ticker.` : F.mode === "matches" && !rows.length ? `Nothing matches \u201C${F.query}\u201D at Yahoo Finance. Check the spelling, or type the ticker.` : F.mode === "recent" ? "The stocks you looked at last. Type to search." : "From Yahoo Finance \xB7 \u2191 \u2193 to move \xB7 Enter to add \xB7 Esc to close";
+    $("#findFoot").textContent = F.mode === "failed" ? `Yahoo Finance's search did not answer. Press Enter to add \u201C${F.query}\u201D as a ticker.` : F.mode === "matches" && !rows.length ? `Nothing matches \u201C${F.query}\u201D at Yahoo Finance. Check the spelling, or type the ticker.` : F.mode === "recent" ? "The stocks you looked at last. Type to search." : `From Yahoo Finance \xB7 \u2191 \u2193 to move \xB7 Enter to add${rows[F.active] && rowOffer(rows[F.active]) === "show" ? " to your watchlist \xB7 Shift+Enter to show it in The whole market" : ""} \xB7 Esc to close`;
     document.getElementById(`find-${F.active}`)?.scrollIntoView({ block: "nearest" });
   }
   async function findNow(q2) {
@@ -2643,6 +2686,18 @@
       remember({ recent: withRecent(r.symbol, r.name) });
       void addStock(r.symbol);
     }
+  }
+  function showInMarket(r) {
+    const d = S.desk, offer = rowOffer(r);
+    if (!d) return;
+    if (offer !== "show") {
+      if (offer === "in") toast(`${r.symbol} is already in The whole market.`);
+      else if (offer === "full") toast(marketFull(d.market.max), "bad");
+      return;
+    }
+    closeFind(true);
+    findInput.blur();
+    void saveMarketList([...d.market.symbols, r.symbol]);
   }
   findInput.addEventListener("input", () => {
     const q2 = findInput.value.trim();
@@ -2698,7 +2753,8 @@
       closeFind();
     } else if (e.key === "Enter" && F.active >= 0 && rows[F.active]) {
       e.preventDefault();
-      pick(rows[F.active]);
+      if (e.shiftKey) showInMarket(rows[F.active]);
+      else pick(rows[F.active]);
     }
   });
   $("#findPanel").addEventListener("mousedown", (e) => e.preventDefault());
@@ -2743,7 +2799,7 @@
       }
     } catch {
     }
-    if (P.view === "account") showView("account", false);
+    if (P.view && P.view !== "overview") showView(P.view, false);
   }
   var seen = "";
   var build = "";

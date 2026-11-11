@@ -11,15 +11,13 @@ import { cleanMarket, isShipped, SHIPPED_MARKET, TIERS, type Tier } from './tier
 
 export interface Recent { symbol: string; name: string }
 export interface Prefs {
-  theme?: 'light' | 'dark'; side?: 'open' | 'folded'; view?: 'overview' | 'account';
+  theme?: 'light' | 'dark'; side?: 'open' | 'folded'; view?: 'overview' | 'account' | 'today' | 'score' | 'analyses';
   symbol?: string; range?: '1M' | '3M' | '6M' | '1Y' | '5Y'; kind?: 'area' | 'candles';
   layers?: { ma50: boolean; ma200: boolean; vol: boolean };
   recent?: Recent[];
-  /** "Run automatically with Claude Code" is on: the dashboard starts the desk's listener again when it starts. Set only
-   *  by that switch, never by the page's other choices. */
-  autorun?: boolean;
-  /** The person's whole-market funds, when they changed the shipped four (tiers.ts SHIPPED_MARKET). Set only by "Change…"
-   *  on "Start here", once each fund's price is checked, never by the page's other choices. */
+  /** The person's whole-market funds, when they changed the shipped four (tiers.ts SHIPPED_MARKET). Set only by the row's own
+   *  save on "Start here" (a fund from the search list, a ✕ on a tile, the four put back), once each fund's price is
+   *  checked, never by the page's other choices. */
   market?: string[];
   /** The tiers of the watchlist folded away. */
   folded?: Tier[];
@@ -48,7 +46,7 @@ export function cleanPrefs(raw: unknown): Prefs {
   const out: Prefs = {};
   const theme = one(r.theme, ['light', 'dark'] as const); if (theme) out.theme = theme;
   const side = one(r.side, ['open', 'folded'] as const); if (side) out.side = side;
-  const view = one(r.view, ['overview', 'account'] as const); if (view) out.view = view;
+  const view = one(r.view, ['overview', 'account', 'today', 'score', 'analyses'] as const); if (view) out.view = view;
   const symbol = sym(r.symbol); if (symbol) out.symbol = symbol;
   const range = one(r.range, ['1M', '3M', '6M', '1Y', '5Y'] as const); if (range) out.range = range;
   const kind = one(r.kind, ['area', 'candles'] as const); if (kind) out.kind = kind;
@@ -64,7 +62,7 @@ export function cleanPrefs(raw: unknown): Prefs {
     }
     out.recent = recent;
   }
-  if (typeof r.autorun === 'boolean') out.autorun = r.autorun;
+  // An `autorun` an older version saved ("Run automatically with Claude Code") is not read: nothing starts a run any more.
   const market = cleanMarket(r.market); if (market) out.market = market;
   if (Array.isArray(r.folded)) out.folded = TIERS.filter((t) => (r.folded as unknown[]).includes(t));
   if (typeof r.morning === 'boolean') out.morning = r.morning;

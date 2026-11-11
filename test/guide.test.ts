@@ -6,7 +6,7 @@ import { SHIPPED_MARKET } from '../src/terminal/tiers.js';
 import type { WatchItem } from '../src/terminal/store.js';
 
 const watch = (...symbols: string[]): WatchItem[] => symbols.map((symbol) => ({ symbol, favourite: false, addedOn: '2026-10-01' }));
-const none: GuideFacts = { email: '', watchlist: [], market: SHIPPED_MARKET, queue: [], calls: [], listener: null, autorun: false, readCall: false, record: { since: null, weeks: 0, calls: 0 } };
+const none: GuideFacts = { email: '', watchlist: [], market: SHIPPED_MARKET, queue: [], calls: [], listener: null, readCall: false, record: { since: null, weeks: 0, calls: 0 } };
 const ticks = (f: Partial<GuideFacts>) => { const g = guideOf({ ...none, ...f }); return [g.email.done, g.picks.done, g.analyse.done, g.read.done, g.paper.done]; };
 
 test('a newcomer sees the guide by itself, with nothing ticked; the owner with calls does not, until they open it', () => {
@@ -47,8 +47,8 @@ test('step three ticks once something was asked for and analyses run by themselv
   assert.deepEqual([guideOf({ ...none, queue: [{ symbol: 'NVDA' }] }).analyse.asked, guideOf({ ...none, queue: [{ symbol: 'NVDA' }] }).analyse.done], [1, false], 'asked, but nothing listens');
   assert.equal(guideOf({ ...none, listener: 'Madav' }).analyse.done, false, 'listening, but nothing asked');
   assert.deepEqual([guideOf({ ...none, queue: [{ symbol: 'NVDA' }], listener: 'Madav' }).analyse.done, guideOf({ ...none, queue: [{ symbol: 'NVDA' }], listener: 'Madav' }).analyse.automatic], [true, 'Madav']);
-  assert.equal(guideOf({ ...none, calls: [{ ticker: 'NVDA', date: '2026-10-01', rating: 'Buy' }], autorun: true }).analyse.done, false, 'the Claude Code switch on, but nothing listens now: nothing runs by itself');
-  assert.equal(guideOf({ ...none, calls: [{ ticker: 'NVDA', date: '2026-10-01', rating: 'Buy' }], autorun: true, listener: 'Claude Code' }).analyse.automatic, 'Claude Code', 'the switch on, and it listens');
+  assert.equal(guideOf({ ...none, calls: [{ ticker: 'NVDA', date: '2026-10-01', rating: 'Buy' }] }).analyse.done, false, 'the Claude Code switch on, but nothing listens now: nothing runs by itself');
+  assert.equal(guideOf({ ...none, calls: [{ ticker: 'NVDA', date: '2026-10-01', rating: 'Buy' }], listener: 'Claude Code' }).analyse.automatic, 'Claude Code', 'the switch on, and it listens');
   assert.equal(guideOf({ ...none, queue: [{ symbol: 'NVDA' }], calls: [{ ticker: 'NVDA', date: '2026-10-01', rating: 'Buy' }] }).analyse.asked, 1, 'one stock once');
 });
 

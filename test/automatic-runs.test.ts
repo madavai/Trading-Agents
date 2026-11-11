@@ -21,7 +21,6 @@ import { addWatch, setFavourite } from '../src/terminal/store.js';
 import { guideOf } from '../src/terminal/guide.js';
 import { teamLine } from '../src/check/desk-check.js';
 import { deskServer } from '../src/tools/server.js';
-import { watch } from '../src/watch/watcher.js';
 import { startTerminal, type Assets, type Terminal } from '../src/terminal/server.js';
 import { readPrefs, savePrefs } from '../src/terminal/prefs.js';
 
@@ -82,26 +81,6 @@ test('routines-1, server-1, server-2: a run that finds another run analysing sto
   } finally { await routine.close(); await listener.close(); }
 });
 
-test('routines-1, server-2: the desk\'s own listener starts no run while another run analyses a stock, and starts one as soon as the list is free', async (t) => {
-  const { root, dir } = desk();
-  process.env.TRADING_AGENTS_TODAY = DAY;
-  configure({ fetch: noRoute, secEmail: '' });
-  const routine = await conversation(root);
-  t.after(() => routine.close());
-  enqueue(dir, 'AAPL', '2026-11-09T13:00:00Z');
-  assert.match(await routine.call('start_queue_item', { symbol: 'AAPL' }), /^START/);
-  let runs = 0;
-  const w = watch({ dir, listener: 'Claude Code', pid: 701, ...quick, run: async () => { runs++; } });
-  t.after(() => w.stop());
-  enqueue(dir, 'NVDA', '2026-11-09T13:30:00Z'); ringDoorbell(dir, 'press');
-  await sleep(400);
-  assert.equal(runs, 0, 'no run while AAPL is another run\'s: it would only stop at once');
-  recordCall(dir, 'AAPL', DAY);
-  await routine.call('finish_queue_item', { symbol: 'AAPL' });
-  await until(() => runs === 1);
-  w.stop(); await w.done;
-});
-
 test('routines-2, server-3: with two runners, a stock is never marked failed while its own run analyses it, and two runs never take the same stock', async (t) => {
   const { root, dir } = desk();
   process.env.TRADING_AGENTS_TODAY = DAY;
@@ -114,15 +93,11 @@ test('routines-2, server-3: with two runners, a stock is never marked failed whi
   assert.match(await routine.call('start_queue_item', { symbol: 'AAPL' }), /^START/, 'the same run asking again is answered as before');
   recordCall(dir, 'AAPL', DAY); await routine.call('finish_queue_item', { symbol: 'AAPL' });
 
-  // the desk's own listener runs while the morning routine starts MSFT: at the end of the listener's run, MSFT is left alone
+  // the morning routine starts MSFT: it is its run's to analyse, whoever else looks at the list
   enqueue(dir, 'MSFT', '2026-11-09T14:00:00Z'); enqueue(dir, 'NVDA', '2026-11-09T14:00:01Z');
-  const w = watch({ dir, listener: 'Claude Code', pid: 702, ...quick, run: async () => { await routine.call('start_queue_item', { symbol: 'MSFT' }); } });
-  t.after(() => w.stop());
-  await until(() => !!readListener(dir)?.lastRun);
+  assert.match(await routine.call('start_queue_item', { symbol: 'MSFT' }), /^START/);
   const msft = readQueue(dir).find((i) => i.symbol === 'MSFT')!;
-  assert.equal(msft.state, 'running', `the routine is still analysing MSFT: ${msft.reason ?? ''}`);
-  assert.equal(readListener(dir)!.lastRun!.result, '0 analysed, 0 failed', 'the listener counts only its own run');
-  w.stop(); await w.done;
+  assert.equal(msft.state, 'running', `the routine is analysing MSFT: ${msft.reason ?? ''}`);
   // any listener's note that its run ended (Madav's, with an end time) leaves alone a stock another live run started in it
   writeListener(dir, { listener: 'Madav', since: '2026-11-09T13:00:00Z', beat: new Date().toISOString(), lastRun: { started: new Date(Date.now() - 60_000).toISOString(), at: new Date(Date.now() + 1000).toISOString(), result: '0 analysed' } });
   assert.equal(readQueue(dir).find((i) => i.symbol === 'MSFT')!.state, 'running');
@@ -197,22 +172,13 @@ test('server-4: the depth chosen on the dashboard decides the rounds when a stop
   } finally { await run.close(); }
 });
 
-test('server-7: a stock whose call was recorded, though its run stopped before finishing it on the list, shows done with that call', async (t) => {
+test('server-7: a stock whose call was recorded, though its run stopped before finishing it on the list, shows done with that call', () => {
   const { dir } = desk();
   enqueue(dir, 'NVDA', '2026-11-09T13:00:00Z');
   startItem(dir, 'NVDA', DAY, new Date('2026-11-09T13:00:00Z'));
   recordCall(dir, 'NVDA', DAY, 'Overweight');
   const late = readQueue(dir, new Date(Date.parse('2026-11-09T13:00:00Z') + QUIET_MS + 60_000))[0]!;
   assert.deepEqual([late.state, late.rating], ['done', 'Overweight'], 'not "failed: nothing was saved" for a call that is in the journal');
-  // the desk's own listener: its run recorded the call and stopped before finish_queue_item
-  const other = desk().dir;
-  enqueue(other, 'AAPL', '2026-11-09T13:00:00Z');
-  const w = watch({ dir: other, listener: 'Claude Code', pid: 703, ...quick, run: async () => { startItem(other, 'AAPL', DAY); recordCall(other, 'AAPL', DAY, 'Hold'); return "Claude Code's usage limit was reached"; } });
-  t.after(() => w.stop());
-  await until(() => !!readListener(other)?.lastRun);
-  const aapl = readQueue(other)[0]!;
-  assert.deepEqual([aapl.state, aapl.rating], ['done', 'Hold']);
-  w.stop(); await w.done;
 });
 
 test('routines-4: starred stocks over the morning\'s limit take turns, oldest call first, so every one is analysed', () => {
@@ -300,10 +266,10 @@ test('server-10: a screen whose names could not be read does not use up the morn
   assert.deepEqual(queueTop(dir, read, DAY, false, new Date('2026-11-09T14:00:00Z')), ['TSLA']);
 });
 
-test('server-9: "Run automatically with Claude Code" is said to run only while something listens', () => {
+test('server-9: "runs by itself" is said only while something listens', () => {
   const record = { since: null, weeks: 0, calls: 0 } as unknown as Parameters<typeof guideOf>[0]['record'];
-  const g = guideOf({ email: '', watchlist: [], market: [], queue: [{ symbol: 'NVDA' }], calls: [], listener: null, autorun: true, readCall: false, record });
-  assert.equal(g.analyse.automatic, '', 'switched on, but nothing listens now');
+  const g = guideOf({ email: '', watchlist: [], market: [], queue: [{ symbol: 'NVDA' }], calls: [], listener: null, readCall: false, record });
+  assert.equal(g.analyse.automatic, '', 'nothing listens now');
 });
 
 /** The dashboard, started with no page open: it answers only the requests a test makes. */
@@ -352,22 +318,37 @@ test('server-6: an "on" from another tab or an old page never moves the morning 
   assert.equal(readPrefs(dir).morningFrom, '2026-11-10');
 });
 
-test('server-9: with "Run automatically with Claude Code" left on, the dashboard starts its listener again once nothing has listened for a while', async (t) => {
+test('the desk starts no run of its own: an "on" saved by an older version is read harmlessly, and its switch and its program are gone', async (t) => {
   const { root, dir } = desk();
-  savePrefs(dir, { autorun: true });
-  let started = 0;
-  const term = await dashboard(root, { keepMs: 15, listen: { start: () => { started++; }, claude: () => true } });
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'dashboard.json'), JSON.stringify({ autorun: true, theme: 'dark' }));
+  assert.deepEqual(readPrefs(dir), { theme: 'dark' }, 'the old switch is not read');
+  const term = await dashboard(root, { keepMs: 15 });
   t.after(() => term.close());
-  assert.equal(started, 1, 'started with the dashboard');
-  await until(() => started === 2);   // its listener never wrote that it listens: started again after five looks
-  const now = new Date().toISOString();
-  writeListener(dir, { listener: 'Madav', since: now, beat: now });
-  let was = started; await sleep(250);
-  assert.equal(started, was, 'someone listens: nothing is started beside it');
-  savePrefs(dir, { autorun: false }); fs.rmSync(path.join(dir, 'listener.json'), { force: true });
-  was = started; await sleep(250);
-  assert.equal(started, was, 'switched off: never started');
-  assert.equal(readPrefs(dir).autorun, false);
+  await sleep(120);
+  assert.equal((await ask(term, 'POST', '/api/listen', { on: true })).status, 404, 'there is no switch to ask');
+  assert.equal(readListener(dir), null, 'and nothing listens because of the old "on"');
+  assert.equal((await ask(term, 'POST', '/api/prefs', { autorun: true, theme: 'light' })).json().autorun, undefined, 'a page cannot set it either');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'dashboard.json'), 'utf8')).autorun, undefined, 'and the next save drops it');
+  assert.equal(fs.existsSync('src/watch'), false);
+  assert.equal(fs.existsSync('dist/watch.mjs'), false, 'the program that started runs in Claude Code is not shipped');
+  assert.doesNotMatch(fs.readFileSync('scripts/build.mjs', 'utf8'), /watch/);
+  assert.doesNotMatch(fs.readFileSync('src/terminal/main.ts', 'utf8'), /watch\.mjs/);
+});
+
+test("a listener left running from before the update is stopped by taking its note away, at once and at every look; Madav's note is never touched", async (t) => {
+  const { root, dir } = desk();
+  fs.mkdirSync(dir, { recursive: true });
+  const now = () => new Date().toISOString();
+  writeListener(dir, { listener: 'Claude Code', since: now(), beat: now(), pid: 4242 });
+  const term = await dashboard(root, { keepMs: 15 });
+  t.after(() => term.close());
+  assert.equal(readListener(dir), null, "the old listener's note is gone as the dashboard starts: it sees that and stops after the run in hand");
+  writeListener(dir, { listener: 'Claude Code', since: now(), beat: now(), pid: 4243 });   // one that starts later still
+  await until(() => readListener(dir) === null);
+  writeListener(dir, { listener: 'Madav', since: now(), beat: now() });
+  await sleep(150);
+  assert.equal(readListener(dir)?.listener, 'Madav', "Madav's note stays: the page still shows when Madav listens");
 });
 
 test("server-11: an analysis asked for with no depth runs the settings' own rounds, never a depth rounded from them", async (t) => {

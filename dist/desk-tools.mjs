@@ -42216,7 +42216,7 @@ function cleanPrefs(raw) {
   if (theme) out.theme = theme;
   const side = one2(r.side, ["open", "folded"]);
   if (side) out.side = side;
-  const view = one2(r.view, ["overview", "account"]);
+  const view = one2(r.view, ["overview", "account", "today", "score", "analyses"]);
   if (view) out.view = view;
   const symbol4 = sym(r.symbol);
   if (symbol4) out.symbol = symbol4;
@@ -42237,7 +42237,6 @@ function cleanPrefs(raw) {
     }
     out.recent = recent;
   }
-  if (typeof r.autorun === "boolean") out.autorun = r.autorun;
   const market = cleanMarket(r.market);
   if (market) out.market = market;
   if (Array.isArray(r.folded)) out.folded = TIERS.filter((t) => r.folded.includes(t));

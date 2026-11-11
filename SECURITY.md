@@ -49,14 +49,12 @@ folder asks you before it runs one.
 ## Analyses that run by themselves
 When you ask for an analysis on the dashboard, it waits on a list in `desk-data` and the dashboard rings a "doorbell"
 (a small file there). Whatever listens for it (Madav's routine "Run automatically when the dashboard asks", which the
-project ships switched off, or the desk's own listener for Claude Code) runs the
+project ships switched off) runs the
 trading-desk team, which proposes only, exactly as when you ask in a chat: the same agents, tools and guard, and no
 order tool.
-- The desk's own listener (`node dist/watch.mjs`, started by "Run automatically with Claude Code") runs one fixed
-  thing, written in its code: Claude Code as the trading-desk team, with the words "Analyse what is waiting on the
-  dashboard", in a mode that refuses anything this folder's settings do not already allow instead of asking. Nothing
-  in the project's files can change that command, so a file an agent could write never chooses what it runs. It never
-  runs with permission checks bypassed.
+- The desk starts no run of its own: it has no listener, program or button that starts Claude Code or any other app. An
+  older version had one; on an update, the dashboard takes away the note such a listener keeps (so one left running
+  stops after the run in hand), the program is no longer shipped, and a switch an older version saved is not read.
 - Madav's routines (`.claude/routines.json`: the waiting list, the morning routine and the evening wrap-up) ship
   switched off, and only you switch one on. A run takes its model and permissions from what you chose in Madav, never
   from the project's files (no desk agent file sets a permission mode), and Madav never runs one with permission checks
@@ -100,7 +98,7 @@ order tool.
 - After an update the dashboard offers Restart at the top of the page: new code on this computer runs only after your
   press, and never while an order is being sent. Stop, at the top right of the page, closes it.
 - The search box sends what you type to Yahoo Finance's public search, which suggests matching stocks.
-- "This morning" asks Yahoo Finance for the daily prices of the whole-market funds, the sector funds and your watchlist
+- "Today's market" asks Yahoo Finance for the daily prices of the whole-market funds, the sector funds and your watchlist
   (and its news search for your companies and coins), and asks Polymarket's public search for its odds on the Federal
   Reserve, at most once an hour. The list is kept in `desk-data/screen.json`. The switch "Analyse the top 3 each market
   morning" ships off and starts the next market morning once switched on; it only puts those stocks on the waiting list, never an order.
