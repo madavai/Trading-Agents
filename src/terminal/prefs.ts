@@ -18,8 +18,9 @@ export interface Prefs {
   /** "Run automatically with Claude Code" is on: the dashboard starts the desk's listener again when it starts. Set only
    *  by that switch, never by the page's other choices. */
   autorun?: boolean;
-  /** The person's whole-market funds, when they changed the shipped four (tiers.ts SHIPPED_MARKET). Set only by "Change…"
-   *  on "Start here", once each fund's price is checked, never by the page's other choices. */
+  /** The person's whole-market funds, when they changed the shipped four (tiers.ts SHIPPED_MARKET). Set only by the row's own
+   *  save on "Start here" (a fund from the search list, a ✕ on a tile, the four put back), once each fund's price is
+   *  checked, never by the page's other choices. */
   market?: string[];
   /** The tiers of the watchlist folded away. */
   folded?: Tier[];

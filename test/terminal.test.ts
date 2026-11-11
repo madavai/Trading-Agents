@@ -424,7 +424,7 @@ test('Start here is in the page\'s state: the whole market, the eleven sectors a
   assert.deepEqual(s.calls.filter((c: any) => c.ticker === 'XLE').map((c: any) => c.ticket), [true]);
 });
 
-test('the whole-market funds are the person\'s to change, each a fund Yahoo prices, checked before it is kept; only Change… sets them', async () => {
+test('the whole-market funds are the person\'s to change, each a fund Yahoo prices, checked before it is kept; only the whole-market row\'s own save sets them', async () => {
   const set = (symbols: unknown, o: Parameters<typeof call>[3] = {}) => call(term, 'POST', '/api/tiers/market', { body: { symbols }, ...o });
   for (const [symbols, status, why] of [
     [['SPY', 'BTC-USD'], 400, /BTC-USD is crypto/], [['XLK'], 400, /XLK is a sector fund/], [['^GSPC'], 400, /cannot be held/], [['../x'], 400, /not a ticker/],

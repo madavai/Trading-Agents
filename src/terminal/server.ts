@@ -402,7 +402,7 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
       for (const until = Date.now() + 8_000; Date.now() < until; await new Promise((r) => setTimeout(r, 200))) { const l = listenerOf(dir); if (l) return json(res, 200, { listener: l }); }
       throw new Refused(502, 'the listener did not start: see desk-data/watcher.log, or start it yourself with node dist/watch.mjs');
     }
-    if (p === '/api/prefs' && method === 'POST') { delete b.autorun; delete b.market; delete b.morning; delete b.morningFrom; delete b.readCall; return json(res, 200, savePrefs(dir, b)); }   // only their own switches set autorun and morning, only Change… the whole market, only a call served readCall
+    if (p === '/api/prefs' && method === 'POST') { delete b.autorun; delete b.market; delete b.morning; delete b.morningFrom; delete b.readCall; return json(res, 200, savePrefs(dir, b)); }   // only their own switches set autorun and morning, only the whole-market row's own save the whole market, only a call served readCall
     // The contact email the SEC asks for, from the field in "Get started": checked, kept in the desk's records like the
     // desk tool set_contact_email keeps it, sent to sec.gov alone, and never shown back in full.
     if (p === '/api/contact' && method === 'POST') {

@@ -164,7 +164,9 @@ built, which decisions stand, every document, and what is pending.
   `desk-data/dashboard.json`, each value checked; the whole-market funds only through `/api/tiers/market`, which checks
   each one's price first), `tiers.ts` (the world in tiers for "Start here" and the watchlist: the whole market, the
   sector funds, single names and crypto, with every fund's and tier's name and meaning in plain words; the page draws
-  what it is sent and holds no tier rules of its own), `guide.ts` ("Get started", the first month in five steps:
+  what it is sent and holds no tier rules of its own, bar one: which search matches may be offered "Show in The whole
+  market", `ui/marketpick.ts`, which a test holds to `marketSymbol`, whose check still decides when the row is saved; the
+  row is changed only from the search box at the top and the ✕ on a tile, never from a typed list), `guide.ts` ("Get started", the first month in five steps:
   `guideOf` ticks each from the desk's own records, the contact email, the watchlist, the waiting list and its listener,
   the journal, `prefs.ts` `readCall` (noted by `/api/call`, never by the page) and the paper record against
   `paper.ts` `RECORD_WEEKS`, said everywhere as `RECORD_WORDS`; it opens by itself while the desk has no calls and the

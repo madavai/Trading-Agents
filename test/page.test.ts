@@ -161,3 +161,45 @@ test('server-11: the Analyse box offers the settings\' own rounds first and asks
   assert.match(page, /await api\.enqueue\(sym, ASK\.depth \?\? undefined\);/);
   assert.match(fs.readFileSync('src/terminal/ui/api.ts', 'utf8'), /enqueue: \(symbol: string, depth\?: Depth\) => call<\{ queue: QueueView\[\] \}>\('POST', '\/api\/queue', depth \? \{ symbol, depth \} : \{ symbol \}\)/, 'no depth sent at all for the settings');
 });
+
+test('page-16: The whole market is changed only from the search box and the tiles: no typed list, no Change… button, and no word that points at them', () => {
+  // Before: "Change…" opened a field for up to eight tickers typed with commas and no suggestions, beside the search box at the top.
+  for (const gone of [/mkInput/, /mk-edit/, /mk-cancel/, /mk-save/, /marketEditor/, /separated by commas/, /Press Change… to add/, /MK\.editing/, /Choose the broad funds this tier shows/]) assert.doesNotMatch(page, gone, String(gone));
+  assert.match(page, /market: 'The whole market is empty\. Search a fund in the box at the top, such as SPY, and press Show in The whole market\.',/);
+  assert.match(page, /<p class="at-quiet">✕ takes a fund out of this row\. To add one, search for it in the box at the top and press Show in The whole market\.<\/p>/);
+  // every save goes through the desk's own, which checks each fund's price (and the desk's rules) before it keeps the row
+  assert.equal((page.match(/api\.setMarket\(/g) ?? []).length, 1);
+  assert.match(page, /case 'mk-remove': if \(S\.desk\) void saveMarketList\(S\.desk\.market\.symbols\.filter\(\(s\) => s !== sym\)\); break;/);
+  assert.match(page, /case 'mk-shipped': void saveMarketList\(\[\.\.\.\(S\.desk\?\.market\.shipped \?\? \[\]\)\]\); break;/);
+  // ✕ only on a tile of The whole market; "Put back" only while the row is not the four the desk ships
+  assert.match(page, /\(tier === 'market' \? `<button class="icon-btn" data-act="mk-remove" data-symbol="\$\{esc\(i\.symbol\)\}" title="\$\{esc\(out\)\}" aria-label="\$\{esc\(out\)\}"><svg class="g"><use href="#i-x"\/><\/svg><\/button>` : ''\)/);
+  assert.match(page, /const out = `Take \$\{i\.symbol\} out of The whole market`;/);
+  assert.match(page, /t\.tier === 'market' && !market\.asShipped \? `<button class="at-btn at-press" data-act="mk-shipped">Put back \$\{esc\(listWords\(market\.shipped\)\)\}<\/button>` : ''/);
+  // each save sends the whole row as the page last read it, so a press made while one is being saved waits to be pressed again
+  assert.match(page, /if \(MK\.saving\) \{ toast\('The whole market is still being saved\. Press again in a moment\.', 'bad'\); return; \}/);
+  assert.match(page, /\} finally \{ MK\.saving = false; \}/);
+  // the other "Change…" buttons stay: the SEC contact email's and the paper money's
+  assert.match(page, /data-act="contact-edit">Change…/);
+  assert.match(page, /data-act="paper-edit">Change…/);
+});
+
+test('page-17: a fund in the search list gets "Add to watchlist" and "Show in The whole market"; one in the row, or a full row, says so; Shift+Enter does what the button does', () => {
+  assert.match(page, /import \{ marketOffer, type MarketOffer \} from '\.\/marketpick\.js';/);
+  assert.match(page, /return marketOffer\(r, d\.market\.symbols, new Set\(d\.startHere\.find\(\(t\) => t\.tier === 'sectors'\)\?\.items\.map\(\(i\) => i\.symbol\)\), d\.market\.max\);/);
+  assert.match(page, /const add = watched \? '' : `<button type="button" class="at-btn at-press" data-act="find-pick" data-i="\$\{i\}">Add to watchlist<\/button>`;/);
+  assert.match(page, /offer === 'show' \? `<button type="button" class="at-btn at-press" data-act="find-market" data-i="\$\{i\}">Show in The whole market<\/button>`/);
+  assert.match(page, /: offer === 'in' \? '<span class="at-chip">In The whole market<\/span>'/);
+  assert.match(page, /const marketFull = \(max: number\): string => `The whole market already holds \$\{max\} funds: take one out to make room\.`;/);
+  // the second press keeps the fund in the row alone, last; it never puts it on the watchlist
+  assert.match(page, /void saveMarketList\(\[\.\.\.d\.market\.symbols, r\.symbol\]\);/);
+  assert.match(page, /if \(e\.shiftKey\) showInMarket\(rows\[F\.active\]!\); else pick\(rows\[F\.active\]!\);/);
+  assert.match(page, / to your watchlist · Shift\+Enter to show it in The whole market/, 'the line under the list says it only for a fund the row can take');
+  // a press on a button inside a row is that button's, never the row's: the closest [data-act] is the button itself
+  assert.match(page, /case 'find-market': \{ const r = findRows\(\)\[Number\(el\.dataset\.i\)\]; if \(r\) showInMarket\(r\); break; \}/);
+  // two buttons, drawn on a phone as on a desktop: nothing waits for a hover, and the phone's rule hides only the tags
+  const css = fs.readFileSync('src/terminal/ui/dashboard.css', 'utf8');
+  assert.match(css, /\.ta-opt-do \{ grid-column: 2 \/ -1;/);
+  assert.doesNotMatch(css, /\.ta-opt-do[^{}]*:hover/);
+  assert.doesNotMatch(css, /\.ta-opt-do[^{}]*\{[^}]*display: none/);
+  assert.match(css, /@media \(max-width: 640px\) \{ \.ta-opt \{ grid-template-columns: calc\(var\(--unit\) \* 18\) minmax\(0, 1fr\); \} \.ta-opt-tags \{ display: none; \} \}/);
+});

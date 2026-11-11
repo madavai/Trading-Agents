@@ -265,8 +265,10 @@ so a word means the same thing everywhere.
 ### Start here: the whole market first
 The first section of the dashboard shows the world in tiers, broadest first, because the broadest risk is the steadiest:
 - **The whole market**: as shipped, four funds: SPY (the S&P 500 fund), QQQ (the Nasdaq 100 fund), VT (the whole world) and BND
-  (US bonds). Press Change… to choose your own, up to eight funds or stocks; each is checked with Yahoo Finance before
-  it is kept, and "Put back" brings the four back. Sector funds and crypto are refused there: they have tiers of their own.
+  (US bonds). Choose your own, up to eight: search a fund in the box at the top and press "Show in The whole market"
+  under it (only a fund the row can take gets that button, never a sector fund, a coin, an index or a single company),
+  and take one out with the ✕ on its tile. Each is checked with Yahoo Finance before it is kept, and "Put back" brings
+  the four back.
 - **Sectors**: the eleven S&P sector funds, from XLK (technology) to XLC (communication), each named in plain words with
   what it holds.
 - **Single names**: the companies on your watchlist, starred first (twelve here at most; the rest are in the watchlist).

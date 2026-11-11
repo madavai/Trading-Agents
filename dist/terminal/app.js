@@ -601,6 +601,14 @@
     return kind === "crypto" ? `${cryptoBase(s) ?? s}-USD` : yahooClass(s);
   }
 
+  // src/terminal/ui/marketpick.ts
+  var FUND_KINDS = ["ETF", "Fund"];
+  function marketOffer(m, row, sectorFunds, max) {
+    if (!m.kind || !FUND_KINDS.includes(m.kind) || isCrypto(m.symbol) || /[\^=]/.test(m.symbol) || sectorFunds.has(m.symbol)) return "none";
+    if (row.includes(m.symbol)) return "in";
+    return row.length >= max ? "full" : "show";
+  }
+
   // src/terminal/ui/main.ts
   var RANGES = ["1M", "3M", "6M", "1Y", "5Y"];
   var OVER = { "1M": "the month", "3M": "three months", "6M": "six months", "1Y": "the year", "5Y": "five years" };
@@ -1619,15 +1627,16 @@
       }
     }
   }
-  var MK = { editing: false };
+  var MK = { saving: false };
   var EMPTY = {
-    market: "You chose no whole-market funds. Press Change\u2026 to add one, such as SPY.",
+    market: "The whole market is empty. Search a fund in the box at the top, such as SPY, and press Show in The whole market.",
     names: "No single names on your watchlist yet: search a company above to add one. Bitcoin and Ether can be watched too, on paper only."
   };
-  function tierTile(i) {
+  function tierTile(i, tier) {
     const q2 = quoteOf(i.symbol);
     const call2 = i.call ? `${ratingChip(i.call.rating)}<span class="at-quiet">${esc(dayText(i.call.date))}</span>` : `<span class="at-quiet" title="${esc(means("call"))}">no call yet</span>`;
-    const ask2 = (isIndex(i.symbol) ? "" : isOpen(i.symbol) ? openChip(i.symbol) : robot(i.symbol)) + (i.watched ? "" : `<button class="icon-btn" data-act="watch-add" data-symbol="${esc(i.symbol)}" title="Add ${esc(i.symbol)} to your watchlist" aria-label="Add ${esc(i.symbol)} to your watchlist"><svg class="g"><use href="#i-plus"/></svg></button>`);
+    const out = `Take ${i.symbol} out of The whole market`;
+    const ask2 = (isIndex(i.symbol) ? "" : isOpen(i.symbol) ? openChip(i.symbol) : robot(i.symbol)) + (i.watched ? "" : `<button class="icon-btn" data-act="watch-add" data-symbol="${esc(i.symbol)}" title="Add ${esc(i.symbol)} to your watchlist" aria-label="Add ${esc(i.symbol)} to your watchlist"><svg class="g"><use href="#i-plus"/></svg></button>`) + (tier === "market" ? `<button class="icon-btn" data-act="mk-remove" data-symbol="${esc(i.symbol)}" title="${esc(out)}" aria-label="${esc(out)}"><svg class="g"><use href="#i-x"/></svg></button>` : "");
     return `<div class="at-tile at-box ta-tier-tile${i.symbol === S.symbol ? " on" : ""}">
     <button class="ta-tier-go" data-act="select" data-symbol="${esc(i.symbol)}" title="Chart ${esc(i.symbol)}">
       <span class="ta-tier-top"><b class="at-tile-name">${esc(i.name ?? q2?.name ?? i.symbol)}</b>${changeChip(q2)}</span>
@@ -1636,20 +1645,14 @@
     <div class="at-tile-foot">${call2}${i.ticket ? "" : noTicketChip(i.paper)}<span class="at-tail">${ask2}</span></div>
   </div>`;
   }
-  function marketEditor() {
-    const m = S.desk.market;
-    return `<div class="at-row">
-    <label class="at-field ta-grow"><span class="at-field-l">Up to ${m.max} broad funds, by ticker, separated by commas</span><input class="at-input at-box" id="mkInput" type="text" value="${esc(m.symbols.join(", "))}" maxlength="160" spellcheck="false" autocomplete="off"></label>
-    <button class="at-btn at-press primary" data-act="mk-save">Save</button><button class="at-btn at-press" data-act="mk-cancel">Cancel</button>${m.asShipped ? "" : `<button class="at-btn at-press" data-act="mk-shipped">Put back ${esc(listWords(m.shipped))}</button>`}
-  </div><p class="at-quiet">Each is checked with Yahoo Finance before it is kept. Sector funds and crypto have tiers of their own.</p>`;
-  }
-  function tierBlock(t) {
-    const change = t.tier === "market" && !MK.editing ? '<button class="at-btn at-press" data-act="mk-edit" title="Choose the broad funds this tier shows">Change\u2026</button>' : "";
+  function tierBlock(t, market) {
+    const putBack = t.tier === "market" && !market.asShipped ? `<button class="at-btn at-press" data-act="mk-shipped">Put back ${esc(listWords(market.shipped))}</button>` : "";
     const name = t.tier === "sectors" ? term("sector", t.name) : t.tier === "crypto" ? term("crypto", t.name) : t.tier === "names" ? term("stock", t.name) : esc(t.name);
-    const head = `<div class="ta-tier-head"><h3>${name}</h3><p class="at-quiet">${esc(t.meaning)}</p>${change}</div>`;
-    const body = t.items.length ? `<div class="at-deck ta-tier-deck">${t.items.map(tierTile).join("")}</div>` : `<p class="at-quiet">${esc(EMPTY[t.tier] ?? "")}</p>`;
+    const head = `<div class="ta-tier-head"><h3>${name}</h3><p class="at-quiet">${esc(t.meaning)}</p>${putBack}</div>`;
+    const body = t.items.length ? `<div class="at-deck ta-tier-deck">${t.items.map((i) => tierTile(i, t.tier)).join("")}</div>` : `<p class="at-quiet">${esc(EMPTY[t.tier] ?? "")}</p>`;
+    const how = t.tier === "market" && t.items.length ? '<p class="at-quiet">\u2715 takes a fund out of this row. To add one, search for it in the box at the top and press Show in The whole market.</p>' : "";
     const more = t.more ? `<div class="at-row"><button class="at-btn at-press" data-act="goto" data-to="sec-watch">${t.more} more on your watchlist</button></div>` : "";
-    return `<div class="ta-tier">${head}${t.tier === "market" && MK.editing ? marketEditor() : ""}${body}${more}</div>`;
+    return `<div class="ta-tier">${head}${body}${how}${more}</div>`;
   }
   function renderStart() {
     const d = S.desk, el = $("#startHere");
@@ -1657,17 +1660,7 @@
       el.innerHTML = `<p class="at-quiet">Reading the desk's files.</p>`;
       return;
     }
-    const typing = document.getElementById("mkInput");
-    const kept = typing ? { value: typing.value, focus: document.activeElement === typing, from: typing.selectionStart, to: typing.selectionEnd } : null;
-    el.innerHTML = d.startHere.map(tierBlock).join("") + `<p class="at-honest">${term("today")} is the change over the latest trading day, from the close before it, with the day named (Fri) when it was not today; a dash is a price Yahoo Finance did not give. Each ${term("call", "call")} is the desk's rating, from Buy to Sell: Buy and Overweight lean towards owning it, Hold keeps what is held, Underweight and Sell lean against it, and pointing at a rating says what its ticket does. A ${term("fund", "fund")} holds many companies at once; + adds one to your watchlist. Nothing here is investment advice.</p>`;
-    const field = document.getElementById("mkInput");
-    if (kept && field) {
-      field.value = kept.value;
-      if (kept.focus) {
-        field.focus();
-        field.setSelectionRange(kept.from, kept.to);
-      }
-    }
+    el.innerHTML = d.startHere.map((t) => tierBlock(t, d.market)).join("") + `<p class="at-honest">${term("today")} is the change over the latest trading day, from the close before it, with the day named (Fri) when it was not today; a dash is a price Yahoo Finance did not give. Each ${term("call", "call")} is the desk's rating, from Buy to Sell: Buy and Overweight lean towards owning it, Hold keeps what is held, Underweight and Sell lean against it, and pointing at a rating says what its ticket does. A ${term("fund", "fund")} holds many companies at once; + adds one to your watchlist. Nothing here is investment advice.</p>`;
   }
   var MORNING = { weather: null, weatherFailed: "", screen: null, screenFailed: "", on: false, known: false, top: 3, from: "" };
   var LINE_TONE = { ok: "ok", warn: "warn", bad: "danger", "": "" };
@@ -1736,13 +1729,21 @@
     renderMorning();
   }
   async function saveMarketList(symbols) {
-    await run(async () => {
-      const { market } = await api.setMarket(symbols);
-      MK.editing = false;
-      await refreshState();
-      void refreshQuotes();
-      toast(market.symbols.length ? `The whole market now shows ${listWords(market.symbols)}.` : "The whole market shows no funds now.");
-    });
+    if (MK.saving) {
+      toast("The whole market is still being saved. Press again in a moment.", "bad");
+      return;
+    }
+    MK.saving = true;
+    try {
+      await run(async () => {
+        const { market } = await api.setMarket(symbols);
+        await refreshState();
+        void refreshQuotes();
+        toast(market.symbols.length ? `The whole market now shows ${listWords(market.symbols)}.` : "The whole market shows no funds now.");
+      });
+    } finally {
+      MK.saving = false;
+    }
   }
   function renderCalls() {
     const d = S.desk;
@@ -2237,17 +2238,13 @@
           toast(!r.morning.on ? "Switched off: nothing goes on the waiting list by itself." : `Switched on: nothing is queued now. From ${r.morning.from ? dayText(r.morning.from) : "the next market morning"}, the top ${r.morning.top} go on the waiting list at shallow depth each market morning.`);
         });
         break;
-      case "mk-edit":
-        MK.editing = true;
-        renderStart();
-        document.getElementById("mkInput")?.focus();
+      case "find-market": {
+        const r = findRows()[Number(el.dataset.i)];
+        if (r) showInMarket(r);
         break;
-      case "mk-cancel":
-        MK.editing = false;
-        renderStart();
-        break;
-      case "mk-save":
-        void saveMarketList($("#mkInput").value.split(/[\s,]+/).filter(Boolean));
+      }
+      case "mk-remove":
+        if (S.desk) void saveMarketList(S.desk.market.symbols.filter((s) => s !== sym));
         break;
       case "mk-shipped":
         void saveMarketList([...S.desk?.market.shipped ?? []]);
@@ -2492,16 +2489,6 @@
     if (t.id === "contactInput" && e.key === "Enter") {
       e.preventDefault();
       void saveContact();
-      return;
-    }
-    if (t.id !== "mkInput") return;
-    if (e.key === "Enter") {
-      e.preventDefault();
-      void saveMarketList(t.value.split(/[\s,]+/).filter(Boolean));
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      MK.editing = false;
-      renderStart();
     }
   });
   var F = { mode: "closed", query: "", matches: [], found: "", active: -1, seq: 0, timer: null };
@@ -2509,14 +2496,28 @@
   var FIND_QUERY = /^[\p{L}\p{N} .&'\-^=,]{1,40}$/u;
   var findInput = $("#addInput");
   var findRows = () => F.mode === "recent" ? P.recent ?? [] : F.mode === "matches" || F.mode === "loading" ? F.matches : [];
+  function rowOffer(r) {
+    const d = S.desk;
+    if (!d) return "none";
+    return marketOffer(r, d.market.symbols, new Set(d.startHere.find((t) => t.tier === "sectors")?.items.map((i) => i.symbol)), d.market.max);
+  }
+  var marketFull = (max) => `The whole market already holds ${max} funds: take one out to make room.`;
+  function rowActions(r, i, watched) {
+    const offer = rowOffer(r);
+    if (offer === "none") return "";
+    const add = watched ? "" : `<button type="button" class="at-btn at-press" data-act="find-pick" data-i="${i}">Add to watchlist</button>`;
+    const market = offer === "show" ? `<button type="button" class="at-btn at-press" data-act="find-market" data-i="${i}">Show in The whole market</button>` : offer === "in" ? '<span class="at-chip">In The whole market</span>' : `<span class="at-quiet">${esc(marketFull(S.desk.market.max))}</span>`;
+    return `<span class="ta-opt-do">${add}${market}</span>`;
+  }
   function findRow(r, i) {
-    const watched = S.desk?.watchlist.some((w) => w.symbol === r.symbol), call2 = latestCall(r.symbol);
+    const watched = !!S.desk?.watchlist.some((w) => w.symbol === r.symbol), call2 = latestCall(r.symbol);
     const where = [r.exchange, r.kind].filter(Boolean).join(" \xB7 ");
     const name = r.name && r.name !== r.symbol ? r.name : "";
     return `<li class="ta-opt${i === F.active ? " on" : ""}" role="option" id="find-${i}" aria-selected="${i === F.active}" data-act="find-pick" data-i="${i}">
     <b class="ta-opt-sym">${esc(r.symbol)}</b>
     <span class="ta-opt-name"><span>${esc(name)}</span>${where ? `<small>${esc(where)}</small>` : ""}</span>
     <span class="ta-opt-tags">${call2 ? ratingChip(call2.rating) : ""}${watched ? '<span class="at-chip">Watched</span>' : ""}</span>
+    ${rowActions(r, i, watched)}
   </li>`;
   }
   function renderFind() {
@@ -2530,7 +2531,7 @@
     const q2 = esc(F.query);
     $("#findHead").innerHTML = F.mode === "recent" ? '<span><svg class="g"><use href="#i-history"/></svg>Recent</span><button type="button" class="at-btn at-press" data-act="find-clear">Clear</button>' : `<span><svg class="g"><use href="#i-search"/></svg>${F.mode === "loading" ? `Looking for \u201C${q2}\u201D\u2026` : `Matches for \u201C${q2}\u201D`}</span>`;
     $("#findList").innerHTML = rows.map(findRow).join("");
-    $("#findFoot").textContent = F.mode === "failed" ? `Yahoo Finance's search did not answer. Press Enter to add \u201C${F.query}\u201D as a ticker.` : F.mode === "matches" && !rows.length ? `Nothing matches \u201C${F.query}\u201D at Yahoo Finance. Check the spelling, or type the ticker.` : F.mode === "recent" ? "The stocks you looked at last. Type to search." : "From Yahoo Finance \xB7 \u2191 \u2193 to move \xB7 Enter to add \xB7 Esc to close";
+    $("#findFoot").textContent = F.mode === "failed" ? `Yahoo Finance's search did not answer. Press Enter to add \u201C${F.query}\u201D as a ticker.` : F.mode === "matches" && !rows.length ? `Nothing matches \u201C${F.query}\u201D at Yahoo Finance. Check the spelling, or type the ticker.` : F.mode === "recent" ? "The stocks you looked at last. Type to search." : `From Yahoo Finance \xB7 \u2191 \u2193 to move \xB7 Enter to add${rows[F.active] && rowOffer(rows[F.active]) === "show" ? " to your watchlist \xB7 Shift+Enter to show it in The whole market" : ""} \xB7 Esc to close`;
     document.getElementById(`find-${F.active}`)?.scrollIntoView({ block: "nearest" });
   }
   async function findNow(q2) {
@@ -2576,6 +2577,18 @@
       remember({ recent: withRecent(r.symbol, r.name) });
       void addStock(r.symbol);
     }
+  }
+  function showInMarket(r) {
+    const d = S.desk, offer = rowOffer(r);
+    if (!d) return;
+    if (offer !== "show") {
+      if (offer === "in") toast(`${r.symbol} is already in The whole market.`);
+      else if (offer === "full") toast(marketFull(d.market.max), "bad");
+      return;
+    }
+    closeFind(true);
+    findInput.blur();
+    void saveMarketList([...d.market.symbols, r.symbol]);
   }
   findInput.addEventListener("input", () => {
     const q2 = findInput.value.trim();
@@ -2631,7 +2644,8 @@
       closeFind();
     } else if (e.key === "Enter" && F.active >= 0 && rows[F.active]) {
       e.preventDefault();
-      pick(rows[F.active]);
+      if (e.shiftKey) showInMarket(rows[F.active]);
+      else pick(rows[F.active]);
     }
   });
   $("#findPanel").addEventListener("mousedown", (e) => e.preventDefault());
