@@ -359,7 +359,10 @@ stands: waiting, being analysed (with the step it is on), done with its rating, 
 A finished one clears from the page when its stock has a newer call or a week has passed; every call stays in the desk's
 calls. When one finishes, a
 notice says so wherever you are on the page. One stock is analysed at a time, at most five a run (the routines' limit
-in `desk-settings.json`); the rest wait for the next run, which is asked for by itself. Each runs at the depth you
+in `desk-settings.json`); the rest wait for the next run, which is asked for by itself. "At once", at the top of
+Analysis status, lets one run analyse two or three side by side instead: a list finishes sooner, but no single analysis
+is faster, and the stocks ask the same free data sources and model at the same time, so a source may answer
+"unavailable" more often. It comes set to 1. Each runs at the depth you
 chose, whatever the team's lead plans: the time and the model allowance it spends are yours.
 
 Something has to run them, and the desk starts no run of its own: it runs analyses only in the app it runs in, never in

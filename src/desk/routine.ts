@@ -9,7 +9,7 @@ import { Journal } from './journal.js';
 import { readHoldings } from './holdings.js';
 import { ordersOn } from './orders.js';
 import { readWatchlist } from '../terminal/store.js';
-import { finishItem, readQueue } from './queue.js';
+import { finishItem, readQueue, type AtOnce } from './queue.js';
 import { TOP_QUEUED, type Pick, type Screen } from './screen.js';
 import { dueForRerate, isRerateDay, readRerate, RERATE_DAYS, RERATE_MAX, type Rerate, type StopsAtClose } from './care.js';
 
@@ -32,17 +32,17 @@ const lastView = (s: Rerate['symbols'][number]): string => (s.called ? `its late
 
 /** What the morning routine analyses, in order: what is waiting on the dashboard first (asked for there, re-rated on a
  *  Monday or put there by the morning switch, each at its depth), then the person's starred watchlist stocks, leaving
- *  out any already called today or being analysed now, at most `max` in all. While another run analyses a stock from the
- *  waiting list, the rest of that list is left to it (one stock runs at a time; it asks for the next run when it ends),
- *  and the morning analyses the starred stocks. Starred stocks take turns: the ones whose latest call is oldest (or that
+ *  out any already called today or being analysed now, at most `max` in all. While another run analyses stocks from the
+ *  waiting list (one or, by the person's choice, up to three side by side), the rest of that list is left to it (one run
+ *  takes stocks from the list at a time; it asks for the next run when it ends), and the morning analyses the starred stocks. Starred stocks take turns: the ones whose latest call is oldest (or that
  *  have none) go first, so one over the limit today is analysed on a later morning. */
-export interface Morning { analyse: Array<{ symbol: string; why: string; queued: boolean }>; later: string[]; calledToday: string[]; running: string | null; leftToRun: string[] }
+export interface Morning { analyse: Array<{ symbol: string; why: string; queued: boolean }>; later: string[]; calledToday: string[]; running: string[]; leftToRun: string[] }
 export function morningList(dir: string, today: string, max: number, screen: Screen | null = null): Morning {
   const entries = new Journal(path.join(dir, 'journal.md')).load(), latest = new Map<string, string>();
   for (const e of entries) if ((latest.get(e.ticker) ?? '') < e.date) latest.set(e.ticker, e.date);
   const called = new Set(entries.filter((e) => e.date === today).map((e) => e.ticker));
-  const queue = readQueue(dir), running = queue.find((q) => q.state === 'running')?.symbol ?? null, leftToRun: string[] = [];
-  const wanted: Array<{ symbol: string; why: string; queued: boolean }> = [], seen = new Set<string>(running ? [running] : []);
+  const queue = readQueue(dir), running = queue.filter((q) => q.state === 'running').map((q) => q.symbol), leftToRun: string[] = [];
+  const wanted: Array<{ symbol: string; why: string; queued: boolean }> = [], seen = new Set<string>(running);
   const add = (symbol: string, why: string, queued: boolean) => { if (!seen.has(symbol) && !called.has(symbol)) { seen.add(symbol); wanted.push({ symbol, why, queued }); } };
   const bySwitch = new Set(screen?.queued?.day === today ? screen.queued.symbols : []), rerated = reratedToday(dir, today);
   const why = (q: { symbol: string; depth?: string }): string => {
@@ -52,7 +52,7 @@ export function morningList(dir: string, today: string, max: number, screen: Scr
   };
   for (const q of queue) {
     if (q.state !== 'waiting') continue;
-    if (running && !called.has(q.symbol)) { leftToRun.push(q.symbol); seen.add(q.symbol); } else add(q.symbol, why(q), true);
+    if (running.length && !called.has(q.symbol)) { leftToRun.push(q.symbol); seen.add(q.symbol); } else add(q.symbol, why(q), true);
   }
   const starred = readWatchlist(dir).filter((w) => w.favourite && !w.symbol.startsWith('^')).map((w, i) => ({ symbol: w.symbol, i, last: latest.get(w.symbol) ?? '' }));
   starred.sort((a, b) => a.last.localeCompare(b.last) || a.i - b.i);
@@ -66,9 +66,9 @@ function whereNow(symbols: string[], m: Morning, max: number): string[] {
   const step2 = new Set(m.analyse.map((a) => a.symbol)), called = new Set(m.calledToday), left = new Set(m.leftToRun), later = new Set(m.later);
   const groups: Array<{ words: (n: number) => string; names: string[] }> = [
     { words: () => 'analysed in step 2', names: symbols.filter((s) => step2.has(s)) },
-    { words: () => 'being analysed now by another run', names: symbols.filter((s) => s === m.running) },
-    { words: () => 'already called today, so not analysed again', names: symbols.filter((s) => !step2.has(s) && s !== m.running && called.has(s)) },
-    { words: () => `left on the dashboard to the run analysing ${m.running} (one stock runs at a time)`, names: symbols.filter((s) => !called.has(s) && left.has(s)) },
+    { words: () => 'being analysed now by another run', names: symbols.filter((s) => m.running.includes(s)) },
+    { words: () => 'already called today, so not analysed again', names: symbols.filter((s) => !step2.has(s) && !m.running.includes(s) && called.has(s)) },
+    { words: () => `left on the dashboard to the run analysing ${m.running.join(' and ')} (one run takes stocks from the waiting list at a time)`, names: symbols.filter((s) => !called.has(s) && left.has(s)) },
     { words: (n) => `over today's limit of ${max}, so ${n === 1 ? 'it waits' : 'they wait'} on the dashboard`, names: symbols.filter((s) => !called.has(s) && later.has(s)) },
   ];
   const told = new Set(groups.flatMap((g) => g.names));
@@ -176,7 +176,8 @@ function doneAlready(dir: string, today: string): Set<string> {
   return marked;
 }
 
-export function morningBrief(dir: string, today: string, max: number, look?: MorningLook, clock?: Clock): string {
+/** `atOnce`: how many stocks the routine analyses side by side (the person's choice on the dashboard; 1, one after another, as shipped). */
+export function morningBrief(dir: string, today: string, max: number, look?: MorningLook, clock?: Clock, atOnce: AtOnce = 1): string {
   const closed = marketClosed(today);
   if (closed) return closedBrief(dir, today, closed, clock);
   const day = weekday(today), marked = doneAlready(dir, today);
@@ -186,10 +187,13 @@ export function morningBrief(dir: string, today: string, max: number, look?: Mor
   lines.push('', `1. Score past calls first: list_settlements, then record_outcome with a lesson for each READY call (the /settle playbook). ${LEFT_CALLS}`);
   if (isRerateDay(today)) lines.push(...rerateLines(dir, today, m, max));
   lines.push(...lookLines(look, today, m, max));
-  if (m.running) lines.push('', `   ${m.running} is being analysed now by another run: leave it alone.${m.leftToRun.length ? ` Waiting on the dashboard, left to that run (one stock runs at a time): ${m.leftToRun.join(', ')}. Do not start them from this routine.` : ''}`);
+  const one = m.running.length === 1;
+  if (m.running.length) lines.push('', `   ${m.running.join(' and ')} ${one ? 'is' : 'are'} being analysed now by another run: leave ${one ? 'it' : 'them'} alone.${m.leftToRun.length ? ` Waiting on the dashboard, left to that run (one run takes stocks from the waiting list at a time): ${m.leftToRun.join(', ')}. Do not start them from this routine.` : ''}`);
   if (!m.analyse.length) lines.push('', '2. Nothing to analyse: no stock is waiting on the dashboard and no starred watchlist stock is without a call today. Say so.');
   else {
-    lines.push('', `2. Analyse, one after another, in this order (${m.analyse.length} of at most ${max} a morning), each by the /analyse playbook with today's date:`);
+    lines.push('', atOnce > 1 && m.analyse.length > 1
+      ? `2. Analyse in this order (${m.analyse.length} of at most ${max} a morning), up to ${atOnce} side by side (the person's choice), each by the /analyse playbook with today's date, as its section 7 ("Side by side") says:`
+      : `2. Analyse, one after another, in this order (${m.analyse.length} of at most ${max} a morning), each by the /analyse playbook with today's date:`);
     m.analyse.forEach((a, i) => lines.push(`   ${i + 1}. ${a.symbol} (${a.why})`));
     if (m.analyse.some((a) => a.queued)) lines.push('   A stock asked for on the dashboard is run as the /analyse playbook\'s waiting list says: start_queue_item first (it gives the depth), finish_queue_item once its call is recorded or with why it failed. A starred stock uses the settings\' depth.');
   }
