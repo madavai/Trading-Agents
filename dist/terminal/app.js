@@ -168,6 +168,30 @@
   var DELAY_SENTENCE = "Prices come from Yahoo Finance: real-time for US stocks and funds on Nasdaq, the New York Stock Exchange, NYSE Arca, NYSE American and Cboe US, and for coins (by Yahoo's own list of its delays and the desk's check of its feed); any other market's price may be late. A close is final.";
   var DELAY_SHORT = "Nasdaq, NYSE, Cboe and coin prices real-time \xB7 others may be late";
 
+  // src/robinhood/states.ts
+  var DONE_GROUPS = {
+    filled: ["filled"],
+    cancelled: ["cancelled", "canceled", "voided"],
+    expired: ["expired"],
+    rejected: ["rejected", "failed"]
+  };
+  var OPEN_GROUPS = {
+    pending: ["queued", "unconfirmed", "confirmed"],
+    partly: ["partially_filled"]
+  };
+  var DONE = new RegExp(`^(${Object.values(DONE_GROUPS).flat().join("|")})$`, "i");
+  var isDone = (state) => DONE.test(state);
+  function stateGroup(state) {
+    const s = (state ?? "").trim();
+    if (!s) return null;
+    const word = s.toLowerCase();
+    for (const groups of [DONE_GROUPS, OPEN_GROUPS]) {
+      for (const [name, words] of Object.entries(groups)) if (words.includes(word)) return name;
+    }
+    return "other";
+  }
+  var DONE_WORDS = Object.values(DONE_GROUPS).flat();
+
   // src/terminal/ui/fmt.ts
   var MINUS = "\u2212";
   var esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -220,18 +244,26 @@
     return `Left out of the table: ${calls(n)} on the yardstick itself or a fund that copies the same index, scored on ${n === 1 ? "its" : "their"} own return rather than against it. ${parts.join("; ")}.`;
   }
   function orderState(side, state) {
-    const raw = (state ?? "").trim(), s = raw.toLowerCase().replace(/[\s-]+/g, "_"), buy = side === "buy", sell = side === "sell";
-    const done = (words, tone2 = "") => ({ words, tone: tone2, open: false, raw });
-    if (!raw) return done("\u2014");
-    if (s === "filled") return done(buy ? "Bought" : sell ? "Sold" : "Filled", "ok");
-    if (s === "cancelled" || s === "canceled") return done("Cancelled");
-    if (s === "rejected") return done("Refused", "danger");
-    if (s === "failed") return done("Failed", "danger");
-    if (s === "expired") return done("Expired");
-    if (s === "voided") return done("Voided");
-    if (s === "partially_filled") return { words: "Partly filled", tone: "accent", open: true, raw };
-    if (s === "queued" || s === "confirmed") return { words: `Waiting${buy ? " to buy" : sell ? " to sell" : ""}`, tone: "accent", open: true, raw };
-    return { words: `Open: ${raw.replace(/_/g, " ")}`, tone: "accent", open: true, raw };
+    const raw = (state ?? "").trim(), group = stateGroup(raw), open = !!raw && !isDone(raw);
+    const as = (words, tone2 = "") => ({ words, tone: tone2, open, raw });
+    switch (group) {
+      case null:
+        return as("\u2014");
+      case "filled":
+        return as(side === "buy" ? "Success: Buy" : side === "sell" ? "Success: Sell" : "Success", "ok");
+      case "cancelled":
+        return as("Cancelled", "danger");
+      case "expired":
+        return as("Expired", "danger");
+      case "rejected":
+        return as("Rejected", "danger");
+      case "partly":
+        return as("Partly filled", "warn");
+      case "pending":
+        return as("Pending", "warn");
+      default:
+        return as(raw);
+    }
   }
   var orderStateWhy = (o) => o.raw ? `Robinhood's word: \u201C${o.raw}\u201D.${o.open ? " The desk counts it as still open: only filled, cancelled, rejected, failed, expired and voided orders are done." : ""}` : "Robinhood gave no state for this order.";
   var NOTES = {

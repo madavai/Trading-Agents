@@ -1007,19 +1007,70 @@ b, strong { font-weight: var(--weight-semibold); }
         "On a narrow window the two cards stack one over the other; at a phone's width the caps fields also go one to a line, each row's name over its limits.",
         "Under \"Accounts\" there is no line of words: each card says for itself \"Agentic · the desk may trade here, only on your Confirm\" or \"View only · the desk never trades here\".",
         "An account that holds nothing shows no sentence about it (its Holdings tile says 0). Nothing at the foot of a card says where the figures come from, and the page's foot says nothing about the sign-in or advice. What stays is what appears only when something failed: \"The orders could not be read.\", \"Not read: …\" and \"N holding(s) could not be read and are left out.\""] },
-    { "id": "D11", "title": "An order says where it stands, in plain words", "tags": [], "changed": "2026-11-11",
-      "about": "Robinhood gives each order a state word (queued, confirmed, filled…). The page puts it in plain words and lists the orders still open first, so \"Any purchases done? Anything pending?\" reads at a glance. The desk reads a state one way: filled, cancelled, rejected, failed, expired and voided are done, and every other state is still open.",
+    { "id": "D11", "title": "Orders say where they stand, waiting ones first", "tags": [], "changed": "2026-11-11",
+      "about": "Robinhood gives each order a state word (queued, confirmed, filled…). The page puts it in a few plain words and lists the orders still open first, so \"Any purchases done? Anything pending?\" reads at a glance. The desk reads a state one way: filled, cancelled, rejected, failed, expired and voided are done, and every other state is still open (this one list also decides which orders count towards your caps).",
       "where": "Dashboard › Your account › Orders in this account, and Stock page › Your orders on it",
       "do": [
-        "In the Agentic account's \"Orders in this account\", look at the State column; if you have an order Robinhood has taken but not filled, find it.",
+        "In the Agentic account's \"Orders in this account\", look at the State column.",
         "Open the Stock page of a stock you have ordered (\"Your orders on it\").",
         "Point at a state, then at the \"Price\" heading."],
       "see": [
         "The same table in both places (When, Order, Quantity, Price, State): orders still open first, then the rest in the order Robinhood listed them.",
-        "An order Robinhood has not filled yet (queued or confirmed) reads \"Waiting to buy\" or \"Waiting to sell\" in blue, never \"confirmed\" as if it were done; a partly filled one reads \"Partly filled\"; any other open state reads \"Open: \" and Robinhood's own word.",
-        "A done order reads \"Bought\" or \"Sold\" (filled) in green; \"Cancelled\", \"Expired\" or \"Voided\" plain; \"Refused\" (Robinhood rejected it) or \"Failed\" in red. A state the page cannot read is a dash.",
+        "Each state is one of the words in D12 to D18, in amber (still open), green (filled) or red (done without a fill).",
         "Pointing at a state says Robinhood's own word, for example \"Robinhood's word: “confirmed”. The desk counts it as still open: only filled, cancelled, rejected, failed, expired and voided orders are done.\"",
-        "Pointing at \"Price\" says \"Robinhood's average price for what has filled, when it gives one; otherwise the price the order is listed at.\""] }
+        "Pointing at \"Price\" says \"Robinhood's average price for what has filled, when it gives one; otherwise the price the order is listed at.\""] },
+    { "id": "D12", "title": "A waiting order reads Pending", "tags": ["Optional"], "changed": "2026-11-11",
+      "about": "An order Robinhood has taken but not yet filled (waiting for your approval on your phone, or for its limit price) is still open. It reads Pending, never a word that reads as finished.",
+      "where": "Dashboard › Your account › Orders in this account (or the Stock page's Your orders on it)",
+      "do": [
+        "Find an order that is not filled yet (place one, F3, or use one you have), and read its State."],
+      "see": [
+        "\"Pending\" in amber, above the finished orders. It is the same for a buy and a sell, and for Robinhood's words queued, unconfirmed and confirmed.",
+        "Pointing at it says Robinhood's own word and that the desk counts it as still open.",
+        "After it fills, \"Refresh from Robinhood\" shows it as \"Success: Buy\" or \"Success: Sell\" (D14)."] },
+    { "id": "D13", "title": "A partly filled order reads Partly filled", "tags": ["Optional"], "changed": "2026-11-11",
+      "about": "Only some of the shares have filled. The order is still open, and the desk counts it as open for your caps.",
+      "where": "Dashboard › Your account › Orders in this account (or the Stock page's Your orders on it)",
+      "do": [
+        "If an order of yours is partly filled, read its State."],
+      "see": [
+        "\"Partly filled\" in amber, above the finished orders. Pointing at it says Robinhood's word, “partially_filled”, and that the desk counts it as still open."] },
+    { "id": "D14", "title": "A filled order reads Success: Buy or Success: Sell", "tags": ["Optional"], "changed": "2026-11-11",
+      "about": "A filled order is done. It says whether it was a buy or a sell.",
+      "where": "Dashboard › Your account › Orders in this account (or the Stock page's Your orders on it)",
+      "do": [
+        "Find a filled buy and a filled sell, and read their State."],
+      "see": [
+        "\"Success: Buy\" for the buy and \"Success: Sell\" for the sell, in green. If the page cannot read an order's side it says \"Success\" alone.",
+        "They stand below the orders still open, in the order Robinhood listed them."] },
+    { "id": "D15", "title": "A cancelled order reads Cancelled", "tags": ["Optional"], "changed": "2026-11-11",
+      "about": "An order that was cancelled (by you, or voided by Robinhood) will never fill. It is done.",
+      "where": "Dashboard › Your account › Orders in this account (or the Stock page's Your orders on it)",
+      "do": [
+        "Find a cancelled order, and read its State."],
+      "see": [
+        "\"Cancelled\" in red. Pointing at it says Robinhood's own word, for example “cancelled” or “voided”."] },
+    { "id": "D16", "title": "An expired order reads Expired", "tags": ["Optional"], "changed": "2026-11-11",
+      "about": "An order that ran out of time without filling will never fill. It is done.",
+      "where": "Dashboard › Your account › Orders in this account (or the Stock page's Your orders on it)",
+      "do": [
+        "Find an expired order (a day order that did not fill by the close, say), and read its State."],
+      "see": [
+        "\"Expired\" in red."] },
+    { "id": "D17", "title": "A refused order reads Rejected", "tags": ["Optional"], "changed": "2026-11-11",
+      "about": "An order Robinhood rejected, or that failed, never filled and never will. It is done.",
+      "where": "Dashboard › Your account › Orders in this account (or the Stock page's Your orders on it)",
+      "do": [
+        "Find a rejected or failed order, and read its State."],
+      "see": [
+        "\"Rejected\" in red, for Robinhood's words rejected and failed alike. Pointing at it says which one Robinhood used."] },
+    { "id": "D18", "title": "A state the page does not know is shown as Robinhood gave it", "tags": ["Optional"], "changed": "2026-11-11",
+      "about": "The page never guesses what a word it has not met means. The desk counts every state that is not done as open, so such an order sits with the open ones.",
+      "where": "Dashboard › Your account › Orders in this account (or the Stock page's Your orders on it)",
+      "do": [
+        "If Robinhood ever gives an order a state not named above (for example one that is being cancelled), read its State. An order Robinhood gives no state shows a dash."],
+      "see": [
+        "Robinhood's own word, plain (no colour), among the orders still open; pointing at it says that the desk counts it as still open. An order with no state shows a dash."] }
   ] },
   { "id": "E", "name": "Deciding on a call",
     "sub": "The ticket proposes an order from your settings and caps, and Robinhood checks it. Nothing is placed here.",
@@ -1133,7 +1184,7 @@ b, strong { font-weight: var(--weight-semibold); }
       "do": [
         "Approve (or decline) in the Robinhood app, then press \"Refresh from Robinhood\"."],
       "see": [
-        "The order appears under the Agentic account's \"Orders in this account\", with its state in plain words (D11): \"Waiting to buy\" until it is filled, then \"Bought\"."] },
+        "The order appears under the Agentic account's \"Orders in this account\", with its state in plain words (D11): \"Pending\" until it is filled, then \"Success: Buy\" (D12, D14)."] },
     { "id": "F5", "title": "One order per ticket", "tags": ["Optional"], "changed": "2026-10-21",
       "about": "A ticket can never send twice, so a double press cannot buy twice.",
       "where": "The same NVDA ticket",

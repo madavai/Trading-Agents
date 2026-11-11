@@ -1,6 +1,7 @@
 // How numbers and words are written on the page. A number that is missing is a dash, never a zero.
 import { GLOSSARY, isTerm, means } from './glossary.js';
 import { LATE, type PriceMarket } from '../../data/delay.js';
+import { isDone, stateGroup } from '../../robinhood/states.js';
 
 const MINUS = '−';
 
@@ -98,25 +99,27 @@ export function ownReturnLine(own: Record<string, { count: number; worked: numbe
   return `Left out of the table: ${calls(n)} on the yardstick itself or a fund that copies the same index, scored on ${n === 1 ? 'its' : 'their'} own return rather than against it. ${parts.join('; ')}.`;
 }
 
-/** An order's state in plain words, for the tables of orders. Robinhood gives a word (queued, confirmed, filled...); the
- *  desk reads it one way only (robinhood/account.ts DONE): filled, cancelled, rejected, failed, expired and voided are done,
- *  and every other state is still open. So a done state has its own word, a partly filled order says so, "queued" and
- *  "confirmed" (the open states the desk has met) read "Waiting to buy" or "to sell", and any other open state says "Open"
- *  with Robinhood's own word, never a guess at what it means. `raw` is Robinhood's word, for the hover. */
-export interface OrderState { words: string; tone: '' | 'ok' | 'accent' | 'danger'; open: boolean; raw: string }
+/** An order's state in the owner's words, for the tables of orders (11 Nov 2026). Robinhood gives a word (queued,
+ *  confirmed, filled...); the groups come from one place, robinhood/states.ts, which the desk counts open orders with too
+ *  (filled, cancelled, rejected, failed, expired and voided are done, every other state is open), so the label and the caps'
+ *  open-order count always agree. Still open: "Pending" (queued, unconfirmed, confirmed) and "Partly filled", both amber.
+ *  Done: "Success: Buy" or "Success: Sell" in green (a filled order); "Cancelled" (also voided), "Expired" and "Rejected"
+ *  (also failed) in red. An open state whose word the desk has not met is Robinhood's own word, plain, never a guess; no
+ *  state at all is a dash. `raw` is Robinhood's word, for the hover. */
+export interface OrderState { words: string; tone: '' | 'ok' | 'warn' | 'danger'; open: boolean; raw: string }
 export function orderState(side: string | null, state: string | null): OrderState {
-  const raw = (state ?? '').trim(), s = raw.toLowerCase().replace(/[\s-]+/g, '_'), buy = side === 'buy', sell = side === 'sell';
-  const done = (words: string, tone: OrderState['tone'] = ''): OrderState => ({ words, tone, open: false, raw });
-  if (!raw) return done('—');
-  if (s === 'filled') return done(buy ? 'Bought' : sell ? 'Sold' : 'Filled', 'ok');
-  if (s === 'cancelled' || s === 'canceled') return done('Cancelled');
-  if (s === 'rejected') return done('Refused', 'danger');
-  if (s === 'failed') return done('Failed', 'danger');
-  if (s === 'expired') return done('Expired');
-  if (s === 'voided') return done('Voided');
-  if (s === 'partially_filled') return { words: 'Partly filled', tone: 'accent', open: true, raw };
-  if (s === 'queued' || s === 'confirmed') return { words: `Waiting${buy ? ' to buy' : sell ? ' to sell' : ''}`, tone: 'accent', open: true, raw };
-  return { words: `Open: ${raw.replace(/_/g, ' ')}`, tone: 'accent', open: true, raw };
+  const raw = (state ?? '').trim(), group = stateGroup(raw), open = !!raw && !isDone(raw);
+  const as = (words: string, tone: OrderState['tone'] = ''): OrderState => ({ words, tone, open, raw });
+  switch (group) {
+    case null: return as('—');
+    case 'filled': return as(side === 'buy' ? 'Success: Buy' : side === 'sell' ? 'Success: Sell' : 'Success', 'ok');
+    case 'cancelled': return as('Cancelled', 'danger');
+    case 'expired': return as('Expired', 'danger');
+    case 'rejected': return as('Rejected', 'danger');
+    case 'partly': return as('Partly filled', 'warn');
+    case 'pending': return as('Pending', 'warn');
+    default: return as(raw);
+  }
 }
 /** What hovering over an order's state says: Robinhood's own word, and how the desk reads it. */
 export const orderStateWhy = (o: OrderState): string => (o.raw

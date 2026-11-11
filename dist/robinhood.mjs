@@ -19545,6 +19545,19 @@ import path3 from "node:path";
 
 // src/robinhood/account.ts
 import crypto3 from "node:crypto";
+
+// src/robinhood/states.ts
+var DONE_GROUPS = {
+  filled: ["filled"],
+  cancelled: ["cancelled", "canceled", "voided"],
+  expired: ["expired"],
+  rejected: ["rejected", "failed"]
+};
+var DONE = new RegExp(`^(${Object.values(DONE_GROUPS).flat().join("|")})$`, "i");
+var isDone = (state) => DONE.test(state);
+var DONE_WORDS = Object.values(DONE_GROUPS).flat();
+
+// src/robinhood/account.ts
 var obj3 = (v) => v && typeof v === "object" && !Array.isArray(v) ? v : {};
 var list = (v) => Array.isArray(v) ? v : [];
 var text = (v) => typeof v === "string" && v.trim() ? v.trim() : null;
@@ -19626,14 +19639,13 @@ function parseOrders(answer) {
   const rows = list(dataOf(answer).orders);
   return { count: rows.length, orders: rows.slice(0, 20).map(orderOf) };
 }
-var DONE = /^(filled|cancell?ed|rejected|failed|expired|voided)$/i;
 function openOrders(answer) {
   const rows = list(dataOf(answer).orders), all = rows.map(orderOf);
   const open2 = [];
   let unread = 0;
   rows.forEach((v, i) => {
     const o = all[i], raw = obj3(v);
-    if (o.state && DONE.test(o.state)) return;
+    if (o.state && isDone(o.state)) return;
     const quantity = figure(raw.quantity), filled = figure(raw.cumulative_quantity) ?? 0;
     if (!o.state || !o.symbol || o.side !== "buy" && o.side !== "sell" || quantity === null) {
       unread++;
