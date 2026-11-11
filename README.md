@@ -353,7 +353,7 @@ indices are analysed but not followed on paper.
 
 ### Analyses that run by themselves
 Press the robot beside any stock, choose how deep (shallow, medium or deep; your settings' depth is chosen first) and
-press "Ask the desk". The stock joins **Analyses you asked for**, where each one shows where it stands: waiting, being
+press "Ask the desk". The stock joins **Analysis status**, where each one shows where it stands: waiting, being
 analysed (with the step it is on), done with its rating, or failed with the reason and a Retry. When one finishes, a
 notice says so wherever you are on the page. One stock is analysed at a time, at most five a run (the routines' limit
 in `desk-settings.json`); the rest wait for the next run, which is asked for by itself. Each runs at the depth you

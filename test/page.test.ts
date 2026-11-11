@@ -346,3 +346,17 @@ test('page-21: "How the desk is doing" is a page of its own with both cards, ope
   assert.match(page, /if \(v === 'score'\) renderPaper\(\);/);
   assert.doesNotMatch(page, /case 'view':[^\n]*(loadPaper|api\.paper)/);
 });
+
+test('page-22: the section that shows where each analysis stands is called "Analysis status" on the page, in the side list and the rail, in every sentence that points at it, and in the docs', () => {
+  const html = fs.readFileSync('src/terminal/ui/index.html', 'utf8');
+  assert.match(html, /<h2>Analysis status<\/h2><p id="analysesSub">Reading the desk's waiting list\.<\/p>/, 'the heading changes; its subtitle and contents do not');
+  assert.match(html, /<button class="at-li" data-act="goto" data-to="sec-analyses">.*<span class="at-li-t">Analysis status<\/span><\/button>/);
+  assert.match(html, /<button class="icon-btn" data-act="goto" data-to="sec-analyses" aria-label="Analysis status" title="Analysis status">/);
+  // the sentences that send the person to it
+  assert.match(page, /they are listed under Analysis status\.<\/p>/);
+  assert.match(page, /': it is asked for, see Analysis status'/);
+  assert.equal((page.match(/see Analysis status\./g) ?? []).length, 2, 'the Analyse box and the notice after asking');
+  // no file says the old name any more (the walk and the guide included), and "Analyses that run by themselves" is another thing and stays
+  for (const f of ['src/terminal/ui/index.html', 'src/terminal/ui/main.ts', 'README.md', 'docs/trading-agents-walk.html', 'docs/inside-the-trading-desk.html']) assert.doesNotMatch(fs.readFileSync(f, 'utf8'), /Analyses you asked for/, f);
+  assert.match(fs.readFileSync('README.md', 'utf8'), /The stock joins \*\*Analysis status\*\*, where each one shows where it stands/);
+});
