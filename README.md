@@ -240,7 +240,12 @@ Robinhood's phone approval is on. The side list folds away to give the page the 
 
 Type a company or a ticker in the search box ("Tesla", "NVDA") and the matches drop down from Yahoo Finance's search:
 the ticker, the name, the market and the kind, with the desk's latest rating. An empty box shows the stocks you looked
-at last. The dashboard opens where you left it (the page, the stock, the chart's settings, light or dark), in any
+at last. Only what you can buy and sell here is offered: US stocks and funds on Nasdaq, NYSE, NYSE Arca, NYSE American or
+Cboe, and Bitcoin and Ether. An index, a currency rate, a future, a mutual fund bought from its fund company, a listing
+outside the main US exchanges and any other coin are left out (the list says how many), and adding one by its ticker is
+refused with the reason, from Yahoo Finance's own word for what it is. Anything on your watchlist from before this rule
+stays, marked "can't be bought here" with the reason, and opens no Buy… or Trade… (Sell… stays for what you hold); its
+bin removes it. The six Markets cards stay, to read the market. The dashboard opens where you left it (the page, the stock, the chart's settings, light or dark), in any
 browser. After an update it offers Restart at the top of the page, and one press opens the new version where you were;
 Stop, at the top right, closes it.
 
@@ -282,7 +287,7 @@ is grouped from the broadest down:
 - **Sectors**: the sector funds you watch.
 - **Single names**: companies, and funds the desk does not count among the broad ones.
 - **Crypto**: Bitcoin and Ether. Their calls say Decide…, as a stock's do, and Trade… opens a coin ticket of your own (see
-  "Coins: Bitcoin and Ether" below). Any other coin opens no ticket.
+  "Coins: Bitcoin and Ether" below). Any other coin cannot be added.
 
 Each sector tile is three lines, the same on every tile. The first is its plain name. The second has a badge with its code (shaded by
 what Yahoo Finance says it is: blue for a fund, teal for a company, amber for a coin, plain for anything else) and the day's

@@ -193,7 +193,7 @@ test('page-19: the whole-market row is gone from the page: no ✕ on a tile, no 
   assert.doesNotMatch(fs.readFileSync('src/terminal/ui/api.ts', 'utf8'), /setMarket|MarketView|tiers\/market/);
   assert.doesNotMatch(fs.readFileSync('src/terminal/ui/dashboard.css', 'utf8'), /ta-opt-do/, 'the two presses under a fund in the search list are gone');
   // a row in the search list is one press (add it); the line under the list says so
-  assert.match(page, /: 'From Yahoo Finance · ↑ ↓ to move · Enter to add to your watchlist · Esc to close';/);
+  assert.match(page, /: `\$\{left\}From Yahoo Finance · ↑ ↓ to move · Enter to add to your watchlist · Esc to close`;/);
   assert.match(page, /else if \(e\.key === 'Enter' && F\.active >= 0 && rows\[F\.active\]\) \{ e\.preventDefault\(\); pick\(rows\[F\.active\]!\); \}/);
   // the other "Change…" buttons stay: the SEC contact email's and the paper money's
   assert.match(page, /data-act="contact-edit">Change…/);
@@ -243,7 +243,7 @@ test('page-21: a Sectors tile is three lines, the same on every tile (name; code
   assert.doesNotMatch(tile, /at-tile-sub|noTicketChip|no call yet/, 'the tile writes no sub line, no order-ticket chip and no date');
   // what left the tile is in its hover (the tile and its button, which is its accessible description): name, ticker and meaning, the call with its day, and why no ticket
   const words = /function tileWords\([\s\S]*?\n\}\n/.exec(page)![0];
-  for (const kept of [/\n {4}name,/, /\$\{i\.symbol\}\$\{i\.meaning \? ` · \$\{i\.meaning\}` : ''\}/, /The desk's latest call: \$\{i\.call\.rating\}, \$\{dayText\(i\.call\.date\)\}\./, /The desk has made no call on it yet\./, /\$\{means\('paper'\)\} \$\{NOTES\.coinOnPaper\}`? : NOTES\.noTicket/]) assert.match(words, kept, String(kept));
+  for (const kept of [/\n {4}name,/, /\$\{i\.symbol\}\$\{i\.meaning \? ` · \$\{i\.meaning\}` : ''\}/, /The desk's latest call: \$\{i\.call\.rating\}, \$\{dayText\(i\.call\.date\)\}\./, /The desk has made no call on it yet\./, /i\.paper && !whyNot\(i\.symbol\) \? `\$\{means\('paper'\)\} \$\{NOTES\.coinOnPaper\}` : `Can't be bought here: \$\{whyNot\(i\.symbol\) \?\? NOTES\.noTicket\}`/]) assert.match(words, kept, String(kept));
   assert.match(page, /<div class="at-tile at-box ta-tier-tile\$\{i\.symbol === S\.symbol \? ' on' : ''\}" title="\$\{words\}">/);
   assert.match(page, /<button class="ta-tier-go" data-act="select" data-symbol="\$\{esc\(i\.symbol\)\}" title="\$\{words\}">/);
   // Worth a look takes the same badge and keeps its words
@@ -510,4 +510,27 @@ test('page-28 (the owner\'s pick, 11 Nov 2026): the account page\'s top is layou
   // Robinhood's tools sentence, word for word as before, folds under one line and stays open when the card is drawn again.
   assert.match(page, /<details class="ta-more"\$\{open \? ' open' : ''\}><summary><svg class="g"><use href="#i-chev-right"\/><\/svg><span>What this page can do in Robinhood<\/span><\/summary><p class="at-quiet">\$\{esc\(r\.message\)\}<\/p><\/details>/);
   assert.match(page, /open = \$\('#accountCard'\)\.querySelector<HTMLDetailsElement>\('\.ta-more'\)\?\.open === true;/);
+});
+
+test('page-29 (the owner\'s rule, 11 Nov 2026): only what can be bought here is offered: Trade… and Buy… only when nothing says it cannot be bought, Sell… stays, a watched row or a call that cannot be bought says so with why, and the search\'s foot counts what it left out', () => {
+  // one rule, shared with the server (buyable.ts): its spelling first, then Yahoo's description in the quote
+  assert.match(page, /import \{ BUYABLE_WORDS, spelledUnbuyable \} from '\.\.\/buyable\.js';/);
+  assert.match(page, /const whyNot = \(sym: string\): string \| null => spelledUnbuyable\(sym\) \?\? quoteOf\(sym\)\?\.unbuyable \?\? null;/);
+  assert.match(page, /const buyHere = \(sym: string\) => tradeable\(sym\) && !whyNot\(sym\);/);
+  // every Trade… (which opens on a buy) asks buyHere; the stock page's Buy… too, while its Sell… needs only tradeable
+  const trades = page.match(/\$\{(\w+)\((sym|symbol)\) \? `<button class="at-btn at-press" data-act="trade" data-symbol/g) ?? [];
+  assert.ok(trades.length >= 2 && trades.every((t) => t.startsWith('${buyHere(')), trades.join('\n'));
+  assert.match(page, /const trade = buyHere\(sym\) \? `<button class="at-btn at-press" data-act="trade" data-symbol="\$\{esc\(sym\)\}" title="Your own order/);
+  assert.match(page, /\(buyHere\(sym\) \? \['buy', 'sell'\] as const : \['sell'\] as const\)\.map/);
+  // the mark: "can't be bought here", with why when pointed at, on a watched row and in place of Decide…
+  assert.match(page, />can't be bought here<\/span>/);
+  // a reason it cannot be bought wins over "on paper only" (a mutual fund the paper record still follows says why it cannot be bought)
+  assert.match(page, /const noTicketChip = \(sym: string, paper: boolean, late = ''\) => \(paper && !whyNot\(sym\) \?/);
+  assert.doesNotMatch(page, /no order ticket<\/span>/);
+  assert.match(page, /\$\{i\.ticket && !whyNot\(i\.symbol\) \? '' : noTicketChip\(i\.symbol, i\.paper\)\}/);
+  assert.match(page, /c\.ticket && !whyNot\(c\.ticker\)\s+\? `<button class="at-btn at-press primary" data-act="decide"/);
+  // the search's foot: how many Yahoo found that cannot be bought here, and when none can, what can
+  assert.match(page, /left out: \$\{F\.left === 1 \? 'it cannot' : 'they cannot'\} be bought here\. /);
+  assert.match(page, /but none can be bought here: only \$\{BUYABLE_WORDS\}\./);
+  assert.match(page, /const \{ matches, left \} = await api\.search\(q\);/);
 });

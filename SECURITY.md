@@ -30,7 +30,9 @@ Among coins, only Bitcoin and Ether can reach Robinhood, and only as a limit ord
 the coin, good till cancelled, after its coin check and your Confirm; each is checked against Robinhood's list of coins
 (tradable now, not halted) and your crypto limit, when the ticket opens and again before it is checked or placed. A
 coin buy not yet filled counts towards your caps as if filled. Any other coin, and every index, is refused at every
-ticket door before Robinhood is asked anything. The dashboard never cancels an order; you cancel in Robinhood's app.
+ticket door before Robinhood is asked anything. So is a buy of what Yahoo Finance describes as something that cannot be
+bought here (a listing outside the main US exchanges, a mutual fund, a currency rate); a sell never is, so what you hold
+can always be sold. The search box and the watchlist offer only what can be bought here. The dashboard never cancels an order; you cancel in Robinhood's app.
 
 A ticket sends at most one order, with Robinhood's own protection against a repeat. Keep Robinhood's phone approval on
 until you trust the desk: then Robinhood also asks you on your phone before the order reaches the market.

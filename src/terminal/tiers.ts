@@ -4,7 +4,7 @@
 // shows the eleven sector funds; the watchlist, which holds everything else the person follows, is grouped by tier.
 import { isCrypto } from '../data/symbols.js';
 import { followed } from '../desk/paper.js';
-import { TICKET_COINS } from '../desk/ticket.js';
+import { spelledUnbuyable } from './buyable.js';
 import { MARKET_FUNDS, SECTOR_FUNDS } from '../desk/sectors.js';
 import type { WatchItem } from './store.js';
 
@@ -54,10 +54,11 @@ export const PLAIN: Readonly<Record<string, { name: string; meaning: string }>> 
   'ETH-USD': { name: 'Ether', meaning: 'the coin of the Ethereum network, the second largest' },
 };
 
-/** Whether an order ticket can open for it: a stock or a fund, or among coins Bitcoin and Ether (each checked live against
- *  Robinhood's list of coins when the ticket opens); never another coin, an index, a future or a currency (the dashboard's
- *  server refuses those at every ticket door too). */
-export const ticketable = (symbol: string): boolean => (!isCrypto(symbol) || TICKET_COINS.has(symbol)) && !/[\^=]/.test(symbol);
+/** Whether an order ticket can open for it, by its spelling (buyable.ts): a stock or a fund, or among coins Bitcoin and
+ *  Ether (each checked live against Robinhood's list of coins when the ticket opens); never another coin, an index, a
+ *  future or a currency (the dashboard's server refuses those at every ticket door too). What Yahoo says of a stock or a
+ *  fund (a foreign listing, a mutual fund) the page reads from its quote, and the server asks again before a buy. */
+export const ticketable = (symbol: string): boolean => spelledUnbuyable(symbol) === null;
 
 /** The tier a symbol belongs to: crypto, a sector fund, the whole market (a broad fund the desk lists in desk/sectors.ts, or an
  *  index), else a single name (one company, or a narrower fund). */

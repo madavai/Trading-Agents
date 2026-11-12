@@ -14,6 +14,7 @@ import { AT_ONCE_CHOICES, AT_ONCE_WHY, atOnceToast, isAtOnceChoice, isStale, pac
 import { cryptoBase, deskSymbol, isCrypto } from '../../data/symbols.js';
 import { coinAmount, placesOf, stepsOf, TICKET_COINS } from '../../desk/ticket.js';
 import type { Quote, QuoteKind } from '../quotes.js';
+import { BUYABLE_WORDS, spelledUnbuyable } from '../buyable.js';
 
 const RANGES = ['1M', '3M', '6M', '1Y', '5Y'] as const;
 type Range = (typeof RANGES)[number];
@@ -52,10 +53,16 @@ const isQuote = (q: QuoteResult | undefined | null): q is Quote => !!q && !('err
 const isIndex = (sym: string) => sym.startsWith('^');
 /** A stock the ticket can trade: not an index, a currency or a coin (Robinhood's order check is for stocks). */
 const isStock = (sym: string) => !!sym && !/[\^=]/.test(sym) && !isCrypto(sym);
-/** Whether the person's own Trade… opens for it: a stock or a fund, or Bitcoin or Ether (each checked live against
- *  Robinhood's list of coins when the ticket opens). */
+/** Whether an order ticket of the person's own can open for it at all: a stock or a fund, or Bitcoin or Ether (each
+ *  checked live against Robinhood's list of coins when the ticket opens). Sell… needs no more. */
 const tradeable = (sym: string) => isStock(sym) || TICKET_COINS.has(sym);
 const quoteOf = (sym: string): Quote | null => { const q = S.quotes.get(sym) ?? S.markets.find((m) => m.symbol === sym)?.quote; return isQuote(q) ? q : null; };
+/** Why it cannot be bought here (buyable.ts): from its spelling, else from Yahoo's description in its quote; null when it
+ *  can, or while its quote is not in. */
+const whyNot = (sym: string): string | null => spelledUnbuyable(sym) ?? quoteOf(sym)?.unbuyable ?? null;
+/** Whether Buy… and Trade… (which opens on a buy) are offered: tradeable, and nothing says it cannot be bought here. The
+ *  server asks Yahoo again before any buy. */
+const buyHere = (sym: string) => tradeable(sym) && !whyNot(sym);
 const marketOf = (sym: string): Market | undefined => S.markets.find((m) => m.symbol === sym);
 const say = (e: unknown): string => (e instanceof ApiError ? e.message : 'The dashboard could not reach the desk.');
 
@@ -151,10 +158,10 @@ const changeChip = (q: Quote | null) => {
   const day = moveDayOf(q.asOf);
   return `<span class="at-chip ${tone(q.changePct)}" title="${esc(day ? `${means('today')} This move is from ${weekDay(day)}.` : means('today'))}">${moveText(q)}${day ? ` · ${chipDay(day)}` : ''}</span>`;
 };
-/** In place of an order ticket for what the desk does not order: a coin other than Bitcoin and Ether, or an index. Its call
- *  has no Decide…: "on paper only" for what paper follows without a ticket (nothing, since Bitcoin and Ether got tickets),
- *  else "no order ticket", with why. */
-const noTicketChip = (paper: boolean, late = '') => (paper ? `<span class="at-chip" title="${esc(`${means('paper')} ${NOTES.coinOnPaper}`)}">on paper only</span>` : `<span class="at-chip" title="${esc(late ? `${NOTES.coinOnPaper} ${daysInWords(late)}` : NOTES.noTicket)}">no order ticket</span>`);
+/** In place of an order ticket for what cannot be bought here (buyable.ts): a coin other than Bitcoin and Ether, an index,
+ *  or what Yahoo says is a foreign listing, a mutual fund and the like. Its call has no Decide…: "on paper only" for what
+ *  paper follows without a ticket (nothing, since Bitcoin and Ether got tickets), else "can't be bought here", with why. */
+const noTicketChip = (sym: string, paper: boolean, late = '') => (paper && !whyNot(sym) ? `<span class="at-chip" title="${esc(`${means('paper')} ${NOTES.coinOnPaper}`)}">on paper only</span>` : `<span class="at-chip" title="${esc(late ? `${NOTES.coinOnPaper} ${daysInWords(late)}` : whyNot(sym) ?? NOTES.noTicket)}">can't be bought here</span>`);
 const robot = (sym: string) => `<button class="icon-btn" data-act="analyse" data-symbol="${esc(sym)}" title="Ask the desk to analyse ${esc(sym)}" aria-label="Ask the desk to analyse ${esc(sym)}"><svg class="g"><use href="#i-bot"/></svg></button>`;
 /** "SPY, QQQ, VT and BND". */
 const listWords = (xs: readonly string[]) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
@@ -981,7 +988,7 @@ function renderHeroActions(): void {
   const c = latestCall(sym);
   const ask = isOpen(sym) ? openChip(sym)
     : `<button class="at-btn at-press" data-act="analyse" data-symbol="${esc(sym)}"><svg class="g"><use href="#i-bot"/></svg><span>${c ? 'Analyse again' : 'Ask the desk to analyse'}</span></button>`;
-  const trade = tradeable(sym) ? `<button class="at-btn at-press" data-act="trade" data-symbol="${esc(sym)}" title="Your own order for ${esc(sym)}, in the Agentic account"><svg class="g"><use href="#i-trade"/></svg><span>Trade…</span></button>` : '';
+  const trade = buyHere(sym) ? `<button class="at-btn at-press" data-act="trade" data-symbol="${esc(sym)}" title="Your own order for ${esc(sym)}, in the Agentic account"><svg class="g"><use href="#i-trade"/></svg><span>Trade…</span></button>` : '';
   el.innerHTML = ask + trade;
 }
 
@@ -1007,10 +1014,10 @@ const resultChip = (c: Pick<Call, 'pending' | 'alpha' | 'rating' | 'worked' | 'y
   return `<span class="at-chip ${r.tone}" title="${esc(r.why)}">${esc(r.words)}</span>`;
 };
 const readButton = (ticker: string, date: string, words = 'Read') => `<button class="at-btn at-press" data-act="open-call" data-symbol="${esc(ticker)}" data-date="${esc(date)}"><svg class="g"><use href="#i-file"/></svg><span>${esc(words)}</span></button>`;
-/** Decide… on a call: an order ticket from it. A call on a coin opens none, and says so instead. */
-const decideButton = (c: Pick<Call, 'ticker' | 'date' | 'ticket' | 'paper' | 'late'>) => (c.ticket
+/** Decide… on a call: an order ticket from it. A call on what cannot be bought here opens none, and says so instead. */
+const decideButton = (c: Pick<Call, 'ticker' | 'date' | 'ticket' | 'paper' | 'late'>) => (c.ticket && !whyNot(c.ticker)
   ? `<button class="at-btn at-press primary" data-act="decide" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}" title="${esc(means('ticket'))}"><span>Decide…</span></button>`
-  : noTicketChip(c.paper, c.late));
+  : noTicketChip(c.ticker, c.paper, c.late));
 
 /** The desk's latest call on the stock being charted, as one bar under the chart: its rating, day, score, gist, and the
  *  two things to do with it. */
@@ -1132,14 +1139,14 @@ function renderStock(): void {
     : !count ? `<p class="at-quiet">Robinhood listed no orders for the Agentic account at ${esc(at)}.</p>`
     : rest > 0 ? `<p class="at-quiet">No orders on ${esc(sym)} among the ${shown} the dashboard reads of the ${count} orders Robinhood listed for the Agentic account at ${esc(at)}: ${restWords}, so ${rest === 1 ? 'it' : 'one of them'} may be.</p>`
     : `<p class="at-quiet">No orders on ${esc(sym)} among the ${count === 1 ? 'one order' : `${count} orders`} Robinhood listed for the Agentic account at ${esc(at)}.</p>`;
-  const trade = tradeable(sym) ? `<div class="at-row">${(['buy', 'sell'] as const).map((s) => `<button class="at-btn at-press" data-act="trade" data-side="${s}" data-symbol="${esc(sym)}"><svg class="g"><use href="#${s === 'buy' ? 'i-up' : 'i-down'}"/></svg><span>${s === 'buy' ? 'Buy' : 'Sell'} ${esc(sym)}…</span></button>`).join('')}</div>` : '';
+  const trade = tradeable(sym) ? `<div class="at-row">${(buyHere(sym) ? ['buy', 'sell'] as const : ['sell'] as const).map((s) => `<button class="at-btn at-press" data-act="trade" data-side="${s}" data-symbol="${esc(sym)}"><svg class="g"><use href="#${s === 'buy' ? 'i-up' : 'i-down'}"/></svg><span>${s === 'buy' ? 'Buy' : 'Sell'} ${esc(sym)}…</span></button>`).join('')}</div>` : '';
   $('#stockBody').innerHTML = `<div class="ta-col">
       <div class="at-card at-box"><div class="at-card-head"><h3>What you hold</h3></div>${held}${trade}</div>
       <div class="at-card at-box"><div class="at-card-head"><h3>Your orders on it</h3></div>${orders}</div>
     </div>
     <div class="at-card at-box"><div class="at-card-head"><h3>The desk's calls on it</h3></div>${latest ? `<p class="at-lede">${esc(latest.summary)}</p>` : ''}${list}</div>`;
 
-  $('#stockActions').innerHTML = `${isOpen(sym) ? openChip(sym) : `<button class="at-btn at-press" data-act="analyse" data-symbol="${esc(sym)}"><svg class="g"><use href="#i-bot"/></svg><span>Ask the desk to analyse</span></button>`}${tradeable(sym) ? `<button class="at-btn at-press" data-act="trade" data-symbol="${esc(sym)}"><svg class="g"><use href="#i-trade"/></svg><span>Trade…</span></button>` : ''}${latest ? decideButton(latest) : ''}`;
+  $('#stockActions').innerHTML = `${isOpen(sym) ? openChip(sym) : `<button class="at-btn at-press" data-act="analyse" data-symbol="${esc(sym)}"><svg class="g"><use href="#i-bot"/></svg><span>Ask the desk to analyse</span></button>`}${buyHere(sym) ? `<button class="at-btn at-press" data-act="trade" data-symbol="${esc(sym)}"><svg class="g"><use href="#i-trade"/></svg><span>Trade…</span></button>` : ''}${latest ? decideButton(latest) : ''}`;
 }
 
 // ---------- watchlist, calls, scorecard ----------
@@ -1155,7 +1162,7 @@ function renderWatch(): void {
       <td class="num"><span class="at-num">${q ? priceText(i.symbol, q) : '—'}</span></td>
       <td class="num">${q ? changeChip(q) : `<span class="at-quiet" title="${esc(err && 'message' in err ? err.message : '')}">${err && 'error' in err ? (err.error === 'no-data' ? 'No data' : 'Unavailable') : '—'}</span>`}</td>
       <td><div class="ta-tablespark" data-sp="${esc(i.symbol)}"></div></td>
-      <td><span class="at-row compact">${c ? `${ratingChip(c.rating)}<span class="at-quiet">${esc(dayText(c.date))}</span>` : `<span class="at-quiet" title="${esc(means('call'))}">no call yet</span>`}${i.ticket ? '' : noTicketChip(i.paper)}</span></td>
+      <td><span class="at-row compact">${c ? `${ratingChip(c.rating)}<span class="at-quiet">${esc(dayText(c.date))}</span>` : `<span class="at-quiet" title="${esc(means('call'))}">no call yet</span>`}${i.ticket && !whyNot(i.symbol) ? '' : noTicketChip(i.symbol, i.paper)}</span></td>
       <td><span class="at-row">${queued ? openChip(i.symbol) : isIndex(i.symbol) ? '' : robot(i.symbol)}<button class="icon-btn" data-act="remove" data-symbol="${esc(i.symbol)}" title="Remove ${esc(i.symbol)}" aria-label="Remove ${esc(i.symbol)} from the watchlist"><svg class="g"><use href="#i-trash"/></svg></button></span></td></tr>`;
   };
   const groups = tiers.map((t) => {
@@ -1198,7 +1205,7 @@ function tileWords(i: TierItem, name: string): string {
     name,
     `${i.symbol}${i.meaning ? ` · ${i.meaning}` : ''}`,
     i.call ? `The desk's latest call: ${i.call.rating}, ${dayText(i.call.date)}.` : 'The desk has made no call on it yet.',
-    ...(i.ticket ? [] : [i.paper ? `${means('paper')} ${NOTES.coinOnPaper}` : NOTES.noTicket]),
+    ...(i.ticket && !whyNot(i.symbol) ? [] : [i.paper && !whyNot(i.symbol) ? `${means('paper')} ${NOTES.coinOnPaper}` : `Can't be bought here: ${whyNot(i.symbol) ?? NOTES.noTicket}`]),
   ].join('\n');
 }
 
@@ -1437,7 +1444,7 @@ async function openCall(symbol: string, date: string): Promise<void> {
         <span class="at-kicker">The portfolio manager's rating</span>
         <span class="at-verdict ${verdictClass(rating)}">${esc(rating)}</span>
         <p class="at-lede">${esc(meta?.summary ?? plain(c.decision).slice(0, 320))}</p>
-        <div class="at-row">${meta ? resultChip(meta) + decideButton(meta) : ''}${tradeable(symbol) ? `<button class="at-btn at-press" data-act="trade" data-symbol="${esc(symbol)}"><svg class="g"><use href="#i-trade"/></svg><span>Trade…</span></button>` : ''}</div>
+        <div class="at-row">${meta ? resultChip(meta) + decideButton(meta) : ''}${buyHere(symbol) ? `<button class="at-btn at-press" data-act="trade" data-symbol="${esc(symbol)}"><svg class="g"><use href="#i-trade"/></svg><span>Trade…</span></button>` : ''}</div>
       </div>
       <div class="ta-callhero-side"><span class="ta-spark-tall" id="callSpark"></span><p class="at-quiet" id="callSince">Reading the price since the call.</p></div>
     </div>
@@ -1740,11 +1747,13 @@ document.addEventListener('keydown', (e) => {
 
 // ---------- finding a stock ----------
 // As the person types a name or a ticker, Yahoo Finance's matches drop down under the box: the ticker, the name, the
-// market and the kind, with the desk's latest rating and a mark when it is already watched. An empty box shows the
-// stocks they looked at last. Arrow keys move, Enter picks (the first match when none is marked), Esc closes.
+// market and the kind, with the desk's latest rating and a mark when it is already watched. Only what can be bought here
+// is listed (buyable.ts), and the foot says how many more Yahoo found. An empty box shows the stocks they looked at last.
+// Arrow keys move, Enter picks (the first match when none is marked), Esc closes.
 type FindRow = { symbol: string; name: string; exchange?: string; kind?: string };
-/** `found`: the words the matches are for; `active`: the row marked, kept while the list is closed until the words change. */
-const F = { mode: 'closed' as 'closed' | 'recent' | 'loading' | 'matches' | 'failed', query: '', matches: [] as Match[], found: '', active: -1, seq: 0, timer: null as ReturnType<typeof setTimeout> | null };
+/** `found`: the words the matches are for; `left`: how many more Yahoo found for them that cannot be bought here; `active`:
+ *  the row marked, kept while the list is closed until the words change. */
+const F = { mode: 'closed' as 'closed' | 'recent' | 'loading' | 'matches' | 'failed', query: '', matches: [] as Match[], left: 0, found: '', active: -1, seq: 0, timer: null as ReturnType<typeof setTimeout> | null };
 /** The match marked first: the ticker typed, when it was typed as a ticker is written (in capitals: "FORD"); else Yahoo's
  *  own first, so a company typed by its name ("Ford") marks Ford Motor (F), not the company whose ticker is FORD. */
 const markedOf = (matches: readonly Match[], q: string): number => (!matches.length ? -1 : Math.max(0, q === q.toUpperCase() ? matches.findIndex((m) => m.symbol === q) : -1));
@@ -1776,10 +1785,11 @@ function renderFind(): void {
     ? '<span><svg class="g"><use href="#i-history"/></svg>Recent</span><button type="button" class="at-btn at-press" data-act="find-clear">Clear</button>'
     : `<span><svg class="g"><use href="#i-search"/></svg>${F.mode === 'loading' ? `Looking for “${q}”…` : `Matches for “${q}”`}</span>`;
   $('#findList').innerHTML = rows.map(findRow).join('');
+  const left = F.mode === 'matches' && F.left ? `${F.left === 1 ? 'One more match' : `${F.left} more matches`} left out: ${F.left === 1 ? 'it cannot' : 'they cannot'} be bought here. ` : '';
   $('#findFoot').textContent = F.mode === 'failed' ? `Yahoo Finance's search did not answer. Press Enter to add “${F.query}” as a ticker.`
-    : F.mode === 'matches' && !rows.length ? `Nothing matches “${F.query}” at Yahoo Finance. Check the spelling, or type the ticker.`
+    : F.mode === 'matches' && !rows.length ? (F.left ? `Yahoo Finance found ${F.left === 1 ? 'one match' : `${F.left} matches`} for “${F.query}”, but none can be bought here: only ${BUYABLE_WORDS}.` : `Nothing matches “${F.query}” at Yahoo Finance. Check the spelling, or type the ticker.`)
     : F.mode === 'recent' ? 'The stocks you looked at last. Type to search.'
-    : 'From Yahoo Finance · ↑ ↓ to move · Enter to add to your watchlist · Esc to close';
+    : `${left}From Yahoo Finance · ↑ ↓ to move · Enter to add to your watchlist · Esc to close`;
   document.getElementById(`find-${F.active}`)?.scrollIntoView({ block: 'nearest' });
 }
 
@@ -1787,13 +1797,13 @@ function renderFind(): void {
 async function findNow(q: string): Promise<Match | null> {
   const seq = ++F.seq;
   try {
-    const { matches } = await api.search(q);
+    const { matches, left } = await api.search(q);
     if (seq !== F.seq) return null;
-    F.matches = matches; F.found = q; F.mode = 'matches';
+    F.matches = matches; F.left = left; F.found = q; F.mode = 'matches';
     F.active = markedOf(matches, q);
   } catch {
     if (seq !== F.seq) return null;
-    F.matches = []; F.found = ''; F.mode = 'failed'; F.active = -1;
+    F.matches = []; F.left = 0; F.found = ''; F.mode = 'failed'; F.active = -1;
   }
   renderFind();
   return F.matches[F.active] ?? null;

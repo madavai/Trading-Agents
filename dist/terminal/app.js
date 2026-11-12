@@ -268,7 +268,7 @@
     /** The Price column of an order: robinhood/account.ts takes `average_price`, else `price`, else `limit_price`. */
     orderPrice: "Robinhood's average price for what has filled, when it gives one; otherwise the price the order is listed at.",
     coinOnPaper: "Among coins, the desk follows and orders only Bitcoin and Ether.",
-    noTicket: "No order ticket: among coins, the desk follows and orders only Bitcoin and Ether; an index cannot be bought (a fund that follows it can).",
+    noTicket: "Among coins, the desk orders only Bitcoin and Ether, and an index cannot itself be bought (a fund that follows it can).",
     noView: "No view yet: the desk has not analysed it. Ask it to (the robot); in the Agentic account, Monday's morning routine rates it.",
     stopWatch: "A stop is the desk's trader's, watched against Yahoo Finance's price only while this page is open in a browser. With the page closed nothing watches it: the evening wrap-up names any holding whose last close is below its stop, but only when it runs (your routines switched on in Madav, or asked for in a chat). It only reports."
   };
@@ -680,6 +680,19 @@
     return { q: r?.quantityStep ?? 1 / COIN_STEP, p: r?.priceStep ?? 0.01, min: r?.minQuantity ?? 0, max: r?.maxQuantity ?? 1e5 };
   };
 
+  // src/terminal/buyable.ts
+  var BUYABLE_WORDS = "US stocks and funds on Nasdaq, NYSE, NYSE Arca, NYSE American or Cboe, and Bitcoin and Ether";
+  var INDEX = (s) => `${s} is an index, a measure of a market that cannot itself be bought: a fund that follows it can, such as SPY for the S&P 500.`;
+  var CURRENCY = (s) => `${s} is a currency rate, which cannot be bought here.`;
+  var FUTURE = (s) => `${s} is a futures contract, which cannot be bought here.`;
+  function spelledUnbuyable(symbol) {
+    if (isCrypto(symbol)) return TICKET_COINS.has(symbol) ? null : `${symbol} is a coin the desk does not order: among coins, only Bitcoin and Ether can be bought here.`;
+    if (symbol.startsWith("^")) return INDEX(symbol);
+    if (/=F$/.test(symbol)) return FUTURE(symbol);
+    if (symbol.includes("=")) return CURRENCY(symbol);
+    return null;
+  }
+
   // src/terminal/ui/main.ts
   var RANGES = ["1M", "3M", "6M", "1Y", "5Y"];
   var OVER = { "1M": "the month", "3M": "three months", "6M": "six months", "1Y": "the year", "5Y": "five years" };
@@ -711,6 +724,8 @@
     const q2 = S.quotes.get(sym) ?? S.markets.find((m) => m.symbol === sym)?.quote;
     return isQuote(q2) ? q2 : null;
   };
+  var whyNot = (sym) => spelledUnbuyable(sym) ?? quoteOf(sym)?.unbuyable ?? null;
+  var buyHere = (sym) => tradeable(sym) && !whyNot(sym);
   var marketOf = (sym) => S.markets.find((m) => m.symbol === sym);
   var say = (e) => e instanceof ApiError ? e.message : "The dashboard could not reach the desk.";
   var P = {};
@@ -804,7 +819,7 @@
     const day = moveDayOf(q2.asOf);
     return `<span class="at-chip ${tone(q2.changePct)}" title="${esc(day ? `${means("today")} This move is from ${weekDay(day)}.` : means("today"))}">${moveText(q2)}${day ? ` \xB7 ${chipDay(day)}` : ""}</span>`;
   };
-  var noTicketChip = (paper, late = "") => paper ? `<span class="at-chip" title="${esc(`${means("paper")} ${NOTES.coinOnPaper}`)}">on paper only</span>` : `<span class="at-chip" title="${esc(late ? `${NOTES.coinOnPaper} ${daysInWords(late)}` : NOTES.noTicket)}">no order ticket</span>`;
+  var noTicketChip = (sym, paper, late = "") => paper && !whyNot(sym) ? `<span class="at-chip" title="${esc(`${means("paper")} ${NOTES.coinOnPaper}`)}">on paper only</span>` : `<span class="at-chip" title="${esc(late ? `${NOTES.coinOnPaper} ${daysInWords(late)}` : whyNot(sym) ?? NOTES.noTicket)}">can't be bought here</span>`;
   var robot = (sym) => `<button class="icon-btn" data-act="analyse" data-symbol="${esc(sym)}" title="Ask the desk to analyse ${esc(sym)}" aria-label="Ask the desk to analyse ${esc(sym)}"><svg class="g"><use href="#i-bot"/></svg></button>`;
   var listWords = (xs) => xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
   var priceText = (sym, q2) => {
@@ -1657,7 +1672,7 @@
     }
     const c = latestCall(sym);
     const ask2 = isOpen(sym) ? openChip(sym) : `<button class="at-btn at-press" data-act="analyse" data-symbol="${esc(sym)}"><svg class="g"><use href="#i-bot"/></svg><span>${c ? "Analyse again" : "Ask the desk to analyse"}</span></button>`;
-    const trade = tradeable(sym) ? `<button class="at-btn at-press" data-act="trade" data-symbol="${esc(sym)}" title="Your own order for ${esc(sym)}, in the Agentic account"><svg class="g"><use href="#i-trade"/></svg><span>Trade\u2026</span></button>` : "";
+    const trade = buyHere(sym) ? `<button class="at-btn at-press" data-act="trade" data-symbol="${esc(sym)}" title="Your own order for ${esc(sym)}, in the Agentic account"><svg class="g"><use href="#i-trade"/></svg><span>Trade\u2026</span></button>` : "";
     el.innerHTML = ask2 + trade;
   }
   async function loadHistory() {
@@ -1683,7 +1698,7 @@
     return `<span class="at-chip ${r.tone}" title="${esc(r.why)}">${esc(r.words)}</span>`;
   };
   var readButton = (ticker, date, words = "Read") => `<button class="at-btn at-press" data-act="open-call" data-symbol="${esc(ticker)}" data-date="${esc(date)}"><svg class="g"><use href="#i-file"/></svg><span>${esc(words)}</span></button>`;
-  var decideButton = (c) => c.ticket ? `<button class="at-btn at-press primary" data-act="decide" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}" title="${esc(means("ticket"))}"><span>Decide\u2026</span></button>` : noTicketChip(c.paper, c.late);
+  var decideButton = (c) => c.ticket && !whyNot(c.ticker) ? `<button class="at-btn at-press primary" data-act="decide" data-symbol="${esc(c.ticker)}" data-date="${esc(c.date)}" title="${esc(means("ticket"))}"><span>Decide\u2026</span></button>` : noTicketChip(c.ticker, c.paper, c.late);
   function renderCall() {
     const sym = S.symbol, c = latestCall(sym), d = S.desk, el = $("#callCard");
     if (!d || !sym) {
@@ -1776,13 +1791,13 @@
     const count = ag?.orders?.count ?? 0, shown = ag?.orders?.orders.length ?? 0, rest = count - shown, at = A.snapshot ? when(A.snapshot.at) : "";
     const restWords = rest === 1 ? "the other one is not read here" : `the other ${rest} are not read here`;
     const orders = !A.snapshot ? '<p class="at-quiet">Read your accounts to see your orders on it.</p>' : !ag ? '<p class="at-quiet">Show your Agentic account to see its orders.</p>' : isCrypto(sym) ? coinOrdersOn(sym, ag.coinOrders, at) : ag.orders === null ? '<p class="at-quiet">The orders could not be read.</p>' : mine.length ? `${ordersTable(mine, "USD", false)}${rest > 0 ? `<p class="at-quiet">Read from ${shown} of the ${count} orders Robinhood listed at ${esc(at)}: ${restWords}.</p>` : ""}` : !count ? `<p class="at-quiet">Robinhood listed no orders for the Agentic account at ${esc(at)}.</p>` : rest > 0 ? `<p class="at-quiet">No orders on ${esc(sym)} among the ${shown} the dashboard reads of the ${count} orders Robinhood listed for the Agentic account at ${esc(at)}: ${restWords}, so ${rest === 1 ? "it" : "one of them"} may be.</p>` : `<p class="at-quiet">No orders on ${esc(sym)} among the ${count === 1 ? "one order" : `${count} orders`} Robinhood listed for the Agentic account at ${esc(at)}.</p>`;
-    const trade = tradeable(sym) ? `<div class="at-row">${["buy", "sell"].map((s) => `<button class="at-btn at-press" data-act="trade" data-side="${s}" data-symbol="${esc(sym)}"><svg class="g"><use href="#${s === "buy" ? "i-up" : "i-down"}"/></svg><span>${s === "buy" ? "Buy" : "Sell"} ${esc(sym)}\u2026</span></button>`).join("")}</div>` : "";
+    const trade = tradeable(sym) ? `<div class="at-row">${(buyHere(sym) ? ["buy", "sell"] : ["sell"]).map((s) => `<button class="at-btn at-press" data-act="trade" data-side="${s}" data-symbol="${esc(sym)}"><svg class="g"><use href="#${s === "buy" ? "i-up" : "i-down"}"/></svg><span>${s === "buy" ? "Buy" : "Sell"} ${esc(sym)}\u2026</span></button>`).join("")}</div>` : "";
     $("#stockBody").innerHTML = `<div class="ta-col">
       <div class="at-card at-box"><div class="at-card-head"><h3>What you hold</h3></div>${held}${trade}</div>
       <div class="at-card at-box"><div class="at-card-head"><h3>Your orders on it</h3></div>${orders}</div>
     </div>
     <div class="at-card at-box"><div class="at-card-head"><h3>The desk's calls on it</h3></div>${latest ? `<p class="at-lede">${esc(latest.summary)}</p>` : ""}${list}</div>`;
-    $("#stockActions").innerHTML = `${isOpen(sym) ? openChip(sym) : `<button class="at-btn at-press" data-act="analyse" data-symbol="${esc(sym)}"><svg class="g"><use href="#i-bot"/></svg><span>Ask the desk to analyse</span></button>`}${tradeable(sym) ? `<button class="at-btn at-press" data-act="trade" data-symbol="${esc(sym)}"><svg class="g"><use href="#i-trade"/></svg><span>Trade\u2026</span></button>` : ""}${latest ? decideButton(latest) : ""}`;
+    $("#stockActions").innerHTML = `${isOpen(sym) ? openChip(sym) : `<button class="at-btn at-press" data-act="analyse" data-symbol="${esc(sym)}"><svg class="g"><use href="#i-bot"/></svg><span>Ask the desk to analyse</span></button>`}${buyHere(sym) ? `<button class="at-btn at-press" data-act="trade" data-symbol="${esc(sym)}"><svg class="g"><use href="#i-trade"/></svg><span>Trade\u2026</span></button>` : ""}${latest ? decideButton(latest) : ""}`;
   }
   function renderWatch() {
     const tiers = S.desk?.watchTiers ?? [], folded = new Set(P.folded ?? []);
@@ -1795,7 +1810,7 @@
       <td class="num"><span class="at-num">${q2 ? priceText(i.symbol, q2) : "\u2014"}</span></td>
       <td class="num">${q2 ? changeChip(q2) : `<span class="at-quiet" title="${esc(err && "message" in err ? err.message : "")}">${err && "error" in err ? err.error === "no-data" ? "No data" : "Unavailable" : "\u2014"}</span>`}</td>
       <td><div class="ta-tablespark" data-sp="${esc(i.symbol)}"></div></td>
-      <td><span class="at-row compact">${c ? `${ratingChip(c.rating)}<span class="at-quiet">${esc(dayText(c.date))}</span>` : `<span class="at-quiet" title="${esc(means("call"))}">no call yet</span>`}${i.ticket ? "" : noTicketChip(i.paper)}</span></td>
+      <td><span class="at-row compact">${c ? `${ratingChip(c.rating)}<span class="at-quiet">${esc(dayText(c.date))}</span>` : `<span class="at-quiet" title="${esc(means("call"))}">no call yet</span>`}${i.ticket && !whyNot(i.symbol) ? "" : noTicketChip(i.symbol, i.paper)}</span></td>
       <td><span class="at-row">${queued ? openChip(i.symbol) : isIndex(i.symbol) ? "" : robot(i.symbol)}<button class="icon-btn" data-act="remove" data-symbol="${esc(i.symbol)}" title="Remove ${esc(i.symbol)}" aria-label="Remove ${esc(i.symbol)} from the watchlist"><svg class="g"><use href="#i-trash"/></svg></button></span></td></tr>`;
     };
     const groups = tiers.map((t) => {
@@ -1825,7 +1840,7 @@
       name,
       `${i.symbol}${i.meaning ? ` \xB7 ${i.meaning}` : ""}`,
       i.call ? `The desk's latest call: ${i.call.rating}, ${dayText(i.call.date)}.` : "The desk has made no call on it yet.",
-      ...i.ticket ? [] : [i.paper ? `${means("paper")} ${NOTES.coinOnPaper}` : NOTES.noTicket]
+      ...i.ticket && !whyNot(i.symbol) ? [] : [i.paper && !whyNot(i.symbol) ? `${means("paper")} ${NOTES.coinOnPaper}` : `Can't be bought here: ${whyNot(i.symbol) ?? NOTES.noTicket}`]
     ].join("\n");
   }
   function tierTile(i, tier) {
@@ -2056,7 +2071,7 @@
         <span class="at-kicker">The portfolio manager's rating</span>
         <span class="at-verdict ${verdictClass(rating)}">${esc(rating)}</span>
         <p class="at-lede">${esc(meta?.summary ?? plain(c.decision).slice(0, 320))}</p>
-        <div class="at-row">${meta ? resultChip(meta) + decideButton(meta) : ""}${tradeable(symbol) ? `<button class="at-btn at-press" data-act="trade" data-symbol="${esc(symbol)}"><svg class="g"><use href="#i-trade"/></svg><span>Trade\u2026</span></button>` : ""}</div>
+        <div class="at-row">${meta ? resultChip(meta) + decideButton(meta) : ""}${buyHere(symbol) ? `<button class="at-btn at-press" data-act="trade" data-symbol="${esc(symbol)}"><svg class="g"><use href="#i-trade"/></svg><span>Trade\u2026</span></button>` : ""}</div>
       </div>
       <div class="ta-callhero-side"><span class="ta-spark-tall" id="callSpark"></span><p class="at-quiet" id="callSince">Reading the price since the call.</p></div>
     </div>
@@ -2676,7 +2691,7 @@
       void saveContact();
     }
   });
-  var F = { mode: "closed", query: "", matches: [], found: "", active: -1, seq: 0, timer: null };
+  var F = { mode: "closed", query: "", matches: [], left: 0, found: "", active: -1, seq: 0, timer: null };
   var markedOf = (matches, q2) => !matches.length ? -1 : Math.max(0, q2 === q2.toUpperCase() ? matches.findIndex((m) => m.symbol === q2) : -1);
   var FIND_QUERY = /^[\p{L}\p{N} .&'\-^=,]{1,40}$/u;
   var findInput = $("#addInput");
@@ -2702,21 +2717,24 @@
     const q2 = esc(F.query);
     $("#findHead").innerHTML = F.mode === "recent" ? '<span><svg class="g"><use href="#i-history"/></svg>Recent</span><button type="button" class="at-btn at-press" data-act="find-clear">Clear</button>' : `<span><svg class="g"><use href="#i-search"/></svg>${F.mode === "loading" ? `Looking for \u201C${q2}\u201D\u2026` : `Matches for \u201C${q2}\u201D`}</span>`;
     $("#findList").innerHTML = rows.map(findRow).join("");
-    $("#findFoot").textContent = F.mode === "failed" ? `Yahoo Finance's search did not answer. Press Enter to add \u201C${F.query}\u201D as a ticker.` : F.mode === "matches" && !rows.length ? `Nothing matches \u201C${F.query}\u201D at Yahoo Finance. Check the spelling, or type the ticker.` : F.mode === "recent" ? "The stocks you looked at last. Type to search." : "From Yahoo Finance \xB7 \u2191 \u2193 to move \xB7 Enter to add to your watchlist \xB7 Esc to close";
+    const left = F.mode === "matches" && F.left ? `${F.left === 1 ? "One more match" : `${F.left} more matches`} left out: ${F.left === 1 ? "it cannot" : "they cannot"} be bought here. ` : "";
+    $("#findFoot").textContent = F.mode === "failed" ? `Yahoo Finance's search did not answer. Press Enter to add \u201C${F.query}\u201D as a ticker.` : F.mode === "matches" && !rows.length ? F.left ? `Yahoo Finance found ${F.left === 1 ? "one match" : `${F.left} matches`} for \u201C${F.query}\u201D, but none can be bought here: only ${BUYABLE_WORDS}.` : `Nothing matches \u201C${F.query}\u201D at Yahoo Finance. Check the spelling, or type the ticker.` : F.mode === "recent" ? "The stocks you looked at last. Type to search." : `${left}From Yahoo Finance \xB7 \u2191 \u2193 to move \xB7 Enter to add to your watchlist \xB7 Esc to close`;
     document.getElementById(`find-${F.active}`)?.scrollIntoView({ block: "nearest" });
   }
   async function findNow(q2) {
     const seq = ++F.seq;
     try {
-      const { matches } = await api.search(q2);
+      const { matches, left } = await api.search(q2);
       if (seq !== F.seq) return null;
       F.matches = matches;
+      F.left = left;
       F.found = q2;
       F.mode = "matches";
       F.active = markedOf(matches, q2);
     } catch {
       if (seq !== F.seq) return null;
       F.matches = [];
+      F.left = 0;
       F.found = "";
       F.mode = "failed";
       F.active = -1;

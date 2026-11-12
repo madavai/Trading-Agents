@@ -17,6 +17,9 @@ import { openSession } from '../src/robinhood/connect.js';
 import { Journal } from '../src/desk/journal.js';
 import { startTerminal, type Assets } from '../src/terminal/server.js';
 import { accountTools, AGENTIC, fakeRobinhood, MAIN, type Fake } from './fake-robinhood.js';
+import { pretendListings } from './pretend-yahoo.js';
+
+pretendListings();
 
 const T = DEFAULTS.trading, C = DEFAULT_CAPS;   // full position 10%; caps $500 an order, 10% a stock, 3 orders a day
 const ctx = (o: Partial<TicketContext> = {}): TicketContext => ({ symbol: 'NVDA', rating: 'Buy', callDate: '2026-10-15', accountValue: 2500, buyingPower: 2500, held: 0, price: 182.4, ordersToday: 0, ...o });
@@ -346,7 +349,7 @@ test("from a call to Robinhood's check: proposed on the real figures, changed on
     assert.equal(early.status, 400);
     assert.match(early.json().error, /show your Agentic account on the dashboard first/);
     const coin = await ask('/api/ticket', { symbol: 'SHIB-USD', date: '2026-10-15' });
-    assert.deepEqual([coin.status, coin.json().error], [400, 'among coins, the order ticket trades only Bitcoin (BTC-USD) and Ether (ETH-USD), not SHIB-USD'], 'a call on another coin never opens a ticket: it is refused before Robinhood is asked');
+    assert.deepEqual([coin.status, coin.json().error], [400, 'SHIB-USD is a coin the desk does not order: among coins, only Bitcoin and Ether can be bought here.'], 'a call on another coin never opens a ticket: it is refused before Robinhood is asked');
     await show();
     assert.equal((await ask('/api/ticket', { symbol: 'NVDA', date: '2020-01-01' })).status, 404);
     const opened = await ask('/api/ticket', { symbol: 'nvda', date: '2026-10-15' });

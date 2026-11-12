@@ -23,6 +23,9 @@ import { sameFigures, typedNumber } from '../src/terminal/ui/typed.js';
 import { dayText } from '../src/terminal/ui/fmt.js';
 import { accountTools, fakeRobinhood, type Fake } from './fake-robinhood.js';
 import { today } from '../src/data/dates.js';
+import { pretendListings } from './pretend-yahoo.js';
+
+pretendListings();
 
 // Audit 3, group A: orders, the caps and the safety around them. Each test here failed on main 4ce0b62.
 

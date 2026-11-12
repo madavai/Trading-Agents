@@ -139,6 +139,13 @@ Each was the owner's, or agreed with them. Change one only on their word.
   limit that counts coin buys not yet filled. Every ticket door refuses any other coin and every index before Robinhood
   is asked anything. The real shapes of Robinhood's coin check, coin quotes and coin orders were not seen when it was
   built: the desk reads them strictly, so an unclear coin check counts as not checked and cannot be placed.
+- Only what can be bought here (Nov 2026, the owner's rule "let us not give the user something that the user cannot buy
+  and sell"): the search box, the watchlist and every buy offer only US stocks and funds on Nasdaq, NYSE, NYSE Arca,
+  NYSE American or Cboe, and Bitcoin and Ether, by Yahoo Finance's own word for each (`src/terminal/buyable.ts`). The
+  rest is left out of the search (the list says how many), refused at the watchlist's door with the reason, and marked
+  "can't be bought here" where it was added before. A buy ticket is refused when Yahoo says it cannot be bought; a sell
+  never is. Robinhood's own per-stock tradability read is not used: its answer was never seen, so Robinhood's check
+  (Review) stays the last word on a stock it will not take.
 - Out of scope until the desk has a long record: options, futures, currencies; notices outside the dashboard (phone,
   email).
 - Nothing here is investment advice; the desk proposes research and the person decides.

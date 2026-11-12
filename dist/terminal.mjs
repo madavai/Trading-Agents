@@ -4682,7 +4682,7 @@ var require_core = __commonJS({
       errorsText(errors = this.errors, { separator = ", ", dataVar = "data" } = {}) {
         if (!errors || errors.length === 0)
           return "No errors";
-        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text2, msg) => text2 + separator + msg);
+        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text3, msg) => text3 + separator + msg);
       }
       $dataMetaSchema(metaSchema, keywordsJsonPointers) {
         const rules = this.RULES.all;
@@ -7457,12 +7457,12 @@ function unreachableWords(e) {
   return why === "no answer in time" ? "did not answer in time" : `could not be reached (${why})`;
 }
 function whatItSaid(body) {
-  const text2 = body.trim();
-  if (!text2) return "";
+  const text3 = body.trim();
+  if (!text3) return "";
   const clean = (s) => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;|&#x27;/g, "'").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim().slice(0, 140);
-  if (/^[[{]/.test(text2)) {
+  if (/^[[{]/.test(text3)) {
     try {
-      const v = JSON.parse(text2);
+      const v = JSON.parse(text3);
       const pick2 = (o, depth) => {
         if (typeof o === "string") return o;
         if (!o || typeof o !== "object" || depth > 3) return "";
@@ -7488,9 +7488,9 @@ function whatItSaid(body) {
     } catch {
     }
   }
-  if (/<feed[\s>]/.test(text2)) return clean(/<title[^>]*>([\s\S]*?)<\/title>/i.exec(text2)?.[1]?.replace(/<[^>]*>/g, " ") ?? "");
-  const page = text2.replace(/<\?[\s\S]*?\?>|<!--[\s\S]*?-->|<!DOCTYPE[^>]*>/gi, " ").replace(/<(head|script|style|noscript)[\s>][\s\S]*?<\/\1>/gi, " ").replace(/<[^>]*>/g, " ");
-  return clean(page) || clean(/<title[^>]*>([\s\S]*?)<\/title>/i.exec(text2)?.[1] ?? "");
+  if (/<feed[\s>]/.test(text3)) return clean(/<title[^>]*>([\s\S]*?)<\/title>/i.exec(text3)?.[1]?.replace(/<[^>]*>/g, " ") ?? "");
+  const page = text3.replace(/<\?[\s\S]*?\?>|<!--[\s\S]*?-->|<!DOCTYPE[^>]*>/gi, " ").replace(/<(head|script|style|noscript)[\s>][\s\S]*?<\/\1>/gi, " ").replace(/<[^>]*>/g, " ");
+  return clean(page) || clean(/<title[^>]*>([\s\S]*?)<\/title>/i.exec(text3)?.[1] ?? "");
 }
 
 // src/check/probes.ts
@@ -7536,10 +7536,10 @@ function withLock(file4, run, waitMs = 15e3) {
     }
   }
 }
-function writeWhole(file4, text2) {
+function writeWhole(file4, text3) {
   const temp = `${file4}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
   try {
-    fs2.writeFileSync(temp, text2);
+    fs2.writeFileSync(temp, text3);
     fs2.renameSync(temp, file4);
   } catch (e) {
     try {
@@ -7643,11 +7643,11 @@ function readCache(url2) {
     return null;
   }
 }
-function writeCache(url2, text2) {
+function writeCache(url2, text3) {
   if (!cacheDir) return;
   try {
     fs3.mkdirSync(cacheDir, { recursive: true });
-    writeWhole(path3.join(cacheDir, `${keyOf(url2)}.txt`), text2);
+    writeWhole(path3.join(cacheDir, `${keyOf(url2)}.txt`), text3);
   } catch {
   }
 }
@@ -7690,12 +7690,12 @@ async function getTextAt(url2, opts = {}) {
       await sleep(Math.min(2e4, wait));
       continue;
     }
-    const text2 = await res.text();
+    const text3 = await res.text();
     if (res.status === 404) throw new NoData(`${sourceName(url2)} ${refusalWords(404).did}`, 404);
-    if (!res.ok) throw refusal(url2, res.status, text2);
+    if (!res.ok) throw refusal(url2, res.status, text3);
     const at = Date.now();
-    if (!opts.usable || opts.usable(text2)) writeCache(url2, text2);
-    return { text: text2, at };
+    if (!opts.usable || opts.usable(text3)) writeCache(url2, text3);
+    return { text: text3, at };
   }
 }
 async function getJson(url2, opts = {}) {
@@ -7703,17 +7703,17 @@ async function getJson(url2, opts = {}) {
 }
 async function getJsonAt(url2, opts = {}) {
   const read2 = {};
-  const usable = (text3) => {
+  const usable = (text4) => {
     try {
-      read2.value = JSON.parse(text3);
-      read2.text = text3;
+      read2.value = JSON.parse(text4);
+      read2.text = text4;
       return true;
     } catch {
       return false;
     }
   };
-  const { text: text2, at } = await getTextAt(url2, { ...opts, usable });
-  if (read2.text !== text2) throw new Unavailable(`${sourceName(url2)} answered, but not with the data the desk reads`);
+  const { text: text3, at } = await getTextAt(url2, { ...opts, usable });
+  if (read2.text !== text3) throw new Unavailable(`${sourceName(url2)} answered, but not with the data the desk reads`);
   return { value: read2.value, at };
 }
 
@@ -8738,7 +8738,7 @@ function lockDown(target) {
   return icacls([target, "/reset"]) && icacls(lockArgs(target, folder2, ownerOnWindows()));
 }
 var lockedFolders = /* @__PURE__ */ new Set();
-function writePrivate(file4, text2) {
+function writePrivate(file4, text3) {
   const folder2 = path6.dirname(file4);
   fs6.mkdirSync(folder2, { recursive: true, mode: 448 });
   if (!lockedFolders.has(folder2)) {
@@ -8746,7 +8746,7 @@ function writePrivate(file4, text2) {
     lockedFolders.add(folder2);
   }
   const tmp = `${file4}.${process.pid}.tmp`;
-  fs6.writeFileSync(tmp, text2, { mode: 384 });
+  fs6.writeFileSync(tmp, text3, { mode: 384 });
   fs6.renameSync(tmp, file4);
   lockDown(file4);
 }
@@ -20318,8 +20318,8 @@ var StreamableHTTPClientTransport = class {
   }
   /** Error text for a redirect `response` that was not followed, or `undefined` for any other response. */
   _unfollowedRedirect(response, url2) {
-    const text2 = unfollowedRedirect(response, url2);
-    return text2 && !this._followRedirects ? `${text2} (redirectPolicy: 'same-origin')` : text2;
+    const text3 = unfollowedRedirect(response, url2);
+    return text3 && !this._followRedirects ? `${text3} (redirectPolicy: 'same-origin')` : text3;
   }
   async _authThenStart() {
     if (!this._authProvider) {
@@ -20554,7 +20554,7 @@ var StreamableHTTPClientTransport = class {
         this._sessionId = sessionId;
       }
       if (!response.ok) {
-        const text2 = await response.text().catch(() => null);
+        const text3 = await response.text().catch(() => null);
         if (response.status === 401 && this._authProvider) {
           if (this._hasCompletedAuthFlow) {
             throw new StreamableHTTPError(401, "Server returned 401 after successful authentication");
@@ -20600,7 +20600,7 @@ var StreamableHTTPClientTransport = class {
             return this.send(message);
           }
         }
-        throw new StreamableHTTPError(response.status, `Error POSTing to endpoint: ${this._unfollowedRedirect(response, this._url) ?? text2}`);
+        throw new StreamableHTTPError(response.status, `Error POSTing to endpoint: ${this._unfollowedRedirect(response, this._url) ?? text3}`);
       }
       this._hasCompletedAuthFlow = false;
       this._lastUpscopingHeader = void 0;
@@ -20839,15 +20839,15 @@ var Reader = class {
     if (kind === "order") throw new Refused(`${name} orders or moves money, or reviews an order, so this part of the desk never calls it.`);
     if (kind !== "read") throw new Refused(`${name} is not labelled read-only by Robinhood, so this part of the desk never calls it.`);
     const r = await this.client.callTool({ name, arguments: args });
-    const text2 = (r.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
+    const text3 = (r.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
     let data = r.structuredContent ?? null;
     if (data === null) {
       try {
-        data = JSON.parse(text2);
+        data = JSON.parse(text3);
       } catch {
       }
     }
-    return { data, text: text2, failed: r.isError === true };
+    return { data, text: text3, failed: r.isError === true };
   }
 };
 
@@ -20931,15 +20931,15 @@ function parsePreview(answer, o) {
   return { answered: true, unclear: false, alerts, approvalRequired: typeof d.customer_approval_required === "boolean" ? d.customer_approval_required : null, facts, error: null };
 }
 var answerOf = (r) => {
-  const text2 = (r.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
+  const text3 = (r.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
   let data = r.structuredContent ?? null;
   if (data === null) {
     try {
-      data = JSON.parse(text2);
+      data = JSON.parse(text3);
     } catch {
     }
   }
-  return { data, text: text2, failed: r.isError === true };
+  return { data, text: text3, failed: r.isError === true };
 };
 var Reviewer = class {
   constructor(client, tools) {
@@ -21013,15 +21013,15 @@ var Placer = class {
   async place(account, o, refId, now = /* @__PURE__ */ new Date(), coin) {
     const name = isCrypto(o.symbol) ? PLACE_COIN : PLACE;
     const r = await this.client.callTool({ name, arguments: this.ready(account, o, refId, now, coin) });
-    const text2 = (r.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
+    const text3 = (r.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
     let data = r.structuredContent ?? null;
     if (data === null) {
       try {
-        data = JSON.parse(text2);
+        data = JSON.parse(text3);
       } catch {
       }
     }
-    return parsePlaced({ data, text: text2, failed: r.isError === true });
+    return parsePlaced({ data, text: text3, failed: r.isError === true });
   }
 };
 
@@ -21644,9 +21644,9 @@ var LABEL = /(?<![a-z])rating\b[^:\-\u2010-\u2015]*[:\-\u2010-\u2015][\s*]*(\w+)
 var OWN = "(?:(?:final|our|overall|my|recommended|updated|revised|new|current)\\s+)*";
 var LINE = new RegExp(`^\\s*(?<item>(?:[-+*\\u2022]|\\d+[.)])\\s+)?[\\s*_#]*${OWN}rating[^\\w:\\-\\u2010-\\u2015]*[:\\-\\u2010-\\u2015][\\s*]*(?<value>\\w+)`, "i");
 var SCALE = /rating\s*(scale|options|legend)/i;
-function extractRating(text2) {
-  if (!text2) return null;
-  const lines = text2.normalize("NFKC").split(/\r?\n/).filter((l) => l.trim() && !SCALE.test(l));
+function extractRating(text3) {
+  if (!text3) return null;
+  const lines = text3.normalize("NFKC").split(/\r?\n/).filter((l) => l.trim() && !SCALE.test(l));
   const first = lines.find((l) => !l.trimStart().startsWith("#") || LINE.test(l)) ?? "";
   const m = LINE.exec(first);
   const opening = m && SET.has(m.groups.value.toLowerCase()) ? m : null;
@@ -21660,15 +21660,15 @@ function extractRating(text2) {
   const found = own2.length ? own2 : labels;
   return found.length && new Set(found).size === 1 ? found[0] : null;
 }
-var parseRating = (text2) => extractRating(text2) ?? REVIEW2;
+var parseRating = (text3) => extractRating(text3) ?? REVIEW2;
 
 // src/numbers.ts
 function signed(v, digits) {
-  const text2 = Math.abs(v).toFixed(digits);
-  return Number(text2) === 0 ? text2 : `${v > 0 ? "+" : "-"}${text2}`;
+  const text3 = Math.abs(v).toFixed(digits);
+  return Number(text3) === 0 ? text3 : `${v > 0 ? "+" : "-"}${text3}`;
 }
 var signedPct = (fraction, digits = 1) => `${signed(fraction * 100, digits)}%`;
-var unsignZero = (text2) => text2.replace(/^[+\-−](0(?:\.0+)?%)$/, "$1");
+var unsignZero = (text3) => text3.replace(/^[+\-−](0(?:\.0+)?%)$/, "$1");
 
 // src/desk/scoring.ts
 var coinDays = (tradingDays) => Math.max(1, Math.round(tradingDays * 7 / 5));
@@ -21735,8 +21735,8 @@ var WITHHELD = ["unreliable", "flagged"];
 var SEPARATOR = "\n\n<!-- ENTRY_END -->\n\n";
 var MARK = /<!--\s*ENTRY_END\s*-->/i;
 var SPLIT = /\s*<!--\s*ENTRY_END\s*-->\s*/i;
-function keep(text2) {
-  let s = text2;
+function keep(text3) {
+  let s = text3;
   while (MARK.test(s)) s = s.replace(MARK, "");
   return s.replace(/^([ \t]*)(DECISION|REFLECTION|LESSON CHECK|EARLIER CORRECTIONS|FIRST LESSON):/gim, "$1$2 -").trim();
 }
@@ -21821,9 +21821,9 @@ var Journal = class {
       return "";
     }
   }
-  write(text2) {
+  write(text3) {
     fs11.mkdirSync(path10.dirname(this.file), { recursive: true });
-    writeWhole(this.file, this.eol === "\n" ? text2 : text2.replace(/\n/g, this.eol));
+    writeWhole(this.file, this.eol === "\n" ? text3 : text3.replace(/\n/g, this.eol));
   }
   blocks() {
     return this.read().split(SPLIT).filter((b) => b.trim());
@@ -22289,8 +22289,8 @@ function viewOf(calls, symbol, today2) {
 }
 var isStale = (v) => !v || v.days >= RERATE_DAYS;
 var saysSell = (rating) => rating === "Sell" || rating === "Underweight";
-function stopOf(text2) {
-  const m = /\*\*Stop[ -]?Loss:?\*\*:?[ \t]*([^\n]*)/i.exec(text2);
+function stopOf(text3) {
+  const m = /\*\*Stop[ -]?Loss:?\*\*:?[ \t]*([^\n]*)/i.exec(text3);
   if (!m) return null;
   const words4 = m[1].replace(/\*\*/g, "").replace(/`/g, "").trim().slice(0, 200);
   const n = /^(?:US)?\$?\s*(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?/.exec(words4);
@@ -22581,6 +22581,48 @@ function removeWatch(dir, raw) {
 import fs15 from "node:fs";
 import path14 from "node:path";
 
+// src/terminal/buyable.ts
+var BUYABLE_WORDS = "US stocks and funds on Nasdaq, NYSE, NYSE Arca, NYSE American or Cboe, and Bitcoin and Ether";
+var INDEX = (s) => `${s} is an index, a measure of a market that cannot itself be bought: a fund that follows it can, such as SPY for the S&P 500.`;
+var CURRENCY = (s) => `${s} is a currency rate, which cannot be bought here.`;
+var FUTURE = (s) => `${s} is a futures contract, which cannot be bought here.`;
+function spelledUnbuyable(symbol) {
+  if (isCrypto(symbol)) return TICKET_COINS.has(symbol) ? null : `${symbol} is a coin the desk does not order: among coins, only Bitcoin and Ether can be bought here.`;
+  if (symbol.startsWith("^")) return INDEX(symbol);
+  if (/=F$/.test(symbol)) return FUTURE(symbol);
+  if (symbol.includes("=")) return CURRENCY(symbol);
+  return null;
+}
+var text2 = (v) => typeof v === "string" ? v.trim() : "";
+var isOtc = (d) => text2(d.exchangeName) === "PNK" || /\bOTC\b/i.test(text2(d.fullExchangeName));
+function unbuyable(symbol, d) {
+  const spelled = spelledUnbuyable(symbol);
+  if (spelled) return spelled;
+  if (TICKET_COINS.has(symbol)) return null;
+  switch (d.instrumentType) {
+    case "EQUITY":
+    case "ETF":
+      if (US_EXCHANGES.includes(text2(d.exchangeName))) return null;
+      if (isOtc(d)) return `${symbol} trades over the counter (between dealers, not on an exchange), so it cannot be bought here: ${BUYABLE_WORDS} can.`;
+      return `${symbol} trades ${text2(d.fullExchangeName) ? `on ${text2(d.fullExchangeName).slice(0, 40)}` : "outside the main US exchanges"}, so it cannot be bought here: ${BUYABLE_WORDS} can.`;
+    case "CRYPTOCURRENCY":
+      return `${symbol} is a coin priced in another currency: Bitcoin and Ether are offered in dollars, as BTC-USD and ETH-USD.`;
+    case "MUTUALFUND":
+      return `${symbol} is a mutual fund, bought from its fund company once a day rather than traded on an exchange, so it cannot be bought here: a fund that trades like a stock (an ETF) can.`;
+    case "INDEX":
+      return INDEX(symbol);
+    case "CURRENCY":
+      return CURRENCY(symbol);
+    case "FUTURE":
+      return FUTURE(symbol);
+    case void 0:
+      return undescribed(symbol);
+    default:
+      return `${symbol} is not a stock, a fund or a coin, so it cannot be bought here.`;
+  }
+}
+var undescribed = (symbol) => `Yahoo Finance does not say what ${symbol} is, so whether it can be bought here cannot be checked: it was not added.`;
+
 // src/terminal/tiers.ts
 var TIERS = ["market", "sectors", "names", "crypto"];
 var TIER_WORDS = {
@@ -22624,7 +22666,7 @@ var PLAIN = {
   "BTC-USD": { name: "Bitcoin", meaning: "the first and largest coin" },
   "ETH-USD": { name: "Ether", meaning: "the coin of the Ethereum network, the second largest" }
 };
-var ticketable = (symbol) => (!isCrypto(symbol) || TICKET_COINS.has(symbol)) && !/[\^=]/.test(symbol);
+var ticketable = (symbol) => spelledUnbuyable(symbol) === null;
 function tierOf(symbol) {
   if (isCrypto(symbol)) return "crypto";
   if (SECTOR_FUNDS[symbol]) return "sectors";
@@ -22780,12 +22822,12 @@ function guideOf(f) {
 // src/terminal/state.ts
 var plainText = (s) => s.replace(/\*\*([^*]+)\*\*/g, "$1").replace(/(^|\s)[*_]([^*_\n]+)[*_](?=\s|[.,;:!?]|$)/g, "$1$2").replace(/`([^`]+)`/g, "$1").replace(/^\s{0,3}#{1,6}\s*/gm, "").replace(/^\s*(?:[-*+]|\d+\.)\s+/gm, "").replace(/\|/g, " ").replace(/\s+/g, " ").trim();
 function summaryOf(decision) {
-  const text2 = decision.replace(/\r\n/g, "\n");
-  const label = /\*\*Executive Summary:?\*\*:?[ \t]*([\s\S]*?)(?=\n\s*\n\*\*|\n\*\*|\n\s{0,3}#{1,6}\s|$)/i.exec(text2);
-  const heading = /^\s{0,3}#{1,6}\s*Executive Summary\s*:?\s*\n+([\s\S]*?)(?=\n\s{0,3}#{1,6}\s|\n\s*\n\*\*[^*\n]+\*\*\s*:|$)/im.exec(text2);
+  const text3 = decision.replace(/\r\n/g, "\n");
+  const label = /\*\*Executive Summary:?\*\*:?[ \t]*([\s\S]*?)(?=\n\s*\n\*\*|\n\*\*|\n\s{0,3}#{1,6}\s|$)/i.exec(text3);
+  const heading = /^\s{0,3}#{1,6}\s*Executive Summary\s*:?\s*\n+([\s\S]*?)(?=\n\s{0,3}#{1,6}\s|\n\s*\n\*\*[^*\n]+\*\*\s*:|$)/im.exec(text3);
   const found = [label, heading].filter((m) => !!m && !!m[1]?.trim()).sort((a, b) => a.index - b.index)[0];
-  const source = found?.[1] ?? text2.split("\n").filter((l) => !/^\s{0,3}#/.test(l) && !/^\s*\*\*[^*\n]+\*\*\s*:/.test(l) && !/^\s*\|/.test(l)).join("\n");
-  const words4 = plainText(source) || plainText(text2);
+  const source = found?.[1] ?? text3.split("\n").filter((l) => !/^\s{0,3}#/.test(l) && !/^\s*\*\*[^*\n]+\*\*\s*:/.test(l) && !/^\s*\|/.test(l)).join("\n");
+  const words4 = plainText(source) || plainText(text3);
   return words4.length > 320 ? `${words4.slice(0, 317).trimEnd()}...` : words4;
 }
 var stamp = (file4) => {
@@ -22931,7 +22973,7 @@ function parseQuote(json, symbol, nowSec = Date.now() / 1e3) {
   const open4 = m.instrumentType === "CRYPTOCURRENCY" || finite2(reg?.start) && finite2(reg?.end) && nowSec >= reg.start && nowSec <= reg.end;
   const t2 = finite2(m.regularMarketTime) ? m.regularMarketTime : (r.timestamp ?? [])[Math.max(0, (r.timestamp ?? []).length - 1)];
   if (!finite2(t2)) throw new NoData(`Yahoo Finance gave a price for ${symbol} with no time, so when it is from is not known`);
-  const kind = quoteKind(m.instrumentType);
+  const kind = quoteKind(m.instrumentType), no = m.instrumentType === void 0 ? spelledUnbuyable(symbol) : unbuyable(symbol, m);
   return {
     symbol,
     name: m.longName ?? m.shortName,
@@ -22944,7 +22986,8 @@ function parseQuote(json, symbol, nowSec = Date.now() / 1e3) {
     asOf: new Date(t2 * 1e3).toISOString(),
     points: points.length ? points : [price],
     market: priceMarket(m),
-    ...kind ? { kind } : {}
+    ...kind ? { kind } : {},
+    ...no ? { unbuyable: no } : {}
   };
 }
 var memo2 = /* @__PURE__ */ new Map();
@@ -23003,26 +23046,29 @@ var MARKETS = [
 ];
 
 // src/terminal/search.ts
-var KINDS = { EQUITY: "Stock", ETF: "ETF", INDEX: "Index", MUTUALFUND: "Fund", CRYPTOCURRENCY: "Crypto", CURRENCY: "Currency" };
+var KINDS = { EQUITY: "Stock", ETF: "ETF", CRYPTOCURRENCY: "Crypto" };
 var QUERY = /^[\p{L}\p{N} .&'\-^=,]{1,40}$/u;
 function parseSearch(json, limit = 8) {
-  const out = [], seen = /* @__PURE__ */ new Set();
+  const matches = [], seen = /* @__PURE__ */ new Set(), left = /* @__PURE__ */ new Set();
   for (const q of json.quotes ?? []) {
-    const kind = KINDS[q.quoteType ?? ""];
-    if (!kind || !q.symbol || q.isYahooFinance === false) continue;
+    if (!q.symbol || q.isYahooFinance === false) continue;
     let symbol;
     try {
       symbol = safeSymbol(q.symbol);
     } catch {
       continue;
     }
-    if (q.quoteType === "CRYPTOCURRENCY" && !isCrypto(symbol)) continue;
-    if (seen.has(symbol)) continue;
+    if (seen.has(symbol) || left.has(symbol)) continue;
+    const kind = KINDS[q.quoteType ?? ""];
+    if (!kind || unbuyable(symbol, { instrumentType: q.quoteType, exchangeName: q.exchange, fullExchangeName: q.exchDisp })) {
+      left.add(symbol);
+      continue;
+    }
+    if (matches.length >= limit) continue;
     seen.add(symbol);
-    out.push({ symbol, name: (q.longname || q.shortname || symbol).trim(), exchange: (q.exchDisp ?? "").trim(), kind });
-    if (out.length >= limit) break;
+    matches.push({ symbol, name: (q.longname || q.shortname || symbol).trim(), exchange: (q.exchDisp ?? "").trim(), kind });
   }
-  return out;
+  return { matches, left: left.size };
 }
 var memo3 = /* @__PURE__ */ new Map();
 var MEMO_MS2 = 5 * 6e4;
@@ -23361,8 +23407,13 @@ var Refused2 = class extends Error {
   status;
 };
 function tradable(symbol) {
-  if (isCrypto(symbol) && !TICKET_COINS.has(symbol)) throw new Refused2(400, `among coins, the order ticket trades only Bitcoin (BTC-USD) and Ether (ETH-USD), not ${symbol}`);
-  if (/[\^=]/.test(symbol)) throw new Refused2(400, "the order ticket trades stocks, funds and coins only, not indices, futures or currencies");
+  const why = spelledUnbuyable(symbol);
+  if (why) throw new Refused2(400, why);
+}
+async function buyable(symbol, side) {
+  if (side !== "buy") return;
+  const q = await quote(symbol);
+  if (!("error" in q) && q.unbuyable) throw new Refused2(400, q.unbuyable);
 }
 function fingerprint(files) {
   const h = crypto6.createHash("sha256");
@@ -23580,7 +23631,7 @@ async function startTerminal(opts) {
         const q = (url2.searchParams.get("q") ?? "").trim();
         if (!QUERY.test(q)) throw new Refused2(400, "type a name or a ticker, in at most 40 letters");
         try {
-          return json(res, 200, { matches: await findSymbols(q) });
+          return json(res, 200, await findSymbols(q));
         } catch {
           throw new Refused2(502, "Yahoo Finance's search did not answer: type the ticker instead");
         }
@@ -23616,9 +23667,13 @@ async function startTerminal(opts) {
     const name = typeof b.symbol === "string" ? b.symbol : sym2;
     if (p === "/api/claim/new" && method === "POST") return json(res, 200, { claim: claim2() });
     if (p === "/api/watchlist" && method === "POST") {
-      safeSymbol(name);
-      const q = await quote(name);
-      if ("error" in q && q.error === "no-data") throw new Refused2(422, q.message);
+      const symbol = safeSymbol(name);
+      const spelled = spelledUnbuyable(symbol);
+      if (spelled) throw new Refused2(422, spelled);
+      const q = await quote(symbol);
+      if ("error" in q) throw q.error === "no-data" ? new Refused2(422, q.message) : new Refused2(503, `Yahoo Finance could not be asked what ${symbol} is, so it was not added: try again in a moment`);
+      if (q.unbuyable) throw new Refused2(422, q.unbuyable);
+      if (q.market !== "us" && q.market !== "coin") throw new Refused2(422, undescribed(symbol));
       return json(res, 200, { watchlist: addWatch(dir, name, day2) });
     }
     if (p === "/api/watchlist" && method === "DELETE") return json(res, 200, { watchlist: removeWatch(dir, name) });
@@ -23709,7 +23764,9 @@ async function startTerminal(opts) {
       tradable(symbol);
       const trading = readSettings(root2).trading, { caps } = robinhood.trading();
       const context = await limited({ ...await askRobinhood(() => robinhood.ticketContext(symbol)), rating: call.rating, callDate: call.date });
-      const t2 = opened(false, context, propose(context, trading, caps), trading, caps);
+      const proposal = propose(context, trading, caps);
+      await buyable(symbol, proposal.order?.side);
+      const t2 = opened(false, context, proposal, trading, caps);
       return json(res, 200, { id: t2.id, own: false, context, proposal: t2.proposal, checks: t2.checks, caps, lost: lostWords(symbol), limitTif: trading.orderDefaults.timeInForce });
     }
     if (p === "/api/ticket/own" && method === "POST") {
@@ -23722,6 +23779,7 @@ async function startTerminal(opts) {
       tradable(symbol);
       const side = b.side === "buy" || b.side === "sell" ? b.side : null;
       if (!side) throw new Refused2(400, "say whether to buy or to sell");
+      await buyable(symbol, side);
       const trading = readSettings(root2).trading, { caps } = robinhood.trading();
       const context = await limited({ ...await askRobinhood(() => robinhood.ticketContext(symbol)), rating: "", callDate: "" });
       const t2 = opened(true, context, proposeOwn(context, side, trading, caps), trading, caps);
@@ -23741,6 +23799,7 @@ async function startTerminal(opts) {
       if (t2.placed || t2.placing) throw new Refused2(409, "this ticket has already sent its order");
       const o = edited(t2, b), checks = check(o, t2.context, readSettings(root2).trading, robinhood.trading().caps);
       tradable(o.symbol);
+      await buyable(o.symbol, o.side);
       t2.order = o;
       t2.checks = checks;
       t2.review = null;
