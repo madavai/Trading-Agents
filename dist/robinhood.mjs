@@ -19865,14 +19865,18 @@ function coinUnusable(symbol, pair) {
   return null;
 }
 var orderOf = (v, symbolOf = (o) => text(o.symbol)?.toUpperCase() ?? null) => {
-  const o = obj4(v);
+  const o = obj4(v), type = text(o.type);
+  const filled = figure(o.average_price), limit = figure(o.limit_price), listed = figure(o.price);
+  const price = filled ?? listed ?? limit;
+  const priceIs = price === null ? null : filled !== null ? "filled" : (listed !== null ? type?.toLowerCase() === "limit" : limit !== null) ? "limit" : "listed";
   return {
     symbol: symbolOf(o),
     side: text(o.side),
-    type: text(o.type),
+    type,
     state: text(o.state),
     quantity: figure(o.quantity) ?? figure(o.cumulative_quantity),
-    price: figure(o.average_price) ?? figure(o.price) ?? figure(o.limit_price),
+    price,
+    priceIs,
     at: text(o.created_at) ?? text(o.updated_at)
   };
 };

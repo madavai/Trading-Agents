@@ -511,3 +511,18 @@ test('page-28 (the owner\'s pick, 11 Nov 2026): the account page\'s top is layou
   assert.match(page, /<details class="ta-more"\$\{open \? ' open' : ''\}><summary><svg class="g"><use href="#i-chev-right"\/><\/svg><span>What this page can do in Robinhood<\/span><\/summary><p class="at-quiet">\$\{esc\(r\.message\)\}<\/p><\/details>/);
   assert.match(page, /open = \$\('#accountCard'\)\.querySelector<HTMLDetailsElement>\('\.ta-more'\)\?\.open === true;/);
 });
+
+test('page-29: every order says which price its Price figure is (filled, limit or listed), in the account card and on the stock page, and the weekly-loss chip says when it is checked', () => {
+  // one table, drawn for both: the figure, and under it the word, with what it means on a hover (fmt.ts ORDER_PRICE); no word for a dash
+  assert.equal([...page.matchAll(/ordersTable\(/g)].length, 5, 'defined once, used for the account card, its coin orders, the stock page and a coin\'s page: every one says which price');
+  assert.match(page, /const p = x\.price !== null && x\.priceIs \? ORDER_PRICE\[x\.priceIs\] : null;/);
+  assert.match(page, /return `\$\{money\(x\.price, cur\)\}\$\{p \? ` <small class="at-quiet" title="\$\{esc\(p\.why\)\}">\$\{p\.words\}<\/small>` : ''\}`;/);
+  assert.match(page, /<td class="num">\$\{price\(x\)\}<\/td>/);
+  assert.doesNotMatch(page, /<td class="num">\$\{money\(x\.price, cur\)\}<\/td>/, 'the bare figure is gone');
+  assert.match(page, /<th class="num" title="\$\{esc\(NOTES\.orderPrice\)\}">Price<\/th>/, 'the heading keeps its hover');
+  // the weekly loss limit: when it is looked at, said in the chip's row and in the form that changes it, the same words
+  assert.match(page, /const WEEK_CHECK = 'Checked each time the dashboard reads the account: when you open Your account before anything has been read, when you press Refresh from Robinhood, when a ticket opens and when an order is sent\.';/);
+  assert.equal([...page.matchAll(/, WEEK_CHECK\)\}/g)].length, 2, 'the chip row and the form');
+  assert.match(page, /chip\('weeklyLoss', `switches itself off after a \$\{c\.weeklyLossPercent\}% fall in a week`\)\), WEEK_CHECK\)/);
+  assert.match(fs.readFileSync('src/terminal/ui/glossary.ts', 'utf8'), /trading switches itself off\. It is checked each time the dashboard reads the account\./);
+});
