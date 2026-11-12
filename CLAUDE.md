@@ -25,8 +25,8 @@ In a chat here:
 - `/terminal`: opens the dashboard on this computer (`node dist/terminal.mjs`): markets, charts, watchlist, the desk's
   calls and scorecard, the analyses the person asked for (waiting, running, done or failed), a page per stock, and the
   person's own Connect to Robinhood. `/analyse` with no stock runs that list, one stock at a time and never asking the
-  person anything; Madav's "Run automatically" routine or the dashboard's "Run automatically with Claude Code" (the
-  desk's own listener, `node dist/watch.mjs`) run it by themselves. An order is placed only by the person's own Confirm there, with trading
+  person anything; Madav's "Run automatically" routine runs it by itself (the desk starts no run of its own: it has no
+  listener and the dashboard has no button for one). An order is placed only by the person's own Confirm there, with trading
   switched on by them. It remembers where the person left it, offers Restart after an update (new code runs only on
   the person's press) and has its own Stop.
 - `/routine morning|evening`: the morning routine (score past calls, on a Monday re-rate up to three holdings whose
