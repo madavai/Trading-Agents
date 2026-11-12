@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { markdown } from '../src/terminal/ui/md.js';
-import { averageOf, barOn, chipDay, clock, labelled, money, moveDayOf, NOTES, num, nyDay, opening, orderState, orderStateWhy, pct, plain, points, priceDayWords, qty, resultOf, shortDay, weekDay, when } from '../src/terminal/ui/fmt.js';
+import { averageOf, barOn, chipDay, clock, labelled, money, moveDayOf, NOTES, num, nyDay, ORDER_PRICE, opening, orderState, orderStateWhy, pct, plain, points, priceDayWords, qty, resultOf, shortDay, weekDay, when } from '../src/terminal/ui/fmt.js';
 import { LATE } from '../src/data/delay.js';
 
 const ui = 'src/terminal/ui';
@@ -215,7 +215,10 @@ test('an order\'s state reads in the owner\'s words: Pending and Partly filled i
   assert.equal(orderStateWhy(orderState('buy', 'confirmed')), "Robinhood's word: “confirmed”. The desk counts it as still open: only filled, cancelled, rejected, failed, expired and voided orders are done.");
   assert.equal(orderStateWhy(orderState('buy', null)), 'Robinhood gave no state for this order.');
   // the Price column is robinhood/account.ts's own rule: the average price when Robinhood gives one, else the order's price
-  assert.equal(NOTES.orderPrice, "Robinhood's average price for what has filled, when it gives one; otherwise the price the order is listed at.");
+  assert.equal(NOTES.orderPrice, "Each price says which it is: “filled” is Robinhood's average price for what has filled, “limit” is the limit price the order was set at, and “listed” is a price Robinhood lists without saying whether it is a limit.");
+  assert.deepEqual(Object.keys(ORDER_PRICE), ['filled', 'limit', 'listed']);
+  assert.deepEqual(Object.values(ORDER_PRICE).map((p) => p.words), ['filled', 'limit', 'listed']);
+  for (const p of Object.values(ORDER_PRICE)) assert.ok(p.why.length > 30 && p.why.endsWith('.'), p.words);
 });
 
 test('one list of states: the page, the desk\'s caps and the hover sentence read done and open the same way (robinhood/states.ts)', async () => {

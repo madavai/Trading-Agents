@@ -45,7 +45,7 @@ export const GLOSSARY = {
   ticket: { group: account, term: 'Order ticket', means: 'one proposed order with its checks against your caps, which Robinhood looks over and you confirm or close.' },
   dryRun: { group: account, term: "Robinhood's check", means: 'a dry run: Robinhood looks the order over and says what it would do, without placing it.' },
   shortestHold: { group: account, term: 'Shortest hold', means: 'the fewest trading days a stock bought here is kept before the desk proposes selling it.' },
-  weeklyLoss: { group: account, term: 'Weekly loss limit', means: 'when the Agentic account falls this much below its best value of the last seven days, trading switches itself off.' },
+  weeklyLoss: { group: account, term: 'Weekly loss limit', means: 'when the Agentic account falls this much below its best value of the last seven days, trading switches itself off. It is checked each time the dashboard reads the account.' },
 } as const satisfies Record<string, Term>;
 
 export type TermKey = keyof typeof GLOSSARY;

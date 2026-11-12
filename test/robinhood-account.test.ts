@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { figure, keyOf, parseAccounts, parsePortfolio, parsePositions, readAccount, sortAccounts } from '../src/robinhood/account.js';
+import { figure, keyOf, parseAccounts, parseOrders, parsePortfolio, parsePositions, readAccount, sortAccounts } from '../src/robinhood/account.js';
 import { Reader } from '../src/robinhood/reader.js';
 import { Link } from '../src/robinhood/link.js';
 import { openSession } from '../src/robinhood/connect.js';
@@ -114,7 +114,7 @@ test('the person ticks which accounts to show; only a live account Robinhood lis
 
   const snap = await link.refresh();
   assert.deepEqual(snap.views.map((v) => v.account.label), ['Individual account', 'Desk']);
-  assert.deepEqual(snap.views[1]!.orders?.orders[0], { symbol: 'NVDA', side: 'buy', type: 'limit', state: 'filled', quantity: 2, price: 180.1, at: '2026-10-15T14:00:00Z' });
+  assert.deepEqual(snap.views[1]!.orders?.orders[0], { symbol: 'NVDA', side: 'buy', type: 'limit', state: 'filled', quantity: 2, price: 180.1, priceIs: 'filled', at: '2026-10-15T14:00:00Z' });
   assert.equal(link.snapshot(), snap);
   assert.ok(!fake.calls.includes('place_equity_order'));
   link.forget();
@@ -173,4 +173,15 @@ test('a read in which some holdings could not be read is not given to the agents
   assert.equal(readHoldings(dir), null);
   assert.equal(shareHoldings(dir, { at: 'now', views: [{ ...view, problems: ['the value and buying power: Robinhood reported an error'] }] }, '2026-10-16'), true, 'a missing value does not hide a holding');
   assert.ok(renderHoldings(readHoldings(dir), 'NVDA').endsWith("\n- Desk (the only account the desk may trade in, and only on the person's Confirm): no position in NVDA"));
+});
+
+test('an order\'s price says which price it is: what it filled at, its limit, or a price Robinhood lists without saying more; none is left unsaid', () => {
+  const read = (...orders: Array<Record<string, unknown>>) => parseOrders({ data: { orders } }).orders.map((o) => [o.price, o.priceIs]);
+  assert.deepEqual(read(
+    { symbol: 'NVDA', type: 'limit', state: 'filled', quantity: '2', average_price: '180.10', price: '181.00', limit_price: '181.00' },   // filled: the average price wins
+    { symbol: 'NVDA', type: 'limit', state: 'queued', quantity: '2', price: '175.00' },                                                       // a price on a limit order is its limit
+    { symbol: 'NVDA', type: 'limit', state: 'queued', quantity: '2', limit_price: '174.50' },                                                 // a limit_price is a limit
+    { symbol: 'META', type: 'market', state: 'queued', quantity: '0.5', price: '650.00' },                                                    // a price on a market order is only listed
+    { symbol: 'META', type: 'market', state: 'queued', quantity: '0.5' },                                                                     // none: a dash, no word
+  ), [[180.1, 'filled'], [175, 'limit'], [174.5, 'limit'], [650, 'listed'], [null, null]]);
 });
