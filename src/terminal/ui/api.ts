@@ -23,7 +23,7 @@ import type { Account, AccountView, Holding, OpenOrder, Order } from '../../robi
 import type { Check, Proposal, TicketContext } from '../../desk/ticket.js';
 import type { Review } from '../../robinhood/review.js';
 import type { Placed } from '../../robinhood/order.js';
-import type { Match } from '../search.js';
+import type { Found, Match } from '../search.js';
 import type { Prefs, Recent } from '../prefs.js';
 import type { Caps } from '../../settings.js';
 import type { HoldingCare } from '../../desk/care.js';
@@ -95,7 +95,7 @@ export const api = {
   restart: () => call<{ restarting: boolean }>('POST', '/api/restart', {}),
   /** Asked without the key: whether a dashboard answers here, and which build of it (after a restart, a new one). */
   ping: async (): Promise<{ build?: string }> => (await fetch('/api/ping', { cache: 'no-store' })).json() as Promise<{ build?: string }>,
-  search: (query: string) => call<{ matches: Match[] }>('GET', `/api/search?${q({ q: query })}`),
+  search: (query: string) => call<Found>('GET', `/api/search?${q({ q: query })}`),
   prefs: () => call<Prefs>('GET', '/api/prefs'),
   savePrefs: (p: Prefs) => call<Prefs>('POST', '/api/prefs', p),
   /** The contact email the SEC asks for; the desk checks it, keeps it, and answers with it masked, never in full. */

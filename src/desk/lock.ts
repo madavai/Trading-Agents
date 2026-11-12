@@ -4,13 +4,24 @@
 import fs from 'node:fs';
 
 const STALE_MS = 60_000;
+/** Windows refuses to make a folder that another program is still removing (EPERM, at times EACCES), for a few
+ *  milliseconds: that is a lock being let go. Refusals in a row for longer than this are a real one (no permission). */
+const LETTING_GO_MS = 1_000;
 const nap = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
 export function withLock<T>(file: string, run: () => T, waitMs = 15_000): T {
   const lock = `${file}.lock`, until = Date.now() + waitMs;
+  let refusedSince = 0;
   for (;;) {
     try { fs.mkdirSync(lock); break; } catch (e) {
-      if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e;
+      const code = (e as NodeJS.ErrnoException).code;
+      if (process.platform === 'win32' && (code === 'EPERM' || code === 'EACCES')) {
+        refusedSince ||= Date.now();
+        if (Date.now() - refusedSince < LETTING_GO_MS) { nap(5); continue; }
+        throw e;
+      }
+      refusedSince = 0;
+      if (code !== 'EEXIST') throw e;
       try { if (Date.now() - fs.statSync(lock).mtimeMs > STALE_MS) { fs.rmdirSync(lock); continue; } } catch { continue; }
       if (Date.now() > until) throw new Error(`${file} is in use by another run; try again in a moment`);
       nap(40);

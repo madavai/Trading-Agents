@@ -7,6 +7,7 @@ import { priceMarket, type PriceMarket } from '../data/delay.js';
 import { getJson, NoData, Unavailable } from '../data/http.js';
 import { compute } from '../data/indicators.js';
 import { safeSymbol } from '../data/symbols.js';
+import { spelledUnbuyable, unbuyable } from './buyable.js';
 import { daily, HOSTS } from '../data/yahoo.js';
 
 /** What Yahoo itself says a quote is, in the page's words: a company (its EQUITY), a fund (an ETF or a mutual fund) or a coin
@@ -28,12 +29,14 @@ export interface Quote {
   market: PriceMarket;
   /** What Yahoo says it is (`quoteKind`), for the letter badges on the page; left out when Yahoo says none of the three. */
   kind?: QuoteKind;
+  /** Why it cannot be bought here (buyable.ts), from Yahoo's description; left out when it can. */
+  unbuyable?: string;
 }
 export type QuoteResult = Quote | { symbol: string; error: 'unavailable' | 'no-data'; message: string };
 
 interface IntradayJson {
   chart?: { result?: Array<{
-    meta?: { symbol?: string; currency?: string; longName?: string; shortName?: string; instrumentType?: string; exchangeName?: string; regularMarketPrice?: number; chartPreviousClose?: number; previousClose?: number; regularMarketTime?: number; currentTradingPeriod?: { regular?: { start?: number; end?: number } } };
+    meta?: { symbol?: string; currency?: string; longName?: string; shortName?: string; instrumentType?: string; exchangeName?: string; fullExchangeName?: string; regularMarketPrice?: number; chartPreviousClose?: number; previousClose?: number; regularMarketTime?: number; currentTradingPeriod?: { regular?: { start?: number; end?: number } } };
     timestamp?: number[]; indicators?: { quote?: Array<{ close?: Array<number | null> }> };
   }> | null; error?: { description?: string } | null };
 }
@@ -55,12 +58,15 @@ export function parseQuote(json: IntradayJson, symbol: string, nowSec = Date.now
   // Every price on the page says when it is from ("now", a close, a day): one that comes with no time is not shown at all,
   // never stamped with the moment it was read.
   if (!finite(t)) throw new NoData(`Yahoo Finance gave a price for ${symbol} with no time, so when it is from is not known`);
-  const kind = quoteKind(m.instrumentType);
+  // Why it cannot be bought here, only when it is known: from its spelling, else from what Yahoo says it is. Yahoo saying
+  // nothing marks nothing (the watchlist's door refuses it for that, buyable.ts `undescribed`).
+  const kind = quoteKind(m.instrumentType), no = m.instrumentType === undefined ? spelledUnbuyable(symbol) : unbuyable(symbol, m);
   return {
     symbol, name: m.longName ?? m.shortName, currency: m.currency, price, previousClose,
     change: previousClose === null ? null : price - previousClose, changePct: previousClose === null ? null : (price / previousClose - 1) * 100,
     open, asOf: new Date(t * 1000).toISOString(), points: points.length ? points : [price], market: priceMarket(m),
     ...(kind ? { kind } : {}),
+    ...(no ? { unbuyable: no } : {}),
   };
 }
 

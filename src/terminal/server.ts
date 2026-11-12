@@ -28,7 +28,7 @@ import { careOf, deskSymbol, stopIn, toWatch, watched, type HoldingCare, type Wa
 import { lastBuy, logOrder, placedToday, unanswered, type SentOrder } from '../desk/orders.js';
 import { Sectors } from '../desk/sectors.js';
 export { placedToday };
-import { check, coinAmount, edit, passes, propose, proposeOwn, TICKET_COINS, type Check, type Order, type Proposal, type TicketContext } from '../desk/ticket.js';
+import { check, coinAmount, edit, passes, propose, proposeOwn, type Check, type Order, type Proposal, type TicketContext } from '../desk/ticket.js';
 import type { Review } from '../robinhood/review.js';
 import type { Placed } from '../robinhood/order.js';
 import { Journal } from '../desk/journal.js';
@@ -36,6 +36,7 @@ import { CAP_RANGE_WORDS, capsFrom, readSettings, type Caps } from '../settings.
 import { VERSION } from '../version.js';
 import { callOf, listenerOf, queueOf, stateOf, versionOf } from './state.js';
 import { clearQuotes, history, isRange, MARKETS, quote } from './quotes.js';
+import { spelledUnbuyable, undescribed } from './buyable.js';
 import { findSymbols, QUERY } from './search.js';
 import { moveMarketToWatchlist, readPrefs, savePrefs } from './prefs.js';
 import { screenUniverse, ticketable } from './tiers.js';
@@ -104,8 +105,17 @@ class Refused extends Error { constructor(readonly status: number, message: stri
  *  Robinhood's list of coins); never an index, a future or a currency. Asked when a ticket opens and again before
  *  Robinhood checks or places it, before anything reaches Robinhood. */
 function tradable(symbol: string): void {
-  if (isCrypto(symbol) && !TICKET_COINS.has(symbol)) throw new Refused(400, `among coins, the order ticket trades only Bitcoin (BTC-USD) and Ether (ETH-USD), not ${symbol}`);
-  if (/[\^=]/.test(symbol)) throw new Refused(400, 'the order ticket trades stocks, funds and coins only, not indices, futures or currencies');
+  const why = spelledUnbuyable(symbol);
+  if (why) throw new Refused(400, why);
+}
+
+/** A buy only for what Yahoo does not say cannot be bought here (buyable.ts: a foreign listing, a mutual fund...). When
+ *  Yahoo cannot be asked, Robinhood's own check (Review) decides. A sell is never stopped here: what the person holds can
+ *  always be sold. */
+async function buyable(symbol: string, side: 'buy' | 'sell' | undefined): Promise<void> {
+  if (side !== 'buy') return;
+  const q = await quote(symbol);
+  if (!('error' in q) && q.unbuyable) throw new Refused(400, q.unbuyable);
 }
 
 /** A short fingerprint of the dashboard's own code on disk. When an update changes it, the running dashboard is old. */
@@ -339,7 +349,7 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
       if (p === '/api/search') {
         const q = (url.searchParams.get('q') ?? '').trim();
         if (!QUERY.test(q)) throw new Refused(400, 'type a name or a ticker, in at most 40 letters');
-        try { return json(res, 200, { matches: await findSymbols(q) }); } catch { throw new Refused(502, "Yahoo Finance's search did not answer: type the ticker instead"); }
+        try { return json(res, 200, await findSymbols(q)); } catch { throw new Refused(502, "Yahoo Finance's search did not answer: type the ticker instead"); }
       }
       if (p === '/api/robinhood') return json(res, 200, robinhood.info());
       if (p === '/api/trading') return json(res, 200, { ...robinhood.trading(), placedToday: placedToday(dir, new Date()) });
@@ -369,10 +379,16 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
     const name = typeof b.symbol === 'string' ? b.symbol : sym;
     // A fresh one-time link, for a program of the person's own that opens the page again (terminal/main.ts, with the key from the private folder).
     if (p === '/api/claim/new' && method === 'POST') return json(res, 200, { claim: claim() });
+    // Only what can be bought here joins the watchlist (buyable.ts): what its spelling rules out is refused before Yahoo is
+    // asked, and the rest only once Yahoo has said what it is. When Yahoo cannot be asked, nothing is added: it is said so.
     if (p === '/api/watchlist' && method === 'POST') {
-      safeSymbol(name);                                       // a name that is not a ticker is refused before Yahoo is asked
-      const q = await quote(name);
-      if ('error' in q && q.error === 'no-data') throw new Refused(422, q.message);
+      const symbol = safeSymbol(name);                        // a name that is not a ticker is refused before Yahoo is asked
+      const spelled = spelledUnbuyable(symbol);
+      if (spelled) throw new Refused(422, spelled);
+      const q = await quote(symbol);
+      if ('error' in q) throw q.error === 'no-data' ? new Refused(422, q.message) : new Refused(503, `Yahoo Finance could not be asked what ${symbol} is, so it was not added: try again in a moment`);
+      if (q.unbuyable) throw new Refused(422, q.unbuyable);
+      if (q.market !== 'us' && q.market !== 'coin') throw new Refused(422, undescribed(symbol));   // Yahoo said no kind: not checked, so not added
       return json(res, 200, { watchlist: addWatch(dir, name, day) });
     }
     if (p === '/api/watchlist' && method === 'DELETE') return json(res, 200, { watchlist: removeWatch(dir, name) });
@@ -450,7 +466,9 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
       tradable(symbol);
       const trading = readSettings(root).trading, { caps } = robinhood.trading();
       const context: TicketContext = await limited({ ...(await askRobinhood(() => robinhood.ticketContext(symbol))), rating: call.rating, callDate: call.date });
-      const t = opened(false, context, propose(context, trading, caps), trading, caps);
+      const proposal = propose(context, trading, caps);
+      await buyable(symbol, proposal.order?.side);
+      const t = opened(false, context, proposal, trading, caps);
       return json(res, 200, { id: t.id, own: false, context, proposal: t.proposal, checks: t.checks, caps, lost: lostWords(symbol), limitTif: trading.orderDefaults.timeInForce });
     }
     // The person's own order: a stock they chose and a side, not one of the desk's calls. It starts at one share and then
@@ -461,6 +479,7 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
       tradable(symbol);
       const side = b.side === 'buy' || b.side === 'sell' ? b.side : null;
       if (!side) throw new Refused(400, 'say whether to buy or to sell');
+      await buyable(symbol, side);
       const trading = readSettings(root).trading, { caps } = robinhood.trading();
       const context: TicketContext = await limited({ ...(await askRobinhood(() => robinhood.ticketContext(symbol))), rating: '', callDate: '' });
       const t = opened(true, context, proposeOwn(context, side, trading, caps), trading, caps);
@@ -478,6 +497,7 @@ export async function startTerminal(opts: TerminalOptions): Promise<Terminal> {
       if (t.placed || t.placing) throw new Refused(409, 'this ticket has already sent its order');
       const o = edited(t, b), checks = check(o, t.context, readSettings(root).trading, robinhood.trading().caps);
       tradable(o.symbol);
+      await buyable(o.symbol, o.side);
       t.order = o; t.checks = checks; t.review = null; t.reviewedAt = 0;
       if (!passes(checks)) throw new Refused(400, 'the order does not pass every check, so it was not sent to Robinhood');
       if (checks.some((c) => c.ask) && b.early !== true) throw new Refused(400, `${o.symbol} was bought here under your shortest hold: press "Sell anyway" to go on`);

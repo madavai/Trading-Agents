@@ -14,6 +14,7 @@ import { Journal } from '../src/desk/journal.js';
 import { AT_ONCE, enqueue, QueueRefusal, readQueue, startItem } from '../src/desk/queue.js';
 import { morningBrief, morningList } from '../src/desk/routine.js';
 import { readNotes } from '../src/desk/loop-notes.js';
+import { withLock } from '../src/desk/lock.js';
 import { addWatch, setFavourite } from '../src/terminal/store.js';
 import { cleanPrefs, readPrefs, savePrefs } from '../src/terminal/prefs.js';
 import { AT_ONCE_CHOICES, atOnceToast, paceWords } from '../src/terminal/ui/analyses.js';
@@ -140,6 +141,31 @@ test('two runs scoring at once never drop each other\'s counts in the scoring no
   assert.deepEqual(await Promise.all(runs), [0, 0]);
   assert.equal(readNotes({ file: journal } as Journal, 'settle-check', Date.now()).saved, 80, 'every save of both runs is counted');
   assert.ok(!fs.existsSync(path.join(dir, 'settle-check.json.lock')), 'no lock is left behind');
+});
+
+test('on Windows, a lock another program is still letting go is waited for, never a crash; a refusal that lasts is still said', () => {
+  // Windows refuses to make a folder another program is still removing ("EPERM: operation not permitted, mkdir"): that
+  // crashed one of the two runs above now and then, losing its counts.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ta-lock-')), file = path.join(dir, 'notes.json');
+  const writable = fs as unknown as { mkdirSync: (...a: unknown[]) => unknown }, real = writable.mkdirSync;
+  const platform = Object.getOwnPropertyDescriptor(process, 'platform')!;
+  const refuse = (times: number) => {
+    let n = 0;
+    writable.mkdirSync = (...a: unknown[]) => { if (n++ < times) throw Object.assign(new Error('EPERM: operation not permitted, mkdir'), { code: 'EPERM' }); return real.apply(fs, a); };
+  };
+  try {
+    Object.defineProperty(process, 'platform', { value: 'win32' });
+    refuse(3);
+    assert.equal(withLock(file, () => 'ran'), 'ran', 'three refusals while the other program lets go: it waits, then runs');
+    assert.ok(!fs.existsSync(`${file}.lock`), 'and lets go itself');
+    refuse(Infinity);
+    const t = Date.now();
+    assert.throws(() => withLock(file, () => 'ran'), { code: 'EPERM' }, 'a refusal that lasts is the real error (no permission), not a lock');
+    assert.ok(Date.now() - t < 5_000, 'said within about a second, not after the 15 seconds a held lock is waited for');
+    Object.defineProperty(process, 'platform', { value: 'linux' });
+    refuse(1);
+    assert.throws(() => withLock(file, () => 'ran'), { code: 'EPERM' }, 'elsewhere a refusal is never a lock being let go: said at once, as before');
+  } finally { writable.mkdirSync = real; Object.defineProperty(process, 'platform', platform); }
 });
 
 test('the playbook and the team say how to work side by side, and the analysts do not message each other then', () => {

@@ -105,9 +105,9 @@ test("an order ticket on BRK-B reads Robinhood's BRK.B holding and price, and as
   assert.equal(brokerSymbol('NVDA'), 'NVDA');
 });
 
-test('a search offers a coin only in dollars, never one in another currency as a stock', () => {
-  const found = parseSearch({ quotes: [{ symbol: 'BTC-EUR', quoteType: 'CRYPTOCURRENCY', shortname: 'Bitcoin EUR' }, { symbol: 'SHIB-USD', quoteType: 'CRYPTOCURRENCY', shortname: 'Shiba Inu USD' }, { symbol: 'BRK-B', quoteType: 'EQUITY', shortname: 'Berkshire Hathaway' }] });
-  assert.deepEqual(found.map((m) => [m.symbol, m.kind]), [['SHIB-USD', 'Crypto'], ['BRK-B', 'Stock']]);
+test('a search offers a coin only in dollars and among coins only Bitcoin and Ether, never one in another currency as a stock', () => {
+  const found = parseSearch({ quotes: [{ symbol: 'BTC-EUR', quoteType: 'CRYPTOCURRENCY', shortname: 'Bitcoin EUR' }, { symbol: 'SHIB-USD', quoteType: 'CRYPTOCURRENCY', shortname: 'Shiba Inu USD' }, { symbol: 'ETH-USD', quoteType: 'CRYPTOCURRENCY', shortname: 'Ethereum USD' }, { symbol: 'BRK-B', quoteType: 'EQUITY', exchange: 'NYQ', shortname: 'Berkshire Hathaway' }] });
+  assert.deepEqual([found.matches.map((m) => [m.symbol, m.kind]), found.left], [[['ETH-USD', 'Crypto'], ['BRK-B', 'Stock']], 2]);
 });
 
 test('a holding whose re-rating left no call goes after those with a real view the next Monday, and the brief says why', () => {

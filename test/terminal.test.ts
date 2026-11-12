@@ -13,6 +13,8 @@ import { saveSection } from '../src/desk/runs.js';
 import { saveContactEmail } from '../src/contact.js';
 import { deskServer } from '../src/tools/server.js';
 import { clearQuotes, parseQuote, quote, quoteKind } from '../src/terminal/quotes.js';
+import { spelledUnbuyable, unbuyable } from '../src/terminal/buyable.js';
+import { ticketable } from '../src/terminal/tiers.js';
 import { clearSearches, parseSearch } from '../src/terminal/search.js';
 import { MAX_RECENT, moveMarketToWatchlist, readPrefs, savePrefs } from '../src/terminal/prefs.js';
 import { scoredBy, scoringNote, scoringShort, summaryOf } from '../src/terminal/state.js';
@@ -28,6 +30,18 @@ const intraday = (symbol: string, price: number | undefined, prev: number | unde
   chart: { result: [{ meta: { symbol, currency: 'USD', longName: `${symbol} Corp`, regularMarketPrice: price, chartPreviousClose: prev, regularMarketTime: NOW - 60, currentTradingPeriod: { regular: { start: NOW - 3600, end: NOW + 3600 } }, ...extra }, timestamp: [NOW - 600, NOW - 300, NOW - 60], indicators: { quote: [{ close: [101, null, 102] }] } }], error: null },
 });
 
+/** What Yahoo says a symbol is, as its chart service does: an index, a coin, a currency rate, a fund bought from its fund
+ *  company (VFIAX), a listing in Toronto (.TO) or over the counter (OTCX), PLAIN with no word at all, else a US stock. */
+const listingOf = (symbol: string): Record<string, string> =>
+  symbol.startsWith('^') ? { instrumentType: 'INDEX', exchangeName: 'SNP' }
+  : symbol.endsWith('-USD') ? { instrumentType: 'CRYPTOCURRENCY', exchangeName: 'CCC' }
+  : symbol.includes('=') ? { instrumentType: 'CURRENCY', exchangeName: 'CCY' }
+  : symbol === 'VFIAX' ? { instrumentType: 'MUTUALFUND', exchangeName: 'NAS' }
+  : symbol.endsWith('.TO') ? { instrumentType: 'EQUITY', exchangeName: 'TOR', fullExchangeName: 'Toronto' }
+  : symbol === 'OTCX' ? { instrumentType: 'EQUITY', exchangeName: 'PNK', fullExchangeName: 'Other OTC' }
+  : symbol === 'PLAIN' ? {}
+  : { instrumentType: 'EQUITY', exchangeName: 'NMS' };
+
 /** A fetch standing in for Yahoo: a one-day answer for the quote address, daily rows for the history address, and no data for ZZZZ. */
 const yahoo: typeof fetch = async (input) => {
   const url = String(input), m = /\/v8\/finance\/chart\/([^?]+)\?(.*)/.exec(url);
@@ -35,7 +49,7 @@ const yahoo: typeof fetch = async (input) => {
   const symbol = decodeURIComponent(m[1]!);
   if (symbol === 'ZZZZ') return new Response(JSON.stringify({ chart: { result: null, error: { description: 'No data found, symbol may be delisted' } } }), { status: 200 });
   if (symbol === 'DOWN') return new Response('down', { status: 503, headers: { 'retry-after': '0' } });
-  if (m[2]!.includes('range=1d')) return new Response(JSON.stringify(intraday(symbol, 102, 100)));
+  if (m[2]!.includes('range=1d')) return new Response(JSON.stringify(intraday(symbol, 102, 100, listingOf(symbol))));
   return new Response(JSON.stringify(chartJson(symbol, series('2026-10-09', 420))));
 };
 
@@ -149,7 +163,22 @@ test('a stock is added only if it has a price, can be starred and removed, and t
   assert.equal((await call(term, 'POST', '/api/watchlist', { body: { symbol: 'NVDA' } })).json().watchlist.length, 2);       // no duplicate
   assert.equal((await call(term, 'POST', '/api/watchlist', { body: { symbol: 'ZZZZ' } })).status, 422);                         // Yahoo has nothing for it
   assert.equal((await call(term, 'POST', '/api/watchlist', { body: { symbol: '../../x' } })).status, 400);
-  assert.equal((await call(term, 'POST', '/api/watchlist', { body: { symbol: 'DOWN' } })).status, 200);                         // Yahoo down: it cannot be checked, so it is allowed and shown unavailable
+  assert.equal((await call(term, 'POST', '/api/watchlist', { body: { symbol: 'DOWN' } })).status, 503);                         // Yahoo down: it cannot be checked, so it is not added, and it is said so
+  addWatch(dir(), 'DOWN', '2026-10-12');                                                                                            // (one kept from before: unavailable, and removable)
+  // Only what can be bought here is added, each refusal saying why: an index, another coin, a currency rate, a mutual fund,
+  // a listing in Toronto or over the counter, and one Yahoo gives no kind for; Bitcoin and a US fund are added.
+  const refused = async (symbol: string) => { const r = await call(term, 'POST', '/api/watchlist', { body: { symbol } }); return [r.status, r.json().error]; };
+  assert.deepEqual(await refused('^GSPC'), [422, '^GSPC is an index, a measure of a market that cannot itself be bought: a fund that follows it can, such as SPY for the S&P 500.']);
+  assert.deepEqual(await refused('DOGE-USD'), [422, 'DOGE-USD is a coin the desk does not order: among coins, only Bitcoin and Ether can be bought here.']);
+  assert.deepEqual(await refused('EURUSD=X'), [422, 'EURUSD=X is a currency rate, which cannot be bought here.']);
+  assert.deepEqual(await refused('VFIAX'), [422, 'VFIAX is a mutual fund, bought from its fund company once a day rather than traded on an exchange, so it cannot be bought here: a fund that trades like a stock (an ETF) can.']);
+  assert.deepEqual(await refused('SHOP.TO'), [422, 'SHOP.TO trades on Toronto, so it cannot be bought here: US stocks and funds on Nasdaq, NYSE, NYSE Arca, NYSE American or Cboe, and Bitcoin and Ether can.']);
+  assert.match((await refused('OTCX'))[1], /^OTCX trades over the counter \(between dealers, not on an exchange\), so it cannot be bought here/);
+  assert.deepEqual(await refused('PLAIN'), [422, 'Yahoo Finance does not say what PLAIN is, so whether it can be bought here cannot be checked: it was not added.']);
+  assert.deepEqual(await refused('DOWN'), [503, 'Yahoo Finance could not be asked what DOWN is, so it was not added: try again in a moment']);
+  for (const s of ['^GSPC', 'DOGE-USD', 'EURUSD=X', 'VFIAX', 'SHOP.TO', 'OTCX', 'PLAIN']) assert.ok(!readWatchlist(dir()).some((w) => w.symbol === s), `${s} was not added`);
+  assert.equal((await call(term, 'POST', '/api/watchlist', { body: { symbol: 'BTC-USD' } })).status, 200);
+  await call(term, 'DELETE', '/api/watchlist?symbol=BTC-USD');
   assert.deepEqual((await call(term, 'POST', '/api/favourite', { body: { symbol: 'AAPL', favourite: true } })).json().watchlist.map((w: any) => [w.symbol, w.favourite]), [['NVDA', false], ['AAPL', true], ['DOWN', false]]);
   assert.equal((await call(term, 'POST', '/api/favourite', { body: { symbol: 'TSLA', favourite: true } })).status, 400);
   assert.deepEqual((await call(term, 'DELETE', '/api/watchlist?symbol=DOWN')).json().watchlist.map((w: any) => w.symbol), ['NVDA', 'AAPL']);
@@ -327,6 +356,32 @@ test('a quote carries what Yahoo says it is (a company, a fund or a coin) and no
   assert.equal(await kinds('ZZZZ'), undefined, 'a quote that failed');
 });
 
+test('what can be bought here is one rule (buyable.ts): a US stock or ETF on a main exchange, or Bitcoin or Ether; everything else says why, and a quote carries it only when it is known', () => {
+  const us = (exchangeName: string, instrumentType = 'EQUITY') => unbuyable('ABC', { instrumentType, exchangeName });
+  for (const ex of ['NMS', 'NGM', 'NCM', 'NYQ', 'PCX', 'ASE', 'BTS']) { assert.equal(us(ex), null, ex); assert.equal(us(ex, 'ETF'), null, `${ex} ETF`); }
+  for (const s of ['BTC-USD', 'ETH-USD']) { assert.equal(unbuyable(s, { instrumentType: 'CRYPTOCURRENCY', exchangeName: 'CCC' }), null, s); assert.equal(unbuyable(s, {}), null, `${s}: its spelling is enough`); }
+  assert.match(us('PNK')!, /over the counter/);
+  assert.match(unbuyable('ABC', { instrumentType: 'EQUITY', exchangeName: 'OQB', fullExchangeName: 'OTC Markets OTCQB' })!, /over the counter/);
+  assert.match(unbuyable('SAP.DE', { instrumentType: 'EQUITY', exchangeName: 'GER', fullExchangeName: 'XETRA' })!, /^SAP\.DE trades on XETRA, so it cannot be bought here/);
+  assert.match(us('LSE')!, /^ABC trades outside the main US exchanges/);
+  assert.match(unbuyable('BTC-EUR', { instrumentType: 'CRYPTOCURRENCY', exchangeName: 'CCC' })!, /in another currency/);
+  assert.match(unbuyable('VFIAX', { instrumentType: 'MUTUALFUND', exchangeName: 'NAS' })!, /mutual fund/);
+  assert.match(unbuyable('SPX', { instrumentType: 'INDEX' })!, /is an index/);
+  assert.match(unbuyable('ABC', { instrumentType: 'OPTION', exchangeName: 'OPR' })!, /not a stock, a fund or a coin/);
+  assert.match(unbuyable('ABC', {})!, /does not say what ABC is/);
+  // Yahoo's fields read only as text: a number or an object is none, never a crash or a match
+  for (const odd of [7, {}, null, ['NMS']]) assert.match(unbuyable('ABC', { instrumentType: 'EQUITY', exchangeName: odd as never, fullExchangeName: odd as never })!, /outside the main US exchanges/, JSON.stringify(odd));
+  assert.match(unbuyable('ABC', { instrumentType: 7 as never })!, /not a stock, a fund or a coin/);
+  // by spelling alone, before Yahoo is asked; the order ticket's own rule (tiers.ts) is the same
+  assert.deepEqual(['NVDA', 'BRK-B', 'BTC-USD', 'ETH-USD'].map(spelledUnbuyable), [null, null, null, null]);
+  for (const s of ['DOGE-USD', 'SHIB-USD', '^GSPC', 'GC=F', 'EURUSD=X']) { assert.ok(spelledUnbuyable(s), s); assert.equal(ticketable(s), false, s); }
+  // a quote carries it when Yahoo said what it is, or its spelling says; Yahoo saying nothing marks nothing
+  assert.equal('unbuyable' in parseQuote(intraday('NVDA', 50, 49, { instrumentType: 'EQUITY', exchangeName: 'NMS' }), 'NVDA', NOW), false);
+  assert.match(parseQuote(intraday('SHOP.TO', 50, 49, { instrumentType: 'EQUITY', exchangeName: 'TOR', fullExchangeName: 'Toronto' }), 'SHOP.TO', NOW).unbuyable!, /trades on Toronto/);
+  assert.match(parseQuote(intraday('^GSPC', 50, 49), '^GSPC', NOW).unbuyable!, /is an index/);
+  assert.equal('unbuyable' in parseQuote(intraday('PLAIN', 50, 49), 'PLAIN', NOW), false);
+});
+
 test('prices: markets, quotes and unavailable symbols are told apart, and Yahoo is asked once for a burst', async () => {
   const m = (await call(term, 'GET', '/api/markets')).json().markets;
   assert.deepEqual(m.map((x: any) => x.symbol), ['^GSPC', '^IXIC', '^DJI', '^VIX', '^TNX', 'BTC-USD']);
@@ -352,25 +407,33 @@ test('history comes with 50- and 200-day averages that are whole at the left edg
 });
 
 const TESLA = { quotes: [
-  { symbol: 'TSLA', shortname: 'Tesla, Inc.', longname: 'Tesla, Inc.', exchDisp: 'NASDAQ', quoteType: 'EQUITY', isYahooFinance: true },
-  { symbol: 'STSLA=F', shortname: 'Tesla Inc Single Stock futures', exchDisp: 'Chicago Mercantile Exchange', quoteType: 'FUTURE', isYahooFinance: true },
-  { symbol: 'TSLA.TO', shortname: 'TESLA CDR (CAD HEDGED)', longname: 'Tesla, Inc.', exchDisp: 'Toronto', quoteType: 'EQUITY', isYahooFinance: true },
-  { symbol: 'TSLT', shortname: 'T-REX 2X Long Tesla Daily Targe', longname: 'T-REX 2X Long Tesla Daily Target ETF', exchDisp: 'BATS Trading', quoteType: 'ETF', isYahooFinance: true },
+  { symbol: 'TSLA', shortname: 'Tesla, Inc.', longname: 'Tesla, Inc.', exchange: 'NMS', exchDisp: 'NASDAQ', quoteType: 'EQUITY', isYahooFinance: true },
+  { symbol: 'STSLA=F', shortname: 'Tesla Inc Single Stock futures', exchange: 'CME', exchDisp: 'Chicago Mercantile Exchange', quoteType: 'FUTURE', isYahooFinance: true },
+  { symbol: 'TSLA.TO', shortname: 'TESLA CDR (CAD HEDGED)', longname: 'Tesla, Inc.', exchange: 'TOR', exchDisp: 'Toronto', quoteType: 'EQUITY', isYahooFinance: true },
+  { symbol: 'TSLT', shortname: 'T-REX 2X Long Tesla Daily Targe', longname: 'T-REX 2X Long Tesla Daily Target ETF', exchange: 'BTS', exchDisp: 'BATS Trading', quoteType: 'ETF', isYahooFinance: true },
+  { symbol: 'TL0.DE', shortname: 'TESLA INC', exchange: 'GER', exchDisp: 'XETRA', quoteType: 'EQUITY', isYahooFinance: true },
+  { symbol: 'TSLA.MX', shortname: 'TESLA INC', exchange: 'MEX', exchDisp: 'Mexico', quoteType: 'EQUITY', isYahooFinance: true },
+  { symbol: 'TSLAX', shortname: 'Some Tesla Mutual Fund', exchange: 'NAS', exchDisp: 'Nasdaq', quoteType: 'MUTUALFUND', isYahooFinance: true },
+  { symbol: '^TSLAIX', shortname: 'A Tesla index', exchange: 'SNP', exchDisp: 'SNP', quoteType: 'INDEX', isYahooFinance: true },
   { symbol: 'TSLA261218C00400000', quoteType: 'OPTION', isYahooFinance: true },
   { shortname: 'Tesla Energy (private)', quoteType: 'EQUITY', isYahooFinance: false },
   { symbol: '<img src=x>', shortname: 'bad', quoteType: 'EQUITY', isYahooFinance: true },
 ] };
 
-test('a name or a ticker finds what Yahoo lists: ticker, name, market and kind, and never futures, options or a bad ticker', async () => {
-  assert.deepEqual(parseSearch(TESLA).map((m) => [m.symbol, m.name, m.exchange, m.kind]), [
-    ['TSLA', 'Tesla, Inc.', 'NASDAQ', 'Stock'], ['TSLA.TO', 'Tesla, Inc.', 'Toronto', 'Stock'], ['TSLT', 'T-REX 2X Long Tesla Daily Target ETF', 'BATS Trading', 'ETF'],
+test('a name or a ticker finds only what can be bought here: ticker, name, market and kind, never a future, an option, a foreign listing, a mutual fund, an index or a bad ticker, and says how many were left out', async () => {
+  const found = parseSearch(TESLA);
+  assert.deepEqual(found.matches.map((m) => [m.symbol, m.name, m.exchange, m.kind]), [
+    ['TSLA', 'Tesla, Inc.', 'NASDAQ', 'Stock'], ['TSLT', 'T-REX 2X Long Tesla Daily Target ETF', 'BATS Trading', 'ETF'],
   ]);
+  assert.equal(found.left, 7, 'the future, Toronto, XETRA, Mexico, the mutual fund, the index and the option; not the private one or the bad ticker');
+  assert.deepEqual(parseSearch(TESLA, 1), { matches: [found.matches[0]], left: 7 }, 'the limit cuts the matches, never counts them as left out');
+  assert.deepEqual(parseSearch({ quotes: [{ symbol: 'NEW', quoteType: 'EQUITY', isYahooFinance: true }] }), { matches: [], left: 1 }, 'no exchange named: not offered');
   const asked: string[] = [];
   configure({ fetch: async (u, i) => { const url = String(u); if (url.includes('/v1/finance/search')) { asked.push(url); return new Response(JSON.stringify(TESLA)); } return yahoo(u, i); } });
   clearSearches();
   const r = await call(term, 'GET', '/api/search?q=Tesla');
   assert.equal(r.status, 200);
-  assert.deepEqual(r.json().matches.map((m: any) => m.symbol), ['TSLA', 'TSLA.TO', 'TSLT']);
+  assert.deepEqual([r.json().matches.map((m: any) => m.symbol), r.json().left], [['TSLA', 'TSLT'], 7]);
   assert.match(asked[0]!, /\/v1\/finance\/search\?q=Tesla&quotesCount=12&newsCount=0/);
   await call(term, 'GET', '/api/search?q=tesla');
   assert.equal(asked.length, 1, 'the same words are asked of Yahoo once');

@@ -17,6 +17,9 @@ import { logOrder, readOrders } from '../src/desk/orders.js';
 import { confirmWords, placedToday, startTerminal, type Assets, type TerminalOptions } from '../src/terminal/server.js';
 import { accountTools, AGENTIC, AGENTIC_RHS, fakeRobinhood, MAIN, PAIRS, type Coins, type Fake } from './fake-robinhood.js';
 import { today } from '../src/data/dates.js';
+import { pretendListings } from './pretend-yahoo.js';
+
+pretendListings();
 
 // The call the tickets come from is dated today, so its paper record is always under a week old: a fixed date made the
 // four-week refusal's words ("0 weeks") wrong a week later.
@@ -221,8 +224,14 @@ test('outside market hours a part-share ticket says when the market opens, and n
 test('the person\'s own order takes the same road: one share to start, no other coin or index, Robinhood\'s clean check, the switch, their exact Confirm', async () => {
   const { o, dir, term, post, link } = await desk();
   try {
-    assert.match((await post('/api/ticket/own', { symbol: 'SHIB-USD', side: 'buy' })).json().error, /among coins, the order ticket trades only Bitcoin \(BTC-USD\) and Ether \(ETH-USD\), not SHIB-USD/);
-    assert.match((await post('/api/ticket/own', { symbol: '^GSPC', side: 'buy' })).json().error, /stocks, funds and coins only, not indices/);
+    assert.equal((await post('/api/ticket/own', { symbol: 'SHIB-USD', side: 'buy' })).json().error, 'SHIB-USD is a coin the desk does not order: among coins, only Bitcoin and Ether can be bought here.');
+    assert.match((await post('/api/ticket/own', { symbol: '^GSPC', side: 'buy' })).json().error, /^\^GSPC is an index, a measure of a market that cannot itself be bought/);
+    // what Yahoo says cannot be bought here (a listing in Toronto) opens no buy, and Robinhood is not asked; a sell still opens
+    const reviewedBefore = o.reviewed.length;
+    const foreign = await post('/api/ticket/own', { symbol: 'SHOP.TO', side: 'buy' });
+    assert.deepEqual([foreign.status, foreign.json().error], [400, 'SHOP.TO trades on Toronto, so it cannot be bought here: US stocks and funds on Nasdaq, NYSE, NYSE Arca, NYSE American or Cboe, and Bitcoin and Ether can.']);
+    assert.equal((await post('/api/ticket/own', { symbol: 'SHOP.TO', side: 'sell' })).status, 200, 'what is held can always be sold');
+    assert.equal(o.reviewed.length, reviewedBefore);
     assert.match((await post('/api/ticket/own', { symbol: 'NVDA' })).json().error, /buy or to sell/);
     const sell = (await post('/api/ticket/own', { symbol: 'NVDA', side: 'sell' })).json();
     assert.deepEqual([sell.own, sell.proposal.order], [true, null], 'nothing held to sell, so nothing is proposed');
