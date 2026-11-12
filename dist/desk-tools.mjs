@@ -36973,15 +36973,27 @@ import { pathToFileURL } from "node:url";
 // src/desk/lock.ts
 import fs4 from "node:fs";
 var STALE_MS = 6e4;
+var LETTING_GO_MS = 1e3;
 var nap = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 function withLock(file5, run, waitMs = 15e3) {
   const lock = `${file5}.lock`, until = Date.now() + waitMs;
+  let refusedSince = 0;
   for (; ; ) {
     try {
       fs4.mkdirSync(lock);
       break;
     } catch (e) {
-      if (e.code !== "EEXIST") throw e;
+      const code = e.code;
+      if (process.platform === "win32" && (code === "EPERM" || code === "EACCES")) {
+        refusedSince ||= Date.now();
+        if (Date.now() - refusedSince < LETTING_GO_MS) {
+          nap(5);
+          continue;
+        }
+        throw e;
+      }
+      refusedSince = 0;
+      if (code !== "EEXIST") throw e;
       try {
         if (Date.now() - fs4.statSync(lock).mtimeMs > STALE_MS) {
           fs4.rmdirSync(lock);

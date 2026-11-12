@@ -7506,15 +7506,27 @@ function userAgentFor(url2, contact2, email2) {
 // src/desk/lock.ts
 import fs2 from "node:fs";
 var STALE_MS = 6e4;
+var LETTING_GO_MS = 1e3;
 var nap = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 function withLock(file4, run, waitMs = 15e3) {
   const lock = `${file4}.lock`, until = Date.now() + waitMs;
+  let refusedSince = 0;
   for (; ; ) {
     try {
       fs2.mkdirSync(lock);
       break;
     } catch (e) {
-      if (e.code !== "EEXIST") throw e;
+      const code2 = e.code;
+      if (process.platform === "win32" && (code2 === "EPERM" || code2 === "EACCES")) {
+        refusedSince ||= Date.now();
+        if (Date.now() - refusedSince < LETTING_GO_MS) {
+          nap(5);
+          continue;
+        }
+        throw e;
+      }
+      refusedSince = 0;
+      if (code2 !== "EEXIST") throw e;
       try {
         if (Date.now() - fs2.statSync(lock).mtimeMs > STALE_MS) {
           fs2.rmdirSync(lock);
